@@ -79,6 +79,10 @@ pub struct CustomInfo {
 
     pub trace: CustomInfoTrace,
 
+    pub need_protocol_merge: bool,
+    pub is_req_end: bool,
+    pub is_resp_end: bool,
+
     #[serde(skip)]
     pub attributes: Vec<KeyVal>,
 }
@@ -122,6 +126,8 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                 val:    $(len) bytes
 
             ) x 2
+
+        need_protocol_merge: 1 byte, the msb indicate is need protocol merge, the lsb indicate is end, such as 1 000000 1
 
         has trace: 1 byte
 
@@ -272,6 +278,23 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
             }
         }
 
+        // need_protocol_merge
+        if off + 1 > buf.len() {
+            return Err(Error::WasmSerializeFail(
+                "buf len too short when parse need protocol merge".to_string(),
+            ));
+        }
+        info.need_protocol_merge = buf[off] & 128 != 0;
+
+        if info.need_protocol_merge {
+            let is_end = buf[off] & 1 != 0;
+            match dir {
+                PacketDirection::ClientToServer => info.is_req_end = is_end,
+                PacketDirection::ServerToClient => info.is_resp_end = is_end,
+            }
+        }
+        off += 1;
+
         // trace info
         if off + 1 > buf.len() {
             return Err(Error::WasmSerializeFail(
@@ -347,8 +370,56 @@ impl L7ProtocolInfoInterface for CustomInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> crate::flow_generator::Result<()> {
         if let L7ProtocolInfo::CustomInfo(w) = other {
-            self.resp = w.resp;
+            // req merge
+            if self.req.domain.is_empty() {
+                self.req.domain = w.req.domain;
+            }
+            if self.req.endpoint.is_empty() {
+                self.req.endpoint = w.req.endpoint;
+            }
 
+            if self.req.req_type.is_empty() {
+                self.req.req_type = w.req.req_type;
+            }
+
+            if self.req.resource.is_empty() {
+                self.req.resource = w.req.resource;
+            }
+
+            if self.req_len.is_none() {
+                self.req_len = w.req_len;
+            }
+
+            if w.is_req_end {
+                self.is_req_end = true;
+            }
+
+            // resp merge
+            if self.resp.exception.is_empty() {
+                self.resp.exception = w.resp.exception;
+            }
+
+            if self.resp.status == L7ResponseStatus::default() {
+                self.resp.status = w.resp.status;
+            }
+
+            if self.resp.code.is_none() {
+                self.resp.code = w.resp.code;
+            }
+
+            if self.resp.result.is_empty() {
+                self.resp.result = w.resp.result;
+            }
+
+            if self.resp_len.is_none() {
+                self.resp_len = w.resp_len;
+            }
+
+            if w.is_resp_end {
+                self.is_resp_end = true;
+            }
+
+            // trace merge
             if self.trace.trace_id.is_none() {
                 self.trace.trace_id = w.trace.trace_id;
             }
@@ -374,6 +445,18 @@ impl L7ProtocolInfoInterface for CustomInfo {
 
     fn is_tls(&self) -> bool {
         false
+    }
+
+    fn need_merge(&self) -> bool {
+        self.need_protocol_merge
+    }
+
+    fn is_req_resp_end(&self) -> (bool, bool) {
+        (self.is_req_end, self.is_resp_end)
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        None
     }
 }
 

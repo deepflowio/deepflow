@@ -65,6 +65,7 @@ type DiffBaseDataSet struct {
 	Pods                   map[string]*Pod
 	Process                map[string]*Process
 	PrometheusTarget       map[string]*PrometheusTarget
+	VIP                    map[string]*VIP
 }
 
 func NewDiffBaseDataSet() DiffBaseDataSet {
@@ -113,6 +114,7 @@ func NewDiffBaseDataSet() DiffBaseDataSet {
 		Pods:                   make(map[string]*Pod),
 		Process:                make(map[string]*Process),
 		PrometheusTarget:       make(map[string]*PrometheusTarget),
+		VIP:                    make(map[string]*VIP),
 	}
 }
 

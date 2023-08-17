@@ -16,6 +16,12 @@
 
 package model
 
+import (
+	"strings"
+
+	"golang.org/x/exp/slices"
+)
+
 type RefreshCacheParam struct {
 	RefreshCache bool `schema:"refresh_cache,omitempty"`
 }
@@ -24,8 +30,23 @@ type IncludedFieldsParam struct {
 	IncludedFields []string `schema:"field,omitempty"`
 }
 
-func (i IncludedFieldsParam) GetIncludedFields() []string {
-	return i.IncludedFields
+func (i IncludedFieldsParam) GetIncludedFields() []string { // TODO should move
+	res := make([]string, 0)
+	for _, i := range i.IncludedFields {
+		res = append(res, strings.ToUpper(i))
+	}
+	slices.Sort(res)
+	return res
+}
+
+type AZQuery struct {
+	AZQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RegionQuery struct {
+	RegionQueryFilterConditions
+	IncludedFieldsParam
 }
 
 // VMQuery defines supported field in query string, and uses tag (schema) to define the parameter name
@@ -49,6 +70,121 @@ type HostQuery struct {
 
 type HostQueryStoredInRedis struct {
 	HostQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type IPQuery struct {
+	IPQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type IPQueryStoredInRedis struct {
+	IPQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type DHCPPortQuery struct {
+	DHCPPortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type DHCPPortQueryStoredInRedis struct {
+	DHCPPortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VRouterQuery struct {
+	VRouterQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RoutingTableQuery struct {
+	RoutingTableQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type NetworkQuery struct {
+	NetworkQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type NetworkQueryStoredInRedis struct {
+	NetworkQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VPCQuery struct {
+	VPCQueryStoredInRedis
+	IncludedFieldsParam
+}
+
+type VPCQueryStoredInRedis struct {
+	VPCQueryFilterConditions
+	RefreshCacheParam
+}
+
+type VInterfaceQuery struct {
+	VInterfaceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VInterfaceQueryStoredInRedis struct {
+	VInterfaceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type SecurityGroupQuery struct {
+	SecurityGroupQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type SecurityGroupRuleQuery struct {
+	SecurityGroupRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type NATGatewayQuery struct {
+	NATGatewayQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type NATRuleQuery struct {
+	NATRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBQuery struct {
+	LBQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBListenerQuery struct {
+	LBListenerQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBRuleQuery struct {
+	LBRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PeerConnectionQuery struct {
+	PeerConnectionQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type CENQuery struct {
+	CENQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RDSInstanceQuery struct {
+	RDSInstanceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RedisInstanceQuery struct {
+	RedisInstanceQueryFilterConditions
 	IncludedFieldsParam
 }
 

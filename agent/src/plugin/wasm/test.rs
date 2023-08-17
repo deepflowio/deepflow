@@ -33,7 +33,7 @@ use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
 
-use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
+use crate::config::handler::LogParserConfig;
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
@@ -68,7 +68,8 @@ fn get_req_param<'a>(
         }),
         packet_seq: 9999999,
         time: 12345678,
-        perf_only: false,
+        parse_perf: true,
+        parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
@@ -78,7 +79,7 @@ fn get_req_param<'a>(
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
-        buf_size: 0,
+        buf_size: 999,
     }
 }
 
@@ -104,7 +105,8 @@ fn get_resq_param<'a>(
         }),
         packet_seq: 9999999,
         time: 12345678,
-        perf_only: false,
+        parse_perf: true,
+        parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
@@ -114,7 +116,7 @@ fn get_resq_param<'a>(
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
-        buf_size: 0,
+        buf_size: 999,
     }
 }
 
@@ -147,11 +149,7 @@ fn load_module() -> WasmVm {
 #[test]
 fn test_wasm_http_req() {
     let vm = Rc::new(RefCell::new(load_module()));
-    let config = LogParserConfig {
-        l7_log_collect_nps_threshold: 0,
-        l7_log_session_aggr_timeout: Duration::ZERO,
-        l7_log_dynamic: L7LogDynamicConfig::default(),
-    };
+    let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let mut param = get_req_param(vm.clone(), rrt_cache.clone());
@@ -159,12 +157,12 @@ fn test_wasm_http_req() {
 
     let mut http = HttpLog::new_v1();
     let payload = "POST /test?a=1&b=2&c=test HTTP/1.1\r\nUser-Agent: deepflow\r\nreferer: aaa.com\r\nHost: abc.com\r\nContent-Type: application/json\r\n\r\n";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> =
         HashMap::from_iter([("a", "1"), ("b", "2"), ("c", "test"), ("empty", "")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwrap_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -206,11 +204,7 @@ fn test_wasm_http_req() {
 #[test]
 fn test_wasm_http_resp() {
     let vm = Rc::new(RefCell::new(load_module()));
-    let config = LogParserConfig {
-        l7_log_collect_nps_threshold: 0,
-        l7_log_session_aggr_timeout: Duration::ZERO,
-        l7_log_dynamic: L7LogDynamicConfig::default(),
-    };
+    let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let mut param = get_resq_param(vm.clone(), rrt_cache.clone());
@@ -218,11 +212,11 @@ fn test_wasm_http_resp() {
 
     let mut http = HttpLog::new_v1();
     let payload = "HTTP/1.1 200 Ok\r\nContent-Type: application/json\r\n\r\n{\"data\":{\"user_id\":123, \"name\":\"kkk\"}}";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> = HashMap::from_iter([("user_id", "123"), ("username", "kkk")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwrap_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -295,6 +289,7 @@ fn test_wasm_parse_payload_req() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -316,6 +311,9 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k2");
         assert_eq!(attr2.val.as_str(), "v2");
+
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -323,6 +321,7 @@ fn test_wasm_parse_payload_req() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(1);
 
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
@@ -345,6 +344,9 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k4");
         assert_eq!(attr2.val.as_str(), "v4");
+
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -362,6 +364,7 @@ fn test_wasm_parse_payload_resp() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -390,6 +393,7 @@ fn test_wasm_parse_payload_resp() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(1);
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -468,6 +472,8 @@ func checkReqCtx(baseCtx *sdk.ParseCtx) {
     sdk.Error("ebpf type: %v", baseCtx.EbpfType)
     sdk.Error("proc name: %v", baseCtx.ProcName)
     sdk.Error("time: %v", baseCtx.Time)
+    sdk.Error("flowid: %v", baseCtx.FlowID)
+    sdk.Error("buf_size: %v", baseCtx.BufSize)
     sdk.Error("payload: %v ", payload)
 
     checkEq("1.2.3.4", baseCtx.SrcIP.IP.String())
@@ -479,6 +485,8 @@ func checkReqCtx(baseCtx *sdk.ParseCtx) {
     checkEq(sdk.EbpfTypeTracePoint, baseCtx.EbpfType)
     checkEq("test_wasm", baseCtx.ProcName)
     checkEq(uint64(12345678), baseCtx.Time)
+    checkEq(uint64(1234567), baseCtx.FlowID)
+    checkEq(uint16(999), baseCtx.BufSize)
 }
 
 func checkRespCtx(baseCtx *sdk.ParseCtx) {
@@ -491,6 +499,8 @@ func checkRespCtx(baseCtx *sdk.ParseCtx) {
     sdk.Error("dir: %v", baseCtx.Direction)
     sdk.Error("ebpf type: %v", baseCtx.EbpfType)
     sdk.Error("time: %v", baseCtx.Time)
+    sdk.Error("flowid: %v", baseCtx.FlowID)
+    sdk.Error("buf_size: %v", baseCtx.BufSize)
     sdk.Error("p: %v ", payload)
 
     checkEq("5.6.7.8", baseCtx.SrcIP.IP.String())
@@ -502,6 +512,8 @@ func checkRespCtx(baseCtx *sdk.ParseCtx) {
     checkEq(sdk.EbpfTypeTracePoint, baseCtx.EbpfType)
     checkEq("test_wasm", baseCtx.ProcName)
     checkEq(uint64(12345678), baseCtx.Time)
+    checkEq(uint64(1234567), baseCtx.FlowID)
+    checkEq(uint16(999), baseCtx.BufSize)
 }
 
 type parser struct {
@@ -705,6 +717,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v2",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
             {
                 ReqLen:    &reqLen,
@@ -727,6 +741,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v4",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
         })
 
@@ -767,6 +783,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v2",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
             {
                 ReqLen:    &reqLen,
@@ -789,6 +807,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v4",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
         })
     default:

@@ -69,6 +69,8 @@ controller:
     # whether drop database when init failed
     drop-database-enabled: false
     auto_increment_increment: 1
+    # limit the total number of process queried at a time
+    result_set_max: 100000
 
   # redis相关配置
   redis:
@@ -101,7 +103,7 @@ controller:
     vtap_group_max: 1000
     vtap_max_per_group: 10000
     az_max_per_server: 10
-    data_source_max: 15
+    data_source_max: 25
     data_source_retention_time_max: 24000
 
   # monitor module config
@@ -256,12 +258,22 @@ querier:
 
   prometheus:
     qps-limit: 100 # setting to 0 means no limit
-    series-limit: 10000
+    series-limit: 500
     max-samples: 50000000
     auto-tagging-prefix: df_
     request-query-with-debug: true
+    external-tag-cache-size: 1024
+    external-tag-load-interval: 300
+    cache:
+      enabled: true
+      cache-item-size: 512000 # max size of cache item, unit: byte
+      cache-max-count: 1024 # max capacity of cache list
+      cache-max-allow-deviation: 3600 # unit:s 
 
 ingester:
+  ## whether Ingester store metrics/flow_log... to database
+  #storage-disabled: false
+
   #ckdb:
   #  # use internal or external ckdb
   #  external: false
@@ -429,9 +441,10 @@ ingester:
   ## prometheus label request/response msg max size (unit: bytes)
   #prometheus-label-msg-max-size: 104857600
 
-  # when prometheus requests labels, how many metric batch requests
+  ## when prometheus requests labels, how many metric batch requests
   #prometheus-label-request-metric-batch-count: 128
   #prometheus-app-label-column-increment: 4
+  #prometheus-app-label-column-min-count: 8
 
   ## Whether to ignore the writing of Universal Tag, the default is false, which means writing
   #prometheus-sample-ignore-universal-tag: false
@@ -495,8 +508,10 @@ ingester:
   ## size of unmarshall queue, defaults to 10240
   #unmarshall-queue-size: 10240
 
-  ## writer all queue limit max size
+  ## the maximum threshold for processing l4/l7 flow logs per second.(threshold for each flow log). If set to 0, the threshold for processing is not limited
   #throttle: 50000
+  ## Sampling bucket count. The larger this value is, the more accurate the sampling current limit is, and the more memory it takes up.
+  #throttle-bucket: 8
 
   ## 分别控制l4流日志, l7流日志，默认值为0，表示使用throttle的设置值.若非0，则使用设置值
   #l4-throttle: 0
@@ -531,10 +546,11 @@ ingester:
   #  export-datas: [cbpf-net-span,ebpf-sys-span]
   #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
-  #  queue-count: 2       # parallelism of sender
+  #  queue-count: 4       # parallelism of sender
   #  queue-size: 100000   # size of each exporter queue
   #  export-custom-k8s-labels-regexp:  # type string, default: "", means not export custom k8s labels. for example: ".+", means export all custom k8s labels; "aaa|bbb": means export labels which contains 'aaa' or 'bbb' string. ref: https://github.com/google/re2/wiki/Syntax
   #  export-only-with-traceid: false # if set 'true', if the span has no trace id, it will not be exported
+  #  export-batch-count: 32 # ExportRequest contains defalut(32) ResourceSpans(each l7_flow_log corresponds to a ResourceSpans)
   #  grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
   #    key1: value1
   #    key2: value2

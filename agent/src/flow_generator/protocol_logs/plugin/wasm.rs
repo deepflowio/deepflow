@@ -21,7 +21,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{protocol_logs::L7ResponseStatus, Error, Result},
 };
@@ -49,14 +49,13 @@ impl L7ProtocolParserInterface for WasmLog {
         self.proto_num.is_some()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(vm) = param.wasm_vm.as_ref() else {
             return Err(Error::WasmParseFail);
         };
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default());
         }
-        let perf_stats = self.perf_stats.as_mut().unwrap();
         let mut vm = vm.borrow_mut();
 
         if let Some(infos) = vm.on_parse_payload(payload, param, self.proto_num.unwrap()) {
@@ -66,28 +65,53 @@ impl L7ProtocolParserInterface for WasmLog {
                     i.proto = self.proto_num.unwrap();
                     i.proto_str = self.proto_str.clone();
                     match i.resp.status {
-                        L7ResponseStatus::ServerError => perf_stats.inc_req_err(),
-                        L7ResponseStatus::ClientError => perf_stats.inc_resp_err(),
+                        L7ResponseStatus::ServerError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                        }
+                        L7ResponseStatus::ClientError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                        }
                         _ => {}
                     }
 
-                    match param.direction {
-                        PacketDirection::ClientToServer => {
-                            perf_stats.inc_req();
-                        }
-                        PacketDirection::ServerToClient => {
-                            perf_stats.inc_resp();
-                        }
-                    }
                     i.msg_type = param.direction.into();
-                    i.cal_rrt(param, None).map(|rrt| {
-                        i.rrt = rrt;
-                        perf_stats.update_rrt(rrt);
-                    });
+
+                    if i.need_merge() {
+                        i.cal_rrt_for_multi_merge_log(param).map(|rrt| {
+                            i.rrt = rrt;
+                        });
+                        if i.is_req_end || i.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(i.rrt));
+
+                            match param.direction {
+                                PacketDirection::ClientToServer => {
+                                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                                }
+                                PacketDirection::ServerToClient => {
+                                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                                }
+                            }
+                        }
+                    } else {
+                        match param.direction {
+                            PacketDirection::ClientToServer => {
+                                self.perf_stats.as_mut().map(|p| p.inc_req());
+                            }
+                            PacketDirection::ServerToClient => {
+                                self.perf_stats.as_mut().map(|p| p.inc_resp());
+                            }
+                        }
+
+                        i.cal_rrt(param, None).map(|rrt| {
+                            i.rrt = rrt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                        });
+                    }
+
                     L7ProtocolInfo::CustomInfo(i)
                 })
                 .collect();
-            Ok(l7_infos)
+            Ok(L7ParseResult::Multi(l7_infos))
         } else {
             Err(Error::WasmParseFail)
         }

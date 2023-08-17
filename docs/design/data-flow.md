@@ -63,6 +63,7 @@ Kernel -->|eBPF| EbpfCollector
 EbpfCollector --> agent.queue.1
 EbpfCollector --> agent.queue.3
 EbpfCollector --> agent.queue.8 -->|ProcEvent| UniformSender.8 -->|"tcp(pb)"| event.decoder -->|EventStore| ingester.queue.4 --> event.dbwriter
+EbpfCollector --> agent.queue.9
 
 otel-collector -->|OTLP| IntegrationCollector
 otel-javaagent/sdk -->|OTLP| IntegrationCollector
@@ -100,14 +101,20 @@ SubQuadGen.1 -->|"AccumulatedFlow (1s)"| QuadrupleStash.1[("QuadrupleStash (1s)"
 SubQuadGen.1 -->|QuadrupleConnections| ConcurrentConnection.1[("ConcurrentConnection (1s)")]
 SubQuadGen.1 -->|"AccumulatedFlow (1s)"| queue.2([queue]) --> Collector.1[Collector] -->|"Metrics(Document)"| queue.3([queue]) --> UniformSender.1[UniformSender]
 QuadrupleGenerator --> SubQuadGen.2["SubQuadGen (1m)"]
-SubQuadGen.2 -->|"AccumulatedFlow (1s)"| QuadrupleStash.2[("QuadrupleStash (1m)")]
+SubQuadGen.2 -->|"AccumulatedFlow (1m)"| QuadrupleStash.2[("QuadrupleStash (1m)")]
 SubQuadGen.2 -->|QuadrupleConnections| ConcurrentConnection.2[("ConcurrentConnection (1m)")]
 SubQuadGen.2 -->|"AccumulatedFlow (1m)"| queue.4([queue]) --> Collector.2[Collector] -->|"Metrics(Document)"| queue.5([queue]) --> UniformSender.1
 QuadrupleGenerator --> queue.6([queue]) --> FlowAggr -->|"TaggedFlow (1m)"| throttler -->|"L4FlowLog(TaggedFlow)"| queue.7([queue]) --> UniformSender.2[UniformSender]
+queue.1 --> L7QuadrupleGenerator
+L7QuadrupleGenerator --> SubQuadGen.1["SubQuadGen (1s)"]
+SubQuadGen.1 -->|"AppMeterWithFlow (1s)"| queue.2([queue])
+L7QuadrupleGenerator --> SubQuadGen.2["SubQuadGen (1m)"]
+SubQuadGen.2 -->|"AppMeterWithFlow (1m)"| queue.4([queue])
 
 FlowGenerator -->|MetaAppProto| queue.8([queue]) --> AppProtoLogsParser -->|AppProtoLogsData| throttler.1[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9([queue]) --> UniformSender.3[UniformSender]
 
 EbpfCollector -->|MetaPacket| queue.10([queue]) --> EbpfRunner -->|AppProtoLogsData| SessionAggr --> throttler.2[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9
+EbpfCollector -->|stack_profile_data| ebpf_on_cpu_callback -->|"Profile"| queue.9
 ```
 
 ## 1.3. Decoders In deepflow-server.ingester

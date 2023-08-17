@@ -104,7 +104,19 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 }
 
 func (c *Cloud) GetResource() model.Resource {
-	return c.resource
+	cResource := c.resource
+	if c.basicInfo.Type != common.KUBERNETES {
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
+			cResource.SubDomainResources = c.getSubDomainData(cResource)
+			cResource = c.appendResourceVIPs(cResource)
+		}
+	}
+
+	if cResource.Verified {
+		cResource = c.appendAddtionalResourcesData(cResource)
+		cResource = c.appendResourceProcess(cResource)
+	}
+	return cResource
 }
 
 func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
@@ -144,10 +156,6 @@ func (c *Cloud) getCloudData() {
 	var cResource model.Resource
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
-		lastResource := c.resource
-		if lastResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && lastResource.Verified && len(lastResource.VMs) > 0 {
-			c.resource.SubDomainResources = c.getSubDomainData(lastResource)
-		}
 		cResource, err = c.platform.GetCloudData()
 		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 		if err == nil {
@@ -155,7 +163,6 @@ func (c *Cloud) getCloudData() {
 				cResource.Verified = true
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 			}
-			cResource.SubDomainResources = c.getSubDomainData(cResource)
 		} else {
 			if cResource.ErrorState == 0 {
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
@@ -176,11 +183,7 @@ func (c *Cloud) getCloudData() {
 		}
 	}
 
-	if cResource.Verified {
-		cResource = c.appendAddtionalResourcesData(cResource)
-		cResource = c.appendResourceProcess(cResource)
-	}
-
+	cResource.SyncAt = time.Now()
 	c.resource = cResource
 }
 
@@ -439,8 +442,8 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		process := model.Process{
 			Lcuuid:      sProcess.Lcuuid,
 			Name:        sProcess.Name,
-			VTapID:      int(sProcess.VtapID),
-			PID:         int(sProcess.PID),
+			VTapID:      sProcess.VtapID,
+			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
 			ProcessName: sProcess.ProcessName,
 			CommandLine: sProcess.CMDLine,
@@ -460,6 +463,39 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		process.SubDomainLcuuid = lcuuid
 		subDomainResource.Processes = append(subDomainResource.Processes, process)
 		resource.SubDomainResources[lcuuid] = subDomainResource
+	}
+	return resource
+}
+
+func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
+
+	if genesis.GenesisService == nil {
+		log.Error("genesis service is nil")
+		return resource
+	}
+
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	if err != nil {
+		log.Error(err.Error())
+		return resource
+	}
+
+	vtapIDToLcuuid, err := GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("domain (%s) add vip failed: %s", c.basicInfo.Name, err.Error())
+		return resource
+	}
+
+	for _, vip := range genesisSyncData.VIPs {
+		lcuuid, ok := vtapIDToLcuuid[int(vip.VtapID)]
+		if !ok || lcuuid != "" {
+			continue
+		}
+		resource.VIPs = append(resource.VIPs, model.VIP{
+			Lcuuid: vip.Lcuuid,
+			IP:     vip.IP,
+			VTapID: vip.VtapID,
+		})
 	}
 	return resource
 }
@@ -487,6 +523,16 @@ func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
 		podNodeIDToSubDomain[podNode.ID] = podNode.SubDomain
 	}
 
+	var pods []mysql.Pod
+	err = mysql.Db.Where("domain = ?", domain).Find(&pods).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	podIDToSubDomain := make(map[int]string)
+	for _, pod := range pods {
+		podIDToSubDomain[pod.ID] = pod.SubDomain
+	}
+
 	var vtaps []mysql.VTap
 	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
 	if err != nil {
@@ -496,6 +542,10 @@ func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
 		vtapIDToSubDomain[vtap.ID] = ""
 		if vtap.Type == common.VTAP_TYPE_POD_HOST || vtap.Type == common.VTAP_TYPE_POD_VM {
 			if subDomain, ok := podNodeIDToSubDomain[vtap.LaunchServerID]; ok {
+				vtapIDToSubDomain[vtap.ID] = subDomain
+			}
+		} else if vtap.Type == common.VTAP_TYPE_K8S_SIDECAR {
+			if subDomain, ok := podIDToSubDomain[vtap.LaunchServerID]; ok {
 				vtapIDToSubDomain[vtap.ID] = subDomain
 			}
 		}

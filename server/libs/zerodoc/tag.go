@@ -338,16 +338,15 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 	var orderKeys []string
 	code := metricsTableCodes[id]
 	if code&L3EpcID != 0 {
-		orderKeys = []string{"l3_epc_id", "ip4", "ip6"}
+		orderKeys = []string{timeKey, "l3_epc_id", "ip4", "ip6"}
 	} else if code&L3EpcIDPath != 0 {
-		orderKeys = []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0"}
+		orderKeys = []string{timeKey, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0"}
 	} else if code&ACLGID != 0 {
-		orderKeys = []string{"acl_gid"}
+		orderKeys = []string{timeKey, "acl_gid"}
 	}
 	if code&ServerPort != 0 {
 		orderKeys = append(orderKeys, "server_port")
 	}
-	orderKeys = append(orderKeys, timeKey)
 
 	var meterColumns []*ckdb.Column
 	switch id {

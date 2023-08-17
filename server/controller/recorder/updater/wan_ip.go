@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -102,8 +101,7 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		subnetLcuuidsRepresentingNone := []string{"", "ffffffff-ffff-ffff-ffff-ffffffffffff", "94f0ca77-cb52-5869-98fb-2773ca4fb83f"} // TODO remove hard code
-		if common.Contains(subnetLcuuidsRepresentingNone, cloudItem.SubnetLcuuid) {
+		if cloudItem.SubnetLcuuid == "" {
 			updateInfo["vl2_net_id"] = 0
 		} else {
 			subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)

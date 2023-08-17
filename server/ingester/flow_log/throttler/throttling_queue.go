@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	THROTTLE_BUCKET = 10 // 由于发送方是有突发的，需要累积一定时间做采样
+	QUEUE_BATCH = 1 << 14
 )
 
 type throttleItem interface {
@@ -36,6 +36,7 @@ type ThrottlingQueue struct {
 	index         int
 
 	Throttle        int
+	throttleBucket  int64 // since the sender has a burst, it needs to accumulate a certain amount of time for sampling
 	lastFlush       int64
 	periodCount     int
 	periodEmitCount int
@@ -44,26 +45,47 @@ type ThrottlingQueue struct {
 	nonSampleItems []interface{}
 }
 
-func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, index int) *ThrottlingQueue {
+func NewThrottlingQueue(throttle, throttleBucket int, flowLogWriter *dbwriter.FlowLogWriter, index int) *ThrottlingQueue {
 	thq := &ThrottlingQueue{
-		Throttle:      throttle * THROTTLE_BUCKET,
-		flowLogWriter: flowLogWriter,
-		index:         index,
+		Throttle:       throttle * throttleBucket,
+		throttleBucket: int64(throttleBucket),
+		flowLogWriter:  flowLogWriter,
+		index:          index,
 	}
-	thq.sampleItems = make([]interface{}, thq.Throttle)
-	thq.nonSampleItems = make([]interface{}, 0, thq.Throttle)
+
+	if thq.Throttle > 0 {
+		thq.sampleItems = make([]interface{}, thq.Throttle)
+	}
+	thq.nonSampleItems = make([]interface{}, 0, QUEUE_BATCH)
 	return thq
+}
+
+func (thq *ThrottlingQueue) SampleDisabled() bool {
+	return thq.Throttle <= 0
 }
 
 func (thq *ThrottlingQueue) flush() {
 	if thq.periodEmitCount > 0 {
-		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+		if thq.flowLogWriter != nil {
+			thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+		} else {
+			for i := range thq.sampleItems[:thq.periodEmitCount] {
+				if tItem, ok := thq.sampleItems[i].(throttleItem); ok {
+					tItem.Release()
+				}
+			}
+		}
 	}
 }
 
 func (thq *ThrottlingQueue) SendWithThrottling(flow interface{}) bool {
+	if thq.SampleDisabled() {
+		thq.SendWithoutThrottling(flow)
+		return true
+	}
+
 	now := time.Now().Unix()
-	if now/THROTTLE_BUCKET != thq.lastFlush/THROTTLE_BUCKET {
+	if now/thq.throttleBucket != thq.lastFlush/thq.throttleBucket {
 		thq.flush()
 		thq.lastFlush = now
 		thq.periodCount = 0
@@ -96,9 +118,17 @@ func (thq *ThrottlingQueue) SendWithThrottling(flow interface{}) bool {
 }
 
 func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) {
-	if flow == nil || len(thq.nonSampleItems) >= thq.Throttle {
+	if flow == nil || len(thq.nonSampleItems) >= QUEUE_BATCH {
 		if len(thq.nonSampleItems) > 0 {
-			thq.flowLogWriter.Put(thq.index, thq.nonSampleItems...)
+			if thq.flowLogWriter != nil {
+				thq.flowLogWriter.Put(thq.index, thq.nonSampleItems...)
+			} else {
+				for i := range thq.nonSampleItems {
+					if tItem, ok := thq.nonSampleItems[i].(throttleItem); ok {
+						tItem.Release()
+					}
+				}
+			}
 			thq.nonSampleItems = thq.nonSampleItems[:0]
 		}
 	}

@@ -136,6 +136,8 @@ const (
 	VTAP_TYPE_POD_VM               // K8S_VM
 	VTAP_TYPE_TUNNEL_DECAPSULATION // TUN_DECAP
 	VTAP_TYPE_HYPER_V
+	_ // 11
+	VTAP_TYPE_K8S_SIDECAR
 )
 
 //go:generate stringer -type=VtapException -trimprefix=VTAP_EXCEPTION_ -linecomment

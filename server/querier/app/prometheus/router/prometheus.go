@@ -32,52 +32,6 @@ import (
 
 const _STATUS_FAIL = "fail"
 
-func adaptPromQuery(svc *service.PrometheusService, router string) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		var result *model.PromQueryResponse
-		var err error
-
-		if router == "label" {
-			labelQueryArgs := model.PromMetaParams{
-				LabelName: c.Request.FormValue("query"),
-				StartTime: c.Request.FormValue("time_start"),
-				EndTime:   c.Request.FormValue("time_end"),
-				Context:   c.Request.Context(),
-			}
-			result, err = svc.PromLabelValuesService(&labelQueryArgs, c.Request.Context())
-		} else {
-			args := model.PromQueryParams{
-				StartTime: c.Request.FormValue("time_start"),
-				EndTime:   c.Request.FormValue("time_end"),
-				Slimit:    c.Request.FormValue("SLIMIT"),
-				Context:   c.Request.Context(),
-			}
-			query := c.Request.FormValue("query")
-			debug := c.Request.FormValue("debug")
-			args.Debug, _ = strconv.ParseBool(debug)
-
-			switch router {
-			case "query_range":
-				args.Promql = query
-				args.Step = c.Request.FormValue("interval")
-				result, err = svc.PromRangeQueryService(&args, c.Request.Context())
-			case "query":
-				args.Promql = query
-				result, err = svc.PromInstantQueryService(&args, c.Request.Context())
-			case "series":
-				args.Matchers = []string{query}
-				ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
-				result, err = svc.PromSeriesQueryService(&args, ctx)
-			}
-		}
-		if err != nil {
-			c.JSON(500, svc.PromQLAdapter(&model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL}))
-			return
-		}
-		c.JSON(200, svc.PromQLAdapter(result))
-	})
-}
-
 // PromQL Query API
 func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
@@ -206,6 +160,36 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 		}
 
 		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to)
+		if err != nil {
+			c.JSON(500, result)
+			return
+		}
+		c.JSON(200, result)
+	})
+}
+
+func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		query := c.Query("query")
+		result, err := svc.PromQLParse(query)
+		if err != nil {
+			c.JSON(500, result)
+			return
+		}
+		c.JSON(200, result)
+	})
+}
+
+func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		query := c.Query("query")
+		filters, ok := c.GetQueryMap("filter")
+		if !ok {
+			// return query itself
+			c.JSON(200, &model.PromQueryWrapper{OptStatus: "success", Data: []map[string]interface{}{{"query": query}}})
+			return
+		}
+		result, err := svc.PromQLParseFilter(query, filters)
 		if err != nil {
 			c.JSON(500, result)
 			return

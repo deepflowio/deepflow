@@ -595,7 +595,13 @@ static bool __is_process(int pid, bool is_user)
 	if (fd < 0)
 		return false;
 
-	read(fd, buff, sizeof(buff));
+	memset(buff, 0, 4096);
+	if (read(fd, buff, sizeof(buff)) <= 0) {
+		ebpf_warning("Read file '%s' failed, errno %d\n",
+			     file, errno);
+		close(fd);
+		return false;
+	}
 	close(fd);
 
 	/*
@@ -606,15 +612,19 @@ static bool __is_process(int pid, bool is_user)
 	if (is_user) {
 		int ppid = -1;
 		p = strstr(buff, "PPid:");
+		if (p == NULL)
+			return false;
 		sscanf(p, "PPid:\t%d", &ppid);
 		if ((ppid == 0 && pid != 1) || ppid == 2 || ppid == -1)
 			return false;
 	}
 
-	p = strstr(buff, "Tgid:");
+	if ((p = strstr(buff, "Tgid:")) == NULL)
+		return false;
 	sscanf(p, "Tgid:\t%d", &read_tgid);
 
-	p = strstr(buff, "Pid:");
+	if ((p = strstr(buff, "Pid:")) == NULL)
+		return false;
 	sscanf(p, "Pid:\t%d", &read_pid);
 
 	if (read_tgid == -1 || read_pid == -1)

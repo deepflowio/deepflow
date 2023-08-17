@@ -9,6 +9,8 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter => ./querier/app/prometheus/router/packet_adapter
+	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper => ./querier/app/prometheus/service/packet_wrapper
 	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 )
@@ -31,7 +33,7 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230725024216-f59403b275be
+	github.com/deepflowio/deepflow/message v0.0.0-20230815052508-4df8a3b357c2
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
@@ -89,8 +91,11 @@ require (
 
 require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
+	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/gorilla/schema v1.2.0
+	github.com/klauspost/compress v1.15.9
 	github.com/pyroscope-io/client v0.7.0
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v0.66.0

@@ -378,6 +378,7 @@ impl MirrorModeDispatcher {
         let mut flow_map = FlowMap::new(
             self.base.id as u32,
             self.base.flow_output_queue.clone(),
+            self.base.l7_stats_output_queue.clone(),
             self.base.policy_getter,
             self.base.log_output_queue.clone(),
             self.base.ntp_diff.clone(),
@@ -391,6 +392,7 @@ impl MirrorModeDispatcher {
             let config = Config {
                 flow: &self.base.flow_map_config.load(),
                 log_parser: &self.base.log_parse_config.load(),
+                collector: &self.base.collector_config.load(),
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };

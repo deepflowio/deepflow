@@ -14,10 +14,18 @@
  * limitations under the License.
  */
 
-package resource
+package packet_wrapper
 
 import (
-	logging "github.com/op/go-logging"
+	"bytes"
+
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 )
 
-var log = logging.MustGetLogger("service.resource")
+func WrapResponse(res *model.PromQueryResponse) *model.PromQueryWrapper {
+	return nil
+}
+
+func FormatData(data *model.PromQueryWrapper) *bytes.Buffer {
+	return nil
+}

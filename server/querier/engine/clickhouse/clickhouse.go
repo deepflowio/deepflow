@@ -59,6 +59,7 @@ type CHEngine struct {
 	View               *view.View
 	Context            context.Context
 	TargetLabelFilters []TargetLabelFilter
+	NoPreWhere         bool
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -68,6 +69,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var err error
 	sql := args.Sql
 	e.Context = args.Context
+	e.NoPreWhere = args.NoPreWhere
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse slimitSql
@@ -121,6 +123,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			FormatLimit(e.Model)
 			// 使用Model生成View
 			e.View = view.NewView(e.Model)
+			e.View.NoPreWhere = e.NoPreWhere
 			chSql := e.ToSQLString()
 			callbacks := e.View.GetCallbacks()
 			debug.Sql = chSql
@@ -153,6 +156,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	FormatModel(e.Model)
 	// 使用Model生成View
 	e.View = view.NewView(e.Model)
+	e.View.NoPreWhere = e.NoPreWhere
 	chSql := e.ToSQLString()
 	callbacks := e.View.GetCallbacks()
 	debug.Sql = chSql
@@ -988,8 +992,8 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, binFunction)
 			return nil
 		}
-		if e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-			funcName := strings.Trim(sqlparser.String(expr.Name), "`")
+		funcName := strings.Trim(sqlparser.String(expr.Name), "`")
+		if funcName != view.FUNCTION_COUNT && (e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM) {
 			if _, ok := metrics.METRICS_FUNCTIONS_MAP[funcName]; ok {
 				if as == "" {
 					as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
@@ -1261,11 +1265,9 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			if ((e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.")) || e.DB == chCommon.DB_NAME_PROMETHEUS {
-				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
-				if ok {
-					whereTag = metricStruct.DBField
-				}
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
+			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
+				whereTag = metricStruct.DBField
 			}
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)

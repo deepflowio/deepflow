@@ -47,3 +47,5 @@ pub const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub const SECONDS_IN_MINUTE: u64 = 60;
 pub const NANOS_IN_SECOND: u64 = 1_000_000_000;
+
+pub const L7_STATS_KEY_SIZE: usize = 12; // L7_STATS_KEY_SIZE(12) = flow_id(u64) + endpoint_hash(u32)

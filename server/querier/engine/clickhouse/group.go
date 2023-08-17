@@ -78,11 +78,54 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 	return tagTranslatorStr
 }
 
+func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) (view.Node, bool) {
+	nameNoPreffix := strings.Trim(name, "`")
+	preAsTag, ok := asTagMap[name]
+	if ok {
+		nameNoPreffix = strings.Trim(preAsTag, "`")
+	}
+	nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
+	filter := ""
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		return &view.Expr{}, false
+	}
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
+	if !ok {
+		return &view.Expr{}, false
+	}
+	// Determine whether the tag is app_label or target_label
+	isAppLabel := false
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+		for _, appLabel := range appLabels {
+			if appLabel.AppLabelName == nameNoPreffix {
+				isAppLabel = true
+				filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d)", appLabel.appLabelColumnIndex, labelNameID)
+				break
+			}
+		}
+	}
+	if !isAppLabel {
+		filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d)", metricID, labelNameID)
+	}
+	return &view.Expr{Value: "(" + filter + ")"}, true
+}
+
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
+	preAsTag, preASOK := asTagMap[name]
+	if preASOK {
+		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(preAsTag, "`tag.") {
+			return GetPrometheusNotNullFilter(name, table, asTagMap)
+		}
+	} else {
+		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(name, "`tag.") {
+			return GetPrometheusNotNullFilter(name, table, asTagMap)
+		}
+	}
+
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
-		preAsTag, ok := asTagMap[name]
-		if ok {
+		if preASOK {
 			tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
 			if !ok {
 				preAsTag := strings.Trim(preAsTag, "`")

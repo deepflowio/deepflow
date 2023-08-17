@@ -28,14 +28,18 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 type prometheusReader struct {
 	slimit                  int
 	interceptPrometheusExpr func(func(e *parser.AggregateExpr) error) error
+	getExternalTagFromCache func(string) string
+	addExternalTagToCache   func(string, string)
 }
 
 func newPrometheusReader(slimit int) *prometheusReader {
@@ -45,78 +49,103 @@ func newPrometheusReader(slimit int) *prometheusReader {
 func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	ctx, sql, db, datasource, metricName, err := p.promReaderTransToSQL(ctx, req)
-	// fmt.Println(sql, db)
-	if err != nil {
-		return nil, "", 0, err
-	}
-	if db == "" {
-		db = "prometheus"
-	}
-	query_uuid := uuid.New()
-	// mark query comes from promql
-	if db == "prometheus" {
-		//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
-		ctx = context.WithValue(ctx, "remote_read", true)
-	}
-	// if `api` pass `debug` or config debug, get debug info from querier
-	debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
-	args := common.QuerierParams{
-		DB:         db,
-		Sql:        sql,
-		DataSource: datasource,
-		Debug:      strconv.FormatBool(debugQuerier),
-		QueryUUID:  query_uuid.String(),
-		Context:    ctx,
-	}
-	// get parentSpan for inject others attribute below
-	parentSpan := trace.SpanFromContext(ctx)
+	var metricName string
+	var result *common.Result
 
-	// start span trace query time of any query uuid
-	var span trace.Span
-	if config.Cfg.Prometheus.RequestQueryWithDebug {
-		tr := otel.GetTracerProvider().Tracer("querier/prometheus/clickhouseQuery")
-		ctx, span = tr.Start(ctx, "PromReaderExecute",
-			trace.WithSpanKind(trace.SpanKindClient),
-			trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())))
+	item, hit, metricName, start, end := cache.RemoteReadCache().Get(req)
+	if hit == cache.CacheHitFull {
+		result = item.Data()
+		if strings.Contains(metricName, "__") {
+			metricsSplit := strings.Split(metricName, "__")
+			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
+				if metricsSplit[0] == DB_NAME_EXT_METRICS || metricsSplit[0] == chCommon.DB_NAME_PROMETHEUS {
+					ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixTag)
+				}
+			}
+		} else {
+			ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
+		}
+	} else {
+		var sql, db, datasource string
+		var debugInfo map[string]interface{}
+		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end)
+		// fmt.Println(sql, db)
+		if err != nil {
+			return nil, "", 0, err
+		}
+		if db == "" {
+			db = "prometheus"
+		}
+		query_uuid := uuid.New()
+		// mark query comes from promql
+		if db == "prometheus" {
+			//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
+			ctx = context.WithValue(ctx, "remote_read", true)
+		}
+		// if `api` pass `debug` or config debug, get debug info from querier
+		debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
+		args := common.QuerierParams{
+			DB:         db,
+			Sql:        sql,
+			DataSource: datasource,
+			Debug:      strconv.FormatBool(debugQuerier),
+			QueryUUID:  query_uuid.String(),
+			Context:    ctx,
+		}
+		// get parentSpan for inject others attribute below
+		parentSpan := trace.SpanFromContext(ctx)
 
-		defer span.End()
-	}
+		// start span trace query time of any query uuid
+		var span trace.Span
+		if config.Cfg.Prometheus.RequestQueryWithDebug {
+			tr := otel.GetTracerProvider().Tracer("querier/prometheus/clickhouseQuery")
+			ctx, span = tr.Start(ctx, "PromReaderExecute",
+				trace.WithSpanKind(trace.SpanKindClient),
+				trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())))
 
-	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
-	ckEngine.Init()
-	result, debugInfo, err := ckEngine.ExecuteQuery(&args)
-	if err != nil {
-		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
-		return nil, "", 0, err
-	}
+			defer span.End()
+		}
 
-	if debugQuerier {
-		duration = extractQueryTimeFromQueryResponse(debugInfo)
-		sql = extractQuerySQLFromQueryResponse(debugInfo)
-	}
+		ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
+		ckEngine.Init()
+		result, debugInfo, err = ckEngine.ExecuteQuery(&args)
+		if err != nil {
+			log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
+			return nil, "", 0, err
+		}
 
-	if config.Cfg.Prometheus.RequestQueryWithDebug {
-		// inject query_time for current span
-		span.SetAttributes(attribute.Float64("query_time", duration))
+		if debugQuerier {
+			duration = extractQueryTimeFromQueryResponse(debugInfo)
+			sql = extractQuerySQLFromQueryResponse(debugInfo)
+		}
 
-		// inject labels for parent span
-		targetLabels := make([]string, 0, len(result.Schemas))
-		appLabels := make([]string, 0, len(result.Schemas))
-		for i := 0; i < len(result.Schemas); i++ {
-			labelType := result.Schemas[i].LabelType
-			if labelType == "app" {
-				appLabels = append(appLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
-			} else if labelType == "target" {
-				targetLabels = append(targetLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+		if config.Cfg.Prometheus.RequestQueryWithDebug {
+			// inject query_time for current span
+			span.SetAttributes(attribute.Float64("query_time", duration))
+
+			// inject labels for parent span
+			targetLabels := make([]string, 0, len(result.Schemas))
+			appLabels := make([]string, 0, len(result.Schemas))
+			for i := 0; i < len(result.Schemas); i++ {
+				labelType := result.Schemas[i].LabelType
+				if labelType == "app" {
+					appLabels = append(appLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+				} else if labelType == "target" {
+					targetLabels = append(targetLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+				}
+			}
+			if len(targetLabels) > 0 {
+				parentSpan.SetAttributes(attribute.String("promql.query.metric.targetLabel", strings.Join(targetLabels, ",")))
+			}
+			if len(appLabels) > 0 {
+				parentSpan.SetAttributes(attribute.String("promql.query.metric.appLabel", strings.Join(appLabels, ",")))
 			}
 		}
-		if len(targetLabels) > 0 {
-			parentSpan.SetAttributes(attribute.String("promql.query.metric.targetLabel", strings.Join(targetLabels, ",")))
-		}
-		if len(appLabels) > 0 {
-			parentSpan.SetAttributes(attribute.String("promql.query.metric.appLabel", strings.Join(appLabels, ",")))
-		}
+	}
+
+	if config.Cfg.Prometheus.Cache.Enabled {
+		// add or merge query result
+		result = cache.RemoteReadCache().AddOrMerge(req, result, item)
 	}
 
 	// response trans to prom resp

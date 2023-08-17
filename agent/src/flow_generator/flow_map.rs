@@ -53,8 +53,8 @@ use crate::{
         },
         enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
         flow::{
-            CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, PacketDirection,
-            SignalSource, TunnelField,
+            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7Protocol,
+            L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
@@ -65,7 +65,7 @@ use crate::{
         Timestamp,
     },
     config::{
-        handler::{L7LogDynamicConfig, LogParserConfig},
+        handler::{CollectorConfig, LogParserConfig},
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
     metric::document::TapSide,
@@ -104,6 +104,7 @@ use packet_sequence_block::PacketSequenceBlock;
 pub struct Config<'a> {
     pub flow: &'a FlowConfig,
     pub log_parser: &'a LogParserConfig,
+    pub collector: &'a CollectorConfig,
     #[cfg(target_os = "linux")]
     pub ebpf: Option<&'a EbpfConfig>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
 }
@@ -134,9 +135,12 @@ pub struct FlowMap {
     time_set_slot_size: usize,
 
     tagged_flow_allocator: Allocator<TaggedFlow>,
-    output_queue: DebugSender<BatchedBox<TaggedFlow>>,
+    l7_stats_allocator: Allocator<L7Stats>,
+    output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+    l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<BatchedBox<TaggedFlow>>,
+    output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
+    l7_stats_buffer: Vec<BatchedBox<L7Stats>>,
     protolog_buffer: Vec<Box<MetaAppProto>>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
@@ -164,7 +168,8 @@ pub struct FlowMap {
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: DebugSender<BatchedBox<TaggedFlow>>,
+        output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+        l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
@@ -283,9 +288,14 @@ impl FlowMap {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
                 Allocator::new(n.max(1))
             },
+            l7_stats_allocator: {
+                let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<L7Stats>();
+                Allocator::new(n.max(1))
+            },
             output_queue,
             out_log_queue: app_proto_log_queue,
             output_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
+            l7_stats_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             protolog_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             last_queue_flush: Duration::ZERO,
             perf_cache: Rc::new(RefCell::new(L7PerfCache::new(
@@ -335,6 +345,7 @@ impl FlowMap {
             so_plugin_counter_map,
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
+            l7_stats_output_queue,
         }
     }
 
@@ -700,6 +711,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
     ) -> bool {
         let flow_config = config.flow;
+        let collector_config = config.collector;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
         if flow_config.collector_enabled {
             let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
@@ -723,7 +735,9 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled {
+        if self.packet_sequence_enabled
+            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
+        {
             self.append_to_block(flow_config, node, meta_packet);
         }
 
@@ -1075,6 +1089,10 @@ impl FlowMap {
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        // Currently, only virtual traffic's tap_side is counted
+        node.tagged_flow
+            .flow
+            .set_tap_side(flow_config.trident_type, flow_config.cloud_gateway_traffic);
 
         Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
 
@@ -1111,13 +1129,19 @@ impl FlowMap {
             (L7ProtocolEnum::default(), 0, false)
         };
 
+        let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
+            && Self::l4_metrics_enabled(flow_config);
+        let l7_enabled = Self::l7_metrics_enabled(flow_config)
+            || Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key);
+        if l4_enabled || l7_enabled {
+            node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats::default());
+        }
+
         if flow_config.collector_enabled {
             node.meta_flow_log = FlowLog::new(
-                node.tagged_flow.flow.signal_source == SignalSource::Packet
-                    && Self::l4_metrics_enabled(flow_config),
+                l4_enabled,
                 &mut self.tcp_perf_pool,
-                Self::l7_metrics_enabled(flow_config)
-                    || Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
+                l7_enabled,
                 self.perf_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
@@ -1182,6 +1206,10 @@ impl FlowMap {
             }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
+            // Currently, only virtual traffic's tap_side is counted
+            node.tagged_flow
+                .flow
+                .set_tap_side(config.flow.trident_type, config.flow.cloud_gateway_traffic);
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data =
@@ -1297,6 +1325,52 @@ impl FlowMap {
         }
     }
 
+    fn collect_l7_stats(&mut self, node: &mut FlowNode, new_endpoint: Option<String>) {
+        let flow_id = &node.tagged_flow.flow.flow_id;
+        // The original endpoint is inconsistent with new_endpoint
+        if let (Some(flow_perf_stats), Some(last_endpoint), Some(new_endpoint)) = (
+            node.tagged_flow.flow.flow_perf_stats.as_mut(),
+            &node.tagged_flow.flow.last_endpoint,
+            &new_endpoint,
+        ) {
+            if last_endpoint.ne(new_endpoint) {
+                let l7_timeout_count = self
+                    .perf_cache
+                    .borrow_mut()
+                    .pop_timeout_count(flow_id, false); // TODO: flow_end is most likely false, but may also be true
+                let (l7_perf_stats, l7_protocol) = node
+                    .meta_flow_log
+                    .as_mut()
+                    .unwrap()
+                    .copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+
+                // FIXME:Because the endpoint changes, the index of the first packet of the current endpoint
+                // will also be counted into the index of the previous endpoint, so there will be a slight error
+                flow_perf_stats.l7.sequential_merge(&l7_perf_stats); // It needs to fill l7 back in flow because flow also needs to present l7 metrics
+
+                flow_perf_stats.l7_protocol = l7_protocol;
+
+                let l7_stats = L7Stats {
+                    flow: None,
+                    stats: l7_perf_stats,
+                    endpoint: Some(last_endpoint.clone()),
+                    flow_id: node.tagged_flow.flow.flow_id,
+                    time_in_second: node.tagged_flow.flow.flow_stat_time.into(),
+                    signal_source: node.tagged_flow.flow.signal_source,
+                    l7_protocol,
+                };
+
+                self.l7_stats_buffer
+                    .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            }
+        }
+        if let Some(new_endpoint) = new_endpoint {
+            if !new_endpoint.is_empty() {
+                node.tagged_flow.flow.last_endpoint = Some(new_endpoint);
+            }
+        }
+    }
+
     fn collect_metric(
         &mut self,
         config: &Config,
@@ -1339,8 +1413,18 @@ impl FlowMap {
                         // Here we determine whether to reverse flow.
                         self.rectify_flow_direction(node, meta_packet, is_first_packet);
                     }
-                    for i in info.into_iter() {
-                        self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                    match info {
+                        crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
+                            self.collect_l7_stats(node, s.get_endpoint());
+                            self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
+                        }
+                        crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                            for i in m.into_iter() {
+                                self.collect_l7_stats(node, i.get_endpoint());
+                                self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 Err(Error::L7ReqNotFound(c)) => {
@@ -1355,6 +1439,7 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let flow_config = &config.flow;
+        let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
@@ -1394,7 +1479,9 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled {
+        if self.packet_sequence_enabled
+            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
+        {
             self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
@@ -1460,6 +1547,15 @@ impl FlowMap {
 
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now - self.last_queue_flush > config.flush_interval {
+            if self.l7_stats_buffer.len() > 0 {
+                if let Err(_) = self
+                    .l7_stats_output_queue
+                    .send_all(&mut self.l7_stats_buffer)
+                {
+                    warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                    self.l7_stats_buffer.clear();
+                }
+            }
             if self.output_buffer.len() > 0 {
                 if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
                     warn!(
@@ -1472,50 +1568,22 @@ impl FlowMap {
         }
     }
 
-    fn push_to_flow_stats_queue(
-        &mut self,
-        config: &FlowConfig,
-        mut tagged_flow: BatchedBox<TaggedFlow>,
-    ) {
-        // This field is required for logging when the flow is not finished. To avoid
-        // double counting, it is assigned when the flow statistics are finished output
-        //
-        // Currently, only virtual traffic's tap_side is counted
-        tagged_flow
-            .flow
-            .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
-
-        // Unknown application only counts metrics, and the judgment condition needs to consider
-        // the flow's duration, so the value is assigned when the flow is finished
-        //
-        // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
-        // 1. TCP protocol
-        // 2. l4_metrics_enabled = true
-        // 3. l7_metrics_enabled = true
-        // 4. The application protocol cannot be identified
-        // 5. The flow ends or the flow lasts more than 60 seconds
-        // 6. The L7PerfStats is valuable
-
-        let flow = &mut tagged_flow.flow;
+    fn push_to_flow_stats_queue(&mut self, tagged_flow: Arc<BatchedBox<TaggedFlow>>) {
+        if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
+            if let Err(_) = self
+                .l7_stats_output_queue
+                .send_all(&mut self.l7_stats_buffer)
+            {
+                warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                self.l7_stats_buffer.clear();
+            }
+        }
 
         self.stats_counter.flow_delay.fetch_max(
-            self.system_time.as_nanos() as i64 - flow.flow_stat_time.as_nanos() as i64,
+            self.system_time.as_nanos() as i64 - tagged_flow.flow.flow_stat_time.as_nanos() as i64,
             Ordering::Relaxed,
         );
 
-        if flow.flow_key.proto == IpProtocol::Tcp
-            && flow.flow_perf_stats.is_some()
-            && Self::l7_metrics_enabled(config)
-        {
-            let stats = flow.flow_perf_stats.as_mut().unwrap();
-            if stats.l7_protocol == L7Protocol::Unknown
-                && (flow.close_type != CloseType::ForcedReport
-                    || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
-                && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
-            {
-                stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
-            }
-        }
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
             if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
@@ -1536,7 +1604,7 @@ impl FlowMap {
         // 统计数据输出前矫正流方向
         self.update_flow_direction(&mut node, meta_packet);
 
-        let flow = &mut node.tagged_flow.flow;
+        let mut flow = &mut node.tagged_flow.flow;
         if flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
@@ -1549,25 +1617,6 @@ impl FlowMap {
                 as u64,
         );
 
-        if config.collector_enabled
-            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
-        {
-            let l7_timeout_count = self
-                .perf_cache
-                .borrow_mut()
-                .pop_timeout_count(&flow.flow_id, true);
-
-            if let Some(perf) = node.meta_flow_log.as_mut() {
-                // 如果返回None，就清空掉flow_perf_stats
-                flow.flow_perf_stats = perf.copy_and_reset_perf_data(
-                    flow.reversed,
-                    l7_timeout_count as u32,
-                    flow.signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
-                    Self::l7_metrics_enabled(config),
-                );
-            }
-        }
-
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::Tcp {
             if let Some(block) = node.packet_sequence_block.take() {
@@ -1577,15 +1626,67 @@ impl FlowMap {
             }
         }
 
+        let mut l7_stats = L7Stats::default();
+        if config.collector_enabled
+            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
+        {
+            if let Some(perf) = node.meta_flow_log.as_mut() {
+                perf.copy_and_reset_l4_perf_data(flow.reversed, &mut flow);
+                let l7_timeout_count = self
+                    .perf_cache
+                    .borrow_mut()
+                    .pop_timeout_count(&flow.flow_id, true);
+                let (l7_perf_stats, l7_protocol) =
+                    perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+
+                let mut flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
+                flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
+                flow_perf_stats.l7_protocol = l7_protocol;
+                l7_stats.stats = l7_perf_stats;
+                l7_stats.endpoint = flow.last_endpoint.clone();
+                l7_stats.flow_id = flow.flow_id;
+                l7_stats.signal_source = flow.signal_source;
+                l7_stats.time_in_second = flow.flow_stat_time.into();
+                l7_stats.l7_protocol = l7_protocol;
+            }
+        }
+        // Unknown application only counts metrics, and the judgment condition needs to consider
+        // the flow's duration, so the value is assigned when the flow is finished
+        //
+        // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
+        // 1. TCP protocol
+        // 2. l4_metrics_enabled = true
+        // 3. l7_metrics_enabled = true
+        // 4. The application protocol cannot be identified
+        // 5. The flow ends or the flow lasts more than 60 seconds
+        // 6. The L7PerfStats is valuable
+        if flow.flow_key.proto == IpProtocol::Tcp
+            && flow.flow_perf_stats.is_some()
+            && Self::l7_metrics_enabled(config)
+        {
+            let stats = flow.flow_perf_stats.as_mut().unwrap();
+            if stats.l7_protocol == L7Protocol::Unknown
+                && (flow.close_type != CloseType::ForcedReport
+                    || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
+                && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
+            {
+                stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
+            }
+        }
+
         self.stats_counter
             .concurrent
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        let tagged_flow = self
-            .tagged_flow_allocator
-            .allocate_one_with(node.tagged_flow.clone());
-        self.push_to_flow_stats_queue(config, tagged_flow);
+        let tagged_flow = Arc::new(
+            self.tagged_flow_allocator
+                .allocate_one_with(node.tagged_flow.clone()),
+        );
+        l7_stats.flow = Some(tagged_flow.clone());
+        self.l7_stats_buffer
+            .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+        self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
@@ -1600,14 +1701,13 @@ impl FlowMap {
         timestamp: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
-        let flow = &node.tagged_flow.flow;
         // if this function is called by inject_flush_ticker (no meta_packet),
         // skip statistical interval check because timestamp will be equal to
         // flow_stat_time
         if node.packet_in_tick
             && (meta_packet.is_none()
-                || timestamp >= flow.flow_stat_time + STATISTICAL_INTERVAL
-                || timestamp < flow.flow_stat_time)
+                || timestamp >= node.tagged_flow.flow.flow_stat_time + STATISTICAL_INTERVAL
+                || timestamp < node.tagged_flow.flow.flow_stat_time)
         {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;
@@ -1615,23 +1715,63 @@ impl FlowMap {
             if !config.collector_enabled {
                 return;
             }
+            let mut l7_stats = L7Stats::default();
             if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
-                    flow.flow_perf_stats = perf.copy_and_reset_perf_data(
-                        flow.reversed,
-                        self.perf_cache
-                            .borrow_mut()
-                            .pop_timeout_count(&flow.flow_id, false) as u32,
-                        flow.signal_source == SignalSource::Packet
-                            && Self::l4_metrics_enabled(config),
-                        Self::l7_metrics_enabled(config),
-                    );
+                    perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
+                    let l7_timeout_count = self
+                        .perf_cache
+                        .borrow_mut()
+                        .pop_timeout_count(&flow.flow_id, false);
+                    let (l7_perf_stats, l7_protocol) =
+                        perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+
+                    let mut flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
+                    flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
+                    flow_perf_stats.l7_protocol = l7_protocol;
+                    if flow.flow_key.proto == IpProtocol::Tcp
+                        || flow.flow_key.proto == IpProtocol::Udp
+                    {
+                        l7_stats.stats = l7_perf_stats;
+                        l7_stats.endpoint = flow.last_endpoint.clone();
+                        l7_stats.flow_id = flow.flow_id;
+                        l7_stats.signal_source = flow.signal_source;
+                        l7_stats.time_in_second = flow.flow_stat_time.into();
+                        l7_stats.l7_protocol = l7_protocol;
+                    }
                 }
             }
-            let tagged_flow = self
-                .tagged_flow_allocator
-                .allocate_one_with(node.tagged_flow.clone());
-            self.push_to_flow_stats_queue(config, tagged_flow);
+            // Unknown application only counts metrics, and the judgment condition needs to consider
+            // the flow's duration, so the value is assigned when the flow is finished
+            //
+            // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
+            // 1. TCP protocol
+            // 2. l4_metrics_enabled = true
+            // 3. l7_metrics_enabled = true
+            // 4. The application protocol cannot be identified
+            // 5. The flow ends or the flow lasts more than 60 seconds
+            // 6. The L7PerfStats is valuable
+            if flow.flow_key.proto == IpProtocol::Tcp
+                && flow.flow_perf_stats.is_some()
+                && Self::l7_metrics_enabled(config)
+            {
+                let stats = flow.flow_perf_stats.as_mut().unwrap();
+                if stats.l7_protocol == L7Protocol::Unknown
+                    && (flow.close_type != CloseType::ForcedReport
+                        || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
+                    && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
+                {
+                    stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
+                }
+            }
+            let tagged_flow = Arc::new(
+                self.tagged_flow_allocator
+                    .allocate_one_with(node.tagged_flow.clone()),
+            );
+            l7_stats.flow = Some(tagged_flow.clone());
+            self.l7_stats_buffer
+                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
     }
@@ -2036,12 +2176,13 @@ pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
-) -> (ModuleConfig, FlowMap, Receiver<BatchedBox<TaggedFlow>>) {
+) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =
         queue::bounded_with_debug(256, "", &queue_debugger);
+    let (l7_stats_output_queue_sender, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
     let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
     let (packet_sequence_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger); // Enterprise Edition Feature: packet-sequence
     let mut config = ModuleConfig {
@@ -2055,11 +2196,6 @@ pub fn _new_flow_map_and_receiver(
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
             ..(&RuntimeConfig::default()).into()
         },
-        log_parser: LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::new(0, 0),
-            l7_log_dynamic: L7LogDynamicConfig::default(),
-        },
         ..Default::default()
     };
     // Any
@@ -2068,6 +2204,7 @@ pub fn _new_flow_map_and_receiver(
     let flow_map = FlowMap::new(
         0,
         output_queue_sender,
+        l7_stats_output_queue_sender,
         policy_getter,
         app_proto_log_queue,
         Arc::new(AtomicI64::new(0)),
@@ -2168,6 +2305,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2203,6 +2341,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2242,6 +2381,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2271,6 +2411,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2311,6 +2452,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2366,6 +2508,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2405,6 +2548,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2440,6 +2584,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2500,6 +2645,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2567,6 +2713,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2634,6 +2781,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2677,6 +2825,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2699,6 +2848,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2722,6 +2872,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2763,6 +2914,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };

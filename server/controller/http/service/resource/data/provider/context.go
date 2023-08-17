@@ -17,10 +17,14 @@
 package provider
 
 import (
+	"github.com/op/go-logging"
+
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
+
+var log = logging.MustGetLogger("service.resource.data.provider")
 
 type DataContext struct {
 	URLInfo         *model.URLInfo            // use to generate redis key
@@ -28,8 +32,8 @@ type DataContext struct {
 	FilterGenerator generator.FilterGenerator // generate filters from URLInfo and UserInfo
 }
 
-func NewDataContext() *DataContext {
-	return &DataContext{}
+func NewDataContext(url *model.URLInfo, user *model.UserInfo, fg generator.FilterGenerator) *DataContext {
+	return &DataContext{URLInfo: url, UserInfo: user, FilterGenerator: fg}
 }
 
 func (c *DataContext) SetURLInfo(u *model.URLInfo) {
@@ -45,6 +49,8 @@ func (c *DataContext) SetFilterGenerator(fg generator.FilterGenerator) {
 }
 
 func (c *DataContext) ApplyFilters(data []common.ResponseElem) ([]common.ResponseElem, error) {
+	log.Infof("%#v", c.URLInfo) // TODO delete
+	log.Infof("%#v", c.UserInfo)
 	filters, dropAll := c.FilterGenerator.Generate(c.URLInfo, c.UserInfo)
 	if dropAll {
 		return []common.ResponseElem{}, nil
@@ -52,6 +58,7 @@ func (c *DataContext) ApplyFilters(data []common.ResponseElem) ([]common.Respons
 	var err error
 	result := data
 	for _, f := range filters {
+		log.Info(f.GetFilterConditions())
 		result, err = f.Filter(result)
 		if err != nil {
 			return []common.ResponseElem{}, err

@@ -24,4 +24,11 @@ message AlarmEvent {
     optional int64 trigger_value = 17; 
     optional string value_unit = 18; 
     optional uint32 event_level = 19;
+    optional string alarm_target = 20;
+    optional uint32 user_id = 21;
+    optional string policy_query_url = 22;
+    optional string policy_query_conditions = 23;
+    optional string policy_threshold_critical = 24;
+    optional string policy_threshold_error = 25;
+    optional string policy_threshold_warning = 26;
 }

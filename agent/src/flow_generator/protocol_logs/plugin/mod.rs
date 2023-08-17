@@ -22,8 +22,7 @@ use wasm::WasmLog;
 use crate::{
     common::{
         flow::L7PerfStats,
-        l7_protocol_info::L7ProtocolInfo,
-        l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::Result,
 };

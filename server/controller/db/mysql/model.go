@@ -76,8 +76,8 @@ type Process struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
-	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
+	VTapID         uint32    `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
+	PID            uint64    `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
 	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
@@ -183,7 +183,7 @@ type VM struct {
 	HType          int    `gorm:"column:htype;type:int;default:1" json:"HTYPE"`                 // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER"`
 	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" json:"CLOUD_TAGS"` // separated by ,
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -313,7 +313,7 @@ type VRouter struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Description    string `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	GWLaunchServer string `gorm:"index:state_server_index;column:gw_launch_server;type:char(64);default:''" json:"GW_LAUNCH_SERVER"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -434,7 +434,7 @@ type SecurityGroup struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Topped         int    `gorm:"column:topped;type:int;default:0" json:"TOPPED"`
@@ -460,7 +460,7 @@ type NATGateway struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:''" json:"FLOATING_IPS"` // separated by ,
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
@@ -506,7 +506,7 @@ type LB struct {
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Model          int    `gorm:"column:model;type:int;default:0" json:"MODEL"` // 1.Internal 2.External
 	VIP            string `gorm:"column:vip;type:text;default:''" json:"VIP"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
@@ -538,7 +538,7 @@ type LBTargetServer struct {
 	Base         `gorm:"embedded"`
 	LBID         int    `gorm:"column:lb_id;type:int;default:0" json:"LB_ID"`
 	LBListenerID int    `gorm:"column:lb_listener_id;type:int;default:0" json:"LB_LISTENER_ID"`
-	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Type         int    `gorm:"column:type;type:int;default:0" json:"TYPE"` // 1.VM 2.IP
 	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	VMID         int    `gorm:"column:vm_id;type:int;default:0" json:"VM_ID"`
@@ -567,8 +567,8 @@ type PeerConnection struct {
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
-	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_VPC_ID"`
-	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_VPC_ID"`
+	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_EPC_ID"`
+	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_EPC_ID"`
 	LocalRegionID  int    `gorm:"column:local_region_id;type:int;default:0" json:"LOCAL_REGION_ID"`
 	RemoteRegionID int    `gorm:"column:remote_region_id;type:int;default:0" json:"REMOTE_REGION_ID"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
@@ -581,7 +581,7 @@ type CEN struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"VPC_IDS"` // separated by ,
+	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"EPC_IDS"` // separated by ,
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -598,7 +598,7 @@ type RDSInstance struct {
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Type           int    `gorm:"column:type;type:int;default:0" json:"TYPE"` // 0. Unknown 1. MySQL 2. SqlServer 3. PPAS 4. PostgreSQL 5. MariaDB
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	Series         int    `gorm:"column:series;type:tinyint(1);not null;default:0" json:"SERIES"` // 0. Unknown 1. basic 2. HA
@@ -619,11 +619,22 @@ type RedisInstance struct {
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	InternalHost   string `gorm:"column:internal_host;type:varchar(128);default:''" json:"INTERNAL_HOST"`
 	PublicHost     string `gorm:"column:public_host;type:varchar(128);default:''" json:"PUBLIC_HOST"`
 	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
+}
+
+type VIP struct {
+	Base   `gorm:"embedded"`
+	IP     string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Domain string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	VTapID uint32 `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
+}
+
+func (VIP) TableName() string {
+	return "vip"
 }
 
 type PodCluster struct {
@@ -1008,8 +1019,8 @@ func (VTapGroup) TableName() string {
 
 type DataSource struct {
 	ID                        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name                      string    `gorm:"column:name;type:char(64);default:''" json:"NAME"`
-	TsdbType                  string    `gorm:"column:tsdb_type;type:char(64);default:''" json:"TSDB_TYPE"`
+	DisplayName               string    `gorm:"column:display_name;type:char(64);default:''" json:"DISPLAY_NAME"`
+	DataTableCollection       string    `gorm:"column:data_table_collection;type:char(64);default:''" json:"DATA_TABLE_COLLECTION"`
 	State                     int       `gorm:"column:state;type:int;default:1" json:"STATE"`
 	BaseDataSourceID          int       `gorm:"column:base_data_source_id;type:int" json:"BASE_DATA_SOURCE_ID"`
 	Interval                  int       `gorm:"column:interval;type:int" json:"INTERVAL"`
@@ -1042,6 +1053,8 @@ type VTapGroupConfiguration struct {
 	CollectorEnabled              *int    `gorm:"column:collector_enabled;type:tinyint(1);default:null" json:"COLLECTOR_ENABLED"`       // 0: disabled 1:enabled
 	VTapFlow1sEnabled             *int    `gorm:"column:vtap_flow_1s_enabled;type:tinyint(1);default:null" json:"VTAP_FLOW_1S_ENABLED"` // 0: disabled 1:enabled
 	L4LogTapTypes                 *string `gorm:"column:l4_log_tap_types;type:text;default:null" json:"L4_LOG_TAP_TYPES"`               // tap type info, separate by ","
+	L4LogIgnoreTapSides           *string `gorm:"column:l4_log_ignore_tap_sides;type:text;default:null" json:"L4_LOG_IGNORE_TAP_SIDES"` // separate by ","
+	L7LogIgnoreTapSides           *string `gorm:"column:l7_log_ignore_tap_sides;type:text;default:null" json:"L7_LOG_IGNORE_TAP_SIDES"` // separate by ","
 	NpbDedupEnabled               *int    `gorm:"column:npb_dedup_enabled;type:tinyint(1);default:null" json:"NPB_DEDUP_ENABLED"`       // 0: disabled 1:enabled
 	PlatformEnabled               *int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   *int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
@@ -1114,6 +1127,8 @@ type RVTapGroupConfiguration struct {
 	CollectorEnabled              int    `gorm:"column:collector_enabled;type:tinyint(1);default:null" json:"COLLECTOR_ENABLED"`       // 0: disabled 1:enabled
 	VTapFlow1sEnabled             int    `gorm:"column:vtap_flow_1s_enabled;type:tinyint(1);default:null" json:"VTAP_FLOW_1S_ENABLED"` // 0: disabled 1:enabled
 	L4LogTapTypes                 string `gorm:"column:l4_log_tap_types;type:text;default:null" json:"L4_LOG_TAP_TYPES"`               // tap type info, separate by ","
+	L4LogIgnoreTapSides           string `gorm:"column:l4_log_ignore_tap_sides;type:text;default:null" json:"L4_LOG_IGNORE_TAP_SIDES"` // separate by ","
+	L7LogIgnoreTapSides           string `gorm:"column:l7_log_ignore_tap_sides;type:text;default:null" json:"L7_LOG_IGNORE_TAP_SIDES"` // separate by ","
 	NpbDedupEnabled               int    `gorm:"column:npb_dedup_enabled;type:tinyint(1);default:null" json:"NPB_DEDUP_ENABLED"`       // 0: disabled 1:enabled
 	PlatformEnabled               int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
@@ -1175,28 +1190,6 @@ type KubernetesCluster struct {
 	CreatedAt   time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	SyncedAt    time.Time `gorm:"column:synced_at;type:datetime" json:"SYNCED_AT"`
 	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime" json:"UPDATED_TIME"`
-}
-
-type GoGenesisVInterface struct {
-	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
-	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	MAC                 string    `gorm:"column:mac;type:char(32);default:null" json:"MAC"`
-	IPS                 string    `gorm:"column:ips;type:text" json:"IPS"`
-	TapName             string    `gorm:"column:tap_name;type:char(64);default:null" json:"TAP_NAME"`
-	TapMAC              string    `gorm:"column:tap_mac;type:char(32);default:null" json:"TAP_MAC"`
-	DeviceLcuuid        string    `gorm:"column:device_lcuuid;type:char(64);default:null" json:"DEVICE_LCUUID"`
-	DeviceName          string    `gorm:"column:device_name;type:char(512);default:null" json:"DEVICE_NAME"`
-	DeviceType          string    `gorm:"column:device_type;type:char(64);default:null" json:"DEVICE_TYPE"`
-	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
-	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
-	VTapID              int       `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	LastSeen            time.Time `gorm:"column:last_seen;type:datetime;default:NULL" json:"LAST_SEEN"`
-	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
-}
-
-func (GoGenesisVInterface) TableName() string {
-	return "go_genesis_vinterface"
 }
 
 type ACL struct {

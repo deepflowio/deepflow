@@ -42,11 +42,17 @@ func NewVM(fpermitCfg config.FPermit) *VM {
 }
 
 func (v *VM) conditionsMapToStruct(fcs common.FilterConditions) filter.Condition {
+	log.Info(fcs) // TODO delete
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"SUBNET_ID", "SECURITY_GROUP_ID"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewSecurityGroupIDCondition("SECURITY_GROUP_ID", fcs["SECURITY_GROUP_ID"].([]int)))
-	c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", fcs["SUBNET_ID"].([]int)))
+	if sgIDs, ok := fcs["SECURITY_GROUP_ID"]; ok {
+		c.TryAppendIntFieldCondition(NewSecurityGroupIDCondition("SECURITY_GROUP_ID", sgIDs))
+	}
+	if networkIDs, ok := fcs["SUBNET_ID"]; ok {
+		c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", networkIDs))
+	}
+	log.Infof("%#v", c) // TODO delete
 	return c
 }
 
@@ -56,7 +62,7 @@ func (v *VM) userPermittedResourceToConditions(upr *UserPermittedResource) (comm
 	}
 	fc.IDs = append(fc.IDs, GetRelatedVMIDs(upr.PodNamespaceIDs)...)
 	dropAll := (len(fc.VPCIDs) == 0 && len(fc.IDs) == 0)
-	return fc.ToMapOmitEmpty(), dropAll
+	return fc.ToMapOmitEmpty(fc), dropAll
 }
 
 // TODO use singleflight
@@ -83,17 +89,17 @@ func GetRelatedVMIDs(podNamespaceIDs []int) []int {
 }
 
 type SubnetIDCondition struct {
-	filter.FieldConditionBase[int]
+	filter.FieldConditionBase[float64]
 }
 
-func NewSubnetIDCondition(key string, value []int) *SubnetIDCondition {
-	return &SubnetIDCondition{filter.FieldConditionBase[int]{Key: key, Value: value}}
+func NewSubnetIDCondition(key string, value interface{}) *SubnetIDCondition {
+	return &SubnetIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
 }
 
 func (p *SubnetIDCondition) Keep(v common.ResponseElem) bool {
 	subnets := v["SUBNETS"].([]map[string]interface{})
 	for _, item := range subnets {
-		if slices.Contains(p.Value, item["ID"].(int)) {
+		if slices.Contains(p.Value, float64(item["ID"].(int))) {
 			return true
 		}
 	}
@@ -101,17 +107,17 @@ func (p *SubnetIDCondition) Keep(v common.ResponseElem) bool {
 }
 
 type SecurityGroupIDCondition struct {
-	filter.FieldConditionBase[int]
+	filter.FieldConditionBase[float64]
 }
 
-func NewSecurityGroupIDCondition(key string, value []int) *SecurityGroupIDCondition {
-	return &SecurityGroupIDCondition{filter.FieldConditionBase[int]{Key: key, Value: value}}
+func NewSecurityGroupIDCondition(key string, value interface{}) *SecurityGroupIDCondition {
+	return &SecurityGroupIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
 }
 
 func (p *SecurityGroupIDCondition) Keep(v common.ResponseElem) bool {
 	sgs := v["SECURITY_GROUPS"].([]map[string]interface{})
 	for _, item := range sgs {
-		if slices.Contains(p.Value, item["ID"].(int)) {
+		if slices.Contains(p.Value, float64(item["ID"].(int))) {
 			return true
 		}
 	}

@@ -23,14 +23,16 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v9"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	"github.com/gin-gonic/gin"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 func GetProcesses(c *gin.Context, redisConfig *redis.Config) (responseData []model.Process, err error) {
@@ -40,8 +42,8 @@ func GetProcesses(c *gin.Context, redisConfig *redis.Config) (responseData []mod
 
 func getProcesses() ([]model.Process, error) {
 	// get processes
-	var processes []*mysql.Process
-	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
+	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped().Order("created_at DESC"))
+	if err != nil {
 		return nil, err
 	}
 	processData, err := GetProcessData(processes)
@@ -88,7 +90,7 @@ type ProcessData struct {
 
 func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 	// store vtap info
-	vtapIDs := mapset.NewSet[int]()
+	vtapIDs := mapset.NewSet[uint32]()
 	for _, item := range processes {
 		vtapIDs.Add(item.VTapID)
 	}
@@ -102,19 +104,24 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 		LaunchServerID int
 	}
 	vtapIDToInfo := make(map[int]vtapInfo, len(vtaps))
-	launchServerIDs := mapset.NewSet[int]()
+	vmLaunchServerIDs := mapset.NewSet[int]()
+	podNodeLaunchServerIDs := mapset.NewSet[int]()
 	for _, vtap := range vtaps {
 		vtapIDToInfo[vtap.ID] = vtapInfo{
 			Name:           vtap.Name,
 			Type:           vtap.Type,
 			LaunchServerID: vtap.LaunchServerID,
 		}
-		launchServerIDs.Add(vtap.LaunchServerID)
+		if utils.Find([]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P}, vtap.Type) {
+			vmLaunchServerIDs.Add(vtap.LaunchServerID)
+		} else if utils.Find([]int{common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtap.Type) {
+			podNodeLaunchServerIDs.Add(vtap.LaunchServerID)
+		}
 	}
 
 	// store vm info
 	var vms []mysql.VM
-	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -124,7 +131,7 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))
@@ -155,24 +162,25 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 		var deviceType, resourceID int
 		var resourceName string
 
+		pVTapID := int(process.VTapID)
 		if podID, ok := containerIDToPodID[process.ContainerID]; ok {
 			deviceType = common.VIF_DEVICE_TYPE_POD
 			resourceName = podIDToName[podID]
 			resourceID = podID
 		} else {
-			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[pVTapID].Type]
 			if deviceType == common.VIF_DEVICE_TYPE_VM {
-				resourceName = vmIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+				resourceName = vmIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
 			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-				resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+				resourceName = podNodeIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
 			}
-			resourceID = vtapIDToInfo[process.VTapID].LaunchServerID
+			resourceID = vtapIDToInfo[pVTapID].LaunchServerID
 		}
 		resp[process.ID] = ProcessData{
 			ResourceType: deviceType,
 			ResourceID:   resourceID,
 			ResourceName: resourceName,
-			VTapName:     vtapIDToInfo[process.VTapID].Name,
+			VTapName:     vtapIDToInfo[pVTapID].Name,
 		}
 	}
 	return resp, nil

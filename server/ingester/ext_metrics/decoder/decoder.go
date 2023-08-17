@@ -82,14 +82,17 @@ func NewDecoder(
 	config *config.Config,
 ) *Decoder {
 	return &Decoder{
-		index:            index,
-		msgType:          msgType,
-		platformData:     platformData,
-		inQueue:          inQueue,
-		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
-		extMetricsWriter: extMetricsWriter,
-		config:           config,
-		counter:          &Counter{},
+		index:                    index,
+		msgType:                  msgType,
+		platformData:             platformData,
+		inQueue:                  inQueue,
+		debugEnabled:             log.IsEnabledFor(logging.DEBUG),
+		extMetricsWriter:         extMetricsWriter,
+		config:                   config,
+		podNameToUniversalTag:    make(map[string]*zerodoc.UniversalTag),
+		instanceIPToUniversalTag: make(map[string]*zerodoc.UniversalTag),
+		vtapIDToUniversalTag:     make(map[uint16]*zerodoc.UniversalTag),
+		counter:                  &Counter{},
 	}
 }
 

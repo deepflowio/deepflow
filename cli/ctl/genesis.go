@@ -35,7 +35,7 @@ func RegisterGenesisCommand() *cobra.Command {
 		Use:   "genesis",
 		Short: "genesis operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("please run with 'sync | k8s | agent'.")
+			fmt.Println("please run with 'sync | k8s | agent | storage'.")
 		},
 	}
 
@@ -48,7 +48,7 @@ func RegisterGenesisCommand() *cobra.Command {
 			syncInfo(cmd, syncType)
 		},
 	}
-	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | network | vinterface | process'\ndefault: vinterface")
+	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | vip | network | vinterface | process'\ndefault: vinterface")
 
 	var k8sType string
 	k8sInfo := &cobra.Command{
@@ -73,9 +73,18 @@ func RegisterGenesisCommand() *cobra.Command {
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -i node_ip [host_ip]",
+		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or vtap_id]",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInfo(cmd, args)
+		},
+	}
+
+	storageInfo := &cobra.Command{
+		Use:     "storage",
+		Short:   "genesis storage info",
+		Example: "deepflow-ctl genesis storage vtap_id",
+		Run: func(cmd *cobra.Command, args []string) {
+			storageInfo(cmd, args)
 		},
 	}
 
@@ -83,6 +92,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
 	genesis.AddCommand(prometheusInfo)
+	genesis.AddCommand(storageInfo)
 	return genesis
 }
 
@@ -124,6 +134,8 @@ func syncInfo(cmd *cobra.Command, resType string) {
 		tableNetwork(response, table)
 	case "ip":
 		tableIp(response, table)
+	case "vip":
+		tableVip(response, table)
 	case "vinterface":
 		tableVinterface(response, table)
 	case "process":
@@ -295,6 +307,22 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 	table.Render()
 }
 
+func tableVip(response *simplejson.Json, table *tablewriter.Table) {
+	table.SetHeader([]string{"IP", "VTAP_ID"})
+
+	tableItems := [][]string{}
+	for i := range response.Get("DATA").MustArray() {
+		data := response.Get("DATA").GetIndex(i)
+		tableItem := []string{}
+		tableItem = append(tableItem, data.Get("IP").MustString())
+		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
+		tableItems = append(tableItems, tableItem)
+	}
+
+	table.AppendBulk(tableItems)
+	table.Render()
+}
+
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
 
@@ -388,27 +416,16 @@ func prometheusInfo(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/prometheus-info/%s/", server.IP, server.Port, args[0])
+	path := fmt.Sprintf("/v1/prometheus-info/%s/", args[0])
+	common.GetURLInfo(cmd, path)
+}
 
-	response, err := common.CURLPerform("GET", url, nil, "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+func storageInfo(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify vtap id.\nExample: %s\n", cmd.Example)
 		return
 	}
 
-	responseByte, err := response.MarshalJSON()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	var str bytes.Buffer
-	err = json.Indent(&str, responseByte, "", "    ")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	fmt.Println(str.String())
+	path := fmt.Sprintf("/v1/genesis-storage/%s/", args[0])
+	common.GetURLInfo(cmd, path)
 }

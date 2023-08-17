@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{net::IpAddr, path::Path, process, thread, time::Duration};
+use std::{net::IpAddr, process, thread, time::Duration};
 
 use log::{info, warn};
 use regex::Regex;
@@ -31,7 +31,7 @@ pub struct SidecarPoller(InterfaceInfo);
 
 impl SidecarPoller {
     pub fn new(dest: IpAddr) -> Self {
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(dest);
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&dest);
         let Ok(links) = link_list() else {
             warn!("call link_list() failed");
             thread::sleep(Duration::from_secs(1));
@@ -42,8 +42,9 @@ impl SidecarPoller {
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);
         };
-        let Ok(ns): Result<NsFile, _> = Path::new(netns::CURRENT_NS_PATH).try_into() else {
-            warn!("cannot open ns file {}", netns::CURRENT_NS_PATH);
+        let path = netns::current_netns_path();
+        let Ok(ns): Result<NsFile, _> = path.as_path().try_into() else {
+            warn!("cannot open ns file {}", path.display());
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);
         };

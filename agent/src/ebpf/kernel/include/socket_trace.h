@@ -137,6 +137,7 @@ struct conn_info_t {
 	__u8 skc_ipv6only : 1;
 	__u8 infer_reliable : 1; // Is protocol inference reliable?
 	__u8 padding : 6;
+	__u8 skc_state;
 	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
 	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
 	__u32 fd;
@@ -150,7 +151,7 @@ struct conn_info_t {
 	enum traffic_direction direction; //T_INGRESS or T_EGRESS
 	enum endpoint_role role;
 	size_t prev_count;
-	char prev_buf[4];
+	char prev_buf[EBPF_CACHE_SIZE];
 	__s32 correlation_id; // 目前用于kafka判断
 	enum traffic_direction prev_direction;
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
@@ -186,6 +187,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_GO_HTTP2_UPROBE,
 	DATA_SOURCE_OPENSSL_UPROBE,
 	DATA_SOURCE_IO_EVENT,
+	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
 };
 
 struct process_data_extra {

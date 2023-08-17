@@ -61,11 +61,12 @@ pub use recv_engine::{
 
 #[cfg(target_os = "linux")]
 use self::base_dispatcher::TapInterfaceWhitelist;
+use crate::config::handler::CollectorAccess;
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
 use crate::utils::environment::get_mac_by_name;
 use crate::{
-    common::{enums::TapType, FlowAclListener, TaggedFlow, TapTyper},
+    common::{enums::TapType, flow::L7Stats, FlowAclListener, TaggedFlow, TapTyper},
     config::{
         handler::{FlowAccess, LogParserAccess},
         DispatcherConfig,
@@ -633,13 +634,15 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    flow_output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
+    l7_stats_output_queue: Option<DebugSender<BatchedBox<L7Stats>>>,
     log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     log_parse_config: Option<LogParserAccess>,
+    collector_config: Option<CollectorAccess>,
     policy_getter: Option<PolicyGetter>,
     #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<GenericPoller>>,
@@ -718,8 +721,13 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: DebugSender<BatchedBox<TaggedFlow>>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<Arc<BatchedBox<TaggedFlow>>>) -> Self {
         self.flow_output_queue = Some(v);
+        self
+    }
+
+    pub fn l7_stats_output_queue(mut self, v: DebugSender<BatchedBox<L7Stats>>) -> Self {
+        self.l7_stats_output_queue = Some(v);
         self
     }
 
@@ -749,6 +757,11 @@ impl DispatcherBuilder {
 
     pub fn log_parse_config(mut self, v: LogParserAccess) -> Self {
         self.log_parse_config = Some(v);
+        self
+    }
+
+    pub fn collector_config(mut self, v: CollectorAccess) -> Self {
+        self.collector_config = Some(v);
         self
     }
 
@@ -799,14 +812,9 @@ impl DispatcherBuilder {
 
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
+        // set ns before creating af packet socket
         #[cfg(target_os = "linux")]
-        let mut current_ns = None;
-        #[cfg(target_os = "linux")]
-        if netns != NsFile::Root {
-            current_ns = Some(netns::open_current_ns()?);
-            // set ns before creating af packet socket
-            let _ = netns::open_named_and_setns(&netns)?;
-        };
+        let _ = netns::open_named_and_setns(&netns)?;
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -898,6 +906,10 @@ impl DispatcherBuilder {
                 .flow_output_queue
                 .take()
                 .ok_or(Error::ConfigIncomplete("no flow_output_queue".into()))?,
+            l7_stats_output_queue: self
+                .l7_stats_output_queue
+                .take()
+                .ok_or(Error::ConfigIncomplete("no l7_stats_output_queue".into()))?,
             log_output_queue: self
                 .log_output_queue
                 .take()
@@ -914,6 +926,10 @@ impl DispatcherBuilder {
                 .log_parse_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no log parse config".into()))?,
+            collector_config: self
+                .collector_config
+                .take()
+                .ok_or(Error::ConfigIncomplete("no collector config".into()))?,
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
@@ -1028,9 +1044,7 @@ impl DispatcherBuilder {
         };
         dispatcher.init();
         #[cfg(target_os = "linux")]
-        if let Some(ns) = current_ns {
-            let _ = netns::setns(&ns, Some(netns::CURRENT_NS_PATH))?;
-        }
+        let _ = netns::reset_netns()?;
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
             terminated,

@@ -17,7 +17,9 @@
 package flow_log
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "golang.org/x/net/context"
@@ -63,6 +65,19 @@ type Logger struct {
 
 func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowLog, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_FLOW_LOG_QUEUE)
+
+	if config.Base.StorageDisabled {
+		otlpExporter := exporter.NewOtlpExporter(config)
+		l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, nil, otlpExporter)
+		if err != nil {
+			return nil, err
+		}
+		return &FlowLog{
+			L7FlowLogger: l7FlowLogger,
+			OtlpExporter: otlpExporter,
+		}, nil
+	}
+
 	geo.NewGeoTree()
 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(
@@ -124,11 +139,12 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(flowLogId),
 		)
 		if platformDataManager != nil {
-			platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "flow-log-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i))
+			platformDatas[i], _ = platformDataManager.NewPlatformInfoTable("flow-log-" + datatype.MessageTypeString[msgType] + "-" + strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, platformDatas[i])
 			}
@@ -177,10 +193,11 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 	for i := 0; i < queueCount; i++ {
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
 		)
-		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "l4-flow-log-"+strconv.Itoa(i))
+		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable("l4-flow-log-" + strconv.Itoa(i))
 		if i == 0 {
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, platformDatas[i])
 		}
@@ -226,17 +243,25 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
+	var flowTagWriter *flow_tag.FlowTagWriter
+	var err error
 	for i := 0; i < queueCount; i++ {
-		flowTagWriter, err := flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
-		if err != nil {
-			return nil, err
+		if flowLogWriter != nil {
+			flowTagWriter, err = flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+			if err != nil {
+				return nil, err
+			}
 		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(common.L7_FLOW_ID),
 		)
-		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "l7-flow-log-"+strconv.Itoa(i))
+		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable("l7-flow-log-" + strconv.Itoa(i))
+		if i == 0 {
+			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, platformDatas[i])
+		}
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
@@ -248,11 +273,22 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 		)
 	}
 
-	return &Logger{
+	l := &Logger{
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
-	}, nil
+	}
+	debug.ServerRegisterSimple(ingesterctl.CMD_L7_FLOW_LOG, l)
+	return l, nil
+}
+
+func (l *Logger) HandleSimpleCommand(op uint16, arg string) string {
+	sb := &strings.Builder{}
+	sb.WriteString("last 10s counter:\n")
+	for i, d := range l.Decoders {
+		sb.WriteString(fmt.Sprintf("  decoder %d: %+v\n", i, d.GetLastCounter()))
+	}
+	return sb.String()
 }
 
 func (l *Logger) Start() {
@@ -276,21 +312,41 @@ func (l *Logger) Close() {
 }
 
 func (s *FlowLog) Start() {
-	s.L4FlowLogger.Start()
-	s.L7FlowLogger.Start()
-	s.L4PacketLogger.Start()
-	s.OtelLogger.Start()
-	s.OtelCompressedLogger.Start()
+	if s.L4FlowLogger != nil {
+		s.L4FlowLogger.Start()
+	}
+	if s.L7FlowLogger != nil {
+		s.L7FlowLogger.Start()
+	}
+	if s.L4PacketLogger != nil {
+		s.L4PacketLogger.Start()
+	}
+	if s.OtelLogger != nil {
+		s.OtelLogger.Start()
+	}
+	if s.OtelCompressedLogger != nil {
+		s.OtelCompressedLogger.Start()
+	}
 	if s.OtlpExporter != nil {
 		s.OtlpExporter.Start()
 	}
 }
 
 func (s *FlowLog) Close() error {
-	s.L4FlowLogger.Close()
-	s.L7FlowLogger.Close()
-	s.L4PacketLogger.Close()
-	s.OtelLogger.Close()
-	s.OtelCompressedLogger.Close()
+	if s.L4FlowLogger != nil {
+		s.L4FlowLogger.Close()
+	}
+	if s.L7FlowLogger != nil {
+		s.L7FlowLogger.Close()
+	}
+	if s.L4PacketLogger != nil {
+		s.L4PacketLogger.Close()
+	}
+	if s.OtelLogger != nil {
+		s.OtelLogger.Close()
+	}
+	if s.OtelCompressedLogger != nil {
+		s.OtelCompressedLogger.Close()
+	}
 	return nil
 }

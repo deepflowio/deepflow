@@ -122,6 +122,16 @@ struct __http2_buffer {
 	char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
+// The first 8 bytes are fixed headers,
+// and the total reported buffer does not exceed 1k
+#define HTTP2_DATAFRAME_DATA_SIZE (CAP_DATA_SIZE - 8)
+
+struct __http2_dataframe {
+	__u32 stream_id;
+	__u32 data_len;
+	char data[HTTP2_DATAFRAME_DATA_SIZE + HTTP2_BUFFER_UESLESS];
+};
+
 #define SOCKET_DATA_HEADER offsetof(typeof(struct __socket_data), data)
 
 struct __http2_stack {
@@ -132,7 +142,10 @@ struct __http2_stack {
 				__u32 __unused_events_num;
 				__u32 __unused_len;
 				char __unused_header[SOCKET_DATA_HEADER];
-				struct __http2_buffer http2_buffer;
+				union{
+					struct __http2_buffer http2_buffer;
+					struct __http2_dataframe http2_dataframe;
+				};
 			} __attribute__((packed));
 		};
 		struct {
@@ -150,18 +163,6 @@ static __inline struct __http2_stack *get_http2_stack()
 {
 	int k0 = 0;
 	return bpf_map_lookup_elem(&NAME(http2_stack), &k0);
-}
-
-static __inline struct __http2_buffer *get_http2_buffer()
-{
-	struct __http2_stack *stack = get_http2_stack();
-	return stack ? (&(stack->http2_buffer)) : NULL;
-}
-
-static __inline struct __socket_data *get_http2_send_buffer()
-{
-	struct __http2_stack *stack = get_http2_stack();
-	return stack ? (&(stack->send_buffer)) : NULL;
 }
 
 static __inline void update_http2_tls(bool tls)
@@ -196,9 +197,9 @@ static __inline bool skip_http2_kprobe(void)
 	if (!info) {
 		return false;
 	}
-	// must have net_TCPConn_itab
-	if (!info->net_TCPConn_itab) {
-		return false;
+
+	if (info->net_TCPConn_itab) {
+		return true;
 	}
 	// HTTP2
 	if (info->crypto_tls_Conn_itab) {
@@ -545,15 +546,9 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 		data.pid = pid;
 		data.meta.event_type = EVENT_TYPE_PROC_EXIT;
 		bpf_get_current_comm(data.name, sizeof(data.name));
-		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-						BPF_F_CURRENT_CPU, &data,
-						sizeof(data));
-
-		if (ret) {
-			bpf_debug
-			    ("bpf_func_sched_process_exit event output failed: %d\n",
-			     ret);
-		}
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, &data,
+				      sizeof(data));
 	}
 
 	bpf_map_delete_elem(&goroutines_map, &id);
@@ -569,13 +564,8 @@ int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 	data.pid = ctx->child_pid;
 	bpf_get_current_comm(data.name, sizeof(data.name));
-	int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-					BPF_F_CURRENT_CPU, &data, sizeof(data));
+	bpf_perf_event_output(ctx, &NAME(socket_data),
+			      BPF_F_CURRENT_CPU, &data, sizeof(data));
 
-	if (ret) {
-		bpf_debug(
-			"bpf_func_sys_exit_execve event output() failed: %d\n",
-			ret);
-	}
 	return 0;
 }

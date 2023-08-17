@@ -39,22 +39,25 @@ use flexi_logger::Duplicate;
 use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
-use log::{info, warn};
+use log::{debug, info, warn};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
-use crate::flow_generator::protocol_logs::SessionAggregator;
 #[cfg(target_os = "linux")]
 use crate::platform::prometheus::targets::TargetsWatcher;
 use crate::{
-    collector::Collector,
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
         MetricsType,
     },
+    collector::{
+        l7_quadruple_generator::L7QuadrupleGeneratorThread, Collector, L7Collector,
+        L7CollectorThread,
+    },
     common::{
         enums::TapType,
+        flow::L7Stats,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
         FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
@@ -70,7 +73,9 @@ use crate::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     exception::ExceptionHandler,
-    flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
+    flow_generator::{
+        protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
+    },
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
         BoxedPrometheusExtra, MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile,
@@ -100,7 +105,7 @@ use crate::{
 use crate::{
     ebpf_dispatcher::EbpfCollector,
     platform::{
-        kubernetes::{GenericPoller, Poller},
+        kubernetes::{GenericPoller, Poller, SidecarPoller},
         ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer,
     },
     utils::{
@@ -124,7 +129,7 @@ use public::{
     proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
-    utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
+    utils::net::{get_route_src_ip, links_by_name_regex, Link, MacAddr},
     LeakyBucket,
 };
 
@@ -203,6 +208,18 @@ CompileTime: {}",
 
 pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 
+#[derive(Clone, Debug)]
+pub struct AgentId {
+    pub ip: IpAddr,
+    pub mac: MacAddr,
+}
+
+impl fmt::Display for AgentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.ip, self.mac)
+    }
+}
+
 pub struct Trident {
     state: TridentState,
     handle: Option<JoinHandle<()>>,
@@ -213,6 +230,7 @@ impl Trident {
         config_path: P,
         version_info: &'static VersionInfo,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
     ) -> Result<Trident> {
         let config = match agent_mode {
             RunningMode::Managed => {
@@ -340,6 +358,7 @@ impl Trident {
                 remote_log_config,
                 stats_collector,
                 config_path,
+                sidecar_mode,
             ) {
                 warn!(
                     "Launching deepflow-agent failed: {}, deepflow-agent restart...",
@@ -360,20 +379,52 @@ impl Trident {
         remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
         config_path: Option<PathBuf>,
+        sidecar_mode: bool,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Environment variables: {:?}", get_env());
 
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
+        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
+
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
         if running_in_container() {
             info!(
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
         }
+
+        #[cfg(target_os = "linux")]
+        let agent_id = if sidecar_mode {
+            AgentId {
+                ip: ctrl_ip.clone(),
+                mac: ctrl_mac,
+            }
+        } else {
+            // use host ip/mac as agent id if not in sidecar mode
+            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                warn!("setns error: {}", e);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            }
+            let (ip, mac) = get_ctrl_ip_and_mac(&controller_ip);
+            if let Err(e) = netns::reset_netns() {
+                warn!("reset setns error: {}", e);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            };
+            AgentId { ip, mac }
+        };
+        #[cfg(target_os = "windows")]
+        let agent_id = AgentId {
+            ip: ctrl_ip.clone(),
+            mac: ctrl_mac,
+        };
+
         info!(
-            "agent running in {:?} mode, ctrl_ip {} ctrl_mac {}",
-            config.agent_mode, ctrl_ip, ctrl_mac
+            "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
+            agent_id, config.agent_mode, ctrl_ip, ctrl_mac
         );
 
         let exception_handler = ExceptionHandler::default();
@@ -420,8 +471,7 @@ impl Trident {
             session.clone(),
             state.clone(),
             version_info,
-            ctrl_ip.to_string(),
-            ctrl_mac.to_string(),
+            agent_id,
             config_handler.static_config.controller_ips[0].clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
@@ -485,12 +535,12 @@ impl Trident {
         monitor.start();
 
         #[cfg(target_os = "linux")]
-        let (libvirt_xml_extractor, platform_synchronizer) = {
+        let (libvirt_xml_extractor, platform_synchronizer, sidecar_poller) = {
             let ext = Arc::new(LibvirtXmlExtractor::new());
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
-                synchronizer.running_config.clone(),
+                synchronizer.agent_id.clone(),
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
@@ -503,13 +553,23 @@ impl Trident {
                 HashMap::new(),
             ));
             ext.start();
-            (ext, syn)
+            let poller = if sidecar_mode {
+                let p: Arc<GenericPoller> = Arc::new(
+                    SidecarPoller::new(config_handler.static_config.controller_ips[0].parse()?)
+                        .into(),
+                );
+                syn.set_kubernetes_poller(p.clone());
+                Some(p)
+            } else {
+                None
+            };
+            (ext, syn, poller)
         };
         #[cfg(target_os = "windows")]
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             config_handler.static_config.override_os_hostname.clone(),
@@ -525,7 +585,7 @@ impl Trident {
         let api_watcher = Arc::new(ApiWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -663,9 +723,12 @@ impl Trident {
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
                         #[cfg(target_os = "linux")]
+                        sidecar_poller.clone(),
+                        #[cfg(target_os = "linux")]
                         api_watcher.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
+                        sidecar_mode,
                         runtime.clone(),
                     )?;
 
@@ -762,6 +825,49 @@ impl Trident {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn get_listener_links(conf: &DispatcherConfig, listener: &DispatcherListener) -> Vec<Link> {
+    let netns = listener.netns();
+    let interfaces = match links_by_name_regex_in_netns(&conf.tap_interface_regex, &netns) {
+        Err(e) => {
+            warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
+            vec![]
+        }
+        Ok(links) => {
+            if links.is_empty() {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                    conf.tap_interface_regex, netns,
+                );
+            }
+            links
+        }
+    };
+    debug!("tap interfaces in namespace {:?}: {:?}", netns, interfaces);
+    interfaces
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_listener_links(conf: &DispatcherConfig, _: &DispatcherListener) -> Vec<Link> {
+    let interfaces = match links_by_name_regex(&conf.tap_interface_regex) {
+        Err(e) => {
+            warn!("get interfaces by name regex failed: {}", e);
+            vec![]
+        }
+        Ok(links) => {
+            if links.is_empty() {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    conf.tap_interface_regex
+                );
+            }
+            links
+        }
+    };
+    debug!("tap interfaces: {:?}", interfaces);
+    interfaces
+}
+
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
     components: &mut AgentComponents,
@@ -772,55 +878,10 @@ fn dispatcher_listener_callback(
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            let links = match links_by_name_regex(&conf.tap_interface_regex) {
-                Err(e) => {
-                    warn!("get interfaces by name regex failed: {}", e);
-                    vec![]
-                }
-                Ok(links) => {
-                    if links.is_empty() {
-                        warn!(
-                            "tap-interface-regex({}) do not match any interface, in local mode",
-                            conf.tap_interface_regex
-                        );
-                    }
-                    links
-                }
-            };
             for listener in components.dispatcher_listeners.iter() {
-                #[cfg(target_os = "linux")]
-                let netns = listener.netns();
-                #[cfg(target_os = "linux")]
-                if netns != NsFile::Root {
-                    let interfaces = match links_by_name_regex_in_netns(
-                        &conf.tap_interface_regex,
-                        &netns,
-                    ) {
-                        Err(e) => {
-                            warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
-                            vec![]
-                        }
-                        Ok(links) => {
-                            if links.is_empty() {
-                                warn!(
-                                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
-                                    conf.tap_interface_regex, netns,
-                                );
-                            }
-                            links
-                        }
-                    };
-                    info!("tap interface in namespace {:?}: {:?}", netns, interfaces);
-                    listener.on_tap_interface_change(
-                        &interfaces,
-                        if_mac_source,
-                        conf.trident_type,
-                        &blacklist,
-                    );
-                    continue;
-                }
+                let interfaces = get_listener_links(conf, listener);
                 listener.on_tap_interface_change(
-                    &links,
+                    &interfaces,
                     if_mac_source,
                     conf.trident_type,
                     &blacklist,
@@ -886,6 +947,8 @@ pub struct DomainNameListener {
     ips: Vec<String>,
     domain_names: Vec<String>,
 
+    sidecar_mode: bool,
+
     thread_handler: Option<JoinHandle<()>>,
     stopped: Arc<AtomicBool>,
 }
@@ -901,6 +964,7 @@ impl DomainNameListener {
         #[cfg(target_os = "linux")] prometheus_targets_watcher: Arc<TargetsWatcher>,
         domain_names: Vec<String>,
         ips: Vec<String>,
+        sidecar_mode: bool,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
@@ -913,6 +977,8 @@ impl DomainNameListener {
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
+
+            sidecar_mode,
 
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -960,6 +1026,9 @@ impl DomainNameListener {
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
 
+        #[cfg(target_os = "linux")]
+        let sidecar_mode = self.sidecar_mode;
+
         info!(
             "Resolve controller domain name {} {}",
             domain_names[0], ips[0]
@@ -991,17 +1060,34 @@ impl DomainNameListener {
                         }
 
                         if changed {
-                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
+                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
                             info!(
                                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                                 ctrl_ip
                             );
+                            #[cfg(target_os = "linux")]
+                            let agent_id = if sidecar_mode {
+                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
+                            } else {
+                                // use host ip/mac as agent id if not in sidecar mode
+                                if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                                    warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                                    warn!("setns error: {}", e);
+                                    thread::sleep(Duration::from_secs(1));
+                                    process::exit(-1);
+                                }
+                                let (ip, mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
+                                if let Err(e) = netns::reset_netns() {
+                                    warn!("reset setns error: {}", e);
+                                    thread::sleep(Duration::from_secs(1));
+                                    process::exit(-1);
+                                };
+                                AgentId { ip, mac }
+                            };
+                            #[cfg(target_os = "windows")]
+                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
 
-                            synchronizer.reset_session(
-                                ips.clone(),
-                                ctrl_ip.to_string(),
-                                ctrl_mac.to_string(),
-                            );
+                            synchronizer.reset_session(ips.clone(), agent_id);
                             platform_synchronizer.reset_session(ips.clone());
                             #[cfg(target_os = "linux")]
                             api_watcher.reset_session(ips.clone());
@@ -1043,13 +1129,14 @@ impl WatcherComponents {
         api_watcher: Arc<ApiWatcher>,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -1063,6 +1150,7 @@ impl WatcherComponents {
             prometheus_targets_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            sidecar_mode,
         );
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
@@ -1105,6 +1193,7 @@ pub struct AgentComponents {
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub session_aggrs: Vec<SessionAggregator>,
     pub collectors: Vec<CollectorThread>,
+    pub l7_collectors: Vec<L7CollectorThread>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
@@ -1152,7 +1241,7 @@ impl AgentComponents {
     fn new_collector(
         id: usize,
         stats_collector: Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<BatchedBox<TaggedFlow>>,
+        flow_receiver: queue::Receiver<Arc<BatchedBox<TaggedFlow>>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
         metrics_sender: DebugSender<BoxedDocument>,
@@ -1294,6 +1383,109 @@ impl AgentComponents {
         )
     }
 
+    fn new_l7_collector(
+        id: usize,
+        stats_collector: Arc<stats::Collector>,
+        l7_stats_receiver: queue::Receiver<BatchedBox<L7Stats>>,
+        metrics_sender: DebugSender<BoxedDocument>,
+        metrics_type: MetricsType,
+        config_handler: &ConfigHandler,
+        queue_debugger: &QueueDebugger,
+        synchronizer: &Arc<Synchronizer>,
+    ) -> L7CollectorThread {
+        let yaml_config = &config_handler.candidate_config.yaml_config;
+
+        let (l7_second_sender, l7_second_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-l7-second-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-l7-second-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+        let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-l7-minute-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-l7-minute-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+
+        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
+        // QuadrupleGenerator的Delay组成部分：
+        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
+        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
+        //   FlowGen中输出队列Flush的Delay：flushInterval
+        //   FlowGen中其它处理流程可能产生的Delay: 5s
+        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
+            + 1
+            + yaml_config.flow.flush_interval.as_secs()
+            + COMMON_DELAY as u64)
+            + yaml_config.second_flow_extra_delay.as_secs();
+        // minute QG window is also pushed forward by flow stat time,
+        // therefore its delay should be 60 + second delay (including extra flow delay)
+        let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
+
+        let quadruple_generator = L7QuadrupleGeneratorThread::new(
+            id,
+            l7_stats_receiver,
+            l7_second_sender,
+            l7_minute_sender,
+            metrics_type,
+            second_quadruple_tolerable_delay,
+            minute_quadruple_tolerable_delay,
+            1 << 18, // possible_host_size
+            config_handler.collector(),
+            synchronizer.ntp_diff(),
+            stats_collector.clone(),
+        );
+
+        let (mut second_collector, mut minute_collector) = (None, None);
+        if metrics_type.contains(MetricsType::SECOND) {
+            second_collector = Some(L7Collector::new(
+                id as u32,
+                l7_second_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND,
+                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
+        }
+        if metrics_type.contains(MetricsType::MINUTE) {
+            minute_collector = Some(L7Collector::new(
+                id as u32,
+                l7_minute_receiver,
+                metrics_sender,
+                MetricsType::MINUTE,
+                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
+        }
+
+        L7CollectorThread::new(quadruple_generator, second_collector, minute_collector)
+    }
+
     fn new(
         version_info: &VersionInfo,
         config_handler: &ConfigHandler,
@@ -1304,9 +1496,11 @@ impl AgentComponents {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
@@ -1397,23 +1591,25 @@ impl AgentComponents {
         // TODO: packet handler builders
 
         #[cfg(target_os = "linux")]
-        let kubernetes_poller = Arc::new(GenericPoller::new(
-            config_handler.static_config.controller_ips[0].parse()?,
-            config_handler.platform(),
-            config_handler
-                .candidate_config
-                .dispatcher
-                .extra_netns_regex
-                .clone(),
-        ));
-        #[cfg(target_os = "linux")]
-        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+        // sidecar poller is created before agent start to provide pod interface info for server
+        let kubernetes_poller = sidecar_poller.unwrap_or_else(|| {
+            let poller = Arc::new(GenericPoller::new(
+                config_handler.platform(),
+                config_handler
+                    .candidate_config
+                    .dispatcher
+                    .extra_netns_regex
+                    .clone(),
+            ));
+            platform_synchronizer.set_kubernetes_poller(poller.clone());
+            poller
+        });
 
         #[cfg(target_os = "linux")]
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -1427,7 +1623,7 @@ impl AgentComponents {
             poller: kubernetes_poller.clone(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
-            running_config: synchronizer.running_config.clone(),
+            agent_id: synchronizer.agent_id.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
             policy_setter,
@@ -1451,7 +1647,7 @@ impl AgentComponents {
         let socket_synchronizer = SocketSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             Arc::new(Mutex::new(policy_getter)),
             policy_setter,
             session.clone(),
@@ -1501,6 +1697,7 @@ impl AgentComponents {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
+        let mut l7_collectors = vec![];
         let mut session_aggrs = vec![];
         let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
 
@@ -1713,6 +1910,20 @@ impl AgentComponents {
                 ],
             );
 
+            let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-l7-stats-to-quadruple-generator",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
+            );
+
             // create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1863,11 +2074,13 @@ impl AgentComponents {
                 .tap_typer(tap_typer.clone())
                 .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
                 .flow_output_queue(flow_sender.clone())
+                .l7_stats_output_queue(l7_stats_sender.clone())
                 .log_output_queue(log_sender.clone())
                 .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
                 .log_parse_config(config_handler.log_parser())
+                .collector_config(config_handler.collector())
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
@@ -1923,6 +2136,17 @@ impl AgentComponents {
                 &synchronizer,
             );
             collectors.push(collector);
+            let l7_collector = Self::new_l7_collector(
+                i,
+                stats_collector.clone(),
+                l7_stats_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            l7_collectors.push(l7_collector);
         }
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
@@ -1948,12 +2172,34 @@ impl AgentComponents {
             true,
         );
 
+        let profile_queue_name = "1-profile-to-sender";
+        let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            profile_queue_name,
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
+        );
+        let profile_uniform_sender = UniformSenderThread::new(
+            profile_queue_name,
+            Arc::new(profile_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            true,
+        );
+
         let ebpf_dispatcher_id = dispatchers.len();
         #[cfg(target_os = "linux")]
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode != TapMode::Analyzer {
+        if !config_handler.ebpf().load().ebpf.disabled
+            && candidate_config.tap_mode != TapMode::Analyzer
+        {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
@@ -1964,6 +2210,20 @@ impl AgentComponents {
                 Countable::Owned(Box::new(counter)),
                 vec![
                     StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
+                ],
+            );
+
+            let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-l7-stats-to-quadruple-generator",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
                     StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
                 ],
             );
@@ -2005,16 +2265,30 @@ impl AgentComponents {
             );
             session_aggrs.push(session_aggr);
             collectors.push(collector);
+            let l7_collector = Self::new_l7_collector(
+                ebpf_dispatcher_id,
+                stats_collector.clone(),
+                l7_stats_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            l7_collectors.push(l7_collector);
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
                 config_handler.ebpf(),
                 config_handler.log_parser(),
                 config_handler.flow(),
+                config_handler.collector(),
                 policy_getter,
                 log_sender,
                 flow_sender,
+                l7_stats_sender,
                 proc_event_sender,
+                profile_sender.clone(),
                 &queue_debugger,
                 stats_collector.clone(),
                 platform_synchronizer.clone(),
@@ -2049,37 +2323,32 @@ impl AgentComponents {
             true,
         );
 
-        let mut otel_metrics_collect_sender = None;
-        if config_handler.metric_server().load().enabled {
-            let otel_dispatcher_id = ebpf_dispatcher_id + 1;
-            let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-tagged-flow-to-quadruple-generator",
-                &queue_debugger,
-            );
-            otel_metrics_collect_sender = Some(otel_metrics_sender);
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-otel-metrics-to-collector".to_string()),
-                    StatsOption::Tag("index", otel_dispatcher_id.to_string()),
-                ],
-            );
-            let collector = Self::new_collector(
-                otel_dispatcher_id,
-                stats_collector.clone(),
-                otel_metrics_receiver,
-                toa_sender.clone(),
-                None,
-                metrics_sender.clone(),
-                MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler,
-                &queue_debugger,
-                &synchronizer,
-            );
-            collectors.push(collector);
-        }
+        let otel_dispatcher_id = ebpf_dispatcher_id + 1;
+
+        let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow_queue_size,
+            "1-l7-stats-to-quadruple-generator",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
+                StatsOption::Tag("index", otel_dispatcher_id.to_string()),
+            ],
+        );
+        let l7_collector = Self::new_l7_collector(
+            otel_dispatcher_id,
+            stats_collector.clone(),
+            l7_stats_receiver,
+            metrics_sender.clone(),
+            MetricsType::SECOND | MetricsType::MINUTE,
+            config_handler,
+            &queue_debugger,
+            &synchronizer,
+        );
+        l7_collectors.push(l7_collector);
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
@@ -2124,26 +2393,6 @@ impl AgentComponents {
             true,
         );
 
-        let profile_queue_name = "1-profile-to-sender";
-        let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
-            profile_queue_name,
-            &queue_debugger,
-        );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
-        );
-        let profile_uniform_sender = UniformSenderThread::new(
-            profile_queue_name,
-            Arc::new(profile_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            true,
-        );
-
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -2171,7 +2420,7 @@ impl AgentComponents {
             runtime.clone(),
             otel_sender,
             compressed_otel_sender,
-            otel_metrics_collect_sender,
+            l7_stats_sender,
             prometheus_sender,
             telegraf_sender,
             profile_sender,
@@ -2204,6 +2453,7 @@ impl AgentComponents {
             prometheus_targets_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            sidecar_mode,
         );
 
         let sender_config = config_handler.sender().load();
@@ -2229,6 +2479,7 @@ impl AgentComponents {
             dispatchers,
             dispatcher_listeners,
             collectors,
+            l7_collectors,
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
@@ -2329,6 +2580,10 @@ impl AgentComponents {
             collector.start();
         }
 
+        for collector in self.l7_collectors.iter_mut() {
+            collector.start();
+        }
+
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
@@ -2378,6 +2633,10 @@ impl AgentComponents {
         }
 
         for q in self.collectors.iter_mut() {
+            join_handles.append(&mut q.notify_stop());
+        }
+
+        for q in self.l7_collectors.iter_mut() {
             join_handles.append(&mut q.notify_stop());
         }
 
@@ -2490,9 +2749,11 @@ impl Components {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
@@ -2506,6 +2767,7 @@ impl Components {
                 api_watcher,
                 exception_handler,
                 agent_mode,
+                sidecar_mode,
                 runtime,
             )?;
             return Ok(Components::Watcher(components));
@@ -2522,9 +2784,12 @@ impl Components {
             libvirt_xml_extractor,
             platform_synchronizer,
             #[cfg(target_os = "linux")]
+            sidecar_poller,
+            #[cfg(target_os = "linux")]
             api_watcher,
             vm_mac_addrs,
             agent_mode,
+            sidecar_mode,
             runtime,
         )?;
         return Ok(Components::Agent(components));

@@ -18,23 +18,87 @@ package data
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
 	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/provider"
 	redisdp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/redis"
 )
 
+type RequiredConfigs struct {
+	Redis      redis.Config
+	WebService config.DFWebService
+}
+
 // GetDataProvider determines which resource uses which type of data provider
-func GetDataProvider(resourceType string, redisCfg redis.Config) provider.DataProvider {
+func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataProvider {
 	switch resourceType {
+	case common.RESOURCE_TYPE_REGION_EN:
+		return mysql.NewRegion(cfg.WebService)
 	case common.RESOURCE_TYPE_AZ_EN:
-		return mysqldp.NewAZ()
+		return mysqldp.NewAZ(cfg.WebService)
 	case common.RESOURCE_TYPE_HOST_EN:
 		return mysqldp.NewHost()
 	case common.RESOURCE_TYPE_VM_EN:
-		return redisdp.GetVM(redisCfg)
+		return redisdp.GetVM(cfg.Redis)
+	case common.RESOURCE_TYPE_VINTERFACE_EN:
+		return redisdp.GetVInterface(cfg.Redis)
+	case common.RESOURCE_TYPE_VROUTER_EN:
+		return mysql.NewVRouter()
+	case common.RESOURCE_TYPE_ROUTING_TABLE_EN:
+		return mysql.NewRoutingTable()
+	case common.RESOURCE_TYPE_SECURITY_GROUP_EN:
+		return mysql.NewSecurityGroup()
+	case common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN:
+		return mysql.NewSecurityGroupRule()
+	case common.RESOURCE_TYPE_NAT_GATEWAY_EN:
+		return mysql.NewNATGateway()
+	case common.RESOURCE_TYPE_NAT_RULE_EN:
+		return mysql.NewNATRule()
+	case common.RESOURCE_TYPE_LB_EN:
+		return mysql.NewLB()
+	case common.RESOURCE_TYPE_LB_LISTENER_EN:
+		return mysql.NewLBListener()
+	case common.RESOURCE_TYPE_LB_RULE_EN:
+		return mysql.NewLBRule()
+	case common.RESOURCE_TYPE_PEER_CONNECTION_EN:
+		return mysql.NewPeerConnection()
+	case common.RESOURCE_TYPE_CEN_EN:
+		return mysql.NewCEN()
+	case common.RESOURCE_TYPE_RDS_INSTANCE_EN:
+		return mysql.NewRDSInstance()
+	case common.RESOURCE_TYPE_REDIS_INSTANCE_EN:
+		return mysql.NewRedisInstance()
 	case common.RESOURCE_TYPE_POD_EN:
-		return redisdp.GetPod(redisCfg)
+		return redisdp.GetPod(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_GROUP_EN:
+		return redisdp.GetPodGroup(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_GROUP_PORT_EN:
+		return mysqldp.NewPodGroupPort()
+	case common.RESOURCE_TYPE_POD_REPLICA_SET_EN:
+		return redisdp.GetPodReplicaSet(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_SERVICE_EN:
+		return redisdp.GetPodSerivce(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_SERVICE_PORT_EN:
+		return mysqldp.NewPodServicePort()
+	case common.RESOURCE_TYPE_POD_INGRESS_EN:
+		return redisdp.GetPodIngress(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_INGRESS_RULE_EN:
+		return mysql.NewPodIngressRule()
+	case common.RESOURCE_TYPE_POD_NODE_EN:
+		return redisdp.GetPodNode(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
+		return redisdp.GetPodCluster(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
+		return redisdp.GetPodNamespace(cfg.Redis)
+	case common.RESOURCE_TYPE_VPC_EN:
+		return mysql.NewVPC()
+	case common.RESOURCE_TYPE_NETWORK_EN:
+		return mysql.NewNetwork()
+	case common.RESOURCE_TYPE_IP_EN:
+		return redisdp.GetIP(cfg.Redis)
+
 	default:
 		return nil
 	}

@@ -522,9 +522,9 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	if !sqlOk {
 		return nil, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
 	}
-	showSqlList := strings.Split(sql, "WHERE")
+	showSqlList := strings.Split(sql, " WHERE ")
 	if len(showSqlList) == 1 {
-		showSqlList = strings.Split(sql, "where")
+		showSqlList = strings.Split(sql, " where ")
 	}
 	//Enum($tag_name) replace in with column 'display_name'
 	//$tag_name replace in with column 'value'
@@ -578,17 +578,17 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	var likeSql string
 	var whereSql string
 	var orderBy = "value"
-	limitList := strings.Split(sql, "LIMIT")
+	limitList := strings.Split(sql, " LIMIT ")
 	if len(limitList) <= 1 {
-		limitList = strings.Split(sql, "limit")
+		limitList = strings.Split(sql, " limit ")
 	}
 	likeSql = limitList[0]
 	if len(limitList) > 1 {
 		limitSql = " LIMIT " + limitList[1]
 	}
-	likeList := strings.Split(likeSql, "WHERE")
+	likeList := strings.Split(likeSql, " WHERE ")
 	if len(likeList) == 1 {
-		likeList = strings.Split(likeSql, "where")
+		likeList = strings.Split(likeSql, " where ")
 	}
 	if len(likeList) > 1 {
 		if strings.Trim(likeList[1], " ") != "" {
@@ -640,15 +640,15 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		orderBy = "length(display_name)"
 	}
 
-	if strings.Contains(rawSql, "WHERE") || strings.Contains(rawSql, "where") {
-		if len(strings.Split(rawSql, "WHERE")) == 1 {
-			whereSql = strings.Split(rawSql, "where")[1]
+	if strings.Contains(rawSql, " WHERE ") || strings.Contains(rawSql, " where ") {
+		if len(strings.Split(rawSql, " WHERE ")) == 1 {
+			whereSql = strings.Split(rawSql, " where ")[1]
 		} else {
-			whereSql = strings.Split(rawSql, "WHERE")[1]
+			whereSql = strings.Split(rawSql, " WHERE ")[1]
 		}
-		whereLimitList := strings.Split(whereSql, "LIMIT")
+		whereLimitList := strings.Split(whereSql, " LIMIT ")
 		if len(whereLimitList) <= 1 {
-			whereLimitList = strings.Split(whereSql, "limit")
+			whereLimitList = strings.Split(whereSql, " limit ")
 		}
 
 		if strings.Trim(whereLimitList[0], " ") != "" {
@@ -660,9 +660,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		}
 	}
 
-	limitList := strings.Split(rawSql, "LIMIT")
+	limitList := strings.Split(rawSql, " LIMIT ")
 	if len(limitList) <= 1 {
-		limitList = strings.Split(rawSql, "limit")
+		limitList = strings.Split(rawSql, " limit ")
 	}
 	if len(limitList) > 1 {
 		limitSql = " LIMIT " + limitList[1]
@@ -1031,15 +1031,15 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 		orderBy = "length(display_name) ASC"
 	}
 	limitSql := "LIMIT 10000"
-	if strings.Contains(rawSql, "WHERE") || strings.Contains(rawSql, "where") {
-		if len(strings.Split(rawSql, "WHERE")) == 1 {
-			whereSql = strings.Split(rawSql, "where")[1]
+	if strings.Contains(rawSql, " WHERE ") || strings.Contains(rawSql, " where ") {
+		if len(strings.Split(rawSql, " WHERE ")) == 1 {
+			whereSql = strings.Split(rawSql, " where ")[1]
 		} else {
-			whereSql = strings.Split(rawSql, "WHERE")[1]
+			whereSql = strings.Split(rawSql, " WHERE ")[1]
 		}
-		whereLimitList := strings.Split(whereSql, "LIMIT")
+		whereLimitList := strings.Split(whereSql, " LIMIT ")
 		if len(whereLimitList) <= 1 {
-			whereLimitList = strings.Split(whereSql, "limit")
+			whereLimitList = strings.Split(whereSql, " limit ")
 		}
 		if strings.Trim(whereLimitList[0], " ") != "" {
 			if strings.Contains(whereLimitList[0], " like ") || strings.Contains(whereLimitList[0], " LIKE ") {
@@ -1049,9 +1049,9 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 			}
 		}
 	}
-	limitList := strings.Split(rawSql, "LIMIT")
+	limitList := strings.Split(rawSql, " LIMIT ")
 	if len(limitList) <= 1 {
-		limitList = strings.Split(rawSql, "limit")
+		limitList = strings.Split(rawSql, " limit ")
 	}
 	if len(limitList) > 1 {
 		limitSql = " LIMIT " + limitList[1]

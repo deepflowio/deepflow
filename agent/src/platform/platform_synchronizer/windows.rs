@@ -33,7 +33,8 @@ use tokio::runtime::Runtime;
 use crate::{
     config::handler::PlatformAccess,
     exception::ExceptionHandler,
-    rpc::{RunningConfig, Session},
+    rpc::Session,
+    trident::AgentId,
     utils::command::{get_hostname, get_ip_address},
 };
 use public::proto::trident::{self, Exception};
@@ -49,7 +50,7 @@ struct ProcessArgs {
     timer: Arc<Condvar>,
     exception_handler: ExceptionHandler,
     override_os_hostname: Arc<Option<String>>,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
 }
 
 #[derive(Default)]
@@ -66,7 +67,7 @@ struct HashArgs {
 pub struct PlatformSynchronizer {
     runtime: Arc<Runtime>,
     config: PlatformAccess,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
@@ -80,7 +81,7 @@ impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         override_os_hostname: Option<String>,
@@ -88,7 +89,7 @@ impl PlatformSynchronizer {
         Self {
             runtime,
             config,
-            running_config,
+            agent_id,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -113,8 +114,8 @@ impl PlatformSynchronizer {
         if !*running_lock {
             let config_guard = self.config.load();
             let err = format!(
-                "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                self.running_config.read().ctrl_ip,
+                "PlatformSynchronizer has already stopped with agent-id:{} vtap-id:{}",
+                self.agent_id.read(),
                 config_guard.vtap_id
             );
             debug!("{}", err);
@@ -136,8 +137,8 @@ impl PlatformSynchronizer {
         if *running_guard {
             let config_guard = self.config.load();
             let err = format!(
-                "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                self.running_config.read().ctrl_ip,
+                "PlatformSynchronizer has already stopped with agent-id:{} vtap-id:{}",
+                self.agent_id.read(),
                 config_guard.vtap_id
             );
             debug!("{}", err);
@@ -149,7 +150,7 @@ impl PlatformSynchronizer {
         let process_args = ProcessArgs {
             runtime: self.runtime.clone(),
             config: self.config.clone(),
-            running_config: self.running_config.clone(),
+            agent_id: self.agent_id.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
             timer: self.timer.clone(),
@@ -238,7 +239,7 @@ impl PlatformSynchronizer {
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
-        let ctrl_ip = process_args.running_config.read().ctrl_ip.clone();
+        let ctrl_ip = process_args.agent_id.read().ip.to_string();
         let platform_enabled = config_guard.enabled;
         drop(config_guard);
 
@@ -282,7 +283,7 @@ impl PlatformSynchronizer {
             let config_guard = args.config.load();
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = args.running_config.read().ctrl_ip.clone();
+            let ctrl_ip = args.agent_id.read().ip.to_string();
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 
@@ -300,7 +301,7 @@ impl PlatformSynchronizer {
                 let msg = trident::GenesisSyncRequest {
                     version: Some(cur_version),
                     trident_type: Some(trident_type as i32),
-                    source_ip: Some(ctrl_ip.to_string()),
+                    source_ip: Some(ctrl_ip),
                     vtap_id: Some(cur_vtap_id as u32),
                     kubernetes_cluster_id: Some(
                         args.config.load().kubernetes_cluster_id.to_string(),

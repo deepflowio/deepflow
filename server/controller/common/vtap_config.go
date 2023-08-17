@@ -41,6 +41,8 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	CollectorEnabled:              &DefaultCollectorEnabled,
 	VTapFlow1sEnabled:             &DefaultVTapFlow1sEnabled,
 	L4LogTapTypes:                 &DefaultL4LogTapTypes,
+	L4LogIgnoreTapSides:           &DefaultL4LogIgnoreTapSides,
+	L7LogIgnoreTapSides:           &DefaultL7LogIgnoreTapSides,
 	NpbDedupEnabled:               &DefaultNpbDedupEnabled,
 	PlatformEnabled:               &DefaultPlatformEnabled,
 	IfMacSource:                   &DefaultIfMacSource,
@@ -103,6 +105,8 @@ var (
 	DefaultCollectorEnabled              = 1
 	DefaultVTapFlow1sEnabled             = 1
 	DefaultL4LogTapTypes                 = "0"
+	DefaultL4LogIgnoreTapSides           = ""
+	DefaultL7LogIgnoreTapSides           = ""
 	DefaultNpbDedupEnabled               = 1
 	DefaultPlatformEnabled               = 0
 	DefaultIfMacSource                   = 0

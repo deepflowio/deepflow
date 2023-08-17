@@ -28,6 +28,7 @@ use std::time::{Duration, UNIX_EPOCH};
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
+    fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
 }
 
@@ -192,6 +193,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("DUBBO");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
             proto_tag.push_str("SOFARPC");
+	} else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
+	    proto_tag.push_str("FASTCGI");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -246,6 +249,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 4 {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
+            } else if (*sd).source == 5 {
+                print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
             } else {
                 for x in data.into_iter() {
                     if x < 32 || x > 126 {
@@ -329,6 +334,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
+	enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
@@ -381,13 +387,13 @@ fn main() {
                 }
         */
         if running_socket_tracer(
-            socket_trace_callback, /* 回调接口 rust -> C */
-            1,                     /* 工作线程数，是指用户态有多少线程参与数据处理 */
-            128,                   /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
-            65536,                 /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
-            524288, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
-            524288, /* 设置用于线程/协程追踪会话的hash表项最大值。*/
-            520000, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
+            socket_trace_callback, /* Callback interface rust -> C */
+            1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
+            128, /* Number of page frames occupied by kernel-shared memory, must be a power of 2. Used for perf data transfer */
+            65536, /* Size of the circular buffer queue, must be a power of 2. e.g: 2, 4, 8, 16, 32, 64, 128 */
+            524288, /* Maximum number of hash table entries for socket tracing, depends on the actual number of concurrent requests in the scenario */
+            524288, /* Maximum number of hash table entries for thread/coroutine tracing sessions */
+            520000, /* Maximum threshold for cleaning socket map entries. If the current number of map entries exceeds this value, map cleaning operation is performed */
         ) != 0
         {
             println!("running_socket_tracer() error.");
@@ -409,10 +415,12 @@ fn main() {
         //}
 
         //set_profiler_regex(
-        //    CString::new("^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*)$".as_bytes())
-        //        .unwrap()
-        //        .as_c_str()
-        //        .as_ptr(),
+        //    CString::new(
+        //        "^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*|socket_tracer)$".as_bytes(),
+        //    )
+        //    .unwrap()
+        //    .as_c_str()
+        //    .as_ptr(),
         //);
 
         //// CPUID will not be included in the aggregation of stack trace data.

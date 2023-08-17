@@ -182,6 +182,38 @@ func (v *VTapCheck) launchServerCheck() {
 					mysql.Db.Model(&vtap).Update("region", podNode.Region)
 				}
 			}
+		case common.VTAP_TYPE_K8S_SIDECAR:
+			var pod mysql.Pod
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
+				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
+				mysql.Db.Delete(&vtap)
+			} else {
+				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-P%d", pod.Name, pod.ID), "-")
+				// check and update name
+				if vtap.Name != vtapName {
+					log.Infof(
+						"update vtap (%s) name from %s to %s",
+						vtap.Lcuuid, vtap.Name, vtapName,
+					)
+					mysql.Db.Model(&vtap).Update("name", vtapName)
+				}
+				// check and update launch_server_id
+				if vtap.LaunchServerID != pod.ID {
+					log.Infof(
+						"update vtap (%s) launch_server_id from %d to %d",
+						vtap.Lcuuid, vtap.LaunchServerID, pod.ID,
+					)
+					mysql.Db.Model(&vtap).Update("launch_server_id", pod.ID)
+				}
+				// check and update region
+				if vtap.Region != pod.Region {
+					log.Infof(
+						"update vtap (%s) region from %s to %s",
+						vtap.Lcuuid, vtap.Region, pod.Region,
+					)
+					mysql.Db.Model(&vtap).Update("region", pod.Region)
+				}
+			}
 		}
 	}
 	log.Debug("vtap launch_server check end")

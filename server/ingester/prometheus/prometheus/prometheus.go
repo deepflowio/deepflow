@@ -68,20 +68,27 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 
 	prometheusLabelTable := decoder.NewPrometheusLabelTable(config.Base.ControllerIPs, int(config.Base.ControllerPort), config.LabelMsgMaxSize)
 
+	prometheusLabelTable.RequestAllLabelIDs()
+	currentColumnIndexMax := prometheusLabelTable.GetMaxAppLabelColumnIndex()
+	initAppLabelColumnCount := config.AppLabelColumnMinCount
+	if initAppLabelColumnCount < currentColumnIndexMax {
+		initAppLabelColumnCount = currentColumnIndexMax
+	}
+
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	slowDecoders := make([]*decoder.SlowDecoder, queueCount)
 	slowPlatformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		var err error
-		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, msgType.String()+"-"+strconv.Itoa(i))
+		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(msgType.String() + "-" + strconv.Itoa(i))
 		if i == 0 {
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROMETHEUS, platformDatas[i])
 		}
 		if err != nil {
 			return nil, err
 		}
-		metricsWriter, err := dbwriter.NewPrometheusWriter(i, msgType.String(), dbwriter.PROMETHEUS_DB, config)
+		metricsWriter, err := dbwriter.NewPrometheusWriter(i, initAppLabelColumnCount, msgType.String(), dbwriter.PROMETHEUS_DB, config)
 		if err != nil {
 			return nil, err
 		}
@@ -94,11 +101,11 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 			metricsWriter,
 			config,
 		)
-		slowMetricsWriter, err := dbwriter.NewPrometheusWriter(i, "slow-prometheus", dbwriter.PROMETHEUS_DB, config)
+		slowMetricsWriter, err := dbwriter.NewPrometheusWriter(i, initAppLabelColumnCount, "slow-prometheus", dbwriter.PROMETHEUS_DB, config)
 		if err != nil {
 			return nil, err
 		}
-		slowPlatformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "slow-prometheus-"+strconv.Itoa(i))
+		slowPlatformDatas[i], err = platformDataManager.NewPlatformInfoTable("slow-prometheus-" + strconv.Itoa(i))
 		slowDecoders[i] = decoder.NewSlowDecoder(
 			i,
 			slowPlatformDatas[i],
@@ -118,7 +125,6 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 }
 
 func (m *PrometheusHandler) Start() {
-	go m.prometheusLabelTable.RequesteAllLabelIDs()
 	for _, platformData := range m.PlatformDatas {
 		platformData.Start()
 	}

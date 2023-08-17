@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-use std::mem::swap;
+use std::{mem::swap, sync::Arc};
 
-use public::proto::metric;
+use public::{buffer::BatchedBox, l7_protocol::L7Protocol, proto::metric};
+
+use crate::common::TaggedFlow;
 
 const FLOW_ID: u32 = 1;
 const USAGE_ID: u32 = 4;
@@ -445,6 +447,17 @@ impl From<AppMeter> for metric::AppMeter {
             anomaly: Some(m.anomaly.into()),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct AppMeterWithFlow {
+    pub app_meter: AppMeter,
+    pub flow: Arc<BatchedBox<TaggedFlow>>,
+    pub l7_protocol: L7Protocol,
+    pub endpoint_hash: u32,
+    pub endpoint: Option<String>,
+    pub is_active_host0: bool,
+    pub is_active_host1: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy)]

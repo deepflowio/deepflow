@@ -67,7 +67,6 @@ type StaticConfig struct {
 	KubernetesNamespace              *string                    `yaml:"kubernetes-namespace,omitempty"`
 	KubernetesAPIListLimit           *uint32                    `yaml:"kubernetes-api-list-limit,omitempty"`
 	KubernetesAPIListInterval        *string                    `yaml:"kubernetes-api-list-interval,omitempty"`
-	KubernetesAPIMemoryTrimPercent   *uint8                     `yaml:"kubernetes-api-memory-trim-percent,omitempty"`
 	KubernetesResources              []KubernetesResourceConfig `yaml:"kubernetes-resources,omitempty"`
 	IngressFlavour                   *string                    `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                       `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
@@ -156,6 +155,13 @@ type EbpfKprobePortlist struct {
 	PortList string `yaml:"port-list,omitempty"`
 }
 
+type OnCpuProfile struct {
+	Disabled  *bool   `yaml:"disabled,omitempty"`
+	Frequency *int    `yaml:"frequency,omitempty"`
+	Cpu       *int    `yaml:"cpu,omitempty"`
+	Regex     *string `yaml:"regex,omitempty"`
+}
+
 type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
 	LogFile                 *string                            `yaml:"log-file,omitempty"`
@@ -171,6 +177,7 @@ type EbpfConfig struct {
 	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
 	IOEventCollectMode      *int                               `yaml:"io-event-collect-mode,omitempty"`
 	IOEventMinimalDuration  *string                            `yaml:"io-event-minimal-duration,omitempty"`
+	OnCpuProfile            *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 }
 
 type OsProcRegex struct {

@@ -19,6 +19,7 @@ package genesis
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,7 +34,7 @@ import (
 )
 
 func isInterestedHost(tType tridentcommon.TridentType) bool {
-	types := []tridentcommon.TridentType{tridentcommon.TridentType_TT_PROCESS, tridentcommon.TridentType_TT_HOST_POD, tridentcommon.TridentType_TT_VM_POD, tridentcommon.TridentType_TT_PHYSICAL_MACHINE, tridentcommon.TridentType_TT_PUBLIC_CLOUD}
+	types := []tridentcommon.TridentType{tridentcommon.TridentType_TT_PROCESS, tridentcommon.TridentType_TT_HOST_POD, tridentcommon.TridentType_TT_VM_POD, tridentcommon.TridentType_TT_PHYSICAL_MACHINE, tridentcommon.TridentType_TT_PUBLIC_CLOUD, tridentcommon.TridentType_TT_K8S_SIDECAR}
 	for _, t := range types {
 		if t == tType {
 			return true
@@ -89,14 +90,23 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8
 	}
 }
 
-func (g *SynchronizerServer) GetAgentStats(ip string) []TridentStats {
+func (g *SynchronizerServer) GetAgentStats(param string) []TridentStats {
 	result := []TridentStats{}
-	g.tridentStatsMap.Range(func(_, value interface{}) bool {
-		if ip == "" || value.(TridentStats).IP == ip {
-			result = append(result, value.(TridentStats))
+	vtapID, err := strconv.Atoi(param)
+	if err != nil {
+		s, ok := g.tridentStatsMap.Load(uint32(vtapID))
+		if !ok {
+			return result
 		}
-		return true
-	})
+		result = append(result, s.(TridentStats))
+	} else {
+		g.tridentStatsMap.Range(func(_, value interface{}) bool {
+			if param == "" || value.(TridentStats).IP == param {
+				result = append(result, value.(TridentStats))
+			}
+			return true
+		})
+	}
 	return result
 }
 
@@ -414,6 +424,18 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 		gSyncIPs = append(gSyncIPs, gIP)
 	}
 
+	gSyncVIPs := []*controller.GenesisSyncVIP{}
+	for _, vip := range gSyncData.VIPs {
+		vipData := vip
+		gVIP := &controller.GenesisSyncVIP{
+			Ip:     &vipData.IP,
+			Lcuuid: &vipData.Lcuuid,
+			NodeIp: &vipData.NodeIP,
+			VtapId: &vipData.VtapID,
+		}
+		gSyncVIPs = append(gSyncVIPs, gVIP)
+	}
+
 	gSyncHosts := []*controller.GenesisSyncHost{}
 	for _, host := range gSyncData.Hosts {
 		hostData := host
@@ -557,6 +579,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 	return &controller.GenesisSharingSyncResponse{
 		Data: &controller.GenesisSyncData{
 			Ip:         gSyncIPs,
+			Vip:        gSyncVIPs,
 			Host:       gSyncHosts,
 			Lldp:       gSyncLldps,
 			Network:    gSyncNetworks,

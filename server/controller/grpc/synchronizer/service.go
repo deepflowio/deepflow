@@ -158,6 +158,11 @@ func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusL
 	return resp, err
 }
 
+func (s *service) GetPrometheusTargets(ctx context.Context, in *api.PrometheusTargetRequest) (*api.PrometheusTargetResponse, error) {
+	// FIXME @zhengya
+	return &api.PrometheusTargetResponse{}, nil
+}
+
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
 	return s.pluginEvent.Plugin(r, in)
 }

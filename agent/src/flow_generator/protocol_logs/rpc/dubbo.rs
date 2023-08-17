@@ -23,7 +23,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
@@ -141,6 +141,14 @@ impl L7ProtocolInfoInterface for DubboInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if !self.service_name.is_empty() && !self.method_name.is_empty() {
+            Some(format!("{}/{}", self.service_name, self.method_name))
+        } else {
+            None
+        }
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
@@ -213,7 +221,6 @@ impl From<DubboInfo> for L7ProtocolSendLog {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DubboLog {
-    info: DubboInfo,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
@@ -236,24 +243,24 @@ impl L7ProtocolParserInterface for DubboLog {
         header.check()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        self.parse(
-            &config.l7_log_dynamic,
-            payload,
-            param.l4_protocol,
-            param.direction,
-        )?;
-        self.info.cal_rrt(param, None).map(|rrt| {
-            self.info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        let mut info = DubboInfo::default();
+        self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())])
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -262,13 +269,6 @@ impl L7ProtocolParserInterface for DubboLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        *self = Self {
-            info: DubboInfo::default(),
-            perf_stats: self.perf_stats.take(),
-        }
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -441,7 +441,12 @@ impl DubboLog {
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
-    fn get_req_body_info(&mut self, config: &L7LogDynamicConfig, payload: &[u8]) {
+    fn get_req_body_info(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        info: &mut DubboInfo,
+    ) {
         let mut n = BODY_PARAM_MIN;
         let mut para_index = 0;
         let payload_len = payload.len();
@@ -455,22 +460,22 @@ impl DubboLog {
 
             match n {
                 BODY_PARAM_DUBBO_VERSION => {
-                    self.info.dubbo_version =
+                    info.dubbo_version =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned()
                 }
                 BODY_PARAM_SERVICE_NAME => {
-                    self.info.service_name =
+                    info.service_name =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned();
                 }
                 BODY_PARAM_SERVICE_VERSION => {
-                    self.info.service_version =
+                    info.service_version =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned();
                 }
                 BODY_PARAM_METHOD_NAME => {
-                    self.info.method_name =
+                    info.method_name =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned();
                 }
@@ -494,8 +499,8 @@ impl DubboLog {
                 continue;
             }
 
-            Self::decode_trace_id(&payload_str, &trace_type, &mut self.info);
-            if self.info.trace_id.len() != 0 {
+            Self::decode_trace_id(&payload_str, &trace_type, info);
+            if info.trace_id.len() != 0 {
                 break;
             }
         }
@@ -504,72 +509,76 @@ impl DubboLog {
                 continue;
             }
 
-            Self::decode_span_id(&payload_str, &span_type, &mut self.info);
-            if self.info.span_id.len() != 0 {
+            Self::decode_span_id(&payload_str, &span_type, info);
+            if info.span_id.len() != 0 {
                 break;
             }
         }
     }
 
-    fn request(&mut self, config: &L7LogDynamicConfig, payload: &[u8], dubbo_header: &DubboHeader) {
-        self.info.msg_type = LogMessageType::Request;
-        self.info.event = dubbo_header.event;
-        self.info.data_type = dubbo_header.data_type;
-        self.info.req_msg_size = Some(dubbo_header.data_length as u32);
-        self.info.serial_id = dubbo_header.serial_id;
-        self.info.request_id = dubbo_header.request_id;
+    fn request(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        dubbo_header: &DubboHeader,
+        info: &mut DubboInfo,
+    ) {
+        info.msg_type = LogMessageType::Request;
+        info.event = dubbo_header.event;
+        info.data_type = dubbo_header.data_type;
+        info.req_msg_size = Some(dubbo_header.data_length as u32);
+        info.serial_id = dubbo_header.serial_id;
+        info.request_id = dubbo_header.request_id;
 
-        self.get_req_body_info(config, &payload[DUBBO_HEADER_LEN..]);
+        self.get_req_body_info(config, &payload[DUBBO_HEADER_LEN..], info);
     }
 
-    fn set_status(&mut self, status_code: u8) {
-        self.info.resp_status = match status_code {
+    fn set_status(&mut self, status_code: u8, info: &mut DubboInfo) {
+        info.resp_status = match status_code {
             20 => L7ResponseStatus::Ok,
             30 | 40 | 90 => {
-                self.perf_stats.as_mut().unwrap().inc_req_err();
+                self.perf_stats.as_mut().map(|p| p.inc_req_err());
                 L7ResponseStatus::ClientError
             }
             31 | 50 | 60 | 70 | 80 | 100 => {
-                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 L7ResponseStatus::ServerError
             }
             _ => L7ResponseStatus::Ok,
         }
     }
 
-    fn response(&mut self, dubbo_header: &DubboHeader) {
-        self.info.msg_type = LogMessageType::Response;
-        self.info.event = dubbo_header.event;
-        self.info.data_type = dubbo_header.data_type;
-        self.info.resp_msg_size = Some(dubbo_header.data_length as u32);
-        self.info.serial_id = dubbo_header.serial_id;
-        self.info.request_id = dubbo_header.request_id;
-        self.info.status_code = Some(dubbo_header.status_code as i32);
-        self.set_status(dubbo_header.status_code);
+    fn response(&mut self, dubbo_header: &DubboHeader, info: &mut DubboInfo) {
+        info.msg_type = LogMessageType::Response;
+        info.event = dubbo_header.event;
+        info.data_type = dubbo_header.data_type;
+        info.resp_msg_size = Some(dubbo_header.data_length as u32);
+        info.serial_id = dubbo_header.serial_id;
+        info.request_id = dubbo_header.request_id;
+        info.status_code = Some(dubbo_header.status_code as i32);
+        self.set_status(dubbo_header.status_code, info);
     }
 
     fn parse(
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
-        proto: IpProtocol,
-        direction: PacketDirection,
+        info: &mut DubboInfo,
+        param: &ParseParam,
     ) -> Result<()> {
-        if proto != IpProtocol::Tcp {
-            return Err(Error::InvalidIpProtocol);
-        }
+        let direction = param.direction;
 
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
 
         match direction {
             PacketDirection::ClientToServer => {
-                self.request(&config, payload, &dubbo_header);
-                self.perf_stats.as_mut().unwrap().inc_req();
+                self.request(&config, payload, &dubbo_header, info);
+                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
-                self.response(&dubbo_header);
-                self.perf_stats.as_mut().unwrap().inc_resp();
+                self.response(&dubbo_header, info);
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())
@@ -647,7 +656,6 @@ pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
 mod tests {
     use std::cell::RefCell;
     use std::path::Path;
-    use std::time::Duration;
     use std::{fs, rc::Rc};
 
     use super::*;
@@ -684,8 +692,6 @@ mod tests {
             };
 
             let config = LogParserConfig {
-                l7_log_collect_nps_threshold: 0,
-                l7_log_session_aggr_timeout: Duration::ZERO,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     "".to_owned(),
                     "".to_owned(),
@@ -698,14 +704,23 @@ mod tests {
                         TraceType::Sw8,
                     ],
                 ),
+                ..Default::default()
             };
             let mut dubbo = DubboLog::default();
-            let param =
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false, &config));
+            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            param.set_log_parse_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 
-            let _ = dubbo.parse_payload(payload, param);
-            output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
+            let i = dubbo.parse_payload(payload, param);
+            let info = if let Ok(info) = i {
+                match info.unwrap_single() {
+                    L7ProtocolInfo::DubboInfo(d) => d,
+                    _ => unreachable!(),
+                }
+            } else {
+                DubboInfo::default()
+            };
+            output.push_str(&format!("{:?} is_dubbo: {}\r\n", info, is_dubbo));
         }
         output
     }
@@ -765,8 +780,6 @@ mod tests {
         let mut packets = capture.as_meta_packets();
 
         let config = LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::ZERO,
             l7_log_dynamic: L7LogDynamicConfig::new(
                 "".to_owned(),
                 "".to_owned(),
@@ -779,6 +792,7 @@ mod tests {
                     TraceType::Sw8,
                 ],
             ),
+            ..Default::default()
         };
 
         let first_dst_port = packets[0].lookup_key.dst_port;
@@ -788,11 +802,10 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
+            let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+            param.set_log_parse_config(&config);
             if packet.get_l4_payload().is_some() {
-                let _ = dubbo.parse_payload(
-                    packet.get_l4_payload().unwrap(),
-                    &ParseParam::from((&*packet, rrt_cache.clone(), true, &config)),
-                );
+                let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }
         dubbo.perf_stats.unwrap()

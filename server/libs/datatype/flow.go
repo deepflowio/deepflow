@@ -628,6 +628,8 @@ func (p L7Protocol) String() string {
 		formatted = "PostgreSQL"
 	case L7_PROTOCOL_REDIS:
 		formatted = "Redis"
+	case L7_PROTOCOL_MONGO:
+		formatted = "MongoDB"
 	case L7_PROTOCOL_DUBBO:
 		formatted = "Dubbo"
 	case L7_PROTOCOL_GRPC:
@@ -658,6 +660,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	L7_PROTOCOL_DNS.String():        L7_PROTOCOL_DNS,
 	L7_PROTOCOL_MYSQL.String():      L7_PROTOCOL_MYSQL,
 	L7_PROTOCOL_REDIS.String():      L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_MONGO.String():      L7_PROTOCOL_MONGO,
 	L7_PROTOCOL_DUBBO.String():      L7_PROTOCOL_DUBBO,
 	L7_PROTOCOL_GRPC.String():       L7_PROTOCOL_GRPC,
 	L7_PROTOCOL_KAFKA.String():      L7_PROTOCOL_KAFKA,

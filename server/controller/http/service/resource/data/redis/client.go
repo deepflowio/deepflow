@@ -46,7 +46,9 @@ type client struct {
 func getClient(cfg dbredis.Config) *client {
 	cliOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
-		cli = &client{db: dbredis.GetClient().ResourceAPI, ctx: ctx, cancel: cancel, cfg: cfg}
+		cli = &client{
+			db:  dbredis.GetClient().ResourceAPI,
+			ctx: ctx, cancel: cancel, cfg: cfg}
 	})
 	return cli
 }
@@ -69,6 +71,7 @@ func (c *client) get(key string) ([]common.ResponseElem, error) {
 }
 
 func (c *client) set(key string, data []common.ResponseElem) error {
+	log.Infof("redis set data, key: %s", key)
 	strCache, err := json.Marshal(data)
 	if err != nil {
 		return err

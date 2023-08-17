@@ -37,7 +37,7 @@ use super::{
 
 use special_recv_engine::Libpcap;
 
-use crate::config::handler::LogParserAccess;
+use crate::config::handler::{CollectorAccess, LogParserAccess};
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
 use crate::{
@@ -45,6 +45,7 @@ use crate::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         endpoint::FeatureFlags,
         enums::{EthernetType, TapType},
+        flow::L7Stats,
         MetaPacket, TaggedFlow, TapTyper, DEFAULT_CONTROLLER_PORT, DEFAULT_INGESTER_PORT,
         ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE, VLAN_ID_MASK,
     },
@@ -85,6 +86,7 @@ pub(super) struct BaseDispatcher {
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
     pub(super) log_parse_config: LogParserAccess,
+    pub(super) collector_config: CollectorAccess,
 
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub(super) tunnel_info: TunnelInfo,
@@ -98,7 +100,8 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: DebugSender<BatchedBox<TaggedFlow>>,
+    pub(super) flow_output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+    pub(super) l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
     pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,

@@ -55,20 +55,12 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		))
 		return nil, false
 	}
-	podNodeID, exists := c.cache.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
-	if !exists {
-		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NODE_EN, cloudItem.PodNodeLcuuid,
-			common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, cloudItem.Lcuuid,
-		))
-		return nil, false
-	}
 
 	dbItem := &mysql.VMPodNodeConnection{
 		Domain:    c.cache.DomainLcuuid,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
-		PodNodeID: podNodeID,
+		PodNodeID: c.cache.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

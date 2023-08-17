@@ -114,8 +114,8 @@ var (
 		input:  "select time(time, 60) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, divide(plus(SUM(byte_tx+byte_rx), 100), 60) AS `persecond_max_byte_100` FROM flow_log.`l4_flow_log` GROUP BY `toi` LIMIT 1",
 	}, {
-		input:  "select resource_gl0_0,ip_0 from l7_flow_log group by resource_gl0_0,ip_0",
-		output: "SELECT if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0`, auto_instance_type_0 AS `resource_gl0_type_0` FROM flow_log.`l7_flow_log` GROUP BY if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, `resource_gl0_type_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` LIMIT 10000",
+		input:  "select resource_gl0_0,ip_0 from l7_flow_log where ip_0='1.1.1.1' group by resource_gl0_0,ip_0",
+		output: "SELECT if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0`, auto_instance_type_0 AS `resource_gl0_type_0` FROM flow_log.`l7_flow_log` PREWHERE (((if(is_ipv4=1, hex(ip4_0), hex(ip6_0)) = hex(toIPv4('1.1.1.1'))))) GROUP BY if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, `resource_gl0_type_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` LIMIT 10000",
 	}, {
 		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
 		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` LIMIT 10000",
@@ -257,18 +257,18 @@ var (
 		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l7_flow_log` PREWHERE `会话长度` >= 893689408 LIMIT 10000",
 	}, {
 		input:  "select session_length AS `会话长度` from l7_flow_log where `session_length`<=392037",
-		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE (if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037) LIMIT 10000",
+		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037 LIMIT 10000",
 	}, {
 		index:  "count_1",
-		input:  "select Count(_) as a from l7_flow_log having a > 0 ",
+		input:  "select Count(row) as a from l7_flow_log having a > 0 ",
 		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
 	}, {
 		index:  "count_2",
-		input:  "select Count(_) from l7_flow_log having Count(_) > 0 ",
-		output: "SELECT COUNT(1) AS `Count(_)` FROM flow_log.`l7_flow_log` HAVING COUNT(1) > 0 LIMIT 10000",
+		input:  "select Count(row) from l7_flow_log having Count(row) > 0 ",
+		output: "SELECT COUNT(1) AS `Count(row)` FROM flow_log.`l7_flow_log` HAVING COUNT(1) > 0 LIMIT 10000",
 	}, {
 		index:  "count_3",
-		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(_) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
+		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
 		db:     "flow_metrics"}}
 )

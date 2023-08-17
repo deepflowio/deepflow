@@ -46,11 +46,12 @@ use tokio::{
     time,
 };
 
+use crate::common::TaggedFlow;
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats, SignalSource},
+        flow::{Flow, FlowPerfStats, L7PerfStats, L7Stats, SignalSource},
         lookup_key::LookupKey,
-        TaggedFlow, Timestamp,
+        Timestamp,
     },
     config::PrometheusExtraConfig,
     exception::ExceptionHandler,
@@ -189,7 +190,7 @@ impl Sendable for TelegrafMetric {
 
 /// java profile xxxx
 #[derive(Debug, PartialEq)]
-pub struct Profile(metric::Profile);
+pub struct Profile(pub metric::Profile);
 
 impl Sendable for Profile {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
@@ -247,9 +248,9 @@ fn decode_otel_trace_data(
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: i64,
-    is_collect: bool,
-) -> Result<(Vec<u8>, Vec<BatchedBox<TaggedFlow>>), GenericError> {
-    let mut tagged_flow: Vec<BatchedBox<TaggedFlow>> = vec![];
+    flow_id: Arc<AtomicU64>,
+) -> Result<(Vec<u8>, Vec<BatchedBox<L7Stats>>), GenericError> {
+    let mut l7_stats: Vec<BatchedBox<L7Stats>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
     // 因为collector传过来traceData的全部resource都有"app.host.ip"的属性，所以只检查第一个resource有没有“app.host.ip”即可，
     // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
@@ -310,33 +311,32 @@ fn decode_otel_trace_data(
             }
         }
         // collect otel metrics
-        if is_collect {
-            for scope_spans in resource_span.scope_spans.iter() {
-                for span in scope_spans.spans.iter() {
-                    match fill_tagged_flow(
-                        span,
-                        ip,
-                        policy_getter.clone(),
-                        local_epc_id,
-                        otel_service.clone(),
-                        otel_instance.clone(),
-                        time_diff,
-                    ) {
-                        Some(f) => {
-                            tagged_flow.push(allocator.allocate_one_with(f));
-                        }
-                        None => continue,
-                    }
-                }
+        let mut id = flow_id.load(Ordering::Relaxed);
+        for scope_spans in resource_span.scope_spans.iter() {
+            for span in scope_spans.spans.iter() {
+                let stats = fill_l7_stats(
+                    id,
+                    span,
+                    ip,
+                    policy_getter.clone(),
+                    local_epc_id,
+                    otel_service.clone(),
+                    otel_instance.clone(),
+                    time_diff,
+                );
+                l7_stats.push(allocator.allocate_one_with(stats));
+                id += 1;
             }
         }
+        flow_id.store(id, Ordering::Relaxed); // FIXME: flow_id may conflict
     }
     let sdk_data = d.encode_to_vec();
     debug!("send otel sdk traces_data to sender: {:?}", d);
-    return Ok((sdk_data, tagged_flow));
+    return Ok((sdk_data, l7_stats));
 }
 
-fn fill_tagged_flow(
+fn fill_l7_stats(
+    flow_id: u64,
     span: &Span,
     ip: IpAddr,
     policy_getter: Arc<PolicyGetter>,
@@ -344,7 +344,7 @@ fn fill_tagged_flow(
     otel_service: Option<String>,
     otel_instance: Option<String>,
     time_diff: i64,
-) -> Option<TaggedFlow> {
+) -> L7Stats {
     let (mut ip0, mut ip1, eth_type) = if ip.is_ipv4() {
         (
             IpAddr::from(Ipv4Addr::UNSPECIFIED),
@@ -363,14 +363,14 @@ fn fill_tagged_flow(
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
 
-    let mut tagged_flow = TaggedFlow::default();
-    tagged_flow.flow.signal_source = SignalSource::OTel;
-    tagged_flow.flow.otel_service = otel_service;
-    tagged_flow.flow.otel_instance = otel_instance;
-    tagged_flow.flow.endpoint = Some(span.name.clone());
-    tagged_flow.flow.eth_type = eth_type;
-    tagged_flow.flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
-    if tagged_flow.flow.tap_side == TapSide::ClientApp {
+    let mut flow = Flow::default();
+    flow.signal_source = SignalSource::OTel;
+    flow.otel_service = otel_service;
+    flow.otel_instance = otel_instance;
+    flow.last_endpoint = Some(span.name.clone());
+    flow.eth_type = eth_type;
+    flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
+    if flow.tap_side == TapSide::ClientApp {
         ip0 = ip;
     } else {
         ip1 = ip;
@@ -409,7 +409,7 @@ fn fill_tagged_flow(
                     if let Some(StringValue(val)) = value.value {
                         if let Ok(ip_addr) = val.parse::<IpAddr>() {
                             let ip_addr = get_ip(ip_addr);
-                            if tagged_flow.flow.tap_side == TapSide::ClientApp {
+                            if flow.tap_side == TapSide::ClientApp {
                                 ip1 = ip_addr;
                             } else {
                                 ip0 = ip_addr;
@@ -456,10 +456,7 @@ fn fill_tagged_flow(
         }
     }
 
-    (
-        tagged_flow.flow.flow_key.ip_src,
-        tagged_flow.flow.flow_key.ip_dst,
-    ) = (ip0, ip1);
+    (flow.flow_key.ip_src, flow.flow_key.ip_dst) = (ip0, ip1);
 
     // According to https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
     // Unset = 0, Ok = 1, Error = 2
@@ -474,56 +471,70 @@ fn fill_tagged_flow(
     let start_time = span.start_time_unix_nano;
     let end_time = span.end_time_unix_nano;
     if time_diff >= 0 {
-        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(end_time + time_diff as u64);
+        flow.flow_stat_time = Timestamp::from_nanos(end_time + time_diff as u64);
     } else {
-        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(end_time - -time_diff as u64);
+        flow.flow_stat_time = Timestamp::from_nanos(end_time - -time_diff as u64);
     }
     let rrt = if end_time > start_time {
         (end_time - start_time) / 1000 // unit: μs
     } else {
         0
     };
+    let stats = L7PerfStats {
+        request_count: 1,
+        response_count: 1, // otel data is all session logs, so the number of requests is the same as the number of responses
+        err_client_count: if status == L7ResponseStatus::ClientError {
+            1
+        } else {
+            0
+        },
+        err_server_count: if status == L7ResponseStatus::ServerError {
+            1
+        } else {
+            0
+        },
+        err_timeout: 0,
+        rrt_count: if rrt > 0 { 1 } else { 0 },
+        rrt_sum: if rrt > 0 { rrt } else { 0 },
+        rrt_max: if rrt > 0 { rrt as u32 } else { 0 },
+    };
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
-        l7: L7PerfStats {
-            request_count: 1,
-            response_count: 1, // otel data is all session logs, so the number of requests is the same as the number of responses
-            err_client_count: if status == L7ResponseStatus::ClientError {
-                1
-            } else {
-                0
-            },
-            err_server_count: if status == L7ResponseStatus::ServerError {
-                1
-            } else {
-                0
-            },
-            err_timeout: 0,
-            rrt_count: if rrt > 0 { 1 } else { 0 },
-            rrt_sum: if rrt > 0 { rrt } else { 0 },
-            rrt_max: if rrt > 0 { rrt as u32 } else { 0 },
-        },
+        l7: stats.clone(),
         l4_protocol,
         l7_protocol,
     };
-    tagged_flow.flow.flow_perf_stats = Some(flow_perf_stats);
+    flow.flow_perf_stats = Some(flow_perf_stats);
     let mut lookup_key = LookupKey {
-        src_ip: tagged_flow.flow.flow_key.ip_src,
-        dst_ip: tagged_flow.flow.flow_key.ip_dst,
+        src_ip: flow.flow_key.ip_src,
+        dst_ip: flow.flow_key.ip_dst,
         ..Default::default()
     };
     let (endpoint, _) = policy_getter
         .policy()
         .lookup_all_by_epc(&mut lookup_key, local_epc_id as i32);
     let (src_info, dst_info) = (endpoint.src_info, endpoint.dst_info);
-    let peer_src = &mut tagged_flow.flow.flow_metrics_peers[0];
+    let peer_src = &mut flow.flow_metrics_peers[0];
     peer_src.l3_epc_id = src_info.l3_epc_id;
-    peer_src.nat_real_ip = tagged_flow.flow.flow_key.ip_src;
-    let peer_dst = &mut tagged_flow.flow.flow_metrics_peers[1];
+    peer_src.nat_real_ip = flow.flow_key.ip_src;
+    let peer_dst = &mut flow.flow_metrics_peers[1];
     peer_dst.l3_epc_id = dst_info.l3_epc_id;
-    peer_dst.nat_real_ip = tagged_flow.flow.flow_key.ip_dst;
-    tagged_flow.flow.flow_key.tap_type = TapType::Cloud;
-    Some(tagged_flow)
+    peer_dst.nat_real_ip = flow.flow_key.ip_dst;
+    flow.flow_key.tap_type = TapType::Cloud;
+    let flow_stat_time = flow.flow_stat_time;
+    let flow_endpoint = flow.last_endpoint.clone();
+    let mut tagged_flow = TaggedFlow::default();
+    tagged_flow.flow = flow;
+    let mut allocator = Allocator::new(1);
+    L7Stats {
+        stats,
+        flow: Some(Arc::new(allocator.allocate_one_with(tagged_flow))),
+        endpoint: flow_endpoint,
+        flow_id,
+        l7_protocol,
+        signal_source: SignalSource::OTel,
+        time_in_second: flow_stat_time.into(),
+    }
 }
 
 fn get_ip(ip_addr: IpAddr) -> IpAddr {
@@ -559,7 +570,7 @@ async fn handler(
     req: Request<Body>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    otel_l7_stats_sender: DebugSender<BatchedBox<L7Stats>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -570,6 +581,7 @@ async fn handler(
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
     prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    flow_id: Arc<AtomicU64>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -596,17 +608,17 @@ async fn handler(
                 local_epc_id,
                 policy_getter,
                 time_diff,
-                otel_metrics_collect_sender.is_some(),
+                flow_id.clone(),
             )
             .map_err(|e| {
                 debug!("decode otel trace data error: {}", e);
                 e
             })?;
-            if let Some(sender) = otel_metrics_collect_sender {
-                if !decode_data.1.is_empty() {
-                    if let Err(Error::Terminated(..)) = sender.send_all(&mut decode_data.1) {
-                        warn!("sender queue has terminated");
-                    }
+            if !decode_data.1.is_empty() {
+                if let Err(Error::Terminated(..)) =
+                    otel_l7_stats_sender.send_all(&mut decode_data.1)
+                {
+                    warn!("sender queue has terminated");
                 }
             }
             if compressed {
@@ -723,6 +735,7 @@ async fn handler(
                 IpAddr::V4(ip4) => ip4.octets().to_vec(),
                 IpAddr::V6(ip6) => ip6.octets().to_vec(),
             };
+            profile.event_type = metric::ProfileEventType::External.into();
             if let Some(content_type) = part.headers.get(CONTENT_TYPE) {
                 profile.content_type = content_type.as_bytes().to_vec();
             }
@@ -828,7 +841,7 @@ pub struct MetricServer {
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    otel_l7_stats_sender: DebugSender<BatchedBox<L7Stats>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -848,7 +861,7 @@ impl MetricServer {
         runtime: Arc<Runtime>,
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-        otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+        otel_l7_stats_sender: DebugSender<BatchedBox<L7Stats>>,
         prometheus_sender: DebugSender<BoxedPrometheusExtra>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
@@ -869,7 +882,6 @@ impl MetricServer {
                 compressed: Arc::new(AtomicBool::new(compressed)),
                 otel_sender,
                 compressed_otel_sender,
-                otel_metrics_collect_sender,
                 prometheus_sender,
                 telegraf_sender,
                 profile_sender,
@@ -881,6 +893,7 @@ impl MetricServer {
                 policy_getter: Arc::new(policy_getter),
                 time_diff,
                 prometheus_extra_config: Arc::new(prometheus_extra_config),
+                otel_l7_stats_sender,
             },
             counter,
         )
@@ -907,7 +920,7 @@ impl MetricServer {
 
         let otel_sender = self.otel_sender.clone();
         let compressed_otel_sender = self.compressed_otel_sender.clone();
-        let otel_metrics_collect_sender = self.otel_metrics_collect_sender.clone();
+        let otel_l7_stats_sender = self.otel_l7_stats_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
         let profile_sender = self.profile_sender.clone();
@@ -972,7 +985,7 @@ impl MetricServer {
 
                     let otel_sender = otel_sender.clone();
                     let compressed_otel_sender = compressed_otel_sender.clone();
-                    let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
+                    let otel_l7_stats_sender = otel_l7_stats_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
                     let profile_sender = profile_sender.clone();
@@ -986,7 +999,7 @@ impl MetricServer {
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
-                        let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
+                        let otel_l7_stats_sender = otel_l7_stats_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
                         let profile_sender = profile_sender.clone();
@@ -998,6 +1011,7 @@ impl MetricServer {
                         let policy_getter = policy_getter.clone();
                         let time_diff = time_diff.clone();
                         let prometheus_extra_config = prometheus_extra_config.clone();
+                        let flow_id = Arc::new(AtomicU64::new(0));
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
@@ -1005,7 +1019,7 @@ impl MetricServer {
                                     req,
                                     otel_sender.clone(),
                                     compressed_otel_sender.clone(),
-                                    otel_metrics_collect_sender.clone(),
+                                    otel_l7_stats_sender.clone(),
                                     prometheus_sender.clone(),
                                     telegraf_sender.clone(),
                                     profile_sender.clone(),
@@ -1016,6 +1030,7 @@ impl MetricServer {
                                     policy_getter.clone(),
                                     time_diff.clone(),
                                     prometheus_extra_config.clone(),
+                                    flow_id.clone(),
                                 )
                             }))
                         }

@@ -57,6 +57,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
+    metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
     utils::{
         environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
@@ -77,7 +78,10 @@ use public::proto::{
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
 };
 #[cfg(target_os = "linux")]
-use public::{consts::NORMAL_EXIT_WITH_RESTART, netns};
+use public::{
+    consts::NORMAL_EXIT_WITH_RESTART,
+    netns::{self, NsFile},
+};
 
 use crate::utils::cgroups::is_kernel_available_for_cgroups;
 #[cfg(target_os = "windows")]
@@ -132,6 +136,7 @@ pub struct CollectorConfig {
     pub vtap_flow_1s_enabled: bool,
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
+    pub l4_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub l7_metrics_enabled: bool,
     pub trident_type: TridentType,
     pub vtap_id: u16,
@@ -155,6 +160,21 @@ impl fmt::Debug for CollectorConfig {
                     .iter()
                     .enumerate()
                     .filter(|&(_, b)| *b)
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "l4_log_ignore_tap_sides",
+                &self
+                    .l4_log_ignore_tap_sides
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, b)| {
+                        if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Vec<_>>(),
             )
             .field(
@@ -262,7 +282,6 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
     pub kubernetes_api_list_interval: Duration,
-    pub kubernetes_api_memory_trim_percent: Option<u8>,
     pub kubernetes_resources: Vec<KubernetesResourceConfig>,
     pub max_memory: u64,
     pub namespace: Option<String>,
@@ -468,11 +487,54 @@ impl fmt::Debug for FlowConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
     pub l7_log_dynamic: L7LogDynamicConfig,
+    pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
+}
+
+impl Default for LogParserConfig {
+    fn default() -> Self {
+        Self {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_dynamic: L7LogDynamicConfig::default(),
+            l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
+        }
+    }
+}
+
+impl fmt::Debug for LogParserConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LogParserConfig")
+            .field(
+                "l7_log_collect_nps_threshold",
+                &self.l7_log_collect_nps_threshold,
+            )
+            .field(
+                "l7_log_session_aggr_timeout",
+                &self.l7_log_session_aggr_timeout,
+            )
+            .field("l7_log_dynamic", &self.l7_log_dynamic)
+            .field(
+                "l7_log_ignore_tap_sides",
+                &self
+                    .l7_log_ignore_tap_sides
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, b)| {
+                        if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -936,6 +998,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     tap_types
                 },
+                l4_log_ignore_tap_sides: {
+                    let mut tap_sides = [false; TapSide::MAX as usize + 1];
+                    for t in conf.l4_log_ignore_tap_sides.iter() {
+                        // TapSide values will be in range [0, TapSide::MAX]
+                        tap_sides[*t as usize] = true;
+                    }
+                    tap_sides
+                },
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             },
             handler: HandlerConfig {
@@ -955,11 +1025,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
                 kubernetes_api_list_interval: conf.yaml_config.kubernetes_api_list_interval,
-                kubernetes_api_memory_trim_percent: if !conf.yaml_config.memory_trim_disabled {
-                    Some(conf.yaml_config.kubernetes_api_memory_trim_percent)
-                } else {
-                    None
-                },
                 kubernetes_resources: conf.yaml_config.kubernetes_resources.clone(),
                 max_memory: conf.max_memory,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
@@ -1019,6 +1084,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .map(|item| TraceType::from(item))
                         .collect(),
                 ),
+                l7_log_ignore_tap_sides: {
+                    let mut tap_sides = [false; TapSide::MAX as usize + 1];
+                    for t in conf.l7_log_ignore_tap_sides.iter() {
+                        // TapSide values will be in range [0, TapSide::MAX]
+                        tap_sides[*t as usize] = true;
+                    }
+                    tap_sides
+                },
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
@@ -1065,8 +1138,20 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
+                    // use host mac
+                    if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                        warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                        warn!("setns error: {}", e);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(-1);
+                    }
                     let (_, ctrl_mac) =
-                        get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
+                        get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
+                    if let Err(e) = netns::reset_netns() {
+                        warn!("reset setns error: {}", e);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(-1);
+                    };
                     ctrl_mac
                 } else {
                     MacAddr::ZERO
@@ -1712,19 +1797,51 @@ impl ConfigHandler {
                 != new_config.collector.l4_log_store_tap_types
             {
                 info!(
-                    "collector config l4_log_store_tap_types change from {:?} to {:?}, will restart dispatcher",
-                    candidate_config.collector.l4_log_store_tap_types
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|&(_, b)| *b)
-                                        .collect::<Vec<_>>(),
-                    new_config.collector.l4_log_store_tap_types
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|&(_, b)| *b)
-                                        .collect::<Vec<_>>()
+                    "collector config l4_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .collector
+                        .l4_log_store_tap_types
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, b)| *b)
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .collector
+                        .l4_log_store_tap_types
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, b)| *b)
+                        .collect::<Vec<_>>()
                 );
-                restart_dispatcher = true;
+            }
+            if candidate_config.collector.l4_log_ignore_tap_sides
+                != new_config.collector.l4_log_ignore_tap_sides
+            {
+                info!(
+                    "collector config l4_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .collector
+                        .l4_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .collector
+                        .l4_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                );
             }
 
             if candidate_config.collector.vtap_id != new_config.collector.vtap_id {
@@ -1764,14 +1881,6 @@ impl ConfigHandler {
                 info!(
                     "Kubernetes API list interval set to {:?}",
                     new_cfg.kubernetes_api_list_interval
-                );
-            }
-            if old_cfg.kubernetes_api_memory_trim_percent
-                != new_cfg.kubernetes_api_memory_trim_percent
-            {
-                info!(
-                    "Kubernetes API memory_trim_percent set to {:?}",
-                    new_cfg.kubernetes_api_memory_trim_percent
                 );
             }
             if old_cfg.kubernetes_resources != new_cfg.kubernetes_resources {
@@ -1820,8 +1929,6 @@ impl ConfigHandler {
                 && (old_cfg.kubernetes_api_list_limit != new_cfg.kubernetes_api_list_limit
                     || old_cfg.kubernetes_api_list_interval
                         != new_cfg.kubernetes_api_list_interval
-                    || old_cfg.kubernetes_api_memory_trim_percent
-                        != new_cfg.kubernetes_api_memory_trim_percent
                     || old_cfg.kubernetes_resources != new_cfg.kubernetes_resources
                     || old_cfg.max_memory != new_cfg.max_memory);
             #[cfg(target_os = "linux")]
@@ -1950,6 +2057,35 @@ impl ConfigHandler {
                 info!(
                     "l7 log collect nps threshold set to {}",
                     new_config.log_parser.l7_log_collect_nps_threshold
+                );
+            }
+            if candidate_config.log_parser.l7_log_ignore_tap_sides
+                != new_config.log_parser.l7_log_ignore_tap_sides
+            {
+                info!(
+                    "l7 log config l7_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .log_parser
+                        .l7_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .log_parser
+                        .l7_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
                 );
             }
 

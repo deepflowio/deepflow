@@ -41,7 +41,7 @@ var TAP_PORT_DEVICE_MAP = map[string]int{
 	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
 }
 
-var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role"}
+var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type"}
 var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"}
 var STRING_ENUM_TAG = []string{"tap_side", "event_type", "profile_language_type"}
 
@@ -970,15 +970,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
 				"",
 			)}
-	}
-	//session_length
-	tagResourceMap["session_length"] = map[string]*Tag{
-		"default": NewTag(
-			"if(request_length>0,request_length,0)+if(response_length>0,response_length,0)",
-			"",
-			"if(request_length>0,request_length,0)+if(response_length>0,response_length,0) %s %s",
-			"",
-		),
 	}
 	return tagResourceMap
 }

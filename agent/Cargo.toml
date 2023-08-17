@@ -76,6 +76,7 @@ tonic = "0.8.1"
 envmnt = "0.10.4"
 wasmtime = "7.0.0"
 wasmtime-wasi = "7.0.0"
+byteorder = "1.4.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"
@@ -153,3 +154,4 @@ panic = 'abort'
 
 [profile.dev]
 panic = 'abort'
+debug-assertions = false

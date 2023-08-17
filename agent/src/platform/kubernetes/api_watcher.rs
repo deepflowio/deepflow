@@ -45,7 +45,8 @@ use crate::{
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    rpc::{RunningConfig, Session},
+    rpc::Session,
+    trident::AgentId,
     utils::{
         environment::{running_in_container, running_in_only_watch_k8s_mode},
         stats,
@@ -97,14 +98,14 @@ pub struct ApiWatcher {
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
     stats_collector: Arc<stats::Collector>,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
 }
 
 impl ApiWatcher {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
@@ -124,7 +125,7 @@ impl ApiWatcher {
             session,
             timer: Arc::new(Condvar::new()),
             running: Arc::new(Mutex::new(false)),
-            running_config,
+            agent_id,
             apiserver_version: Arc::new(Mutex::new(Info::default())),
             err_msgs: Arc::new(Mutex::new(vec![])),
             watchers: Arc::new(Mutex::new(HashMap::new())),
@@ -214,7 +215,7 @@ impl ApiWatcher {
         let session = self.session.clone();
         let timer = self.timer.clone();
         let running = self.running.clone();
-        let running_config = self.running_config.clone();
+        let agent_id = self.agent_id.clone();
         let apiserver_version = self.apiserver_version.clone();
         let err_msgs = self.err_msgs.clone();
         let watchers = self.watchers.clone();
@@ -234,7 +235,7 @@ impl ApiWatcher {
                     watchers,
                     exception_handler,
                     stats_collector,
-                    running_config,
+                    agent_id,
                 )
             })
             .unwrap();
@@ -561,7 +562,7 @@ impl ApiWatcher {
         watcher_versions: &mut HashMap<WatcherKey, u64>,
         resource_watchers: &Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
         exception_handler: &ExceptionHandler,
-        running_config: &Arc<RwLock<RunningConfig>>,
+        agent_id: &Arc<RwLock<AgentId>>,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -572,6 +573,14 @@ impl ApiWatcher {
             let resource_watchers_guard = resource_watchers.lock().unwrap();
             for (resource, watcher_version) in watcher_versions.iter_mut() {
                 if let Some(watcher) = resource_watchers_guard.get(resource) {
+                    if !watcher.ready() {
+                        err_msgs_guard.push(format!("{} watcher is not ready", resource));
+                        if let Some(msg) = watcher.error() {
+                            err_msgs_guard.push(msg);
+                        }
+                        continue;
+                    }
+
                     let new_version = watcher.version();
                     if new_version != *watcher_version {
                         updated_versions.push(format!(
@@ -622,7 +631,7 @@ impl ApiWatcher {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 vtap_id: Some(config_guard.vtap_id as u32),
-                source_ip: Some(running_config.read().ctrl_ip.clone()),
+                source_ip: Some(agent_id.read().ip.to_string()),
                 error_msg: Some(
                     err_msgs
                         .lock()
@@ -724,7 +733,7 @@ impl ApiWatcher {
         watchers: Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -736,7 +745,6 @@ impl ApiWatcher {
             list_limit: config.kubernetes_api_list_limit,
             list_interval: config.kubernetes_api_list_interval,
             max_memory: config.max_memory,
-            memory_trim_percent: config.kubernetes_api_memory_trim_percent,
         };
 
         let (resource_watchers, task_handles) = loop {
@@ -757,7 +765,7 @@ impl ApiWatcher {
                         cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                         version: Some(context.version.load(Ordering::SeqCst)),
                         vtap_id: Some(config_guard.vtap_id as u32),
-                        source_ip: Some(running_config.read().ctrl_ip.clone()),
+                        source_ip: Some(agent_id.read().ip.to_string()),
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
@@ -795,13 +803,13 @@ impl ApiWatcher {
         let mut wait_count = 0;
         while !Self::ready_stop(&running, &timer, INIT_WAIT_INTERVAL) {
             let ws = resource_watchers.lock().unwrap();
-            let mut ready = false;
-            for (k, v) in ws.iter() {
-                if k.name == "nodes" {
-                    ready = v.ready();
-                    break;
+            let ready = ws.iter().all(|(n, v)| {
+                let r = v.ready();
+                if !r {
+                    debug!("{} watcher is not ready yet", n);
                 }
-            }
+                r
+            });
             if !ready {
                 wait_count += 1;
                 if wait_count >= sync_interval.as_secs() / INIT_WAIT_INTERVAL.as_secs() {
@@ -818,7 +826,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
-                &running_config,
+                &agent_id,
             );
             break;
         }
@@ -833,7 +841,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
-                &running_config,
+                &agent_id,
             );
         }
         info!("kubernetes api watcher stopping");

@@ -27,7 +27,6 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	_ "go.opentelemetry.io/proto/otlp/common/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
@@ -109,11 +108,9 @@ func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *Univers
 	}
 }
 
-func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *UniversalTagsManager, dataTypeBits uint32) ptraceotlp.ExportRequest {
+func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager *UniversalTagsManager, dataTypeBits uint32, resSpan ptrace.ResourceSpans) {
 	tags0, tags1 := universalTagsManager.QueryUniversalTags(l7)
-	td := ptrace.NewTraces()
 
-	resSpan := td.ResourceSpans().AppendEmpty()
 	resAttrs := resSpan.Resource().Attributes()
 	putUniversalTags(resAttrs, tags0, tags1, dataTypeBits)
 	if dataTypeBits&K8S_LABEL != 0 && l7.PodID0 != 0 {
@@ -155,7 +152,7 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 			}
 		} else {
 			span.SetParentSpanID(getSpanID(l7.SpanId, l7.ID()))
-			span.SetSpanID(newSpanId())
+			span.SetSpanID(uint64ToSpanID(l7.ID()))
 		}
 
 		if l7.SpanKind != uint8(ptrace.SpanKindUnspecified) {
@@ -274,8 +271,6 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 			spanAttrs.PutDouble(l7.MetricsNames[i], l7.MetricsValues[i])
 		}
 	}
-
-	return ptraceotlp.NewExportRequestFromTraces(td)
 }
 
 func getTraceID(traceID string, id uint64) pcommon.TraceID {

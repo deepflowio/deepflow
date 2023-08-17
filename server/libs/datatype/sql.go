@@ -18,6 +18,7 @@ package datatype
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -187,5 +188,61 @@ func (i *RedisInfo) Merge(r interface{}) {
 		i.Response = redis.Response
 		i.Status = redis.Status
 		i.Error = redis.Error
+	}
+}
+
+var mongoInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(MongoDBInfo)
+})
+
+func AcquireMONGOInfo() *MongoDBInfo {
+	return mongoInfoPool.Get().(*MongoDBInfo)
+}
+
+func ReleaseMONGOInfo(d *MongoDBInfo) {
+	*d = MongoDBInfo{}
+	mongoInfoPool.Put(d)
+}
+
+type MongoDBInfo struct {
+	// request
+	MessageLength uint32
+	RequestId     uint32
+	ResponseTo    uint32
+	OpCode        uint32
+	OpCodeName    string
+}
+
+func (i *MongoDBInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType:  i.OpCodeName,
+			Resource: strconv.FormatUint(uint64(i.RequestId), 10),
+		}
+		p.ReqLen = int32(i.MessageLength)
+	}
+
+	p.ReqLen, p.RespLen = -1, -1
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.Resp.Code = int32(i.OpCode)
+		p.Resp.Exception = i.OpCodeName
+		if p.Resp.Code == 0 {
+			p.Resp.Code = L7PROTOCOL_LOG_RESP_CODE_NONE
+		}
+	}
+	p.RowEffect = uint32(i.RequestId)
+}
+
+func (i *MongoDBInfo) String() string {
+	return fmt.Sprintf("%#v", i)
+}
+
+func (i *MongoDBInfo) Merge(r interface{}) {
+	if response, ok := r.(*MongoDBInfo); ok {
+		i.MessageLength = response.MessageLength
+		i.OpCode = response.OpCode
+		i.RequestId = response.RequestId
+		i.ResponseTo = response.ResponseTo
+		i.OpCodeName = response.OpCodeName
 	}
 }

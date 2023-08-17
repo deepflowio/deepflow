@@ -29,6 +29,7 @@ type QuerierParams struct {
 	Sql        string
 	DataSource string
 	Context    context.Context
+	NoPreWhere bool
 }
 
 type TempoParams struct {

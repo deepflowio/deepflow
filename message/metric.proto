@@ -189,6 +189,12 @@ message AppAnomaly {
     uint32 timeout = 3;
 }
 
+enum ProfileEventType {
+    External = 0;
+    EbpfOnCpu = 1;
+    EbpfOffCpu = 2;
+}
+
 message Profile {
     bytes ip = 1;
     string name = 2;
@@ -201,6 +207,18 @@ message Profile {
     string format = 9;
     bytes content_type = 10;
     bytes data = 11;
+
+    uint64 timestamp = 20;
+    ProfileEventType event_type = 21;
+    uint64 stime = 22;
+    uint32 pid = 23;
+    uint32 tid = 24;
+    string thread_name = 25;
+    string process_name = 26;
+    uint32 u_stack_id = 27;
+    uint32 k_stack_id = 28;
+    uint32 cpu = 29;
+    uint32 count = 30;
 }
 
 enum IoOperation {

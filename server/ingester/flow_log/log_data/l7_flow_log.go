@@ -451,7 +451,7 @@ func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
 		} else {
 			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(code))
 		}
-	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_REDIS:
+	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_REDIS, datatype.L7_PROTOCOL_MONGO:
 		fallthrough
 	default:
 		h.ResponseException = l.Resp.Exception

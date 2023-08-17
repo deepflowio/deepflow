@@ -18,7 +18,9 @@ use std::{
     fmt::{self, Display},
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    process, thread,
+    process,
+    sync::Arc,
+    thread,
     time::Duration,
 };
 
@@ -31,6 +33,7 @@ use super::{
     decapsulate::TunnelType,
     enums::{EthernetType, IpProtocol, TapType, TcpFlags},
     tap_port::TapPort,
+    TaggedFlow,
 };
 
 use crate::{
@@ -43,8 +46,11 @@ use crate::{
     metric::document::TapSide,
     utils::environment::{is_tt_pod, is_tt_workload},
 };
-use public::proto::{common::TridentType, flow_log};
 use public::utils::net::MacAddr;
+use public::{
+    buffer::BatchedBox,
+    proto::{common::TridentType, flow_log},
+};
 
 pub use public::enums::L4Protocol;
 pub use public::l7_protocol::*;
@@ -521,6 +527,17 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct L7Stats {
+    pub stats: L7PerfStats,
+    pub flow: Option<Arc<BatchedBox<TaggedFlow>>>,
+    pub endpoint: Option<String>,
+    pub flow_id: u64,
+    pub l7_protocol: L7Protocol,
+    pub signal_source: SignalSource,
+    pub time_in_second: Duration,
+}
+
 #[derive(Serialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct L7PerfStats {
     #[serde(rename = "l7_request")]
@@ -917,7 +934,7 @@ pub struct Flow {
     #[serde(skip)]
     pub otel_instance: Option<String>,
     #[serde(skip)]
-    pub endpoint: Option<String>,
+    pub last_endpoint: Option<String>,
     pub direction_score: u8,
     pub netns_id: u32,
 }
@@ -1011,7 +1028,7 @@ impl Flow {
         //                                     SYN-ACK
         //            [ACK]
         //            RST|RST-ACK
-        src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST_ACK)
+        src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST)
             && dst_tcp_flags.contains(TcpFlags::SYN_ACK)
     }
 
@@ -1320,7 +1337,7 @@ pub fn get_direction(
                     }
                 }
             }
-            TridentType::TtHostPod | TridentType::TtVmPod => {
+            TridentType::TtHostPod | TridentType::TtVmPod | TridentType::TtK8sSidecar => {
                 if is_ep {
                     if tunnel_tier == 0 {
                         return (Direction::ClientToServer, Direction::ServerToClient);
@@ -1489,16 +1506,10 @@ pub fn get_direction(
     let flow_key = &flow.flow_key;
 
     // Workload和容器采集器需采集loopback口流量
-    if flow_key.mac_src == flow_key.mac_dst {
-        match trident_type {
-            TridentType::TtPublicCloud
-            | TridentType::TtPhysicalMachine
-            | TridentType::TtHostPod
-            | TridentType::TtVmPod => {
-                return [Direction::None, Direction::LocalToLocal];
-            }
-            _ => (),
-        }
+    if flow_key.mac_src == flow_key.mac_dst
+        && (is_tt_workload(trident_type) || is_tt_pod(trident_type))
+    {
+        return [Direction::None, Direction::LocalToLocal];
     }
 
     // 全景图统计

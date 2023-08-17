@@ -19,11 +19,11 @@ package dbwriter
 import (
 	"fmt"
 	"net"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -47,8 +47,6 @@ type InProcessProfile struct {
 	Time uint32
 
 	// Profile
-	// TODO: ProfileEventType/ProfileValueUnit/ProfileLanguageType/Tags 可以写 flow_tag 优化查询
-	// TODO: ProfileEventType/ProfileValueUnit/ProfileLanguageType/Tags can write in flow_tag for query optimize
 	AppService         string `json:"app_service"`
 	ProfileLocationStr string `json:"profile_location_str"` // package/(class/struct)/function name, e.g.: java/lang/Thread.run
 	ProfileValue       int64  `json:"profile_value"`
@@ -59,14 +57,16 @@ type InProcessProfile struct {
 	ProfileCreateTimestamp int64    `json:"profile_create_timestamp"` // 数据上传时间 while data upload to server
 	ProfileInTimestamp     int64    `json:"profile_in_timestamp"`     // 数据写入时间 while data write in storage
 	ProfileLanguageType    string   `json:"profile_language_type"`    // e.g.: Golang/Java/Python...
-	ProfileNodeID          uint64   `json:"profile_node_id"`
-	ProfileParentNodeID    uint64   `json:"profile_parent_node_id"`
 	ProfileID              string   `json:"profile_id"`
 	TraceID                string   `json:"trace_id"`
 	SpanName               string   `json:"span_name"`
 	AppInstance            string   `json:"app_instance"`
 	TagNames               []string `json:"tag_names"`
 	TagValues              []string `json:"tag_values"`
+	CompressionAlgo        string   `json:"compression_algo"`
+	// Ebpf Profile Infos
+	ProcessID        uint32 `json:"process_id"`
+	ProcessStartTime int64  `json:"process_start_time"`
 
 	// Universal Tag
 	VtapID       uint16
@@ -111,6 +111,7 @@ type InProcessProfile struct {
 | alloc_outside_tlab_bytes(java)   | bytes            | byte                                                     |
 | lock_count(java)                 | lock_samples     | count                                                    |
 | lock_duration(java)              | lock_nanoseconds | ns                                                       |
+| on-cpu(eBPF)                     | samples          | cpu time, DeepFlow-Agent as profiler                     |
 */
 
 func ProfileColumns() []*ckdb.Column {
@@ -123,21 +124,22 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax),
 
 		ckdb.NewColumn("app_service", ckdb.String).SetComment("应用名称, 用户配置上报"),
-		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("profile 位置"),
+		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("单次 profile 堆栈"),
 		ckdb.NewColumn("profile_value", ckdb.Int64).SetComment("profile self value"),
 		ckdb.NewColumn("profile_value_unit", ckdb.String).SetComment("profile value 的单位"),
 		ckdb.NewColumn("profile_event_type", ckdb.String).SetComment("剖析类型"),
 		ckdb.NewColumn("profile_create_timestamp", ckdb.DateTime64us).SetIndex(ckdb.IndexSet).SetComment("client 端聚合时间"),
 		ckdb.NewColumn("profile_in_timestamp", ckdb.DateTime64us).SetComment("DeepFlow 的写入时间，同批上报的批次数据具备相同的值"),
 		ckdb.NewColumn("profile_language_type", ckdb.String).SetComment("语言类型"),
-		ckdb.NewColumn("profile_node_id", ckdb.UInt64).SetComment("叶子节点 ID"),
-		ckdb.NewColumn("profile_parent_node_id", ckdb.UInt64).SetComment("父节点 ID"),
 		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
 		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
 		ckdb.NewColumn("app_instance", ckdb.String).SetComment("应用实例名称, 用户上报"),
 		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("profile 上报的 tagnames"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues"),
+		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
+		ckdb.NewColumn("process_id", ckdb.UInt32).SetComment("进程 id"),
+		ckdb.NewColumn("process_start_time", ckdb.DateTime64ms).SetComment("进程启动时间"),
 
 		// universal tag
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -161,7 +163,7 @@ func ProfileColumns() []*ckdb.Column {
 func GenProfileCKTable(cluster, dbName, tableName, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"app_service", "ip4", "ip6", timeKey}
+	orderKeys := []string{timeKey, "app_service", "ip4", "ip6"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -197,14 +199,15 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.ProfileCreateTimestamp,
 		p.ProfileInTimestamp,
 		p.ProfileLanguageType,
-		p.ProfileNodeID,
-		p.ProfileParentNodeID,
 		p.ProfileID,
 		p.TraceID,
 		p.SpanName,
 		p.AppInstance,
 		p.TagNames,
 		p.TagValues,
+		p.CompressionAlgo,
+		p.ProcessID,
+		p.ProcessStartTime,
 
 		p.VtapID,
 		p.RegionID,
@@ -252,28 +255,39 @@ func ReleaseInProcess(p *InProcessProfile) {
 	poolInProcess.Put(p)
 }
 
-func (p *InProcessProfile) FillProfile(input *storage.PutInput, platformData *grpc.PlatformInfoTable,
-	vtapID uint16, profileName string, location string, self int64,
-	inTimeStamp time.Time, languageType string, parentID uint64,
-	tagNames []string, tagValues []string) {
+func (p *InProcessProfile) FillProfile(input *storage.PutInput,
+	platformData *grpc.PlatformInfoTable,
+	vtapID uint16,
+	profileName string,
+	eventType string,
+	location string,
+	compressionAlgo string,
+	self int64,
+	inTimeStamp time.Time,
+	languageType string,
+	pid uint32,
+	stime int64,
+	tagNames []string,
+	tagValues []string) {
 
 	p.Time = uint32(inTimeStamp.Unix())
 	p._id = genID(uint32(input.StartTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
 	p.VtapID = vtapID
 	p.AppService = profileName
 	p.ProfileLocationStr = location
-	p.ProfileEventType = strings.TrimPrefix(input.Key.AppName(), fmt.Sprintf("%s.", profileName))
+	p.CompressionAlgo = compressionAlgo
+	p.ProfileEventType = eventType
 	p.ProfileValue = self
 	p.ProfileValueUnit = input.Units.String()
 	p.ProfileCreateTimestamp = input.StartTime.UnixMicro()
 	p.ProfileInTimestamp = inTimeStamp.UnixMicro()
 	p.ProfileLanguageType = languageType
-	p.ProfileNodeID = p._id
-	p.ProfileParentNodeID = parentID
 	p.ProfileID, _ = input.Key.ProfileID()
 	if input.Key.Labels() != nil {
 		p.SpanName = input.Key.Labels()[LabelSpanName]
 	}
+	p.ProcessID = pid
+	p.ProcessStartTime = stime
 	tagNames = append(tagNames, LabelAppService, LabelLanguageType, LabelTraceID, LabelSpanName, LabelAppInstance)
 	tagValues = append(tagValues, p.AppService, p.ProfileLanguageType, p.TraceID, p.SpanName, p.AppInstance)
 	p.TagNames = tagNames
@@ -313,5 +327,50 @@ func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.Platfo
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
 		p.ServiceID = platformData.QueryService(p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
+	}
+}
+
+func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
+	flowTagInfo := &cache.FlowTagInfoBuffer
+	*flowTagInfo = flow_tag.FlowTagInfo{
+		Table:   fmt.Sprintf("%s.%s", p.ProfileLanguageType, p.ProfileEventType),
+		VpcId:   p.L3EpcID,
+		PodNsId: p.PodNSID,
+	}
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	// tags
+	flowTagInfo.FieldType = flow_tag.FieldTag
+	for i, name := range p.TagNames {
+		flowTagInfo.FieldName = name
+
+		// tag + value
+		flowTagInfo.FieldValue = p.TagValues[i]
+		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, p.Time); ok {
+			if old+cache.CacheFlushTimeout >= p.Time {
+				continue
+			} else {
+				cache.FieldValueCache.Add(*flowTagInfo, p.Time)
+			}
+		}
+		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue.Timestamp = p.Time
+		tagFieldValue.FlowTagInfo = *flowTagInfo
+		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+		// only tag
+		flowTagInfo.FieldValue = ""
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, p.Time); ok {
+			if old+cache.CacheFlushTimeout >= p.Time {
+				continue
+			} else {
+				cache.FieldCache.Add(*flowTagInfo, p.Time)
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag()
+		tagField.Timestamp = p.Time
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
 	}
 }

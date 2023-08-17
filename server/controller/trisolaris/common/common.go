@@ -67,7 +67,7 @@ const (
 	TRIDENT_LINUX   = 0
 	TRIDENT_WINDOWS = 1
 
-	TSDB_PROCESS_NAME = "roze"
+	TSDB_PROCESS_NAME = "ingester"
 
 	CONN_DEFAULT_AZ     = "ALL"
 	CONN_DEFAULT_REGION = "ffffffff-ffff-ffff-ffff-ffffffffffff"

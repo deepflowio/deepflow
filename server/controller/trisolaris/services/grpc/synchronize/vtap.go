@@ -135,14 +135,16 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		KubernetesApiEnabled:          proto.Bool(false),
 		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
-		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
+		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig(gVTapInfo))),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
 		PrometheusHttpApiAddress:      proto.String(vtapConfig.PrometheusHttpAPIAddress),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		// 调整后采集器配置信息
-		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
-		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
+		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
+		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
+		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
+		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		// 采集器其他配置
 		Enabled:           proto.Bool(Int2Bool(c.GetVTapEnabled())),
 		Host:              proto.String(c.GetVTapHost()),
@@ -223,7 +225,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 
 func isOpenK8sSyn(vtapType int) bool {
 	switch vtapType {
-	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P:
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P,
+		VTAP_TYPE_K8S_SIDECAR:
 		return true
 	default:
 		return false
@@ -232,7 +235,7 @@ func isOpenK8sSyn(vtapType int) bool {
 
 func isPodVTap(vtapType int) bool {
 	switch vtapType {
-	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST:
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_K8S_SIDECAR:
 		return true
 	default:
 		return false
@@ -492,8 +495,10 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		TapMode:                       &tapMode,
 		// 调整后采集器配置信息
-		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
-		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
+		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
+		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
+		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
+		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)

@@ -17,6 +17,7 @@
 package vtap
 
 import (
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,15 +41,25 @@ import (
 
 type VTapConfig struct {
 	models.RVTapGroupConfiguration
-	ConvertedL4LogTapTypes      []uint32
-	ConvertedL7LogStoreTapTypes []uint32
-	ConvertedDecapType          []uint32
-	ConvertedDomains            []string
+	ConvertedL4LogTapTypes       []uint32
+	ConvertedL4LogIgnoreTapSides []uint32
+	ConvertedL7LogIgnoreTapSides []uint32
+	ConvertedL7LogStoreTapTypes  []uint32
+	ConvertedDecapType           []uint32
+	ConvertedDomains             []string
 }
 
 func (f *VTapConfig) convertData() {
 	var err error
 	f.ConvertedL4LogTapTypes, err = ConvertStrToU32List(f.L4LogTapTypes)
+	if err != nil {
+		log.Error(err)
+	}
+	f.ConvertedL4LogIgnoreTapSides, err = ConvertStrToU32List(f.L4LogIgnoreTapSides)
+	if err != nil {
+		log.Error(err)
+	}
+	f.ConvertedL7LogIgnoreTapSides, err = ConvertStrToU32List(f.L7LogIgnoreTapSides)
 	if err != nil {
 		log.Error(err)
 	}
@@ -518,6 +529,26 @@ func (c *VTapCache) GetLaunchServer() string {
 	return ""
 }
 
+var regV = regexp.MustCompile("B_LC_RELEASE_v6_[12]")
+
+func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig(v *VTapInfo) int {
+	if enabled, ok := v.vtapGroupLcuuidToEAHPEnabled[c.GetVTapGroupLcuuid()]; ok {
+		if enabled != nil {
+			return *enabled
+		}
+	}
+	if regV.MatchString(c.GetRevision()) {
+		return 0
+	}
+
+	config := c.GetVTapConfig()
+	if config == nil {
+		return 0
+	}
+
+	return config.ExternalAgentHTTPProxyEnabled
+}
+
 func (c *VTapCache) UpdateLaunchServer(launcherServer string) {
 	c.launchServer = &launcherServer
 }
@@ -788,6 +819,12 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
 			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
+		}
+	} else if vTapType == VTAP_TYPE_K8S_SIDECAR {
+		pod := v.metaData.GetPlatformDataOP().GetRawData().GetPod(c.GetLaunchServerID())
+		if pod != nil {
+			c.podClusterID = pod.PodClusterID
+			c.VPCID = pod.VPCID
 		}
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]

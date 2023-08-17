@@ -114,7 +114,7 @@ func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[str
 	for field, metric := range allMetrics {
 		metricType := METRICS_TYPE_COUNTER
 		isAgg := false
-		if field == "_" {
+		if field == COUNT_METRICS_NAME {
 			metricType = METRICS_TYPE_OTHER
 			isAgg = true
 		}

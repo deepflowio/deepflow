@@ -100,8 +100,8 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				abstractPGName = resourceName[:targetIndex]
 			}
 			uid := common.GetUUID(namespace+abstractPGName, uuid.Nil)
-			// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
-			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s","abstract": true}]`, uid, abstractPGType)))
+			// 适配 serverless pod, 需要抽象出一个对应的 node
+			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, abstractPGType)))
 		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if ID == "" {
@@ -114,15 +114,6 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			continue
 		}
 		hostIP := pData.Get("status").Get("hostIP").MustString()
-		nodeLcuuid, ok := k.nodeIPToLcuuid[hostIP]
-		if !ok {
-			if podGroups.GetIndex(0).Get("abstract").MustBool() {
-				abstractNodes[hostIP] = 0
-			} else {
-				log.Infof("pod (%s) hostIP (%s) not found in node", hostIP, name)
-				continue
-			}
-		}
 
 		podRSLcuuid := ""
 		podGroupLcuuid := ""
@@ -206,7 +197,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			Annotation:          annotationString,
 			ContainerIDs:        strings.Join(containerIDs, ", "),
 			PodReplicaSetLcuuid: podRSLcuuid,
-			PodNodeLcuuid:       nodeLcuuid,
+			PodNodeLcuuid:       k.nodeIPToLcuuid[hostIP],
 			PodGroupLcuuid:      podGroupLcuuid,
 			PodNamespaceLcuuid:  namespaceLcuuid,
 			CreatedAt:           created,

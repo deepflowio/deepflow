@@ -778,6 +778,7 @@ dependencies = [
  "base64 0.13.1",
  "bincode 2.0.0-rc.3",
  "bitflags",
+ "byteorder",
  "bytesize",
  "cadence",
  "cgroups-rs",

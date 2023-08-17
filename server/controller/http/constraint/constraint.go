@@ -17,24 +17,51 @@
 package constraint
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 )
 
 // 各资源可支持的 query 字段定义
 type QueryModel interface {
-	model.VMQuery | model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
+	model.RegionQuery | model.AZQuery | model.HostQuery | model.VMQuery | model.VInterfaceQuery |
+		model.SecurityGroupQuery | model.SecurityGroupRuleQuery | model.NATGatewayQuery | model.NATRuleQuery |
+		model.LBQuery | model.LBListenerQuery | model.LBRuleQuery | model.PeerConnectionQuery | model.CENQuery |
+		model.RDSInstanceQuery | model.RedisInstanceQuery |
+		model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
 		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
-		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery
-}
-
-// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
-type QueryStoredInRedisModel interface {
-	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis | model.PodReplicaSetQueryStoredInRedis |
-		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
-		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |
-		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis
+		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery |
+		model.IPQuery | model.DHCPPortQuery | model.VRouterQuery | model.RoutingTableQuery |
+		model.NetworkQuery | model.VPCQuery
 
 	GetIncludedFields() []string
 	GetUserID() int
 	GetFilterConditions() map[string]interface{}
+}
+
+// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
+type QueryStoredInRedisModel interface {
+	model.HostQueryStoredInRedis | model.VMQueryStoredInRedis | model.VInterfaceQueryStoredInRedis |
+		model.PodQueryStoredInRedis | model.PodReplicaSetQueryStoredInRedis |
+		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
+		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |
+		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis |
+		model.IPQueryStoredInRedis | model.DHCPPortQueryStoredInRedis | model.NetworkQueryStoredInRedis | model.VPCQueryStoredInRedis
+
+	GetIncludedFields() []string
+	GetUserID() int
+	GetFilterConditions() map[string]interface{}
+}
+
+type MySQLModel interface {
+	mysql.Domain | mysql.Region | mysql.AZ | mysql.SubDomain | mysql.Host | mysql.VM |
+		mysql.VPC | mysql.Network | mysql.Subnet | mysql.VRouter | mysql.RoutingTable |
+		mysql.DHCPPort | mysql.VInterface | mysql.WANIP | mysql.LANIP | mysql.FloatingIP |
+		mysql.SecurityGroup | mysql.SecurityGroupRule | mysql.VMSecurityGroup |
+		mysql.NATGateway | mysql.NATRule | mysql.NATVMConnection | mysql.LB |
+		mysql.LBListener | mysql.LBTargetServer | mysql.LBVMConnection | mysql.CEN |
+		mysql.PeerConnection | mysql.RDSInstance | mysql.RedisInstance | mysql.PodCluster |
+		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
+		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
+		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
+		mysql.Pod | mysql.Process | mysql.PrometheusTarget
 }

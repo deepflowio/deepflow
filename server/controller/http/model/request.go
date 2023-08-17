@@ -23,26 +23,17 @@ import (
 // UserInfo defines the user information parsed from the request header, used to build redis cache key and build memory cache filter conditions
 // 定义从 request header 中解析出的用户信息，用于构建 redis 缓存 key 以及构建 memory 缓存过滤条件
 type UserInfo struct { // TODO HeaderInfo?
-	Type int
-	ID   int
+	Type int `json:"TYPE"`
+	ID   int `json:"ID"`
 }
 
 // URLInfo defines the URL information parsed from the request url, which is used to build redis cache key and memory cache filter conditions
 // 定义从 request url 中解析出的 URL 信息，用于构建 redis 缓存 key 以及构建 memory 缓存过滤条件
 type URLInfo struct {
-	RawString        string                  // url raw string
-	UserID           int                     // user_id from query string
-	IncludedFields   []string                // field from query string
-	FilterConditions common.FilterConditions // filter from query string
-}
-
-func NewURLInfo(u string, ifs []string, fcs common.FilterConditions, userID int) *URLInfo {
-	return &URLInfo{
-		RawString:        u,
-		IncludedFields:   ifs,
-		FilterConditions: fcs,
-		UserID:           userID,
-	}
+	RawString        string                  `json:"RAW_STRING"`        // url raw string
+	UserID           int                     `json:"USER_ID"`           // user_id from query string
+	IncludedFields   []string                `json:"INCLUDED_FIELDS"`   // field from query string
+	FilterConditions common.FilterConditions `json:"FILTER_CONDITIONS"` // filter from query string
 }
 
 func (u *URLInfo) String() string {
@@ -50,5 +41,7 @@ func (u *URLInfo) String() string {
 }
 
 type TaskCreate struct {
-	ResourceType int
+	ResourceType string   `json:"RESOURCE_TYPE" binding:"required"`
+	URLInfo      URLInfo  `json:"URL_INFO" binding:"required"`
+	UserInfo     UserInfo `json:"USER_INFO" binding:"required"`
 }

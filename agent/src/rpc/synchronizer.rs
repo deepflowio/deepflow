@@ -52,7 +52,7 @@ use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROL
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
-use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
+use crate::trident::{self, AgentId, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
     command::get_hostname,
     environment::{
@@ -106,20 +106,6 @@ impl Default for StaticConfig {
             kubernetes_cluster_id: Default::default(),
             kubernetes_cluster_name: Default::default(),
             override_os_hostname: None,
-        }
-    }
-}
-
-pub struct RunningConfig {
-    pub ctrl_mac: String,
-    pub ctrl_ip: String,
-}
-
-impl Default for RunningConfig {
-    fn default() -> Self {
-        Self {
-            ctrl_ip: Default::default(),
-            ctrl_mac: Default::default(),
         }
     }
 }
@@ -420,7 +406,7 @@ impl Status {
 
 pub struct Synchronizer {
     pub static_config: Arc<StaticConfig>,
-    pub running_config: Arc<RwLock<RunningConfig>>,
+    pub agent_id: Arc<RwLock<AgentId>>,
     pub status: Arc<RwLock<Status>>,
 
     trident_state: TridentState,
@@ -449,8 +435,7 @@ impl Synchronizer {
         session: Arc<Session>,
         trident_state: TridentState,
         version_info: &'static VersionInfo,
-        ctrl_ip: String,
-        ctrl_mac: String,
+        agent_id: AgentId,
         controller_ip: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
@@ -472,7 +457,7 @@ impl Synchronizer {
                 kubernetes_cluster_name,
                 override_os_hostname,
             }),
-            running_config: Arc::new(RwLock::new(RunningConfig { ctrl_mac, ctrl_ip })),
+            agent_id: Arc::new(RwLock::new(agent_id)),
             trident_state,
             status: Default::default(),
             session,
@@ -489,12 +474,10 @@ impl Synchronizer {
         }
     }
 
-    pub fn reset_session(&self, controller_ips: Vec<String>, ctrl_ip: String, ctrl_mac: String) {
+    pub fn reset_session(&self, controller_ips: Vec<String>, agent_id: AgentId) {
         self.session.reset_server_ip(controller_ips);
 
-        let mut running_config = self.running_config.write();
-        running_config.ctrl_ip = ctrl_ip;
-        running_config.ctrl_mac = ctrl_mac;
+        *self.agent_id.write() = agent_id;
 
         self.status.write().proxy_ip = None;
         self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
@@ -531,7 +514,7 @@ impl Synchronizer {
     }
 
     pub fn generate_sync_request(
-        running_config: &Arc<RwLock<RunningConfig>>,
+        agent_id: &Arc<RwLock<AgentId>>,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
         time_diff: i64,
@@ -557,7 +540,7 @@ impl Synchronizer {
             }
         }
 
-        let running_config = running_config.read();
+        let agent_id = agent_id.read();
 
         tp::SyncRequest {
             boot_time: Some(boot_time as u32),
@@ -569,8 +552,8 @@ impl Synchronizer {
             revision: Some(static_config.version_info.revision.to_owned()),
             exception: Some(exception_handler.take()),
             process_name: Some(static_config.version_info.name.to_owned()),
-            ctrl_mac: Some(running_config.ctrl_mac.clone()),
-            ctrl_ip: Some(running_config.ctrl_ip.clone()),
+            ctrl_mac: Some(agent_id.mac.to_string()),
+            ctrl_ip: Some(agent_id.ip.to_string()),
             tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
             host_ips: addr_list().map_or(vec![], |xs| {
@@ -789,7 +772,7 @@ impl Synchronizer {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
-        let running_config = self.running_config.clone();
+        let agent_id = self.agent_id.clone();
         let status = self.status.clone();
         let running = self.running.clone();
         let max_memory = self.max_memory.clone();
@@ -801,7 +784,7 @@ impl Synchronizer {
             while running.load(Ordering::SeqCst) {
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
-                        &running_config,
+                        &agent_id,
                         &static_config,
                         &status,
                         ntp_diff.load(Ordering::Relaxed),
@@ -929,7 +912,7 @@ impl Synchronizer {
     }
 
     fn run_ntp_sync(&self) {
-        let running_config = self.running_config.clone();
+        let agent_id = self.agent_id.clone();
         let session = self.session.clone();
         let status = self.status.clone();
         let running = self.running.clone();
@@ -954,7 +937,7 @@ impl Synchronizer {
                 ntp_msg.ts_xmit = rand::thread_rng().next_u64();
                 let send_time = SystemTime::now();
 
-                let ctrl_ip = running_config.read().ctrl_ip.clone();
+                let ctrl_ip = agent_id.read().ip.to_string();
                 let response = session
                     .grpc_ntp_with_statsd(tp::NtpRequest {
                         ctrl_ip: Some(ctrl_ip),
@@ -1027,8 +1010,7 @@ impl Synchronizer {
         running: &AtomicBool,
         session: &Session,
         new_revision: &str,
-        ctrl_ip: &str,
-        ctrl_mac: &str,
+        agent_id: &AgentId,
     ) -> Result<(), String> {
         if running_in_container() {
             info!("running in a container, exit directly and try to recreate myself using a new version docker image...");
@@ -1037,8 +1019,8 @@ impl Synchronizer {
 
         let response = session
             .grpc_upgrade_with_statsd(tp::UpgradeRequest {
-                ctrl_ip: Some(ctrl_ip.to_owned()),
-                ctrl_mac: Some(ctrl_mac.to_owned()),
+                ctrl_ip: Some(agent_id.ip.to_string()),
+                ctrl_mac: Some(agent_id.mac.to_string()),
             })
             .await;
         if let Err(m) = response {
@@ -1209,7 +1191,7 @@ impl Synchronizer {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
-        let running_config = self.running_config.clone();
+        let agent_id = self.agent_id.clone();
         let status = self.status.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let running = self.running.clone();
@@ -1238,19 +1220,18 @@ impl Synchronizer {
                     }
                 };
                 if session.get_request_failed() {
-                    let running_config = running_config.read();
+                    let agent_id = agent_id.read();
                     let status = status.read();
                     info!(
-                        "TapMode: {:?}, CtrlMac: {}, CtrlIp: {}, Hostname: {}",
+                        "TapMode: {:?}, AgentId: {:?}, Hostname: {}",
                         static_config.tap_mode,
-                        running_config.ctrl_mac,
-                        running_config.ctrl_ip,
+                        agent_id,
                         status.hostname,
                     )
                 }
 
                 let request = Synchronizer::generate_sync_request(
-                    &running_config,
+                    &agent_id,
                     &static_config,
                     &status,
                     ntp_diff.load(Ordering::Relaxed),
@@ -1293,11 +1274,8 @@ impl Synchronizer {
                     )
                 };
                 if let Some(revision) = new_revision {
-                    let (ctrl_ip, ctrl_mac) = {
-                        let running_config = running_config.read();
-                        (running_config.ctrl_ip.clone(), running_config.ctrl_mac.clone())
-                    };
-                    match Self::upgrade(&running, &session, &revision, &ctrl_ip, &ctrl_mac).await {
+                    let id = agent_id.read().clone();
+                    match Self::upgrade(&running, &session, &revision, &id).await {
                         Ok(_) => {
                             let (ts, cvar) = &*trident_state;
                             *ts.lock().unwrap() = trident::State::Terminated;

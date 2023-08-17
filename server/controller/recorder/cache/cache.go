@@ -22,6 +22,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
@@ -180,6 +181,7 @@ func (c *Cache) Refresh() {
 		c.refreshCENs()
 		c.refreshRDSInstances()
 		c.refreshRedisInstances()
+		c.refreshVIP()
 	}
 	c.refreshPodClusters()
 	c.refreshPodNodes()
@@ -1506,7 +1508,8 @@ func (c *Cache) DeleteProcesses(lcuuids []string) {
 func (c *Cache) refreshProcesses() {
 	log.Infof(refreshResource(RESOURCE_TYPE_PROCESS_EN))
 	var processes []*mysql.Process
-	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&processes).Error; err != nil {
+	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid))
+	if err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROCESS_EN, err))
 		return
 	}
@@ -1535,4 +1538,27 @@ func (c *Cache) refreshPrometheusTarget() {
 	}
 
 	c.AddPrometheusTargets(prometheusTargets)
+}
+
+func (c *Cache) AddVIPs(items []*mysql.VIP) {
+	for _, item := range items {
+		c.DiffBaseDataSet.addVIP(item, c.Sequence)
+	}
+}
+
+func (c *Cache) DeleteVIPs(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.deleteVIP(lcuuid)
+	}
+}
+
+func (c *Cache) refreshVIP() {
+	log.Infof(refreshResource(RESOURCE_TYPE_VIP_EN))
+	var vips []*mysql.VIP
+	if err := mysql.Db.Where("domain = ?", c.DomainLcuuid).Find(&vips).Error; err != nil {
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VIP_EN, err))
+		return
+	}
+
+	c.AddVIPs(vips)
 }

@@ -24,6 +24,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -47,6 +48,8 @@ const (
 	LruSlotSize           = 1 << 14
 	LruCap                = 1 << 17
 	GROUPID_MAX           = 1 << 16
+
+	MASTER_TABLE_MOUDLE_NANE = "ingester"
 )
 
 type BaseInfo struct {
@@ -305,6 +308,7 @@ func (t *PlatformInfoTable) QueryNetnsIdInfo(vtapId, netnsId uint32) *Info {
 
 type PlatformDataManager struct {
 	masterTable       *PlatformInfoTable
+	tableLock         sync.Mutex
 	slaveTables       []*PlatformInfoTable
 	slaveCount        uint32
 	maxSlaveTableSize int
@@ -328,14 +332,19 @@ func NewPlatformDataManager(ips []net.IP, port, maxSlaveTableSize, rpcMaxMsgSize
 	}
 }
 
-func (m *PlatformDataManager) NewPlatformInfoTable(isMaster bool, moudleName string) (*PlatformInfoTable, error) {
-	if isMaster {
-		if m.masterTable != nil {
-			err := fmt.Errorf("new platformData table  %s failed, master table already added", moudleName)
-			log.Error(err)
-			return nil, err
+func (m *PlatformDataManager) NewPlatformInfoTable(moudleName string) (*PlatformInfoTable, error) {
+	m.tableLock.Lock()
+	if m.masterTable == nil {
+		// the master table moudleName must be 'ingester', the Controller adds datanode information according to the name of the request is 'ingester'.
+		m.masterTable = NewPlatformInfoTable(m.ips, m.port, 0, m.rpcMaxMsgSize, MASTER_TABLE_MOUDLE_NANE, m.nodeIP, m.receiver, true, m)
+		m.masterTable.Start()
+		if moudleName == MASTER_TABLE_MOUDLE_NANE {
+			m.tableLock.Unlock()
+			return m.masterTable, nil
 		}
-		m.masterTable = NewPlatformInfoTable(m.ips, m.port, 0, m.rpcMaxMsgSize, moudleName, m.nodeIP, m.receiver, isMaster, m)
+	}
+	m.tableLock.Unlock()
+	if moudleName == MASTER_TABLE_MOUDLE_NANE {
 		return m.masterTable, nil
 	}
 
@@ -345,8 +354,12 @@ func (m *PlatformDataManager) NewPlatformInfoTable(isMaster bool, moudleName str
 		log.Error(err)
 		return nil, err
 	}
-	m.slaveTables[index] = NewPlatformInfoTable(m.ips, m.port, index, m.rpcMaxMsgSize, moudleName, m.nodeIP, m.receiver, isMaster, m)
+	m.slaveTables[index] = NewPlatformInfoTable(m.ips, m.port, index, m.rpcMaxMsgSize, moudleName, m.nodeIP, m.receiver, false, m)
 	return m.slaveTables[index], nil
+}
+
+func (m *PlatformDataManager) GetMasterPlatformInfoTable() *PlatformInfoTable {
+	return m.masterTable
 }
 
 func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleName, nodeIP string, receiver *receiver.Receiver, isMaster bool, manager *PlatformDataManager) *PlatformInfoTable {
@@ -1558,8 +1571,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			m := NewPlatformDataManager(ips, port, 16, 41943040, "", nil)
-			table, _ := m.NewPlatformInfoTable(true, "test")
+			table := NewPlatformInfoTable(ips, port, 0, 41943040, "test", "", nil, true, nil)
 			table.ReloadMaster()
 			fmt.Println(table)
 		},

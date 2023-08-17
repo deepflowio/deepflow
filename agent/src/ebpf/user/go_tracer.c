@@ -158,6 +158,18 @@ static struct data_members offsets[] = {
 		.field_name = "StreamID",
 		.idx = OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER,
 		.default_offset = 8,
+	},
+	{
+		.structure = "golang.org/x/net/http2.Framer",
+		.field_name = "w",
+		.idx = OFFSET_IDX_HTTP2_FRAMER_W,
+		.default_offset = 112,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.bufWriter",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_BUFWRITTER_CONN,
+		.default_offset = 0,
 	}
 };
 
@@ -298,6 +310,20 @@ static struct symbol syms[] = {
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders",
 		.probe_func = "uprobe_go_http2Server_operateHeaders",
+		.is_probe_ret = false,
+	},
+	// grpc datafram read
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*Framer).checkFrameOrder",
+		.probe_func = "uprobe_golang_org_x_net_http2_Framer_checkFrameOrder",
+		.is_probe_ret = false,
+	},
+	// grpc datafram write
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*Framer).WriteDataPadded",
+		.probe_func = "uprobe_golang_org_x_net_http2_Framer_WriteDataPadded",
 		.is_probe_ret = false,
 	},
 };
@@ -572,14 +598,23 @@ static int resolve_bin_file(const char *path, int pid,
 			p_info->info.offsets[off->idx] = offset;
 		}
 
-		p_info->info.net_TCPConn_itab = get_symbol_addr_from_binary(
-			binary_path, "go.itab.*net.TCPConn,net.Conn");
-		p_info->info.crypto_tls_Conn_itab = get_symbol_addr_from_binary(
-			binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
-		p_info->info
-			.credentials_syscallConn_itab = get_symbol_addr_from_binary(
-			binary_path,
-			"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		if (p_info->info.version < GO_VERSION(1, 20, 0)) {
+			p_info->info.net_TCPConn_itab =
+				get_symbol_addr_from_binary(binary_path, "go.itab.*net.TCPConn,net.Conn");
+			p_info->info.crypto_tls_Conn_itab =
+				get_symbol_addr_from_binary(binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
+			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+				binary_path,
+				"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		} else {
+			p_info->info.net_TCPConn_itab =
+				get_symbol_addr_from_binary(binary_path, "go:itab.*net.TCPConn,net.Conn");
+			p_info->info.crypto_tls_Conn_itab =
+				get_symbol_addr_from_binary(binary_path, "go:itab.*crypto/tls.Conn,net.Conn");
+			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+				binary_path,
+				"go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		}
 
 		p_info->has_updated = false;
 

@@ -125,6 +125,8 @@ const (
 	VTAP_TYPE_POD_VM
 	VTAP_TYPE_TUNNEL_DECAPSULATION
 	VTAP_TYPE_HYPER_V
+	_ // 11
+	VTAP_TYPE_K8S_SIDECAR
 )
 
 var VTapTypeName = map[int]string{
@@ -137,6 +139,7 @@ var VTapTypeName = map[int]string{
 	VTAP_TYPE_POD_VM:               "K8S_VM",
 	VTAP_TYPE_TUNNEL_DECAPSULATION: "TUN_DECAP",
 	VTAP_TYPE_HYPER_V:              "HYPER_V",
+	VTAP_TYPE_K8S_SIDECAR:          "K8S_SIDECAR",
 }
 
 var VTapTypeChinese = map[int]string{
@@ -149,6 +152,7 @@ var VTapTypeChinese = map[int]string{
 	VTAP_TYPE_POD_VM:               "容器-V",
 	VTAP_TYPE_TUNNEL_DECAPSULATION: "隧道解封装",
 	VTAP_TYPE_HYPER_V:              "Hyper-V",
+	VTAP_TYPE_K8S_SIDECAR:          "K8s-Sidecar",
 }
 
 // need synchronized update with the cli
@@ -212,6 +216,7 @@ var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 	VTAP_TYPE_POD_VM:               VIF_DEVICE_TYPE_POD_NODE,
 	VTAP_TYPE_TUNNEL_DECAPSULATION: 0,
 	VTAP_TYPE_HYPER_V:              VIF_DEVICE_TYPE_HOST,
+	VTAP_TYPE_K8S_SIDECAR:          VIF_DEVICE_TYPE_POD,
 }
 
 const (
@@ -305,10 +310,35 @@ const (
 	MICROSOFT_CH        = "微软云"
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
+
+	OPENSTACK_CH  = "OpenStack"
+	VSPHERE_CH    = "vSphere"
+	NSP_CH        = "NSP"
+	AWS_CH        = "AWS"
+	ZSTACK_CH     = "ZStack"
+	KUBERNETES_CH = "Kubernetes"
 )
 
 var DomainTypeToIconID = map[int]int{
 	KUBERNETES: 14,
+}
+
+// TODO delete tagrecorder dup definition
+var IconNameToDomainTypes = map[string][]int{
+	OPENSTACK_CH:        {OPENSTACK},
+	VSPHERE_CH:          {VSPHERE},
+	NSP_CH:              {NSP},
+	TENCENT_CH:          {TENCENT, TENCENT_TCE},
+	AWS_CH:              {AWS},
+	PINGAN_CH:           {PINGAN},
+	ZSTACK_CH:           {ZSTACK},
+	ALIYUN_CH:           {ALIYUN, APSARA_STACK},
+	KUBERNETES_CH:       {KUBERNETES},
+	HUAWEI_CH:           {HUAWEI, HUAWEI_PRIVATE},
+	QINGCLOUD_CH:        {QINGCLOUD, QINGCLOUD_PRIVATE},
+	MICROSOFT_CH:        {AZURE, CMB_CMDB, MICROSOFT_ACS},
+	KINGSOFT_PRIVATE_CH: {KINGSOFT_PRIVATE},
+	BAIDU_BCE_CH:        {BAIDU_BCE},
 }
 
 const (
@@ -429,13 +459,8 @@ const (
 )
 
 const (
-	DATA_SOURCE_FLOW            = "flow"
-	DATA_SOURCE_APP             = "app"
-	DATA_SOURCE_L4_FLOW_LOG     = "flow_log.l4_flow_log"
-	DATA_SOURCE_L7_FLOW_LOG     = "flow_log.l7_flow_log"
-	DATA_SOURCE_L4_PACKAGE      = "flow_log.l4_packet"
-	DATA_SOURCE_L7_PACKAGE      = "flow_log.l7_packet"
-	DATA_SOURCE_DEEPFLOW_SYSTEM = "flow_log.deepflow_system"
+	DATA_SOURCE_FLOW = "flow_metrics.vtap_flow*"
+	DATA_SOURCE_APP  = "flow_metrics.vtap_app*"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1
@@ -560,6 +585,7 @@ var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_POD_VM:               []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 	VTAP_TYPE_TUNNEL_DECAPSULATION: []int{TAPMODE_DECAP},
 	VTAP_TYPE_HYPER_V:              []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_K8S_SIDECAR:          []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 }
 
 type DataChanged string

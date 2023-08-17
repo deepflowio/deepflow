@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
+mod mongo;
 mod mysql;
 mod postgre_convert;
 mod postgresql;
 mod redis;
-mod mongo;
 mod sql_check;
 
+pub use mongo::{MongoDBInfo, MongoDBLog};
 pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{decode, RedisInfo, RedisLog};
-pub use mongo::{MongoDBInfo, MongoDBLog};
-use sql_check::trim_head_comment_and_first_upper;

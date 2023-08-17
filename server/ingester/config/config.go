@@ -35,7 +35,7 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultContrallerIP             = "127.0.0.1"
+	DefaultControllerIP             = "127.0.0.1"
 	DefaultControllerPort           = 20035
 	DefaultCheckInterval            = 300 // clickhouse是异步删除
 	DefaultDiskUsedPercent          = 80
@@ -121,6 +121,7 @@ type CKDB struct {
 }
 
 type Config struct {
+	StorageDisabled          bool            `yaml:"storage-disabled"`
 	ListenPort               uint16          `yaml:"listen-port"`
 	CKDB                     CKDB            `yaml:"ckdb"`
 	ControllerIPs            []string        `yaml:"controller-ips,flow"`
@@ -175,8 +176,28 @@ func (c *Config) Validate() error {
 		c.FlowTagCacheFlushTimeout = DefaultFlowTagCacheFlushTimeout
 	}
 
+	level := strings.ToLower(c.LogLevel)
+	c.LogLevel = "info"
+	for _, l := range []string{"error", "warn", "info", "debug"} {
+		if level == l {
+			c.LogLevel = l
+		}
+	}
+
+	if c.GrpcBufferSize <= 0 {
+		c.GrpcBufferSize = DefaultGrpcBufferSize
+	}
+
+	if c.ServiceLabelerLruCap <= 0 {
+		c.ServiceLabelerLruCap = DefaultServiceLabelerLruCap
+	}
+
+	if c.StatsInterval <= 0 {
+		c.StatsInterval = DefaultStatsInterval
+	}
+
 	// should get node ip from ENV
-	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
+	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultControllerIP {
 		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
 			log.Errorf("Can't get env %s", EnvK8sNodeIP)
@@ -191,6 +212,11 @@ func (c *Config) Validate() error {
 		sleepAndExit()
 	}
 	c.MyNodeName = myNodeName
+
+	if c.StorageDisabled {
+		return nil
+	}
+
 	myPodName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
 		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
@@ -277,26 +303,6 @@ func (c *Config) Validate() error {
 		break
 	}
 
-	level := strings.ToLower(c.LogLevel)
-	c.LogLevel = "info"
-	for _, l := range []string{"error", "warn", "info", "debug"} {
-		if level == l {
-			c.LogLevel = l
-		}
-	}
-
-	if c.GrpcBufferSize <= 0 {
-		c.GrpcBufferSize = DefaultGrpcBufferSize
-	}
-
-	if c.ServiceLabelerLruCap <= 0 {
-		c.ServiceLabelerLruCap = DefaultServiceLabelerLruCap
-	}
-
-	if c.StatsInterval <= 0 {
-		c.StatsInterval = DefaultStatsInterval
-	}
-
 	return c.ValidateAndSetckdbColdStorages()
 }
 
@@ -357,7 +363,7 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:   []string{DefaultContrallerIP},
+			ControllerIPs:   []string{DefaultControllerIP},
 			ControllerPort:  DefaultControllerPort,
 			CKDBAuth:        Auth{"default", ""},
 			IngesterEnabled: true,

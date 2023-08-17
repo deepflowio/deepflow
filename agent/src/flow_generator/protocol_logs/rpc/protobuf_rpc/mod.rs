@@ -28,7 +28,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
-            KafkaInfoCache, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+            KafkaInfoCache, L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
         },
     },
     flow_generator::{protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result},
@@ -56,7 +56,7 @@ pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
     match proto {
         ProtobufRpcProtocol::Krpc => p.set_rpc_parser(ProtobufRpcLog::KrpcLog(KrpcLog::default())),
     }
-    L7ProtocolParser::ProtobufRPC(Box::new(p))
+    L7ProtocolParser::ProtobufRPC(p)
 }
 
 // all protobuf rpc parser
@@ -66,6 +66,6 @@ pub enum ProtobufRpcLog {
     KrpcLog(KrpcLog),
 }
 
-fn all_protobuf_rpc_parser() -> Vec<ProtobufRpcLog> {
-    vec![ProtobufRpcLog::KrpcLog(KrpcLog::default())]
+fn all_protobuf_rpc_parser() -> [ProtobufRpcLog; 1] {
+    [ProtobufRpcLog::KrpcLog(KrpcLog::default())]
 }

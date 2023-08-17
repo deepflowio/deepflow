@@ -18,11 +18,14 @@ package mysql
 
 import (
 	"github.com/goccy/go-json"
+	"github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/controller/http/constraint"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/provider"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
+
+var log = logging.MustGetLogger("service.resource.data.mysql")
 
 type DataProvider struct {
 	resourceType string

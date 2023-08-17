@@ -238,11 +238,13 @@ impl AnalyzerModeDispatcher {
 
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let flow_output_queue = base.flow_output_queue.clone();
+        let l7_stats_output_queue = base.l7_stats_output_queue.clone();
         let policy_getter = base.policy_getter;
         let log_output_queue = base.log_output_queue.clone();
         let ntp_diff = base.ntp_diff.clone();
         let flow_map_config = base.flow_map_config.clone();
         let log_parse_config = base.log_parse_config.clone();
+        let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
 
@@ -256,6 +258,7 @@ impl AnalyzerModeDispatcher {
                     let mut flow_map = FlowMap::new(
                         id as u32,
                         flow_output_queue,
+                        l7_stats_output_queue,
                         policy_getter,
                         log_output_queue,
                         ntp_diff,
@@ -269,6 +272,7 @@ impl AnalyzerModeDispatcher {
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parse_config.load(),
+                            collector: &collector_config.load(),
                             #[cfg(target_os = "linux")]
                             ebpf: None,
                         };

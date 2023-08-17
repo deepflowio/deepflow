@@ -59,9 +59,13 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Use:   "prometheus",
 		Short: "Prometheus label debug commands",
 	}
+	otlpCmd := &cobra.Command{
+		Use:   "otlp",
+		Short: "otlp exporter debug commands",
+	}
 
 	root.AddCommand(ingesterCmd)
-	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd)
+	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd, otlpCmd)
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
@@ -86,6 +90,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		"1-receive-to-decode-l7",
 	}))
 	flowLogCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, debug.CmdHelper{"platformData [filter]", "show flow log platform data statistics"}, nil))
+	flowLogCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_L7_FLOW_LOG, debug.CmdHelper{"l7", "show l7 flow log counter"}, nil))
 
 	prometheusCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROMETHEUS, debug.CmdHelper{"platformData [filter]", "show prometheus platform data statistics"}, nil))
 	prometheusCmd.AddCommand(decoder.RegisterClientPrometheusLabelCommand())
@@ -93,6 +98,9 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		"1-receive-to-decode-prometheus",
 		"2-decode-to-slow-decode-prometheus",
 	}))
+
+	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"stats", "show otlp exporter stats"}, nil))
+	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }

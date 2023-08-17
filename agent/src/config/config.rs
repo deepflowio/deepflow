@@ -24,9 +24,6 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
-use public::bitmap::Bitmap;
-use public::consts::NPB_DEFAULT_PORT;
-use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -35,19 +32,26 @@ use serde::{
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
-use crate::common::decapsulate::TunnelType;
-use crate::common::l7_protocol_log::get_all_protocol;
-use crate::common::l7_protocol_log::L7ProtocolParserInterface;
-use crate::common::{
-    enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
-    L7_PROTOCOL_INFERENCE_TTL,
+use crate::{
+    common::{
+        decapsulate::TunnelType,
+        enums::TapType,
+        l7_protocol_log::{get_all_protocol, L7ProtocolParserInterface},
+        DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL,
+    },
+    flow_generator::protocol_logs::SLOT_WIDTH,
+    metric::document::TapSide,
+    rpc::Session,
+    trident::RunningMode,
 };
-use crate::flow_generator::protocol_logs::SLOT_WIDTH;
-use crate::rpc::Session;
-use crate::trident::RunningMode;
-use public::proto::{
-    common,
-    trident::{self, KubernetesClusterIdRequest, TapMode},
+use public::{
+    bitmap::Bitmap,
+    consts::NPB_DEFAULT_PORT,
+    proto::{
+        common,
+        trident::{self, KubernetesClusterIdRequest, TapMode},
+    },
+    utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
 const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
@@ -284,6 +288,26 @@ pub struct EbpfKprobePortlist {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct OnCpuProfile {
+    pub disabled: bool,
+    pub frequency: u16,
+    pub cpu: u16,
+    pub regex: String,
+}
+
+impl Default for OnCpuProfile {
+    fn default() -> Self {
+        OnCpuProfile {
+            disabled: false,
+            frequency: 99,
+            cpu: 0,
+            regex: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
@@ -301,6 +325,7 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
+    pub on_cpu_profile: OnCpuProfile,
 }
 
 impl Default for EbpfYamlConfig {
@@ -320,6 +345,7 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
+            on_cpu_profile: OnCpuProfile::default(),
         }
     }
 }
@@ -410,7 +436,6 @@ pub struct YamlConfig {
     pub kubernetes_api_list_limit: u32,
     #[serde(with = "humantime_serde")]
     pub kubernetes_api_list_interval: Duration,
-    pub kubernetes_api_memory_trim_percent: u8,
     pub kubernetes_resources: Vec<KubernetesResourceConfig>,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
@@ -615,10 +640,6 @@ impl YamlConfig {
             c.kubernetes_api_list_interval = Duration::from_secs(600);
         }
 
-        if c.kubernetes_api_memory_trim_percent > 100 {
-            c.kubernetes_api_memory_trim_percent = 100;
-        }
-
         if c.forward_capacity < 1 << 14 {
             c.forward_capacity = 1 << 14;
         }
@@ -741,7 +762,6 @@ impl Default for YamlConfig {
             kubernetes_namespace: "".into(),
             kubernetes_api_list_limit: 1000,
             kubernetes_api_list_interval: Duration::from_secs(600),
-            kubernetes_api_memory_trim_percent: 100,
             kubernetes_resources: vec![],
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
@@ -950,7 +970,6 @@ pub enum KubernetesPollerType {
     Adaptive,
     Active,
     Passive,
-    Sidecar,
 }
 
 #[derive(Debug, Deserialize)]
@@ -984,6 +1003,10 @@ pub struct RuntimeConfig {
     #[serde(skip)]
     pub app_proto_log_enabled: bool,
     pub l7_log_store_tap_types: Vec<u8>,
+    #[serde(deserialize_with = "tap_side_vec_de")]
+    pub l4_log_ignore_tap_sides: Vec<TapSide>,
+    #[serde(deserialize_with = "tap_side_vec_de")]
+    pub l7_log_ignore_tap_sides: Vec<TapSide>,
     #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
     #[serde(skip)]
@@ -1141,6 +1164,8 @@ impl RuntimeConfig {
             l7_metrics_enabled: true,
             app_proto_log_enabled: true,
             l7_log_store_tap_types: vec![0],
+            l4_log_ignore_tap_sides: vec![],
+            l7_log_ignore_tap_sides: vec![],
             decap_types: Default::default(),
             http_log_proxy_client: "X-Forwarded-For".into(),
             http_log_trace_id: "traceparent, sw8".into(),
@@ -1336,6 +1361,28 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                     }
                 })
                 .collect(),
+            l4_log_ignore_tap_sides: conf
+                .l4_log_ignore_tap_sides
+                .iter()
+                .filter_map(|s| match TapSide::try_from(*s as u8) {
+                    Ok(side) => Some(side),
+                    Err(_) => {
+                        warn!("invalid tap side: {}", s);
+                        None
+                    }
+                })
+                .collect(),
+            l7_log_ignore_tap_sides: conf
+                .l7_log_ignore_tap_sides
+                .iter()
+                .filter_map(|s| match TapSide::try_from(*s as u8) {
+                    Ok(side) => Some(side),
+                    Err(_) => {
+                        warn!("invalid tap side: {}", s);
+                        None
+                    }
+                })
+                .collect(),
             decap_types: conf
                 .decap_type
                 .iter()
@@ -1485,6 +1532,16 @@ where
             &"0|1",
         )),
     }
+}
+
+fn tap_side_vec_de<'de, D>(deserializer: D) -> Result<Vec<TapSide>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Vec::<u8>::deserialize(deserializer)?
+        .into_iter()
+        .map(|t| TapSide::try_from(t).map_err(de::Error::custom))
+        .collect()
 }
 
 // resolve domain name (without port) to ip address

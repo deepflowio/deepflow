@@ -36,15 +36,17 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
-use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
+use crate::common::{
+    flow::{Flow, L7PerfStats},
+    l7_protocol_log::L7ParseResult,
+};
 use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
-        l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::{
             get_all_protocol, get_parser, L7ProtocolBitmap, L7ProtocolParser,
             L7ProtocolParserInterface, ParseParam,
@@ -212,7 +214,7 @@ impl FlowLog {
         parse_param: &ParseParam,
         local_epc: i32,
         remote_epc: i32,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
@@ -270,11 +272,12 @@ impl FlowLog {
         log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
         }
@@ -288,12 +291,13 @@ impl FlowLog {
                 &payload[..pkt_size]
             };
 
-            let mut param = ParseParam::from((
+            let mut param = ParseParam::new(
                 &*packet,
                 self.perf_cache.clone(),
-                !is_parse_log,
-                log_parser_config,
-            ));
+                is_parse_perf,
+                is_parse_log,
+            );
+            param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
             {
                 param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
@@ -340,15 +344,14 @@ impl FlowLog {
                     param.direction = packet.lookup_key.direction;
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
-                    let ret = self.l7_parse_log(
+                    return self.l7_parse_log(
                         flow_config,
                         packet,
                         app_table,
                         &param,
                         local_epc,
                         remote_epc,
-                    )?;
-                    return Ok(ret);
+                    );
                 }
             }
 
@@ -372,11 +375,12 @@ impl FlowLog {
         log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
             // direction by comparing self.server_port with packet.lookup_key.dst_port When check_payload()
@@ -389,12 +393,13 @@ impl FlowLog {
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            let param = &mut ParseParam::from((
+            let param = &mut ParseParam::new(
                 &*packet,
                 self.perf_cache.clone(),
-                !is_parse_log,
-                log_parser_config,
-            ));
+                is_parse_perf,
+                is_parse_log,
+            );
+            param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
             param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
@@ -422,6 +427,7 @@ impl FlowLog {
             log_parser_config,
             packet,
             app_table,
+            is_parse_perf,
             is_parse_log,
             local_epc,
             remote_epc,
@@ -501,7 +507,7 @@ impl FlowLog {
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if let Some(l4) = self.l4.as_mut() {
             l4.parse(packet, is_first_packet_direction)?;
         }
@@ -513,56 +519,45 @@ impl FlowLog {
                 log_parser_config,
                 packet,
                 app_table,
+                l7_performance_enabled,
                 l7_log_parse_enabled,
                 local_epc,
                 remote_epc,
                 checker,
             );
         }
-        Ok(vec![])
+        Ok(L7ParseResult::None)
     }
 
-    pub fn copy_and_reset_perf_data(
-        &mut self,
-        flow_reversed: bool,
-        l7_timeout_count: u32,
-        _: bool,
-        l7_performance_enabled: bool,
-    ) -> Option<FlowPerfStats> {
-        let mut stats = None;
+    pub fn copy_and_reset_l4_perf_data(&mut self, flow_reversed: bool, flow: &mut Flow) {
         if let Some(l4) = self.l4.as_mut() {
             if l4.data_updated() {
-                stats.replace(l4.copy_and_reset_data(flow_reversed));
+                let flow_perf_stats = l4.copy_and_reset_data(flow_reversed);
+                flow.flow_perf_stats.as_mut().unwrap().l4_protocol = flow_perf_stats.l4_protocol;
+                flow.flow_perf_stats.as_mut().unwrap().tcp = flow_perf_stats.tcp;
             }
         }
+    }
 
-        if l7_performance_enabled {
-            let default_l7_perf = L7PerfStats {
-                err_timeout: l7_timeout_count,
-                ..Default::default()
-            };
+    pub fn copy_and_reset_l7_perf_data(
+        &mut self,
+        l7_timeout_count: u32,
+    ) -> (L7PerfStats, L7Protocol) {
+        let default_l7_perf = L7PerfStats {
+            err_timeout: l7_timeout_count,
+            ..Default::default()
+        };
 
-            let l7_perf =
-                self.l7_protocol_log_parser
-                    .as_mut()
-                    .map_or(default_l7_perf.clone(), |l| {
-                        l.perf_stats().map_or(default_l7_perf, |mut p| {
-                            p.err_timeout = l7_timeout_count;
-                            p
-                        })
-                    });
+        let l7_perf = self
+            .l7_protocol_log_parser
+            .as_mut()
+            .map_or(default_l7_perf.clone(), |l| {
+                l.perf_stats().map_or(default_l7_perf, |mut p| {
+                    p.err_timeout = l7_timeout_count;
+                    p
+                })
+            });
 
-            if let Some(stats) = stats.as_mut() {
-                stats.l7 = l7_perf;
-                stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
-            } else {
-                stats.replace(FlowPerfStats {
-                    l7: l7_perf,
-                    l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                    ..Default::default()
-                });
-            }
-        }
-        stats
+        (l7_perf, self.l7_protocol_enum.get_l7_protocol())
     }
 }

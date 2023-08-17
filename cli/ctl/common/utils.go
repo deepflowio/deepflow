@@ -253,3 +253,30 @@ func ConvertControllerAddrToPodIP(controllerIP string, controllerPort uint32) (s
 	}
 	return podIP, nil
 }
+
+func GetURLInfo(cmd *cobra.Command, urlPath string) {
+
+	server := GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d", server.IP, server.Port) + urlPath
+
+	response, err := CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	responseByte, err := response.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var str bytes.Buffer
+	err = json.Indent(&str, responseByte, "", "    ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	fmt.Println(str.String())
+}

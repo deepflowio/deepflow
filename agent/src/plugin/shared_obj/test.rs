@@ -71,7 +71,8 @@ fn get_req_param<'a>(
         }),
         packet_seq: 9999999,
         time: 12345678,
-        perf_only: false,
+        parse_log: true,
+        parse_perf: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: None,
@@ -105,7 +106,8 @@ fn get_resp_param<'a>(
         }),
         packet_seq: 9999999,
         time: 12345679,
-        perf_only: false,
+        parse_perf: true,
+        parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: None,
@@ -154,7 +156,7 @@ fn test_parse() {
     let param = get_req_param(rrt_cache.clone(), plugin.clone());
     let mut p = get_so_parser(1, "dns".into());
     let infos = p.parse_payload(&REQ_PAYLOAD, &param).unwrap();
-    let info = infos.get(0).unwrap();
+    let info = infos.unwrap_single();
 
     if let L7ProtocolInfo::CustomInfo(info) = info {
         assert_eq!(info.proto, 1);
@@ -185,7 +187,7 @@ fn test_parse() {
 
     let param = get_resp_param(rrt_cache, plugin.clone());
     let infos = p.parse_payload(&RESP_PAYLOAD, &param).unwrap();
-    let info = infos.get(0).unwrap();
+    let info = infos.unwrap_single();
 
     if let L7ProtocolInfo::CustomInfo(info) = info {
         assert_eq!(info.proto, 1);

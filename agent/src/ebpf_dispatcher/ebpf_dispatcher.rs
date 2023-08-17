@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
+use std::slice;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -25,16 +26,21 @@ use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
 
 use super::{Error, Result};
+use crate::common::flow::L7Stats;
 use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::TaggedFlow;
-use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
+use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
-use crate::ebpf::{self, set_allow_port_bitmap, set_bypass_port_bitmap};
+use crate::ebpf::{
+    self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
+    set_profiler_regex, start_continuous_profiler,
+};
 use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
+use crate::integration_collector::Profile;
 use crate::platform::PlatformSynchronizer;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
@@ -42,6 +48,7 @@ use public::{
     buffer::BatchedBox,
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
+    proto::metric,
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -188,10 +195,12 @@ struct EbpfDispatcher {
     // GRPC配置
     log_parser_config: LogParserAccess,
     flow_map_config: FlowAccess,
+    collector_config: CollectorAccess,
 
     config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<BatchedBox<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
+    flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>, // Send TaggedFlows to the QuadrupleGenerator
+    l7_stats_output: DebugSender<BatchedBox<L7Stats>>,     // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
@@ -202,6 +211,7 @@ impl EbpfDispatcher {
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
             self.flow_output.clone(),
+            self.l7_stats_output.clone(),
             self.policy_getter,
             self.output.clone(),
             self.time_diff.clone(),
@@ -217,6 +227,7 @@ impl EbpfDispatcher {
             let config = Config {
                 flow: &self.flow_map_config.load(),
                 log_parser: &self.log_parser_config.load(),
+                collector: &self.collector_config.load(),
                 ebpf: Some(&ebpf_config),
             };
 
@@ -263,10 +274,12 @@ pub struct EbpfCollector {
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
+static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut PLATFORM_SYNC: Option<Arc<PlatformSynchronizer>> = None;
+static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
 
 impl EbpfCollector {
-    extern "C" fn ebpf_callback(sd: *mut ebpf::SK_BPF_DATA) {
+    extern "C" fn ebpf_l7_callback(sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
@@ -303,10 +316,79 @@ impl EbpfCollector {
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
+    extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
+        unsafe {
+            if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
+                return;
+            }
+            let mut profile = metric::Profile::default();
+            let data = &mut *data;
+            profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
+            profile.timestamp = data.timestamp;
+            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.stime = data.stime;
+            profile.pid = data.pid;
+            profile.tid = data.tid;
+            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned();
+            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned();
+            profile.u_stack_id = data.u_stack_id;
+            profile.k_stack_id = data.k_stack_id;
+            profile.cpu = data.cpu;
+            profile.count = data.count;
+            profile.data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
+                    .to_vec();
+
+            if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
+                warn!("ebpf profile send error: {:?}", e);
+            }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
+        unsafe {
+            if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
+                return;
+            }
+            let mut profile = metric::Profile::default();
+            let data = &mut *data;
+            profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
+            profile.timestamp = data.timestamp;
+            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.stime = data.stime;
+            profile.pid = data.pid;
+            profile.tid = data.tid;
+            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const u8)
+                .to_string_lossy()
+                .into_owned();
+            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
+                .to_string_lossy()
+                .into_owned();
+            profile.u_stack_id = data.u_stack_id;
+            profile.k_stack_id = data.k_stack_id;
+            profile.cpu = data.cpu;
+            profile.count = data.count;
+            profile.data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
+                    .to_vec();
+
+            if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
+                warn!("ebpf profile send error: {:?}", e);
+            }
+        }
+    }
+
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
+        ebpf_profile_sender: DebugSender<Profile>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
         platform_sync: Arc<PlatformSynchronizer>,
     ) -> Result<()> {
@@ -431,7 +513,7 @@ impl EbpfCollector {
             }
 
             if ebpf::running_socket_tracer(
-                Self::ebpf_callback,                       /* 回调接口 rust -> C */
+                Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
                 config.ebpf.perf_pages_count as u32, /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
                 config.ebpf.ring_size as u32, /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
@@ -442,6 +524,29 @@ impl EbpfCollector {
             {
                 return Err(Error::EbpfRunningError);
             }
+
+            let on_cpu_profile_config = &config.ebpf.on_cpu_profile;
+            if !on_cpu_profile_config.disabled {
+                if start_continuous_profiler(
+                    on_cpu_profile_config.frequency as i32,
+                    Self::ebpf_on_cpu_callback,
+                ) != 0
+                {
+                    info!("ebpf start_continuous_profiler error.");
+                    return Err(Error::EbpfInitError);
+                }
+
+                set_profiler_regex(
+                    CString::new(on_cpu_profile_config.regex.as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+
+                // CPUID will not be included in the aggregation of stack trace data.
+                set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
+            }
+
             ebpf::bpf_tracer_finish();
         }
         // ebpf和ebpf collector通信配置初始化
@@ -449,7 +554,9 @@ impl EbpfCollector {
             SWITCH = false;
             SENDER = Some(sender);
             PROC_EVENT_SENDER = Some(proc_event_sender);
+            EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             PLATFORM_SYNC = Some(platform_sync);
+            ON_CPU_PROFILE_FREQUENCY = config.ebpf.on_cpu_profile.frequency as u32;
         }
 
         Ok(())
@@ -516,10 +623,13 @@ impl EbpfCollector {
         config: EbpfAccess,
         log_parser_config: LogParserAccess,
         flow_map_config: FlowAccess,
+        collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
-        flow_output: DebugSender<BatchedBox<TaggedFlow>>,
+        flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+        l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
+        ebpf_profile_sender: DebugSender<Profile>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
         platform_sync: Arc<PlatformSynchronizer>,
@@ -537,6 +647,7 @@ impl EbpfCollector {
             &ebpf_config,
             sender,
             proc_event_output,
+            ebpf_profile_sender,
             ebpf_config.l7_protocol_enabled_bitmap,
             platform_sync,
         )?;
@@ -553,8 +664,10 @@ impl EbpfCollector {
                 log_parser_config,
                 output,
                 flow_output,
+                l7_stats_output,
                 flow_map_config,
                 stats_collector,
+                collector_config,
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },

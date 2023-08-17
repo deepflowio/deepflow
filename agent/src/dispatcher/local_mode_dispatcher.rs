@@ -44,12 +44,10 @@ use crate::{
     rpc::get_timestamp,
     utils::bytes::read_u16_be,
 };
-#[cfg(target_os = "linux")]
-use public::netns::link_list_in_netns;
 use public::{
     netns::NsFile,
     proto::{common::TridentType, trident::IfMacSource},
-    utils::net::{link_list, Link, MacAddr},
+    utils::net::{Link, MacAddr},
 };
 
 pub(super) struct LocalModeDispatcher {
@@ -70,6 +68,7 @@ impl LocalModeDispatcher {
         let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
+            base.l7_stats_output_queue.clone(),
             base.policy_getter,
             base.log_output_queue.clone(),
             base.ntp_diff.clone(),
@@ -83,6 +82,7 @@ impl LocalModeDispatcher {
             let config = Config {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parse_config.load(),
+                collector: &base.collector_config.load(),
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };
@@ -480,7 +480,7 @@ impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        match link_list() {
+        match public::utils::net::link_list() {
             Ok(links) => {
                 if result.len() == 0 {
                     debug!("Poller Mac:");
@@ -515,36 +515,22 @@ impl LocalModeDispatcherListener {
             _ => return result,
         }
 
-        let links = if matches!(ns, NsFile::Root) {
-            match link_list() {
-                Ok(o) => Some(o),
-                Err(e) => {
-                    warn!("failed getting link list: {:?}", e);
-                    None
+        match public::netns::link_list_in_netns(ns) {
+            Ok(links) => {
+                if result.len() == 0 {
+                    debug!("Poller Mac:");
+                }
+                for link in links {
+                    if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
+                        debug!(
+                            "\tif_index: {}, mac: {}, not mapped",
+                            link.if_index, link.mac_addr
+                        );
+                        result.insert(link.if_index, link.mac_addr);
+                    }
                 }
             }
-        } else {
-            match link_list_in_netns(ns) {
-                Ok(o) => Some(o),
-                Err(e) => {
-                    warn!("failed getting link list: {:?}", e);
-                    None
-                }
-            }
-        };
-        if let Some(links) = links {
-            if result.len() == 0 {
-                debug!("Poller Mac:");
-            }
-            for link in links {
-                if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
-                    debug!(
-                        "\tif_index: {}, mac: {}, not mapped",
-                        link.if_index, link.mac_addr
-                    );
-                    result.insert(link.if_index, link.mac_addr);
-                }
-            }
+            Err(e) => warn!("failed getting link list: {:?}", e),
         }
 
         result

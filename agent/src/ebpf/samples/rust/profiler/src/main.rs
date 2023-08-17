@@ -71,6 +71,8 @@ fn increment_counter(num: u32, counter_type: u32) {
     }
 }
 
+extern "C" fn socket_trace_callback(_sd: *mut SK_BPF_DATA) {}
+
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
         process_stack_trace_data_for_flame_graph(cp);
@@ -112,22 +114,47 @@ fn main() {
             ::std::process::exit(1);
         }
 
+        if running_socket_tracer(
+            socket_trace_callback, /* Callback interface rust -> C */
+            1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
+            64, /* Number of page frames occupied by kernel-shared memory, must be a power of 2. Used for perf data transfer */
+            65536, /* Size of the circular buffer queue, must be a power of 2. e.g: 2, 4, 8, 16, 32, 64, 128 */
+            524288, /* Maximum number of hash table entries for socket tracing, depends on the actual number of concurrent requests in the scenario */
+            524288, /* Maximum number of hash table entries for thread/coroutine tracing sessions */
+            520000, /* Maximum threshold for cleaning socket map entries. If the current number of map entries exceeds this value, map cleaning operation is performed */
+        ) != 0
+        {
+            println!("running_socket_tracer() error.");
+            ::std::process::exit(1);
+        }
+
         if start_continuous_profiler(99, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
 
         set_profiler_regex(
-            CString::new("^(java|nginx|profiler|telegraf|mysqld|socket_tracer|.*deepflow.*)$".as_bytes())
-                .unwrap()
-                .as_c_str()
-                .as_ptr(),
+            CString::new(
+                "^(java|nginx|profiler|telegraf|mysqld|socket_tracer|.*deepflow.*)$".as_bytes(),
+            )
+            .unwrap()
+            .as_c_str()
+            .as_ptr(),
         );
 
-	// CPUID will not be included in the aggregation of stack trace data.
+        // CPUID will not be included in the aggregation of stack trace data.
         set_profiler_cpu_aggregation(0);
 
         bpf_tracer_finish();
+
+        let stats = socket_tracer_stats();
+        print!("{:#?}\n", stats);
+
+        print!("start start ...\n");
+        while socket_tracer_start() != 0 {
+            print!("socket_tracer_start() error, sleep 1s retry.\n");
+            std::thread::sleep(Duration::from_secs(1));
+        }
 
         thread::sleep(Duration::from_secs(65));
         stop_continuous_profiler();

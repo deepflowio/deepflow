@@ -79,31 +79,36 @@ type PlatformRawData struct {
 	vmIDToPodNodeID        map[int]int
 	idToVPC                map[int]*models.VPC
 
-	idToHost                      map[int]*models.Host
-	idToVM                        map[int]*models.VM
-	vmIDs                         mapset.Set
-	vRouterIDs                    mapset.Set
-	dhcpPortIDs                   mapset.Set
-	podIDs                        mapset.Set
-	vpcIDs                        mapset.Set
-	tunnelIDs                     mapset.Set
-	vifIDsOfLANIP                 mapset.Set
-	vifIDsOfWANIP                 mapset.Set
-	ipsOfLANIP                    mapset.Set
-	ipsOfWANIP                    mapset.Set
-	vmIDsOfFIP                    mapset.Set
-	regionUUIDs                   mapset.Set
-	azUUIDs                       mapset.Set
-	peerConnIDs                   mapset.Set
-	cenIDs                        mapset.Set
-	podServiceIDs                 mapset.Set
-	redisInstanceIDs              mapset.Set
-	rdsInstanceIDs                mapset.Set
-	podNodeIDs                    mapset.Set
-	lbIDs                         mapset.Set
-	natIDs                        mapset.Set
-	podServicePortIDs             mapset.Set
-	processIDs                    mapset.Set
+	idToHost          map[int]*models.Host
+	idToVM            map[int]*models.VM
+	vmIDs             mapset.Set
+	vRouterIDs        mapset.Set
+	dhcpPortIDs       mapset.Set
+	podIDs            mapset.Set
+	vpcIDs            mapset.Set
+	tunnelIDs         mapset.Set
+	vifIDsOfLANIP     mapset.Set
+	vifIDsOfWANIP     mapset.Set
+	ipsOfLANIP        mapset.Set
+	ipsOfWANIP        mapset.Set
+	vmIDsOfFIP        mapset.Set
+	regionUUIDs       mapset.Set
+	azUUIDs           mapset.Set
+	peerConnIDs       mapset.Set
+	cenIDs            mapset.Set
+	podServiceIDs     mapset.Set
+	redisInstanceIDs  mapset.Set
+	rdsInstanceIDs    mapset.Set
+	podNodeIDs        mapset.Set
+	lbIDs             mapset.Set
+	natIDs            mapset.Set
+	podServicePortIDs mapset.Set
+	processIDs        mapset.Set
+	vipIDs            mapset.Set
+
+	vtapIdToVtap                  map[int]*models.VTap
+	isVifofVip                    map[int]struct{}
+	vipIDToNetwork                map[int]*models.Network
 	subnetPrefix                  []string
 	subnetMask                    []string
 	serverToVmIDs                 map[string]mapset.Set
@@ -119,6 +124,7 @@ type PlatformRawData struct {
 	domainIpToHostID    map[DomainIPKey]int
 	podServiceIDToPorts map[int][]*models.PodServicePort
 	idToPodNode         map[int]*models.PodNode
+	idToPod             map[int]*models.Pod
 	idToPodService      map[int]*models.PodService
 
 	vmIDToVifs            map[int]mapset.Set
@@ -145,31 +151,36 @@ type PlatformRawData struct {
 
 func NewPlatformRawData() *PlatformRawData {
 	return &PlatformRawData{
-		idToHost:                      make(map[int]*models.Host),
-		idToVM:                        make(map[int]*models.VM),
-		vmIDs:                         mapset.NewSet(),
-		vRouterIDs:                    mapset.NewSet(),
-		dhcpPortIDs:                   mapset.NewSet(),
-		podIDs:                        mapset.NewSet(),
-		vpcIDs:                        mapset.NewSet(),
-		tunnelIDs:                     mapset.NewSet(),
-		vifIDsOfLANIP:                 mapset.NewSet(),
-		vifIDsOfWANIP:                 mapset.NewSet(),
-		ipsOfLANIP:                    mapset.NewSet(),
-		ipsOfWANIP:                    mapset.NewSet(),
-		vmIDsOfFIP:                    mapset.NewSet(),
-		regionUUIDs:                   mapset.NewSet(),
-		azUUIDs:                       mapset.NewSet(),
-		peerConnIDs:                   mapset.NewSet(),
-		cenIDs:                        mapset.NewSet(),
-		podServiceIDs:                 mapset.NewSet(),
-		redisInstanceIDs:              mapset.NewSet(),
-		rdsInstanceIDs:                mapset.NewSet(),
-		podNodeIDs:                    mapset.NewSet(),
-		lbIDs:                         mapset.NewSet(),
-		natIDs:                        mapset.NewSet(),
-		podServicePortIDs:             mapset.NewSet(),
-		processIDs:                    mapset.NewSet(),
+		idToHost:          make(map[int]*models.Host),
+		idToVM:            make(map[int]*models.VM),
+		vmIDs:             mapset.NewSet(),
+		vRouterIDs:        mapset.NewSet(),
+		dhcpPortIDs:       mapset.NewSet(),
+		podIDs:            mapset.NewSet(),
+		vpcIDs:            mapset.NewSet(),
+		tunnelIDs:         mapset.NewSet(),
+		vifIDsOfLANIP:     mapset.NewSet(),
+		vifIDsOfWANIP:     mapset.NewSet(),
+		ipsOfLANIP:        mapset.NewSet(),
+		ipsOfWANIP:        mapset.NewSet(),
+		vmIDsOfFIP:        mapset.NewSet(),
+		regionUUIDs:       mapset.NewSet(),
+		azUUIDs:           mapset.NewSet(),
+		peerConnIDs:       mapset.NewSet(),
+		cenIDs:            mapset.NewSet(),
+		podServiceIDs:     mapset.NewSet(),
+		redisInstanceIDs:  mapset.NewSet(),
+		rdsInstanceIDs:    mapset.NewSet(),
+		podNodeIDs:        mapset.NewSet(),
+		lbIDs:             mapset.NewSet(),
+		natIDs:            mapset.NewSet(),
+		podServicePortIDs: mapset.NewSet(),
+		processIDs:        mapset.NewSet(),
+		vipIDs:            mapset.NewSet(),
+
+		vtapIdToVtap:                  make(map[int]*models.VTap),
+		isVifofVip:                    make(map[int]struct{}),
+		vipIDToNetwork:                make(map[int]*models.Network),
 		serverToVmIDs:                 make(map[string]mapset.Set),
 		floatingIPs:                   make(map[int]*IPData),
 		podServiceIDToPodGroupPortIDs: make(map[int]mapset.Set),
@@ -195,6 +206,7 @@ func NewPlatformRawData() *PlatformRawData {
 		vInterfaceIDToIP:       make(map[int][]*trident.IpResource),
 		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
 		idToPodNode:            make(map[int]*models.PodNode),
+		idToPod:                make(map[int]*models.Pod),
 		idToPodService:         make(map[int]*models.PodService),
 
 		vmIDToVifs:                    make(map[int]mapset.Set),
@@ -440,6 +452,7 @@ func (r *PlatformRawData) ConvertDBPod(dbDataCache *DBDataCache) {
 		return
 	}
 	for _, pod := range pods {
+		r.idToPod[pod.ID] = pod
 		r.podIDs.Add(pod.ID)
 		podIDs, ok := r.podNodeIDtoPodIDs[pod.PodNodeID]
 		if ok {
@@ -1033,6 +1046,39 @@ func (r *PlatformRawData) ConvertDBProcesses(dbDataCache *DBDataCache) {
 	}
 }
 
+func (r *PlatformRawData) ConvertDBVIPs(dbDataCache *DBDataCache) {
+	vips := dbDataCache.GetVIPs()
+	if vips == nil {
+		return
+	}
+	for _, vip := range vips {
+		r.vipIDs.Add(vip.ID)
+
+		vtap := r.GetVTap(int(vip.VTapID))
+		if vtap == nil {
+			continue
+		}
+		vifs, ok := r.vmIDToVifs[vtap.LaunchServerID]
+		if ok == false {
+			continue
+		}
+
+		for vmVif := range vifs.Iter() {
+			vif := vmVif.(*models.VInterface)
+			r.isVifofVip[vif.ID] = struct{}{}
+			if network, ok := r.idToNetwork[vif.NetworkID]; ok {
+				r.vipIDToNetwork[vip.ID] = network
+			}
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVTaps(dbDataCache *DBDataCache) {
+	for _, vtap := range dbDataCache.GetVTapsIDAndName() {
+		r.vtapIdToVtap[vtap.ID] = vtap
+	}
+}
+
 // 有依赖 需要按顺序convert
 func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertHost(dbDataCache)
@@ -1060,6 +1106,13 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBVipDomain(dbDataCache)
 	r.ConvertSkipVTapVIfIDs(dbDataCache)
 	r.ConvertDBProcesses(dbDataCache)
+	r.ConvertDBVTaps(dbDataCache)
+	r.ConvertDBVIPs(dbDataCache)
+}
+
+func (r *PlatformRawData) checkVifIsVip(vif *models.VInterface) bool {
+	_, ok := r.isVifofVip[vif.ID]
+	return ok
 }
 
 func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface, platformVips []string) bool {
@@ -1069,6 +1122,9 @@ func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface, platform
 
 	if vif == nil {
 		return false
+	}
+	if r.checkVifIsVip(vif) == true {
+		return true
 	}
 	switch vif.DeviceType {
 	case VIF_DEVICE_TYPE_LB, VIF_DEVICE_TYPE_NAT_GATEWAY:
@@ -1252,12 +1308,20 @@ func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
 	return r.idToPodNode[podNodeID]
 }
 
+func (r *PlatformRawData) GetPod(podID int) *models.Pod {
+	return r.idToPod[podID]
+}
+
 func (r *PlatformRawData) GetSkipInterface(server string) []*trident.SkipInterface {
 	if result, ok := r.launchServerToSkipInterface[server]; ok {
 		return result
 	}
 
 	return nil
+}
+
+func (r *PlatformRawData) GetVTap(vtapID int) *models.VTap {
+	return r.vtapIdToVtap[vtapID]
 }
 
 func (r *PlatformRawData) equal(o *PlatformRawData) bool {
@@ -1450,6 +1514,11 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 
 	if !r.processIDs.Equal(o.processIDs) {
 		log.Info("platform processes changed")
+		return false
+	}
+
+	if !r.vipIDs.Equal(o.vipIDs) {
+		log.Info("vip changed")
 		return false
 	}
 

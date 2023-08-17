@@ -25,8 +25,8 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -58,8 +58,8 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 func getDomain(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := GetDomains(args)
-	JsonResponse(c, data, err)
+	data, err := resource.GetDomains(args)
+	common.JsonResponse(c, data, err)
 }
 
 func getDomains(c *gin.Context) {
@@ -67,8 +67,8 @@ func getDomains(c *gin.Context) {
 	if value, ok := c.GetQuery("name"); ok {
 		args["name"] = value
 	}
-	data, err := GetDomains(args)
-	JsonResponse(c, data, err)
+	data, err := resource.GetDomains(args)
+	common.JsonResponse(c, data, err)
 }
 
 func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
@@ -79,12 +79,12 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// message validation
 		err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 			return
 		}
 
-		data, err := CreateDomain(domainCreate, cfg)
-		JsonResponse(c, data, err)
+		data, err := resource.CreateDomain(domainCreate, cfg)
+		common.JsonResponse(c, data, err)
 	})
 }
 
@@ -96,7 +96,7 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// message validation
 		err = c.ShouldBindBodyWith(&domainUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
 
@@ -113,14 +113,14 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		lcuuid := c.Param("lcuuid")
 
 		// set vtap
-		err = KubernetesSetVtap(lcuuid, vTapValue, false)
+		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
+			common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 			return
 		}
 
-		data, err := UpdateDomain(lcuuid, patchMap, cfg)
-		JsonResponse(c, data, err)
+		data, err := resource.UpdateDomain(lcuuid, patchMap, cfg)
+		common.JsonResponse(c, data, err)
 	})
 }
 
@@ -128,15 +128,15 @@ func deleteDomain(c *gin.Context) {
 	var err error
 
 	lcuuid := c.Param("lcuuid")
-	data, err := DeleteDomain(lcuuid)
-	JsonResponse(c, data, err)
+	data, err := resource.DeleteDomain(lcuuid)
+	common.JsonResponse(c, data, err)
 }
 
 func getSubDomain(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := GetSubDomains(args)
-	JsonResponse(c, data, err)
+	data, err := resource.GetSubDomains(args)
+	common.JsonResponse(c, data, err)
 }
 
 func getSubDomains(c *gin.Context) {
@@ -147,8 +147,8 @@ func getSubDomains(c *gin.Context) {
 	if value, ok := c.GetQuery("cluster_id"); ok {
 		args["cluster_id"] = value
 	}
-	data, err := GetSubDomains(args)
-	JsonResponse(c, data, err)
+	data, err := resource.GetSubDomains(args)
+	common.JsonResponse(c, data, err)
 }
 
 func createSubDomain(c *gin.Context) {
@@ -158,20 +158,20 @@ func createSubDomain(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&subDomainCreate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 		return
 	}
 
-	data, err := CreateSubDomain(subDomainCreate)
-	JsonResponse(c, data, err)
+	data, err := resource.CreateSubDomain(subDomainCreate)
+	common.JsonResponse(c, data, err)
 }
 
 func deleteSubDomain(c *gin.Context) {
 	var err error
 
 	lcuuid := c.Param("lcuuid")
-	data, err := DeleteSubDomain(lcuuid)
-	JsonResponse(c, data, err)
+	data, err := resource.DeleteSubDomain(lcuuid)
+	common.JsonResponse(c, data, err)
 }
 
 func updateSubDomain(c *gin.Context) {
@@ -181,7 +181,7 @@ func updateSubDomain(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&subDomainUpdate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -198,25 +198,25 @@ func updateSubDomain(c *gin.Context) {
 
 	lcuuid := c.Param("lcuuid")
 
-	err = KubernetesSetVtap(lcuuid, vTapValue, true)
+	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
+		common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 		return
 	}
 
-	data, err := UpdateSubDomain(lcuuid, patchMap)
-	JsonResponse(c, data, err)
+	data, err := resource.UpdateSubDomain(lcuuid, patchMap)
+	common.JsonResponse(c, data, err)
 }
 
 func applyDomainAddtionalResource(c *gin.Context) {
 	b, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+		common.BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 		return
 	}
-	err = CheckJSONParam(string(b), model.AdditionalResource{})
+	err = common.CheckJSONParam(string(b), model.AdditionalResource{})
 	if err != nil {
-		BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, err.Error())
+		common.BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, err.Error())
 		return
 	}
 
@@ -224,10 +224,10 @@ func applyDomainAddtionalResource(c *gin.Context) {
 	err = json.Unmarshal(b, &data)
 	// invalidate request body
 	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
-	err = ApplyDomainAddtionalResource(data)
-	JsonResponse(c, map[string]interface{}{}, err)
+	err = resource.ApplyDomainAddtionalResource(data)
+	common.JsonResponse(c, map[string]interface{}{}, err)
 }

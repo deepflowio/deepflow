@@ -55,7 +55,7 @@ struct __socket_data {
 	 * 携带数据， 比如：MySQL第一次读取的数据，被第二次读取的数据携带一并发给用户
 	 * 注意携带数据只有4字节大小。
 	 */
-	__u32 extra_data;
+	char extra_data[EBPF_CACHE_SIZE];
 	__u32 extra_data_count;
 
 	/* 追踪信息 */
@@ -114,7 +114,7 @@ struct socket_info_t {
 	 * 然后再读取剩下的数据，这里用于对预先读取的数据存储
 	 * 用于后续的协议分析。
 	 */
-	__u8 prev_data[4];
+	__u8 prev_data[EBPF_CACHE_SIZE];
 	__u8 direction: 1;
 	__u8 msg_type: 2;	// 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 	__u8 role: 5;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
@@ -188,6 +188,8 @@ enum offsets_index {
 	OFFSET_IDX_FIELDS_HTTP2_META_HEADERS_FRAME,
 	OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN,
 	OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER,
+	OFFSET_IDX_HTTP2_FRAMER_W,
+	OFFSET_IDX_BUFWRITTER_CONN,
 	OFFSET_IDX_MAX,
 };
 

@@ -66,7 +66,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			extMetrics, _ := metrics.GetExtMetrics(DB_NAME_EXT_METRICS, "", where, args.Context)
 			for _, v := range extMetrics {
 				// append telegraf metrics, e.g.: influxdb_internal_statsd__tcp_current_connections[influxdb_target__metric]
-				metricName := fmt.Sprintf("%s__%s", strings.Replace(v.Table, ".", "_", 1), strings.TrimPrefix(v.DisplayName, "metrics."))
+				metricName := fmt.Sprintf("%s__%s__%s__%s", db, "metrics", strings.Replace(v.Table, ".", "_", 1), strings.TrimPrefix(v.DisplayName, "metrics."))
 				resp = append(resp, metricName)
 			}
 		} else if db == chCommon.DB_NAME_PROMETHEUS {

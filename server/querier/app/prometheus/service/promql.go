@@ -37,8 +37,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
 
 // The Series API supports returning the following time series (metrics):
@@ -69,10 +72,30 @@ import (
 const _SUCCESS = "success"
 
 // executors for prometheus query
-type prometheusExecutor struct{}
+type prometheusExecutor struct {
+	extraLabelCache *lru.Cache[string, string]
+	ticker          *time.Ticker
+}
 
 func NewPrometheusExecutor() *prometheusExecutor {
-	return &prometheusExecutor{}
+	executor := &prometheusExecutor{
+		extraLabelCache: lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize),
+	}
+	go executor.triggerLoadExternalTag()
+	return executor
+}
+
+func (p *prometheusExecutor) triggerLoadExternalTag() {
+	p.ticker = time.NewTicker(time.Duration(config.Cfg.Prometheus.ExternalTagLoadInterval) * time.Second)
+	defer func() {
+		p.ticker.Stop()
+		if err := recover(); err != nil {
+			go p.triggerLoadExternalTag()
+		}
+	}()
+	for range p.ticker.C {
+		p.loadExternalTagCache()
+	}
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
@@ -99,6 +122,8 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		slimit = slimitArgs
 	}
 	reader := newPrometheusReader(slimit)
+	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
+	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	// instant query will hint default query range:
 	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
 	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
@@ -160,6 +185,8 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		slimit = slimitArgs
 	}
 	reader := newPrometheusReader(slimit)
+	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
+	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
@@ -189,6 +216,8 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
 	// analysis for ReadRequest
 	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
+	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
+	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	result, _, _, err := reader.promReaderExecute(ctx, req, false)
 	return result, err
 }
@@ -279,6 +308,8 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		return nil, err
 	}
 	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
+	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
+	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
 	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
@@ -318,6 +349,75 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 	return &model.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
 }
 
+func (p *prometheusExecutor) parsePromQL(promQL string) (res *model.PromQueryWrapper, err error) {
+	res = &model.PromQueryWrapper{}
+	expr, err := parser.ParseExpr(promQL)
+	if err != nil {
+		res.OptStatus = "fail"
+		res.Description = err.Error()
+		return res, err
+	}
+	var db, tableName, metric, aggFunc string
+	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
+		if vs, ok := node.(*parser.VectorSelector); ok {
+			pbMatchers := make([]*prompb.LabelMatcher, 0, 1)
+			for _, m := range vs.LabelMatchers {
+				if m.Name == PROMETHEUS_METRICS_NAME {
+					// metric name is only expected
+					pbMatchers = append(pbMatchers, &prompb.LabelMatcher{
+						Type:  prompb.LabelMatcher_EQ,
+						Name:  m.Name,
+						Value: m.Value,
+					})
+					_, _, db, tableName, _, _, metric, err = parseMetric(pbMatchers)
+					break
+				}
+			}
+		}
+		return nil
+	})
+	switch e := expr.(type) {
+	case *parser.AggregateExpr:
+		aggFunc = e.Op.String()
+	case *parser.Call:
+		aggFunc = e.Func.Name
+	}
+	res.OptStatus = _SUCCESS
+	res.Data = []map[string]interface{}{{"db": db, "table": tableName, "metric": metric, "aggFunc": aggFunc}}
+	return res, nil
+}
+
+func (p *prometheusExecutor) addExtraFilters(promQL string, filters map[string]string) (*model.PromQueryWrapper, error) {
+	res := &model.PromQueryWrapper{}
+	expr, err := parser.ParseExpr(promQL)
+	if err != nil {
+		res.OptStatus = "fail"
+		res.Description = err.Error()
+		return res, err
+	}
+
+	matchers := make([]*labels.Matcher, 0, len(filters))
+	for k, v := range filters {
+		matcher, err := labels.NewMatcher(labels.MatchEqual, k, v)
+		if err != nil {
+			res.OptStatus = "fail"
+			res.Description = err.Error()
+			return res, err
+		}
+		matchers = append(matchers, matcher)
+	}
+
+	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
+		if vs, ok := node.(*parser.VectorSelector); ok {
+			vs.LabelMatchers = append(vs.LabelMatchers, matchers...)
+		}
+		return nil
+	})
+	res.OptStatus = _SUCCESS
+	res.Data = []map[string]interface{}{{"query": expr.String()}}
+	return res, nil
+}
+
 func (p *prometheusExecutor) matchMetricName(matchers *[]*labels.Matcher) string {
 	var metric string
 	for _, v := range *matchers {
@@ -340,4 +440,51 @@ func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e 
 		}
 	}
 	return nil
+}
+
+func (p *prometheusExecutor) loadExternalTagCache() {
+	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
+	showTags := fmt.Sprintf("show tags from %s", VTAP_FLOW_PORT_TABLE)
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, context.Background())
+	if err != nil {
+		log.Errorf("load external tag error when start up prometheus executor: %s", err)
+		return
+	}
+	if data != nil {
+		for _, value := range data.Values {
+			values := value.([]interface{})
+			// data.Columns definitions:
+			// "columns": ["name","client_name","server_name","display_name","type","category","operators","permissions","description","related_tag"]
+			// we need to get .[4] value, confirm len(values) >= 5
+			if values == nil || len(values) < 5 {
+				continue
+			}
+			if values[4].(string) != "map_item" {
+				continue
+			}
+			tag := values[0].(string)
+			p.addExtraLabelConvertion(formatTagName(tag), tag)
+		}
+	}
+}
+
+// convert external tag to querier tag
+// e.g.: k8s_label_helm_sh_chart_0 to 'k8s.label/helm.sh-chart'
+func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(displayTag string) string {
+	var suffix string
+	if strings.HasSuffix(displayTag, "_0") {
+		suffix = "_0"
+	} else if strings.HasSuffix(displayTag, "_1") {
+		suffix = "_1"
+	}
+	cacheTag := strings.TrimSuffix(displayTag, suffix)
+	querierTag, ok := p.extraLabelCache.Get(cacheTag)
+	if ok {
+		return fmt.Sprintf("%s%s", querierTag, suffix)
+	}
+	return ""
+}
+
+func (p *prometheusExecutor) addExtraLabelConvertion(displayTag string, querierTag string) {
+	p.extraLabelCache.Add(displayTag, querierTag)
 }

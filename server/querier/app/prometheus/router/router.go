@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/libs/datastructure"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
@@ -46,7 +47,10 @@ func PrometheusRouter(e *gin.Engine) {
 
 	// not use "/prom/api/v1/adapter/:name", suitable for map[rouer key]counter in statsd
 	for _, v := range []string{"label", "query_range", "query", "series"} {
-		e.POST("/prom/api/v1/adapter/"+v, adaptPromQuery(prometheusService, v))
-		e.GET("/prom/api/v1/adapter/"+v, adaptPromQuery(prometheusService, v))
+		e.POST("/prom/api/v1/adapter/"+v, packet_adapter.AdaptPromQuery(prometheusService, v))
+		e.GET("/prom/api/v1/adapter/"+v, packet_adapter.AdaptPromQuery(prometheusService, v))
 	}
+
+	e.GET("/prom/api/v1/parse", promQLParse(prometheusService))
+	e.GET("/prom/api/v1/addfilter", promQLAddFilters(prometheusService))
 }

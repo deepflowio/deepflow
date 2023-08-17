@@ -29,11 +29,13 @@ import (
 var log = logging.MustGetLogger("flow_log.config")
 
 const (
-	DefaultThrottle          = 50000
-	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 1 << 14
-	DefaultBrokerQueueSize   = 1 << 14
-	DefaultFlowLogTTL        = 72 // hour
+	DefaultThrottle             = 50000
+	DefaultThrottleBucket       = 8
+	DefaultDecoderQueueCount    = 2
+	DefaultDecoderQueueSize     = 1 << 14
+	DefaultBrokerQueueSize      = 1 << 14
+	DefaultFlowLogTTL           = 72 // hour
+	DefaultOtlpExportBatchCount = 32
 )
 
 var DefaultOtlpExportDatas = []string{"cbpf-net-span", "ebpf-sys-span"}
@@ -54,6 +56,7 @@ type ExporterConfig struct {
 	ExportDataTypes             []string          `yaml:"export-data-types"`
 	ExportCustomK8sLabelsRegexp string            `yaml:"export-custom-k8s-labels-regexp"`
 	ExportOnlyWithTraceID       bool              `yaml:"export-only-with-traceid"`
+	ExportBatchCount            int               `yaml:"export-batch-count"`
 	GrpcHeaders                 map[string]string `yaml:"grpc-headers"`
 }
 
@@ -61,6 +64,7 @@ type Config struct {
 	Base              *config.Config
 	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
 	Throttle          int                   `yaml:"throttle"`
+	ThrottleBucket    int                   `yaml:"throttle-bucket"`
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
@@ -96,6 +100,9 @@ func (c *Config) Validate() error {
 	if len(c.Exporter.ExportDataTypes) == 0 {
 		c.Exporter.ExportDataTypes = DefaultOtlpExportDataTypes
 	}
+	if c.Exporter.ExportBatchCount == 0 {
+		c.Exporter.ExportBatchCount = DefaultOtlpExportBatchCount
+	}
 
 	return nil
 }
@@ -105,20 +112,22 @@ func Load(base *config.Config, path string) *Config {
 		FlowLog: Config{
 			Base:              base,
 			Throttle:          DefaultThrottle,
+			ThrottleBucket:    DefaultThrottleBucket,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
 			Exporter: ExporterConfig{
-				false,
-				"127.0.0.1:4317",
-				2,
-				100000,
-				DefaultOtlpExportDatas,
-				DefaultOtlpExportDataTypes,
-				"",
-				false,
-				nil,
+				Enabled:                     false,
+				Addr:                        "127.0.0.1:4317",
+				QueueCount:                  4,
+				QueueSize:                   100000,
+				ExportDatas:                 DefaultOtlpExportDatas,
+				ExportDataTypes:             DefaultOtlpExportDataTypes,
+				ExportCustomK8sLabelsRegexp: "",
+				ExportOnlyWithTraceID:       false,
+				ExportBatchCount:            DefaultOtlpExportBatchCount,
+				GrpcHeaders:                 nil,
 			},
 		},
 	}

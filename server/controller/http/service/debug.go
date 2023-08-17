@@ -17,14 +17,18 @@
 package service
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 
 	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/manager"
+	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
 
@@ -139,6 +143,16 @@ func GetGenesisPrometheusData(g *genesis.Genesis, clusterID string) ([]cloudmode
 	return data, err
 }
 
-func GetAgentStats(g *genesis.Genesis, ip string) ([]genesis.TridentStats, error) {
-	return genesis.Synchronizer.GetAgentStats(ip), nil
+func GetAgentStats(g *genesis.Genesis, param string) ([]genesis.TridentStats, error) {
+	return genesis.Synchronizer.GetAgentStats(param), nil
+}
+
+func GetGenesisAgentStorage(vtapIDString string) (model.GenesisStorage, error) {
+	var gStorage model.GenesisStorage
+	vtapID, err := strconv.Atoi(vtapIDString)
+	if err != nil {
+		return gStorage, errors.New(fmt.Sprintf("invalid vtap id (%s)", vtapIDString))
+	}
+	err = mysql.Db.Where("vtap_id = ?", vtapID).First(&gStorage).Error
+	return gStorage, err
 }

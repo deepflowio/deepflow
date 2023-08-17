@@ -39,11 +39,11 @@ func GetPod(cfg redis.Config) *Pod {
 	podOnce.Do(func() {
 		pod = &Pod{
 			DataProvider: DataProvider{
-				resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-				next:         mysqldp.NewVM(),
+				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
+				next:         mysqldp.NewPod(),
 				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.VMQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_VM,
+				keyConv:      newKeyConvertor[model.PodQueryStoredInRedis](),
+				urlPath:      httpcommon.PATH_POD,
 			},
 		}
 	})

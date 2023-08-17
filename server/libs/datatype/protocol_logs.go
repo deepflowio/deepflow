@@ -227,6 +227,8 @@ func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 		ReleaseMYSQLInfo(d.Detail.(*MysqlInfo))
 	case L7_PROTOCOL_REDIS:
 		ReleaseREDISInfo(d.Detail.(*RedisInfo))
+	case L7_PROTOCOL_MONGO:
+		ReleaseMONGOInfo(d.Detail.(*MongoDBInfo))
 	case L7_PROTOCOL_DUBBO:
 		ReleaseDubboInfo(d.Detail.(*DubboInfo))
 	case L7_PROTOCOL_KAFKA:
@@ -327,6 +329,10 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 	case L7_PROTOCOL_REDIS:
 		if redis, ok := l.Detail.(*RedisInfo); ok {
 			redis.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_MONGO:
+		if mongo, ok := l.Detail.(*MongoDBInfo); ok {
+			mongo.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
 		}
 	case L7_PROTOCOL_DUBBO:
 		if dubbo, ok := l.Detail.(*DubboInfo); ok {

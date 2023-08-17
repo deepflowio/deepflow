@@ -408,6 +408,13 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.TriggerValue = event.GetTriggerValue()
 	s.ValueUnit = event.GetValueUnit()
 	s.EventLevel = event.GetEventLevel()
+	s.AlarmTarget = event.GetAlarmTarget()
+	s.RegionId = uint16(d.platformData.QueryRegionID())
+	s.PolicyQueryUrl = event.GetPolicyQueryUrl()
+	s.PolicyQueryConditions = event.GetPolicyQueryConditions()
+	s.PolicyThresholdCritical = event.GetPolicyThresholdCritical()
+	s.PolicyThresholdError = event.GetPolicyThresholdError()
+	s.PolicyThresholdWarning = event.GetPolicyThresholdWarning()
 
 	d.eventWriter.WriteAlarmEvent(s)
 }

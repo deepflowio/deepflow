@@ -44,7 +44,7 @@ type Profiler struct {
 
 func NewProfile(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Profile, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EXTMETRICS_QUEUE)
-	profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, config)
+	profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, 0, config)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 	for i := 0; i < config.DecoderQueueCount; i++ {
 		if platformDataManager != nil {
 			var err error
-			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "profile-"+msgType.String()+"-"+strconv.Itoa(i))
+			platformDatas[i], err = platformDataManager.NewPlatformInfoTable("profile-" + msgType.String() + "-" + strconv.Itoa(i))
 			if err != nil {
 				return nil, err
 			}

@@ -15,6 +15,7 @@
  */
 
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <arpa/inet.h>
 #include <sched.h>
 #include <sys/prctl.h>
@@ -611,6 +612,34 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	struct mem_block_head *block_head;	// 申请内存块的指针
 
 	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
+	int data_offset = offsetof(typeof(struct __socket_data_buffer), data);
+	if (raw_size < data_offset) {
+		ebpf_warning("The amount(%d) of received data is less than the "
+			     "minimum value(%d).\n", raw_size, data_offset);
+		return;
+	}
+
+	if (raw_size < (buf->len + data_offset)) {
+		ebpf_warning("There is an error in the received data length."
+			     "raw_size %d events_num %u data_len %u.\n",
+			     raw_size, buf->events_num, buf->len);
+		return;
+	}
+
+	if (buf->events_num <= 0 || buf->events_num > MAX_PKT_BURST) {
+		ebpf_warning("buf->events_num %u, invalid\n", buf->events_num);
+		return;
+	}
+
+	if (buf->len < (offsetof(typeof(struct __socket_data),
+				 data) * buf->events_num)) {
+		ebpf_warning("buf->len(%u) invalid, socket data head size %u, "
+			     "events_num %u\n", buf->len,
+			     offsetof(typeof(struct __socket_data), data),
+			     buf->events_num);
+		return;
+	}
+
 	int i, start = 0;
 	struct __socket_data *sd;
 
@@ -714,9 +743,10 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		int offset = 0;
 		if (len > 0) {
 			if (sd->extra_data_count > 0) {
-				*(uint32_t *) submit_data->cap_data =
-				    sd->extra_data;
-				offset = sizeof(sd->extra_data);
+				memcpy_fast(submit_data->cap_data,
+					    sd->extra_data,
+					    sd->extra_data_count);
+				offset = sd->extra_data_count;
 			}
 
 			memcpy_fast(submit_data->cap_data + offset, sd->data,
@@ -2280,6 +2310,32 @@ void print_io_event_info(const char *data, int len)
 	return;
 }
 
+void print_uprobe_grpc_dataframe(const char *data, int len)
+{
+	int i;
+	struct {
+		__u32 stream_id;
+		__u32 data_len;
+		char data[1024];
+	} __attribute__((packed)) dataframe;
+
+	memcpy(&dataframe, data, len);
+	
+	fprintf(datadump_file, "stream_id=[%d]\n", dataframe.stream_id);
+	fprintf(datadump_file, "data_len=[%d]\n", dataframe.data_len);
+
+	for (i = 0; i < dataframe.data_len; ++i) {
+		if (!isprint(dataframe.data[i])) {
+			dataframe.data[i] = '.';
+		}
+	}
+	dataframe.data[dataframe.data_len] = '\0';
+
+	fprintf(datadump_file, "data=[%s]\n", dataframe.data);
+	fflush(datadump_file);
+	return;
+}
+
 void print_dns_info(const char *data, int len)
 {
 	//refer: https://www.binarytides.com/dns-query-code-in-c-with-winsock/
@@ -2601,6 +2657,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 			print_uprobe_http2_info(sd->cap_data, sd->cap_len);
 		} else if (sd->source == 4) {
 			print_io_event_info(sd->cap_data, sd->cap_len);
+		} else if (sd->source == 5) {
+			print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len);
 		} else {
 			int i, len = 0, __len;
 			char output_buf[OUTPUT_DATA_SIZE];

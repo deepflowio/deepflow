@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::ffi::OsString;
-use std::fmt::{self, Debug};
-use std::fs::{self, File};
-use std::hash::{Hash, Hasher};
-use std::io::{Cursor, Write};
-use std::mem;
-use std::os::unix::{fs::MetadataExt, io::AsRawFd};
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    cell::OnceCell,
+    cmp::Ordering,
+    collections::HashMap,
+    ffi::OsString,
+    fmt::{self, Debug},
+    fs::{self, File},
+    hash::{Hash, Hasher},
+    io::{Cursor, Write},
+    mem,
+    os::unix::{fs::MetadataExt, io::AsRawFd},
+    path::{Path, PathBuf},
+};
 
 use log::{debug, trace, warn};
 use neli::{
@@ -36,7 +40,7 @@ use neli::{
     types::Buffer,
     ToBytes,
 };
-use nix::sched::{setns as lib_setns, CloneFlags};
+use nix::sched::{setns, CloneFlags};
 use num_enum::IntoPrimitive;
 use regex::Regex;
 
@@ -150,7 +154,6 @@ impl TryFrom<&Path> for NsFile {
 
 pub const NAMED_PATH: &'static str = "/var/run/netns";
 pub const ROOT_NS_PATH: &'static str = "/proc/1/ns/net";
-pub const CURRENT_NS_PATH: &'static str = "/proc/self/ns/net";
 pub const PROC_PATH: &'static str = "/proc";
 
 pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<InterfaceInfo>>> {
@@ -194,9 +197,6 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
         })
         .collect::<Vec<_>>();
 
-    // for restore
-    let current_ns = open_current_ns()?;
-
     let mut result = HashMap::new();
     // namespace id to nsfile in namespaces
     // cleared and updated in each namespace
@@ -220,7 +220,7 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
                     continue;
                 }
             };
-            if let Err(_) = setns(&fp, Some(path)) {
+            if let Err(_) = set_netns(&fp) {
                 debug!("setns failed for file {}", path.display());
                 continue;
             }
@@ -306,16 +306,8 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
         debug!("query namespace ino {} failed", ino);
     }
 
-    setns(&current_ns, Some(CURRENT_NS_PATH))?;
+    reset_netns()?;
     Ok(result)
-}
-
-pub fn get_current_ns() -> Result<NsFile> {
-    Ok(NsFile::Proc(fs::metadata(CURRENT_NS_PATH)?.ino()))
-}
-
-pub fn open_current_ns() -> Result<File> {
-    Ok(File::open(CURRENT_NS_PATH)?)
 }
 
 pub fn find_ns_files_by_regex(re: &Regex) -> Vec<NsFile> {
@@ -337,36 +329,88 @@ pub fn find_ns_files_by_regex(re: &Regex) -> Vec<NsFile> {
     files
 }
 
-pub fn setns<P: AsRef<Path>>(fp: &File, path: Option<P>) -> Result<()> {
-    if let Err(e) = lib_setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
-        match path {
-            Some(p) => warn!(
-                "setns({}) failed for {}: {:?}",
-                fp.as_raw_fd(),
-                p.as_ref().display(),
-                e
-            ),
-            None => warn!(
-                "setns({}) failed for inode {:?}: {:?}",
-                fp.as_raw_fd(),
-                fp.metadata().ok().map(|m| m.ino()),
-                e
-            ),
-        }
+pub fn current_netns_path() -> PathBuf {
+    // SAFTY: safe FFI call to get thread id
+    let tid = unsafe { libc::syscall(libc::SYS_gettid) as u32 };
+    [PROC_PATH, "self", "task", &tid.to_string(), "ns", "net"]
+        .iter()
+        .collect()
+}
+
+thread_local! {
+    // original per thread net namespace file handle
+    // set at first `setns` call
+    // used to restore net namespace
+    static ORIGINAL_NETNS: OnceCell<File> = OnceCell::new();
+}
+
+pub fn set_netns(fp: &File) -> Result<()> {
+    let cur_path = current_netns_path();
+    ORIGINAL_NETNS.with(|f| {
+        f.get_or_init(|| File::open(&cur_path).expect("open thread net namespace file failed"));
+    });
+
+    // do nothing if current ns is target ns
+    let inode = fs::metadata(&cur_path);
+    let target_inode = fp.metadata().ok().map(|m| m.ino());
+    match (inode.as_ref(), target_inode) {
+        (Ok(a), Some(b)) if a.ino() == b => return Ok(()),
+        _ => (),
+    }
+
+    if let Err(e) = setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
+        debug!(
+            "setns({}) failed for inode {:?}: {:?}",
+            fp.as_raw_fd(),
+            target_inode,
+            e
+        );
         return Err(e.into());
+    }
+    match (inode, target_inode) {
+        (Ok(a), Some(b)) => debug!("set_netns {} -> {}", a.ino(), b),
+        _ => (),
     }
     Ok(())
 }
 
-pub fn open_named_and_setns(ns: &NsFile) -> Result<()> {
-    match ns {
-        NsFile::Named(name) => {
-            let path = Path::new(NAMED_PATH).join(name);
-            let fp = File::open(&path)?;
-            setns(&fp, Some(path))
+pub fn reset_netns() -> Result<()> {
+    ORIGINAL_NETNS.with(|f| {
+        if let Some(fp) = f.get() {
+            // do nothing if current ns is target ns
+            let inode = fs::metadata(&current_netns_path());
+            let target_inode = fp.metadata().ok().map(|m| m.ino());
+            match (inode.as_ref(), target_inode) {
+                (Ok(a), Some(b)) if a.ino() == b => return Ok(()),
+                _ => (),
+            }
+
+            if let Err(e) = setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
+                debug!("reset netns failed: {:?}", e);
+                return Err(e.into());
+            }
+
+            match (inode, target_inode) {
+                (Ok(a), Some(b)) => debug!("set_netns {} -> {}", a.ino(), b),
+                _ => (),
+            }
         }
+        Ok(())
+    })
+}
+
+pub fn open_named_and_setns(ns: &NsFile) -> Result<()> {
+    let path = match ns {
+        NsFile::Root => Cow::Borrowed(Path::new(ROOT_NS_PATH)),
+        NsFile::Named(name) => Cow::Owned(Path::new(NAMED_PATH).join(name)),
         _ => unimplemented!(),
+    };
+    let fp = File::open(&*path)?;
+    let r = set_netns(&fp);
+    if let Err(e) = r.as_ref() {
+        debug!("open {} and setns failed: {:?}", path.display(), e);
     }
+    r
 }
 
 fn get_named_file_paths() -> Vec<PathBuf> {
@@ -488,17 +532,15 @@ impl WrappedSocket {
 }
 
 pub fn links_by_name_regex_in_netns<S: AsRef<str>>(regex: S, ns: &NsFile) -> Result<Vec<Link>> {
-    let current_ns = open_current_ns()?;
     let _ = open_named_and_setns(ns)?;
     let links = links_by_name_regex(regex.as_ref())?;
-    let _ = setns(&current_ns, Some(CURRENT_NS_PATH))?;
+    reset_netns()?;
     Ok(links)
 }
 
 pub fn link_list_in_netns(ns: &NsFile) -> Result<Vec<Link>> {
-    let current_ns = open_current_ns()?;
     let _ = open_named_and_setns(ns)?;
     let links = link_list()?;
-    let _ = setns(&current_ns, Some(CURRENT_NS_PATH))?;
+    reset_netns()?;
     Ok(links)
 }

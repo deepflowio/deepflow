@@ -42,8 +42,8 @@ func (p *Pod) conditionsMapToStruct(fcs common.FilterConditions) filter.Conditio
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"POD_SERVICE_ID", "SUBNET_ID"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewPodServiceIDCondition("POD_SERVICE_ID", fcs["POD_SERVICE_ID"].([]int)))
-	c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", fcs["SUBNET_ID"].([]int)))
+	c.TryAppendIntFieldCondition(NewPodServiceIDCondition("POD_SERVICE_ID", fcs["POD_SERVICE_ID"].([]float64)))
+	c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", fcs["SUBNET_ID"].([]float64)))
 	return c
 }
 
@@ -53,21 +53,21 @@ func (p *Pod) userPermittedResourceToConditions(upr *UserPermittedResource) (com
 		PodNamespaceIDs: upr.PodNamespaceIDs,
 	}
 	dropAll := (len(fcs.VPCIDs) == 0 && len(fcs.PodNamespaceIDs) == 0)
-	return fcs.ToMapOmitEmpty(), dropAll
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }
 
 type PodServiceIDCondition struct {
-	filter.FieldConditionBase[int]
+	filter.FieldConditionBase[float64]
 }
 
-func NewPodServiceIDCondition(key string, value []int) *PodServiceIDCondition {
-	return &PodServiceIDCondition{filter.FieldConditionBase[int]{Key: key, Value: value}}
+func NewPodServiceIDCondition(key string, value []float64) *PodServiceIDCondition {
+	return &PodServiceIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
 }
 
 func (p *PodServiceIDCondition) Keep(v common.ResponseElem) bool {
 	podServices := v["POD_SERVICES"].([]map[string]interface{})
 	for _, item := range podServices {
-		if slices.Contains(p.Value, item["ID"].(int)) {
+		if slices.Contains(p.Value, item["ID"].(float64)) {
 			return true
 		}
 	}

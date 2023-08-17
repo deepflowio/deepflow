@@ -312,26 +312,8 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 
 func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 	vTapIDToDeviceInfo := make(map[int]DeviceInfo)
-	var hosts []mysql.Host
-	err := mysql.Db.Unscoped().Find(&hosts).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
-		return vTapIDToDeviceInfo, false
-	}
-	var vms []mysql.VM
-	err = mysql.Db.Unscoped().Find(&vms).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
-		return vTapIDToDeviceInfo, false
-	}
-	var podNodes []mysql.PodNode
-	err = mysql.Db.Unscoped().Find(&podNodes).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
-		return vTapIDToDeviceInfo, false
-	}
 	var hostChDevices []mysql.ChDevice
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&hostChDevices).Error
+	err := mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&hostChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
 		return vTapIDToDeviceInfo, false
@@ -348,6 +330,12 @@ func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
 		return vTapIDToDeviceInfo, false
 	}
+	var podChDevices []mysql.ChDevice
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD).Unscoped().Find(&podChDevices).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
+		return vTapIDToDeviceInfo, false
+	}
 	var vTaps []mysql.VTap
 	err = mysql.Db.Unscoped().Find(&vTaps).Error
 	if err != nil {
@@ -357,27 +345,27 @@ func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 
 	hostIDToName := make(map[int]string)
 	hostIDToIconID := make(map[int]int)
-	for _, host := range hosts {
-		hostIDToName[host.ID] = host.Name
-	}
 	for _, hostChDevice := range hostChDevices {
+		hostIDToName[hostChDevice.DeviceID] = hostChDevice.Name
 		hostIDToIconID[hostChDevice.DeviceID] = hostChDevice.IconID
 	}
 	vmIDToName := make(map[int]string)
 	vmIDToIconID := make(map[int]int)
-	for _, vm := range vms {
-		vmIDToName[vm.ID] = vm.Name
-	}
 	for _, vmChDevice := range vmChDevices {
+		vmIDToName[vmChDevice.DeviceID] = vmChDevice.Name
 		vmIDToIconID[vmChDevice.DeviceID] = vmChDevice.IconID
 	}
 	podNodeIDToName := make(map[int]string)
 	podNodeIDToIconID := make(map[int]int)
-	for _, podNode := range podNodes {
-		podNodeIDToName[podNode.ID] = podNode.Name
-	}
 	for _, podNodeChDevice := range podNodeChDevices {
+		podNodeIDToName[podNodeChDevice.DeviceID] = podNodeChDevice.Name
 		podNodeIDToIconID[podNodeChDevice.DeviceID] = podNodeChDevice.IconID
+	}
+	podIDToName := make(map[int]string)
+	podIDToIconID := make(map[int]int)
+	for _, podChDevice := range podChDevices {
+		podIDToName[podChDevice.DeviceID] = podChDevice.Name
+		podIDToIconID[podChDevice.DeviceID] = podChDevice.IconID
 	}
 
 	for _, vTap := range vTaps {
@@ -404,6 +392,13 @@ func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 				DeviceID:   vTap.LaunchServerID,
 				DeviceName: podNodeIDToName[vTap.LaunchServerID],
 				IconID:     podNodeIDToIconID[vTap.LaunchServerID],
+			}
+		} else if vTap.Type == common.VTAP_TYPE_K8S_SIDECAR {
+			vTapIDToDeviceInfo[vTap.ID] = DeviceInfo{
+				DeviceType: common.VIF_DEVICE_TYPE_POD,
+				DeviceID:   vTap.LaunchServerID,
+				DeviceName: podIDToName[vTap.LaunchServerID],
+				IconID:     podIDToIconID[vTap.LaunchServerID],
 			}
 		}
 	}

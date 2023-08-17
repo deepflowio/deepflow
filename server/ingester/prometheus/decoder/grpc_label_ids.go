@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cornelk/hashmap"
+	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/model"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -49,6 +50,10 @@ func targetIdKey(jobID, instanceID uint32) uint64 {
 	return uint64(jobID)<<JOBID_OFFSET | uint64(instanceID)
 }
 
+func nameValueKey(nameID, valueID uint32) uint64 {
+	return uint64(nameID)<<32 | uint64(valueID)
+}
+
 func metricTargetPairKey(metricID, targetID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(targetID)
 }
@@ -63,6 +68,11 @@ func (t *PrometheusLabelTable) QueryLabelNameID(labelName string) (uint32, bool)
 
 func (t *PrometheusLabelTable) QueryLabelValueID(labelValue string) (uint32, bool) {
 	return t.labelValueIDs.Get(labelValue)
+}
+
+func (t *PrometheusLabelTable) QueryLabelNameValue(nameId, valueId uint32) bool {
+	_, exists := t.labelNameValues.Get(nameValueKey(nameId, valueId))
+	return exists
 }
 
 func (t *PrometheusLabelTable) QueryColumnIndex(metricID, labelNameID uint32) (uint32, bool) {
@@ -85,7 +95,7 @@ type RequestCounter struct {
 	RequestLabelsCount  int64  `statsd:"request-labels-count"`
 	ResponseLabelsCount int64  `statsd:"response-labels-count"`
 	MetricUnknown       uint64 `statsd:"metric-unknown"`
-	TargetUnknown       uint64 `statsd:"target-unknown"`
+	TargetIdZero        uint64 `statsd:"target-id-zero"`
 	LabelNameUnknown    uint64 `statsd:"label-name-unknown"`
 	LabelValueUnknown   uint64 `statsd:"label-value-unknown"`
 }
@@ -103,9 +113,11 @@ type PrometheusLabelTable struct {
 	metricNameIDs     *hashmap.Map[string, uint32]
 	labelNameIDs      *hashmap.Map[string, uint32]
 	labelValueIDs     *hashmap.Map[string, uint32]
+	labelNameValues   *hashmap.Map[uint64, struct{}]
 	labelColumnIndexs *hashmap.Map[uint64, uint32]
 	targetIDs         *hashmap.Map[uint64, uint32]
 	metricTargetPair  *hashmap.Map[uint64, struct{}]
+	targetVersion     uint32
 
 	counter *RequestCounter
 	utils.Closable
@@ -124,6 +136,7 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 		metricNameIDs:     hashmap.New[string, uint32](),   // metricName => metricID
 		labelNameIDs:      hashmap.New[string, uint32](),   // labelName  => labelNameID
 		labelValueIDs:     hashmap.New[string, uint32](),   // labelValue => labelValueID
+		labelNameValues:   hashmap.New[uint64, struct{}](), // labelNameValue => exists
 		labelColumnIndexs: hashmap.New[uint64, uint32](),   // metricID + LabelNameID => columnIndex
 		targetIDs:         hashmap.New[uint64, uint32](),   // jobID + instanceID => targetID
 		metricTargetPair:  hashmap.New[uint64, struct{}](), // metricID + targetID => exists
@@ -133,10 +146,44 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 	log.Infof("New PrometheusLabelTable ips:%v port:%d rpcMaxMsgSize:%d", ips, port, rpcMaxMsgSize)
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_LABEL, t)
 	common.RegisterCountableForIngester("prometheus-label-request", t)
+	go t.UpdateTargetIdsRegularIntervals()
 	return t
 }
 
-func (t *PrometheusLabelTable) RequesteLabelIDs(request *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
+func (t *PrometheusLabelTable) UpdateTargetIdsRegularIntervals() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		t.RequestAllTargetIDs()
+	}
+}
+
+func (t *PrometheusLabelTable) RequestAllTargetIDs() {
+	var response *trident.PrometheusTargetResponse
+	err := t.GrpcSession.Request(func(ctx context.Context, remote net.IP) error {
+		var err error
+		c := t.GrpcSession.GetClient()
+		if c == nil {
+			return fmt.Errorf("can't get grpc client to %s", remote)
+		}
+		client := trident.NewSynchronizerClient(c)
+		response, err = client.GetPrometheusTargets(ctx, &trident.PrometheusTargetRequest{Version: proto.Uint32(t.targetVersion)})
+		return err
+	})
+	if err != nil {
+		log.Warning("request all prometheus target ids failed: %s", err)
+		return
+	}
+	newVersion := response.GetVersion()
+	if t.targetVersion != newVersion {
+		log.Warning("prometheus target version update from %d to %d", t.targetVersion, newVersion)
+		t.targetVersion = newVersion
+		t.updatePrometheusTargets(response.GetResponseTargetIds())
+	}
+}
+
+func (t *PrometheusLabelTable) RequestLabelIDs(request *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
 	t.counter.RequestCount++
 	t.counter.RequestLabelsCount += int64(len(request.GetRequestLabels()))
 	var response *trident.PrometheusLabelResponse
@@ -163,36 +210,37 @@ func (t *PrometheusLabelTable) RequesteLabelIDs(request *trident.PrometheusLabel
 	return response, nil
 }
 
-func (t *PrometheusLabelTable) RequesteAllLabelIDs() {
+func (t *PrometheusLabelTable) RequestAllLabelIDs() {
 	log.Info("prometheus request all label IDs start")
-	_, err := t.RequesteLabelIDs(&trident.PrometheusLabelRequest{})
+	_, err := t.RequestLabelIDs(&trident.PrometheusLabelRequest{})
 	if err != nil {
 		log.Warning("request all prometheus label ids failed: %s", err)
 	}
 	log.Infof("prometheus request all label IDs end. %s", t.statsString())
 }
 
-func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse) {
-	for _, target := range resp.GetResponseTargetIds() {
+func (t *PrometheusLabelTable) updatePrometheusTargets(targetIds []*trident.TargetResponse) {
+	for _, target := range targetIds {
 		targetId := target.GetTargetId()
 		if targetId == 0 {
-			if t.counter.TargetUnknown == 0 {
-				log.Warningf("prometheus label response target invalid: %s", target)
+			if t.counter.TargetIdZero == 0 {
+				log.Infof("prometheus label response target id 0: %s", target)
 			}
-			t.counter.TargetUnknown++
-			continue
+			t.counter.TargetIdZero++
 		}
 		jobId := target.GetJobId()
 		instanceId := target.GetInstanceId()
-		if jobId > 0 || instanceId > 0 {
-			t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
-			t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
-			t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
-		}
+		t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
+		t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
+		t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
 		for _, metricId := range target.GetMetricIds() {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
 	}
+}
+
+func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse) {
+	t.updatePrometheusTargets(resp.GetResponseTargetIds())
 
 	for _, metric := range resp.GetResponseLabelIds() {
 		metricName := metric.GetMetricName()
@@ -223,6 +271,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			} else if instanceId == 0 && name == model.InstanceLabel {
 				instanceId = valueId
 			}
+			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
 			t.labelColumnIndexs.Set(columnIndexKey(metricId, nameId), cIndex)
@@ -230,16 +279,20 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 
 		targetId, ok := t.targetIDs.Get(targetIdKey(jobId, instanceId))
 		if !ok {
-			if t.counter.TargetUnknown == 0 {
+			if t.counter.TargetIdZero == 0 {
 				log.Warningf("prometheus label response label target invalid: jobId: %d, instanceId: %d, metric: %s", jobId, instanceId, metric)
 			}
-			t.counter.TargetUnknown++
+			t.counter.TargetIdZero++
 			continue
 		}
 		if _, ok := t.metricTargetPair.Get(metricTargetPairKey(metricId, targetId)); !ok {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
 	}
+}
+
+func (t *PrometheusLabelTable) GetMaxAppLabelColumnIndex() int {
+	return int(getUInt64MapMaxValue(t.labelColumnIndexs))
 }
 
 func (t *PrometheusLabelTable) metricIDsString(filter string) string {
@@ -430,7 +483,7 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	}
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
-	resp, err := t.RequesteLabelIDs(req)
+	resp, err := t.RequestLabelIDs(req)
 	if err != nil {
 		return fmt.Sprintf("request: %s\nresponse failed: %s", req, err)
 	}
