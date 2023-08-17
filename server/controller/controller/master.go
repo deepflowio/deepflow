@@ -147,7 +147,9 @@ func checkAndStartMasterFunctions(
 
 				prometheus.Encoder.Start()
 
-				httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
+				if cfg.DFWebService.Enabled {
+					httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
+				}
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -175,7 +177,9 @@ func checkAndStartMasterFunctions(
 
 				prometheus.Encoder.Stop()
 
-				httpService.TaskManager.Stop()
+				if cfg.DFWebService.Enabled {
+					httpService.TaskManager.Stop()
+				}
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",

@@ -14,29 +14,12 @@
  * limitations under the License.
  */
 
-package http
+package registrant
 
 import (
-	"sync"
-
-	"github.com/deepflowio/deepflow/server/controller/http/appender"
-	"github.com/deepflowio/deepflow/server/controller/http/common/rsctask"
+	"github.com/gin-gonic/gin"
 )
 
-var (
-	httpOnce sync.Once
-	http     *HTTP
-)
-
-type HTTP struct {
-	TaskManager rsctask.ResourceTaskManager
-}
-
-func GetSingleton() *HTTP {
-	httpOnce.Do(func() {
-		http = &HTTP{
-			TaskManager: appender.GetResourceTaskManager(),
-		}
-	})
-	return http
+type Registrant interface {
+	RegisterTo(*gin.Engine)
 }

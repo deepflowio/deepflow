@@ -27,8 +27,9 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/http/appender"
+	"github.com/deepflowio/deepflow/server/controller/http/common/registrant"
 	"github.com/deepflowio/deepflow/server/controller/http/router"
-	"github.com/deepflowio/deepflow/server/controller/http/router/configuration"
 	"github.com/deepflowio/deepflow/server/controller/http/router/resource"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
@@ -37,10 +38,6 @@ import (
 )
 
 var log = logging.MustGetLogger("http")
-
-type Registrant interface {
-	RegisterTo(*gin.Engine)
-}
 
 type Server struct {
 	engine           *gin.Engine
@@ -93,7 +90,15 @@ func (s *Server) SetGenesis(g *genesis.Genesis) {
 }
 
 func (s *Server) RegisterRouters() {
-	for _, i := range []Registrant{
+	for _, i := range s.appendRegistrant() {
+		i.RegisterTo(s.engine)
+	}
+	trouter.RegisterTo(s.engine)
+}
+
+func (s *Server) appendRegistrant() []registrant.Registrant {
+	// contains routers supported in CE and EE
+	rs := []registrant.Registrant{
 		router.NewElection(),
 		router.NewDebug(s.manager, s.genesis),
 		router.NewController(s.controllerConfig, s.controllerChecker),
@@ -103,48 +108,13 @@ func (s *Server) RegisterRouters() {
 		router.NewDataSource(s.controllerConfig),
 		router.NewVTapGroupConfig(),
 		router.NewVTapInterface(),
-		configuration.NewConfiguration(),
 		router.NewVtapRepo(),
 		router.NewPlugin(),
 
 		// resource
-		resource.NewTask(),
 		resource.NewDomain(s.controllerConfig),
-		resource.NewAZ(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
-		resource.NewRegion(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
-		resource.NewHost(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewVInterface(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewVPC(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewNetwork(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewIP(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewVRouter(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewRoutingTable(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewSecurityGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewSecurityGroupRule(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewNATGateway(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewNATRule(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewLB(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewLBListener(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewLBRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPeerConnection(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewCEN(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewRDSInstance(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewRedisInstance(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
-		resource.NewProcess(s.controllerConfig.RedisCfg),
-		resource.NewPod(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodGroupPort(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodReplicaSet(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodService(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodServicePort(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodIngress(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodIngressRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodNode(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodCluster(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewPodNamespace(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-	} {
-		i.RegisterTo(s.engine)
 	}
-	trouter.RegisterTo(s.engine)
+
+	// appends routers supported in CE or EE
+	return append(rs, appender.GetRegistrants(s.controllerConfig)...)
 }

@@ -14,29 +14,12 @@
  * limitations under the License.
  */
 
-package http
+package appender
 
 import (
-	"sync"
-
-	"github.com/deepflowio/deepflow/server/controller/http/appender"
 	"github.com/deepflowio/deepflow/server/controller/http/common/rsctask"
 )
 
-var (
-	httpOnce sync.Once
-	http     *HTTP
-)
-
-type HTTP struct {
-	TaskManager rsctask.ResourceTaskManager
-}
-
-func GetSingleton() *HTTP {
-	httpOnce.Do(func() {
-		http = &HTTP{
-			TaskManager: appender.GetResourceTaskManager(),
-		}
-	})
-	return http
+func GetResourceTaskManager() rsctask.ResourceTaskManager {
+	return nil
 }

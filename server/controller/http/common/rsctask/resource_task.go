@@ -14,29 +14,16 @@
  * limitations under the License.
  */
 
-package http
+package rsctask
 
 import (
-	"sync"
+	"context"
 
-	"github.com/deepflowio/deepflow/server/controller/http/appender"
-	"github.com/deepflowio/deepflow/server/controller/http/common/rsctask"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/redis"
 )
 
-var (
-	httpOnce sync.Once
-	http     *HTTP
-)
-
-type HTTP struct {
-	TaskManager rsctask.ResourceTaskManager
-}
-
-func GetSingleton() *HTTP {
-	httpOnce.Do(func() {
-		http = &HTTP{
-			TaskManager: appender.GetResourceTaskManager(),
-		}
-	})
-	return http
+type ResourceTaskManager interface {
+	Start(context.Context, config.FPermit, redis.Config)
+	Stop()
 }
