@@ -704,12 +704,8 @@ impl Trident {
                         api_watcher.stop();
                     }
 
-                    config_handler.load_plugin(
-                        &runtime,
-                        &session,
-                        ctrl_ip.to_string().as_str(),
-                        ctrl_mac.to_string().as_str(),
-                    );
+                    let agent_id = synchronizer.agent_id.read().clone();
+                    config_handler.load_plugin(&runtime, &session, &agent_id);
 
                     let mut comp = Components::new(
                         &version_info,
