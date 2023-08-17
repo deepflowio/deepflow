@@ -46,6 +46,7 @@ type NodeInfo struct {
 	tsdbRegion              map[string]uint32
 	tsdbToNATIP             map[string]string
 	tsdbToPodIP             map[string]string
+	tsdbToID                map[string]uint32
 	controllerToNATIP       map[string]string
 	controllerToPodIP       map[string]string
 	localServers            *atomic.Value // []*trident.DeepFlowServerInstanceInfo
@@ -73,6 +74,7 @@ func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		tsdbRegion:              make(map[string]uint32),
 		tsdbToNATIP:             make(map[string]string),
 		tsdbToPodIP:             make(map[string]string),
+		tsdbToID:                make(map[string]uint32),
 		controllerToNATIP:       make(map[string]string),
 		controllerToPodIP:       make(map[string]string),
 		localServers:            localServers,
@@ -297,13 +299,16 @@ func (n *NodeInfo) initTSDBInfo() {
 
 	tsdbToNATIP := make(map[string]string)
 	tsdbToPodIP := make(map[string]string)
-	for _, dbTSDB := range dbTSDBs {
+	tsdbToID := make(map[string]uint32)
+	for index, dbTSDB := range dbTSDBs {
 		n.AddTSDBCache(dbTSDB)
 		tsdbToNATIP[dbTSDB.IP] = dbTSDB.NATIP
 		tsdbToPodIP[dbTSDB.IP] = dbTSDB.PodIP
+		tsdbToID[dbTSDB.IP] = uint32(index + 1)
 	}
 	n.tsdbToNATIP = tsdbToNATIP
 	n.tsdbToPodIP = tsdbToPodIP
+	n.tsdbToID = tsdbToID
 	n.generateTSDBRegion()
 	n.generatesysConfiguration()
 }
@@ -364,6 +369,14 @@ func (n *NodeInfo) updateTSDBNATIP(data map[string]string) {
 	n.tsdbToNATIP = data
 }
 
+func (n *NodeInfo) updateTSDBToID(data map[string]uint32) {
+	n.tsdbToID = data
+}
+
+func (n *NodeInfo) GetTSDBID(ip string) uint32 {
+	return n.tsdbToID[ip]
+}
+
 func (n *NodeInfo) GetTSDBNatIP(ip string) string {
 	return n.tsdbToNATIP[ip]
 }
@@ -400,14 +413,17 @@ func (n *NodeInfo) updateTSDBInfo() {
 	ipToTSDB := make(map[string]*models.Analyzer)
 	tsdbToNATIP := make(map[string]string)
 	tsdbToPodIP := make(map[string]string)
-	for _, dbTSDB := range dbTSDBs {
+	tsdbToID := make(map[string]uint32)
+	for index, dbTSDB := range dbTSDBs {
 		ipToTSDB[dbTSDB.IP] = dbTSDB
 		tsdbToNATIP[dbTSDB.IP] = dbTSDB.NATIP
 		tsdbToPodIP[dbTSDB.IP] = dbTSDB.PodIP
+		tsdbToID[dbTSDB.IP] = uint32(index + 1)
 		dbKeys.Add(dbTSDB.IP)
 	}
 	n.updateTSDBNATIP(tsdbToNATIP)
 	n.updateTSDBPodIP(tsdbToPodIP)
+	n.updateTSDBToID(tsdbToID)
 
 	cacheKeys := n.tsdbCaches.GetKeySet()
 	addTSDB := dbKeys.Difference(cacheKeys)
