@@ -53,7 +53,7 @@ func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *g
 
 func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) *L7FlowLog {
 	h := AcquireL7FlowLog()
-	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, vtapID)
+	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
 	h.VtapID = vtapID
 	h.FillOTel(span, resAttributes, platformData)
 	return h
