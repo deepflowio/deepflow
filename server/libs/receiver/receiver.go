@@ -392,7 +392,8 @@ type Receiver struct {
 }
 
 type ReceiverCounter struct {
-	Invalid         uint64 `statsd:"invalid"` // version不匹配
+	Invalid         uint64 `statsd:"invalid"`
+	Unregistered    uint64 `statsd:"unregistered"`
 	RxPackets       uint64 `statsd:"rx_packets"`
 	MaxDelay        int64  `statsd:"max_delay"`
 	MinDelay        int64  `statsd:"min_delay"`
@@ -691,9 +692,9 @@ func (r *Receiver) ProcessUDPServer() {
 			r.logReceiveError(size, remoteAddr, err)
 			continue
 		}
-		if r.handlers[baseHeader.Type] == nil {
+		if baseHeader.Type >= datatype.MESSAGE_TYPE_MAX {
 			ReleaseRecvBuffer(recvBuffer)
-			r.logReceiveError(size, remoteAddr, fmt.Errorf("unregist message type %d", baseHeader.Type))
+			r.logReceiveError(size, remoteAddr, fmt.Errorf("unknown message type %d", baseHeader.Type))
 			continue
 		}
 
@@ -722,14 +723,20 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, sequence, metricsTimestamp, UDP)
 
-		recvBuffer.Begin = headerLen
-		recvBuffer.End = size // syslog,statsd数据的FrameSize长度是0,需要以实际长度为准
-		if baseHeader.Type == datatype.MESSAGE_TYPE_COMPRESS {
-			recvBuffer.End = int(baseHeader.FrameSize) // 可能收到的包长会大于FrameSize, 以FrameSize为准
+		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
+		if r.handlers[baseHeader.Type] == nil {
+			atomic.AddUint64(&r.counter.Unregistered, 1)
+			ReleaseRecvBuffer(recvBuffer)
+		} else {
+			recvBuffer.Begin = headerLen
+			recvBuffer.End = size // syslog,statsd数据的FrameSize长度是0,需要以实际长度为准
+			if baseHeader.Type == datatype.MESSAGE_TYPE_COMPRESS {
+				recvBuffer.End = int(baseHeader.FrameSize) // 可能收到的包长会大于FrameSize, 以FrameSize为准
+			}
+			recvBuffer.IP = remoteAddr.IP
+			recvBuffer.VtapID = vtapID
+			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
-		recvBuffer.IP = remoteAddr.IP
-		recvBuffer.VtapID = vtapID
-		r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 	}
 }
 
@@ -836,9 +843,9 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			continue
 		}
-		if r.handlers[baseHeader.Type] == nil {
+		if baseHeader.Type >= datatype.MESSAGE_TYPE_MAX {
 			if r.counter.Invalid == 0 {
-				log.Warningf("recv from %s, unregist message type %d", conn.RemoteAddr().String(), baseHeader.Type)
+				log.Warningf("recv from %s, unknown message type %d", conn.RemoteAddr().String(), baseHeader.Type)
 			}
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			time.Sleep(10 * time.Second)
@@ -896,11 +903,17 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, sequence, metricsTimestamp, TCP)
 		atomic.AddUint64(&r.counter.RxPackets, 1)
 
-		recvBuffer.Begin = 0
-		recvBuffer.End = int(baseHeader.FrameSize) - headerLen
-		recvBuffer.IP = ip
-		recvBuffer.VtapID = vtapID
-		r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
+		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
+		if r.handlers[baseHeader.Type] == nil {
+			atomic.AddUint64(&r.counter.Unregistered, 1)
+			ReleaseRecvBuffer(recvBuffer)
+		} else {
+			recvBuffer.Begin = 0
+			recvBuffer.End = int(baseHeader.FrameSize) - headerLen
+			recvBuffer.IP = ip
+			recvBuffer.VtapID = vtapID
+			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
+		}
 	}
 }
 
