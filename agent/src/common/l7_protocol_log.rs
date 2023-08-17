@@ -374,6 +374,10 @@ pub struct ParseParam<'a> {
 }
 
 impl ParseParam<'_> {
+    pub fn is_from_ebpf(&self) -> bool {
+        self.ebpf_type != EbpfType::None
+    }
+
     pub fn new(
         packet: &MetaPacket<'_>,
         cache: Rc<RefCell<L7PerfCache>>,
