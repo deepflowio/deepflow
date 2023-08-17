@@ -14,29 +14,19 @@
  * limitations under the License.
  */
 
-package http
+package appender
 
 import (
-	"sync"
-
-	"github.com/deepflowio/deepflow/server/controller/http/appender"
-	"github.com/deepflowio/deepflow/server/controller/http/common/rsctask"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/http/common/registrant"
+	"github.com/deepflowio/deepflow/server/controller/http/router/configuration"
+	"github.com/deepflowio/deepflow/server/controller/http/router/resource"
 )
 
-var (
-	httpOnce sync.Once
-	http     *HTTP
-)
+func GetRegistrants(cfg *config.ControllerConfig) []registrant.Registrant {
+	return []registrant.Registrant{
+		configuration.NewConfiguration(), // TODO delete
 
-type HTTP struct {
-	TaskManager rsctask.ResourceTaskManager
-}
-
-func GetSingleton() *HTTP {
-	httpOnce.Do(func() {
-		http = &HTTP{
-			TaskManager: appender.GetResourceTaskManager(),
-		}
-	})
-	return http
+		resource.NewVPC(cfg.HTTPCfg, cfg.RedisCfg, cfg.FPermit),
+	}
 }
