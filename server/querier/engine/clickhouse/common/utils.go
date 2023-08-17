@@ -23,10 +23,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -35,39 +33,9 @@ import (
 )
 
 var log = logging.MustGetLogger("common")
-var symbolRegexp = regexp.MustCompile("[\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]")
 
 func ParseAlias(node sqlparser.SQLNode) string {
 	alias := sqlparser.String(node)
-	// 判断字符串首尾是否为反引号
-	if strings.HasPrefix(alias, "`") && strings.HasSuffix(alias, "`") {
-		alias = strings.Trim(alias, "`")
-	} else {
-		return alias
-	}
-
-	// 中文带上``
-	// 部分特殊字符带上`
-	for _, r := range alias {
-		if unicode.Is(unicode.Scripts["Han"], r) || (symbolRegexp.MatchString(string(r))) {
-			return fmt.Sprintf("`%s`", alias)
-		}
-		if string(r) == "(" || string(r) == ")" {
-			return fmt.Sprintf("`%s`", alias)
-		}
-	}
-	// 纯数字带上``
-	if _, err := strconv.ParseInt(alias, 10, 64); err == nil {
-		return fmt.Sprintf("`%s`", alias)
-	}
-	// K8s Labels字带上``
-	if strings.HasPrefix(alias, "k8s.label") || strings.HasPrefix(alias, "k8s.annotation") || strings.HasPrefix(alias, "k8s.env") || strings.HasPrefix(alias, "os.app") || strings.HasPrefix(alias, "cloud.tag") {
-		return fmt.Sprintf("`%s`", alias)
-	}
-	// 外部字段带上``
-	if strings.HasPrefix(alias, "tag.") || strings.HasPrefix(alias, "attribute.") || strings.HasPrefix(alias, "metrics.") {
-		return fmt.Sprintf("`%s`", alias)
-	}
 	return alias
 }
 
