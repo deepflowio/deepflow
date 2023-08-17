@@ -125,6 +125,7 @@ type PlatformInfoTable struct {
 
 	receiver         *receiver.Receiver
 	regionID         uint32
+	analyzerID       uint32
 	otherRegionCount int64
 	epcIDIPV4Lru     *lru.U64LRU
 	epcIDIPV6Lru     *lru.U160LRU
@@ -180,6 +181,10 @@ func (t *PlatformInfoTable) ClosePlatformInfoTable() {
 
 func (t *PlatformInfoTable) QueryRegionID() uint32 {
 	return t.regionID
+}
+
+func (t *PlatformInfoTable) QueryAnalyzerID() uint32 {
+	return t.analyzerID
 }
 
 // 统计收到其他region的数据
@@ -664,7 +669,7 @@ func (t *PlatformInfoTable) queryIPV6Cidr(epcID int32, ipv6 net.IP) *Info {
 func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("RegionID:%d   Drop Other RegionID Data Count:%d\n", t.regionID, t.otherRegionCount))
+	sb.WriteString(fmt.Sprintf("AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", t.analyzerID, t.regionID, t.otherRegionCount))
 	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d\n",
 		t.moduleName, t.ctlIP, t.hostname, t.regionID))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
@@ -913,10 +918,14 @@ func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
 		t.updatePodIps(podIps)
 	}
 
-	if config := response.GetConfig(); config != nil {
-		t.regionID = config.GetRegionId()
+	if analyzerConfig := response.GetAnalyzerConfig(); analyzerConfig != nil {
+		t.regionID = analyzerConfig.GetRegionId()
+		t.analyzerID = analyzerConfig.GetAnalyzerId()
 	} else {
-		log.Warning("get regionID failed")
+		log.Warning("get analyzer config failed")
+	}
+	if t.analyzerID == 0 {
+		log.Error("get analyzerID from Controller is invalid")
 	}
 }
 
@@ -961,6 +970,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 	t.vtapIdInfos = masterTable.vtapIdInfos
 	t.podNameInfos = masterTable.podNameInfos
 	t.regionID = masterTable.regionID
+	t.analyzerID = masterTable.analyzerID
 
 	return nil
 }
