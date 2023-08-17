@@ -59,5 +59,4 @@ func (p *RDSInstance) Get(c *gin.Context) {
 
 	data, err := service.Get()
 	common.JsonResponse(c, data, err)
-
 }

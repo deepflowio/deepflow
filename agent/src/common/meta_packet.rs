@@ -454,6 +454,7 @@ impl<'a> MetaPacket<'a> {
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;
         self.packet_len = packet.len() as u32;
+        self.ebpf_type = EbpfType::None;
         let mut size_checker = packet.len() as isize;
 
         // eth

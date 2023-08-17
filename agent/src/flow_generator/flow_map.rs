@@ -1639,7 +1639,7 @@ impl FlowMap {
                 let (l7_perf_stats, l7_protocol) =
                     perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
 
-                let mut flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
+                let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
                 flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
                 flow_perf_stats.l7_protocol = l7_protocol;
                 l7_stats.stats = l7_perf_stats;
@@ -1726,7 +1726,7 @@ impl FlowMap {
                     let (l7_perf_stats, l7_protocol) =
                         perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
 
-                    let mut flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
+                    let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
                     flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
                     flow_perf_stats.l7_protocol = l7_protocol;
                     if flow.flow_key.proto == IpProtocol::Tcp

@@ -27,9 +27,12 @@ use log::{debug, error, info};
 use parking_lot::RwLock;
 use tonic::transport::{Channel, Endpoint};
 
-use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
-use crate::exception::ExceptionHandler;
-use crate::utils::stats::{self, AtomicTimeStats, StatsOption};
+use crate::{
+    common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT},
+    exception::ExceptionHandler,
+    trident::AgentId,
+    utils::stats::{self, AtomicTimeStats, StatsOption},
+};
 use public::proto::trident::{self, Exception, Status};
 use public::{
     counter::{Countable, Counter, CounterType, CounterValue, RefCountable},
@@ -443,13 +446,12 @@ impl Session {
         &self,
         name: &str,
         plugin_type: PluginType,
-        ctrl_ip: &str,
-        ctrl_mac: &str,
+        agent_id: &AgentId,
     ) -> Result<Vec<u8>> {
         let s = self
             .plugin(trident::PluginRequest {
-                ctrl_ip: Some(ctrl_ip.into()),
-                ctrl_mac: Some(ctrl_mac.into()),
+                ctrl_ip: Some(agent_id.ip.to_string()),
+                ctrl_mac: Some(agent_id.mac.to_string()),
                 plugin_type: Some(plugin_type as i32),
                 plugin_name: Some(name.into()),
             })

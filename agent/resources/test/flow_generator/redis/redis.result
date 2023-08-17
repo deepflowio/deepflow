@@ -24,5 +24,5 @@ RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: fal
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
-RedisInfo { request: "", request_type: "", status: "", error: "-hash:7d9cd9bf65\", \"TYPE\": 5, \"POD_NUM\": 2, \"POD_NAMESPACE_ID\": 1391, \"POD_CLUSTER_ID\": 171, \"CREATED_AT\": \"2021-08-10 16:43:48\", \"UPDATED_AT\": \"2021-08-10 16:43:48\", \"AZ\": \"3e818fb4-477c-5604-b56b-ed1be042dcff\", \"REGION\": \"ffffffff-ffff-ffff-ffff-ffffffff" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
