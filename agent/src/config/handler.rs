@@ -83,7 +83,7 @@ use public::{
     netns::{self, NsFile},
 };
 
-use crate::utils::cgroups::is_kernel_available_for_cgroups;
+use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -2239,15 +2239,9 @@ impl ConfigHandler {
         callbacks
     }
 
-    pub fn load_plugin(
-        &mut self,
-        rt: &Arc<Runtime>,
-        session: &Arc<Session>,
-        ctrl_ip: &str,
-        ctrl_mac: &str,
-    ) {
+    pub fn load_plugin(&mut self, rt: &Arc<Runtime>, session: &Arc<Session>, agent_id: &AgentId) {
         self.candidate_config
-            .fill_plugin_prog_from_server(rt, session, ctrl_ip, ctrl_mac);
+            .fill_plugin_prog_from_server(rt, session, agent_id);
         self.current_config
             .store(Arc::new(self.candidate_config.clone()));
     }
@@ -2274,8 +2268,7 @@ impl ModuleConfig {
         &mut self,
         rt: &Arc<Runtime>,
         session: &Arc<Session>,
-        ctrl_ip: &str,
-        ctrl_mac: &str,
+        agent_id: &AgentId,
     ) {
         let mut wasm = vec![];
         #[cfg(target_os = "windows")]
@@ -2285,7 +2278,7 @@ impl ModuleConfig {
         rt.block_on(async {
             for i in self.yaml_config.wasm_plugins.iter() {
                 match session
-                    .get_plugin(i.as_str(), trident::PluginType::Wasm, ctrl_ip, ctrl_mac)
+                    .get_plugin(i.as_str(), trident::PluginType::Wasm, agent_id)
                     .await
                 {
                     Ok(prog) => wasm.push((i.clone(), prog)),
@@ -2301,7 +2294,7 @@ impl ModuleConfig {
         rt.block_on(async {
             for i in self.yaml_config.so_plugins.iter() {
                 match session
-                    .get_plugin(i.as_str(), trident::PluginType::So, ctrl_ip, ctrl_mac)
+                    .get_plugin(i.as_str(), trident::PluginType::So, agent_id)
                     .await
                 {
                     Ok(prog) => match load_plugin(prog.as_slice(), i) {
