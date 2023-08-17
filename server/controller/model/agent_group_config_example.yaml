@@ -423,8 +423,9 @@ vtap_group_id: g-xxxxxx
 
 # Prometheus API address
 ## Note: Get target from Prometheus and synchronize to the deepflow-server.
-## Example: ip:port
-#prometheus_http_api_address:
+## Example: 
+#prometheus_http_api_addresses:
+#- http://10.96.1.8:9090
 
 ##################
 ## NPB Switches ##
