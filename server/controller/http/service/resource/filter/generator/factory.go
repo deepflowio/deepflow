@@ -66,6 +66,10 @@ func Get(resourceType string, cfg *RequiredConfigs) FilterGenerator {
 		return NewPeerConnection()
 	case common.RESOURCE_TYPE_CEN_EN:
 		return NewCEN()
+	case common.RESOURCE_TYPE_RDS_INSTANCE_EN:
+		return NewRDSInstance(cfg.FPermit)
+	case common.RESOURCE_TYPE_REDIS_INSTANCE_EN:
+		return NewRedisInstance(cfg.FPermit)
 	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
 		return NewPodCluster(cfg.FPermit)
 	case common.RESOURCE_TYPE_POD_NODE_EN:
