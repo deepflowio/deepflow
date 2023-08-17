@@ -37,6 +37,7 @@ import (
 )
 
 var log = logging.MustGetLogger("profile")
+var InstanceProfileEventType = []string{"inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines"}
 
 func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, debug interface{}, err error) {
 	whereSlice := []string{}
@@ -54,14 +55,52 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		"SELECT %s, %s FROM %s WHERE %s LIMIT %d",
 		common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, limitSql,
 	)
+
+	if slices.Contains[string](InstanceProfileEventType, args.ProfileEventType) {
+		timeSql := fmt.Sprintf(
+			"SELECT time FROM %s WHERE %s ORDER BY time DESC LIMIT 1",
+			common.TABLE_PROFILE, whereSql,
+		)
+		timeArgs := querier_common.QuerierParams{
+			DB:      common.DATABASE_PROFILE,
+			Sql:     timeSql,
+			Debug:   strconv.FormatBool(args.Debug),
+			Context: args.Context,
+		}
+		timeEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
+		timeEngine.Init()
+		timeResult, timeDebug, timeError := timeEngine.ExecuteQuery(&timeArgs)
+		if timeError != nil {
+			log.Errorf("ExecuteQuery failed: %v", timeDebug, timeError)
+			return
+		}
+		var timeValue int64
+		timeValues := timeResult.Values
+		for _, value := range timeValues {
+			switch valueSlice := value.(type) {
+			case []interface{}:
+				if timeValueTime, ok := valueSlice[0].(time.Time); ok {
+					timeValue = timeValueTime.Unix()
+					break
+				}
+			}
+		}
+		if timeValue > 0 {
+			sql = fmt.Sprintf(
+				"SELECT %s, %s FROM %s WHERE %s AND time=%d LIMIT %d",
+				common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, timeValue, limitSql,
+			)
+		}
+
+	}
+	ckEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
+	ckEngine.Init()
 	querierArgs := querier_common.QuerierParams{
 		DB:      common.DATABASE_PROFILE,
 		Sql:     sql,
 		Debug:   strconv.FormatBool(args.Debug),
 		Context: args.Context,
 	}
-	ckEngine := &clickhouse.CHEngine{DB: querierArgs.DB}
-	ckEngine.Init()
 	querierResult, querierDebug, err := ckEngine.ExecuteQuery(&querierArgs)
 	if err != nil {
 		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
