@@ -172,12 +172,12 @@ func (t *PrometheusLabelTable) RequestAllTargetIDs() {
 		return err
 	})
 	if err != nil {
-		log.Warning("request all prometheus target ids failed: %s", err)
+		log.Warningf("request all prometheus target ids failed: %s", err)
 		return
 	}
 	newVersion := response.GetVersion()
 	if t.targetVersion != newVersion {
-		log.Warning("prometheus target version update from %d to %d", t.targetVersion, newVersion)
+		log.Infof("prometheus target version update from %d to %d", t.targetVersion, newVersion)
 		t.targetVersion = newVersion
 		t.updatePrometheusTargets(response.GetResponseTargetIds())
 	}
