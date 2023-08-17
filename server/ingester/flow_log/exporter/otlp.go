@@ -54,6 +54,7 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
 		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_0", tags0.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_0", tags0.Subnet)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0.PodCluster)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0.PodNS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0.PodNode)
@@ -68,12 +69,17 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.rds_0", tags0.RDS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.lb_0", tags0.LB)
 		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_0", tags0.NatGW)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_0", tags0.AutoInstanceType)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_0", tags0.AutoInstance)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_0", tags0.AutoServiceType)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_0", tags0.AutoService)
 	}
 	if dataTypeBits&SERVER_UNIVERSAL_TAG != 0 {
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
 		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_1", tags1.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_1", tags1.Subnet)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1.PodCluster)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1.PodNS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1.PodNode)
@@ -88,6 +94,10 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.rds_1", tags1.RDS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.lb_1", tags1.LB)
 		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_1", tags1.NatGW)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_1", tags1.AutoInstanceType)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_1", tags1.AutoInstance)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_1", tags1.AutoServiceType)
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_1", tags1.AutoService)
 	}
 }
 

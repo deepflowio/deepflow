@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type UniversalTags struct {
@@ -60,34 +61,41 @@ type UniversalTags struct {
 	NatGW      string
 
 	TapPortName string
+
+	AutoInstanceType string
+	AutoInstance     string
+	AutoServiceType  string
+	AutoService      string
 }
 
+type DeviceType uint8
+
 const (
-	TYPE_INTERNET       = 0
-	TYPE_VM             = 1
-	TYPE_VROUTER        = 5
-	TYPE_HOST           = 6
-	TYPE_DHCP_PORT      = 9
-	TYPE_POD            = 10
-	TYPE_POD_SERVICE    = 11
-	TYPE_REDIS_INSTANCE = 12
-	TYPE_RDS_INSTANCE   = 13
-	TYPE_POD_NODE       = 14
-	TYPE_LB             = 15
-	TYPE_NAT_GATEWAY    = 16
-	TYPE_POD_GROUP      = 101
-	TYPE_SERVICE        = 102
-	TYPE_GPROCESS       = 120
-	TYPE_IP             = 255
+	TYPE_INTERNET       DeviceType = 0
+	TYPE_VM             DeviceType = 1
+	TYPE_VROUTER        DeviceType = 5
+	TYPE_HOST           DeviceType = 6
+	TYPE_DHCP_GW        DeviceType = 9
+	TYPE_POD            DeviceType = 10
+	TYPE_POD_SERVICE    DeviceType = 11
+	TYPE_REDIS_INSTANCE DeviceType = 12
+	TYPE_RDS_INSTANCE   DeviceType = 13
+	TYPE_POD_NODE       DeviceType = 14
+	TYPE_LB             DeviceType = 15
+	TYPE_NAT_GATEWAY    DeviceType = 16
+	TYPE_POD_GROUP      DeviceType = 101
+	TYPE_SERVICE        DeviceType = 102
+	TYPE_GPROCESS       DeviceType = 120
+	TYPE_IP             DeviceType = 255
 )
 
 // from clickhouse flow_tag.node_type_map
-var deviceTypeMap = map[uint32]string{
+var deviceTypeStrings = []string{
 	TYPE_INTERNET:       "internet_ip",
 	TYPE_VM:             "chost",
 	TYPE_VROUTER:        "router",
 	TYPE_HOST:           "host",
-	TYPE_DHCP_PORT:      "dhcpgw",
+	TYPE_DHCP_GW:        "dhcpgw",
 	TYPE_POD:            "pod",
 	TYPE_POD_SERVICE:    "pod_service",
 	TYPE_REDIS_INSTANCE: "redis",
@@ -99,6 +107,10 @@ var deviceTypeMap = map[uint32]string{
 	TYPE_SERVICE:        "service",
 	TYPE_GPROCESS:       "gprocess",
 	TYPE_IP:             "ip",
+}
+
+func (t DeviceType) String() string {
+	return deviceTypeStrings[t]
 }
 
 type Labels map[string]string
@@ -121,55 +133,87 @@ type UniversalTagMaps struct {
 
 func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog) (*UniversalTags, *UniversalTags) {
 	tagMaps := u.universalTagMaps
-	return &UniversalTags{
-			Region:       tagMaps.regionMap[l7FlowLog.RegionID0],
-			AZ:           tagMaps.azMap[l7FlowLog.AZID0],
-			Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID0)],
-			L3DeviceType: deviceTypeMap[uint32(l7FlowLog.L3DeviceType0)],
-			L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType0)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID0],
-			PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID0],
-			PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID0],
-			Pod:          tagMaps.podMap[l7FlowLog.PodID0],
-			PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID0],
-			L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID0)],
-			Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID0],
-			Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID0)],
-			GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID0],
-			Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
+	tags0, tags1 := &UniversalTags{
+		Region:       tagMaps.regionMap[l7FlowLog.RegionID0],
+		AZ:           tagMaps.azMap[l7FlowLog.AZID0],
+		Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID0)],
+		L3DeviceType: DeviceType(l7FlowLog.L3DeviceType0).String(),
+		L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType0)<<32|uint64(l7FlowLog.L3DeviceID0)],
+		PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID0],
+		PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID0],
+		PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID0],
+		Pod:          tagMaps.podMap[l7FlowLog.PodID0],
+		PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID0],
+		L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID0)],
+		Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID0],
+		Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID0)],
+		GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID0],
+		Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
+	}, &UniversalTags{
+		Region:       tagMaps.regionMap[l7FlowLog.RegionID1],
+		AZ:           tagMaps.azMap[l7FlowLog.AZID1],
+		Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID1)],
+		L3DeviceType: DeviceType(l7FlowLog.L3DeviceType1).String(),
+		L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType1)<<32|uint64(l7FlowLog.L3DeviceID1)],
+		PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID1],
+		PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID1],
+		PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID1],
+		Pod:          tagMaps.podMap[l7FlowLog.PodID1],
+		PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID1],
+		L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID1)],
+		Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID1],
+		Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID1)],
+		GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID1],
+		Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
+	}
 
-			CHost:      tagMaps.deviceMap[uint64(TYPE_VM)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			Router:     tagMaps.deviceMap[uint64(TYPE_VROUTER)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			DhcpGW:     tagMaps.deviceMap[uint64(TYPE_DHCP_PORT)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			PodService: tagMaps.deviceMap[uint64(TYPE_POD_SERVICE)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			Redis:      tagMaps.deviceMap[uint64(TYPE_REDIS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			RDS:        tagMaps.deviceMap[uint64(TYPE_RDS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID0)],
-			LB:         tagMaps.deviceMap[uint64(TYPE_LB)<<32|uint64(l7FlowLog.L3DeviceID0)],
-		}, &UniversalTags{
-			Region:       tagMaps.regionMap[l7FlowLog.RegionID1],
-			AZ:           tagMaps.azMap[l7FlowLog.AZID1],
-			Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID1)],
-			L3DeviceType: deviceTypeMap[uint32(l7FlowLog.L3DeviceType1)],
-			L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType1)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID1],
-			PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID1],
-			PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID1],
-			Pod:          tagMaps.podMap[l7FlowLog.PodID1],
-			PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID1],
-			L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID1)],
-			Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID1],
-			Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID1)],
-			GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID1],
-			Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
+	l3Device0 := tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType0)<<32|uint64(l7FlowLog.L3DeviceID0)]
+	fillDevice(tags0, DeviceType(l7FlowLog.L3DeviceType0), l3Device0)
 
-			CHost:      tagMaps.deviceMap[uint64(TYPE_VM)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			Router:     tagMaps.deviceMap[uint64(TYPE_VROUTER)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			DhcpGW:     tagMaps.deviceMap[uint64(TYPE_DHCP_PORT)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			PodService: tagMaps.deviceMap[uint64(TYPE_POD_SERVICE)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			Redis:      tagMaps.deviceMap[uint64(TYPE_REDIS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			RDS:        tagMaps.deviceMap[uint64(TYPE_RDS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID1)],
-			LB:         tagMaps.deviceMap[uint64(TYPE_LB)<<32|uint64(l7FlowLog.L3DeviceID1)],
+	l3Device1 := tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType1)<<32|uint64(l7FlowLog.L3DeviceID1)]
+	fillDevice(tags1, DeviceType(l7FlowLog.L3DeviceType1), l3Device1)
+
+	tags0.AutoServiceType = DeviceType(l7FlowLog.AutoServiceType0).String()
+	tags0.AutoService = u.getAuto(DeviceType(l7FlowLog.AutoServiceType0), l7FlowLog.AutoServiceID0, l7FlowLog.IsIPv4, l7FlowLog.IP40, l7FlowLog.IP60)
+	tags0.AutoInstanceType = DeviceType(l7FlowLog.AutoInstanceType0).String()
+	tags0.AutoInstance = u.getAuto(DeviceType(l7FlowLog.AutoInstanceType0), l7FlowLog.AutoInstanceID0, l7FlowLog.IsIPv4, l7FlowLog.IP40, l7FlowLog.IP60)
+
+	tags1.AutoServiceType = DeviceType(l7FlowLog.AutoServiceType1).String()
+	tags1.AutoService = u.getAuto(DeviceType(l7FlowLog.AutoServiceType1), l7FlowLog.AutoServiceID1, l7FlowLog.IsIPv4, l7FlowLog.IP41, l7FlowLog.IP61)
+	tags1.AutoInstanceType = DeviceType(l7FlowLog.AutoInstanceType1).String()
+	tags1.AutoInstance = u.getAuto(DeviceType(l7FlowLog.AutoInstanceType1), l7FlowLog.AutoInstanceID1, l7FlowLog.IsIPv4, l7FlowLog.IP41, l7FlowLog.IP61)
+
+	return tags0, tags1
+}
+
+func fillDevice(tags *UniversalTags, deviceType DeviceType, device string) {
+	switch deviceType {
+	case TYPE_VM:
+		tags.CHost = device
+	case TYPE_VROUTER:
+		tags.Router = device
+	case TYPE_DHCP_GW:
+		tags.DhcpGW = device
+	case TYPE_POD_SERVICE:
+		tags.PodService = device
+	case TYPE_REDIS_INSTANCE:
+		tags.Redis = device
+	case TYPE_RDS_INSTANCE:
+		tags.RDS = device
+	case TYPE_LB:
+		tags.LB = device
+	}
+}
+
+func (u *UniversalTagsManager) getAuto(autoType DeviceType, autoID uint32, isIPv4 bool, ip4 uint32, ip6 net.IP) string {
+	if autoType == TYPE_IP || autoType == TYPE_INTERNET {
+		if isIPv4 {
+			return utils.IpFromUint32(ip4).String()
+		} else {
+			return ip6.String()
 		}
+	}
+	return u.universalTagMaps.deviceMap[uint64(autoType)<<32|uint64(autoID)]
 }
 
 func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
