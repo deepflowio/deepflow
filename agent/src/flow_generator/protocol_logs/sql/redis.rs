@@ -160,6 +160,8 @@ impl From<RedisInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
     #[serde(skip)]
+    has_request: bool,
+    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 
@@ -184,7 +186,13 @@ impl L7ProtocolParserInterface for RedisLog {
         };
         let mut info = RedisInfo::default();
         info.is_tls = param.is_tls();
-        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
+        self.parse(
+            payload,
+            param.l4_protocol,
+            param.direction,
+            param.is_from_ebpf(),
+            &mut info,
+        )?;
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
@@ -211,7 +219,7 @@ impl L7ProtocolParserInterface for RedisLog {
 
 impl RedisLog {
     fn reset(&mut self) {
-        *self = RedisLog::default();
+        self.perf_stats = None;
     }
 
     fn fill_request(&mut self, context: Vec<u8>, info: &mut RedisInfo) {
@@ -221,11 +229,13 @@ impl RedisLog {
         };
         info.msg_type = LogMessageType::Request;
         info.request = context;
+        self.has_request = true;
         self.perf_stats.as_mut().map(|p| p.inc_req());
     }
 
     fn fill_response(&mut self, context: Vec<u8>, error_response: bool, info: &mut RedisInfo) {
         info.msg_type = LogMessageType::Response;
+        self.has_request = false;
         self.perf_stats.as_mut().map(|p| p.inc_resp());
         if context.is_empty() {
             return;
@@ -248,6 +258,7 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        is_from_ebpf: bool,
         info: &mut RedisInfo,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
@@ -262,7 +273,10 @@ impl RedisLog {
             PacketDirection::ClientToServer if payload[0] == b'*' => {
                 self.fill_request(context, info)
             }
-            PacketDirection::ServerToClient => self.fill_response(context, error_response, info),
+            // When packet comes from AfPacket, there must be a request before parsing the response.
+            PacketDirection::ServerToClient if self.has_request || is_from_ebpf => {
+                self.fill_response(context, error_response, info)
+            }
             _ => {}
         };
         Ok(())
@@ -376,19 +390,26 @@ fn decode_asterisk(payload: &[u8], strict: bool) -> Option<(Vec<u8>, usize)> {
     Some((ret_vec, offset))
 }
 
-fn decode_str(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
+fn decode_ascii_str(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
     let len = payload.len();
     let separator_pos = find_separator(payload).unwrap_or(len);
 
-    if separator_pos > limit {
-        return Some((
+    let (context, length) = if separator_pos > limit {
+        (
             // 截取数据后，并不会在末尾增加'...'提示
             &payload[..limit],
             limit,
-        ));
+        )
+    } else {
+        (&payload[..separator_pos], separator_pos)
+    };
+
+    // Do not parse strings with non ascii byte
+    if !context.is_ascii() {
+        return None;
     }
 
-    Some((&payload[..separator_pos], separator_pos))
+    Some((context, length))
 }
 
 // 函数在入参为"$-1"或"-1"时都返回"-1", 使用第三个参数区分是否为错误回复
@@ -401,9 +422,9 @@ pub fn decode(payload: &[u8], strict: bool) -> Option<(Vec<u8>, usize, bool)> {
         // 请求或多条批量回复
         b'*' => decode_asterisk(payload, strict).map(|(v, s)| (v, s, false)),
         // 状态回复,整数回复
-        b'+' | b':' => decode_str(payload, 32).map(|(v, s)| (v.to_vec(), s, false)),
+        b'+' | b':' => decode_ascii_str(payload, 32).map(|(v, s)| (v.to_vec(), s, false)),
         // 错误回复
-        b'-' => decode_str(payload, 256).map(|(v, s)| (v.to_vec(), s, true)),
+        b'-' => decode_ascii_str(payload, 256).map(|(v, s)| (v.to_vec(), s, true)),
         // 批量回复
         b'$' => decode_dollor(payload, strict).map(|(v, s)| (v.to_vec(), s, false)),
         _ => None,
@@ -447,6 +468,7 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut redis = RedisLog::default();
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -458,7 +480,6 @@ mod tests {
                 None => continue,
             };
 
-            let mut redis = RedisLog::default();
             let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
 
             let is_redis = redis.check_payload(payload, param);
@@ -554,9 +575,9 @@ mod tests {
                 "redis.pcap",
                 L7PerfStats {
                     request_count: 10,
-                    response_count: 11,
+                    response_count: 10,
                     err_client_count: 0,
-                    err_server_count: 1,
+                    err_server_count: 0,
                     err_timeout: 0,
                     rrt_count: 10,
                     rrt_sum: 592,
