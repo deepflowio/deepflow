@@ -996,17 +996,17 @@ func ReleaseL4FlowLog(l *L4FlowLog) {
 
 var L4FlowCounter uint32
 
-func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
+func genID(time uint32, counter *uint32, analyzerID uint32) uint64 {
 	count := atomic.AddUint32(counter, 1)
-	// 高32位时间，18-32位 表示 vtapid, 低18位是counter
-	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
+	// 高32位时间，23-32位 表示 analyzerId, 低22位是counter
+	return uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
 func TaggedFlowToL4FlowLog(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
 	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
 
 	s := AcquireL4FlowLog()
-	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, uint16(f.Flow.FlowKey.VtapId))
+	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, platformData.QueryAnalyzerID())
 	s.DataLinkLayer.Fill(f.Flow)
 	s.NetworkLayer.Fill(f.Flow, isIPV6)
 	s.TransportLayer.Fill(f.Flow)

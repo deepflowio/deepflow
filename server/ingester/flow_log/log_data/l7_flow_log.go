@@ -570,7 +570,7 @@ var L7FlowLogCounter uint32
 
 func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) *L7FlowLog {
 	h := AcquireL7FlowLog()
-	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, uint16(l.Base.VtapId))
+	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
 	h.Fill(l, platformData)
 	return h
 }
