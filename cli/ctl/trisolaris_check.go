@@ -564,6 +564,9 @@ func configData(response *trident.SyncResponse) {
 	fmt.Println(proto.MarshalTextString(config))
 	fmt.Println("revision:", response.GetRevision())
 	fmt.Println("self_update_url:", response.GetSelfUpdateUrl())
+
+	fmt.Println("\nAnalyzerconfig:")
+	fmt.Println(proto.MarshalTextString(response.GetAnalyzerConfig()))
 }
 
 func skipInterface(response *trident.SyncResponse) {
