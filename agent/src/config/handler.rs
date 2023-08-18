@@ -32,9 +32,18 @@ use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
     Naming,
 };
+#[cfg(target_os = "linux")]
+use libc::{c_int, setpriority, PRIO_PROCESS};
 use log::{error, info, warn, Level};
 #[cfg(target_os = "linux")]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
+#[cfg(target_os = "linux")]
 use regex::Regex;
+#[cfg(target_os = "linux")]
+use sysinfo::System;
 use sysinfo::SystemExt;
 use tokio::runtime::Runtime;
 
@@ -1386,6 +1395,69 @@ impl ConfigHandler {
                 "prometheus_extra_config set to {:?}",
                 new_config.yaml_config.prometheus_extra_config
             );
+        }
+
+        #[cfg(target_os = "linux")]
+        if yaml_config.process_scheduling_priority
+            != new_config.yaml_config.process_scheduling_priority
+        {
+            info!(
+                "Process scheduling priority set to {}.",
+                new_config.yaml_config.process_scheduling_priority
+            );
+            let pid = process::id();
+            unsafe {
+                if setpriority(
+                    PRIO_PROCESS,
+                    pid,
+                    new_config.yaml_config.process_scheduling_priority as c_int,
+                ) != 0
+                {
+                    warn!(
+                        "Process scheduling priority set {} to pid {} error.",
+                        new_config.yaml_config.process_scheduling_priority, pid
+                    );
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
+            info!(
+                "CPU Affinity set to {}.",
+                new_config.yaml_config.cpu_affinity
+            );
+            let mut cpu_set = CpuSet::new();
+            let splits = new_config.yaml_config.cpu_affinity.split(',');
+            let mut invalid_config = false;
+            if new_config.yaml_config.cpu_affinity.len() > 0 {
+                for id in splits.into_iter() {
+                    if let Ok(id) = id.parse::<usize>() {
+                        let _ = cpu_set.set(id);
+                    } else {
+                        invalid_config = true;
+                        break;
+                    }
+                }
+            } else {
+                let sys = System::new();
+                let n = sys.cpus().len() as usize;
+                for i in 0..n {
+                    let _ = cpu_set.set(i);
+                }
+            }
+
+            if invalid_config {
+                warn!(
+                    "Invalid CPU Affinity config {}.",
+                    new_config.yaml_config.cpu_affinity
+                );
+            } else {
+                let pid = process::id() as i32;
+                if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
+                    warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                }
+            }
         }
 
         if *yaml_config != new_config.yaml_config {

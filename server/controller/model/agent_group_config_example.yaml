@@ -423,7 +423,7 @@ vtap_group_id: g-xxxxxx
 
 # Prometheus API address
 ## Note: Get target from Prometheus and synchronize to the deepflow-server.
-## Example: 
+## Example:
 #prometheus_http_api_addresses:
 #- http://10.96.1.8:9090
 
@@ -1278,12 +1278,34 @@ vtap_group_id: g-xxxxxx
   #####################
   ## Check core file ##
   #####################
-  ## When the host has an invalid NFS file system or a docker is running, Sometime program hang when checking the
-  ## core file, so the core file check provides a switch to prevent the process hang.
-  ## Additional links:
-  ##   https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
-  ##   https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
+  ## Note:
+  ##   When the host has an invalid NFS file system or a docker is running, Sometime program hang when checking the
+  ##   core file, so the core file check provides a switch to prevent the process hang.
+  ##   Additional links:
+  ##     https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
+  ##     https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
   #check-core-file-disabled: false
+
+  ##################
+  ## CPU Affinity ##
+  ##################
+  ## Note:
+  ##   CPU affinity is the tendency of a process to run on a given CPU for as long as possible without being migrated
+  ##   to other processors
+  ## Example:
+  ##   cpu-affinity: 1,3,5,7,9,11,13,15
+  #cpu-affinity:
+
+  #################################
+  ## Process scheduling priority ##
+  #################################
+  ## Note:
+  ##   The smaller the value of process scheduling priority, the higher the priority of the process,
+  ##   and the larger the priority, the lower the priority
+  ##   Default: 0. Range: [-20, 19].
+  ## Example:
+  ##   process-scheduling-priority: -15
+  #process-scheduling-priority: 0
 
   #################
   ## FeatureFlag ##
