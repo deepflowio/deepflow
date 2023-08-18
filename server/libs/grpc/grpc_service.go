@@ -97,6 +97,10 @@ func (s *ServiceTable) QueryService(podID, podNodeID, podClusterID, podGroupID u
 	if podID != 0 {
 		return s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
 	} else if podNodeID != 0 {
+		// If serverPort is 0, the matched Service may not be accurate
+		if serverPort == 0 {
+			return 0
+		}
 		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
 	}
 
@@ -120,6 +124,7 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 		protocol := svc.GetProtocol()
 		serviceId := svc.GetId()
 		switch svc.GetType() {
+		// Service from 'nodeip + port' generate 'pod_cluster_id + port' table.
 		case trident.ServiceType_POD_SERVICE_NODE:
 			podClusterId := svc.GetPodClusterId()
 			for _, port := range svc.GetServerPorts() {
@@ -130,6 +135,7 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 			// add port 0 for ANY
 			s.podClusterIDTable[genPodXIDKey(podClusterId, protocol, 0)] = serviceId
 			s.podClusterIDTable[genPodXIDKey(podClusterId, trident.ServiceProtocol_ANY, 0)] = serviceId
+		// Service from 'pod + port' generate 'pod_group_id + port' table
 		case trident.ServiceType_POD_SERVICE_POD_GROUP:
 			podGroupId := svc.GetPodGroupId()
 			for _, port := range svc.GetServerPorts() {
@@ -140,6 +146,7 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 			// add port 0 for ANY
 			s.podGroupIDTable[genPodXIDKey(podGroupId, protocol, 0)] = svc.GetId()
 			s.podGroupIDTable[genPodXIDKey(podGroupId, trident.ServiceProtocol_ANY, 0)] = svc.GetId()
+		// Service from 'clusterIp + port' generate 'epc + ip + port' table
 		case trident.ServiceType_POD_SERVICE_IP:
 			s.addPodServiceIp(svc)
 		}
