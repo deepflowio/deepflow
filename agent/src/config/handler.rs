@@ -1460,6 +1460,31 @@ impl ConfigHandler {
             }
         }
 
+        if yaml_config.external_profile_integration_disabled
+            != new_config.yaml_config.external_profile_integration_disabled
+        {
+            info!(
+                "external_profile_integration_disabled set to {}",
+                new_config.yaml_config.external_profile_integration_disabled
+            );
+        }
+        if yaml_config.external_trace_integration_disabled
+            != new_config.yaml_config.external_trace_integration_disabled
+        {
+            info!(
+                "external_trace_integration_disabled set to {}",
+                new_config.yaml_config.external_trace_integration_disabled
+            );
+        }
+        if yaml_config.external_metric_integration_disabled
+            != new_config.yaml_config.external_metric_integration_disabled
+        {
+            info!(
+                "external_metric_integration_disabled set to {}",
+                new_config.yaml_config.external_metric_integration_disabled
+            );
+        }
+
         if *yaml_config != new_config.yaml_config {
             *yaml_config = new_config.yaml_config;
         }

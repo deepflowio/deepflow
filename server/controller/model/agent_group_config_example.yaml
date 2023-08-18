@@ -1307,6 +1307,21 @@ vtap_group_id: g-xxxxxx
   ##   process-scheduling-priority: -15
   #process-scheduling-priority: 0
 
+  ######################
+  ## External Signals ##
+  ######################
+  ## Note:
+  ##   When it is false, it supports the integration of java-async-profiler, golang-pprof and other profile data by instrumentation
+  #external-profile-integration-disabled: false
+
+  ## Note:
+  ##   When it is false, it supports the integration of OpenTelemetry, SkyWalking and other tracking data in accordance with the OTLP protocol
+  #external-trace-integration-disabled: false
+
+  ## Note:
+  ##   When it is false, it supports the integration of metrics data of Prometheus, InfluxDB and other protocols
+  #external-metric-integration-disabled: false
+
   #################
   ## FeatureFlag ##
   #################

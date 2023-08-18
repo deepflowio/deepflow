@@ -582,6 +582,9 @@ async fn handler(
     time_diff: Arc<AtomicI64>,
     prometheus_extra_config: Arc<PrometheusExtraConfig>,
     flow_id: Arc<AtomicU64>,
+    external_profile_integration_disabled: bool,
+    external_trace_integration_disabled: bool,
+    external_metric_integration_disabled: bool,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -593,6 +596,9 @@ async fn handler(
         }
         // OpenTelemetry trace integration
         (&Method::POST, "/api/v1/otel/trace") => {
+            if external_trace_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
             let (part, body) = req.into_parts();
             let whole_body = match aggregate_with_catch_exception(body, &exception_handler).await {
                 Ok(b) => b,
@@ -644,6 +650,9 @@ async fn handler(
         }
         // Prometheus integration
         (&Method::POST, "/api/v1/prometheus") => {
+            if external_metric_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
             let headers = req.headers();
             let labels = &prometheus_extra_config.labels;
             let labels_limit = prometheus_extra_config.labels_limit;
@@ -699,6 +708,9 @@ async fn handler(
         }
         // Telegraf integration
         (&Method::POST, "/api/v1/telegraf") => {
+            if external_metric_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
             let (part, body) = req.into_parts();
             let whole_body = match aggregate_with_catch_exception(body, &exception_handler).await {
                 Ok(b) => b,
@@ -719,6 +731,9 @@ async fn handler(
         }
         // profile integration
         (&Method::POST, "/api/v1/profile/ingest") => {
+            if external_profile_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
             let mut profile = metric::Profile::default();
             if let Some(query) = req.uri().query() {
                 parse_profile_query(query, &mut profile);
@@ -854,6 +869,9 @@ pub struct MetricServer {
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
     prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    external_profile_integration_disabled: bool,
+    external_trace_integration_disabled: bool,
+    external_metric_integration_disabled: bool,
 }
 
 impl MetricServer {
@@ -872,6 +890,9 @@ impl MetricServer {
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
         prometheus_extra_config: PrometheusExtraConfig,
+        external_profile_integration_disabled: bool,
+        external_trace_integration_disabled: bool,
+        external_metric_integration_disabled: bool,
     ) -> (Self, IntegrationCounter) {
         let counter = IntegrationCounter::default();
         (
@@ -894,6 +915,9 @@ impl MetricServer {
                 time_diff,
                 prometheus_extra_config: Arc::new(prometheus_extra_config),
                 otel_l7_stats_sender,
+                external_profile_integration_disabled,
+                external_trace_integration_disabled,
+                external_metric_integration_disabled,
             },
             counter,
         )
@@ -935,6 +959,9 @@ impl MetricServer {
         let policy_getter = self.policy_getter.clone();
         let time_diff = self.time_diff.clone();
         let prometheus_extra_config = self.prometheus_extra_config.clone();
+        let external_profile_integration_disabled = self.external_profile_integration_disabled;
+        let external_trace_integration_disabled = self.external_trace_integration_disabled;
+        let external_metric_integration_disabled = self.external_metric_integration_disabled;
         let (tx, mut rx) = mpsc::channel(8);
         self.runtime
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
@@ -1031,6 +1058,9 @@ impl MetricServer {
                                     time_diff.clone(),
                                     prometheus_extra_config.clone(),
                                     flow_id.clone(),
+                                    external_profile_integration_disabled,
+                                    external_trace_integration_disabled,
+                                    external_metric_integration_disabled,
                                 )
                             }))
                         }
