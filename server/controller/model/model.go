@@ -835,3 +835,32 @@ type Plugin struct {
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
+
+type MailServerCreate struct {
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST" binding:"required"`
+	Port     int    `json:"PORT" binding:"required"`
+	User     string `json:"USER" binding:"required"`
+	Password string `json:"PASSWORD" binding:"required"`
+	Security string `json:"SECURITY" binding:"required"`
+}
+
+type MailServerUpdate struct {
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST"`
+	Port     int    `json:"PORT"`
+	User     string `json:"USER"`
+	Password string `json:"PASSWORD"`
+	Security string `json:"SECURITY"`
+}
+
+type MailServer struct {
+	ID       int    `json:"ID"`
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST"`
+	Port     int    `json:"PORT"`
+	User     string `json:"USER"`
+	Password string `json:"PASSWORD"`
+	Security string `json:"SECURITY"`
+	Lcuuid   string `json:"LCUUID"`
+}
