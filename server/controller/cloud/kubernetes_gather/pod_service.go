@@ -126,7 +126,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					for i := range labelArray.MustArray() {
 						if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
 							if groupLcuuids.Cardinality() > 0 {
-								podGroupLcuuids.Add(groupLcuuids)
+								podGroupLcuuids = podGroupLcuuids.Union(groupLcuuids)
 							}
 						}
 					}
@@ -171,7 +171,12 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 
 				podTargetPorts := map[string]int{}
 				for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
-					targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuid.(string)]
+					pgLcuuidString, ok := pgLcuuid.(string)
+					if !ok {
+						log.Warningf("sercice (%s) pod group lcuuid interface conversion failed", name)
+						continue
+					}
+					targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuidString]
 					if !ok {
 						continue
 					}
