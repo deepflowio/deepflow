@@ -522,6 +522,19 @@ void update_symbol_cache(pid_t pid)
 		int ret = VEC_OK;
 
 		symbol_cache_pids_lock();
+		/*
+		 * Make sure that there are no duplicate items of 'pid' in
+		 * 'cache del pids.pid caches', so as to avoid program crashes
+		 * caused by repeated release of occupied memory resources.
+		 */
+		struct symbolizer_cache_kvp *kv_tmp;
+		vec_foreach(kv_tmp, cache_del_pids.pid_caches) {
+			if (kv_tmp->k.pid == kv.k.pid) {
+				symbol_cache_pids_unlock();
+				return;
+			}
+		}
+	
 		vec_add1(cache_del_pids.pid_caches, kv, ret);
 		if (ret != VEC_OK) {
 			ebpf_warning("vec add failed.\n");
