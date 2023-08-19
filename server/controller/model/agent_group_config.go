@@ -105,6 +105,8 @@ type StaticConfig struct {
 	RrtTcpTimeout                    *string                    `yaml:"rrt-tcp-timeout,omitempty"`
 	RrtUdpTimeout                    *string                    `yaml:"rrt-udp-timeout,omitempty"`
 	PrometheusExtraConfig            *PrometheusExtraConfig     `yaml:"prometheus-extra-config,omitempty"`
+	ProcessSchedulingPriority        *int8                      `yaml:"process-scheduling-priority,omitempty"`
+	CpuAffinity                      *string                    `yaml:"cpu-affinity,omitempty"`
 }
 
 type XflowCollectorConfig struct {

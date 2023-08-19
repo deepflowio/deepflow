@@ -481,6 +481,8 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub rrt_udp_timeout: Duration,
     pub prometheus_extra_config: PrometheusExtraConfig,
+    pub process_scheduling_priority: i8,
+    pub cpu_affinity: String,
 }
 
 impl YamlConfig {
@@ -680,6 +682,10 @@ impl YamlConfig {
         }
         c.prometheus_extra_config.labels = valid_labels;
 
+        if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
+            c.process_scheduling_priority = 0;
+        }
+
         Ok(c)
     }
 
@@ -816,6 +822,8 @@ impl Default for YamlConfig {
             rrt_tcp_timeout: Duration::from_secs(1800),
             rrt_udp_timeout: Duration::from_secs(150),
             prometheus_extra_config: PrometheusExtraConfig::default(),
+            process_scheduling_priority: 0,
+            cpu_affinity: "".to_string(),
         }
     }
 }
