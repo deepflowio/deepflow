@@ -297,6 +297,7 @@ pub struct PlatformConfig {
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
     pub os_proc_scan_conf: OsProcScanConfig,
+    pub tap_interface_regex: String,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -1076,6 +1077,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
                 prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
+                tap_interface_regex: conf.tap_interface_regex.to_string(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {

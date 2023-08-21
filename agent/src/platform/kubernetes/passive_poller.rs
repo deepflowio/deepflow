@@ -19,7 +19,7 @@ use std::{
     collections::HashSet,
     ffi::CString,
     fmt,
-    net::IpAddr,
+    net::{IpAddr, Ipv4Addr},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
@@ -29,34 +29,32 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use libc::RT_SCOPE_LINK;
 use log::{debug, error, info, log_enabled, warn, Level};
-use pnet::packet::icmpv6::Icmpv6Types;
 use regex::Regex;
 
 use super::Poller;
 use crate::{
     common::{
-        ARP_SPA_OFFSET, ETH_TYPE_LEN, ETH_TYPE_OFFSET, FIELD_OFFSET_SA, ICMPV6_TYPE_OFFSET,
-        ICMPV6_TYPE_SIZE, IPV4_ADDR_LEN, IPV6_ADDR_LEN, IPV6_FRAGMENT_LEN, IPV6_PROTO_LEN,
-        IPV6_PROTO_OFFSET, IPV6_SRC_OFFSET, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
+        ARP_SPA_OFFSET, ETH_HEADER_SIZE, ETH_TYPE_LEN, ETH_TYPE_OFFSET, FIELD_OFFSET_SA,
+        IPV4_ADDR_LEN, IPV4_SRC_OFFSET, IPV6_ADDR_LEN, IPV6_SRC_OFFSET, MAC_ADDR_LEN,
+        VLAN_HEADER_SIZE,
     },
     config::handler::PlatformAccess,
     dispatcher::{
         af_packet::{bpf::*, Options, Tpacket},
-        recv_engine::{
-            RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
-        },
+        recv_engine::{RecvEngine, POLL_TIMEOUT},
     },
 };
 
 use public::{
     bytes::read_u16_be,
-    enums::{EthernetType, IpProtocol},
+    consts::{IPV4_PACKET_SIZE, IPV6_PACKET_SIZE},
+    enums::EthernetType,
     error::Error,
     netns::{InterfaceInfo, NsFile},
+    packet::Packet,
     proto::trident::TapMode,
-    utils::net::{addr_list, MacAddr},
+    utils::net::{links_by_name_regex, MacAddr},
 };
 
 const LINUX_SLL_PACKET_TYPE_OUT_GONING: u32 = 4;
@@ -72,6 +70,8 @@ pub struct PassivePoller {
 }
 
 impl PassivePoller {
+    const TAP_INTERFACE_MAX: usize = 950;
+    const CAPTURE_PACKET_SIZE: usize = IPV6_PACKET_SIZE + VLAN_HEADER_SIZE * 2;
     pub fn new(interval: Duration, config: PlatformAccess) -> Self {
         Self {
             config,
@@ -83,27 +83,9 @@ impl PassivePoller {
         }
     }
 
-    // 排除掉有非link类型IP的接口，这些不会作为tap interface
-    // Exclude interfaces with non-link type IPs, these will not be used as tap interfaces
-    fn get_ignored_interface_indice() -> HashSet<u32> {
-        let mut ignored = HashSet::new();
-
-        let Ok(addrs) = addr_list() else { return ignored; };
-        for addr in addrs {
-            if addr.scope != RT_SCOPE_LINK {
-                ignored.insert(addr.if_index);
-            }
-        }
-
-        // HashSet Debug trait is {a, b, c, d} better than handwrite formatted string
-        debug!("ignore tap interfaces with id in {ignored:?}");
-
-        ignored
-    }
-
-    fn get_bpf() -> Vec<RawInstruction> {
-        let bpf = vec![
-            // 对于宿主命名空间的接口来看，容器发出来的流量是inbound
+    fn update_bpf(engine: &mut RecvEngine, white_list: &HashSet<u32>) {
+        let white_list = white_list.iter().map(|x| *x).collect::<Vec<u32>>();
+        let mut bpf = vec![
             // From the perspective of the interface of the host namespace, the traffic sent by the container is inbound
             BpfSyntax::LoadExtension(LoadExtension {
                 num: Extension::ExtType,
@@ -115,8 +97,7 @@ impl PassivePoller {
                 skip_true: 0,
             }),
             BpfSyntax::RetConstant(RetConstant { val: 0 }),
-            // 跳过VLAN
-            // skip VLAN packet
+            // Skip vlan header
             BpfSyntax::LoadAbsolute(LoadAbsolute {
                 off: ETH_TYPE_OFFSET as u32,
                 size: ETH_TYPE_LEN as u32,
@@ -139,10 +120,16 @@ impl PassivePoller {
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
                 val: u16::from(EthernetType::Arp) as u32,
-                skip_false: 1,
-                skip_true: 0,
+                skip_true: 3,
+                skip_false: 0,
             }),
-            BpfSyntax::RetConstant(RetConstant { val: 64 }),
+            // IPv4
+            BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: u16::from(EthernetType::Ipv4) as u32,
+                skip_true: 2,
+                skip_false: 0,
+            }),
             // IPv6
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
@@ -151,58 +138,128 @@ impl PassivePoller {
                 skip_false: 0,
             }),
             BpfSyntax::RetConstant(RetConstant { val: 0 }),
-            // IPv6 next header
-            BpfSyntax::LoadIndirect(LoadIndirect {
-                off: IPV6_PROTO_OFFSET as u32,
-                size: IPV6_PROTO_LEN as u32,
+            BpfSyntax::LoadExtension(LoadExtension {
+                num: Extension::ExtInterfaceIndex,
             }),
-            BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Icmpv6) as u32,
-                skip_true: 8,
-                skip_false: 0,
-            }),
-            BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Ipv6Fragment) as u32,
-                skip_true: 1,
-                skip_false: 0,
-            }),
-            BpfSyntax::RetConstant(RetConstant { val: 0 }),
-            // skip fragment header
-            BpfSyntax::Txa(Txa),
-            BpfSyntax::ALUOpConstant(ALUOpConstant {
-                op: ALU_OP_ADD,
-                val: IPV6_FRAGMENT_LEN as u32,
-            }),
-            BpfSyntax::Txa(Txa),
-            BpfSyntax::LoadIndirect(LoadIndirect {
-                off: IPV6_PROTO_OFFSET as u32,
-                size: IPV6_PROTO_LEN as u32,
-            }),
-            BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Icmpv6) as u32,
-                skip_true: 1,
-                skip_false: 0,
-            }),
-            BpfSyntax::RetConstant(RetConstant { val: 0 }),
-            // neighbour advertisement
-            BpfSyntax::LoadIndirect(LoadIndirect {
-                off: ICMPV6_TYPE_OFFSET as u32,
-                size: ICMPV6_TYPE_SIZE as u32,
-            }),
-            BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpEqual,
-                val: Icmpv6Types::NeighborAdvert.0 as u32,
-                skip_true: 0,
-                skip_false: 1,
-            }),
-            BpfSyntax::RetConstant(RetConstant { val: 128 }),
-            BpfSyntax::RetConstant(RetConstant { val: 0 }),
         ];
+        let total = white_list.len();
+        for (i, if_index) in white_list.iter().enumerate() {
+            bpf.push(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: *if_index,
+                skip_true: (total - i) as u8,
+                skip_false: 0,
+            }));
+        }
+        bpf.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+        bpf.push(BpfSyntax::RetConstant(RetConstant {
+            val: Self::CAPTURE_PACKET_SIZE as u32,
+        }));
 
-        bpf.into_iter().map(|ins| ins.to_instruction()).collect()
+        let ins = bpf.into_iter().map(|ins| ins.to_instruction()).collect();
+        if let Err(e) = engine.set_bpf(ins, &CString::new("").unwrap()) {
+            error!("RecvEngine set bpf error: {e}");
+        }
+    }
+
+    fn generate_white_list(tap_interface_regex: &String) -> HashSet<u32> {
+        let links = match links_by_name_regex(tap_interface_regex) {
+            Err(e) => {
+                warn!("get interfaces by name regex failed: {}", e);
+                vec![]
+            }
+            Ok(links) => {
+                if links.is_empty() {
+                    warn!(
+                        "tap-interface-regex({}) do not match any interface, in passive poller.",
+                        tap_interface_regex
+                    );
+                }
+                links
+            }
+        };
+        let mut if_indices = links.iter().map(|x| x.if_index).collect::<Vec<u32>>();
+        if_indices.sort();
+        let limit = if_indices.len().min(Self::TAP_INTERFACE_MAX);
+        if_indices[..limit]
+            .iter()
+            .map(|x| *x)
+            .collect::<HashSet<u32>>()
+    }
+
+    fn flush_timeout(
+        now: &SystemTime,
+        expire_timeout: Duration,
+        last_expire: &mut SystemTime,
+        entries: &Arc<Mutex<Vec<PassiveEntry>>>,
+        version: &Arc<AtomicU64>,
+        white_list: &mut HashSet<u32>,
+    ) {
+        // 每分钟移除超时的记录
+        // Remove timed out records every minute
+        if now.duration_since(*last_expire).unwrap() > MINUTE {
+            let mut entries_gurad = entries.lock().unwrap();
+            let old_len: usize = entries_gurad.len();
+            entries_gurad.retain_mut(|e| {
+                let mut is_not_timeout = now.duration_since(e.last_seen).unwrap() <= expire_timeout;
+                if !is_not_timeout {
+                    white_list.insert(e.tap_index);
+                    e.retry_count += 1;
+                    if e.retry_count < PassiveEntry::RETRY_COUNT_LIMIT {
+                        debug!("Capture pod timeout {}, try {}", e, e.retry_count);
+                        e.last_seen = *now;
+                        is_not_timeout = true
+                    } else {
+                        debug!("Capture remote pod {} {}", e, e.retry_count);
+                    }
+                }
+                is_not_timeout
+            });
+
+            if entries_gurad.len() != old_len {
+                version.fetch_add(1, Ordering::Relaxed);
+            }
+            *last_expire = *now;
+        }
+    }
+
+    fn log_version(
+        now: &SystemTime,
+        last_version_log: &mut SystemTime,
+        version: &Arc<AtomicU64>,
+        last_version: &mut u64,
+        entries: &Arc<Mutex<Vec<PassiveEntry>>>,
+    ) {
+        let new_version = version.load(Ordering::Relaxed);
+        if *last_version != new_version {
+            if now.duration_since(*last_version_log).unwrap() > MINUTE {
+                info!("kubernetes poller updated to version {new_version}");
+                *last_version_log = *now;
+                if log_enabled!(Level::Debug) {
+                    for entry in entries.lock().unwrap().iter() {
+                        debug!("{entry}");
+                    }
+                }
+            }
+            *last_version = new_version;
+        }
+    }
+
+    fn update_entries(
+        entries: &Arc<Mutex<Vec<PassiveEntry>>>,
+        version: &Arc<AtomicU64>,
+        entry: PassiveEntry,
+    ) {
+        let mut entries = entries.lock().unwrap();
+        let index = entries.partition_point(|x| x < &entry);
+        if index >= entries.len() || !entries[index].eq(&entry) {
+            debug!("Capture add pod {}", &entry);
+            entries.insert(index, entry);
+            version.fetch_add(1, Ordering::Relaxed);
+        } else {
+            entries[index].last_seen = entry.last_seen;
+            entries[index].retry_count = 0;
+        }
     }
 
     fn process(
@@ -210,18 +267,14 @@ impl PassivePoller {
         expire_timeout: Duration,
         version: Arc<AtomicU64>,
         entries: Arc<Mutex<Vec<PassiveEntry>>>,
-        tap_mode: TapMode,
+        config: PlatformAccess,
     ) {
+        let tap_mode = config.load().tap_mode;
         let mut engine = match tap_mode {
             TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
                 let afp = Options {
-                    frame_size: if tap_mode == TapMode::Analyzer {
-                        FRAME_SIZE_MIN as u32
-                    } else {
-                        FRAME_SIZE_MAX as u32
-                    },
-                    block_size: DEFAULT_BLOCK_SIZE as u32,
-                    num_blocks: 128,
+                    frame_size: 256,
+                    num_blocks: 1,
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     ..Default::default()
                 };
@@ -233,16 +286,45 @@ impl PassivePoller {
                 return;
             }
         };
-        if let Err(e) = engine.set_bpf(Self::get_bpf(), &CString::new("").unwrap()) {
-            error!("RecvEngine set bpf error: {e}");
-            return;
-        }
 
+        let mut white_list = HashSet::new();
+        let mut tap_interface_regex = String::new();
         let mut last_version = version.load(Ordering::Relaxed);
         let mut last_version_log = SystemTime::now();
         let mut last_expire = SystemTime::now();
-        let mut ignored_indice = Self::get_ignored_interface_indice();
         while running.load(Ordering::Relaxed) {
+            if config.load().tap_interface_regex != tap_interface_regex {
+                info!(
+                    "Passive poller tap interface regex change from {} to {}.",
+                    tap_interface_regex,
+                    config.load().tap_interface_regex
+                );
+
+                tap_interface_regex = config.load().tap_interface_regex.clone();
+                white_list = Self::generate_white_list(&tap_interface_regex);
+                entries.lock().unwrap().clear();
+                Self::update_bpf(&mut engine, &white_list);
+            }
+
+            let now = SystemTime::now();
+            Self::flush_timeout(
+                &now,
+                expire_timeout,
+                &mut last_expire,
+                &entries,
+                &version,
+                &mut white_list,
+            );
+            Self::log_version(
+                &now,
+                &mut last_version_log,
+                &version,
+                &mut last_version,
+                &entries,
+            );
+
+            Self::update_bpf(&mut engine, &white_list);
+
             // The lifecycle of the packet will end before the next call to recv.
             let packet = match unsafe { engine.recv() } {
                 Ok(p) => p,
@@ -253,134 +335,34 @@ impl PassivePoller {
                     continue;
                 }
             };
-            let now = SystemTime::now();
-            // 每分钟移除超时的记录
-            // Remove timed out records every minute
-            if now.duration_since(last_expire).unwrap() > MINUTE {
-                ignored_indice = Self::get_ignored_interface_indice();
-                let mut entries_gurad = entries.lock().unwrap();
-                let old_len = entries_gurad.len();
-                entries_gurad
-                    .retain(|e| now.duration_since(e.last_seen).unwrap() <= expire_timeout);
 
-                if entries_gurad.len() != old_len {
-                    version.fetch_add(1, Ordering::Relaxed);
-                }
-                last_expire = now;
-            }
-
-            if ignored_indice.contains(&(packet.if_index as u32)) {
+            let if_index = packet.if_index as u32;
+            if !white_list.contains(&if_index) {
+                drop(packet);
                 continue;
             }
 
-            let packet_len = packet.data.len();
-            let packet_data = &packet.data;
-            if packet_len < ETH_TYPE_OFFSET + 2 * VLAN_HEADER_SIZE + 2 {
-                // 22
-                debug!("ignore short packet, size={packet_len}");
-                continue;
-            }
-
-            let mut eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET..]);
-            let mut extra_offset = 0;
-            if eth_type == EthernetType::Dot1Q {
-                extra_offset += VLAN_HEADER_SIZE;
-                eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
-                if eth_type == EthernetType::Dot1Q {
-                    extra_offset += VLAN_HEADER_SIZE;
-                    eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
+            let entry = match PassiveEntry::new(&packet) {
+                Ok(mut e) => {
+                    e.last_seen = now;
+                    e
                 }
-            }
-
-            let eth_type = match EthernetType::try_from(eth_type) {
-                Ok(e) => e,
                 Err(e) => {
-                    debug!("parse packet eth_type failed: {e}");
+                    error!("{:?}", e);
                     continue;
                 }
             };
+            drop(packet);
+            Self::update_entries(&entries, &version, entry);
+            Self::log_version(
+                &now,
+                &mut last_version_log,
+                &version,
+                &mut last_version,
+                &entries,
+            );
 
-            let entry = match eth_type {
-                EthernetType::Arp => {
-                    if packet_len < ARP_SPA_OFFSET + extra_offset + 4 {
-                        debug!("ignore short arp packet, size={packet_len}");
-                        continue;
-                    }
-
-                    let so = ARP_SPA_OFFSET + extra_offset;
-                    PassiveEntry {
-                        last_seen: now,
-                        tap_index: packet.if_index as u32,
-                        mac: MacAddr::try_from(
-                            &packet_data[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN],
-                        )
-                        .unwrap(),
-                        ip: IpAddr::from(
-                            *<&[u8; 4]>::try_from(&packet_data[so..so + IPV4_ADDR_LEN]).unwrap(),
-                        ),
-                    }
-                }
-                EthernetType::Ipv6 => {
-                    if packet_len < IPV6_PROTO_OFFSET + extra_offset + 1 {
-                        debug!("ignore short ipv6 packet, size={packet_len}");
-                        continue;
-                    }
-
-                    let mut protocol = packet_data[IPV6_PROTO_OFFSET + extra_offset];
-                    if protocol == IpProtocol::Ipv6 {
-                        extra_offset += IPV6_FRAGMENT_LEN;
-                        protocol = packet_data[IPV6_PROTO_OFFSET + extra_offset];
-                    }
-                    if packet_len < ICMPV6_TYPE_OFFSET + extra_offset + 1 {
-                        debug!("ignore short icmpv6 packet, size={packet_len}");
-                        continue;
-                    }
-                    if protocol != IpProtocol::Icmpv6
-                        || packet_data[ICMPV6_TYPE_OFFSET + extra_offset]
-                            != Icmpv6Types::NeighborAdvert.0
-                    {
-                        continue;
-                    }
-
-                    let so = IPV6_SRC_OFFSET + extra_offset;
-                    PassiveEntry {
-                        last_seen: now,
-                        tap_index: packet.if_index as u32,
-                        mac: MacAddr::try_from(
-                            &packet_data[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN],
-                        )
-                        .unwrap(),
-                        ip: IpAddr::from(
-                            *<&[u8; 16]>::try_from(&packet_data[so..so + IPV6_ADDR_LEN]).unwrap(),
-                        ),
-                    }
-                }
-                _ => continue,
-            };
-
-            {
-                let mut entries = entries.lock().unwrap();
-                let index = entries.partition_point(|x| x < &entry);
-                if index >= entries.len() || !entries[index].eq(&entry) {
-                    entries.insert(index, entry);
-                    version.fetch_add(1, Ordering::Relaxed);
-                } else {
-                    entries[index].last_seen = entry.last_seen;
-                }
-            }
-            let new_version = version.load(Ordering::Relaxed);
-            if last_version != new_version {
-                if now.duration_since(last_version_log).unwrap() > MINUTE {
-                    info!("kubernetes poller updated to version {new_version}");
-                    last_version_log = now;
-                    if log_enabled!(Level::Debug) {
-                        for entry in entries.lock().unwrap().iter() {
-                            debug!("{entry}");
-                        }
-                    }
-                }
-                last_version = new_version;
-            }
+            white_list.remove(&if_index);
         }
     }
 }
@@ -438,10 +420,10 @@ impl Poller for PassivePoller {
         let running = self.running.clone();
         let version = self.version.clone();
         let entries = self.entries.clone();
-        let tap_mode = self.config.load().tap_mode;
+        let config = self.config.clone();
         let handle = thread::Builder::new()
             .name("kubernetes-poller".to_owned())
-            .spawn(move || Self::process(running, expire_timeout, version, entries, tap_mode))
+            .spawn(move || Self::process(running, expire_timeout, version, entries, config))
             .unwrap();
         self.thread.lock().unwrap().replace(handle);
         info!("kubernetes passive poller started");
@@ -460,16 +442,128 @@ impl Poller for PassivePoller {
     }
 }
 
+#[derive(Debug)]
 struct PassiveEntry {
     tap_index: u32,
     mac: MacAddr,
     ip: IpAddr,
     last_seen: SystemTime,
+    retry_count: u8,
+}
+
+impl Default for PassiveEntry {
+    fn default() -> Self {
+        PassiveEntry {
+            last_seen: SystemTime::UNIX_EPOCH,
+            tap_index: 0,
+            ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            mac: MacAddr::ZERO,
+            retry_count: 0,
+        }
+    }
+}
+
+impl PassiveEntry {
+    const RETRY_COUNT_LIMIT: u8 = 3;
+
+    fn new(packet: &Packet) -> Result<Self, String> {
+        let packet_len = packet.data.len();
+        let packet_data = &packet.data;
+        if packet_len < ETH_HEADER_SIZE {
+            debug!("ignore short packet, size={packet_len}");
+            return Err("Invalid packet length.".to_string());
+        }
+
+        let mut eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET..]);
+        let mut extra_offset = 0;
+        if eth_type == EthernetType::Dot1Q {
+            extra_offset += VLAN_HEADER_SIZE;
+            eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
+            if eth_type == EthernetType::Dot1Q {
+                extra_offset += VLAN_HEADER_SIZE;
+                eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
+            }
+        }
+
+        let eth_type = match EthernetType::try_from(eth_type) {
+            Ok(e) => e,
+            Err(e) => {
+                debug!("parse packet eth_type failed: {e}");
+                return Err("Unsupport ether type.".to_string());
+            }
+        };
+
+        let entry = match eth_type {
+            EthernetType::Ipv4 => {
+                if packet_len < IPV4_PACKET_SIZE + extra_offset {
+                    debug!("ignore short ipv4 packet, size={packet_len}");
+                    return Err("Invalid ipv4 packet length.".to_string());
+                }
+                let so = IPV4_SRC_OFFSET + extra_offset;
+                PassiveEntry {
+                    tap_index: packet.if_index as u32,
+                    mac: MacAddr::try_from(
+                        &packet_data[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN],
+                    )
+                    .unwrap(),
+                    ip: IpAddr::from(
+                        *<&[u8; 4]>::try_from(&packet_data[so..so + IPV4_ADDR_LEN]).unwrap(),
+                    ),
+                    ..Default::default()
+                }
+            }
+            EthernetType::Arp => {
+                if packet_len < ARP_SPA_OFFSET + extra_offset + 4 {
+                    debug!("ignore short arp packet, size={packet_len}");
+                    return Err("Invalid arp packet length.".to_string());
+                }
+
+                let so = ARP_SPA_OFFSET + extra_offset;
+                PassiveEntry {
+                    tap_index: packet.if_index as u32,
+                    mac: MacAddr::try_from(
+                        &packet_data[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN],
+                    )
+                    .unwrap(),
+                    ip: IpAddr::from(
+                        *<&[u8; 4]>::try_from(&packet_data[so..so + IPV4_ADDR_LEN]).unwrap(),
+                    ),
+                    ..Default::default()
+                }
+            }
+            EthernetType::Ipv6 => {
+                if packet_len < IPV6_PACKET_SIZE + extra_offset {
+                    debug!("ignore short ipv6 packet, size={packet_len}");
+                    return Err("Invalid ipv6 packet length.".to_string());
+                }
+
+                let so = IPV6_SRC_OFFSET + extra_offset;
+                PassiveEntry {
+                    tap_index: packet.if_index as u32,
+                    mac: MacAddr::try_from(
+                        &packet_data[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN],
+                    )
+                    .unwrap(),
+                    ip: IpAddr::from(
+                        *<&[u8; 16]>::try_from(&packet_data[so..so + IPV6_ADDR_LEN]).unwrap(),
+                    ),
+                    ..Default::default()
+                }
+            }
+            _ => return Err("Unsupport ether type.".to_string()),
+        };
+
+        Ok(entry)
+    }
 }
 
 impl fmt::Display for PassiveEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {} {}", self.tap_index, self.mac, self.ip)
+        write!(
+            f,
+            "IfIndex: {} MAC: {} IP: {}",
+            self.tap_index, self.mac, self.ip
+        )
     }
 }
 
