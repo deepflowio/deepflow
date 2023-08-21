@@ -319,7 +319,9 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 			}
 		}
 	}
-	tData.PrometheusHttpAPIAddresses = strings.Split(*sData.PrometheusHttpAPIAddresses, ",")
+	if sData.PrometheusHttpAPIAddresses != nil {
+		tData.PrometheusHttpAPIAddresses = strings.Split(*sData.PrometheusHttpAPIAddresses, ",")
+	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps / 1000
 		tData.MaxCollectPps = &cMaxCollectPps
