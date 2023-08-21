@@ -96,7 +96,6 @@ require (
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
-	github.com/gorilla/schema v1.2.0
 	github.com/klauspost/compress v1.15.9
 	github.com/pyroscope-io/client v0.7.0
 	github.com/pyroscope-io/pyroscope v0.37.1
