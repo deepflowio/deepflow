@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
+	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
@@ -83,6 +84,7 @@ func Start(configPath, serverLogFile string) {
 	router.QueryRouter(r)
 	profile_router.ProfileRouter(r, &cfg)
 	prometheus_router.PrometheusRouter(r)
+	tracing_adapter.TracingAdapterRouter(r)
 	registerRouterCounter(r.Routes())
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
