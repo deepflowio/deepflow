@@ -1143,8 +1143,8 @@ vtap_group_id: g-xxxxxx
       #cpu: 0
 
       ## Sampling process name
-      ## Default: ""
-      #regex:
+      ## Default: ^deepflow-.*
+      #regex: ^deepflow-.*
 
   ######################################
   ## Agent Running in Standalone Mode ##
