@@ -3,6 +3,12 @@ log-file: /var/log/deepflow/server.log
 # loglevel: "debug/info/warn/error"
 log-level: info
 
+## open pprof serves via HTTP server port 9526. ref: https://pkg.go.dev/net/http/pprof
+#profiler: false
+
+## maximum usage of cpu cores, 0 means no limit
+#max-cpus: 0
+
 #continuous-profile:
 #  enabled: false
 #  server-addr: http://deepflow-agent/api/v1/profile
@@ -475,12 +481,6 @@ ingester:
 
   ## syslog是否写入elasticsearch，默认启用
   #es-syslog: true
-
-  ## profiler
-  #profiler: false
-
-  ## maximum usage of cpu cores, 0 means no limit
-  #max-cpus: 0
 
   ## udp socket receiver buffer: 64M
   #udp-read-buffer: 67108864
