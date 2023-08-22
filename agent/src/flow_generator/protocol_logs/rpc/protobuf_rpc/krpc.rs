@@ -267,7 +267,7 @@ impl L7ProtocolParserInterface for KrpcLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = KrpcInfo::default();
         self.parse(payload, param, false, &mut info)?;
-        if param.parse_log {
+        if param.parse_log && !info.is_heartbeat() {
             Ok(L7ParseResult::Single(L7ProtocolInfo::ProtobufRpcInfo(
                 ProtobufRpcInfo::KrpcInfo(info),
             )))

@@ -35,8 +35,8 @@ use crate::{
     },
     plugin::{
         c_ffi::{
-            ParseCtx, ParseInfo, ACTION_CONTINUE, ACTION_ERROR, ACTION_OK, CHECK_PAYLOAD_FUNC_SYM,
-            PARSE_PAYLOAD_FUNC_SYM,
+            c_str_to_string, ParseCtx, ParseInfo, ACTION_CONTINUE, ACTION_ERROR, ACTION_OK,
+            CHECK_PAYLOAD_FUNC_SYM, PARSE_PAYLOAD_FUNC_SYM,
         },
         shared_obj::get_so_plug_metric_counter_map_key,
         CustomInfo,
@@ -96,10 +96,10 @@ impl L7ProtocolParserInterface for SoLog {
 
             if res.proto != 0 {
                 self.proto_num = res.proto.into();
-                match std::str::from_utf8(&res.proto_name) {
-                    Ok(s) => self.proto_str = s.to_owned(),
-                    Err(e) => {
-                        error!("read proto str from so plugin fail: {}", e);
+                match c_str_to_string(&res.proto_name) {
+                    Some(s) => self.proto_str = s,
+                    None => {
+                        error!("read proto str from so plugin fail");
                         counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
                         return false;
                     }
