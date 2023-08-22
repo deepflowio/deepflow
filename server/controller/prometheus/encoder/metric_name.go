@@ -31,19 +31,15 @@ type metricName struct {
 	lock         sync.Mutex
 	resourceType string
 	strToID      map[string]int
-	idAllocator
+	ascIDAllocator
 }
 
 func newMetricName(max int) *metricName {
 	mn := &metricName{
 		resourceType: "metric_name",
 		strToID:      make(map[string]int),
-		idAllocator: idAllocator{
-			resourceType: "metric_name",
-			max:          max,
-			usableIDs:    make([]int, 0, max),
-		},
 	}
+	mn.ascIDAllocator = newAscIDAllocator(mn.resourceType, 1, max)
 	mn.rawDataProvider = mn
 	return mn
 }
@@ -52,7 +48,7 @@ func (mn *metricName) refresh(args ...interface{}) error {
 	mn.lock.Lock()
 	defer mn.lock.Unlock()
 
-	return mn.idAllocator.refresh()
+	return mn.ascIDAllocator.refresh()
 }
 
 func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName, error) {

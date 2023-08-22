@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -57,16 +58,17 @@ func GetSingleton() *Cache {
 	cacheOnce.Do(func() {
 		mn := new(metricName)
 		l := newLabel()
+		t := newTarget()
 		cacheIns = &Cache{
 			canRefresh:              make(chan bool, 1),
 			MetricName:              mn,
 			LabelName:               new(labelName),
 			LabelValue:              new(labelValue),
 			MetricAndAPPLabelLayout: new(metricAndAPPLabelLayout),
-			Target:                  newTarget(),
+			Target:                  t,
 			Label:                   l,
 			MetricLabel:             newMetricLabel(l),
-			MetricTarget:            newMetricTarget(mn),
+			MetricTarget:            newMetricTarget(mn, t),
 		}
 	})
 	return cacheIns
@@ -75,6 +77,61 @@ func GetSingleton() *Cache {
 func (c *Cache) Init(ctx context.Context, cfg *config.Config) {
 	c.ctx = ctx
 	c.refreshInterval = time.Duration(cfg.SynchronizerCacheRefreshInterval) * time.Second
+}
+
+func (c *Cache) Start(ctx context.Context, cfg *config.Config) error {
+	c.Init(ctx, cfg)
+	c.canRefresh <- true
+	if err := c.tryRefresh(); err != nil {
+		return err
+	}
+	go func() {
+		ticker := time.NewTicker(c.refreshInterval)
+		for {
+			select {
+			case <-ticker.C:
+				c.tryRefresh()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (c *Cache) tryRefresh() (err error) {
+LOOP:
+	for {
+		select {
+		case <-c.canRefresh:
+			err = c.refresh()
+			c.canRefresh <- true
+			break LOOP
+		default:
+			time.Sleep(time.Second)
+			log.Info("last refresh cache not completed now")
+		}
+	}
+	return
+}
+
+func (c *Cache) refresh() error {
+	log.Info("refresh cache started")
+	egRunAhead := &errgroup.Group{}
+	AppendErrGroup(egRunAhead, c.MetricName.refresh)
+	AppendErrGroup(egRunAhead, c.Label.refresh)
+	AppendErrGroup(egRunAhead, c.Target.refresh)
+	egRunAhead.Wait()
+	eg := &errgroup.Group{}
+	AppendErrGroup(eg, c.LabelName.refresh)
+	AppendErrGroup(eg, c.LabelValue.refresh)
+	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
+	AppendErrGroup(eg, c.MetricLabel.refresh)
+	AppendErrGroup(eg, c.MetricTarget.refresh)
+	err := eg.Wait()
+	log.Info("refresh cache completed")
+	return err
+
 }
 
 func GetDebugCache(t controller.PrometheusCacheType) []byte {
@@ -138,18 +195,22 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	}
 	getTarget := func() {
 		temp := map[string]interface{}{
-			"key_to_target_id":  make(map[string]interface{}),
-			"target_label_keys": make(map[string]interface{}),
+			"key_to_target_id":         make(map[string]interface{}),
+			"target_id_to_label_names": make(map[string]interface{}),
 		}
 		for key, value := range tempCache.Target.keyToTargetID.Get() {
 			k, _ := json.Marshal(key)
 			temp["key_to_target_id"].(map[string]interface{})[string(k)] = value
 		}
-		for item := range tempCache.Target.targetLabelKeys.Get().Iterator().C {
-			temp["target_label_keys"].(map[string]interface{})[marshal(item)] = struct{}{}
+		for key, value := range tempCache.Target.targetIDToLabelNames.Get() {
+			keys := make(map[string]interface{})
+			for item := range value.Iterator().C {
+				keys[marshal(item)] = struct{}{}
+			}
+			temp["target_id_to_label_names"].(map[string]interface{})[fmt.Sprintf("%d", key)] = keys
 		}
 		if len(temp["key_to_target_id"].(map[string]interface{})) > 0 ||
-			len(temp["target_label_keys"].(map[string]interface{})) > 0 {
+			len(temp["target_id_to_label_names"].(map[string]interface{})) > 0 {
 			content["target"] = temp
 		}
 	}
@@ -201,8 +262,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	}
 	getMetricTarget := func() {
 		temp := map[string]interface{}{
-			"metric_target_keys":      make(map[string]interface{}),
-			"target_id_to_metric_ids": make(map[int][]uint32),
+			"metric_target_keys":        make(map[string]interface{}),
+			"metric_name_to_target_ids": make(map[string]interface{}),
+			"target_id_to_metric_ids":   make(map[int][]uint32),
 		}
 		for elem := range tempCache.MetricTarget.metricTargetKeys.Iterator().C {
 			temp["metric_target_keys"].(map[string]interface{})[marshal(elem)] = struct{}{}
@@ -210,7 +272,15 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		for k, v := range tempCache.MetricTarget.targetIDToMetricIDs {
 			temp["target_id_to_metric_ids"].(map[int][]uint32)[k] = v
 		}
+		for key, value := range tempCache.MetricTarget.metricNameToTargetIDs.Get() {
+			keys := make(map[string]interface{})
+			for item := range value.Iterator().C {
+				keys[marshal(item)] = struct{}{}
+			}
+			temp["target_id_to_label_names"].(map[string]interface{})[key] = keys
+		}
 		if len(temp["metric_target_keys"].(map[string]interface{})) > 0 ||
+			len(temp["metric_name_to_target_ids"].(map[string]interface{})) > 0 ||
 			len(temp["target_id_to_metric_ids"].(map[int][]uint32)) > 0 {
 			content["metric_target"] = temp
 		}
@@ -252,59 +322,4 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		log.Error(err)
 	}
 	return b
-}
-
-func (c *Cache) Start(ctx context.Context, cfg *config.Config) error {
-	c.Init(ctx, cfg)
-	c.canRefresh <- true
-	if err := c.tryRefresh(); err != nil {
-		return err
-	}
-	go func() {
-		ticker := time.NewTicker(c.refreshInterval)
-		for {
-			select {
-			case <-ticker.C:
-				c.tryRefresh()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-func (c *Cache) tryRefresh() (err error) {
-LOOP:
-	for {
-		select {
-		case <-c.canRefresh:
-			err = c.refresh()
-			c.canRefresh <- true
-			break LOOP
-		default:
-			time.Sleep(time.Second)
-			log.Info("last refresh cache not completed now")
-		}
-	}
-	return
-}
-
-func (c *Cache) refresh() error {
-	log.Info("refresh cache started")
-	egRunAhead := &errgroup.Group{}
-	AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	AppendErrGroup(egRunAhead, c.Label.refresh)
-	egRunAhead.Wait()
-	eg := &errgroup.Group{}
-	AppendErrGroup(eg, c.LabelName.refresh)
-	AppendErrGroup(eg, c.LabelValue.refresh)
-	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
-	AppendErrGroup(eg, c.MetricLabel.refresh)
-	AppendErrGroup(eg, c.Target.refresh)
-	AppendErrGroup(eg, c.MetricTarget.refresh)
-	err := eg.Wait()
-	log.Info("refresh cache completed")
-	return err
-
 }

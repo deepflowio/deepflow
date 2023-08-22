@@ -115,13 +115,20 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 			nonJobs.Add(tk.Job)
 			continue
 		}
+		var labelNIDs []uint32
+		for _, n := range s.cache.Target.GetLabelNamesByID(targetID) {
+			if id, ok := s.cache.LabelName.GetIDByName(n); ok {
+				labelNIDs = append(labelNIDs, uint32(id))
+			}
+		}
 		targets = append(targets, &trident.TargetResponse{
-			Instance:   &tk.Instance,
-			Job:        &tk.Job,
-			InstanceId: proto.Uint32(uint32(tInstanceID)),
-			JobId:      proto.Uint32(uint32(tJobID)),
-			TargetId:   proto.Uint32(uint32(targetID)),
-			MetricIds:  s.cache.MetricTarget.GetMetricIDsByTargetID(targetID),
+			Instance:           &tk.Instance,
+			Job:                &tk.Job,
+			InstanceId:         proto.Uint32(uint32(tInstanceID)),
+			JobId:              proto.Uint32(uint32(tJobID)),
+			TargetId:           proto.Uint32(uint32(targetID)),
+			MetricIds:          s.cache.MetricTarget.GetMetricIDsByTargetID(targetID),
+			TargetLabelNameIds: labelNIDs,
 		})
 		s.counter.SendTargetCount++
 	}
