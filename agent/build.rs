@@ -123,8 +123,6 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
-    #[cfg(target_arch = "x86_64")]
-    println!("cargo:rustc-link-lib=static=pcap");
 
     println!("cargo:rustc-link-lib=static=elf");
 
@@ -134,6 +132,10 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
             println!("cargo:rustc-link-lib=dylib=pthread");
             println!("cargo:rustc-link-lib=dylib=z");
             println!("cargo:rustc-link-lib=dylib=stdc++");
+            #[cfg(target_arch = "x86_64")]
+            println!("cargo:rustc-link-lib=static=pcap");
+            #[cfg(target_arch = "aarch64")]
+            println!("cargo:rustc-link-lib=dylib=pcap");
         }
         "musl" => {
             #[cfg(target_arch = "x86_64")]
@@ -142,6 +144,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
             #[cfg(target_arch = "x86_64")]
             println!("cargo:rustc-link-lib=static=stdc++");
 
+            println!("cargo:rustc-link-lib=static=pcap");
             println!("cargo:rustc-link-lib=static=c");
             println!("cargo:rustc-link-lib=static=elf");
             println!("cargo:rustc-link-lib=static=m");
