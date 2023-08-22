@@ -101,6 +101,7 @@ type ToolDataSet struct {
 	podServiceLcuuidToID map[string]int
 
 	podGroupLcuuidToID map[string]int
+	podGroupIDToLcuuid map[int]string
 
 	podReplicaSetLcuuidToID map[string]int
 	podReplicaSetIDToLcuuid map[int]string
@@ -179,6 +180,7 @@ func NewToolDataSet() ToolDataSet {
 		podServiceLcuuidToID: make(map[string]int),
 
 		podGroupLcuuidToID: make(map[string]int),
+		podGroupIDToLcuuid: make(map[int]string),
 
 		podReplicaSetLcuuidToID: make(map[string]int),
 		podReplicaSetIDToLcuuid: make(map[int]string),
@@ -909,10 +911,13 @@ func (t *ToolDataSet) deletePodService(lcuuid string) {
 
 func (t *ToolDataSet) addPodGroup(item *mysql.PodGroup) {
 	t.podGroupLcuuidToID[item.Lcuuid] = item.ID
+	t.podGroupIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_GROUP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodGroup(lcuuid string) {
+	id, _ := t.podGroupLcuuidToID[lcuuid]
+	delete(t.podGroupIDToLcuuid, id)
 	delete(t.podGroupLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 }
@@ -1630,6 +1635,23 @@ func (t *ToolDataSet) GetPodGroupIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetPodGroupLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.podGroupIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(RESOURCE_TYPE_POD_GROUP_EN, id))
+	var podGroup mysql.PodGroup
+	result := mysql.Db.Where("id = ?", id).Find(&podGroup)
+	if result.RowsAffected == 1 {
+		t.addPodGroup(&podGroup)
+		return podGroup.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_POD_GROUP_EN, id))
+		return lcuuid, false
 	}
 }
 
