@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/golang/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -30,12 +31,14 @@ type metricTarget struct {
 	lock          sync.Mutex
 	resourceType  string
 	metricTargets mapset.Set[cache.MetricTargetKey]
+	targetEncoder *target
 }
 
-func newMetricTarget() *metricTarget {
+func newMetricTarget(te *target) *metricTarget {
 	return &metricTarget{
 		resourceType:  "metric_target",
 		metricTargets: mapset.NewSet[cache.MetricTargetKey](),
+		targetEncoder: te,
 	}
 }
 
@@ -51,28 +54,44 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTarget) error {
+func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest) ([]*controller.PrometheusMetricTarget, error) {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
+	resp := make([]*controller.PrometheusMetricTarget, 0)
 	var dbToAdd []*mysql.PrometheusMetricTarget
 	for _, item := range toAdd {
 		mn := item.GetMetricName()
 		ti := int(item.GetTargetId())
-		if ok := mt.metricTargets.Contains(cache.NewMetricTargetKey(mn, ti)); !ok {
+		if ti == 0 {
+			ti, _ = mt.targetEncoder.getID(cache.NewTargetKey(item.GetInstance(), item.GetJob()))
+		}
+		if ti != 0 {
+			if ok := mt.metricTargets.Contains(cache.NewMetricTargetKey(mn, ti)); ok {
+				resp = append(resp, &controller.PrometheusMetricTarget{
+					MetricName: &mn,
+					TargetId:   proto.Uint32(uint32(ti)),
+				})
+				continue
+			}
 			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricTarget{
 				MetricName: mn,
 				TargetID:   ti,
 			})
 		}
 	}
+
 	err := addBatch(dbToAdd, mt.resourceType)
 	if err != nil {
 		log.Errorf("add %s error: %s", mt.resourceType, err.Error())
-		return err
+		return resp, err
 	}
 	for _, item := range dbToAdd {
 		mt.metricTargets.Add(cache.NewMetricTargetKey(item.MetricName, item.TargetID))
+		resp = append(resp, &controller.PrometheusMetricTarget{
+			MetricName: &item.MetricName,
+			TargetId:   proto.Uint32(uint32(item.TargetID)),
+		})
 	}
-	return nil
+	return resp, nil
 }

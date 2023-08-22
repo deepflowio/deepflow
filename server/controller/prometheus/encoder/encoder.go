@@ -51,6 +51,7 @@ type Encoder struct {
 	label        *label
 	metricLabel  *metricLabel
 	metricTarget *metricTarget
+	target       *target
 }
 
 func GetSingleton() *Encoder {
@@ -71,7 +72,8 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.label = newLabel()
 	e.labelLayout = newLabelLayout()
 	e.metricLabel = newMetricLabel(e.label)
-	e.metricTarget = newMetricTarget()
+	e.target = newTarget(cfg.ResourceMaxID1)
+	e.metricTarget = newMetricTarget(e.target)
 	e.refreshInterval = time.Duration(cfg.EncoderCacheRefreshInterval) * time.Second
 	return
 }
@@ -119,6 +121,7 @@ func (e *Encoder) refresh() error {
 	AppendErrGroup(eg, e.labelLayout.refresh)
 	AppendErrGroup(eg, e.metricLabel.refresh)
 	AppendErrGroup(eg, e.metricTarget.refresh)
+	AppendErrGroup(eg, e.target.refresh)
 	return eg.Wait()
 }
 
@@ -127,6 +130,7 @@ func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.Syn
 	egRunAhead := &errgroup.Group{}
 	AppendErrGroup(egRunAhead, e.encodeLabel, resp, req.GetLabels())
 	AppendErrGroup(egRunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
+	AppendErrGroup(egRunAhead, e.encodeTarget, resp, req.GetTargets())
 	err := egRunAhead.Wait()
 	if err != nil {
 		return resp, err
@@ -136,7 +140,7 @@ func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.Syn
 	AppendErrGroup(eg, e.encodeLabelName, resp, req.GetLabelNames())
 	AppendErrGroup(eg, e.encodeLabelValue, resp, req.GetLabelValues())
 	AppendErrGroup(eg, e.encodeMetricLabel, req.GetMetricLabels())
-	AppendErrGroup(eg, e.encodeMetricTarget, req.GetMetricTargets())
+	AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
 	err = eg.Wait()
 	return resp, err
 }
@@ -206,10 +210,23 @@ func (e *Encoder) encodeMetricLabel(args ...interface{}) error {
 }
 
 func (e *Encoder) encodeMetricTarget(args ...interface{}) error {
-	targets := args[0].([]*controller.PrometheusMetricTarget)
-	err := e.metricTarget.encode(targets)
+	resp := args[0].(*controller.SyncPrometheusResponse)
+	metricTargets := args[1].([]*controller.PrometheusMetricTargetRequest)
+	mts, err := e.metricTarget.encode(metricTargets)
 	if err != nil {
 		return err
 	}
+	resp.MetricTargets = mts
+	return nil
+}
+
+func (e *Encoder) encodeTarget(args ...interface{}) error {
+	resp := args[0].(*controller.SyncPrometheusResponse)
+	targets := args[1].([]*controller.PrometheusTargetRequest)
+	ts, err := e.target.encode(targets)
+	if err != nil {
+		return err
+	}
+	resp.Targets = ts
 	return nil
 }
