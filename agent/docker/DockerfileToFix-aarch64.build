@@ -60,7 +60,7 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     ln -s /usr/include/sys/queue.h sys/queue.h && \
     ln -s /usr/include/zlib.h zlib.h && \
     ln -s /usr/bin/musl-gcc /usr/bin/aarch64-linux-musl-gcc && \
-    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libpcap.a --silent -o /usr/lib64/libpcap.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libpcap.a --silent -o /usr/lib64/libpcap.a && \
     chmod 755 /usr/lib64/libpcap.a && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libbcc.a --silent -o /usr/lib64/libbcc.a && \
     chmod 755 /usr/lib64/libbcc.a && \
