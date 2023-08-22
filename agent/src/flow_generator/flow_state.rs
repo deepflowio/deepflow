@@ -1035,7 +1035,7 @@ mod tests {
     fn opening_reset() {
         state_machine_helper(
             Path::new(FILE_DIR).join("client-syn-try-lack.pcap"),
-            CloseType::TcpClientRst,
+            CloseType::TcpFinClientRst,
         );
     }
 
