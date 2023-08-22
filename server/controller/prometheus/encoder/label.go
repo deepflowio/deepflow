@@ -19,10 +19,11 @@ package encoder
 import (
 	"sync"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
-	"github.com/golang/protobuf/proto"
 )
 
 type label struct {

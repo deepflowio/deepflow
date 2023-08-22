@@ -31,19 +31,15 @@ type labelValue struct {
 	lock         sync.Mutex
 	resourceType string
 	strToID      map[string]int
-	idAllocator
+	ascIDAllocator
 }
 
 func newLabelValue(max int) *labelValue {
 	lv := &labelValue{
 		resourceType: "label_value",
 		strToID:      make(map[string]int),
-		idAllocator: idAllocator{
-			resourceType: "label_value",
-			max:          max,
-			usableIDs:    make([]int, 0, max),
-		},
 	}
+	lv.ascIDAllocator = newAscIDAllocator(lv.resourceType, 1, max)
 	lv.rawDataProvider = lv
 	return lv
 }
@@ -52,7 +48,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	lv.lock.Lock()
 	defer lv.lock.Unlock()
 
-	return lv.idAllocator.refresh()
+	return lv.ascIDAllocator.refresh()
 }
 
 func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue, error) {

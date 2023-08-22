@@ -29,20 +29,20 @@ import (
 type metricLabel struct {
 	lock                  sync.Mutex
 	resourceType          string
-	label                 *label
+	labelEncoder          *label
 	metricLabelDetailKeys mapset.Set[cache.MetricLabelDetailKey]
 }
 
 func newMetricLabel(l *label) *metricLabel {
 	return &metricLabel{
 		resourceType:          "metric_label",
-		label:                 l,
+		labelEncoder:          l,
 		metricLabelDetailKeys: mapset.NewSet[cache.MetricLabelDetailKey](),
 	}
 }
 
 func (ml *metricLabel) store(item *mysql.PrometheusMetricLabel) {
-	if labelKey, ok := ml.label.getKey(item.LabelID); ok {
+	if labelKey, ok := ml.labelEncoder.getKey(item.LabelID); ok {
 		ml.metricLabelDetailKeys.Add(cache.NewMetricLabelDetailKey(item.MetricName, labelKey.Name, labelKey.Value))
 	}
 }
@@ -72,7 +72,7 @@ func (ml *metricLabel) encode(rMLs []*controller.PrometheusMetricLabelRequest) e
 			if ok := ml.metricLabelDetailKeys.Contains(cache.NewMetricLabelDetailKey(mn, ln, lv)); ok {
 				continue
 			}
-			if li, ok := ml.label.getID(cache.NewLabelKey(ln, lv)); ok {
+			if li, ok := ml.labelEncoder.getID(cache.NewLabelKey(ln, lv)); ok {
 				dbToAdd = append(dbToAdd, &mysql.PrometheusMetricLabel{
 					MetricName: mn,
 					LabelID:    li,
