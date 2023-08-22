@@ -1532,7 +1532,7 @@ func (c *Cache) DeletePrometheusTargets(lcuuids []string) {
 func (c *Cache) refreshPrometheusTarget() {
 	log.Infof(refreshResource(RESOURCE_TYPE_PROMETHEUS_TARGET_EN))
 	var prometheusTargets []*mysql.PrometheusTarget
-	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&prometheusTargets).Error; err != nil {
+	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).Find(&prometheusTargets).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, err))
 		return
 	}
