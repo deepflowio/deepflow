@@ -161,6 +161,17 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 		}
 		updateInfo["pod_rs_id"] = podReplicaSetID
 	}
+	if diffBase.PodGroupLcuuid != cloudItem.PodGroupLcuuid {
+		podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
+				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["pod_group_id"] = podGroupID
+	}
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
 	}
