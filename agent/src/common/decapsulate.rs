@@ -434,14 +434,14 @@ impl TunnelInfo {
             .try_into()
             .unwrap_or_default();
         match protocol {
-            IpProtocol::Udp if tunnel_types.has(TunnelType::Vxlan) => {
+            IpProtocol::UDP if tunnel_types.has(TunnelType::Vxlan) => {
                 self.decapsulate_vxlan(packet, l2_len)
             }
-            IpProtocol::Gre => self.decapsulate_gre(packet, l2_len, tunnel_types),
-            IpProtocol::Ipv4 if tunnel_types.has(TunnelType::Ipip) => {
+            IpProtocol::GRE => self.decapsulate_gre(packet, l2_len, tunnel_types),
+            IpProtocol::IPV4 if tunnel_types.has(TunnelType::Ipip) => {
                 self.decapsulate_ipip(packet, l2_len, false, false)
             }
-            IpProtocol::Ipv6 if tunnel_types.has(TunnelType::Ipip) => {
+            IpProtocol::IPV6 if tunnel_types.has(TunnelType::Ipip) => {
                 self.decapsulate_ipip(packet, l2_len, false, true)
             }
             _ => 0,
@@ -505,13 +505,13 @@ impl TunnelInfo {
 
         let protocol: IpProtocol = l3_packet[IP6_PROTO_OFFSET].try_into().unwrap_or_default();
         match protocol {
-            IpProtocol::Udp if tunnel_types.has(TunnelType::Vxlan) => {
+            IpProtocol::UDP if tunnel_types.has(TunnelType::Vxlan) => {
                 self.decapsulate_v6_vxlan(packet, l2_len)
             }
-            IpProtocol::Ipv4 if tunnel_types.has(TunnelType::Ipip) => {
+            IpProtocol::IPV4 if tunnel_types.has(TunnelType::Ipip) => {
                 self.decapsulate_ipip(packet, l2_len, true, false)
             }
-            IpProtocol::Ipv6 if tunnel_types.has(TunnelType::Ipip) => {
+            IpProtocol::IPV6 if tunnel_types.has(TunnelType::Ipip) => {
                 self.decapsulate_ipip(packet, l2_len, true, true)
             }
             _ => 0,
@@ -562,12 +562,12 @@ impl TunnelInfo {
         if !overlay_ipv6 {
             bytes::write_u16_be(
                 &mut packet[start + l2_len - 2..],
-                u16::from(EthernetType::Ipv4),
+                u16::from(EthernetType::IPV4),
             );
         } else {
             bytes::write_u16_be(
                 &mut packet[start + l2_len - 2..],
-                u16::from(EthernetType::Ipv6),
+                u16::from(EthernetType::IPV6),
             );
         }
         // l2已经做过解析，这个去除掉已经解析的l2长度

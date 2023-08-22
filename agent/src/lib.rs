@@ -57,6 +57,7 @@ pub use {
         platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
         policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
         port_range::PortRange as _PortRange,
+        Timestamp as _Timestamp,
     },
     flow_generator::flow_map::{
         Config as _FlowMapConfig, _new_flow_map_and_receiver, _new_meta_packet,

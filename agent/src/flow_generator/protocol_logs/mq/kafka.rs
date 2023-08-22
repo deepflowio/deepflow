@@ -220,7 +220,7 @@ pub struct KafkaLog {
 impl L7ProtocolParserInterface for KafkaLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol()
-            || param.l4_protocol != IpProtocol::Tcp
+            || param.l4_protocol != IpProtocol::TCP
             || payload.len() < KAFKA_REQ_HEADER_LEN
         {
             return false;
@@ -351,7 +351,7 @@ impl KafkaLog {
         direction: PacketDirection,
         info: &mut KafkaInfo,
     ) -> Result<()> {
-        if proto != IpProtocol::Tcp {
+        if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
         if payload.len() < KAFKA_REQ_HEADER_LEN {

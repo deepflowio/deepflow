@@ -874,8 +874,8 @@ impl TryFrom<IpProtocol> for GpidProtocol {
 
     fn try_from(value: IpProtocol) -> Result<Self, Self::Error> {
         match value {
-            IpProtocol::Tcp => Ok(GpidProtocol::Tcp),
-            IpProtocol::Udp => Ok(GpidProtocol::Udp),
+            IpProtocol::TCP => Ok(GpidProtocol::Tcp),
+            IpProtocol::UDP => Ok(GpidProtocol::Udp),
             _ => Err(Error::InvalidProtocol(format!(
                 "Invalid protocol {:?}",
                 value

@@ -77,7 +77,7 @@ fn serialize_seq(
     underlay_is_ipv6: bool,
 ) {
     if !underlay_is_ipv6 {
-        if packet[underlay_l2_opt_size + IPV4_PROTO_OFFSET] == IpProtocol::Udp {
+        if packet[underlay_l2_opt_size + IPV4_PROTO_OFFSET] == IpProtocol::UDP {
             let offset = UDP_PACKET_SIZE + underlay_l2_opt_size + vxlan::SEQUENCE_OFFSET;
             packet[offset] = (seq >> 16) as u8;
             packet[offset + 1..offset + 3].copy_from_slice(&(seq as u16).to_be_bytes());
@@ -86,7 +86,7 @@ fn serialize_seq(
             packet[offset..offset + 4].copy_from_slice(&seq.to_be_bytes());
         }
     } else {
-        if packet[underlay_l2_opt_size + IPV4_PROTO_OFFSET] == IpProtocol::Udp {
+        if packet[underlay_l2_opt_size + IPV4_PROTO_OFFSET] == IpProtocol::UDP {
             let offset = UDP6_PACKET_SIZE + underlay_l2_opt_size + vxlan::SEQUENCE_OFFSET;
             packet[offset] = (seq >> 16) as u8;
             packet[offset + 1..offset + 3].copy_from_slice(&(seq as u16).to_be_bytes());
@@ -167,7 +167,7 @@ impl AfpacketSender {
                     .copy_from_slice(&addr.octets());
 
                 let protocol_offset = IPV6_PROTO_OFFSET + underlay_l2_opt_size;
-                if packet[protocol_offset] == IpProtocol::Udp {
+                if packet[protocol_offset] == IpProtocol::UDP {
                     let udp_header_offset = IPV6_PACKET_SIZE + underlay_l2_opt_size;
                     let checksum_offset = UDP6_CHKSUM_OFFSET + underlay_l2_opt_size;
                     let checksum = Self::checksum(&packet[udp_header_offset..]);
@@ -824,18 +824,18 @@ impl NpbConnectionPool {
         // Trigger to create ARP table entry.
         self.arp.add(remote);
         match self.socket_type {
-            SocketType::Udp if protocol != IpProtocol::Tcp => {
+            SocketType::Udp if protocol != IpProtocol::TCP => {
                 let sender = IpSender::new(remote, protocol);
                 if sender.is_err() {
                     return Err(format!("IpSender error: {:?}.", sender.unwrap_err()));
                 }
                 Ok(NpbSender::IpSender(sender.unwrap()))
             }
-            SocketType::Tcp if protocol == IpProtocol::Tcp => {
+            SocketType::Tcp if protocol == IpProtocol::TCP => {
                 Ok(NpbSender::TcpSender(TcpSender::new(remote, self.npb_port)))
             }
             #[cfg(unix)]
-            SocketType::RawUdp if protocol != IpProtocol::Tcp => {
+            SocketType::RawUdp if protocol != IpProtocol::TCP => {
                 Ok(NpbSender::RawSender(AfpacketSender::new(remote)))
             }
             _ => Err(format!(

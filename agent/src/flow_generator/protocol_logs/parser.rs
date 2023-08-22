@@ -80,8 +80,8 @@ impl MetaAppProto {
         head: AppProtoHead,
     ) -> Option<Self> {
         let mut base_info = AppProtoLogsBaseInfo {
-            start_time: meta_packet.lookup_key.timestamp,
-            end_time: meta_packet.lookup_key.timestamp,
+            start_time: meta_packet.lookup_key.timestamp.into(),
+            end_time: meta_packet.lookup_key.timestamp.into(),
             flow_id: flow.flow.flow_id,
             vtap_id: flow.flow.flow_key.vtap_id,
             tap_type: flow.flow.flow_key.tap_type,
@@ -100,7 +100,7 @@ impl MetaAppProto {
             mac_dst: MacAddr::ZERO,
             ip_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_ip,
             ip_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_ip,
-            is_ipv6: meta_packet.lookup_key.eth_type == EthernetType::Ipv6,
+            is_ipv6: meta_packet.lookup_key.eth_type == EthernetType::IPV6,
             port_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_port,
             port_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_port,
             l3_epc_id_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id,

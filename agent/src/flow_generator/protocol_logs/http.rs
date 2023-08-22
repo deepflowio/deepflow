@@ -358,7 +358,7 @@ pub struct HttpLog {
 
 impl L7ProtocolParserInterface for HttpLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
 
@@ -1351,7 +1351,7 @@ mod tests {
         }
         let conf = LogParserConfig::default();
         let param = &ParseParam {
-            l4_protocol: IpProtocol::Tcp,
+            l4_protocol: IpProtocol::TCP,
             ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             ip_dst: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             port_src: 0,

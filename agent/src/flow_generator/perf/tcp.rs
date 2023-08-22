@@ -16,7 +16,6 @@
 
 use std::fmt;
 use std::sync::{atomic::Ordering, Arc};
-use std::time::Duration;
 
 use bitflags::bitflags;
 use log::debug;
@@ -1111,7 +1110,7 @@ impl<'a> From<MiniMetaPacket> for MetaPacket<'_> {
             ..Default::default()
         };
         packet.lookup_key = LookupKey {
-            timestamp: Duration::from_secs(m.timestamp),
+            timestamp: Timestamp::from_secs(m.timestamp),
             ..Default::default()
         };
         packet.payload_len = m.payload_len;
@@ -1968,7 +1967,7 @@ mod tests {
         }
 
         for (i, packet) in packets.iter_mut().enumerate() {
-            packet.lookup_key.timestamp += Duration::from_secs(60);
+            packet.lookup_key.timestamp += Timestamp::from_secs(60);
             if i + 1 == ignore_nth_packet {
                 continue;
             }
