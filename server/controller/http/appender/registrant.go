@@ -27,6 +27,6 @@ func GetRegistrants(cfg *config.ControllerConfig) []registrant.Registrant {
 	return []registrant.Registrant{
 		configuration.NewConfiguration(), // TODO delete
 
-		resource.NewVPC(cfg.HTTPCfg, cfg.RedisCfg, cfg.FPermit),
+		resource.NewVPC(),
 	}
 }

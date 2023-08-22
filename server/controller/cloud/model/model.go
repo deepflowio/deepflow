@@ -491,12 +491,13 @@ type Process struct {
 }
 
 type PrometheusTarget struct {
-	Lcuuid          string `json:"lcuuid" binding:"required"`
-	ScrapeURL       string `json:"scrape_url" binding:"required"`
-	Instance        string `json:"instance" binding:"required"`
-	Job             string `json:"job" binding:"required"`
-	OtherLabels     string `json:"other_labels" binding:"required"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	Lcuuid            string `json:"lcuuid" binding:"required"`
+	ScrapeURL         string `json:"scrape_url" binding:"required"`
+	Instance          string `json:"instance" binding:"required"`
+	Job               string `json:"job" binding:"required"`
+	OtherLabels       string `json:"other_labels" binding:"required"`
+	SubDomainLcuuid   string `json:"sub_domain_lcuuid"`
+	HonorLabelsConfig bool   `json:"honor_labels_config" binding:"required"`
 }
 
 type SubDomainResource struct {

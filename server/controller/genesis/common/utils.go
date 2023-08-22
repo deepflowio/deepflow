@@ -17,6 +17,8 @@
 package common
 
 import (
+	"bytes"
+	"compress/zlib"
 	. "encoding/binary"
 	"encoding/csv"
 	"encoding/xml"
@@ -27,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"gopkg.in/yaml.v3"
 )
 
 type VifInfo struct {
@@ -132,6 +135,15 @@ type XMLVM struct {
 	Label      string
 	VPC        XMLVPC
 	Interfaces []XMLInterface
+}
+
+type scrapeConfig struct {
+	JobName     string `yaml:"job_name"`
+	HonorLabels bool   `yaml:"honor_labels"`
+}
+
+type prometheusConfig struct {
+	ScrapeConfigs []scrapeConfig `yaml:"scrape_configs"`
 }
 
 var IfaceRegex = regexp.MustCompile("^(\\d+):\\s+([^@:]+)(@.*)?\\:")
@@ -387,6 +399,29 @@ func ParseVMXml(s string) ([]XMLVM, error) {
 		vms = append(vms, vm)
 	}
 	return vms, nil
+}
+
+func ParseYMAL(y string) (prometheusConfig, error) {
+	pConfig := prometheusConfig{}
+	err := yaml.Unmarshal([]byte(y), &pConfig)
+	if err != nil {
+		return prometheusConfig{}, err
+	}
+	return pConfig, nil
+}
+
+func ParseCompressedInfo(cInfo []byte) (bytes.Buffer, error) {
+	reader := bytes.NewReader(cInfo)
+	var out bytes.Buffer
+	r, err := zlib.NewReader(reader)
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+	_, err = out.ReadFrom(r)
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+	return out, nil
 }
 
 func Uint64ToMac(v uint64) net.HardwareAddr {

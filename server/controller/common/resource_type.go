@@ -64,5 +64,6 @@ const (
 
 	// http api resource type
 	RESOURCE_TYPE_IP_EN      = "ip"
+	RESOURCE_TYPE_ALL_IP_EN  = "all_ip"
 	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
 )

@@ -16,21 +16,16 @@
 
 package resource
 
-import (
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	"github.com/deepflowio/deepflow/server/controller/http/model"
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
-)
+import "github.com/deepflowio/deepflow/server/controller/db/mysql"
 
-type VPC struct {
-	ServiceGet
-}
-
-func NewVPCGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VPC {
-	s := &VPC{newServiceGet(ctrlcommon.RESOURCE_TYPE_VPC_EN, data.GetDataProvider(ctrlcommon.RESOURCE_TYPE_VPC_EN, &data.RequiredConfigs{}))}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVPC(fpermitCfg))
-	return s
+func GetVPCs(filter map[string]interface{}) ([]*mysql.VPC, error) {
+	db := mysql.Db
+	if _, ok := filter["name"]; ok {
+		db = db.Where("name = ?", filter["name"])
+	}
+	var vpcs []*mysql.VPC
+	if err := db.Where("deleted_at IS NULL").Order("created_at DESC").Find(&vpcs).Error; err != nil {
+		return nil, err
+	}
+	return vpcs, nil
 }
