@@ -131,8 +131,6 @@ type Config struct {
 	UDPReadBuffer            int             `yaml:"udp-read-buffer"`
 	TCPReadBuffer            int             `yaml:"tcp-read-buffer"`
 	TCPReaderBuffer          int             `yaml:"tcp-reader-buffer"`
-	Profiler                 bool            `yaml:"profiler"`
-	MaxCPUs                  int             `yaml:"max-cpus"`
 	CKDiskMonitor            CKDiskMonitor   `yaml:"ck-disk-monitor"`
 	ColdStorage              CKDBColdStorage `yaml:"ckdb-cold-storage"`
 	ckdbColdStorages         map[string]*ckdb.ColdStorage

@@ -17,8 +17,6 @@
 package genesis
 
 import (
-	"bytes"
-	"compress/zlib"
 	"context"
 	"fmt"
 	"net"
@@ -945,57 +943,85 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 	result := []cloudmodel.PrometheusTarget{}
 	entries := info.message.GetEntries()
 	for _, e := range entries {
-		eInfo := e.GetCompressedInfo()
-		reader := bytes.NewReader(eInfo)
-		var out bytes.Buffer
-		r, err := zlib.NewReader(reader)
+		pJobNameToHonorLabelsConfig := map[string]bool{}
+		configOut, err := genesiscommon.ParseCompressedInfo(e.GetConfigCompressedInfo())
 		if err != nil {
-			log.Warningf("zlib decompress error: %s", err.Error())
+			log.Warningf("config decode decompress error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
-		_, err = out.ReadFrom(r)
+		cEntryJson, err := simplejson.NewJson(configOut.Bytes())
 		if err != nil {
-			log.Warningf("read decompress error: %s", err.Error())
+			log.Warningf("config marshal json error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
-		entryJson, err := simplejson.NewJson(out.Bytes())
+		cStatus := cEntryJson.Get("status").MustString()
+		if cStatus != "success" {
+			log.Warningf("prometheus target api status (%s)", cStatus)
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		prometheusConfig, err := genesiscommon.ParseYMAL(cEntryJson.GetPath("data", "yaml").MustString())
 		if err != nil {
-			log.Warningf("marshal json error: %s", err.Error())
+			log.Warningf("config parse yaml error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
-		status := entryJson.Get("status").MustString()
-		if status != "success" {
-			log.Warningf("prometheus target api status (%s)", status)
+		for _, scrapeConfig := range prometheusConfig.ScrapeConfigs {
+			pJobNameToHonorLabelsConfig[scrapeConfig.JobName] = scrapeConfig.HonorLabels
+		}
+
+		targetOut, err := genesiscommon.ParseCompressedInfo(e.GetTargetCompressedInfo())
+		if err != nil {
+			log.Warningf("target decode decompress error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
-		targets := entryJson.GetPath("data", "activeTargets")
+		tEntryJson, err := simplejson.NewJson(targetOut.Bytes())
+		if err != nil {
+			log.Warningf("target marshal json error: %s", err.Error())
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		tStatus := tEntryJson.Get("status").MustString()
+		if tStatus != "success" {
+			log.Warningf("prometheus target api status (%s)", tStatus)
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		targets := tEntryJson.GetPath("data", "activeTargets")
 		for t := range targets.MustArray() {
 			target := targets.GetIndex(t)
 			scrapeUrl := target.Get("scrapeUrl").MustString()
 			labels := target.Get("labels")
 			job := labels.Get("job").MustString()
 			instance := labels.Get("instance").MustString()
-			labelsMap := labels.MustMap()
-			delete(labelsMap, "job")
-			delete(labelsMap, "instance")
-			keys := []string{}
+
 			labelsSlice := []string{}
-			for key := range labelsMap {
-				keys = append(keys, key)
+			honorLabelsConfig, ok := pJobNameToHonorLabelsConfig[job]
+			if !ok || !honorLabelsConfig {
+				labelsMap := labels.MustMap()
+				delete(labelsMap, "job")
+				delete(labelsMap, "instance")
+				keys := []string{}
+				for key := range labelsMap {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					v := labelsMap[k]
+					vString, ok := v.(string)
+					if !ok {
+						vString = ""
+					}
+					newString := k + ":" + vString
+					labelsSlice = append(labelsSlice, newString)
+				}
 			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				newString := k + ":" + labelsMap[k].(string)
-				labelsSlice = append(labelsSlice, newString)
-			}
+
 			otherLabelsString := strings.Join(labelsSlice, ", ")
 
 			result = append(result, cloudmodel.PrometheusTarget{
-				Lcuuid:      common.GetUUID(instance+job+otherLabelsString, uuid.Nil),
-				ScrapeURL:   scrapeUrl,
-				Job:         job,
-				Instance:    instance,
-				OtherLabels: otherLabelsString,
+				Lcuuid:            common.GetUUID(instance+job+otherLabelsString, uuid.Nil),
+				ScrapeURL:         scrapeUrl,
+				Job:               job,
+				Instance:          instance,
+				OtherLabels:       otherLabelsString,
+				HonorLabelsConfig: honorLabelsConfig,
 			})
 		}
 	}

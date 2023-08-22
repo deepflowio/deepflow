@@ -17,8 +17,6 @@
 package genesis
 
 import (
-	"bytes"
-	"compress/zlib"
 	"context"
 	"encoding/json"
 	"errors"
@@ -37,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
@@ -502,17 +501,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 
 	for _, e := range k8sInfo.Entries {
 		eType := e.GetType()
-		eInfo := e.GetCompressedInfo()
-		reader := bytes.NewReader(eInfo)
-		var out bytes.Buffer
-		r, err := zlib.NewReader(reader)
+		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
 		if err != nil {
-			log.Warningf("zlib decompress error: %s", err.Error())
-			return k8sResp, err
-		}
-		_, err = out.ReadFrom(r)
-		if err != nil {
-			log.Warningf("read decompress error: %s", err.Error())
+			log.Warningf("decode decompress error: %s", err.Error())
 			return k8sResp, err
 		}
 		if _, ok := k8sResp[eType]; ok {

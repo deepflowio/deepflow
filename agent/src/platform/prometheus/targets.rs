@@ -260,6 +260,8 @@ impl TargetsWatcher {
                                     let entry = PrometheusApiInfo {
                                         r#type: Some(API_TARGETS_ENDPOINT.to_string()),
                                         compressed_info: Some(data),
+                                        target_compressed_info: None,
+                                        config_compressed_info: None,
                                     };
                                     total_entries.push(entry);
                                 }

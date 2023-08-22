@@ -888,7 +888,11 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					valueIDs = append(valueIDs, valueIDString)
 				}
 				valueIDFilter := strings.Join(valueIDs, ",")
-				filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.appLabelColumnIndex, valueIDFilter)
+				if valueIDFilter == "" {
+					filter = "1!=1"
+				} else {
+					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.appLabelColumnIndex, valueIDFilter)
+				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 				prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
 				return filter, nil

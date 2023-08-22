@@ -2427,6 +2427,15 @@ impl AgentComponents {
             policy_getter,
             synchronizer.ntp_diff(),
             candidate_config.yaml_config.prometheus_extra_config.clone(),
+            candidate_config
+                .yaml_config
+                .external_profile_integration_disabled,
+            candidate_config
+                .yaml_config
+                .external_trace_integration_disabled,
+            candidate_config
+                .yaml_config
+                .external_metric_integration_disabled,
         );
 
         stats_collector.register_countable(

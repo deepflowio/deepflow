@@ -19,7 +19,8 @@ package http
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/task"
+	"github.com/deepflowio/deepflow/server/controller/http/appender"
+	"github.com/deepflowio/deepflow/server/controller/http/common/rsctask"
 )
 
 var (
@@ -28,13 +29,13 @@ var (
 )
 
 type HTTP struct {
-	TaskManager *task.Manager
+	TaskManager rsctask.ResourceTaskManager
 }
 
 func GetSingleton() *HTTP {
 	httpOnce.Do(func() {
 		http = &HTTP{
-			TaskManager: task.GetManager(),
+			TaskManager: appender.GetResourceTaskManager(),
 		}
 	})
 	return http

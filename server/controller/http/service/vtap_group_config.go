@@ -248,7 +248,9 @@ func convertDBToJson(
 func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroupConfiguration) {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
-		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
+		"PrometheusHttpAPIAddresses",
+	}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
 		yamlConfig := &model.StaticConfig{}
@@ -317,6 +319,9 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 			}
 		}
 	}
+	if sData.PrometheusHttpAPIAddresses != nil {
+		tData.PrometheusHttpAPIAddresses = strings.Split(*sData.PrometheusHttpAPIAddresses, ",")
+	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps / 1000
 		tData.MaxCollectPps = &cMaxCollectPps
@@ -354,7 +359,9 @@ func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroup
 func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
 	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
-		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
+		"PrometheusHttpAPIAddresses",
+	}
 	copyStruct(sData, tData, ignoreName)
 	if len(sData.L4LogTapTypes) > 0 {
 		cL4LogTapTypes := convertIntSliceToString(sData.L4LogTapTypes)
@@ -391,6 +398,12 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 		tData.Domains = &cDomains
 	} else {
 		tData.Domains = nil
+	}
+	if len(sData.PrometheusHttpAPIAddresses) > 0 {
+		cAddrs := strings.Join(sData.PrometheusHttpAPIAddresses, ",")
+		tData.PrometheusHttpAPIAddresses = &cAddrs
+	} else {
+		tData.PrometheusHttpAPIAddresses = nil
 	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps * 1000

@@ -26,6 +26,8 @@ message KubernetesAPIInfo {
 }
 
 message PrometheusAPIInfo {
-    optional string type = 1;
-    optional bytes compressed_info = 2;
+    optional string type = 1; // deprecated
+    optional bytes compressed_info = 2; // deprecated
+    optional bytes target_compressed_info = 3;
+    optional bytes config_compressed_info = 4;
 }

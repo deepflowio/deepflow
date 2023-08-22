@@ -301,7 +301,7 @@ impl Default for OnCpuProfile {
             disabled: false,
             frequency: 99,
             cpu: 0,
-            regex: "".to_string(),
+            regex: "^deepflow-.*".to_string(),
         }
     }
 }
@@ -483,6 +483,9 @@ pub struct YamlConfig {
     pub prometheus_extra_config: PrometheusExtraConfig,
     pub process_scheduling_priority: i8,
     pub cpu_affinity: String,
+    pub external_profile_integration_disabled: bool,
+    pub external_trace_integration_disabled: bool,
+    pub external_metric_integration_disabled: bool,
 }
 
 impl YamlConfig {
@@ -824,6 +827,9 @@ impl Default for YamlConfig {
             prometheus_extra_config: PrometheusExtraConfig::default(),
             process_scheduling_priority: 0,
             cpu_affinity: "".to_string(),
+            external_profile_integration_disabled: false,
+            external_trace_integration_disabled: false,
+            external_metric_integration_disabled: false,
         }
     }
 }
