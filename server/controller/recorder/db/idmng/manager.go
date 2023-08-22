@@ -25,6 +25,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -171,8 +172,11 @@ func (p *IDPool[MT]) refresh() error {
 
 	var items []*MT
 	var err error
+	// TODO do not handle concrete resource in common, create new type IDPool for process and target
 	if p.resourceType == RESOURCE_TYPE_PROCESS_EN {
 		items, err = query.FindInBatches[MT](mysql.Db.Unscoped().Select("id"))
+	} else if p.resourceType == RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
+		err = mysql.Db.Unscoped().Where("create_method = ?", common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).Select("id").Find(&items).Error
 	} else {
 		err = mysql.Db.Unscoped().Select("id").Find(&items).Error
 	}
