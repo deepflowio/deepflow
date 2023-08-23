@@ -480,12 +480,23 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		osAppTagString := strings.Join(osAppTagSlice, ", ")
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
+		// prevent database insert from failing
+		name := p.GetName()
+		if len(name) > 256 {
+			log.Warningf("process name too long: %v, command line: %v, pid: %v", name, p.GetCmdline(), pID)
+			name = name[:256]
+		}
+		processName := p.GetProcessName()
+		if len(processName) > 256 {
+			log.Warningf("process process_name too long: %v, command line: %v, pid: %v", processName, p.GetCmdline(), pID)
+			processName = processName[:256]
+		}
 		processes = append(processes, model.GenesisProcess{
 			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
 			PID:         pID,
 			NetnsID:     p.GetNetnsId(),
-			Name:        p.GetName(),
-			ProcessName: p.GetProcessName(),
+			Name:        name,
+			ProcessName: processName,
 			CMDLine:     p.GetCmdline(),
 			User:        p.GetUser(),
 			ContainerID: p.GetContainerId(),
