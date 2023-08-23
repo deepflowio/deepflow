@@ -606,7 +606,6 @@ type BasicInfo struct {
 	Lcuuid          string        `json:"lcuuid"`
 	Name            string        `json:"name"`
 	PlatformType    string        `json:"platform_type"`
-	PortNameRegex   string        `json:"port_name_regex"`
 	ErrorMsg        string        `json:"error_msg"`
 	Type            int           `json:"type"`
 	Interval        time.Duration `json:"interval"`
