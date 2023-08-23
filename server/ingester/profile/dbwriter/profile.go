@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	DefaultPartition  = ckdb.TimeFuncTwelveHour
+	DefaultPartition  = ckdb.TimeFuncHour
 	LabelTraceID      = "trace_id"
 	LabelSpanName     = "span_name"
 	LabelAppService   = "app_service"
@@ -163,7 +163,7 @@ func ProfileColumns() []*ckdb.Column {
 func GenProfileCKTable(cluster, dbName, tableName, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{timeKey, "app_service", "ip4", "ip6"}
+	orderKeys := []string{"app_service", timeKey, "ip4", "ip6"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
