@@ -351,6 +351,7 @@ pub struct stack_profile_data {
      */
     pub tid: u32,
     pub stime: u64,      // The start time of the process is measured in milliseconds.
+    pub netns_id: u64,   // Fetch from /proc/<PID>/ns/net
     pub u_stack_id: u32, // User space stackID.
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?

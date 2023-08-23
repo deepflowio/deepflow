@@ -301,10 +301,11 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         increment_counter(1, 0);
         //let data = cp_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
-        //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
         //           date_time((*cp).timestamp / 1000),
         //           (*cp).pid,
         //           (*cp).stime,
+        //           (*cp).netns_id,
         //           (*cp).u_stack_id,
         //           (*cp).k_stack_id,
         //           cp_process_name_safe(cp),
