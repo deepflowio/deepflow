@@ -167,7 +167,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			if i == 0 {
 				rootNSMacs[item.MAC] = false
 			}
-			ifIndexToInterface[nsName+string(item.Index)] = item
+			ifIndexToInterface[fmt.Sprintf("%v%v", nsName, item.Index)] = item
 			ifNameToInterface[nsName+item.Name] = item
 			vIF := model.GenesisVinterface{
 				Name:    item.Name,
@@ -247,7 +247,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		}
 		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)), uuid.Nil)
 		ifaceNSName := iface.GetNetns()
-		if gIF, ok := ifIndexToInterface[ifaceNSName+string(iface.GetTapIndex())]; ok && isContainer {
+		if gIF, ok := ifIndexToInterface[fmt.Sprintf("%v%v", ifaceNSName, iface.GetTapIndex())]; ok && isContainer {
 			vIF.TapName = gIF.Name
 			vIF.TapMac = gIF.MAC
 		} else if gIF, ok := ifNameToInterface[ifaceNSName+iface.GetName()]; ok && !isContainer {
@@ -437,11 +437,22 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		osAppTagString := strings.Join(osAppTagSlice, ", ")
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
+		// prevent database insert from failing
+		name := p.GetName()
+		if len(name) > genesiscommon.PROCESS_NAME_LENGTH_MAX {
+			log.Warningf("process name too long: %v, command line: %v, pid: %v", name, p.GetCmdline(), pID)
+			name = truncateProcessName(name)
+		}
+		processName := p.GetProcessName()
+		if len(processName) > genesiscommon.PROCESS_NAME_LENGTH_MAX {
+			log.Warningf("process process_name too long: %v, command line: %v, pid: %v", processName, p.GetCmdline(), pID)
+			processName = truncateProcessName(processName)
+		}
 		processes = append(processes, model.GenesisProcess{
 			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
 			PID:         pID,
-			Name:        p.GetName(),
-			ProcessName: p.GetProcessName(),
+			Name:        name,
+			ProcessName: processName,
 			CMDLine:     p.GetCmdline(),
 			User:        p.GetUser(),
 			VtapID:      vtapID,
@@ -450,6 +461,10 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		})
 	}
 	return processes
+}
+
+func truncateProcessName(str string) string {
+	return str[:genesiscommon.PROCESS_NAME_LENGTH_MAX]
 }
 
 func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer string, vtapID uint32) GenesisSyncDataOperation {
