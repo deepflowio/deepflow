@@ -421,7 +421,7 @@ impl Policy {
     }
 
     fn lookup_gpid_entry(&self, key: &mut LookupKey, _endpoints: &EndpointData) -> GpidEntry {
-        if !key.is_ipv4() || (key.proto != IpProtocol::Udp && key.proto != IpProtocol::Tcp) {
+        if !key.is_ipv4() || (key.proto != IpProtocol::UDP && key.proto != IpProtocol::TCP) {
             return GpidEntry::default();
         }
         let protocol = u8::from(GpidProtocol::try_from(key.proto).unwrap()) as usize;

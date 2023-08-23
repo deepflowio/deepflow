@@ -230,7 +230,7 @@ impl L7ProtocolParserInterface for DubboLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
 

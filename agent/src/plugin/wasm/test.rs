@@ -52,7 +52,7 @@ fn get_req_param<'a>(
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
-        l4_protocol: IpProtocol::Tcp,
+        l4_protocol: IpProtocol::TCP,
         ip_src: IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)),
         ip_dst: IpAddr::V4(Ipv4Addr::new(5, 6, 7, 8)),
         port_src: 12345,
@@ -88,7 +88,7 @@ fn get_resq_param<'a>(
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
-        l4_protocol: IpProtocol::Tcp,
+        l4_protocol: IpProtocol::TCP,
         ip_src: IpAddr::V4(Ipv4Addr::new(5, 6, 7, 8)),
         ip_dst: IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)),
         port_src: 8080,

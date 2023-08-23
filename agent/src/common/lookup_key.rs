@@ -17,7 +17,6 @@
 use std::fmt;
 use std::mem::swap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::time::Duration;
 
 use super::TapPort;
 use super::{
@@ -25,6 +24,7 @@ use super::{
     enums::{EthernetType, IpProtocol, TapType},
     flow::PacketDirection,
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
+    Timestamp,
 };
 
 use npb_pcap_policy::{DedupOperator, TapSide};
@@ -32,7 +32,7 @@ use public::utils::net::MacAddr;
 
 #[derive(Clone, Debug)]
 pub struct LookupKey {
-    pub timestamp: Duration,
+    pub timestamp: Timestamp,
     pub src_mac: MacAddr,
     pub dst_mac: MacAddr,
     pub src_ip: IpAddr,
@@ -82,7 +82,7 @@ impl DedupOperator for LookupKey {
 impl Default for LookupKey {
     fn default() -> Self {
         LookupKey {
-            timestamp: Duration::ZERO,
+            timestamp: Timestamp::ZERO,
             src_mac: Default::default(),
             dst_mac: Default::default(),
             src_ip: Ipv4Addr::UNSPECIFIED.into(),
@@ -199,15 +199,15 @@ impl LookupKey {
     }
 
     pub fn is_l2(&self) -> bool {
-        self.eth_type != EthernetType::Ipv4 && self.eth_type != EthernetType::Ipv6
+        self.eth_type != EthernetType::IPV4 && self.eth_type != EthernetType::IPV6
     }
 
     pub fn is_tcp(&self) -> bool {
-        self.proto == IpProtocol::Tcp
+        self.proto == IpProtocol::TCP
     }
 
     pub fn is_ipv4(&self) -> bool {
-        self.eth_type == EthernetType::Ipv4
+        self.eth_type == EthernetType::IPV4
     }
 }
 

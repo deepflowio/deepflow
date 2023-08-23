@@ -123,7 +123,7 @@ impl PassivePoller {
             }),
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: u16::from(EthernetType::Dot1Q) as u32,
+                val: u16::from(EthernetType::DOT1Q) as u32,
                 skip_false: 0,
                 skip_true: 2,
             }),
@@ -138,7 +138,7 @@ impl PassivePoller {
             // ARP
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: u16::from(EthernetType::Arp) as u32,
+                val: u16::from(EthernetType::ARP) as u32,
                 skip_false: 1,
                 skip_true: 0,
             }),
@@ -146,7 +146,7 @@ impl PassivePoller {
             // IPv6
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: u16::from(EthernetType::Ipv6) as u32,
+                val: u16::from(EthernetType::IPV6) as u32,
                 skip_true: 1,
                 skip_false: 0,
             }),
@@ -158,13 +158,13 @@ impl PassivePoller {
             }),
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Icmpv6) as u32,
+                val: u8::from(IpProtocol::ICMPV6) as u32,
                 skip_true: 8,
                 skip_false: 0,
             }),
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Ipv6Fragment) as u32,
+                val: u8::from(IpProtocol::IPV6_FRAGMENT) as u32,
                 skip_true: 1,
                 skip_false: 0,
             }),
@@ -182,7 +182,7 @@ impl PassivePoller {
             }),
             BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: u8::from(IpProtocol::Icmpv6) as u32,
+                val: u8::from(IpProtocol::ICMPV6) as u32,
                 skip_true: 1,
                 skip_false: 0,
             }),
@@ -283,10 +283,10 @@ impl PassivePoller {
 
             let mut eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET..]);
             let mut extra_offset = 0;
-            if eth_type == EthernetType::Dot1Q {
+            if eth_type == EthernetType::DOT1Q {
                 extra_offset += VLAN_HEADER_SIZE;
                 eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
-                if eth_type == EthernetType::Dot1Q {
+                if eth_type == EthernetType::DOT1Q {
                     extra_offset += VLAN_HEADER_SIZE;
                     eth_type = read_u16_be(&packet_data[ETH_TYPE_OFFSET + extra_offset..]);
                 }
@@ -301,7 +301,7 @@ impl PassivePoller {
             };
 
             let entry = match eth_type {
-                EthernetType::Arp => {
+                EthernetType::ARP => {
                     if packet_len < ARP_SPA_OFFSET + extra_offset + 4 {
                         debug!("ignore short arp packet, size={packet_len}");
                         continue;
@@ -320,14 +320,14 @@ impl PassivePoller {
                         ),
                     }
                 }
-                EthernetType::Ipv6 => {
+                EthernetType::IPV6 => {
                     if packet_len < IPV6_PROTO_OFFSET + extra_offset + 1 {
                         debug!("ignore short ipv6 packet, size={packet_len}");
                         continue;
                     }
 
                     let mut protocol = packet_data[IPV6_PROTO_OFFSET + extra_offset];
-                    if protocol == IpProtocol::Ipv6 {
+                    if protocol == IpProtocol::IPV6 {
                         extra_offset += IPV6_FRAGMENT_LEN;
                         protocol = packet_data[IPV6_PROTO_OFFSET + extra_offset];
                     }
@@ -335,7 +335,7 @@ impl PassivePoller {
                         debug!("ignore short icmpv6 packet, size={packet_len}");
                         continue;
                     }
-                    if protocol != IpProtocol::Icmpv6
+                    if protocol != IpProtocol::ICMPV6
                         || packet_data[ICMPV6_TYPE_OFFSET + extra_offset]
                             != Icmpv6Types::NeighborAdvert.0
                     {

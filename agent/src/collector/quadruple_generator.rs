@@ -408,8 +408,8 @@ impl SubQuadGen {
                 &acc_flow.tagged_flow.flow.flow_key.ip_dst,
             );
 
-            if acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
-                || acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::Udp
+            if acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::TCP
+                || acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::UDP
             {
                 acc_flow.flow_meter.flow_load.load =
                     connection.get_concurrent(acc_flow.time_in_second, &mut acc_flow.key);
@@ -490,8 +490,8 @@ impl SubQuadGen {
         let connection = &mut self.connections[slot];
 
         // Only count the number of concurrent connections between TCP and UDP with the signal_source of packet
-        if (tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
-            || tagged_flow.flow.flow_key.proto == IpProtocol::Udp)
+        if (tagged_flow.flow.flow_key.proto == IpProtocol::TCP
+            || tagged_flow.flow.flow_key.proto == IpProtocol::UDP)
             && tagged_flow.flow.signal_source == SignalSource::Packet
         {
             if tagged_flow.flow.is_new_flow
@@ -980,7 +980,7 @@ impl QuadrupleGenerator {
                 direction_score: tagged_flow.flow.direction_score,
             };
 
-            if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
+            if tagged_flow.flow.flow_key.proto == IpProtocol::TCP {
                 match tagged_flow.flow.close_type {
                     CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
                     CloseType::Timeout => flow_meter.anomaly.tcp_timeout = 1,
@@ -1013,7 +1013,7 @@ impl QuadrupleGenerator {
                 None => return flow_meter,
             };
 
-            if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
+            if tagged_flow.flow.flow_key.proto == IpProtocol::TCP {
                 flow_meter.latency = Latency {
                     rtt_max: stats.tcp.rtt,
                     rtt_client_max: stats.tcp.rtt_client_max,
@@ -1133,7 +1133,7 @@ impl QuadrupleGenerator {
     }
 
     pub fn get_key(tagged_flow: &TaggedFlow) -> QgKey {
-        if tagged_flow.flow.eth_type == EthernetType::Ipv6 {
+        if tagged_flow.flow.eth_type == EthernetType::IPV6 {
             let mut key: [u8; IPV6_LRU_KEY_SIZE] = [0; IPV6_LRU_KEY_SIZE];
             Self::set_key(&mut key, tagged_flow);
             match (
@@ -1279,7 +1279,7 @@ mod test {
         let mut tagged_flow = TaggedFlow::default();
         tagged_flow.flow.close_type = CloseType::ForcedReport;
         tagged_flow.flow.is_new_flow = true;
-        tagged_flow.flow.flow_key.proto = IpProtocol::Tcp;
+        tagged_flow.flow.flow_key.proto = IpProtocol::TCP;
         let tagged_flow = Arc::new(allocator.allocate_one_with(tagged_flow));
         let flow_meter = FlowMeter::default();
         let id_maps = [HashMap::new(), HashMap::new()];

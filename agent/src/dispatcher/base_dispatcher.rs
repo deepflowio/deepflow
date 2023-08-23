@@ -289,8 +289,8 @@ impl BaseDispatcher {
         let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
         let offset = match eth_type {
             // 最外层隧道封装，可能是ERSPAN或VXLAN
-            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
-            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
+            EthernetType::IPV4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
+            EthernetType::IPV6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
             _ => 0,
         };
         if offset == 0 {
@@ -457,8 +457,8 @@ impl BaseDispatcher {
         let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
         let offset = match eth_type {
             // 最外层隧道封装，可能是ERSPAN或VXLAN
-            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
-            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
+            EthernetType::IPV4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
+            EthernetType::IPV6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
             _ => 0,
         };
         if offset == 0 {
@@ -527,7 +527,7 @@ impl TapTypeHandler {
         let mut eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE..]);
         let mut tap_type = self.default_tap_type;
         let mut l2_len = ETH_HEADER_SIZE;
-        if eth_type == EthernetType::Dot1Q && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+        if eth_type == EthernetType::DOT1Q && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
             let vlan_tag = read_u16_be(&packet[ETH_HEADER_SIZE..]);
             eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..]);
             // tap_type从qinq外层的vlan获取
@@ -541,7 +541,7 @@ impl TapTypeHandler {
                 }
             }
             l2_len += VLAN_HEADER_SIZE;
-            if eth_type == EthernetType::Dot1Q
+            if eth_type == EthernetType::DOT1Q
                 && packet.len() >= ETH_HEADER_SIZE + 2 * VLAN_HEADER_SIZE
             {
                 eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + 2 * VLAN_HEADER_SIZE..]);

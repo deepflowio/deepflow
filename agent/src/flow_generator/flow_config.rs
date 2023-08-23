@@ -17,21 +17,21 @@
 use std::{
     sync::atomic::{AtomicBool, AtomicU32},
     sync::Arc,
-    time::Duration,
 };
 
+use crate::common::Timestamp;
 use public::proto::common::TridentType;
 
-pub const TIMEOUT_OTHERS: Duration = Duration::from_secs(5);
-pub const TIMEOUT_ESTABLISHED: Duration = Duration::from_secs(300);
-pub const TIMEOUT_CLOSING: Duration = Duration::from_secs(35);
-pub const TIMEOUT_OPENING_RST: Duration = Duration::from_secs(1);
+pub const TIMEOUT_OTHERS: Timestamp = Timestamp::from_secs(5);
+pub const TIMEOUT_ESTABLISHED: Timestamp = Timestamp::from_secs(300);
+pub const TIMEOUT_CLOSING: Timestamp = Timestamp::from_secs(35);
+pub const TIMEOUT_OPENING_RST: Timestamp = Timestamp::from_secs(1);
 
 pub struct TcpTimeout {
-    pub established: Duration,
-    pub closing_rst: Duration,
-    pub others: Duration,
-    pub opening_rst: Duration,
+    pub established: Timestamp,
+    pub closing_rst: Timestamp,
+    pub others: Timestamp,
+    pub opening_rst: Timestamp,
 }
 
 impl Default for TcpTimeout {
@@ -47,17 +47,17 @@ impl Default for TcpTimeout {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FlowTimeout {
-    pub opening: Duration,
-    pub established: Duration,
-    pub closing: Duration,
-    pub established_rst: Duration,
-    pub exception: Duration,
-    pub closed_fin: Duration,
-    pub single_direction: Duration,
-    pub opening_rst: Duration,
+    pub opening: Timestamp,
+    pub established: Timestamp,
+    pub closing: Timestamp,
+    pub established_rst: Timestamp,
+    pub exception: Timestamp,
+    pub closed_fin: Timestamp,
+    pub single_direction: Timestamp,
+    pub opening_rst: Timestamp,
 
-    pub min: Duration,
-    pub max: Duration, // time window
+    pub min: Timestamp,
+    pub max: Timestamp, // time window
 }
 
 impl From<TcpTimeout> for FlowTimeout {
@@ -68,11 +68,11 @@ impl From<TcpTimeout> for FlowTimeout {
             closing: t.others,
             established_rst: t.closing_rst,
             exception: t.others,
-            closed_fin: Duration::from_secs(2),
+            closed_fin: Timestamp::from_secs(2),
             single_direction: t.others,
             opening_rst: t.opening_rst,
-            min: Duration::from_secs(0),
-            max: Duration::from_secs(0),
+            min: Timestamp::from_secs(0),
+            max: Timestamp::from_secs(0),
         };
         ft.update_min_max();
         ft
@@ -118,8 +118,8 @@ pub struct FlowMapConfig {
     pub collector_enabled: bool,
     pub tap_types: [bool; 256],
 
-    pub packet_delay: Duration,
-    pub flush_interval: Duration,
+    pub packet_delay: Timestamp,
+    pub flush_interval: Timestamp,
     pub flow_timeout: FlowTimeout,
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,

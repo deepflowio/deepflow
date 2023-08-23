@@ -496,10 +496,10 @@ pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L
     for i in get_all_protocol().iter() {
         if l7_enabled.is_enabled(i.protocol()) {
             match protocol {
-                IpProtocol::Tcp if i.parsable_on_tcp() => {
+                IpProtocol::TCP if i.parsable_on_tcp() => {
                     bitmap.set_enabled(i.protocol());
                 }
-                IpProtocol::Udp if i.parsable_on_udp() => {
+                IpProtocol::UDP if i.parsable_on_udp() => {
                     bitmap.set_enabled(i.protocol());
                 }
                 _ => {}
