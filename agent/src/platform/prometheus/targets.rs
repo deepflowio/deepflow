@@ -15,6 +15,7 @@
  */
 
 use std::{
+    io::Error,
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Mutex, Weak,
@@ -50,19 +51,29 @@ use public::{
 };
 
 const API_TARGETS_ENDPOINT: &str = "/api/v1/targets?state=active";
+const API_CONFIG_ENDPOINT: &str = "/api/v1/status/config";
 
 #[derive(Default)]
 pub struct TargetsCounter {
-    compressed_length: AtomicU32,
+    target_compressed_length: AtomicU32,
+    config_compressed_length: AtomicU32,
 }
 impl RefCountable for TargetsCounter {
     fn get_counters(&self) -> Vec<Counter> {
-        let compressed_length = self.compressed_length.swap(0, Ordering::Relaxed);
-        vec![(
-            "compressed_length",
-            CounterType::Gauged,
-            CounterValue::Unsigned(compressed_length as u64),
-        )]
+        let target_compressed_length = self.target_compressed_length.swap(0, Ordering::Relaxed);
+        let config_compressed_length = self.config_compressed_length.swap(0, Ordering::Relaxed);
+        vec![
+            (
+                "target_compressed_length",
+                CounterType::Gauged,
+                CounterValue::Unsigned(target_compressed_length as u64),
+            ),
+            (
+                "config_compressed_length",
+                CounterType::Gauged,
+                CounterValue::Unsigned(config_compressed_length as u64),
+            ),
+        ]
     }
 }
 
@@ -152,7 +163,7 @@ impl TargetsWatcher {
         self.stats_collector.register_countable(
             "prometheus_targets_watcher",
             Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("kind", API_TARGETS_ENDPOINT.to_string())],
+            vec![StatsOption::Tag("kind", "prometheus_api".to_string())],
         );
         let session = self.session.clone();
         let running = self.running.clone();
@@ -199,15 +210,46 @@ impl TargetsWatcher {
         let mut total_entries = vec![];
         let mut err_msgs = vec![];
         for api in api_addresses {
-            Self::get_prometheus_api_info(
+            if api.is_empty() {
+                continue;
+            }
+            let mut entry = PrometheusApiInfo::default();
+            match Self::get_prometheus_api_info(
                 context,
-                counter,
-                api,
-                API_TARGETS_ENDPOINT,
+                api.clone() + API_TARGETS_ENDPOINT,
                 encoder,
-                &mut total_entries,
-                &mut err_msgs,
-            );
+            ) {
+                Ok(data) => {
+                    counter
+                        .target_compressed_length
+                        .fetch_add(data.len() as u32, Ordering::Relaxed);
+                    entry.target_compressed_info = Some(data);
+                }
+                Err(e) => {
+                    warn!("get prometheus target info failed: {}", e);
+                    err_msgs.push(e.to_string());
+                    continue;
+                }
+            }
+            match Self::get_prometheus_api_info(context, api + API_CONFIG_ENDPOINT, encoder) {
+                Ok(data) => {
+                    counter
+                        .config_compressed_length
+                        .fetch_add(data.len() as u32, Ordering::Relaxed);
+                    entry.config_compressed_info = Some(data);
+                }
+                Err(e) => {
+                    warn!("get prometheus config info failed: {}", e);
+                    err_msgs.push(e.to_string());
+                    continue;
+                }
+            }
+            total_entries.push(entry);
+        }
+
+        if total_entries.is_empty() {
+            info!("there has no prometheus target info or config info");
+            return;
         }
 
         let version = &context.version;
@@ -239,47 +281,23 @@ impl TargetsWatcher {
 
     fn get_prometheus_api_info(
         context: &mut Arc<Context>,
-        counter: &mut Arc<TargetsCounter>,
-        api_address: String,
-        api_endpoint: &str,
+        api: String,
         encoder: &mut ZlibEncoder<Vec<u8>>,
-        total_entries: &mut Vec<PrometheusApiInfo>,
-        err_msgs: &mut Vec<String>,
-    ) {
-        let api = api_address + api_endpoint;
+    ) -> Result<Vec<u8>, Error> {
         context.runtime.block_on(async {
-            match context.client.get(api).send().await {
-                Ok(resp) => {
-                    match resp.text().await {
-                        Ok(body) => {
-                            match compress_entry(encoder, body.trim().as_bytes()) {
-                                Ok(data) => {
-                                    counter
-                                        .compressed_length
-                                        .fetch_add(data.len() as u32, Ordering::Relaxed);
-                                    let entry = PrometheusApiInfo {
-                                        r#type: Some(API_TARGETS_ENDPOINT.to_string()),
-                                        compressed_info: Some(data),
-                                    };
-                                    total_entries.push(entry);
-                                }
-                                Err(e) => {
-                                    warn!("{}", e);
-                                    err_msgs.push(e.to_string());
-                                }
-                            };
-                        }
-                        Err(e) => {
-                            warn!("{}", e);
-                            err_msgs.push(e.to_string());
-                        }
-                    };
-                }
-                Err(e) => {
-                    warn!("{}", e);
-                    err_msgs.push(e.to_string());
-                }
-            }
-        });
+            compress_entry(
+                encoder,
+                context
+                    .client
+                    .get(api)
+                    .send()
+                    .await
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?
+                    .text()
+                    .await
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?
+                    .as_bytes(),
+            )
+        })
     }
 }

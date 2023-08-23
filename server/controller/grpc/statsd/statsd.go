@@ -76,6 +76,7 @@ const (
 	PrometheusAPISync
 	GPIDSync
 	GetPrometheusLabelIDs
+	GetPrometheusTargets
 	MaxApiType
 )
 
@@ -89,6 +90,7 @@ var ApiTypeToName = map[ApiType]string{
 	KubernetesAPISync:      "KubernetesAPISync",
 	PrometheusAPISync:      "PrometheusAPISync",
 	GetPrometheusLabelIDs:  "GetPrometheusLabelIDs",
+	GetPrometheusTargets:   "GetPrometheusTargets",
 	GPIDSync:               "GPIDSync",
 }
 

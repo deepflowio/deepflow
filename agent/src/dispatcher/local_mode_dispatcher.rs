@@ -126,12 +126,14 @@ impl LocalModeDispatcher {
                     continue;
                 } else {
                     // send to one of the pipelines if packet is LLDP
-                    let mut eth_type = read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE..]);
-                    if eth_type == EthernetType::Dot1Q {
+                    let mut eth_type: EthernetType =
+                        read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE..]).into();
+                    if eth_type == EthernetType::DOT1Q {
                         eth_type =
-                            read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..]);
+                            read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..])
+                                .into();
                     }
-                    if eth_type != EthernetType::LinkLayerDiscovery {
+                    if eth_type != EthernetType::LINK_LAYER_DISCOVERY {
                         continue;
                     }
                     pipelines.iter().next().unwrap().1.clone()
@@ -261,7 +263,7 @@ impl LocalModeDispatcher {
             }
             if base
                 .tap_interface_whitelist
-                .next_sync(meta_packet.lookup_key.timestamp)
+                .next_sync(meta_packet.lookup_key.timestamp.into())
             {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }

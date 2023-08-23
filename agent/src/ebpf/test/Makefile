@@ -29,7 +29,7 @@ ifeq ($(ARCH), x86_64)
 #-lbcc -lstdc++
         LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++
 else ifeq ($(ARCH), aarch64)
-        LDLIBS += ../libtrace.a -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread
+        LDLIBS += ../libtrace.a -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread -lbcc -lstdc++
 endif
 
 all: $(EXECS) 

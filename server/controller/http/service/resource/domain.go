@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
@@ -39,6 +40,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
+
+var log = logging.MustGetLogger("service.resource")
 
 var DOMAIN_PASSWORD_KEYS = []string{
 	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password", "token",

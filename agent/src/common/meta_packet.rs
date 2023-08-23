@@ -42,7 +42,6 @@ use super::{
 };
 
 use crate::error;
-use crate::utils::bytes::{read_u16_be, read_u32_be};
 #[cfg(target_os = "linux")]
 use crate::{
     common::ebpf::GO_HTTP2_UPROBE,
@@ -50,6 +49,10 @@ use crate::{
         MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
         SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
     },
+};
+use crate::{
+    common::Timestamp,
+    utils::bytes::{read_u16_be, read_u32_be},
 };
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
@@ -174,9 +177,9 @@ pub struct MetaPacket<'a> {
 impl<'a> MetaPacket<'a> {
     pub fn timestamp_adjust(&mut self, time_diff: i64) {
         if time_diff >= 0 {
-            self.lookup_key.timestamp += Duration::from_nanos(time_diff as u64);
+            self.lookup_key.timestamp += Timestamp::from_nanos(time_diff as u64);
         } else {
-            self.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
+            self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
         }
     }
     pub fn is_tls(&self) -> bool {
@@ -201,7 +204,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     pub fn is_ndp_response(&self) -> bool {
-        self.nd_reply_or_arp_request && self.lookup_key.proto == IpProtocol::Icmpv6
+        self.nd_reply_or_arp_request && self.lookup_key.proto == IpProtocol::ICMPV6
     }
 
     pub fn is_syn(&self) -> bool {
@@ -319,7 +322,7 @@ impl<'a> MetaPacket<'a> {
         loop {
             if let Ok(header) = IpProtocol::try_from(next_header) {
                 match header {
-                    IpProtocol::Ah => {
+                    IpProtocol::AH => {
                         if size_checker < 2 {
                             break;
                         }
@@ -333,9 +336,9 @@ impl<'a> MetaPacket<'a> {
                         }
                         continue;
                     }
-                    IpProtocol::Ipv6Destination
-                    | IpProtocol::Ipv6HopByHop
-                    | IpProtocol::Ipv6Routing => {
+                    IpProtocol::IPV6_DESTINATION
+                    | IpProtocol::IPV6_HOP_BY_HOP
+                    | IpProtocol::IPV6_ROUTING => {
                         size_checker -= 8;
                         if size_checker < 0 {
                             break;
@@ -350,7 +353,7 @@ impl<'a> MetaPacket<'a> {
                         }
                         continue;
                     }
-                    IpProtocol::Ipv6Fragment => {
+                    IpProtocol::IPV6_FRAGMENT => {
                         size_checker -= 8;
                         if size_checker < 0 {
                             break;
@@ -361,10 +364,10 @@ impl<'a> MetaPacket<'a> {
                         option_offset += 8;
                         continue;
                     }
-                    IpProtocol::Icmpv6 => {
+                    IpProtocol::ICMPV6 => {
                         return (next_header, option_offset - original_offset);
                     }
-                    IpProtocol::Esp => {
+                    IpProtocol::ESP => {
                         self.offset_ipv6_last_option = option_offset as u16;
                         option_offset += size_checker as usize;
                         return (next_header, option_offset - original_offset);
@@ -405,7 +408,7 @@ impl<'a> MetaPacket<'a> {
 
     // 目前仅支持获取UDP或TCP的Payload
     pub fn get_l4_payload(&self) -> Option<&[u8]> {
-        if self.lookup_key.proto != IpProtocol::Tcp && self.lookup_key.proto != IpProtocol::Udp {
+        if self.lookup_key.proto != IpProtocol::TCP && self.lookup_key.proto != IpProtocol::UDP {
             return None;
         }
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
@@ -422,6 +425,7 @@ impl<'a> MetaPacket<'a> {
         }
         None
     }
+
     pub fn update<P: AsRef<[u8]> + Into<RawPacket<'a>>>(
         &mut self,
         raw_packet: P,
@@ -450,7 +454,7 @@ impl<'a> MetaPacket<'a> {
         original_length: usize,
     ) -> error::Result<()> {
         let packet = raw_packet.as_ref();
-        self.lookup_key.timestamp = timestamp;
+        self.lookup_key.timestamp = timestamp.into();
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;
         self.packet_len = packet.len() as u32;
@@ -467,7 +471,7 @@ impl<'a> MetaPacket<'a> {
             .map_err(|e| {
                 error::Error::ParsePacketFailed(format!("parse eth_type failed: {}", e))
             })?;
-        if eth_type == EthernetType::Dot1Q {
+        if eth_type == EthernetType::DOT1Q {
             vlan_tag_size = VLAN_HEADER_SIZE;
             size_checker -= VLAN_HEADER_SIZE as isize;
             if size_checker < 0 {
@@ -481,7 +485,7 @@ impl<'a> MetaPacket<'a> {
             .map_err(|e| {
                 error::Error::ParsePacketFailed(format!("parse eth_type failed: {}", e))
             })?;
-            if eth_type == EthernetType::Dot1Q {
+            if eth_type == EthernetType::DOT1Q {
                 vlan_tag_size += VLAN_HEADER_SIZE;
                 size_checker -= VLAN_HEADER_SIZE as isize;
                 if size_checker < 0 {
@@ -509,7 +513,7 @@ impl<'a> MetaPacket<'a> {
         let mut offset_port_0 = FIELD_OFFSET_SPORT;
         let mut offset_port_1 = FIELD_OFFSET_DPORT;
         match eth_type {
-            EthernetType::Arp => {
+            EthernetType::ARP => {
                 size_checker -= HeaderType::Arp.min_header_size() as isize;
                 if size_checker < 0 {
                     return Ok(());
@@ -527,7 +531,7 @@ impl<'a> MetaPacket<'a> {
                     read_u16_be(&packet[vlan_tag_size + ARP_OP_OFFSET..]) == arp::OP_REQUEST;
                 return Ok(());
             }
-            EthernetType::Ipv6 => {
+            EthernetType::IPV6 => {
                 is_ipv6 = true;
                 offset_port_0 = FIELD_OFFSET_IPV6_SPORT;
                 offset_port_1 = FIELD_OFFSET_IPV6_DPORT;
@@ -570,7 +574,7 @@ impl<'a> MetaPacket<'a> {
                 }
                 self.l3_payload_len = size_checker as u16;
             }
-            EthernetType::Ipv4 => {
+            EthernetType::IPV4 => {
                 size_checker -= HeaderType::Ipv4.min_header_size() as isize;
                 if size_checker < 0 {
                     return Ok(());
@@ -633,7 +637,7 @@ impl<'a> MetaPacket<'a> {
         }
 
         match ip_protocol {
-            IpProtocol::Icmpv4 => {
+            IpProtocol::ICMPV4 => {
                 // 错包时取最小包长
                 self.packet_len = self.packet_len.max(
                     HeaderType::Ipv4Icmp.min_packet_size() as u32 + self.l2_l3_opt_size as u32,
@@ -663,15 +667,15 @@ impl<'a> MetaPacket<'a> {
                 self.header_type = HeaderType::Ipv4Icmp;
                 return Ok(());
             }
-            IpProtocol::Udp => {
+            IpProtocol::UDP => {
                 match eth_type {
-                    EthernetType::Ipv4 => {
+                    EthernetType::IPV4 => {
                         self.packet_len = self.packet_len.max(
                             HeaderType::Ipv4Udp.min_packet_size() as u32
                                 + self.l2_l3_opt_size as u32,
                         )
                     }
-                    EthernetType::Ipv6 => {
+                    EthernetType::IPV6 => {
                         self.packet_len = self.packet_len.max(
                             HeaderType::Ipv6Udp.min_packet_size() as u32
                                 + self.l2_l3_opt_size as u32,
@@ -693,7 +697,7 @@ impl<'a> MetaPacket<'a> {
                 self.payload_len = self.l4_payload_len as u16;
                 self.header_type = header_type;
             }
-            IpProtocol::Tcp => {
+            IpProtocol::TCP => {
                 let (data_off, seq_off, ack_off, win_off, flag_off) = if is_ipv6 {
                     (
                         FIELD_OFFSET_TCPV6_DATAOFF,
@@ -713,13 +717,13 @@ impl<'a> MetaPacket<'a> {
                 };
 
                 match eth_type {
-                    EthernetType::Ipv4 => {
+                    EthernetType::IPV4 => {
                         self.packet_len = self.packet_len.max(
                             HeaderType::Ipv4Tcp.min_packet_size() as u32
                                 + self.l2_l3_opt_size as u32,
                         )
                     }
-                    EthernetType::Ipv6 => {
+                    EthernetType::IPV6 => {
                         self.packet_len = self.packet_len.max(
                             HeaderType::Ipv6Tcp.min_packet_size() as u32
                                 + self.l2_l3_opt_size as u32,
@@ -765,7 +769,7 @@ impl<'a> MetaPacket<'a> {
                     self.update_tcp_opt(packet);
                 }
             }
-            IpProtocol::Icmpv6 => {
+            IpProtocol::ICMPV6 => {
                 if size_checker > 0 {
                     // ICMPV6_TYPE_OFFSET使用ipv6的头长，实际ipv6比ipv4多的已经加在l3optSize中，这里再去掉
                     self.nd_reply_or_arp_request = Icmpv6Type::new(
@@ -846,15 +850,15 @@ impl<'a> MetaPacket<'a> {
         let mut packet = MetaPacket::default();
 
         packet.lookup_key = LookupKey {
-            timestamp: Duration::from_micros(data.timestamp),
+            timestamp: Timestamp::from_micros(data.timestamp),
             src_ip,
             dst_ip,
             src_port,
             dst_port,
             eth_type: if data.tuple.addr_len == 4 {
-                EthernetType::Ipv4
+                EthernetType::IPV4
             } else {
-                EthernetType::Ipv6
+                EthernetType::IPV6
             },
             l2_end_0: data.direction == SOCK_DIR_SND,
             l2_end_1: data.direction == SOCK_DIR_RCV,
@@ -992,7 +996,7 @@ impl<'a> fmt::Display for MetaPacket<'a> {
         if let Some(t) = &self.tunnel {
             write!(f, "\t\ttunnel: {}\n", t)?;
         }
-        if self.lookup_key.proto == IpProtocol::Tcp {
+        if self.lookup_key.proto == IpProtocol::TCP {
             write!(f, "\t\ttcp: {:?}\n", self.tcp_data)?;
         }
         if let Some(r) = &self.raw {

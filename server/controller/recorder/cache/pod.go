@@ -30,6 +30,10 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 	if dbItem.PodReplicaSetID != 0 {
 		podReplicaSetLcuuid, _ = toolDataSet.GetPodReplicaSetLcuuidByID(dbItem.PodReplicaSetID)
 	}
+	var podGroupLcuuid string
+	if dbItem.PodGroupID != 0 {
+		podGroupLcuuid, _ = toolDataSet.GetPodGroupLcuuidByID(dbItem.PodGroupID)
+	}
 	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
 	b.Pods[dbItem.Lcuuid] = &Pod{
 		DiffBase: DiffBase{
@@ -45,6 +49,7 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		CreatedAt:           dbItem.CreatedAt,
 		PodNodeLcuuid:       podNodeLcuuid,
 		PodReplicaSetLcuuid: podReplicaSetLcuuid,
+		PodGroupLcuuid:      podGroupLcuuid,
 		VPCLcuuid:           vpcLcuuid,
 		RegionLcuuid:        dbItem.Region,
 		AZLcuuid:            dbItem.AZ,
@@ -69,6 +74,7 @@ type Pod struct {
 	CreatedAt           time.Time `json:"created_at"`
 	PodNodeLcuuid       string    `json:"pod_node_lcuuid"`
 	PodReplicaSetLcuuid string    `json:"pod_replica_set_lcuuid"`
+	PodGroupLcuuid      string    `json:"pod_group_lcuuid"`
 	VPCLcuuid           string    `json:"vpc_lcuuid"`
 	RegionLcuuid        string    `json:"region_lcuuid"`
 	AZLcuuid            string    `json:"az_lcuuid"`
@@ -85,6 +91,7 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.CreatedAt = cloudItem.CreatedAt
 	p.PodNodeLcuuid = cloudItem.PodNodeLcuuid
 	p.PodReplicaSetLcuuid = cloudItem.PodReplicaSetLcuuid
+	p.PodGroupLcuuid = cloudItem.PodGroupLcuuid
 	p.VPCLcuuid = cloudItem.VPCLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid

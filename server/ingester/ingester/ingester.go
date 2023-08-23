@@ -21,13 +21,11 @@ import (
 	"io"
 	"net"
 	"os"
-	"runtime"
 	"strconv"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/ckmonitor"
 	"github.com/deepflowio/deepflow/server/ingester/datasource"
-	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -43,7 +41,6 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	dropletcfg "github.com/deepflowio/deepflow/server/ingester/droplet/config"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/droplet"
-	"github.com/deepflowio/deepflow/server/ingester/droplet/profiler"
 	eventcfg "github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/event"
 	extmetricscfg "github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
@@ -52,7 +49,6 @@ import (
 	flowlog "github.com/deepflowio/deepflow/server/ingester/flow_log/flow_log"
 	flowmetricscfg "github.com/deepflowio/deepflow/server/ingester/flow_metrics/config"
 	flowmetrics "github.com/deepflowio/deepflow/server/ingester/flow_metrics/flow_metrics"
-	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	pcapcfg "github.com/deepflowio/deepflow/server/ingester/pcap/config"
 	"github.com/deepflowio/deepflow/server/ingester/pcap/pcap"
 	profilecfg "github.com/deepflowio/deepflow/server/ingester/profile/config"
@@ -64,7 +60,6 @@ import (
 var log = logging.MustGetLogger("ingester")
 
 const (
-	INFLUXDB_RELAY_PORT          = 20048
 	PROFILER_PORT                = 9526
 	MAX_SLAVE_PLATFORMDATA_COUNT = 64
 )
@@ -80,20 +75,6 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 
 	log.Info("==================== Launching DeepFlow-Server-Ingester ====================")
 	log.Infof("ingester base config:\n%s", string(bytes))
-
-	debug.SetIpAndPort(ingesterctl.DEBUG_LISTEN_IP, ingesterctl.DEBUG_LISTEN_PORT)
-	debug.NewLogLevelControl()
-
-	profiler := profiler.NewProfiler(PROFILER_PORT)
-	if cfg.Profiler {
-		runtime.SetMutexProfileFraction(1)
-		runtime.SetBlockProfileRate(1)
-		profiler.Start()
-	}
-
-	if cfg.MaxCPUs > 0 {
-		runtime.GOMAXPROCS(cfg.MaxCPUs)
-	}
 
 	pool.SetCounterRegisterCallback(func(counter *pool.Counter) {
 		tags := stats.OptionStatTags{

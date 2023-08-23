@@ -19,19 +19,19 @@ use std::fmt;
 use std::net::IpAddr;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
 use ipnetwork::IpNetwork;
 use log::{debug, error};
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
-use crate::common::decapsulate::TunnelType;
-use crate::common::enums::TapType;
-use crate::common::lookup_key::LookupKey;
-use crate::common::platform_data::PlatformData;
-use crate::common::TapPort;
-use crate::utils::environment::is_tt_workload;
+use crate::{
+    common::{
+        decapsulate::TunnelType, enums::TapType, lookup_key::LookupKey,
+        platform_data::PlatformData, TapPort, Timestamp,
+    },
+    utils::environment::is_tt_workload,
+};
 use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
 
@@ -55,7 +55,7 @@ struct L3Item {
     tap_type: TapType,
     tap_port: TapPort,
 
-    last: Duration,
+    last: Timestamp,
     from: u16,
 }
 
@@ -175,7 +175,7 @@ impl Forward {
                         TunnelType::None,
                         0,
                     ),
-                    last: Duration::from_secs(0),
+                    last: Timestamp::ZERO,
                     from: FROM_CONTROLLER,
                     ip: ip.raw_ip,
                     mac,
@@ -249,7 +249,7 @@ impl Forward {
                         TunnelType::None,
                         0,
                     ),
-                    last: Duration::from_secs(0),
+                    last: Timestamp::ZERO,
                     from: FROM_CONFIG,
                     ip: ip.ip(),
                     mac,

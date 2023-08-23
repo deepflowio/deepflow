@@ -18,11 +18,14 @@ package event
 
 import (
 	"fmt"
+	"strings"
+
+	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/slices"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -46,7 +49,7 @@ func NewProcess(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Process {
 }
 
 func (p *Process) ProduceByAdd(items []*mysql.Process) {
-	processData, err := resource.GetProcessData(items)
+	processData, err := GetProcessData(items)
 	if err != nil {
 		log.Error(err)
 	}
@@ -148,4 +151,109 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 			id,
 		)
 	}
+}
+
+type ProcessData struct {
+	ResourceType int
+	ResourceName string
+	ResourceID   int
+	VTapName     string
+}
+
+func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
+	// store vtap info
+	vtapIDs := mapset.NewSet[uint32]()
+	for _, item := range processes {
+		vtapIDs.Add(item.VTapID)
+	}
+	var vtaps []mysql.VTap
+	if err := mysql.Db.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
+		return nil, err
+	}
+	type vtapInfo struct {
+		Name           string
+		Type           int
+		LaunchServerID int
+	}
+	vtapIDToInfo := make(map[int]vtapInfo, len(vtaps))
+	vmLaunchServerIDs := mapset.NewSet[int]()
+	podNodeLaunchServerIDs := mapset.NewSet[int]()
+	for _, vtap := range vtaps {
+		vtapIDToInfo[vtap.ID] = vtapInfo{
+			Name:           vtap.Name,
+			Type:           vtap.Type,
+			LaunchServerID: vtap.LaunchServerID,
+		}
+		if slices.Contains([]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P}, vtap.Type) {
+			vmLaunchServerIDs.Add(vtap.LaunchServerID)
+		} else if slices.Contains([]int{common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtap.Type) {
+			podNodeLaunchServerIDs.Add(vtap.LaunchServerID)
+		}
+	}
+
+	// store vm info
+	var vms []mysql.VM
+	if err := mysql.Db.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+		return nil, err
+	}
+	vmIDToName := make(map[int]string, len(vms))
+	for _, vm := range vms {
+		vmIDToName[vm.ID] = vm.Name
+	}
+
+	// store pod node info
+	var podNodes []mysql.PodNode
+	if err := mysql.Db.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+		return nil, err
+	}
+	podNodeIDToName := make(map[int]string, len(podNodes))
+	for _, podNode := range podNodes {
+		podNodeIDToName[podNode.ID] = podNode.Name
+	}
+
+	// store pod info
+	var pods []mysql.Pod
+	if err := mysql.Db.Find(&pods).Error; err != nil {
+		return nil, err
+	}
+	podIDToName := make(map[int]string, len(pods))
+	containerIDToPodID := make(map[string]int)
+	for _, pod := range pods {
+		podIDToName[pod.ID] = pod.Name
+		var containerIDs []string
+		if len(pod.ContainerIDs) > 0 {
+			containerIDs = strings.Split(pod.ContainerIDs, ", ")
+		}
+		for _, id := range containerIDs {
+			containerIDToPodID[id] = pod.ID
+		}
+	}
+
+	resp := make(map[int]ProcessData, len(processes))
+	for _, process := range processes {
+		var deviceType, resourceID int
+		var resourceName string
+
+		pVTapID := int(process.VTapID)
+		if podID, ok := containerIDToPodID[process.ContainerID]; ok {
+			deviceType = common.VIF_DEVICE_TYPE_POD
+			resourceName = podIDToName[podID]
+			resourceID = podID
+		} else {
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[pVTapID].Type]
+			if deviceType == common.VIF_DEVICE_TYPE_VM {
+				resourceName = vmIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
+			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+				resourceName = podNodeIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
+			}
+			resourceID = vtapIDToInfo[pVTapID].LaunchServerID
+		}
+		resp[process.ID] = ProcessData{
+			ResourceType: deviceType,
+			ResourceID:   resourceID,
+			ResourceName: resourceName,
+			VTapName:     vtapIDToInfo[pVTapID].Name,
+		}
+	}
+	return resp, nil
 }
