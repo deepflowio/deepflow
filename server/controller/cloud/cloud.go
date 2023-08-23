@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"regexp"
 	"sync"
 	"time"
 
@@ -61,17 +60,14 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 		return nil
 	}
 
-	domainConfigJson, _ := simplejson.NewJson([]byte(domain.Config))
-
 	log.Infof("cloud task (%s) init success", domain.Name)
 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		basicInfo: model.BasicInfo{
-			Lcuuid:        domain.Lcuuid,
-			Name:          domain.Name,
-			Type:          domain.Type,
-			PortNameRegex: domainConfigJson.Get("port_name_regex").MustString(),
+			Lcuuid: domain.Lcuuid,
+			Name:   domain.Name,
+			Type:   domain.Type,
 		},
 		platform:                platform,
 		kubernetesGatherTaskMap: make(map[string]*KubernetesGatherTask),
@@ -472,15 +468,6 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 }
 
 func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
-
-	if c.basicInfo.PortNameRegex == "" {
-		return resource
-	}
-
-	portRegex := regexp.MustCompile(c.basicInfo.PortNameRegex)
-	if !portRegex.MatchString("lo") {
-		return resource
-	}
 
 	if genesis.GenesisService == nil {
 		log.Error("genesis service is nil")
