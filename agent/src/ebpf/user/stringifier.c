@@ -169,8 +169,8 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 {
 	ASSERT(pid >= 0);
 
-	static const char *k_sym_prefix = "[k]";
-	static const char *u_sym_prefix = "[u]";
+	static const char *k_sym_prefix = "[k] ";
+	static const char *u_sym_prefix = "[u] ";
 	int len = 0;
 	char *ptr = NULL;
 	if (pid > 0) {
@@ -241,7 +241,7 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 	 */
 resolver_err:
 	snprintf(format_str, sizeof(format_str), "%s0x%016lx",
-		 pid == 0 ? "[k]" : "[u]",
+		 pid == 0 ? "[k] " : "[u] ",
 		 address);
 
 	len = strlen(format_str);
