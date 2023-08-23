@@ -39,12 +39,9 @@ span_name                  , span_name                 , span_name              
 
 vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111
 
-profile_location_str       , profile_location_str      , profile_location_str      , string        ,                       , Profile Info    , 111
 profile_value_unit         , profile_value_unit        , profile_value_unit        , string        ,                       , Profile Info    , 111
 profile_event_type         , profile_event_type        , profile_event_type        , string        ,                       , Profile Info    , 111
 profile_create_timestamp   , profile_create_timestamp  , profile_create_timestamp  , time          ,                       , Profile Info    , 111
 profile_in_timestamp       , profile_in_timestamp      , profile_in_timestamp      , time          ,                       , Profile Info    , 111
 profile_language_type      , profile_language_type     , profile_language_type     , string_enum   , profile_language_type , Profile Info    , 111
-profile_node_id            , profile_node_id           , profile_node_id           , int           ,                       , Profile Info    , 111
-profile_parent_node_id     , profile_parent_node_id    , profile_parent_node_id    , int           ,                       , Profile Info    , 111
 profile_id                 , profile_id                , profile_id                , string        ,                       , Profile Info    , 111
