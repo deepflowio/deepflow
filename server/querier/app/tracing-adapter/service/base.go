@@ -17,30 +17,27 @@
 package service
 
 import (
-	"sync"
-
-	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/model"
+	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service"
 	"github.com/op/go-logging"
 )
 
 var (
-	Adapters map[string]TraceAdapter
-	once     sync.Once
+	Adapters map[string]model.TraceAdapter
 	log_base = logging.MustGetLogger("tracing-adapter.base")
 )
 
-type TraceAdapter interface {
-	GetTrace(traceID string, c *config.ExternalAPM) (*model.ExTrace, error)
-}
-
-func MustRegister(name string, ad TraceAdapter) error {
-	once.Do(func() {
-		if Adapters == nil {
-			Adapters = make(map[string]TraceAdapter, 0)
+func Register() error {
+	if Adapters == nil {
+		Adapters = make(map[string]model.TraceAdapter, 0)
+	}
+	Adapters["skywalking"] = &SkyWalkingAdapter{}
+	subServices := packet_service.GetPacketServices()
+	if subServices != nil {
+		for k, v := range subServices {
+			Adapters[k] = v
 		}
-	})
-	Adapters[name] = ad
-	log_base.Debugf("external apm %s register success", name)
+		log_base.Debugf("external apm %s register success")
+	}
 	return nil
 }

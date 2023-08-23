@@ -37,7 +37,7 @@ var (
 
 type adapterPipeline struct {
 	config  adapter_config.ExternalAPM
-	adpater service.TraceAdapter
+	adpater model.TraceAdapter
 }
 
 func ensureAdapterConfig() {
@@ -45,6 +45,7 @@ func ensureAdapterConfig() {
 		return
 	}
 	once.Do(func() {
+		service.Register()
 		if len(pipeline) == 0 {
 			pipeline = make([]adapterPipeline, 0, len(config.Cfg.ExternalAPM))
 		}
