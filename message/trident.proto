@@ -854,6 +854,7 @@ message MetricLabelResponse {
 message TargetRequest {
     optional string job = 1;
     optional string instance = 2;
+    optional uint32 vtap_id = 3;
 }
 
 message TargetResponse {
@@ -863,6 +864,7 @@ message TargetResponse {
     optional uint32 instance_id = 4;
     optional uint32 target_id = 5; // when the Controller cannot determine the target_id, fill in 0
     repeated uint32 metric_ids = 6; // when requesting all prometheus information, you need to carry the metric list related to the target
+    repeated uint32 target_label_name_ids = 7; // when the target labels change, it needs to be synchronized to Ingester regularly
 }
 
 // when the request content is empty, it means requesting all metric label and target information
