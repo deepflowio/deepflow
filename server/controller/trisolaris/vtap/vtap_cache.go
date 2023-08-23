@@ -141,7 +141,10 @@ type VTapCache struct {
 
 	enabledTrafficDistribution   atomicbool.Bool
 	enabledNetworkMonitoring     atomicbool.Bool
+	enabledCallMonitoring        atomicbool.Bool
+	enabledFunctionMonitoring    atomicbool.Bool
 	enabledApplicationMonitoring atomicbool.Bool
+	enabledIndicatorMonitoring   atomicbool.Bool
 
 	cachedAt         time.Time
 	expectedRevision *string
@@ -214,7 +217,10 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.licenseFunctionSet = mapset.NewSet()
 	vTapCache.enabledTrafficDistribution = atomicbool.NewBool(false)
 	vTapCache.enabledNetworkMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledCallMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledFunctionMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledIndicatorMonitoring = atomicbool.NewBool(false)
 
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
@@ -254,9 +260,12 @@ func ConvertStrToIntList(convertStr string) ([]int, error) {
 }
 
 func (c *VTapCache) unsetLicenseFunctionEnable() {
-	c.enabledApplicationMonitoring.Unset()
+	c.enabledCallMonitoring.Unset()
 	c.enabledNetworkMonitoring.Unset()
 	c.enabledTrafficDistribution.Unset()
+	c.enabledFunctionMonitoring.Unset()
+	c.enabledApplicationMonitoring.Unset()
+	c.enabledIndicatorMonitoring.Unset()
 }
 
 func (c *VTapCache) convertLicenseFunctions() {
@@ -278,14 +287,23 @@ func (c *VTapCache) convertLicenseFunctions() {
 	}
 	c.licenseFunctionSet = functionSet
 
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
-		c.enabledApplicationMonitoring.Set()
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_CALL_MONITORING) {
+		c.enabledCallMonitoring.Set()
 	}
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_NETWORK_MONITORING) {
 		c.enabledNetworkMonitoring.Set()
 	}
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION) {
 		c.enabledTrafficDistribution.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING) {
+		c.enabledFunctionMonitoring.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
+		c.enabledApplicationMonitoring.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING) {
+		c.enabledIndicatorMonitoring.Set()
 	}
 }
 
@@ -304,7 +322,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	if configure == nil {
 		return
 	}
-	if c.EnabledApplicationMonitoring() == false &&
+	if c.EnabledCallMonitoring() == false &&
 		c.EnabledNetworkMonitoring() == false {
 		configure.L7MetricsEnabled = DISABLED
 		configure.ConvertedL7LogStoreTapTypes = nil
@@ -324,14 +342,14 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	if c.EnabledNetworkMonitoring() == true &&
-		c.EnabledApplicationMonitoring() == false {
+		c.EnabledCallMonitoring() == false {
 		yamlConfig.L7ProtocolEnabled = NetWorkL7ProtocolEnabled
 	} else if c.EnabledNetworkMonitoring() == false &&
-		c.EnabledApplicationMonitoring() == false {
+		c.EnabledCallMonitoring() == false {
 		yamlConfig.L7ProtocolEnabled = nil
 	}
 
-	if c.EnabledApplicationMonitoring() == false {
+	if c.EnabledCallMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
 			yamlConfig.Ebpf = &cmodel.EbpfConfig{
 				Disabled: proto.Bool(true),
@@ -339,6 +357,29 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		} else {
 			yamlConfig.Ebpf.Disabled = proto.Bool(true)
 		}
+	}
+
+	if c.EnabledFunctionMonitoring() == false {
+		if yamlConfig.Ebpf == nil {
+			yamlConfig.Ebpf = &cmodel.EbpfConfig{}
+		}
+		if yamlConfig.Ebpf.OnCpuProfile == nil {
+			yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
+				Disabled: proto.Bool(true),
+			}
+		} else {
+			yamlConfig.Ebpf.OnCpuProfile.Disabled = proto.Bool(true)
+		}
+
+		yamlConfig.ExternalProfileIntegrationDisabled = proto.Bool(true)
+	}
+
+	if c.EnabledApplicationMonitoring() == false {
+		yamlConfig.ExternalTraceIntegrationDisabled = proto.Bool(true)
+	}
+
+	if c.EnabledIndicatorMonitoring() == false {
+		yamlConfig.ExternalMetricIntegrationDisabled = proto.Bool(true)
 	}
 
 	b, err := yaml.Marshal(yamlConfig)
@@ -349,8 +390,8 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	configure.YamlConfig = string(b)
 }
 
-func (c *VTapCache) EnabledApplicationMonitoring() bool {
-	return c.enabledApplicationMonitoring.IsSet()
+func (c *VTapCache) EnabledCallMonitoring() bool {
+	return c.enabledCallMonitoring.IsSet()
 }
 
 func (c *VTapCache) EnabledNetworkMonitoring() bool {
@@ -359,6 +400,18 @@ func (c *VTapCache) EnabledNetworkMonitoring() bool {
 
 func (c *VTapCache) EnabledTrafficDistribution() bool {
 	return c.enabledTrafficDistribution.IsSet()
+}
+
+func (c *VTapCache) EnabledFunctionMonitoring() bool {
+	return c.enabledFunctionMonitoring.IsSet()
+}
+
+func (c *VTapCache) EnabledApplicationMonitoring() bool {
+	return c.enabledApplicationMonitoring.IsSet()
+}
+
+func (c *VTapCache) EnabledIndicatorMonitoring() bool {
+	return c.enabledIndicatorMonitoring.IsSet()
 }
 
 func (c *VTapCache) updateLicenseFunctions(licenseFunctions string) {
