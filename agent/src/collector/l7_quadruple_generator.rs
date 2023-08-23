@@ -273,11 +273,15 @@ impl SubQuadGen {
                 }
             }
         } else {
+            // app_meter.traffic.request and app_meter.traffic.response are 0, there is no need to save
+            if app_meter.traffic.request == 0 && app_meter.traffic.response == 0 {
+                return;
+            }
             // If l7_stats.flow.is_some(), set the flow of all meter belonging to this flow
             if let Some(tagged_flow) = &l7_stats.flow {
                 let (is_active_host0, is_active_host1) =
                     check_active(time_in_second.as_secs(), possible_host, &tagged_flow.flow);
-                let app_meter = Box::new(AppMeterWithFlow {
+                let boxed_app_meter = Box::new(AppMeterWithFlow {
                     app_meter: *app_meter,
                     flow: tagged_flow.clone(),
                     l7_protocol: l7_stats.l7_protocol,
@@ -286,7 +290,7 @@ impl SubQuadGen {
                     is_active_host0,
                     is_active_host1,
                 });
-                stash.meters.push(app_meter);
+                stash.meters.push(boxed_app_meter);
             } else {
                 let meter = AppMeterWithL7Protocol {
                     app_meter: *app_meter,

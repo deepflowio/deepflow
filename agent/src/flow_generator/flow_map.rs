@@ -1324,7 +1324,12 @@ impl FlowMap {
         }
     }
 
-    fn collect_l7_stats(&mut self, node: &mut FlowNode, new_endpoint: Option<String>) {
+    fn collect_l7_stats(
+        &mut self,
+        node: &mut FlowNode,
+        meta_packet: &MetaPacket,
+        new_endpoint: Option<String>,
+    ) {
         let flow_id = &node.tagged_flow.flow.flow_id;
         // The original endpoint is inconsistent with new_endpoint
         if let (Some(flow_perf_stats), Some(last_endpoint), Some(new_endpoint)) = (
@@ -1363,10 +1368,9 @@ impl FlowMap {
                     .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
         }
-        if let Some(new_endpoint) = new_endpoint {
-            if !new_endpoint.is_empty() {
-                node.tagged_flow.flow.last_endpoint = Some(new_endpoint);
-            }
+        // endpoint as long as it can be parsed in the request packet
+        if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
+            node.tagged_flow.flow.last_endpoint = new_endpoint;
         }
     }
 
@@ -1414,12 +1418,12 @@ impl FlowMap {
                     }
                     match info {
                         crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
-                            self.collect_l7_stats(node, s.get_endpoint());
+                            self.collect_l7_stats(node, &meta_packet, s.get_endpoint());
                             self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
                         }
                         crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
                             for i in m.into_iter() {
-                                self.collect_l7_stats(node, i.get_endpoint());
+                                self.collect_l7_stats(node, &meta_packet, i.get_endpoint());
                                 self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
                             }
                         }
