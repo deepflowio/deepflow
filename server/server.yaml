@@ -258,7 +258,7 @@ querier:
     host: deepflow-app
     port: 20418
 
-  otel-endpoint: otel-agent.open-telemetry:4317
+  otel-endpoint: http://deepflow-agent/api/v1/otel/trace
   limit: 10000
   time-fill-limit: 20
 

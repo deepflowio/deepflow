@@ -48,7 +48,7 @@ type QuerierConfig struct {
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`
 	Language                        string                        `default:"en" yaml:"language"`
-	OtelEndpoint                    string                        `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+	OtelEndpoint                    string                        `default:"http://deepflow-agent/api/v1/otel/trace" yaml:"otel-endpoint"`
 	Limit                           string                        `default:"10000" yaml:"limit"`
 	TimeFillLimit                   int                           `default:"20" yaml:"time-fill-limit"`
 	PrometheusCacheUpdateInterval   int                           `default:"60" yaml:"prometheus-cache-update-interval"`
