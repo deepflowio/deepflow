@@ -147,7 +147,11 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn get_endpoint(&self) -> Option<String> {
         if self.is_grpc() {
-            Some(self.path.clone())
+            if self.path.is_empty() {
+                None
+            } else {
+                Some(self.path.clone())
+            }
         } else {
             None
         }
