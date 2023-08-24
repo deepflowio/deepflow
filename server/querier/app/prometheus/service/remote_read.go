@@ -66,7 +66,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 			ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
 		}
 	} else {
-		var sql, db, datasource string
+		var db, datasource string
 		var debugInfo map[string]interface{}
 		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end)
 		// fmt.Println(sql, db)
