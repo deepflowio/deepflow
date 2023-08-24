@@ -340,6 +340,7 @@ impl EbpfCollector {
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
             profile.count = data.count;
+            profile.netns_id = data.netns_id;
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
