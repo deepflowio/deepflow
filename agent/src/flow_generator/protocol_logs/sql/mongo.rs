@@ -68,6 +68,7 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
     }
 }
 
+// 协议文档: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
 impl MongoDBInfo {
     fn merge(&mut self, other: Self) {
         self.message_length = other.message_length;
@@ -147,6 +148,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
         false
     }
 
+    // TODO
     fn reset(&mut self) {
         self.info = MongoDBInfo::default();
         self.perf_stats = self.perf_stats.take();
@@ -158,7 +160,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
 }
 
 impl MongoDBLog {
-    // return is_greeting?
+    // TODO: tracing
     fn parse(
         &mut self,
         payload: &[u8],
@@ -217,24 +219,26 @@ impl MongoDBHeader {
         self.response_to = bytes::read_u32_le(&payload[8..12]);
         return self.length as isize;
     }
+
     pub fn get_op_str(&self) -> &'static str {
         match self.op_code {
-            0x00000001 => "OP_REPLY",
-            0x000003E8 => "DB_MSG",
-            0x000007D1 => "OP_UPDATE",
-            0x000007D2 => "OP_INSERT",
-            0x000007D3 => "RESERVED",
-            0x000007D4 => "OP_QUERY",
-            0x000007D5 => "OP_GET_MORE",
-            0x000007D6 => "OP_DELETE",
-            0x000007D7 => "OP_KILL_CURSORS",
-            0x000007DC => "OP_COMPRESSED",
-            0x000007DD => "OP_MSG",
+            1 => "OP_REPLY",
+            1000 => "DB_MSG",
+            2001 => "OP_UPDATE",
+            2002 => "OP_INSERT",
+            2003 => "RESERVED",
+            2004 => "OP_QUERY",
+            2005 => "OP_GET_MORE",
+            2006 => "OP_DELETE",
+            2007 => "OP_KILL_CURSORS",
+            2012 => "OP_COMPRESSED",
+            2013 => "OP_MSG",
             _ => "OP_UNKNOWN",
         }
     }
 }
 
+// TODO: support compressed
 pub struct MongoOpCompressed {
     original_op_code: u32,
     uncompressed_size: u32,
@@ -242,32 +246,39 @@ pub struct MongoOpCompressed {
     //char: String,
 }
 
+// TODO: support op msg
 pub struct MongoOpMsg {
     flag: u32,
 }
 
 // Deprecated as of MongoDB 5.0.
 // Unsupported as of MongoDB 5.1.
+// TODO: support
 pub struct MongoOpDel {
     zero: u32,
 }
 
+// TODO: support
 pub struct MongoOpGetMore {
     zero: u32,
 }
 
+// TODO: support
 pub struct MongoOpInsert {
     zero: u32,
 }
 
+// TODO: support
 pub struct MongoOpKillCursors {
     zero: u32,
 }
 
+// TODO: support
 pub struct MongoOpQuery {
     flags: u32,
 }
 
+// TODO: support
 pub struct MongoOpReply {
     response_flags: u32,
     cursor_id: u64,
@@ -275,6 +286,7 @@ pub struct MongoOpReply {
     number_to_return: u32,
 }
 
+// TODO: support
 pub struct MongoOpUpdate {
     zero: u32,
 }
