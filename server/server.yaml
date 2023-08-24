@@ -543,18 +543,21 @@ ingester:
   #flow-tag-cache-flush-timeout: 1800
 
   ## export to OTLP collector, now only support protocol 'grpc'
-  #otlp-exporter:
-  #  enabled: false
-  #  addr: 127.0.0.1:4317 # grpc protobuf addr
-  #  # export datas ranges: cbpf-net-span, ebpf-sys-span
-  #  export-datas: [cbpf-net-span,ebpf-sys-span]
-  #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
-  #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
-  #  queue-count: 4       # parallelism of sender
-  #  queue-size: 100000   # size of each exporter queue
-  #  export-custom-k8s-labels-regexp:  # type string, default: "", means not export custom k8s labels. for example: ".+", means export all custom k8s labels; "aaa|bbb": means export labels which contains 'aaa' or 'bbb' string. ref: https://github.com/google/re2/wiki/Syntax
-  #  export-only-with-traceid: false # if set 'true', if the span has no trace id, it will not be exported
-  #  export-batch-count: 32 # ExportRequest contains defalut(32) ResourceSpans(each l7_flow_log corresponds to a ResourceSpans)
-  #  grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
-  #    key1: value1
-  #    key2: value2
+#  exporters:
+#    - name: default otlp exporter
+#      type: otlp-exporter
+#      otlp-exporter:
+#        enabled: false
+#        addr: 127.0.0.1:4317 # grpc protobuf addr
+#        # export datas ranges: cbpf-net-span, ebpf-sys-span
+#        export-datas: [cbpf-net-span,ebpf-sys-span]
+#        # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
+#        export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
+#        queue-count: 4       # parallelism of sender
+#        queue-size: 100000   # size of each exporter queue
+#        export-custom-k8s-labels-regexp:  # type string, default: "", means not export custom k8s labels. for example: ".+", means export all custom k8s labels; "aaa|bbb": means export labels which contains 'aaa' or 'bbb' string. ref: https://github.com/google/re2/wiki/Syntax
+#        export-only-with-traceid: false # if set 'true', if the span has no trace id, it will not be exported
+#        export-batch-count: 32 # ExportRequest contains defalut(32) ResourceSpans(each l7_flow_log corresponds to a ResourceSpans)
+#        grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
+#          key1: value1
+#          key2: value2

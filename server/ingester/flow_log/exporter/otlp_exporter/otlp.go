@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package exporter
+package otlp_exporter
 
 import (
 	crand "crypto/rand"
@@ -29,11 +29,12 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	_ "go.opentelemetry.io/proto/otlp/common/v1"
 
+	"github.com/google/gopacket/layers"
+
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/google/gopacket/layers"
 )
 
 func putStrWithoutEmpty(attrs pcommon.Map, key, value string) {
