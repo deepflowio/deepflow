@@ -45,7 +45,9 @@ use num_enum::IntoPrimitive;
 use regex::Regex;
 
 use super::{Error, InterfaceInfo, Result};
-use crate::utils::net::{addr_list, link_list, links_by_name_regex, Link, IF_TYPE_IPVLAN};
+use crate::utils::net::{
+    addr_list, link_by_name, link_list, links_by_name_regex, Addr, Link, IF_TYPE_IPVLAN,
+};
 
 #[derive(IntoPrimitive)]
 #[repr(u16)]
@@ -531,6 +533,13 @@ impl WrappedSocket {
     }
 }
 
+pub fn link_by_name_in_netns<S: AsRef<str>>(name: S, ns: &NsFile) -> Result<Link> {
+    let _ = open_named_and_setns(ns)?;
+    let link = link_by_name(name.as_ref())?;
+    reset_netns()?;
+    Ok(link)
+}
+
 pub fn links_by_name_regex_in_netns<S: AsRef<str>>(regex: S, ns: &NsFile) -> Result<Vec<Link>> {
     let _ = open_named_and_setns(ns)?;
     let links = links_by_name_regex(regex.as_ref())?;
@@ -543,4 +552,11 @@ pub fn link_list_in_netns(ns: &NsFile) -> Result<Vec<Link>> {
     let links = link_list()?;
     reset_netns()?;
     Ok(links)
+}
+
+pub fn addr_list_in_netns(ns: &NsFile) -> Result<Vec<Addr>> {
+    let _ = open_named_and_setns(ns)?;
+    let addrs = addr_list()?;
+    reset_netns()?;
+    Ok(addrs)
 }

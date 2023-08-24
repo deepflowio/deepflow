@@ -50,6 +50,7 @@ use crate::{
 use public::{
     buffer::{Allocator, BatchedBuffer},
     debug::QueueDebugger,
+    netns::NsFile,
     proto::trident::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
@@ -71,6 +72,10 @@ pub struct AnalyzerModeDispatcherListener {
 }
 
 impl AnalyzerModeDispatcherListener {
+    pub fn netns(&self) -> &NsFile {
+        &self.base.netns
+    }
+
     pub fn on_tap_interface_change(&self, _: &Vec<Link>, _: IfMacSource) {
         self.base
             .on_tap_interface_change(vec![], IfMacSource::IfMac);

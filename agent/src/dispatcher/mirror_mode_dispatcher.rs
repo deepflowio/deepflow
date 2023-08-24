@@ -57,8 +57,11 @@ use crate::{
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
 use public::packet::Packet;
-use public::proto::{common::TridentType, trident::IfMacSource};
-use public::utils::net::{Link, MacAddr};
+use public::{
+    netns::NsFile,
+    proto::{common::TridentType, trident::IfMacSource},
+    utils::net::{Link, MacAddr},
+};
 
 const IF_INDEX_MAX_SIZE: usize = 1000;
 
@@ -73,6 +76,10 @@ pub struct MirrorModeDispatcherListener {
 }
 
 impl MirrorModeDispatcherListener {
+    pub fn netns(&self) -> &NsFile {
+        &self.base.netns
+    }
+
     pub fn on_tap_interface_change(
         &self,
         _: &Vec<Link>,

@@ -124,9 +124,9 @@ impl DispatcherFlavor {
         }
     }
 
-    fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+    fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
         match self {
-            DispatcherFlavor::Local(d) => d.switch_recv_engine(pcap_interfaces),
+            DispatcherFlavor::Local(d) => d.switch_recv_engine(config),
             _ => todo!(),
         }
     }
@@ -182,7 +182,7 @@ impl Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn switch_recv_engine(&self, pcap_interfaces: Vec<Link>) {
+    pub fn switch_recv_engine(&self, config: &DispatcherConfig) {
         self.stop();
         if let Err(e) = self
             .flavor
@@ -190,7 +190,7 @@ impl Dispatcher {
             .unwrap()
             .as_mut()
             .ok_or(Error::DispatcherFlavorEmpty)
-            .and_then(|d| d.switch_recv_engine(pcap_interfaces))
+            .and_then(|d| d.switch_recv_engine(config))
         {
             error!("switch RecvEngine error: {}, deepflow-agent restart...", e);
             thread::sleep(Duration::from_secs(1));
@@ -237,10 +237,11 @@ impl FlowAclListener for DispatcherListener {
 }
 
 impl DispatcherListener {
-    pub(super) fn netns(&self) -> NsFile {
+    pub(super) fn netns(&self) -> &NsFile {
         match self {
-            Self::Local(l) => l.netns(),
-            _ => NsFile::Root,
+            Self::Local(a) => a.netns(),
+            Self::Mirror(a) => a.netns(),
+            Self::Analyzer(a) => a.netns(),
         }
     }
 

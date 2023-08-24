@@ -285,8 +285,8 @@ impl LocalModeDispatcher {
 }
 
 impl LocalModeDispatcher {
-    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        self.base.switch_recv_engine(pcap_interfaces)
+    pub(super) fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
+        self.base.switch_recv_engine(config)
     }
 }
 
@@ -311,8 +311,8 @@ impl LocalModeDispatcherListener {
         }
     }
 
-    pub(super) fn netns(&self) -> NsFile {
-        self.base.netns.clone()
+    pub fn netns(&self) -> &NsFile {
+        &self.base.netns
     }
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {

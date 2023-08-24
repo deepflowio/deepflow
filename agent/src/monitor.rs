@@ -39,6 +39,8 @@ use crate::{
         },
     },
 };
+#[cfg(target_os = "linux")]
+use public::netns::{self, NsFile};
 use public::utils::net::link_list;
 
 #[derive(Default)]
@@ -333,11 +335,22 @@ impl Monitor {
         self.stats.register_pre_hook(Box::new(move || {
             let mut link_map_guard = link_map.lock().unwrap();
 
+            #[cfg(target_os = "linux")]
+            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                warn!("setns error: {}", e);
+                return;
+            }
+
             // resolve network interface update
             let links = match link_list() {
                 Ok(links) => links,
                 Err(e) => {
                     warn!("get interface list error: {}", e);
+                    #[cfg(target_os = "linux")]
+                    if let Err(e) = netns::reset_netns() {
+                        warn!("reset netns error: {}", e);
+                    };
                     return;
                 }
             };
@@ -396,6 +409,11 @@ impl Monitor {
                     broker.update(metric);
                 }
             }
+
+            #[cfg(target_os = "linux")]
+            if let Err(e) = netns::reset_netns() {
+                warn!("reset netns error: {}", e);
+            };
         }));
 
         self.stats.register_countable(
