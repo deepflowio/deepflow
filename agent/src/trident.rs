@@ -331,7 +331,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = Arc::new(stats::Collector::new(&hostname));
+        let stats_collector = stats::Collector::new(&hostname);
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -377,7 +377,7 @@ impl Trident {
         version_info: &'static VersionInfo,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
-        stats_collector: Arc<stats::Collector>,
+        mut stats_collector: stats::Collector,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
     ) -> Result<()> {
@@ -487,6 +487,8 @@ impl Trident {
             Default::default(),
         );
         synchronizer.start();
+        stats_collector.set_ntp_diff(synchronizer.ntp_diff());
+        let stats_collector = Arc::new(stats_collector);
 
         let mut cgroup_mount_path = "".to_string();
         let mut is_cgroup_v2 = false;
@@ -1940,6 +1942,7 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 i as u32,
                 config_handler.log_parser(),
+                synchronizer.ntp_diff(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -2253,6 +2256,7 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
                 config_handler.log_parser(),
+                synchronizer.ntp_diff(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -2291,6 +2295,7 @@ impl AgentComponents {
             )
             .ok();
             if let Some(collector) = &ebpf_collector {
+                synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));
                 stats_collector.register_countable(
                     "ebpf-collector",
                     Countable::Owned(Box::new(collector.get_sync_counter())),

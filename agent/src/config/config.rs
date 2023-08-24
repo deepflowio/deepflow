@@ -486,6 +486,10 @@ pub struct YamlConfig {
     pub external_profile_integration_disabled: bool,
     pub external_trace_integration_disabled: bool,
     pub external_metric_integration_disabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub ntp_max_interval: Duration,
+    #[serde(with = "humantime_serde")]
+    pub ntp_min_interval: Duration,
 }
 
 impl YamlConfig {
@@ -830,6 +834,8 @@ impl Default for YamlConfig {
             external_profile_integration_disabled: false,
             external_trace_integration_disabled: false,
             external_metric_integration_disabled: false,
+            ntp_max_interval: Duration::from_secs(300),
+            ntp_min_interval: Duration::from_secs(10),
         }
     }
 }

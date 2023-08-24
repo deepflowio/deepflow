@@ -129,6 +129,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_read");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
 
 	// exit tracepoints
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
@@ -142,6 +143,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
 
@@ -734,6 +737,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->process_kname[sizeof(submit_data->process_kname) -
 					   1] = '\0';
 		submit_data->msg_type = sd->msg_type;
+		submit_data->socket_role = sd->socket_role;
 
 		// 各种协议的统计
 		if (sd->data_type >= PROTO_NUM)
@@ -2338,6 +2342,8 @@ void print_uprobe_grpc_dataframe(const char *data, int len)
 
 void print_dns_info(const char *data, int len)
 {
+	// FIXME: crash
+	return;
 	//refer: https://www.binarytides.com/dns-query-code-in-c-with-winsock/
 	struct DNS_HEADER *header = (struct DNS_HEADER *)data;
 	unsigned char *qname = (unsigned char *)(header + 1);

@@ -249,13 +249,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	}
 	oldRetentionTime := dataSource.RetentionTime
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
-	if dataSource.DisplayName != dataSourceUpdate.DisplayName {
-		if utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSourceUpdate.DisplayName) {
-			return model.DataSource{}, NewError(
-				httpcommon.INVALID_POST_DATA,
-				fmt.Sprintf("data_source default name(%s) cannot be modified", dataSource.DisplayName),
-			)
-		}
+	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
 		dataSource.DisplayName = dataSourceUpdate.DisplayName
 	}
 
