@@ -484,12 +484,12 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		name := p.GetName()
 		if len(name) > 256 {
 			log.Warningf("process name too long: %v, command line: %v, pid: %v", name, p.GetCmdline(), pID)
-			name = truncateTo256(name)
+			name = name[:genesiscommon.PROCESS_NAME_LENGTH_MAX]
 		}
 		processName := p.GetProcessName()
 		if len(processName) > 256 {
 			log.Warningf("process process_name too long: %v, command line: %v, pid: %v", processName, p.GetCmdline(), pID)
-			processName = truncateTo256(processName)
+			processName = processName[:genesiscommon.PROCESS_NAME_LENGTH_MAX]
 		}
 		processes = append(processes, model.GenesisProcess{
 			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
@@ -506,10 +506,6 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		})
 	}
 	return processes
-}
-
-func truncateTo256(str string) string {
-	return str[:256]
 }
 
 func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer string, vtapID uint32) GenesisSyncDataOperation {
