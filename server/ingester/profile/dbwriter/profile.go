@@ -80,9 +80,11 @@ type InProcessProfile struct {
 	PodNSID      uint16
 	PodClusterID uint16
 	PodGroupID   uint32
-	IP4          uint32 `json:"ip4"`
-	IP6          net.IP `json:"ip6"`
-	IsIPv4       bool   `json:"is_ipv4"`
+	NetnsID      uint32
+
+	IP4    uint32 `json:"ip4"`
+	IP6    net.IP `json:"ip6"`
+	IsIPv4 bool   `json:"is_ipv4"`
 
 	L3DeviceType uint8
 	L3DeviceID   uint32
@@ -153,6 +155,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID"),
 		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID"),
 		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID"),
+		ckdb.NewColumn("netns_id", ckdb.UInt32).SetComment("应用网络命名空间ID"),
 
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
@@ -220,6 +223,7 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.PodNSID,
 		p.PodClusterID,
 		p.PodGroupID,
+		p.NetnsID,
 		p.L3DeviceType,
 		p.L3DeviceID,
 		p.ServiceID,
@@ -258,6 +262,7 @@ func ReleaseInProcess(p *InProcessProfile) {
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
 	vtapID uint16,
+	netNsID uint64,
 	profileName string,
 	eventType string,
 	location string,
@@ -293,7 +298,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
-	p.fillResource(uint32(vtapID), platformData)
+	p.fillResource(uint32(vtapID), netNsID, platformData)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -301,7 +306,7 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillResource(vtapID uint32, netNsID uint64, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
 	if vtapInfo != nil {
 		p.L3EpcID = vtapInfo.EpcId
@@ -309,10 +314,19 @@ func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.Platfo
 	}
 
 	var info *grpc.Info
-	if p.IsIPv4 {
-		info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
+	if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
+		// ebpf profile will submit netns from agent
+		if netNsID != 0 {
+			info = platformData.QueryNetnsIdInfo(vtapID, uint32(netNsID))
+			p.NetnsID = uint32(netNsID)
+		}
 	} else {
-		info = platformData.QueryIPV6Infos(p.L3EpcID, p.IP6)
+		// app profile will submit IP from agent
+		if p.IsIPv4 {
+			info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
+		} else {
+			info = platformData.QueryIPV6Infos(p.L3EpcID, p.IP6)
+		}
 	}
 
 	if info != nil {
