@@ -28,6 +28,9 @@ BEGIN
     ALTER TABLE data_source RENAME COLUMN name TO display_name;
     ALTER TABLE data_source RENAME COLUMN tsdb_type TO data_table_collection;
 
+    UPDATE data_source SET data_table_collection='flow_metrics.vtap_app*'  WHERE data_table_collection='app' AND display_name in('1h', '1d');
+    UPDATE data_source SET data_table_collection='flow_metrics.vtap_flow*'  WHERE data_table_collection='flow' AND display_name in('1h', '1d');
+
     set @lcuuid = (select uuid());
     INSERT INTO data_source (display_name, data_table_collection, `interval`, retention_time, lcuuid) 
                  VALUES ('外部指标数据', 'ext_metrics.*', 0, 7*24, @lcuuid);
