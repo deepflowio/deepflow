@@ -215,6 +215,7 @@ pub struct SK_BPF_DATA {
     pub syscall_len: u64,      // 本次系统调用读、写数据的总长度
     pub cap_len: u32,          // 返回的cap_data长度
     pub cap_seq: u64, // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
+    pub socket_role: u8, // this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
     pub cap_data: *mut c_char, // 内核送到用户空间的数据地址
 }
 
@@ -351,6 +352,7 @@ pub struct stack_profile_data {
      */
     pub tid: u32,
     pub stime: u64,      // The start time of the process is measured in milliseconds.
+    pub netns_id: u64,   // Fetch from /proc/<PID>/ns/net
     pub u_stack_id: u32, // User space stackID.
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?

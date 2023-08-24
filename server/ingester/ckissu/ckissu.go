@@ -922,6 +922,12 @@ var ColumnAdd635 = []*ColumnAdds{
 		ColumnNames: []string{"process_start_time"},
 		ColumnType:  ckdb.DateTime64,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"netns_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var ColumnDrops635 = []*ColumnDrops{

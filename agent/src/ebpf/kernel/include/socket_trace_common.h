@@ -71,6 +71,7 @@ struct __socket_data {
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL
 	__u16 data_len;      // 数据长度
+	__u8  socket_role;   // this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
 	char data[BURST_DATA_BUF_SIZE];
 } __attribute__((packed));
 

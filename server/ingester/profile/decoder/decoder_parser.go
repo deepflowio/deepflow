@@ -36,6 +36,7 @@ type Parser struct {
 	profileName string
 	vtapID      uint16
 	IP          net.IP
+	netNsID     uint64
 
 	// profileWriter.Write
 	callBack func(interface{})
@@ -115,6 +116,7 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 	ret.FillProfile(input,
 		p.platformData,
 		p.vtapID,
+		p.netNsID,
 		p.profileName,
 		eventType,
 		location,

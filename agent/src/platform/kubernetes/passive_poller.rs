@@ -256,7 +256,7 @@ impl PassivePoller {
             let now = SystemTime::now();
             // 每分钟移除超时的记录
             // Remove timed out records every minute
-            if now.duration_since(last_expire).unwrap() > MINUTE {
+            if now < last_expire || now.duration_since(last_expire).unwrap() > MINUTE {
                 ignored_indice = Self::get_ignored_interface_indice();
                 let mut entries_gurad = entries.lock().unwrap();
                 let old_len = entries_gurad.len();
@@ -370,7 +370,9 @@ impl PassivePoller {
             }
             let new_version = version.load(Ordering::Relaxed);
             if last_version != new_version {
-                if now.duration_since(last_version_log).unwrap() > MINUTE {
+                // Local timestamp may be modified
+                if now < last_version_log || now.duration_since(last_version_log).unwrap() > MINUTE
+                {
                     info!("kubernetes poller updated to version {new_version}");
                     last_version_log = now;
                     if log_enabled!(Level::Debug) {

@@ -18,7 +18,7 @@ use std::fmt;
 use std::io;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicI64, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
@@ -28,6 +28,7 @@ use cadence::{Metric, MetricBuilder, MetricError, MetricResult, MetricSink, Stat
 use log::{debug, info, warn};
 use prost::Message;
 
+use crate::rpc::get_timestamp;
 pub use public::counter::*;
 use public::{
     proto::stats,
@@ -73,7 +74,7 @@ pub struct Batch {
     hostname: String,
     tags: Vec<(&'static str, String)>,
     points: Vec<Counter>,
-    timestamp: SystemTime,
+    timestamp: u32,
 }
 
 impl Batch {
@@ -107,11 +108,7 @@ impl Batch {
 
         stats::Stats {
             name: format!("{}_{}", STATS_PREFIX, self.module).replace("-", "_"),
-            timestamp: self
-                .timestamp
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: self.timestamp as u64,
             tag_names,
             tag_values,
             metrics_float_names,
@@ -142,6 +139,7 @@ pub struct Collector {
 
     min_interval: Arc<AtomicU64>,
 
+    ntp_diff: Arc<AtomicI64>,
     running: Arc<(Mutex<bool>, Condvar)>,
     thread: Mutex<Option<JoinHandle<()>>>,
 
@@ -152,6 +150,10 @@ pub struct Collector {
 impl Collector {
     pub fn new<S: AsRef<str>>(hostname: S) -> Self {
         Self::with_min_interval(hostname, TICK_CYCLE)
+    }
+
+    pub fn set_ntp_diff(&mut self, ntp_diff: Arc<AtomicI64>) {
+        self.ntp_diff = ntp_diff;
     }
 
     pub fn with_min_interval<S: AsRef<str>>(hostname: S, interval: Duration) -> Self {
@@ -173,6 +175,7 @@ impl Collector {
             thread: Mutex::new(None),
             sender: Arc::new(stats_queue_sender),
             receiver: Arc::new(stats_queue_receiver),
+            ntp_diff: Arc::new(AtomicI64::new(0)),
         };
         Self::register_countable(
             &s,
@@ -304,6 +307,7 @@ impl Collector {
         let hostname = self.hostname.clone();
         let min_interval = self.min_interval.clone();
         let sender = self.sender.clone();
+        let ntp_diff = self.ntp_diff.clone();
         *self.thread.lock().unwrap() = Some(
             thread::Builder::new()
                 .name("stats-collector".to_owned())
@@ -314,7 +318,7 @@ impl Collector {
                             pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
                         }
 
-                        let now = SystemTime::now();
+                        let now = get_timestamp(ntp_diff.load(Ordering::Relaxed)).as_secs() as u32;
                         {
                             let mut sources = sources.lock().unwrap();
                             let min_interval_loaded = min_interval.load(Ordering::Relaxed);

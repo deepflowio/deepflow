@@ -143,7 +143,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if !self.service_name.is_empty() && !self.method_name.is_empty() {
+        if !self.service_name.is_empty() || !self.method_name.is_empty() {
             Some(format!("{}/{}", self.service_name, self.method_name))
         } else {
             None

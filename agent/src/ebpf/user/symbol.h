@@ -53,6 +53,7 @@ struct symbolizer_proc_info {
 	/* The process creation time since
 	 * system boot, (in milliseconds) */
 	u64 stime;
+	u64 netns_id;
 	/* process name */
 	char comm[TASK_COMM_LEN];
 };
@@ -129,6 +130,12 @@ cache_process_stime(struct symbolizer_cache_kvp *kv)
 	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
 }
 
+static_always_inline u64
+cache_process_netns_id(struct symbolizer_cache_kvp *kv)
+{
+	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->netns_id;
+}
+
 static_always_inline void
 copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 {
@@ -151,8 +158,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid);
 uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
-u64 get_pid_stime_and_name(pid_t pid, char *name);
-
+void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id, char *name);
 #ifndef AARCH64_MUSL
 void *get_symbol_cache(pid_t pid, bool new_cache);
 int create_and_init_symbolizer_caches(void);

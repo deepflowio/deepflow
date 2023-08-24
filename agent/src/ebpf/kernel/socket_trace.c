@@ -1085,16 +1085,21 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			      &thread_trace_id, time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
-			sk_info.peer_fd = socket_info_ptr->peer_fd;
-			thread_trace_id = socket_info_ptr->trace_id;
+		if (socket_info_ptr) {
+			sk_info.role = socket_info_ptr->role;
+			if (conn_info->direction == T_EGRESS) {
+				sk_info.peer_fd = socket_info_ptr->peer_fd;
+				thread_trace_id = socket_info_ptr->trace_id;
+			}
 		}
 
 		sk_info.uid = trace_conf->socket_id + 1;
 		trace_conf->socket_id++; // Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
-		sk_info.role = conn_info->role;
+		if(conn_info->role){
+			sk_info.role = conn_info->role;
+		}
 		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
@@ -1126,6 +1131,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
+		sk_info.role = socket_info_ptr->role;
 
 		/*
 		 * 同方向多个连续请求或回应的场景时，
@@ -1185,6 +1191,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    (extra->source == DATA_SOURCE_OPENSSL_UPROBE))
 		v->data_type = PROTO_TLS_HTTP2;
 
+	v->socket_role = sk_info.role;
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
@@ -1896,6 +1903,72 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		}
 	}
 
+	return 0;
+}
+
+TPPROG(sys_exit_accept)(struct syscall_comm_exit_ctx *ctx)
+{
+	__u32 k0 = 0;
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_conf && trace_stats) {
+		int sockfd = ctx->ret;
+		__u64 pid_tgid = bpf_get_current_pid_tgid();
+		__u32 tgid = (__u32)(pid_tgid >> 32);
+		__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+
+		struct socket_info_t sk_info = {
+			.role = ROLE_SERVER,
+		};
+
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
+		}
+	}
+	return 0;
+}
+
+TPPROG(sys_exit_accept4)(struct syscall_comm_exit_ctx *ctx)
+{
+	__u32 k0 = 0;
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_conf && trace_stats) {
+		int sockfd = ctx->ret;
+		__u64 pid_tgid = bpf_get_current_pid_tgid();
+		__u32 tgid = (__u32)(pid_tgid >> 32);
+		__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+
+		struct socket_info_t sk_info = {
+			.role = ROLE_SERVER,
+		};
+
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
+		}
+	}
+	return 0;
+}
+
+TPPROG(sys_enter_connect)(struct syscall_comm_enter_ctx *ctx)
+{
+	__u32 k0 = 0;
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_conf && trace_stats) {
+		int sockfd = ctx->fd;
+		__u64 pid_tgid = bpf_get_current_pid_tgid();
+		__u32 tgid = (__u32)(pid_tgid >> 32);
+		__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+
+		struct socket_info_t sk_info = {
+			.role = ROLE_CLIENT,
+		};
+
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
+		}
+	}
 	return 0;
 }
 

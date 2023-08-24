@@ -49,6 +49,7 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
+			return
 		}
 		c.JSON(200, result)
 	})
@@ -70,6 +71,7 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
+			return
 		}
 		//pp.Println(result)
 		c.JSON(200, result)

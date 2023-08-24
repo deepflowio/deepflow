@@ -26,7 +26,6 @@ use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
 extern "C" {
-    fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
@@ -193,8 +192,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("DUBBO");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
             proto_tag.push_str("SOFARPC");
-	} else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
-	    proto_tag.push_str("FASTCGI");
+        } else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
+            proto_tag.push_str("FASTCGI");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -202,7 +201,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -212,6 +211,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).thread_id,
                      (*sd).coroutine_id,
                      (*sd).source,
+		     (*sd).socket_role,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -224,7 +224,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -234,6 +234,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).thread_id,
                      (*sd).coroutine_id,
                      (*sd).source,
+		     (*sd).socket_role,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -243,9 +244,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
                      (*sd).timestamp);
-            if sk_proto_safe(sd) == SOCK_DATA_DNS {
-                print_dns_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 2 {
+            if (*sd).source == 2 {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 4 {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
@@ -301,10 +300,11 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         increment_counter(1, 0);
         //let data = cp_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
-        //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
         //           date_time((*cp).timestamp / 1000),
         //           (*cp).pid,
         //           (*cp).stime,
+        //           (*cp).netns_id,
         //           (*cp).u_stack_id,
         //           (*cp).k_stack_id,
         //           cp_process_name_safe(cp),
@@ -334,7 +334,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
-	enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
+        enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);

@@ -161,6 +161,7 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			callBack:     d.profileWriter.Write,
 			platformData: d.platformData,
 			IP:           make([]byte, len(profile.Ip)),
+			netNsID:      profile.NetnsId,
 			observer:     &observer{},
 			Counter:      d.counter,
 		}
@@ -264,7 +265,6 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 		labelKey := make(map[string]string, 1)
 		labels = segment.NewKey(labelKey)
 		labels.Add("__name__", profileName)
-		log.Debugf("parse profile labels wrong, got %s", profileName)
 	}
 	return ingestion.Metadata{
 		StartTime:       time.Unix(int64(profile.From), 0),

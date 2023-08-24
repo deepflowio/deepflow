@@ -62,6 +62,8 @@
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
+static const char *k_sym_prefix = "[k] ";
+static const char *u_sym_prefix = "";
 
 /*
  * To track the scenario where stack data is missing in the eBPF
@@ -169,8 +171,6 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 {
 	ASSERT(pid >= 0);
 
-	static const char *k_sym_prefix = "[k] ";
-	static const char *u_sym_prefix = "[u] ";
 	int len = 0;
 	char *ptr = NULL;
 	if (pid > 0) {
@@ -222,10 +222,10 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 		/*
 		 * Module is known (from /proc/<pid>/maps), but symbol is not known.
 		 * build a string:
-		 * [m]/lib64/xxx.so + 0x00001234
+		 * /lib64/xxx.so + 0x00001234
 		 */
 		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "[m]%s + 0x%08lx",
+		snprintf(format_str, sizeof(format_str), "%s + 0x%08lx",
 			 sym.module, sym.offset);
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
@@ -241,7 +241,7 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 	 */
 resolver_err:
 	snprintf(format_str, sizeof(format_str), "%s0x%016lx",
-		 pid == 0 ? "[k] " : "[u] ",
+		 pid == 0 ? k_sym_prefix : u_sym_prefix,
 		 address);
 
 	len = strlen(format_str);

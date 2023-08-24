@@ -395,6 +395,10 @@ impl TcpSender {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs() as u32;
+        // If the local timestamp adjustment requires recalculating the interval
+        if self.last_connect > now {
+            self.last_connect = now;
+        }
         if self.last_connect + Self::CONNECT_INTERVAL > now {
             return Err(IOError::new(
                 ErrorKind::Other,

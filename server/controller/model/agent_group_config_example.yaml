@@ -1322,6 +1322,19 @@ vtap_group_id: g-xxxxxx
   ##   When it is false, it supports the integration of metrics data of Prometheus, InfluxDB and other protocols
   #external-metric-integration-disabled: false
 
+  #######################
+  ## NTP Configuration ##
+  #######################
+  ## Note:
+  ##   When the timestamp fallback exceeds this value, the agent will restart.
+  ## Default: 300s
+  #ntp-max-interval = 300s
+
+  ## Note:
+  ##   When the time difference exceeds this value, the timestamp will be corrected.
+  ## Default: 10s
+  #ntp-min-interval = 10s
+
   #################
   ## FeatureFlag ##
   #################

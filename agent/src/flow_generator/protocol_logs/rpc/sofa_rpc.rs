@@ -212,7 +212,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if !self.target_serv.is_empty() && !self.method.is_empty() {
+        if !self.target_serv.is_empty() || !self.method.is_empty() {
             Some(format!("{}/{}", self.target_serv, self.method))
         } else {
             None

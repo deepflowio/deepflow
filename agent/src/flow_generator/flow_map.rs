@@ -1549,7 +1549,7 @@ impl FlowMap {
     }
 
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
-        if now - self.last_queue_flush > config.flush_interval {
+        if now > config.flush_interval + self.last_queue_flush {
             if self.l7_stats_buffer.len() > 0 {
                 if let Err(_) = self
                     .l7_stats_output_queue

@@ -624,11 +624,15 @@ where
         loop {
             let need_relist = Self::watch(&mut ctx, &mut encoder).await;
             time::sleep(SLEEP_INTERVAL).await;
+            let now = SystemTime::now();
             // list and rewatch
-            if need_relist || last_update.elapsed().unwrap() >= ctx.config.list_interval {
+            if need_relist
+                || now < last_update
+                || last_update.elapsed().unwrap() >= ctx.config.list_interval
+            {
                 debug!("{} watcher relisting", ctx.kind);
                 Self::full_sync(&mut ctx, &mut encoder).await;
-                last_update = SystemTime::now();
+                last_update = now;
             }
         }
     }
