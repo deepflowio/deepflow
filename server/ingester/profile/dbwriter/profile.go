@@ -270,7 +270,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	tagNames []string,
 	tagValues []string) {
 
-	p.Time = uint32(inTimeStamp.Unix())
+	p.Time = uint32(input.StartTime.Unix())
 	p._id = genID(uint32(input.StartTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
 	p.VtapID = vtapID
 	p.AppService = profileName
@@ -305,6 +305,7 @@ func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.Platfo
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
 	if vtapInfo != nil {
 		p.L3EpcID = vtapInfo.EpcId
+		p.PodClusterID = uint16(vtapInfo.PodClusterId)
 	}
 
 	var info *grpc.Info
@@ -322,7 +323,9 @@ func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.Platfo
 		p.PodID = info.PodID
 		p.PodNodeID = info.PodNodeID
 		p.PodNSID = uint16(info.PodNSID)
-		p.PodClusterID = uint16(info.PodClusterID)
+		if p.PodClusterID == 0 {
+			p.PodClusterID = uint16(info.PodClusterID)
+		}
 		p.PodGroupID = info.PodGroupID
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
