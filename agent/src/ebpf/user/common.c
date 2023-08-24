@@ -718,3 +718,36 @@ char *gen_timestamp_str(u64 ns)
 {
 	return __gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld", ns);
 }
+
+u64 get_netns_id_from_pid(pid_t pid)
+{
+#define MAX_PATH_LENGTH 256
+	char netns_path[MAX_PATH_LENGTH];
+	snprintf(netns_path, sizeof(netns_path), "/proc/%d/ns/net", pid);
+
+	char target_path[MAX_PATH_LENGTH];
+	ssize_t len =
+	    readlink(netns_path, target_path, sizeof(target_path) - 1);
+	if (len == -1) {
+		return 0;
+	}       
+	target_path[len] = '\0';
+
+	// Extract netns_id from the target path
+	char *netns_id_str_start = strstr(target_path, "[");
+	if (netns_id_str_start == NULL) {
+		ebpf_warning("Failed to extract netns_id.\n");
+		return 0;
+	}       
+
+	char *netns_id_str_end = strstr(netns_id_str_start, "]");
+	if (netns_id_str_end == NULL) {
+		ebpf_warning("Failed to extract netns_id.\n");
+		return 0;
+	}
+
+	*netns_id_str_end = '\0';
+	char *netns_id_str = netns_id_str_start + 1;
+
+	return strtoull(netns_id_str, NULL, 10);
+}

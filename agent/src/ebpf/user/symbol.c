@@ -340,7 +340,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 			goto invalid;
 		}
 	}
-
 	// If bcc_elf_foreach_sym is successful, uprobe_sym->entry will
 	// not be 0. try GoReSym
 	if (uprobe_sym->name && uprobe_sym->entry == 0x0 &&
@@ -534,7 +533,7 @@ void update_symbol_cache(pid_t pid)
 				return;
 			}
 		}
-	
+
 		vec_add1(cache_del_pids.pid_caches, kv, ret);
 		if (ret != VEC_OK) {
 			ebpf_warning("vec add failed.\n");
@@ -609,23 +608,25 @@ u64 get_pid_stime(pid_t pid)
 	return 0;
 }
 
-u64 get_pid_stime_and_name(pid_t pid, char *name)
+void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
+			     char *name)
 {
-	ASSERT(pid >= 0);
+	ASSERT(pid >= 0 && stime != NULL && netns_id != NULL && name != NULL);
 
+	*stime = *netns_id = 0;
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
-	if (pid == 0)
-		return sys_btime_msecs;
+	if (pid == 0) {
+		*stime = sys_btime_msecs;
+		return;
+	}
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		goto finish;
-	} else {
+				      (symbol_caches_hash_kv *) & kv) != 0) {
 		struct symbolizer_proc_info *p =
 		    clib_mem_alloc_aligned("sym_proc_info",
 					   sizeof(struct symbolizer_proc_info),
@@ -634,17 +635,23 @@ u64 get_pid_stime_and_name(pid_t pid, char *name)
 			/* exit process */
 			ebpf_warning
 			    ("Failed to build process information table.\n");
-			return 0;
+			return;
+		}
+
+		p->netns_id = get_netns_id_from_pid(pid);
+		if (p->netns_id == 0) {
+			clib_mem_free(p);
+			return;
 		}
 
 		p->stime = (u64) get_process_starttime_and_comm(pid,
 								p->comm,
-								sizeof(p->
-								       comm));
+								sizeof
+								(p->comm));
 		p->comm[sizeof(p->comm) - 1] = '\0';
 		if (p->stime == 0) {
 			clib_mem_free(p);
-			return 0;
+			return;
 		}
 
 		kv.v.proc_info_p = pointer_to_uword(p);
@@ -655,18 +662,14 @@ u64 get_pid_stime_and_name(pid_t pid, char *name)
 			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
 			     pid);
 			free_symbolizer_cache_kvp(&kv);
-			return 0;
+			return;
 		} else
 			__sync_fetch_and_add(&h->hash_elems_count, 1);
 	}
 
-	return 0;
-
-finish:
-	if (name != NULL)
-		copy_process_name(&kv, name);
-
-	return cache_process_stime(&kv);
+	copy_process_name(&kv, name);
+	*stime = cache_process_stime(&kv);
+	*netns_id = cache_process_netns_id(&kv);
 }
 
 /*
@@ -763,10 +766,16 @@ int create_and_init_symbolizer_caches(void)
 				return ETR_NOMEM;
 			}
 
+			p->netns_id = get_netns_id_from_pid(pid);
+			if (p->netns_id == 0) {
+				clib_mem_free(p);
+				continue;
+			}
+
 			p->stime =
 			    (u64) get_process_starttime_and_comm(pid, p->comm,
-								 sizeof(p->
-									comm));
+								 sizeof
+								 (p->comm));
 			p->comm[sizeof(p->comm) - 1] = '\0';
 			if (p->stime == 0) {
 				clib_mem_free(p);

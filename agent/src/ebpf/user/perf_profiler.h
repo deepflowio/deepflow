@@ -124,6 +124,7 @@ typedef struct {
 	u32 pid;
 	u32 tid;
 	u64 stime;
+	u64 netns_id;
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;

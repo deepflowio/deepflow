@@ -264,4 +264,5 @@ u64 get_process_starttime_and_comm(pid_t pid,
 				   char *name_base,
 				   int len);
 u32 legacy_fetch_log2_page_size(void);
+u64 get_netns_id_from_pid(pid_t pid);
 #endif /* DF_COMMON_H */

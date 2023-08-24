@@ -188,10 +188,11 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_stack_trace_msg(stack_trace_msg_t * msg,
+static void set_stack_trace_msg(stack_trace_msg_t *msg,
 				struct stack_trace_key_t *v,
 				bool matched,
 				u64 stime,
+				u64 ns_id,
 				const char *process_name)
 {
 	msg->pid = v->tgid;
@@ -201,9 +202,10 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	msg->k_stack_id = (u32) v->kernstack;
 	strcpy_s_inline(msg->comm, sizeof(msg->comm),
 			v->comm, strlen(v->comm));
+	msg->stime = stime;
+	msg->netns_id = ns_id;
 
 	if (stime > 0) {
-		msg->stime = stime;
 		/*
 		 * Note: There is no process with PID 0 in procfs.
 		 * If the PID is 0, it will return the kernel's
@@ -455,7 +457,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 */
 		stack_trace_msg_kv_t kv;
 		char name[TASK_COMM_LEN];
-		u64 stime = get_pid_stime_and_name(v->tgid, (char *)name);
+		u64 stime, netns_id;
+		get_process_info_by_pid(v->tgid, &stime, &netns_id, (char *)name);
 		char *process_name = NULL;
 		bool matched = false;
 
@@ -505,7 +508,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				continue;
 			}
 
-			set_stack_trace_msg(msg, v, matched, stime, process_name);
+			set_stack_trace_msg(msg, v, matched, stime, netns_id, process_name);
 			snprintf((char *)&msg->data[0], str_len, "%s", trace_str);
 			msg->data_len = str_len - 1;
 			clib_mem_free(trace_str);
