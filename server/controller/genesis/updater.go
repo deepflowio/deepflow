@@ -961,7 +961,7 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 		pJobNameToHonorLabelsConfig := map[string]bool{}
 		configOut, err := genesiscommon.ParseCompressedInfo(e.GetConfigCompressedInfo())
 		if err != nil {
-			log.Warningf("config decode decompress error: %s", err.Error())
+			log.Warningf("config decompress error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
 		cEntryJson, err := simplejson.NewJson(configOut.Bytes())
@@ -985,7 +985,7 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 
 		targetOut, err := genesiscommon.ParseCompressedInfo(e.GetTargetCompressedInfo())
 		if err != nil {
-			log.Warningf("target decode decompress error: %s", err.Error())
+			log.Warningf("target decompress error: %s", err.Error())
 			return []cloudmodel.PrometheusTarget{}, err
 		}
 		tEntryJson, err := simplejson.NewJson(targetOut.Bytes())
@@ -1056,11 +1056,11 @@ func (p *PrometheusRpcUpdater) run() {
 		version := info.message.GetVersion()
 		entries, err := p.ParsePrometheusEntries(info)
 		if err != nil {
-			log.Warningf("prometheus from vtap_id %v received cluster_id %s version %s parse failed (%s)", info.vtapID, clusterID, version, err.Error())
+			log.Warningf("prometheus from vtap_id %v received cluster_id %s version %v parse failed (%s)", info.vtapID, clusterID, version, err.Error())
 			continue
 		}
 
-		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %s", info.peer, info.vtapID, clusterID, version)
+		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, clusterID, version)
 
 		prometheusInfo := PrometheusInfo{
 			ClusterID: clusterID,
