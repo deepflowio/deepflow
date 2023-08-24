@@ -26,7 +26,6 @@ use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
 extern "C" {
-    fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
@@ -245,9 +244,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
                      (*sd).timestamp);
-            if sk_proto_safe(sd) == SOCK_DATA_DNS {
-                print_dns_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 2 {
+            if (*sd).source == 2 {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 4 {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
