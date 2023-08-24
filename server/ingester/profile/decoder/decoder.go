@@ -253,7 +253,7 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 	} else {
 		profileName, err = url.QueryUnescape(profile.Name)
 		if err != nil {
-			log.Warning("decode profile.name wrong, got %s, will use as profilename", profile.Name)
+			log.Debugf("decode profile.name wrong, got %s, will use as profilename", profile.Name)
 			profileName = profile.Name
 		}
 	}
@@ -264,7 +264,7 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 		labelKey := make(map[string]string, 1)
 		labels = segment.NewKey(labelKey)
 		labels.Add("__name__", profileName)
-		log.Warningf("parse profile labels wrong, got %s", profileName)
+		log.Debugf("parse profile labels wrong, got %s", profileName)
 	}
 	return ingestion.Metadata{
 		StartTime:       time.Unix(int64(profile.From), 0),
