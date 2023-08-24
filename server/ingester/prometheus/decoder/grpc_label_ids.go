@@ -117,6 +117,7 @@ type PrometheusLabelTable struct {
 	labelColumnIndexs *hashmap.Map[uint64, uint32]
 	targetIDs         *hashmap.Map[uint64, uint32]
 	metricTargetPair  *hashmap.Map[uint64, struct{}]
+	targetLabelIDs    *hashmap.Map[uint32, []uint32]
 	targetVersion     uint32
 
 	counter *RequestCounter
@@ -140,6 +141,7 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 		labelColumnIndexs: hashmap.New[uint64, uint32](),   // metricID + LabelNameID => columnIndex
 		targetIDs:         hashmap.New[uint64, uint32](),   // jobID + instanceID => targetID
 		metricTargetPair:  hashmap.New[uint64, struct{}](), // metricID + targetID => exists
+		targetLabelIDs:    hashmap.New[uint32, []uint32](), // targetID => targetLabelIDs
 		counter:           &RequestCounter{},
 	}
 	t.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, nil)
@@ -232,11 +234,75 @@ func (t *PrometheusLabelTable) updatePrometheusTargets(targetIds []*trident.Targ
 		instanceId := target.GetInstanceId()
 		t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
 		t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
-		t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
 		for _, metricId := range target.GetMetricIds() {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
+		t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
+		t.updateTargetLabelIds(targetId, target.GetTargetLabelNameIds())
 	}
+}
+
+func u32SliceIsEqual(l, r []uint32) bool {
+	if len(l) != len(r) {
+		return false
+	}
+	for i := range l {
+		if l[i] != r[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// get elements that appear only once in the two slices
+func uniqueElements(slice1, slice2 []uint32) map[uint32]bool {
+	unique := make(map[uint32]bool)
+
+	for _, v1 := range slice1 {
+		unique[v1] = true
+	}
+
+	for _, v2 := range slice2 {
+		if _, ok := unique[v2]; !ok {
+			unique[v2] = true
+		} else {
+			delete(unique, v2)
+		}
+	}
+
+	return unique
+}
+
+// if the target labels of the target change, the label column index needs to be updated
+func (t *PrometheusLabelTable) updateTargetLabelIds(targetId uint32, targetLabelIDs []uint32) {
+	oldLabelIds, ok := t.targetLabelIDs.Get(targetId)
+	if !ok {
+		ids := make([]uint32, 0, len(targetLabelIDs))
+		ids = append(ids, targetLabelIDs...)
+		t.targetLabelIDs.Set(targetId, ids)
+		return
+	}
+	// check equal first
+	if u32SliceIsEqual(oldLabelIds, targetLabelIDs) {
+		return
+	}
+	uniqueLabelIds := uniqueElements(oldLabelIds, targetLabelIDs)
+
+	// check all metric of target
+	t.metricTargetPair.Range(func(k uint64, v struct{}) bool {
+		if uint32(k) == targetId {
+			metricId := uint32(k >> METRICID_OFFSET)
+			// delete the label column index information, it will update when receive the data
+			for labelId := range uniqueLabelIds {
+				t.labelColumnIndexs.Del(columnIndexKey(metricId, labelId))
+			}
+		}
+		return true
+	})
+	log.Infof("update target labels of target_id(%d) from %+v to %+v", targetId, oldLabelIds, targetLabelIDs)
+	newLabelIds := oldLabelIds[:0]
+	newLabelIds = append(newLabelIds, targetLabelIDs...)
+	t.targetLabelIDs.Set(targetId, newLabelIds)
 }
 
 func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse) {
@@ -370,7 +436,7 @@ func (t *PrometheusLabelTable) columnIndexString(filter string) string {
 
 func (t *PrometheusLabelTable) targetString(filter string) string {
 	sb := &strings.Builder{}
-	sb.WriteString("\ntargetId     job                                                              jobId    instance                          instanceId\n")
+	sb.WriteString("\ntargetId     job                                                              jobId    instance                             instanceId                       target_label_ids\n")
 	sb.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 
 	t.targetIDs.Range(func(k uint64, v uint32) bool {
@@ -388,7 +454,8 @@ func (t *PrometheusLabelTable) targetString(filter string) string {
 			}
 			return true
 		})
-		row := fmt.Sprintf("%-10d   %-64s  %-5d   %-32s     %d\n", v, job, jobId, instance, instanceId)
+		targetLabebs, _ := t.targetLabelIDs.Get(v)
+		row := fmt.Sprintf("%-10d   %-64s  %-5d   %-32s     %-32d %v\n", v, job, jobId, instance, instanceId, targetLabebs)
 		if strings.Contains(row, filter) {
 			sb.WriteString(row)
 		}
