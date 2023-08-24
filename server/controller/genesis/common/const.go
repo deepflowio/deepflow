@@ -27,3 +27,5 @@ const (
 	DEVICE_TYPE_PUBLIC_CLOUD     = "public-cloud"
 	DEVICE_TYPE_PHYSICAL_MACHINE = "physical-machine"
 )
+
+const PROCESS_NAME_LENGTH_MAX = 256
