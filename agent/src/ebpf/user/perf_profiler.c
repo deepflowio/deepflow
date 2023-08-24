@@ -752,7 +752,6 @@ static int create_profiler(struct bpf_tracer *tracer)
 	 * Use of void* is inherited from the BCC library. */
 	create_and_init_symbolizer_caches();
 
-	set_profiler_regex("");
 	/*
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
