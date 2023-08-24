@@ -218,7 +218,26 @@ impl BaseDispatcher {
         }
     }
 
-    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+    pub(super) fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
+        #[cfg(target_os = "linux")]
+        let pcap_interfaces = match public::netns::links_by_name_regex_in_netns(
+            &config.tap_interface_regex,
+            &self.netns,
+        ) {
+            Err(e) => {
+                warn!("get interfaces by name regex failed: {}", e);
+                vec![]
+            }
+            Ok(links) => links,
+        };
+        #[cfg(target_os = "windows")]
+        let pcap_interfaces = match net::links_by_name_regex(&config.tap_interface_regex) {
+            Err(e) => {
+                warn!("get interfaces by name regex failed: {}", e);
+                vec![]
+            }
+            Ok(links) => links,
+        };
         let options = self.options.lock().unwrap();
         self.engine = if options.tap_mode == TapMode::Local && options.libpcap_enabled {
             if pcap_interfaces.is_empty() {
@@ -772,6 +791,12 @@ impl BaseDispatcherListener {
 
     pub(super) fn on_tap_interface_change(&self, mut interfaces: Vec<Link>, _: IfMacSource) {
         if &self.src_interface != "" {
+            #[cfg(target_os = "linux")]
+            match public::netns::link_by_name_in_netns(&self.src_interface, &self.netns) {
+                Ok(link) => interfaces = vec![link],
+                Err(e) => warn!("link_by_name failed: {:?}", e),
+            }
+            #[cfg(target_os = "windows")]
             match net::link_by_name(&self.src_interface) {
                 Ok(link) => interfaces = vec![link],
                 Err(e) => warn!("link_by_name failed: {:?}", e),

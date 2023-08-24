@@ -60,9 +60,17 @@ use crate::utils::{
     },
     stats,
 };
-use public::proto::common::TridentType;
-use public::proto::trident::{self as tp, Exception, TapMode};
-use public::utils::net::{addr_list, is_unicast_link_local, MacAddr};
+#[cfg(target_os = "linux")]
+use public::netns::{addr_list_in_netns, NsFile};
+#[cfg(target_os = "windows")]
+use public::utils::net::addr_list;
+use public::{
+    proto::{
+        common::TridentType,
+        trident::{self as tp, Exception, TapMode},
+    },
+    utils::net::{is_unicast_link_local, MacAddr},
+};
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
@@ -568,17 +576,24 @@ impl Synchronizer {
             ctrl_ip: Some(agent_id.ip.to_string()),
             tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
-            host_ips: addr_list().map_or(vec![], |xs| {
-                xs.into_iter()
-                    .filter_map(|x| {
-                        if is_excluded_ip_addr(x.ip_addr) {
-                            None
-                        } else {
-                            Some(x.ip_addr.to_string())
-                        }
-                    })
-                    .collect()
-            }),
+            host_ips: {
+                #[cfg(target_os = "linux")]
+                let addrs = addr_list_in_netns(&NsFile::Root);
+                #[cfg(target_os = "windows")]
+                let addrs = addr_list();
+
+                addrs.map_or(vec![], |xs| {
+                    xs.into_iter()
+                        .filter_map(|x| {
+                            if is_excluded_ip_addr(x.ip_addr) {
+                                None
+                            } else {
+                                Some(x.ip_addr.to_string())
+                            }
+                        })
+                        .collect()
+                })
+            },
             cpu_num: Some(static_config.env.cpu_num),
             memory_size: Some(static_config.env.memory_size),
             arch: Some(static_config.env.arch.clone()),

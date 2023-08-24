@@ -93,8 +93,6 @@ use public::{
 };
 
 use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
-#[cfg(target_os = "windows")]
-use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
@@ -1550,17 +1548,8 @@ impl ConfigHandler {
                     != new_config.dispatcher.tap_interface_regex
             {
                 fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
-                    let pcap_interfaces = match links_by_name_regex(
-                        &handler.candidate_config.dispatcher.tap_interface_regex,
-                    ) {
-                        Err(e) => {
-                            warn!("get interfaces by name regex failed: {}", e);
-                            vec![]
-                        }
-                        Ok(links) => links,
-                    };
                     for dispatcher in comp.dispatchers.iter() {
-                        dispatcher.switch_recv_engine(pcap_interfaces.clone());
+                        dispatcher.switch_recv_engine(&handler.candidate_config.dispatcher);
                     }
                 }
                 callbacks.push(switch_recv_engine);

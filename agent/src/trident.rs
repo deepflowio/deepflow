@@ -119,8 +119,9 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
 use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
-use public::netns::{self, links_by_name_regex_in_netns};
-use public::utils::net::link_by_name;
+use public::netns::{self, link_by_name_in_netns, links_by_name_regex_in_netns};
+#[cfg(target_os = "windows")]
+use public::utils::net::{link_by_name, links_by_name_regex};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
@@ -129,7 +130,7 @@ use public::{
     proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
-    utils::net::{get_route_src_ip, links_by_name_regex, Link, MacAddr},
+    utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
 
@@ -824,9 +825,8 @@ impl Trident {
 }
 
 #[cfg(target_os = "linux")]
-fn get_listener_links(conf: &DispatcherConfig, listener: &DispatcherListener) -> Vec<Link> {
-    let netns = listener.netns();
-    let interfaces = match links_by_name_regex_in_netns(&conf.tap_interface_regex, &netns) {
+fn get_listener_links(conf: &DispatcherConfig, netns: &NsFile) -> Vec<Link> {
+    let interfaces = match links_by_name_regex_in_netns(&conf.tap_interface_regex, netns) {
         Err(e) => {
             warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
             vec![]
@@ -846,7 +846,7 @@ fn get_listener_links(conf: &DispatcherConfig, listener: &DispatcherListener) ->
 }
 
 #[cfg(not(target_os = "linux"))]
-fn get_listener_links(conf: &DispatcherConfig, _: &DispatcherListener) -> Vec<Link> {
+fn get_listener_links(conf: &DispatcherConfig, _: &NsFile) -> Vec<Link> {
     let interfaces = match links_by_name_regex(&conf.tap_interface_regex) {
         Err(e) => {
             warn!("get interfaces by name regex failed: {}", e);
@@ -877,7 +877,7 @@ fn dispatcher_listener_callback(
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
             for listener in components.dispatcher_listeners.iter() {
-                let interfaces = get_listener_links(conf, listener);
+                let interfaces = get_listener_links(conf, listener.netns());
                 listener.on_tap_interface_change(
                     &interfaces,
                     if_mac_source,
@@ -1668,29 +1668,6 @@ impl AgentComponents {
 
         let tap_typer = Arc::new(TapTyper::new());
 
-        let tap_interfaces = match links_by_name_regex(
-            &config_handler
-                .candidate_config
-                .dispatcher
-                .tap_interface_regex,
-        ) {
-            Err(e) => {
-                warn!("get interfaces by name regex failed: {}", e);
-                vec![]
-            }
-            Ok(links) if links.is_empty() => {
-                warn!(
-                    "tap-interface-regex({}) do not match any interface, in local mode",
-                    config_handler
-                        .candidate_config
-                        .dispatcher
-                        .tap_interface_regex
-                );
-                vec![]
-            }
-            Ok(links) => links,
-        };
-
         // TODO: collector enabled
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
@@ -1999,38 +1976,21 @@ impl AgentComponents {
             ]));
             handler_builders.push(handler_builder.clone());
 
-            #[cfg(target_os = "linux")]
-            let tap_interfaces = if netns != NsFile::Root {
-                let interfaces = match links_by_name_regex_in_netns(
-                    &config_handler
-                        .candidate_config
-                        .dispatcher
-                        .tap_interface_regex,
-                    &netns,
-                ) {
-                    Err(e) => {
-                        warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
-                        vec![]
-                    }
-                    Ok(links) => {
-                        if links.is_empty() {
-                            warn!(
-                                "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
-                                config_handler.candidate_config.dispatcher.tap_interface_regex, netns,
-                            );
-                        }
-                        links
-                    }
-                };
-                info!("tap interface in namespace {:?}: {:?}", netns, interfaces);
-                interfaces
-            } else {
-                tap_interfaces.clone()
-            };
+            let tap_interfaces =
+                get_listener_links(&config_handler.candidate_config.dispatcher, &netns);
 
             let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
                 tap_interfaces.clone()
             } else {
+                #[cfg(target_os = "linux")]
+                match link_by_name_in_netns(&src_interface, &netns) {
+                    Ok(link) => vec![link],
+                    Err(e) => {
+                        warn!("link_by_name: {}, error: {}", src_interface, e);
+                        vec![]
+                    }
+                }
+                #[cfg(target_os = "windows")]
                 match link_by_name(&src_interface) {
                     Ok(link) => vec![link],
                     Err(e) => {
