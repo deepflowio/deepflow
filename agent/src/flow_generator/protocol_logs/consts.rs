@@ -125,11 +125,13 @@ pub const ERROR_CODE_LEN: usize = 2;
 pub const AFFECTED_ROWS_LEN: usize = 1;
 pub const SQL_STATE_LEN: usize = 6;
 pub const SQL_STATE_MARKER: u8 = b'#';
+pub const STATEMENT_ID_LEN: usize = 4;
 
 pub const RESPONSE_CODE_OFFSET: usize = 0;
 pub const ERROR_CODE_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 pub const AFFECTED_ROWS_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 pub const SQL_STATE_OFFSET: usize = ERROR_CODE_OFFSET + ERROR_CODE_LEN;
+pub const STATEMENT_ID_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 
 // int
 pub const INT_FLAGS_2: u8 = 0xfc;
