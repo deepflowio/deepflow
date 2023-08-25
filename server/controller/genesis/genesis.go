@@ -73,7 +73,7 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 		kubernetesData:   kData,
 		prometheusData:   pData,
 		genesisStatsd: statsd.GenesisStatsd{
-			K8SInfoDelay: make(map[string][]int),
+			K8SInfoDelay: make(map[string][]float64),
 		},
 	}
 	return GenesisService
@@ -494,8 +494,8 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	}
 
 	g.mutex.Lock()
-	g.genesisStatsd.K8SInfoDelay = map[string][]int{}
-	g.genesisStatsd.K8SInfoDelay[clusterID] = []int{int(time.Now().Sub(k8sInfo.Epoch).Seconds())}
+	g.genesisStatsd.K8SInfoDelay = map[string][]float64{}
+	g.genesisStatsd.K8SInfoDelay[clusterID] = []float64{time.Now().Sub(k8sInfo.Epoch).Seconds()}
 	statsd.MetaStatsd.RegisterStatsdTable(g)
 	g.mutex.Unlock()
 

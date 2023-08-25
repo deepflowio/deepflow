@@ -76,11 +76,7 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		defaultVpcName:  cfg.GenesisDefaultVpcName,
 		regionUuid:      config.Get("region_uuid").MustString(),
 		genesisData:     genesis.GenesisSyncData{},
-		cloudStatsd: statsd.CloudStatsd{
-			APICount: make(map[string][]int),
-			APICost:  make(map[string][]int),
-			ResCount: make(map[string][]int),
-		},
+		cloudStatsd:     statsd.NewCloudStatsd(),
 	}, nil
 }
 
@@ -263,9 +259,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	g.azLcuuid = ""
 	g.defaultVpc = false
-	g.cloudStatsd.APICount = map[string][]int{}
-	g.cloudStatsd.APICost = map[string][]int{}
-	g.cloudStatsd.ResCount = map[string][]int{}
+	g.cloudStatsd = statsd.NewCloudStatsd()
 
 	if genesis.GenesisService == nil {
 		return cloudmodel.Resource{}, errors.New("genesis service is nil")

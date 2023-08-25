@@ -17,6 +17,8 @@
 package genesis
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 
@@ -28,8 +30,7 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 	vms := []model.VM{}
 	vmsData := g.genesisData.VMs
 
-	g.cloudStatsd.APICost["vms"] = []int{0}
-	g.cloudStatsd.APICount["vms"] = []int{len(vmsData)}
+	g.cloudStatsd.RefreshAPIMoniter("vms", len(vmsData), time.Time{})
 
 	for _, v := range vmsData {
 		vpcLcuuid := v.VPCLcuuid

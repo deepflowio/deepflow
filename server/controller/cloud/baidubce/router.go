@@ -43,8 +43,7 @@ func (b *BaiduBce) getRouterAndTables(
 			return nil, nil, err
 		}
 
-		b.cloudStatsd.APICost["GetRouteTableDetail"] = append(b.cloudStatsd.APICost["GetRouteTableDetail"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["GetRouteTableDetail"] = append(b.cloudStatsd.APICount["GetRouteTableDetail"], len(result.RouteRules))
+		b.cloudStatsd.RefreshAPIMoniter("GetRouteTableDetail", len(result.RouteRules), startTime)
 		b.debugger.WriteJson("GetRouteTableDetail", " ", structToJson([]*vpc.GetRouteTableResult{result}))
 		vrouterLcuuid := common.GenerateUUID(result.RouteTableId)
 		vrouterName, _ := vpcIdToName[vpcId]
