@@ -47,8 +47,7 @@ func (b *BaiduBce) getNetworks(
 			log.Error(err)
 			return nil, nil, nil, err
 		}
-		b.cloudStatsd.APICost["ListSubnets"] = append(b.cloudStatsd.APICost["ListSubnets"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["ListSubnets"] = append(b.cloudStatsd.APICount["ListSubnets"], len(result.Subnets))
+		b.cloudStatsd.RefreshAPIMoniter("ListSubnets", len(result.Subnets), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
