@@ -217,15 +217,16 @@ func (u *UniversalTagsManager) getAuto(autoType DeviceType, autoID uint32, isIPv
 }
 
 func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
-	return u.podIDLabelsMap[podID]
+	return u.universalTagMaps.podK8SLabelMap[podID]
 }
 
 type UniversalTagsManager struct {
 	config           *config.Config
 	universalTagMaps *UniversalTagMaps
 	tapPortNameMap   map[uint64]string
-	podIDLabelsMap   map[uint32]Labels
-	k8sLabelsRegexp  *regexp.Regexp
+	// Deprecated
+	podIDLabelsMap  map[uint32]Labels
+	k8sLabelsRegexp *regexp.Regexp
 
 	connection              *sql.DB
 	grpcSession             *grpc.GrpcSession

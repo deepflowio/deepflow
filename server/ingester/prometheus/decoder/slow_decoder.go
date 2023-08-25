@@ -144,7 +144,7 @@ func (d *SlowDecoder) Run() {
 				continue
 			}
 			slowItems = append(slowItems, slowItem)
-			metricLabelReq, targetReq := d.TimeSeriesToLableIDRequest(&slowItem.ts)
+			metricLabelReq, targetReq := d.TimeSeriesToLableIDRequest(&slowItem.ts, slowItem.vtapID)
 			addMetricLabelRequest(req, metricLabelReq)
 			addTargetRequest(req, targetReq)
 		}
@@ -229,7 +229,7 @@ func addTargetRequest(req *trident.PrometheusLabelRequest, target *trident.Targe
 	req.RequestTargets = append(req.RequestTargets, target)
 }
 
-func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries) (*trident.MetricLabelRequest, *trident.TargetRequest) {
+func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, vtapId uint16) (*trident.MetricLabelRequest, *trident.TargetRequest) {
 	labelReq := &trident.MetricLabelRequest{}
 	targetReq := &trident.TargetRequest{}
 	var metricId uint32
@@ -287,6 +287,7 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries) (*triden
 	if !hasInstanceId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
+		targetReq.VtapId = proto.Uint32(uint32(vtapId))
 		return labelReq, targetReq
 	}
 
@@ -294,12 +295,14 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries) (*triden
 	if !hasJobId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
+		targetReq.VtapId = proto.Uint32(uint32(vtapId))
 		return labelReq, targetReq
 	}
 
 	if _, hasTargetId := d.labelTable.QueryTargetID(jobId, instanceId); !hasTargetId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
+		targetReq.VtapId = proto.Uint32(uint32(vtapId))
 	}
 	return labelReq, targetReq
 }
