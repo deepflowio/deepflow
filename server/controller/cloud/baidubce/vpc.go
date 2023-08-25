@@ -45,8 +45,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 			log.Error(err)
 			return nil, nil, nil, err
 		}
-		b.cloudStatsd.APICost["ListVPC"] = append(b.cloudStatsd.APICost["ListVPC"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["ListVPC"] = append(b.cloudStatsd.APICount["ListVPC"], len(result.VPCs))
+		b.cloudStatsd.RefreshAPIMoniter("ListVPC", len(result.VPCs), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

@@ -42,8 +42,7 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 			log.Error(err)
 			return []model.CEN{}, err
 		}
-		b.cloudStatsd.APICost["ListCsn"] = append(b.cloudStatsd.APICost["ListCsn"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["ListCsn"] = append(b.cloudStatsd.APICount["ListCsn"], 1)
+		b.cloudStatsd.RefreshAPIMoniter("ListCsn", 1, startTime)
 		retCsns = append(retCsns, result.Csns...)
 		if !result.IsTruncated {
 			break

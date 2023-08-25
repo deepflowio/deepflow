@@ -17,6 +17,8 @@
 package kubernetes_gather
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -164,11 +166,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		pgLcuuidTopodTargetPorts:     map[string]map[string]int{},
 		namespaceToExLabels:          map[string]map[string]interface{}{},
 		nsServiceNameToService:       map[string]map[string]map[string]int{},
-		cloudStatsd: statsd.CloudStatsd{
-			APICount: make(map[string][]int),
-			APICost:  make(map[string][]int),
-			ResCount: make(map[string][]int),
-		},
+		cloudStatsd:                  statsd.NewCloudStatsd(),
 	}
 }
 
@@ -179,11 +177,8 @@ func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
 	}
 
 	for key, v := range kData {
-		// resource from genesis , so api cost is 0 ms
-		k.cloudStatsd.APICost[key] = []int{0}
-
-		k.cloudStatsd.APICount[key] = []int{len(v)}
-
+		// resource from genesis , so api start is 0
+		k.cloudStatsd.RefreshAPIMoniter(key, len(v), time.Time{})
 	}
 	return kData, nil
 }
@@ -216,9 +211,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.pgLcuuidTopodTargetPorts = map[string]map[string]int{}
 	k.namespaceToExLabels = map[string]map[string]interface{}{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}
-	k.cloudStatsd.APICount = map[string][]int{}
-	k.cloudStatsd.APICost = map[string][]int{}
-	k.cloudStatsd.ResCount = map[string][]int{}
+	k.cloudStatsd = statsd.NewCloudStatsd()
 
 	region, err := k.getRegion()
 	if err != nil {
@@ -341,8 +334,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PrometheusTargets:      prometheusTargets,
 	}
 
-	k.cloudStatsd.APICost["PrometheusTarget"] = []int{0}
-	k.cloudStatsd.APICount["PrometheusTarget"] = []int{len(prometheusTargets)}
+	k.cloudStatsd.RefreshAPIMoniter("PrometheusTarget", len(prometheusTargets), time.Time{})
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil

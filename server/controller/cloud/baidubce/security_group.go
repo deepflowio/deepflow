@@ -49,8 +49,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 			log.Error(err)
 			return nil, nil, err
 		}
-		b.cloudStatsd.APICost["ListSecurityGroup"] = append(b.cloudStatsd.APICost["ListSecurityGroup"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["ListSecurityGroup"] = append(b.cloudStatsd.APICount["ListSecurityGroup"], len(result.SecurityGroups))
+		b.cloudStatsd.RefreshAPIMoniter("ListSecurityGroup", len(result.SecurityGroups), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

@@ -21,11 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
-func (c *Cloud) getKubernetesData() model.Resource {
+func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
 		errMSG := fmt.Sprintf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
@@ -33,7 +33,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		return model.Resource{
 			ErrorMessage: errMSG,
 			ErrorState:   common.RESOURCE_STATE_CODE_EXCEPTION,
-		}
+		}, 0
 	}
 	kubernetesGatherResource := k8sGatherTask.GetResource()
 
@@ -44,7 +44,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		return model.Resource{
 			ErrorState:   kubernetesGatherResource.ErrorState,
 			ErrorMessage: kubernetesGatherResource.ErrorMessage,
-		}
+		}, 0
 	}
 
 	// 合并网络
@@ -132,5 +132,5 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		Networks:               networks,
 		VInterfaces:            vinterfaces,
 		VMPodNodeConnections:   vmPodNodeConnections,
-	}
+	}, k8sGatherTask.GetGatherCost()
 }

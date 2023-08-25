@@ -31,6 +31,7 @@ type KubernetesGatherTask struct {
 	kCtx             context.Context
 	kCancel          context.CancelFunc
 	interval         uint32
+	gatherCost       float64
 	kubernetesGather *kubernetes_gather.KubernetesGather
 	resource         kmodel.KubernetesGatherResource
 	basicInfo        kmodel.KubernetesGatherBasicInfo
@@ -78,6 +79,10 @@ func (k *KubernetesGatherTask) GetResource() kmodel.KubernetesGatherResource {
 	return k.resource
 }
 
+func (k *KubernetesGatherTask) GetGatherCost() float64 {
+	return k.gatherCost
+}
+
 func (k *KubernetesGatherTask) Start() {
 	go func() {
 		k.run()
@@ -95,6 +100,7 @@ func (k *KubernetesGatherTask) Start() {
 }
 
 func (k *KubernetesGatherTask) run() {
+	startTime := time.Now()
 	log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
 	kResource, err := k.kubernetesGather.GetKubernetesGatherData()
 	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
@@ -108,6 +114,7 @@ func (k *KubernetesGatherTask) run() {
 	}
 	k.resource = kResource
 	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
+	k.gatherCost = time.Now().Sub(startTime).Seconds()
 }
 
 func (k *KubernetesGatherTask) Stop() {
