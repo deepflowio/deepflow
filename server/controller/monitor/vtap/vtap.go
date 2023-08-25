@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 var log = logging.MustGetLogger("monitor/vtap")
@@ -208,6 +209,15 @@ func (v *VTapCheck) typeCheck() {
 		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
+	var vms []mysql.VM
+	if err := mysql.Db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms); err != nil {
+		log.Error(err)
+	}
+	vmIDToVMType := make(map[int]int)
+	for _, vm := range vms {
+		vmIDToVMType[vm.ID] = vm.HType
+	}
+
 	mysql.Db.Where(
 		"type IN (?)",
 		[]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P, common.VTAP_TYPE_POD_HOST},
@@ -242,7 +252,11 @@ func (v *VTapCheck) typeCheck() {
 			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				continue
 			}
-			if _, ok := podNodeIDToVMID[podNode.ID]; !ok {
+			vmID, ok := podNodeIDToVMID[podNode.ID]
+			if !ok {
+				continue
+			}
+			if vmType, ok := vmIDToVMType[vmID]; ok && utils.IsVMofBMHtype(vmType) {
 				continue
 			}
 		}

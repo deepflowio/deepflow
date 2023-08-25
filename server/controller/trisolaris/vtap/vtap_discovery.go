@@ -27,6 +27,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
@@ -246,13 +247,6 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 	return dbVTap, result
 }
 
-func isVMofBMHtype(htype int) bool {
-	if Find[int]([]int{VM_HTYPE_BM_C, VM_HTYPE_BM_N, VM_HTYPE_BM_S}, htype) == true {
-		return true
-	}
-	return false
-}
-
 func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 	podNodeMgr := dbmgr.DBMgr[models.PodNode](db)
 	podNodes, err := podNodeMgr.GetBatchFromIPs(l.hostIPs)
@@ -320,7 +314,7 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 					l.getKey(), conn.VMID, err)
 				return nil
 			}
-			if isVMofBMHtype(vm.HType) == true {
+			if utils.IsVMofBMHtype(vm.HType) == true {
 				vTapType = VTAP_TYPE_POD_HOST
 			} else {
 				vTapType = VTAP_TYPE_POD_VM
@@ -336,7 +330,7 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 				log.Errorf("failed to register agent(%s) by querying DB table vm(id=%d) without finding data, err: %s", l.getKey(), matchVif.DeviceID, err)
 				return nil
 			}
-			if isVMofBMHtype(vm.HType) == true {
+			if utils.IsVMofBMHtype(vm.HType) == true {
 				vTapType = VTAP_TYPE_POD_HOST
 			} else {
 				vTapType = VTAP_TYPE_POD_VM
@@ -499,7 +493,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 			log.Errorf("failed to register agent(%s), host_device(ip=%s) not found vm", host.IP)
 			return nil
 		}
-		if isVMofBMHtype(vm.HType) == true {
+		if utils.IsVMofBMHtype(vm.HType) == true {
 			vTapType = VTAP_TYPE_WORKLOAD_P
 		} else {
 			vTapType = VTAP_TYPE_WORKLOAD_V
@@ -593,7 +587,7 @@ func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
 		vTapType     int
 		launchServer string
 	)
-	if isVMofBMHtype(vm.HType) == true {
+	if utils.IsVMofBMHtype(vm.HType) == true {
 		vTapType = VTAP_TYPE_WORKLOAD_P
 	} else {
 		vTapType = VTAP_TYPE_WORKLOAD_V
