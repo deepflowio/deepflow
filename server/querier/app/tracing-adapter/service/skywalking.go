@@ -19,6 +19,7 @@ package service
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"skywalking.apache.org/repo/goapi/query"
 
@@ -54,6 +55,29 @@ const (
 		}
 	}
 }`
+)
+
+const (
+	// https://github.com/apache/skywalking-query-protocol/blob/master/trace.graphqls#L86
+	SpanTypeLocal  = "Local"
+	SpanTypeClient = "Exit"
+	SpanTypeServer = "Entry"
+
+	AttributeHTTPMethod      = "http.method"
+	AttributeHTTPStatus_Code = "http.status_code"
+	AttributeHTTPStatusCode  = "http.status.code"
+	AttributeDbStatement     = "db.statement"
+	AttributeCacheCmd        = "cache.cmd"
+	AttributeCacheKey        = "cache.key"
+
+	// layer possible values: Unknown, Database, RPCFramework, Http, MQ and Cache
+	// ref: https://github.com/apache/skywalking-query-protocol/blob/master/trace.graphqls#L94
+	LayerUnknown  = "Unknown"
+	LayerDatabase = "Database"
+	LayerRPC      = "RPCFramework"
+	LayerHTTP     = "Http"
+	LayerCache    = "Cache"
+	LayerMQ       = "MQ"
 )
 
 type swGraphRequest[T any] struct {
@@ -136,15 +160,22 @@ func (s *SkyWalkingAdapter) skywalkingTracesToExTraces(traces *query.Trace) *mod
 	for i := 0; i < len(traces.Spans); i++ {
 		skywalkingSpan := traces.Spans[i]
 		span := model.ExSpan{
-			StartTimeUs:  skywalkingSpan.StartTime * 1e3, // millisecond to microsecond
-			EndTimeUs:    skywalkingSpan.EndTime * 1e3,
-			TraceID:      skywalkingSpan.TraceID,
-			SpanID:       s.swSpanIDToDFSpanID(skywalkingSpan.SegmentID, skywalkingSpan.SpanID),
-			ParentSpanID: s.swSpanIDToDFSpanID(skywalkingSpan.SegmentID, skywalkingSpan.ParentSpanID),
-			SpanKind:     s.swSpanTypeToSpanKind(skywalkingSpan.Type),
-			Endpoint:     *skywalkingSpan.EndpointName,
-			Name:         *skywalkingSpan.EndpointName,
+			Name:            *skywalkingSpan.EndpointName,
+			StartTimeUs:     skywalkingSpan.StartTime * 1e3,
+			EndTimeUs:       skywalkingSpan.EndTime * 1e3,
+			TapSide:         s.swSpanTypeToTapSide(skywalkingSpan.Type),
+			TraceID:         skywalkingSpan.TraceID,
+			SpanID:          s.swSpanIDToDFSpanID(skywalkingSpan.SegmentID, skywalkingSpan.SpanID),
+			ParentSpanID:    s.swRefSpanToParentSpanID(skywalkingSpan.SegmentID, skywalkingSpan.ParentSpanID, &skywalkingSpan.Refs),
+			SpanKind:        s.swSpanTypeToSpanKind(skywalkingSpan.Type),
+			Endpoint:        *skywalkingSpan.EndpointName,
+			AppService:      skywalkingSpan.ServiceCode, // service name
+			AppInstance:     skywalkingSpan.ServiceInstanceName,
+			ServiceUname:    skywalkingSpan.ServiceCode,
+			RequestResource: *skywalkingSpan.EndpointName, // maybe overwrite by tags
+			Attribute:       s.swTagsToAttributes(skywalkingSpan.Tags),
 		}
+		s.swTagsToSpanRequestInfo(*skywalkingSpan.Layer, skywalkingSpan.Tags, &span)
 		exTrace.Spans = append(exTrace.Spans, span)
 	}
 	return exTrace
@@ -158,18 +189,118 @@ func (s *SkyWalkingAdapter) swSpanIDToDFSpanID(segmentID string, spanID int) str
 	return fmt.Sprintf("%s-%d", segmentID, spanID)
 }
 
+func (s *SkyWalkingAdapter) swRefSpanToParentSpanID(segmentID string, parentSpanID int, refSpan *[]*query.Ref) string {
+	if parentSpanID == -1 {
+		if refSpan != nil && len(*refSpan) > 0 {
+			// in opentracing, a span only have ONE parent now, so identified ONE parent here
+			// but remember in batch cosumer case, MQ/async batch process, there could be multiple refs
+			refParent := (*refSpan)[0]
+			if refParent != nil {
+				return fmt.Sprintf("%s-%d", refParent.ParentSegmentID, refParent.ParentSpanID)
+			}
+		} else {
+			return ""
+		}
+	}
+	return fmt.Sprintf("%s-%d", segmentID, parentSpanID)
+}
+
 func (s *SkyWalkingAdapter) swSpanTypeToSpanKind(spanType string) int {
 	switch spanType {
-	case "Exit":
+	case SpanTypeClient:
 		// client-side span
 		return int(v1.Span_SPAN_KIND_CLIENT)
-	case "Entry":
+	case SpanTypeServer:
 		// server-side span
 		return int(v1.Span_SPAN_KIND_SERVER)
-	case "Local":
+	case SpanTypeLocal:
 		// internal span
 		return int(v1.Span_SPAN_KIND_INTERNAL)
 	default:
 		return int(v1.Span_SPAN_KIND_UNSPECIFIED)
+	}
+}
+
+func (s *SkyWalkingAdapter) swSpanTypeToTapSide(spanType string) string {
+	switch spanType {
+	case SpanTypeClient:
+		// client-side span
+		return "c-app"
+	case SpanTypeServer:
+		// server-side span
+		return "s-app"
+	case SpanTypeLocal:
+		// internal span
+		return "app"
+	default:
+		return "app"
+	}
+}
+
+func (s *SkyWalkingAdapter) swTagsToAttributes(tags []*query.KeyValue) map[string]string {
+	attr := make(map[string]string, len(tags))
+	for _, v := range tags {
+		attr[v.Key] = *v.Value
+	}
+	return attr
+}
+
+func (s *SkyWalkingAdapter) swTagsToSpanRequestInfo(layer string, tags []*query.KeyValue, span *model.ExSpan) {
+	if tags == nil {
+		return
+	}
+	span.L7Protocol, span.L7ProtocolStr = s.getL7Protocol(layer)
+	switch layer {
+	case LayerDatabase:
+		s.getDBTags(tags, span)
+	case LayerHTTP:
+		s.getHTTPTags(tags, span)
+	case LayerCache:
+		s.getCacheTags(tags, span)
+	default:
+		// Unknown
+		return
+	}
+}
+
+func (s *SkyWalkingAdapter) getL7Protocol(layer string) (int, string) {
+	if layer == LayerHTTP {
+		// the only protocol can get from span now
+		return 20, "HTTP"
+	} else {
+		return 0, ""
+	}
+}
+
+func (s *SkyWalkingAdapter) getHTTPTags(tags []*query.KeyValue, span *model.ExSpan) {
+	for _, v := range tags {
+		switch v.Key {
+		case AttributeHTTPMethod:
+			span.RequestType = *v.Value // http method
+		case AttributeHTTPStatusCode, AttributeHTTPStatus_Code:
+			code, err := strconv.Atoi(*v.Value)
+			if err == nil {
+				span.ResponseStatus = code
+			}
+		}
+	}
+}
+
+func (s *SkyWalkingAdapter) getDBTags(tags []*query.KeyValue, span *model.ExSpan) {
+	for _, v := range tags {
+		if v.Key == AttributeDbStatement {
+			span.RequestResource = *v.Value
+		}
+	}
+}
+
+func (s *SkyWalkingAdapter) getCacheTags(tags []*query.KeyValue, span *model.ExSpan) {
+	for _, v := range tags {
+		switch v.Key {
+		case AttributeCacheCmd:
+			span.RequestType = *v.Value
+		case AttributeCacheKey:
+			span.RequestResource = *v.Value
+		}
 	}
 }
