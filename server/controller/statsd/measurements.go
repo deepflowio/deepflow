@@ -48,42 +48,30 @@ type StatsdElement struct {
 	// private tag key
 	PrivateTagKey string
 	// metrics float name to values
-	MetricsFloatNameToValues map[string][]int
+	MetricsFloatNameToValues map[string][]float64
 }
 
 type CloudStatsd struct {
-	APICount map[string][]int
-	APICost  map[string][]int
-	ResCount map[string][]int
+	APICount map[string][]float64
+	ResCount map[string][]float64
+	APICost  map[string][]float64
 }
 
 func NewCloudStatsd() CloudStatsd {
 	return CloudStatsd{
-		APICount: make(map[string][]int),
-		APICost:  make(map[string][]int),
-		ResCount: make(map[string][]int),
+		APICount: make(map[string][]float64),
+		ResCount: make(map[string][]float64),
+		APICost:  make(map[string][]float64),
 	}
 }
 
-func (c *CloudStatsd) RefreshAPICount(key string, count int) {
-	if _, ok := c.APICount[key]; !ok {
-		c.APICount[key] = []int{count}
-	} else {
-		c.APICount[key] = append(c.APICount[key], count)
+func (c *CloudStatsd) RefreshAPIMoniter(key string, count int, start time.Time) {
+	var cost float64 = 0
+	if !start.IsZero() {
+		cost = time.Now().Sub(start).Seconds()
 	}
-}
-
-func (c *CloudStatsd) RefreshAPICost(key string, start time.Time) {
-	cost := time.Now().Sub(start).Milliseconds()
-	if _, ok := c.APICost[key]; !ok {
-		c.APICost[key] = []int{int(cost)}
-	} else {
-		c.APICost[key] = append(c.APICost[key], int(cost))
-	}
-}
-
-func (c *CloudStatsd) RefreshResCount(resource model.Resource) {
-	c.ResCount = GetResCount(resource)
+	c.APICost[key] = append(c.APICost[key], cost)
+	c.APICount[key] = append(c.APICount[key], float64(count))
 }
 
 func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
@@ -118,7 +106,7 @@ func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
 }
 
 type CloudTaskStatsd struct {
-	TaskCost map[string][]int
+	TaskCost map[string][]float64
 }
 
 func GetCloudTaskStatsd(cloud CloudTaskStatsd) []StatsdElement {
@@ -134,12 +122,12 @@ func GetCloudTaskStatsd(cloud CloudTaskStatsd) []StatsdElement {
 	return []StatsdElement{taskCost}
 }
 
-func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res T) map[string][]int {
-	resCount := map[string][]int{}
+func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res T) map[string][]float64 {
+	resCount := map[string][]float64{}
 	resAttr := reflect.TypeOf(res)
 	resValue := reflect.ValueOf(res)
 	for i := 0; i < resAttr.NumField(); i++ {
-		var rCount int
+		var rCount float64
 		rKey := resAttr.Field(i).Name
 		switch rKey {
 		case "Verified", "ErrorState", "ErrorMessage", "SyncAt":
@@ -147,18 +135,18 @@ func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res
 		case "AZ", "VPC", "Region", "PodCluster", "PodNodeNetwork", "PodServiceNetwork", "PodNetwork":
 			rCount = 1
 		default:
-			rCount = resValue.Field(i).Len()
+			rCount = float64(resValue.Field(i).Len())
 		}
 		if rCount == 0 {
 			continue
 		}
-		resCount[rKey] = []int{rCount}
+		resCount[rKey] = []float64{rCount}
 	}
 	return resCount
 }
 
 type GenesisStatsd struct {
-	K8SInfoDelay map[string][]int
+	K8SInfoDelay map[string][]float64
 }
 
 func GetGenesisStatsd(genesis GenesisStatsd) []StatsdElement {
