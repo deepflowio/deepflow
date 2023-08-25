@@ -594,6 +594,7 @@ type VTapGroupConfigurationResponse struct {
 	HTTPLogXRequestID             *string        `json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	PrometheusHttpAPIAddresses    *string        `json:"PROMETHEUS_HTTP_API_ADDRESSES"` // separate by ","
 	AnalyzerPort                  *int           `json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int           `json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             *string        `json:"PROXY_CONTROLLER_IP"`
