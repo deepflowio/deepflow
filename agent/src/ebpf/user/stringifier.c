@@ -222,11 +222,11 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 		/*
 		 * Module is known (from /proc/<pid>/maps), but symbol is not known.
 		 * build a string:
-		 * /lib64/xxx.so + 0x00001234
+		 * [/lib64/xxx.so]
 		 */
 		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "%s + 0x%08lx",
-			 sym.module, sym.offset);
+		snprintf(format_str, sizeof(format_str), "[%s]",
+			 sym.module);
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
 		goto finish;
@@ -236,14 +236,10 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 	 * If we have reached this point, it means that we have truly obtained
 	 * nothing. Perhaps this is a JIT-compiled or interpreted program?
 	 * Perhaps the stack trace has been corrupted (no frame pointers)? We
-	 * will simply return the virtual address in the form of a 64-bit
-	 * hexadecimal string.
+	 * will simply return '[unknown]' string.
 	 */
 resolver_err:
-	snprintf(format_str, sizeof(format_str), "%s0x%016lx",
-		 pid == 0 ? k_sym_prefix : u_sym_prefix,
-		 address);
-
+	snprintf(format_str, sizeof(format_str), "[unknown]");
 	len = strlen(format_str);
 	ptr = create_symbol_str(len, format_str, "");
 
