@@ -17,7 +17,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -161,7 +160,7 @@ func (c *Config) Validate() error {
 }
 
 func Load(base *config.Config, path string) *Config {
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	config := &DropletConfig{
 		Droplet: Config{
 			Base:        base,

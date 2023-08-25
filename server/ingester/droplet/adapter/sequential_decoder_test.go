@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -62,11 +61,11 @@ func TestDecoder(t *testing.T) {
 	f.Close()
 
 	expectFile := "icmp_decode_test.result"
-	content, _ := ioutil.ReadFile(expectFile)
+	content, _ := os.ReadFile(expectFile)
 	expected := string(content)
 	actual := buffer.String()
 	if expected != actual {
-		ioutil.WriteFile("actual_icmp.txt", []byte(actual), 0644)
+		os.WriteFile("actual_icmp.txt", []byte(actual), 0644)
 		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual_icmp.txt", expectFile))
 	}
 }

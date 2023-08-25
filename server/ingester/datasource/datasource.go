@@ -19,7 +19,7 @@ package datasource
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,7 +123,7 @@ type DelBody struct {
 }
 
 func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("read body err, %v", err)
 		respFailed(w, err.Error())
@@ -146,7 +146,7 @@ func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("read body err, %v", err)
 		respFailed(w, err.Error())
@@ -174,7 +174,7 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *DatasourceManager) rpDel(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("read body err, %v", err)
 		respFailed(w, err.Error())

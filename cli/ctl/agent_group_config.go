@@ -18,7 +18,6 @@ package ctl
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -159,7 +158,7 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/advanced/", server.IP, server.Port)
-	yamlFile, err := ioutil.ReadFile(createFilename)
+	yamlFile, err := os.ReadFile(createFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -171,7 +170,7 @@ func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename st
 }
 
 func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename string) {
-	yamlFile, err := ioutil.ReadFile(updateFilename)
+	yamlFile, err := os.ReadFile(updateFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return

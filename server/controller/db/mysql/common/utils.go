@@ -19,7 +19,6 @@ package common
 import (
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	l "log"
 	"os"
 	"path/filepath"
@@ -137,7 +136,7 @@ func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) bool {
 
 func InitTables(db *gorm.DB) error {
 	log.Info("init db tables start")
-	initSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
+	initSQL, err := os.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql file failed: %v", err)
 		return err
@@ -157,7 +156,7 @@ func InitTables(db *gorm.DB) error {
 }
 
 func ExecuteIssus(db *gorm.DB, curVersion string) error {
-	issus, err := ioutil.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
+	issus, err := os.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql dir faild: %v", err)
 		return err
@@ -174,7 +173,7 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 }
 
 func executeIssu(db *gorm.DB, nextVersion string) error {
-	issuSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
+	issuSQL, err := os.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
 	if err != nil {
 		log.Errorf("read sql file (version: %s) failed: %v", nextVersion, err)
 		return err
@@ -192,7 +191,7 @@ func executeIssu(db *gorm.DB, nextVersion string) error {
 	return nil
 }
 
-func getAscSortedNextVersions(files []fs.FileInfo, curVersion string) []string {
+func getAscSortedNextVersions(files []fs.DirEntry, curVersion string) []string {
 	vs := []string{}
 	for _, f := range files {
 		vs = append(vs, trimFilenameExt(f.Name()))

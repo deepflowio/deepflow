@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -68,7 +68,7 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("curl: %s failed, response detail: %+v", url, resp)
-		if respBytes, err := ioutil.ReadAll(resp.Body); err == nil {
+		if respBytes, err := io.ReadAll(resp.Body); err == nil {
 			if response, err := simplejson.NewJson(respBytes); err == nil {
 				description := response.Get("DESCRIPTION").MustString()
 				if description != "" {
@@ -80,7 +80,7 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 		return errResponse, errors.New(errMsg)
 	}
 
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("read (%s) body failed, (%v)", url, err)
 		return errResponse, err

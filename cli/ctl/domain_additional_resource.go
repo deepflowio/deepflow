@@ -18,7 +18,6 @@ package ctl
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -83,7 +82,7 @@ func exampleDomainAdditionalResourceConfig(cmd *cobra.Command) {
 
 func loadBodyFromFile(filename string) (map[string]interface{}, error) {
 	var body map[string]interface{}
-	yamlFile, err := ioutil.ReadFile(filename)
+	yamlFile, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

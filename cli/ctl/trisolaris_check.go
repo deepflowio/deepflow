@@ -24,8 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"time"
@@ -672,7 +672,7 @@ func plugin(cmd *cobra.Command) {
 		}
 	}
 	fileName := paramData.PluginType + "-" + paramData.PluginName
-	err = ioutil.WriteFile(fileName, data, 0666)
+	err = os.WriteFile(fileName, data, 0666)
 	if err != nil {
 		fmt.Printf("save plugin(%s) fail %s\n", fileName, err)
 		return

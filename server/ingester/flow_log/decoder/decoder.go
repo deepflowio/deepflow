@@ -19,10 +19,11 @@ package decoder
 import (
 	"bytes"
 	"compress/zlib"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"time"
+
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 
 	"github.com/golang/protobuf/proto"
 
@@ -210,7 +211,7 @@ func decompressOpenTelemetry(compressed []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return ioutil.ReadAll(reader)
+	return io.ReadAll(reader)
 }
 
 func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecoder, pbTracesData *v1.TracesData, compressed bool) {

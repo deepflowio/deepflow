@@ -19,7 +19,6 @@ package ctl
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -341,7 +340,7 @@ func formatBody(filename string) (map[string]interface{}, error) {
 			return upperBody, err
 		}
 	} else {
-		yamlFile, err := ioutil.ReadFile(filename)
+		yamlFile, err := os.ReadFile(filename)
 		if err != nil {
 			return upperBody, err
 		}

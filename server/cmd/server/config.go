@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -56,7 +55,7 @@ func loadConfig(path string) *Config {
 			LogEnabled:    true,
 		},
 	}
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Read config file path: %s, error: %s", err, path)
 		os.Exit(1)

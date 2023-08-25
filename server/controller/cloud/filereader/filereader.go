@@ -19,8 +19,9 @@ package filereader
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
@@ -105,7 +106,7 @@ func (f *FileReader) CheckAuth() error {
 func (f *FileReader) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 
-	fileBytes, err := ioutil.ReadFile(f.filePath)
+	fileBytes, err := os.ReadFile(f.filePath)
 	if err != nil {
 		log.Error(err)
 		return resource, err

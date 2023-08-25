@@ -19,7 +19,7 @@ package kubernetes_gather
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -64,7 +64,7 @@ func TestKubernetes(t *testing.T) {
 			Resources KResource `json:"resources"`
 		}
 
-		kJsonData, _ := ioutil.ReadFile("./testfiles/kubernetes-info.json")
+		kJsonData, _ := os.ReadFile("./testfiles/kubernetes-info.json")
 		var kData KDataResp
 		json.Unmarshal(kJsonData, &kData)
 		k8sInfo := map[string][]string{}
@@ -84,7 +84,7 @@ func TestKubernetes(t *testing.T) {
 		defer k8sInfoPatch.Reset()
 
 		g := genesis.NewGenesis(&config.ControllerConfig{})
-		vJsonData, _ := ioutil.ReadFile("./testfiles/vinterfaces.json")
+		vJsonData, _ := os.ReadFile("./testfiles/vinterfaces.json")
 		var vData genesis.GenesisSyncData
 		json.Unmarshal(vJsonData, &vData)
 		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis) (genesis.GenesisSyncData, error) {

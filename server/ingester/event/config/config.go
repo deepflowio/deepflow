@@ -17,7 +17,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
@@ -101,7 +100,7 @@ func Load(base *config.Config, path string) *Config {
 		log.Info("no config file, use defaults")
 		return &config.Event
 	}
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Warning("Read config file error:", err)
 		config.Event.Validate()

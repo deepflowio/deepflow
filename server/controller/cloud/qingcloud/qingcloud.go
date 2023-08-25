@@ -23,7 +23,7 @@ import (
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -220,7 +220,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 		}
 		defer resp.Body.Close()
 
-		respBytes, err := ioutil.ReadAll(resp.Body)
+		respBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("read (%s) response failed, (%v)", action, err)
 			return nil, err

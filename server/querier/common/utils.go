@@ -18,7 +18,6 @@ package common
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -42,7 +41,7 @@ func LoadDbDescriptions(dir string) (map[string]interface{}, error) {
 }
 
 func readDir(dir string, desMap map[string]interface{}) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		// TODO
 		return err

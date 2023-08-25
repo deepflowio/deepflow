@@ -18,7 +18,7 @@ package router
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
 
@@ -81,7 +81,7 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 // RemoteRead API
 func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		compressed, _ := ioutil.ReadAll(c.Request.Body)
+		compressed, _ := io.ReadAll(c.Request.Body)
 		reqBuf, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			c.JSON(500, err)
