@@ -1,0 +1,25 @@
+name: deepflow-agent
+version: 6.3.6
+description: 基础性能采集器
+scenario: 负责采集CMDB上的实时数据，蓝鲸监控里的主机监控，包含CPU，内存，磁盘等
+category: official  # officical 表示标准插件
+config_file: basereport.conf
+config_format: yaml
+launch_node: agent  # 在说明节点运行，agent、proxy、all
+auto_launch: 1  # 是否再部署 GSE Agent 后自动拉起
+is_binary: 1
+use_db: 0
+config_templates:  # 配置文件信息
+- plugin_version: "*"    
+  name: deepflow-agent.yaml
+  version: 6.3.6
+  file_path: etc    
+  format: yaml    
+  is_main_config: 1    
+  source_path: etc/deepflow-agent.yaml.tpl
+control:  # 插件控制命令，注意操作系统，控制脚本文件后缀会改变  
+  start: "./start.sh deepflow-agent"  
+  stop: "./stop.sh deepflow-agent"  
+  restart: "./restart.sh deepflow-agent"  
+  reload: "./reload.sh deepflow-agent"  
+  version: "./deepflow-agent -v"
