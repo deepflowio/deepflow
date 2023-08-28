@@ -129,14 +129,16 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        if start_continuous_profiler(99, continuous_profiler_callback) != 0 {
+	// Used to test our DeepFlow products, written as 97 frequency, so that
+        // it will not affect the sampling test of deepflow agent (using 99Hz).
+        if start_continuous_profiler(97, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
 
         set_profiler_regex(
             CString::new(
-                "^(java|nginx|profiler|telegraf|mysqld|socket_tracer|.*deepflow.*)$".as_bytes(),
+                "^(socket_tracer|deepflow-.*)$".as_bytes(),
             )
             .unwrap()
             .as_c_str()

@@ -241,6 +241,10 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		)
 	}
 
+	if table == "alarm_event" {
+		return response, nil
+	}
+
 	// 查询 k8s_label
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
