@@ -17,6 +17,7 @@
 package dbwriter
 
 import (
+	"fmt"
 	"strconv"
 	"sync/atomic"
 
@@ -101,7 +102,7 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		writer.ckdbAddrs,
 		writer.ckdbUsername,
 		writer.ckdbPassword,
-		PROFILE_TABLE,
+		fmt.Sprintf("%s-%s-%d", msgType, PROFILE_TABLE, decoderIndex),
 		config.Base.CKDB.TimeZone,
 		table,
 		writer.writerConfig.QueueCount,
