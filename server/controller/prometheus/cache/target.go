@@ -17,11 +17,14 @@
 package cache
 
 import (
+	"sort"
 	"strings"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -39,18 +42,6 @@ func NewTargetKey(instance, job string) TargetKey {
 	return TargetKey{
 		Instance: instance,
 		Job:      job,
-	}
-}
-
-type TargetLabelKey struct {
-	TargetID  int    `json:"target_id"`
-	LabelName string `json:"label_name"`
-}
-
-func NewTargetLabelKey(targetID int, labelName string) TargetLabelKey {
-	return TargetLabelKey{
-		TargetID:  targetID,
-		LabelName: labelName,
 	}
 }
 
@@ -76,48 +67,70 @@ func (k *keyToTargetID) Get() map[TargetKey]int {
 	return k.data
 }
 
+func (k *keyToTargetID) Store(tk TargetKey, v int) {
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	k.data[tk] = v
+}
+
 func (k *keyToTargetID) Coverage(data map[TargetKey]int) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	k.data = data
 }
 
-type targetLabelKeys struct {
+type targetIDToLabelNames struct {
 	lock sync.Mutex
-	data mapset.Set[TargetLabelKey]
+	data map[int]mapset.Set[string]
 }
 
-func newTargetLabelKeys() *targetLabelKeys {
-	return &targetLabelKeys{data: mapset.NewThreadUnsafeSet[TargetLabelKey]()}
+func newTargetIDToLabelNames() *targetIDToLabelNames {
+	return &targetIDToLabelNames{data: make(map[int]mapset.Set[string])}
 }
 
-func (t *targetLabelKeys) Contains(tlk TargetLabelKey) bool {
+func (t *targetIDToLabelNames) Contains(id int, labelName string) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.data.Contains(tlk)
+	if set, ok := t.data[id]; ok {
+		return set.Contains(labelName)
+	}
+	return false
 }
 
-func (t *targetLabelKeys) Get() mapset.Set[TargetLabelKey] {
+func (t *targetIDToLabelNames) Get() map[int]mapset.Set[string] {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	return t.data
 }
 
-func (t *targetLabelKeys) Coverage(data mapset.Set[TargetLabelKey]) {
+func (t *targetIDToLabelNames) Coverage(data map[int]mapset.Set[string]) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.data = data
 }
 
+func (t *targetIDToLabelNames) Load(id int) []string {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	set, ok := t.data[id]
+	if ok {
+		slice := set.ToSlice()
+		sort.Strings(slice)
+		return slice
+	}
+	return []string{}
+}
+
 type target struct {
-	keyToTargetID   *keyToTargetID
-	targetLabelKeys *targetLabelKeys
+	keyToTargetID        *keyToTargetID
+	targetIDToLabelNames *targetIDToLabelNames
+	idToLabels           sync.Map
 }
 
 func newTarget() *target {
 	return &target{
-		keyToTargetID:   newKeyToTargetID(),
-		targetLabelKeys: newTargetLabelKeys(),
+		keyToTargetID:        newKeyToTargetID(),
+		targetIDToLabelNames: newTargetIDToLabelNames(),
 	}
 }
 
@@ -125,34 +138,56 @@ func (t *target) Get() map[TargetKey]int {
 	return t.keyToTargetID.Get()
 }
 
-func (t *target) IfTargetLabelKeyExists(key TargetLabelKey) bool {
-	return t.targetLabelKeys.Contains(key)
+func (t *target) IfLabelIsTargetType(id int, labelName string) bool {
+	return t.targetIDToLabelNames.Contains(id, labelName)
 }
 
 func (t *target) GetIDByKey(key TargetKey) (int, bool) {
 	return t.keyToTargetID.Load(key)
 }
 
+func (t *target) GetLabelNamesByID(id int) []string {
+	return t.targetIDToLabelNames.Load(id)
+}
+
+func (t *target) Add(batch []*controller.PrometheusTarget) {
+	for _, item := range batch {
+		t.keyToTargetID.Store(NewTargetKey(item.GetInstance(), item.GetJob()), int(item.GetId()))
+	}
+}
+
 func (t *target) refresh(args ...interface{}) error {
-	targets, err := t.load()
+	recorderTargets, selfTargets, err := t.load()
 	if err != nil {
 		return err
 	}
 	keyToTargetID := make(map[TargetKey]int)
-	targetLabelKeys := mapset.NewThreadUnsafeSet[TargetLabelKey]()
-	for _, item := range targets {
+	targetIDToLabelNames := make(map[int]mapset.Set[string])
+	for _, item := range recorderTargets {
 		keyToTargetID[NewTargetKey(item.Instance, item.Job)] = item.ID
-		for _, ln := range t.getTargetLabelNames(item) {
-			targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
-		}
+		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
 	}
+
+	dupKeyIDs := make([]int, 0)
+	for _, item := range selfTargets {
+		if _, ok := keyToTargetID[NewTargetKey(item.Instance, item.Job)]; ok {
+			dupKeyIDs = append(dupKeyIDs, item.ID)
+			continue
+		}
+		keyToTargetID[NewTargetKey(item.Instance, item.Job)] = item.ID
+		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
+	}
+	if len(dupKeyIDs) != 0 {
+		t.dedup(dupKeyIDs)
+	}
+
 	t.keyToTargetID.Coverage(keyToTargetID)
-	t.targetLabelKeys.Coverage(targetLabelKeys)
+	t.targetIDToLabelNames.Coverage(targetIDToLabelNames)
 	return nil
 }
 
 func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
-	var lns []string
+	lns := []string{"instance", "job"}
 	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
 			continue
@@ -167,8 +202,15 @@ func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
 	return lns
 }
 
-func (t *target) load() ([]*mysql.PrometheusTarget, error) {
-	var targets []*mysql.PrometheusTarget
-	err := mysql.Db.Find(&targets).Error
-	return targets, err
+func (t *target) load() (recorderTargets, selfTargets []*mysql.PrometheusTarget, err error) {
+	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
+	if err != nil {
+		return
+	}
+	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
+	return
+}
+
+func (t *target) dedup(ids []int) error {
+	return mysql.Db.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error // TODO 强删？
 }
