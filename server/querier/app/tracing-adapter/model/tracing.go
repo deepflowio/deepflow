@@ -17,14 +17,25 @@
 package model
 
 type ExSpan struct {
-	Name         string `json:"name"`
-	StartTimeUs  int64  `json:"start_time_us"` // microseconds
-	EndTimeUs    int64  `json:"end_time_us"`
-	TraceID      string `json:"trace_id"`
-	SpanID       string `json:"span_id"`
-	ParentSpanID string `json:"parent_span_id"`
-	SpanKind     int    `json:"span_kind"`
-	Endpoint     string `json:"endpoint"`
+	Name            string `json:"name"`
+	StartTimeUs     int64  `json:"start_time_us"` // microseconds
+	EndTimeUs       int64  `json:"end_time_us"`
+	TapSide         string `json:"tap_side"` // spankind=server: s-app/ spankind=client: c-app/ spankind=internal: app
+	L7Protocol      int    `json:"l7_protocol"`
+	L7ProtocolStr   string `json:"l7_protocol_str"`
+	TraceID         string `json:"trace_id"`
+	SpanID          string `json:"span_id"`
+	ParentSpanID    string `json:"parent_span_id"`
+	SpanKind        int    `json:"span_kind"` // client/server/internal
+	Endpoint        string `json:"endpoint"`
+	RequestType     string `json:"request_type"`     // method
+	RequestResource string `json:"request_resource"` // path
+	ResponseStatus  int    `json:"response_status"`
+	AppService      string `json:"app_service"`   // service name
+	AppInstance     string `json:"app_instance"`  // service instance name
+	ServiceUname    string `json:"service_uname"` // equals app_service
+
+	Attribute map[string]string `json:"attribute"`
 }
 
 type ExTrace struct {
