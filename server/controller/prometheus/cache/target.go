@@ -156,6 +156,10 @@ func (t *target) Add(batch []*controller.PrometheusTarget) {
 	}
 }
 
+func (t *target) GetTargetIDToLabelNames() map[int]mapset.Set[string] {
+	return t.targetIDToLabelNames.Get()
+}
+
 func (t *target) refresh(args ...interface{}) error {
 	recorderTargets, selfTargets, err := t.load()
 	if err != nil {
@@ -212,5 +216,5 @@ func (t *target) load() (recorderTargets, selfTargets []*mysql.PrometheusTarget,
 }
 
 func (t *target) dedup(ids []int) error {
-	return mysql.Db.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error // TODO 强删？
+	return mysql.Db.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error
 }

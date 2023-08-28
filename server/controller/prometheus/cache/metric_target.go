@@ -120,6 +120,10 @@ func (mt *metricTarget) IfLabelIsTargetType(mn, ln string) bool {
 	return false
 }
 
+func (mt *metricTarget) GetMetricNameToTargetIDs() map[string]mapset.Set[int] {
+	return mt.metricNameToTargetIDs.Get()
+}
+
 func (mt *metricTarget) refresh(args ...interface{}) error {
 	mts, err := mt.load()
 	if err != nil {
