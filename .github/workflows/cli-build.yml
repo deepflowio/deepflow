@@ -57,8 +57,8 @@ jobs:
           cd cli
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.linux-amd64 -e BRANCH=${{ github.ref_name }}
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 make -e BINARY_SUFFIX=.linux-arm64 -e BRANCH=${{ github.ref_name }}
-          # CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 make -e BINARY_SUFFIX=.darwin-amd64
-          # CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 make -e BINARY_SUFFIX=.darwin-arm64
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 make -e BINARY_SUFFIX=.darwin-amd64 -e BRANCH=${{ github.ref_name }}
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 make -e BINARY_SUFFIX=.darwin-arm64 -e BRANCH=${{ github.ref_name }}
           cd bin/
           sha256sum * > deepflow-agent.sha256sum.txt
 
@@ -83,14 +83,16 @@ jobs:
         run: |
           ossutil cp -rf cli/bin/deepflow-ctl.linux-amd64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-ctl
           ossutil cp -rf cli/bin/deepflow-ctl.linux-arm64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-ctl
-          # ossutil cp -rf cli/bin/deepflow-ctl.darwin-amd64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/amd64/deepflow-ctl
-          # ossutil cp -rf cli/bin/deepflow-ctl.darwin-arm64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/arm64/deepflow-ctl
+          ossutil cp -rf cli/bin/deepflow-ctl.darwin-amd64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/darwin/amd64/deepflow-ctl
+          ossutil cp -rf cli/bin/deepflow-ctl.darwin-arm64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/darwin/arm64/deepflow-ctl
 
       - name: upload cli stable artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
           ossutil cp -rf cli/bin/deepflow-ctl.linux-amd64 oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-ctl
           ossutil cp -rf cli/bin/deepflow-ctl.linux-arm64 oss://deepflow-ce/bin/ctl/stable/linux/arm64/deepflow-ctl
+          ossutil cp -rf cli/bin/deepflow-ctl.darwin-amd64 oss://deepflow-ce/bin/ctl/stable/darwin/amd64/deepflow-ctl
+          ossutil cp -rf cli/bin/deepflow-ctl.darwin-arm64 oss://deepflow-ce/bin/ctl/stable/darwin/arm64/deepflow-ctl
 
       # - name: Prepare for upload package
       #   shell: bash
