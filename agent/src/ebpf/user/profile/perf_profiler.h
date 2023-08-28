@@ -16,7 +16,7 @@
 
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
-#include "bihash_24_8.h"
+#include "../bihash_24_8.h"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and

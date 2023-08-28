@@ -138,7 +138,7 @@ fn main() {
 
         set_profiler_regex(
             CString::new(
-                "^(socket_tracer|deepflow-.*)$".as_bytes(),
+                "^(socket_tracer|java|deepflow-.*)$".as_bytes(),
             )
             .unwrap()
             .as_c_str()

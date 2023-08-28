@@ -22,24 +22,39 @@
  */
 #ifndef AARCH64_MUSL
 #include <bcc/perf_reader.h>
-#include "config.h"
-#include "common.h"
-#include "mem.h"
-#include "log.h"
-#include "types.h"
-#include "vec.h"
-#include "tracer.h"
+#include "../config.h"
+#include "../common.h"
+#include "../mem.h"
+#include "../log.h"
+#include "../types.h"
+#include "../vec.h"
+#include "../tracer.h"
 #include "perf_profiler.h"
-#include "elf.h"
-#include "load.h"
-#include "../kernel/include/perf_profiler.h"
-#include "perf_reader.h"
-#include "bihash_8_8.h"
+#include "../elf.h"
+#include "../load.h"
+#include "../../kernel/include/perf_profiler.h"
+#include "../perf_reader.h"
+#include "../bihash_8_8.h"
 #include "stringifier.h"
-#include "table.h"
+#include "../table.h"
 #include <regex.h>
+#include "java/df_jattach.h"
 
-#include "perf_profiler_bpf_common.c"
+#include "../perf_profiler_bpf_common.c"
+
+/*
+ * This section is for symbolization of Java addresses, and we need
+ * to prepare two so librarys, one for GNU and the other for MUSL:
+ *
+ * df_java_agent.so
+ * df_java_agent_musl.so
+ *
+ * These two files need to be saved in the '/tmp' directory, and the
+ * agent so library will be injected into the JVM to generate
+ * 'perf-<pid>.map'.
+ */
+#include "java_agent_so_gnu.c"
+#include "java_agent_so_musl.c"
 
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
@@ -60,7 +75,9 @@ static __thread bool msg_clear_hash;
 
 // for flame-graph test
 static FILE *folded_file;
-#define FOLDED_FILE_PATH "./profiler.folded" 
+#define FOLDED_FILE_PATH "./profiler.folded"
+static char *flame_graph_start_time;
+static char *flame_graph_end_time;
 
 /* "Maximum data push interval time (in seconds). */
 #define MAX_PUSH_MSG_TIME_INTERVAL 10
@@ -115,8 +132,8 @@ static u64 transfer_count;
 static u64 process_count;
 
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
-				  stack_str_hash_t *h,
-				  stack_trace_msg_hash_t *msg_h);
+				  stack_str_hash_t * h,
+				  stack_trace_msg_hash_t * msg_h);
 static void print_cp_tracer_status(struct bpf_tracer *t);
 
 /*
@@ -124,7 +141,7 @@ static void print_cp_tracer_status(struct bpf_tracer *t);
  * to be missing (processes that start and exit quickly). This variable
  * is used to count the number of lost processes during the parsing process.
  */
-static atomic64_t process_lost_count; 
+static atomic64_t process_lost_count;
 
 static u64 get_process_lost_count(void)
 {
@@ -147,12 +164,11 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 
 static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 				const char *process_name,
-				struct stack_trace_key_t *v,
-				void *msg_value)
+				struct stack_trace_key_t *v, void *msg_value)
 {
 	if (process_name == NULL) {
 		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-        	                v->comm, strlen(v->comm));
+				v->comm, strlen(v->comm));
 	} else {
 		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
 				process_name, strlen(process_name));
@@ -174,9 +190,7 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 }
 
 static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v,
-			u64 stime,
-			void *msg_value)
+			struct stack_trace_key_t *v, u64 stime, void *msg_value)
 {
 	kvp->k.tgid = v->tgid;
 	kvp->k.pid = v->pid;
@@ -187,20 +201,17 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_stack_trace_msg(stack_trace_msg_t *msg,
+static void set_stack_trace_msg(stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v,
 				bool matched,
-				u64 stime,
-				u64 ns_id,
-				const char *process_name)
+				u64 stime, u64 ns_id, const char *process_name)
 {
 	msg->pid = v->tgid;
 	msg->tid = v->pid;
 	msg->cpu = v->cpu;
 	msg->u_stack_id = (u32) v->userstack;
 	msg->k_stack_id = (u32) v->kernstack;
-	strcpy_s_inline(msg->comm, sizeof(msg->comm),
-			v->comm, strlen(v->comm));
+	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
 	msg->stime = stime;
 	msg->netns_id = ns_id;
 
@@ -243,6 +254,11 @@ static void set_stack_trace_msg(stack_trace_msg_t *msg,
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	msg->count = 1;
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);
+
+	/* Only use for test flame graph. */
+	if (flame_graph_start_time == NULL) {
+		flame_graph_start_time = gen_file_name_by_datetime();
+	}
 }
 
 static void reader_lost_cb(void *t, u64 lost)
@@ -289,7 +305,7 @@ static int relase_profiler(struct bpf_tracer *tracer)
 	return ETR_OK;
 }
 
-static int init_stack_trace_msg_hash(stack_trace_msg_hash_t *h,
+static int init_stack_trace_msg_hash(stack_trace_msg_hash_t * h,
 				     const char *name)
 {
 	memset(h, 0, sizeof(*h));
@@ -299,24 +315,25 @@ static int init_stack_trace_msg_hash(stack_trace_msg_hash_t *h,
 					 nbuckets, hash_memory_size);
 }
 
-static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
+static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 {
-	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
+	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *) kv;
 	if (msg_kv->msg_ptr != 0) {
-		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
+		stack_trace_msg_t *msg = (stack_trace_msg_t *) msg_kv->msg_ptr;
 #ifdef CP_DEBUG
-		ebpf_debug("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
-			   "%lu cpu %u count %u comm %s datalen %u data %s\n",
-			   msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
-			   msg->k_stack_id, msg->cpu, msg->count, msg->comm,
-			   msg->data_len, msg->data);
+		ebpf_debug
+		    ("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
+		     "%lu cpu %u count %u comm %s datalen %u data %s\n",
+		     msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
+		     msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+		     msg->data_len, msg->data);
 #endif
 		tracer_callback_t fun = profiler_tracer->process_fn;
 		/*
- 		 * Execute callback function to hand over the data to the
- 		 * higher level for processing. The higher level will se-
- 		 * nd the data to the server for storage as required.
- 		 */
+		 * Execute callback function to hand over the data to the
+		 * higher level for processing. The higher level will se-
+		 * nd the data to the server for storage as required.
+		 */
 		if (likely(profiler_stop == 0))
 			fun(msg);
 
@@ -339,7 +356,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
  * Push the data and release the resources.
  * @is_force: Do you need to perform a forced release?
  */
-static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h,
+static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 					     bool is_force)
 {
 	ASSERT(profiler_tracer != NULL);
@@ -378,7 +395,8 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h,
 	stack_trace_msg_hash_kv *v;
 	vec_foreach(v, trace_msg_kvps) {
 		if (stack_trace_msg_hash_add_del(h, v, 0 /* delete */ )) {
-			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+			ebpf_warning
+			    ("stack_trace_msg_hash_add_del() failed.\n");
 			msg_clear_hash = true;
 		}
 	}
@@ -405,9 +423,9 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h,
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
-				   stack_str_hash_t *stack_str_hash,
-				   stack_trace_msg_hash_t *msg_hash,
-				   u32 *count)
+				   stack_str_hash_t * stack_str_hash,
+				   stack_trace_msg_hash_t * msg_hash,
+				   u32 * count)
 {
 	struct stack_trace_key_t *v;
 	vec_foreach(v, raw_stack_data) {
@@ -457,7 +475,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		stack_trace_msg_kv_t kv;
 		char name[TASK_COMM_LEN];
 		u64 stime, netns_id;
-		get_process_info_by_pid(v->tgid, &stime, &netns_id, (char *)name);
+		get_process_info_by_pid(v->tgid, &stime, &netns_id,
+					(char *)name);
 		char *process_name = NULL;
 		bool matched = false;
 
@@ -467,20 +486,24 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			else
 				process_name = name;
 
-			matched = (regexec(&profiler_regex, process_name, 0, NULL, 0) == 0);
+			matched =
+			    (regexec(&profiler_regex, process_name, 0, NULL, 0)
+			     == 0);
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else
-				set_msg_kvp_by_comm(&kv, process_name, v, (void *)0);
+				set_msg_kvp_by_comm(&kv, process_name, v,
+						    (void *)0);
 		} else {
 			/* Not find process in procfs. */
 			set_msg_kvp_by_comm(&kv, NULL, v, (void *)0);
 		}
 
-		if (stack_trace_msg_hash_search(msg_hash, (stack_trace_msg_hash_kv *)&kv,
-						(stack_trace_msg_hash_kv *)&kv) == 0) {
+		if (stack_trace_msg_hash_search
+		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
+		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			((stack_trace_msg_t *)kv.msg_ptr)->count++;
+			((stack_trace_msg_t *) kv.msg_ptr)->count++;
 
 			continue;
 		}
@@ -495,8 +518,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 */
 
 		char *trace_str =
-			resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-							stack_str_hash, matched);
+		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
+						    stack_str_hash, matched);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -510,19 +533,24 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				continue;
 			}
 
-			set_stack_trace_msg(msg, v, matched, stime, netns_id, process_name);
-			snprintf((char *)&msg->data[0], str_len, "%s;%s", v->comm, trace_str);
+			set_stack_trace_msg(msg, v, matched, stime, netns_id,
+					    process_name);
+			snprintf((char *)&msg->data[0], str_len, "%s;%s",
+				 v->comm, trace_str);
 			msg->data_len = str_len - 1;
 			clib_mem_free(trace_str);
 			kv.msg_ptr = pointer_to_uword(msg);
-			
+
 			if (stack_trace_msg_hash_add_del(msg_hash,
-							 (stack_trace_msg_hash_kv *)&kv,
+							 (stack_trace_msg_hash_kv
+							  *) & kv,
 							 1 /* is_add */ )) {
-				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+				ebpf_warning
+				    ("stack_trace_msg_hash_add_del() failed.\n");
 				clib_mem_free(msg);
 			} else {
-				__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
+				__sync_fetch_and_add(&msg_hash->
+						     hash_elems_count, 1);
 			}
 		}
 
@@ -606,7 +634,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 
 	if (nfds > 0) {
 
-check_again:
+	      check_again:
 		if (unlikely(profiler_stop == 1))
 			goto release_iter;
 
@@ -633,7 +661,8 @@ check_again:
 		 * to incomplete processing.
 		 */
 		if (bpf_table_get_value(t, MAP_PROFILER_STATE_MAP,
-					sample_count_idx, (void *)&sample_cnt_val)) {
+					sample_count_idx,
+					(void *)&sample_cnt_val)) {
 			if (sample_cnt_val > count) {
 				nfds = reader_epoll_short_wait(r, events);
 				if (nfds > 0)
@@ -685,7 +714,7 @@ static void cp_reader_work(void *arg)
 	}
 
 exit:
-        print_cp_tracer_status(t);
+	print_cp_tracer_status(t);
 
 	print_hash_stack_str(&g_stack_str_hash);
 	/* free stack_str_hash */
@@ -772,6 +801,10 @@ static int create_profiler(struct bpf_tracer *tracer)
 int stop_continuous_profiler(void)
 {
 	profiler_stop = 1;
+	if (flame_graph_end_time == NULL) {
+		flame_graph_end_time = gen_file_name_by_datetime();
+	}
+
 	release_bpf_tracer(CP_TRACER_NAME);
 	profiler_tracer = NULL;
 
@@ -832,17 +865,18 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 		  " - output_err_cnt:\t%lu\n"
 		  " - iter_max_cnt:\t%lu\n"
 		  "----------------------------\n\n",
-		  atomic64_read(&t->recv), process_count, atomic64_read(&t->lost),
-		  get_process_lost_count(), get_stack_table_data_miss_count(),
-		  stack_trace_lost, transfer_count,
+		  atomic64_read(&t->recv), process_count,
+		  atomic64_read(&t->lost), get_process_lost_count(),
+		  get_stack_table_data_miss_count(), stack_trace_lost,
+		  transfer_count,
 		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
-		  alloc_b, free_b, alloc_b - free_b, output_count, sample_drop_cnt,
-		  output_err_cnt, iter_max_cnt);
+		  alloc_b, free_b, alloc_b - free_b, output_count,
+		  sample_drop_cnt, output_err_cnt, iter_max_cnt);
 }
 
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
-				  stack_str_hash_t *h,
-				  stack_trace_msg_hash_t *msg_h)
+				  stack_str_hash_t * h,
+				  stack_trace_msg_hash_t * msg_h)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -863,8 +897,7 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
-int start_continuous_profiler(int freq,
-			      tracer_callback_t callback)
+int start_continuous_profiler(int freq, tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
@@ -888,6 +921,41 @@ int start_continuous_profiler(int freq,
 	// CPUID will not be included in the aggregation of stack trace data.
 	set_profiler_cpu_aggregation(0);
 
+	// Java agent so library generation.
+	if (access(AGENT_LIB_SRC_PATH, F_OK) == 0) {
+		if (unlink(AGENT_LIB_SRC_PATH) != 0) {
+			ebpf_warning(LOG_CP_TAG "rm file %s failed.\n",
+				     AGENT_LIB_SRC_PATH);
+			return (-1);
+		}
+	}
+
+	if (access(AGENT_MUSL_LIB_SRC_PATH, F_OK) == 0) {
+		if (unlink(AGENT_MUSL_LIB_SRC_PATH) != 0) {
+			ebpf_warning(LOG_CP_TAG "rm file %s failed.\n",
+				     AGENT_MUSL_LIB_SRC_PATH);
+			return (-1);
+		}
+	}
+
+	if (gen_file_from_mem((const char *)java_agent_so_gnu,
+			      sizeof(java_agent_so_gnu),
+			      (const char *)AGENT_LIB_SRC_PATH)) {
+		ebpf_warning(LOG_CP_TAG
+			     "Java agent so library(%s) generate failed.\n",
+			     AGENT_LIB_SRC_PATH);
+		return (-1);
+	}
+
+	if (gen_file_from_mem((const char *)java_agent_so_musl,
+			      sizeof(java_agent_so_musl),
+			      (const char *)AGENT_MUSL_LIB_SRC_PATH)) {
+		ebpf_warning(LOG_CP_TAG
+			     "Java agent so library(%s) generate failed.\n",
+			     AGENT_MUSL_LIB_SRC_PATH);
+		return (-1);
+	}
+
 	snprintf(bpf_load_buffer_name, NAME_LEN, "continuous_profiler");
 	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
 	buffer_sz = sizeof(perf_profiler_common_ebpf_data);
@@ -906,7 +974,7 @@ int start_continuous_profiler(int freq,
 
 static u64 test_add_count, stack_count;
 static u64 test_hit_count, msg_ptr_zero_count;
-void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *msg)
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
 {
 	stack_count++;
 	if (folded_file == NULL) {
@@ -917,14 +985,15 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *msg)
 	}
 
 	/* Ensure that the buffer is long enough to accommodate the stack trace string. */
-	int len = msg->data_len + sizeof(msg->comm) + sizeof(msg->process_name) + 64;
+	int len =
+	    msg->data_len + sizeof(msg->comm) + sizeof(msg->process_name) + 64;
 	char str[len];
 	/* profile regex match ? */
 	if (msg->stime > 0)
-		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name, msg->pid,
-			 msg->data, msg->count);
+		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name,
+			 msg->pid, msg->data, msg->count);
 	else
-		snprintf(str, len, "%s;%s %u\n", msg->process_name, /*msg->pid,*/
+		snprintf(str, len, "%s;%s %u\n", msg->process_name,	/*msg->pid, */
 			 msg->data, msg->count);
 
 	os_puts(folded_file, str, strlen(str), false);
@@ -934,7 +1003,8 @@ void release_flame_graph_hash(void)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-	ebpf_info(LOG_CP_TAG "pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
+	ebpf_info(LOG_CP_TAG
+		  "pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
 		  " bytes\n", alloc_b, free_b, alloc_b - free_b);
 	if (folded_file)
 		fclose(folded_file);
@@ -943,16 +1013,21 @@ void release_flame_graph_hash(void)
 #ifdef DF_MEM_DEBUG
 	show_mem_list();
 #endif
-	ebpf_info(LOG_CP_TAG "after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
-		  " bytes\n",alloc_b, free_b, alloc_b - free_b);
+	ebpf_info(LOG_CP_TAG
+		  "after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
+		  " bytes\n", alloc_b, free_b, alloc_b - free_b);
 
-	ebpf_info(LOG_CP_TAG "<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
-		  "_count %lu push_count %lu >>>\n", stack_count, test_add_count, test_hit_count,
-		  msg_ptr_zero_count, push_count);
+	ebpf_info(LOG_CP_TAG
+		  "<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
+		  "_count %lu push_count %lu >>>\n", stack_count,
+		  test_add_count, test_hit_count, msg_ptr_zero_count,
+		  push_count);
 
-	ebpf_info(LOG_CP_TAG "Please use the following command to generate a flame graph:"
+	ebpf_info(LOG_CP_TAG
+		  "Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl"
-		  " --countname=samples --inverted > profiler-test.svg\033[0m\n");
+		  " --countname=samples --inverted > profiler-from_%s_to_%s.svg\033[0m\n",
+		  flame_graph_start_time, flame_graph_end_time);
 }
 
 /*
@@ -964,7 +1039,8 @@ void release_flame_graph_hash(void)
 int set_profiler_regex(const char *pattern)
 {
 	if (profiler_tracer == NULL) {
-		ebpf_warning(LOG_CP_TAG "The 'profiler_tracer' has not been created yet."
+		ebpf_warning(LOG_CP_TAG
+			     "The 'profiler_tracer' has not been created yet."
 			     " Please use start_continuous_profiler() to create it first.\n");
 		return (-1);
 	}
@@ -978,7 +1054,8 @@ int set_profiler_regex(const char *pattern)
 	tracer_reader_lock(profiler_tracer);
 	if (*pattern == '\0') {
 		regex_existed = false;
-		ebpf_warning(LOG_CP_TAG "Set 'profiler_regex' pattern : '', an empty"
+		ebpf_warning(LOG_CP_TAG
+			     "Set 'profiler_regex' pattern : '', an empty"
 			     " regular expression will not generate any stack data."
 			     "Please configure the regular expression for profiler.\n");
 		tracer_reader_unlock(profiler_tracer);
@@ -992,8 +1069,10 @@ int set_profiler_regex(const char *pattern)
 	int ret = regcomp(&profiler_regex, pattern, REG_EXTENDED);
 	if (ret != 0) {
 		char error_buffer[100];
-		regerror(ret, &profiler_regex, error_buffer, sizeof(error_buffer));
-		ebpf_warning(LOG_CP_TAG "Pattern %s failed to compile the regular "
+		regerror(ret, &profiler_regex, error_buffer,
+			 sizeof(error_buffer));
+		ebpf_warning(LOG_CP_TAG
+			     "Pattern %s failed to compile the regular "
 			     "expression: %s\n", pattern, error_buffer);
 		regex_existed = false;
 		tracer_reader_unlock(profiler_tracer);
@@ -1002,20 +1081,23 @@ int set_profiler_regex(const char *pattern)
 
 	regex_existed = true;
 	tracer_reader_unlock(profiler_tracer);
-	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'", pattern);
+	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
+		  pattern);
 	return (0);
 }
 
 int set_profiler_cpu_aggregation(int flag)
 {
 	if (flag != 0 && flag != 1) {
-		ebpf_info(LOG_CP_TAG "Set 'cpu_aggregation_flag' parameter invalid.\n");
+		ebpf_info(LOG_CP_TAG
+			  "Set 'cpu_aggregation_flag' parameter invalid.\n");
 		return (-1);
 	}
 
-	cpu_aggregation_flag = (u64)flag;
+	cpu_aggregation_flag = (u64) flag;
 
-	ebpf_info(LOG_CP_TAG "Set 'cpu_aggregation_flag' successful, value %d\n", flag);
+	ebpf_info(LOG_CP_TAG
+		  "Set 'cpu_aggregation_flag' successful, value %d\n", flag);
 	return (0);
 }
 
@@ -1029,8 +1111,7 @@ int set_profiler_cpu_aggregation(int flag)
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
-int start_continuous_profiler(int freq,
-			      tracer_callback_t callback)
+int start_continuous_profiler(int freq, tracer_callback_t callback)
 {
 	return (-1);
 }

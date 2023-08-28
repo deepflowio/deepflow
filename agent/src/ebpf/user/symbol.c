@@ -45,6 +45,7 @@
 #include "bddisasm/disasmtypes.h"
 #endif
 #include "libGoReSym.h"
+#include "profile/attach.h"
 
 static u64 add_symcache_count;
 static u64 free_symcache_count;
@@ -780,6 +781,10 @@ int create_and_init_symbolizer_caches(void)
 			if (p->stime == 0) {
 				clib_mem_free(p);
 				continue;
+			}
+
+			if (strcmp(p->comm, "java") == 0) {
+				gen_java_symbols_file(pid);
 			}
 
 			sym.v.proc_info_p = pointer_to_uword(p);

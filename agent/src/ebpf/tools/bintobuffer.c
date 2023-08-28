@@ -1,9 +1,9 @@
 /*
- * file: tools/ebpftobuffer.c
+ * file: tools/bintobuffer.c
  *
- * This tool is used to convert eBPF bytecode into a buffer in C file.
+ * This tool is used to convert eBPF/library bytecode into a buffer in C file.
  *
- * Uage: ebpftobuffer <ebpf-elf-file> <target-file> <variable-name>
+ * Uage: bintobuffer <ebpf-elf-file/library-file> <target-file> <variable-name>
  * @ebpf-elf-file : eBPF binary file path (to be converted)
  * @target-file : target c file path
  * @variable-name : buffer variable name
@@ -52,7 +52,7 @@ static unsigned char *read_bin_file(char *name, int *len)
 int main(int argc, char *argv[])
 {
 	if (argc < 4) {
-		printf("Uage:%s <ebpf-elf-file> <target-file> <variable-name>\n",
+		printf("Uage:%s <ebpf-elf-file/library-file> <target-file> <variable-name>\n",
 		       argv[0]);
 		return -1;
 	}
