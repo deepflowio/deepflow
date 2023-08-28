@@ -3,8 +3,7 @@ name: build server
 on: 
   push:
     branches:
-      - main
-      - 'feature-**'
+      - v6.3
     paths:
       - 'server/**'
       - 'message/**'
