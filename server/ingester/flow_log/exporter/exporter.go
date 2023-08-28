@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/loki_exporter"
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
@@ -30,6 +31,10 @@ func NewExporters(exportersCfg []ExporterCfg, baseCfg *config.Config) []Exporter
 		case OtlpExporter:
 			if otlpExporter := otlp_exporter.NewOtlpExporter(&exportersCfg[i].OtlpExporter, baseCfg); otlpExporter != nil {
 				exporters = append(exporters, otlpExporter)
+			}
+		case LokiExporter:
+			if lokiExporter := loki_exporter.NewLokiExporter(&exportersCfg[i].LokiExporter); lokiExporter != nil {
+				exporters = append(exporters, lokiExporter)
 			}
 		default:
 

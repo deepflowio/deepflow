@@ -20,6 +20,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
 	"math/rand"
 	"net"
 	"strconv"
@@ -50,7 +51,7 @@ func putIntWithoutZero(attrs pcommon.Map, key string, value int64) {
 }
 
 func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBits uint32) {
-	if dataTypeBits&CLIENT_UNIVERSAL_TAG != 0 {
+	if dataTypeBits&exporter_common.CLIENT_UNIVERSAL_TAG != 0 {
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
@@ -75,7 +76,7 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_0", tags0.AutoServiceType)
 		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_0", tags0.AutoService)
 	}
-	if dataTypeBits&SERVER_UNIVERSAL_TAG != 0 {
+	if dataTypeBits&exporter_common.SERVER_UNIVERSAL_TAG != 0 {
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
@@ -124,24 +125,24 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 
 	resAttrs := resSpan.Resource().Attributes()
 	putUniversalTags(resAttrs, tags0, tags1, dataTypeBits)
-	if dataTypeBits&K8S_LABEL != 0 && l7.PodID0 != 0 {
+	if dataTypeBits&exporter_common.K8S_LABEL != 0 && l7.PodID0 != 0 {
 		putK8sLabels(resAttrs, l7.PodID0, universalTagsManager, "_0")
 	}
-	if dataTypeBits&K8S_LABEL != 0 && l7.PodID1 != 0 {
+	if dataTypeBits&exporter_common.K8S_LABEL != 0 && l7.PodID1 != 0 {
 		putK8sLabels(resAttrs, l7.PodID1, universalTagsManager, "_1")
 	}
 
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	spanAttrs := span.Attributes()
 
-	if dataTypeBits&NATIVE_TAG != 0 {
+	if dataTypeBits&exporter_common.NATIVE_TAG != 0 {
 		for i := range l7.AttributeNames {
 			putStrWithoutEmpty(spanAttrs, l7.AttributeNames[i], l7.AttributeValues[i])
 		}
 	}
 
 	spanKind := tapSideToSpanKind(l7.TapSide)
-	if dataTypeBits&TRACING_INFO != 0 {
+	if dataTypeBits&exporter_common.TRACING_INFO != 0 {
 		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id_0", l7.XRequestId0)
 		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id_1", l7.XRequestId1)
 		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_request", int64(l7.SyscallTraceIDRequest))
@@ -177,7 +178,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	putStrWithoutEmpty(spanAttrs, "df.span.type", strings.ToLower(msgType.String()))
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
 
-	if dataTypeBits&SERVICE_INFO != 0 {
+	if dataTypeBits&exporter_common.SERVICE_INFO != 0 {
 		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
 		putStrWithoutEmpty(resAttrs, "service.instance.id", l7.AppInstance)
 		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
@@ -186,7 +187,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		putStrWithoutEmpty(resAttrs, "thread.name_1", l7.ProcessKName1)
 	}
 
-	if dataTypeBits&FLOW_INFO != 0 {
+	if dataTypeBits&exporter_common.FLOW_INFO != 0 {
 		putIntWithoutZero(resAttrs, "df.flow_info.id", int64(l7.ID()))
 		putIntWithoutZero(resAttrs, "df.flow_info.time", int64(l7.EndTime()))
 		putIntWithoutZero(resAttrs, "df.flow_info.flow_id", int64(l7.FlowID))
@@ -194,7 +195,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		span.SetEndTimestamp(pcommon.Timestamp(l7.EndTime()))
 	}
 
-	if dataTypeBits&CAPTURE_INFO != 0 {
+	if dataTypeBits&exporter_common.CAPTURE_INFO != 0 {
 		putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
@@ -204,7 +205,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
 	}
 
-	if dataTypeBits&NETWORK_LAYER != 0 {
+	if dataTypeBits&exporter_common.NETWORK_LAYER != 0 {
 		resAttrs.PutBool("df.network.is_ipv4", l7.IsIPv4)
 		resAttrs.PutBool("df.network.is_internet_0", l7.L3EpcID0 == datatype.EPC_FROM_INTERNET)
 		resAttrs.PutBool("df.network.is_internet_1", l7.L3EpcID1 == datatype.EPC_FROM_INTERNET)
@@ -218,20 +219,20 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		resAttrs.PutStr("df.network.protocol", layers.IPProtocol(l7.Protocol).String())
 	}
 
-	if dataTypeBits&TUNNEL_INFO != 0 {
+	if dataTypeBits&exporter_common.TUNNEL_INFO != 0 {
 		if l7.TunnelType != uint8(datatype.TUNNEL_TYPE_NONE) {
 			putStrWithoutEmpty(resAttrs, "df.tunnel.tunnel_type", datatype.TunnelType(l7.TunnelType).String())
 		}
 	}
 
-	if dataTypeBits&TRANSPORT_LAYER != 0 {
+	if dataTypeBits&exporter_common.TRANSPORT_LAYER != 0 {
 		putIntWithoutZero(resAttrs, "df.transport.client_port", int64(l7.ClientPort))
 		putIntWithoutZero(resAttrs, "df.transport.server_port", int64(l7.ServerPort))
 		putIntWithoutZero(resAttrs, "df.transport.req_tcp_seq", int64(l7.ReqTcpSeq))
 		putIntWithoutZero(resAttrs, "df.transport.resp_tcp_seq", int64(l7.RespTcpSeq))
 	}
 
-	if dataTypeBits&APPLICATION_LAYER != 0 {
+	if dataTypeBits&exporter_common.APPLICATION_LAYER != 0 {
 		putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String())
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.name", "deepflow")
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.version", common.CK_VERSION)
@@ -266,7 +267,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 			setOtherSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
 		}
 	}
-	if dataTypeBits&METRICS != 0 {
+	if dataTypeBits&exporter_common.METRICS != 0 {
 		if l7.RequestLength != nil {
 			spanAttrs.PutInt("df.metrics.request_length", *l7.RequestLength)
 		}

@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/loki_exporter"
 
 	otlp_exporter "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/otlp_exporter"
 )
@@ -13,18 +14,24 @@ type ExporterCfg struct {
 
 	// OtlpExporter config for OTLP exporter
 	OtlpExporter otlp_exporter.OtlpExporterConfig `yaml:"otlp-exporter"`
+
+	// LokiExporter config for Loki exporter
+	LokiExporter loki_exporter.LokiExporterConfig `yaml:"loki-exporter"`
 }
 
 type ExporterType string
 
 const (
 	OtlpExporter ExporterType = "otlp-exporter"
+	LokiExporter ExporterType = "loki-exporter"
 )
 
 func (ec ExporterCfg) Validate() error {
 	switch ec.Type {
 	case OtlpExporter:
 		return otlp_exporter.Validate(ec.OtlpExporter)
+	case LokiExporter:
+		return loki_exporter.Validate(ec.LokiExporter)
 	default:
 		return fmt.Errorf("unknown exporter type %s", ec.Type)
 	}
