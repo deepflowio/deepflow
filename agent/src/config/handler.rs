@@ -42,9 +42,9 @@ use nix::{
 };
 #[cfg(target_os = "linux")]
 use regex::Regex;
-#[cfg(target_os = "linux")]
-use sysinfo::System;
 use sysinfo::SystemExt;
+#[cfg(target_os = "linux")]
+use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
@@ -1428,19 +1428,30 @@ impl ConfigHandler {
             let mut cpu_set = CpuSet::new();
             let splits = new_config.yaml_config.cpu_affinity.split(',');
             let mut invalid_config = false;
+            let system = System::new_with_specifics(
+                RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+            );
+            let cpu_count = system.cpus().len() as usize;
             if new_config.yaml_config.cpu_affinity.len() > 0 {
                 for id in splits.into_iter() {
-                    if let Ok(id) = id.parse::<usize>() {
-                        let _ = cpu_set.set(id);
-                    } else {
-                        invalid_config = true;
-                        break;
-                    }
+                    match id.parse::<usize>() {
+                        Ok(id) if id < cpu_count => {
+                            if let Err(e) = cpu_set.set(id) {
+                                warn!(
+                                    "Invalid CPU Affinity config {}, error: {:?}",
+                                    new_config.yaml_config.cpu_affinity, e
+                                );
+                                invalid_config = true;
+                            }
+                        }
+                        _ => {
+                            invalid_config = true;
+                            break;
+                        }
+                    };
                 }
             } else {
-                let sys = System::new();
-                let n = sys.cpus().len() as usize;
-                for i in 0..n {
+                for i in 0..cpu_count {
                     let _ = cpu_set.set(i);
                 }
             }
