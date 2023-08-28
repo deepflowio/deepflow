@@ -19,17 +19,16 @@ package decoder
 import (
 	"bytes"
 	"compress/zlib"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 	"io/ioutil"
 	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-
 	logging "github.com/op/go-logging"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -79,7 +78,7 @@ type Decoder struct {
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
 	flowTagWriter *flow_tag.FlowTagWriter
-	exporters     []exporter.Exporter
+	exporters     *exporters.Exporters
 	debugEnabled  bool
 
 	fieldsBuf      []interface{}
@@ -95,7 +94,7 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
-	exporters []exporter.Exporter,
+	exporters *exporters.Exporters,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
@@ -294,17 +293,8 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 }
 
 func (d *Decoder) export(l *log_data.L7FlowLog) {
-	// todo @jiekun move back to otlp exporter
-	//if d.otlpExporter != nil && d.otlpExporter.IsExportData(datatype.SignalSource(l.SignalSource)) {
-	//	d.otlpExporter.Put(l)
-	//}
-
-	for i := range d.exporters {
-		if !d.exporters[i].IsExportData(datatype.SignalSource(l.SignalSource)) {
-			continue
-		}
-		l.AddReferenceCount()
-		d.exporters[i].Put(l)
+	if d.exporters != nil {
+		d.exporters.Put(l, d.index)
 	}
 }
 
@@ -313,20 +303,18 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	dropped := false
 	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData)
 	l.AddReferenceCount()
-	if d.throttler.SendWithThrottling(l) {
+	sent := d.throttler.SendWithThrottling(l)
+	if sent {
 		if d.flowTagWriter != nil {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 		}
 		d.export(l)
-	} else {
-		dropped = true
 	}
-	d.updateCounter(datatype.L7Protocol(proto.Base.Head.Proto), dropped)
+	d.updateCounter(datatype.L7Protocol(proto.Base.Head.Proto), !sent)
 	l.Release()
 	proto.Release()
 
@@ -366,4 +354,5 @@ func (d *Decoder) flush() {
 		d.throttler.SendWithThrottling(nil)
 		d.throttler.SendWithoutThrottling(nil)
 	}
+	d.export(nil)
 }
