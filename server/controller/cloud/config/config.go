@@ -34,11 +34,12 @@ type CloudConfig struct {
 
 func SetCloudGlobalConfig(c CloudConfig) {
 	CONF = &CloudConfig{
-		HostnameToIPFile: c.HostnameToIPFile,
-		DNSEnable:        c.DNSEnable,
-		HTTPTimeout:      c.HTTPTimeout,
-		DebugEnabled:     c.DebugEnabled,
-		AWSRegionName:    c.AWSRegionName,
-		CustomTagLenMax:  c.CustomTagLenMax,
+		HostnameToIPFile:  c.HostnameToIPFile,
+		DNSEnable:         c.DNSEnable,
+		HTTPTimeout:       c.HTTPTimeout,
+		DebugEnabled:      c.DebugEnabled,
+		AWSRegionName:     c.AWSRegionName,
+		CustomTagLenMax:   c.CustomTagLenMax,
+		ProcessNameLenMax: c.ProcessNameLenMax,
 	}
 }
