@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
@@ -32,7 +31,7 @@ const (
 
 var log = logging.MustGetLogger("exporter.loki_exporter")
 
-type lokiExporter struct {
+type LokiExporter struct {
 	cfg lokiExporterConfig
 
 	// Internal Fields
@@ -86,20 +85,20 @@ type lokiExporterConfig struct {
 	// StaticLabels labels to add to each log
 	StaticLabels model.LabelSet
 	// LogFmt log format
-	LogFmt logFmt
+	LogFmt LogFmt
 	// ExportOnlyWithTraceID filter flow log without trace_id
 	ExportOnlyWithTraceID bool
 }
 
-func (le *lokiExporter) GetCounter() interface{} {
+func (le *LokiExporter) GetCounter() interface{} {
 	var counter exporter_common.Counter
 	counter, *le.counter = *le.counter, exporter_common.Counter{}
 	le.lastCounter = counter
 	return &counter
 }
 
-func NewLokiExporter(config *LokiExporterConfig) exporter.Exporter {
-	le := &lokiExporter{
+func NewLokiExporter(config *LokiExporterConfig) *LokiExporter {
+	le := &LokiExporter{
 		cfg: lokiExporterConfig{
 			URL:             config.URL,
 			TenantID:        config.TenantID,
@@ -114,24 +113,24 @@ func NewLokiExporter(config *LokiExporterConfig) exporter.Exporter {
 		},
 	}
 
-	if config.MaxMessageWait > 0 {
-		le.cfg.MaxMessageWait = time.Duration(config.MaxMessageWait) * time.Second
+	if config.MaxMessageWaitSecond > 0 {
+		le.cfg.MaxMessageWait = time.Duration(config.MaxMessageWaitSecond) * time.Second
 	}
 
 	if config.MaxMessageBytes > 0 {
 		le.cfg.MaxMessageBytes = int(config.MaxMessageBytes)
 	}
 
-	if config.Timeout > 0 {
-		le.cfg.Timeout = time.Duration(config.Timeout) * time.Second
+	if config.TimeoutSecond > 0 {
+		le.cfg.Timeout = time.Duration(config.TimeoutSecond) * time.Second
 	}
 
-	if config.MinBackoff > 0 {
-		le.cfg.MinBackoff = time.Duration(config.MinBackoff) * time.Second
+	if config.MinBackoffSecond > 0 {
+		le.cfg.MinBackoff = time.Duration(config.MinBackoffSecond) * time.Second
 	}
 
-	if config.MaxBackoff > 0 {
-		le.cfg.MaxBackoff = time.Duration(config.MaxBackoff) * time.Second
+	if config.MaxBackoffSecond > 0 {
+		le.cfg.MaxBackoff = time.Duration(config.MaxBackoffSecond) * time.Second
 	}
 
 	if config.MaxRetries > 0 {
@@ -190,7 +189,7 @@ func NewLokiExporter(config *LokiExporterConfig) exporter.Exporter {
 	return le
 }
 
-func (le *lokiExporter) buildLokiConfig() (loki.Config, error) {
+func (le *LokiExporter) buildLokiConfig() (loki.Config, error) {
 	config := loki.Config{
 		TenantID:  le.cfg.TenantID,
 		BatchWait: le.cfg.MaxMessageWait,
@@ -215,13 +214,13 @@ func (le *lokiExporter) buildLokiConfig() (loki.Config, error) {
 }
 
 // Start starts an exporter worker
-func (le *lokiExporter) Start() {
+func (le *LokiExporter) Start() {
 	for i := 0; i < le.cfg.QueueCount; i++ {
 		go le.processQueue(i)
 	}
 }
 
-func (le *lokiExporter) processQueue(queueID int) {
+func (le *LokiExporter) processQueue(queueID int) {
 	defer le.stop()
 
 	flows := make([]interface{}, LokiQueueBatchLimit)
@@ -249,7 +248,7 @@ func (le *lokiExporter) processQueue(queueID int) {
 
 // Put sends data to the loki exporter worker. Worker transform data to plaintext log and batch in
 // buffer queue, then push it to loki via HTTP API `POST /loki/api/v1/push`
-func (le *lokiExporter) Put(items ...interface{}) {
+func (le *LokiExporter) Put(items ...interface{}) {
 	le.counter.RecvCounter++
 	if err := le.dataQueues.Put(queue.HashKey(int(le.counter.RecvCounter)%le.cfg.QueueCount), items...); err != nil {
 		log.Errorf("queue put error: %v", err)
@@ -257,7 +256,7 @@ func (le *lokiExporter) Put(items ...interface{}) {
 }
 
 // IsExportData tell the decoder if data need to be sended to loki exporter.
-func (le *lokiExporter) IsExportData(item interface{}) bool {
+func (le *LokiExporter) IsExportData(item interface{}) bool {
 	l7, ok := item.(log_data.L7FlowLog)
 	if !ok {
 		return false
@@ -275,7 +274,7 @@ func (le *lokiExporter) IsExportData(item interface{}) bool {
 	return true
 }
 
-func (le *lokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
+func (le *LokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
 	t := time.UnixMicro(item.EndTime().Microseconds()) // time.Time
 	serviceName := item.AppService
 	logLevel := responseStatusToLogLevel(item.ResponseStatus)
@@ -309,6 +308,6 @@ func (le *lokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
 }
 
 // stop will be executed in defer to close resources.
-func (le *lokiExporter) stop() {
+func (le *LokiExporter) stop() {
 	le.lokiClient.Stop()
 }

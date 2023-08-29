@@ -15,3 +15,28 @@ ingester:
         grpc-headers:
           key1: value1
           key2: value2
+    - name: test loki exporter
+      exporter_type: loki-exporter
+      loki-exporter:
+        url: 127.0.0.1
+        tenant-id: test_tenant_id
+        queue-count: 999
+        queue-size: 10002
+        max-message-wait-second: 105
+        max-message-bytes: 20000
+        timeout-second: 1
+        min-backoff-second: 11
+        max-backoff-second: 20
+        max-retries: 2
+        static-labels:
+          foo: bar
+        export-datas:
+          - ebpf-sys-span
+        export-data-types:
+          - service_info
+          - tracing_info
+          - network_layer
+        export-only-with-traceid: false
+        log-format:
+          mapping:
+            foo2: bar2

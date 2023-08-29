@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/loki_exporter"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -44,6 +45,31 @@ func TestConfig(t *testing.T) {
 						GrpcHeaders: map[string]string{
 							"key1": "value1",
 							"key2": "value2",
+						},
+					},
+				},
+				{
+					Name: "test loki exporter",
+					Type: "loki-exporter",
+					LokiExporter: loki_exporter.LokiExporterConfig{
+						URL:                   "127.0.0.1",
+						TenantID:              "test_tenant_id",
+						QueueCount:            999,
+						QueueSize:             10002,
+						MaxMessageWaitSecond:  105,
+						MaxMessageBytes:       20000,
+						TimeoutSecond:         1,
+						MinBackoffSecond:      11,
+						MaxBackoffSecond:      20,
+						MaxRetries:            2,
+						StaticLabels:          map[string]string{"foo": "bar"},
+						ExportDatas:           []string{"ebpf-sys-span"},
+						ExportDataTypes:       []string{"service_info", "tracing_info", "network_layer"},
+						ExportOnlyWithTraceID: false,
+						LogFmt: loki_exporter.LogFmt{
+							Mapping: map[string]string{
+								"foo2": "bar2",
+							},
 						},
 					},
 				},

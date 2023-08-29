@@ -29,7 +29,7 @@ var defaultHeader = map[string]string{
 	"span_id":      "span_id",
 }
 
-func (le *lokiExporter) buildLogHeader() {
+func (le *LokiExporter) buildLogHeader() {
 	defaultLogHeaderFormat := "{time}=%s, {service_name}=%s, {log_level}=%s, {trace_id}=%s, {span_id}=%s, "
 	for k, v := range defaultHeader {
 		if _, ok := le.cfg.LogFmt.Mapping[k]; ok {

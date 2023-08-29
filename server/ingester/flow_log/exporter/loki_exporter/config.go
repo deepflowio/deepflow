@@ -13,16 +13,16 @@ type LokiExporterConfig struct {
 	QueueCount int64 `yaml:"queue-count"`
 	// QueueSize represent the max item could be hold in a single queue
 	QueueSize int64 `yaml:"queue-size"`
-	// MaxMessageWait maximum wait period before sending batch of message
-	MaxMessageWait int64 `yaml:"max-message-wait-second"`
+	// MaxMessageWaitSecond maximum wait period before sending batch of message
+	MaxMessageWaitSecond int64 `yaml:"max-message-wait-second"`
 	// MaxMessageBytes maximum batch size of message to accrue before sending
 	MaxMessageBytes int64 `yaml:"max-message-bytes"`
-	// Timeout maximum time to wait for server to respond
-	Timeout int64 `yaml:"timeout"`
-	// MinBackoff minimum backoff time between retries
-	MinBackoff int64 `yaml:"min-backoff"`
-	// MaxBackoff maximum backoff time between retries
-	MaxBackoff int64 `yaml:"max-backoff"`
+	// TimeoutSecond maximum time to wait for server to respond
+	TimeoutSecond int64 `yaml:"timeout-second"`
+	// MinBackoffSecond minimum backoff time between retries
+	MinBackoffSecond int64 `yaml:"min-backoff-second"`
+	// MaxBackoffSecond maximum backoff time between retries
+	MaxBackoffSecond int64 `yaml:"max-backoff-second"`
 	// MaxRetries maximum number of retries when sending batches
 	MaxRetries int64 `yaml:"max-retries"`
 	// StaticLabels labels to add to each log
@@ -35,10 +35,10 @@ type LokiExporterConfig struct {
 	// ExportOnlyWithTraceID filter flow log without trace_id
 	ExportOnlyWithTraceID bool `yaml:"export-only-with-traceid"`
 	// Log format
-	LogFmt logFmt `yaml:"log-format"`
+	LogFmt LogFmt `yaml:"log-format"`
 }
 
-type logFmt struct {
+type LogFmt struct {
 	// Mapping set alias for default log header field names.
 	Mapping map[string]string `yaml:"mapping"`
 }
