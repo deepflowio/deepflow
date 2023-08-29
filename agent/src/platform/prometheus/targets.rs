@@ -193,10 +193,6 @@ impl TargetsWatcher {
         info!("prometheus watcher is running");
     }
 
-    pub fn reset_session(&self, controller_ips: Vec<String>) {
-        self.session.reset_server_ip(controller_ips);
-    }
-
     fn process(
         context: &mut Arc<Context>,
         counter: &mut Arc<TargetsCounter>,

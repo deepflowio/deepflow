@@ -242,10 +242,6 @@ impl ApiWatcher {
         self.thread.lock().unwrap().replace(handle);
     }
 
-    pub fn reset_session(&self, controller_ips: Vec<String>) {
-        self.session.reset_server_ip(controller_ips);
-    }
-
     async fn discover_resources(
         client: &Client,
         resource_config: &Vec<KubernetesResourceConfig>,

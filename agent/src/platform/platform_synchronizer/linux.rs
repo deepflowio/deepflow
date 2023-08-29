@@ -253,10 +253,6 @@ impl PlatformSynchronizer {
         info!("PlatformSynchronizer started");
     }
 
-    pub fn reset_session(&self, controller_ips: Vec<String>) {
-        self.session.reset_server_ip(controller_ips);
-    }
-
     fn query_platform(
         platform_args: &mut PlatformArgs,
         hash_args: &mut HashArgs,
