@@ -45,7 +45,9 @@ use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
 use super::parse_ip_slice;
 use super::{arp::lookup as arp_lookup, Error, Result};
-use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
+use super::{Addr, Link, LinkFlags, LinkStats, MacAddr, NeighborEntry, Route};
+
+use crate::bytes::{read_u16_le, read_u32_le, read_u64_le};
 
 pub const IF_TYPE_IPVLAN: &'static str = "ipvlan";
 
@@ -114,9 +116,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
             mac_addr: MacAddr(mac.unwrap().octets()),
             name,
             flags: flags.into(),
-            if_type: None,
-            peer_index: None,
-            link_netnsid: None,
+            ..Default::default()
         },
         dest_addr,
         dest_mac_addr: target_mac,
@@ -213,6 +213,8 @@ fn to_multi_address(addr: Ipv6Addr) -> SockAddr {
     SockAddr::from(SocketAddrV6::new(multi, 0, 0, 0))
 }
 
+const MIN_RTNL_LINK_STATS64_LEN: usize = 64;
+
 fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
     let rtattrs = match name {
         Some(n) => RtBuffer::from_iter(
@@ -265,6 +267,7 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
             let mut peer_index = None;
             let mut if_name = None;
             let mut link_netnsid = None;
+            let mut link_stats = None;
 
             for attr in payload.rtattrs.iter() {
                 match attr.rta_type {
@@ -273,9 +276,8 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     }
                     Ifla::Linkinfo => {
                         let info = attr.rta_payload.as_ref();
-                        let len = u16::from_le_bytes(*<&[u8; 2]>::try_from(&info[..2]).unwrap());
-                        let attr_type =
-                            u16::from_le_bytes(*<&[u8; 2]>::try_from(&info[2..4]).unwrap());
+                        let len = read_u16_le(&info[..2]);
+                        let attr_type = read_u16_le(&info[2..4]);
 
                         if let Some(attr_payload) = info.get(4..len as usize) {
                             // INFO_KIND 排列payload第一， IFLA_INFO_KIND = 1
@@ -295,15 +297,42 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     }
                     Ifla::Link => {
                         if let Some(payload) = attr.rta_payload.as_ref().get(..4) {
-                            peer_index =
-                                Some(u32::from_le_bytes(*<&[u8; 4]>::try_from(payload).unwrap()));
+                            peer_index = Some(read_u32_le(payload));
                         }
                     }
                     Ifla::LinkNetnsid => {
                         if let Some(payload) = attr.rta_payload.as_ref().get(..4) {
-                            link_netnsid =
-                                Some(u32::from_le_bytes(*<&[u8; 4]>::try_from(payload).unwrap()));
+                            link_netnsid = Some(read_u32_le(payload));
                         }
+                    }
+                    Ifla::Stats64 if attr.rta_payload.len() >= MIN_RTNL_LINK_STATS64_LEN => {
+                        /* the buffer is rtnl_link_stat64
+
+                        link: https://github.com/torvalds/linux/blob/1c59d383390f970b891b503b7f79b63a02db2ec5/include/uapi/linux/if_link.h#L218C27-L218C27
+
+                            struct rtnl_link_stats64 {
+                                __u64   rx_packets;
+                                __u64   tx_packets;
+                                __u64   rx_bytes;
+                                __u64   tx_bytes;
+                                __u64   rx_errors;
+                                __u64   tx_errors;
+                                __u64   rx_dropped;
+                                __u64   tx_dropped;
+
+                                ... (more)
+                            }
+
+                        */
+                        let payload = attr.rta_payload.as_ref();
+                        link_stats = Some(LinkStats {
+                            rx_packets: read_u64_le(payload),
+                            tx_packets: read_u64_le(&payload[8..]),
+                            rx_bytes: read_u64_le(&payload[16..]),
+                            tx_bytes: read_u64_le(&payload[24..]),
+                            rx_dropped: read_u64_le(&payload[48..]),
+                            tx_dropped: read_u64_le(&payload[56..]),
+                        });
                     }
                     _ => {}
                 }
@@ -318,6 +347,7 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     if_type,
                     peer_index,
                     link_netnsid,
+                    stats: link_stats.unwrap_or_default(),
                 });
             }
         }
