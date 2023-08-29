@@ -51,10 +51,10 @@ TRUNCATE TABLE domain_additional_resource;
 
 CREATE TABLE IF NOT EXISTS process (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                VARCHAR(256) DEFAULT '',
+    name                TEXT,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
-    process_name        VARCHAR(256) DEFAULT '',
+    process_name        TEXT,
     command_line        TEXT,
     user_name           VARCHAR(256) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1885,8 +1885,8 @@ CREATE TABLE IF NOT EXISTS go_genesis_process (
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
     lcuuid              CHAR(64) DEFAULT '',
-    name                VARCHAR(256) DEFAULT '',
-    process_name        VARCHAR(256) DEFAULT '',
+    name                TEXT, 
+    process_name        TEXT,
     cmd_line            TEXT,
     user                VARCHAR(256) DEFAULT '',
     container_id        CHAR(64) DEFAULT '',
@@ -2512,7 +2512,7 @@ TRUNCATE TABLE ch_os_app_tags;
 
 CREATE TABLE IF NOT EXISTS ch_gprocess (
     id                      INTEGER NOT NULL PRIMARY KEY,
-    name                    VARCHAR(256),
+    name                    TEXT,
     icon_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;

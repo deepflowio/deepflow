@@ -439,13 +439,20 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		if !ok {
 			continue
 		}
+		var name, processName string
+		if len(sProcess.Name) > c.cfg.ProcessNameLenMax {
+			name = sProcess.Name[:c.cfg.ProcessNameLenMax]
+		}
+		if len(sProcess.ProcessName) > c.cfg.ProcessNameLenMax {
+			processName = sProcess.ProcessName[:c.cfg.ProcessNameLenMax]
+		}
 		process := model.Process{
 			Lcuuid:      sProcess.Lcuuid,
-			Name:        sProcess.Name,
+			Name:        name,
 			VTapID:      sProcess.VtapID,
 			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
-			ProcessName: sProcess.ProcessName,
+			ProcessName: processName,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,
 			ContainerID: sProcess.ContainerID,

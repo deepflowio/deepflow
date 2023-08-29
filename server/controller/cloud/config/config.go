@@ -28,16 +28,18 @@ type CloudConfig struct {
 	DNSEnable                bool   `default:"false" yaml:"dns_enable"`
 	HTTPTimeout              int    `default:"30" yaml:"http_timeout"`
 	CustomTagLenMax          int    `default:"256" yaml:"custom_tag_len_max"`
+	ProcessNameLenMax        int    `default:"256" yaml:"process_name_len_max"`
 	DebugEnabled             bool   `default:"false" yaml:"debug_enabled"`
 }
 
 func SetCloudGlobalConfig(c CloudConfig) {
 	CONF = &CloudConfig{
-		HostnameToIPFile: c.HostnameToIPFile,
-		DNSEnable:        c.DNSEnable,
-		HTTPTimeout:      c.HTTPTimeout,
-		DebugEnabled:     c.DebugEnabled,
-		AWSRegionName:    c.AWSRegionName,
-		CustomTagLenMax:  c.CustomTagLenMax,
+		HostnameToIPFile:  c.HostnameToIPFile,
+		DNSEnable:         c.DNSEnable,
+		HTTPTimeout:       c.HTTPTimeout,
+		DebugEnabled:      c.DebugEnabled,
+		AWSRegionName:     c.AWSRegionName,
+		CustomTagLenMax:   c.CustomTagLenMax,
+		ProcessNameLenMax: c.ProcessNameLenMax,
 	}
 }
