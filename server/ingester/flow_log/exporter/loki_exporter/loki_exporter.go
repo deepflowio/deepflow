@@ -227,6 +227,10 @@ func (le *LokiExporter) processQueue(queueID int) {
 	for {
 		n := le.dataQueues.Gets(queue.HashKey(queueID), flows)
 		for _, flow := range flows[:n] {
+			if flow == nil {
+				continue
+			}
+
 			switch t := flow.(type) {
 			case *log_data.L7FlowLog:
 				f := flow.(*log_data.L7FlowLog)
@@ -257,16 +261,12 @@ func (le *LokiExporter) Put(items ...interface{}) {
 
 // IsExportData tell the decoder if data need to be sended to loki exporter.
 func (le *LokiExporter) IsExportData(item interface{}) bool {
-	l7, ok := item.(log_data.L7FlowLog)
+	l7, ok := item.(*log_data.L7FlowLog)
 	if !ok {
 		return false
 	}
 
-	// always not export data from OTel
 	signalSource := datatype.SignalSource(l7.SignalSource)
-	if signalSource == datatype.SIGNAL_SOURCE_OTEL {
-		return false
-	}
 
 	if (1<<uint32(signalSource))&le.exportDataBits == 0 {
 		return false
@@ -304,6 +304,7 @@ func (le *LokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
 	case datatype.L7_PROTOCOL_POSTGRE:
 		logBody = buildLogBodyPostgreSQL(item)
 	}
+	log.Infof(logHeader + logBody)
 	return logHeader + logBody
 }
 
