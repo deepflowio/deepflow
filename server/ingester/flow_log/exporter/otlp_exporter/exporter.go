@@ -52,33 +52,19 @@ type OtlpExporter struct {
 	grpcConns            []*grpc.ClientConn
 	universalTagsManager *UniversalTagsManager
 	config               *OtlpExporterConfig
-	counter              *Counter
-	lastCounter          Counter
+	counter              *exporter_common.Counter
+	lastCounter          exporter_common.Counter
 	exportDataBits       uint32
 	exportDataTypeBits   uint32
 
 	utils.Closable
 }
 
-type Counter struct {
-	RecvCounter          int64 `statsd:"recv-count"`
-	SendCounter          int64 `statsd:"send-count"`
-	SendBatchCounter     int64 `statsd:"send-batch-count"`
-	ExportUsedTimeNs     int64 `statsd:"export-used-time-ns"`
-	DropCounter          int64 `statsd:"drop-count"`
-	DropBatchCounter     int64 `statsd:"drop-batch-count"`
-	DropNoTraceIDCounter int64 `statsd:"drop-no-traceid-count"`
-}
-
 func (e *OtlpExporter) GetCounter() interface{} {
-	var counter Counter
-	counter, *e.counter = *e.counter, Counter{}
+	var counter exporter_common.Counter
+	counter, *e.counter = *e.counter, exporter_common.Counter{}
 	e.lastCounter = counter
 	return &counter
-}
-
-type ExportItem interface {
-	Release()
 }
 
 func NewOtlpExporter(config *OtlpExporterConfig, baseConfig *config.Config) *OtlpExporter {
@@ -103,9 +89,9 @@ func NewOtlpExporter(config *OtlpExporterConfig, baseConfig *config.Config) *Otl
 	log.Infof("export data type bits: %08b, string: %s", exportDataTypeBits, exporter_common.ExportedDataTypeBitsToString(exportDataTypeBits))
 
 	dataQueues := queue.NewOverwriteQueues(
-		"exporter", queue.HashKey(exportConfig.QueueCount), exportConfig.QueueSize,
+		"otlp-exporter", queue.HashKey(exportConfig.QueueCount), exportConfig.QueueSize,
 		queue.OptionFlushIndicator(time.Second),
-		queue.OptionRelease(func(p interface{}) { p.(ExportItem).Release() }),
+		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
 	universalTagsManager := NewUniversalTagsManager(config, baseConfig)
@@ -118,7 +104,7 @@ func NewOtlpExporter(config *OtlpExporterConfig, baseConfig *config.Config) *Otl
 		config:               config,
 		exportDataBits:       exportDataBits,
 		exportDataTypeBits:   exportDataTypeBits,
-		counter:              &Counter{},
+		counter:              &exporter_common.Counter{},
 	}
 	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter)
@@ -127,12 +113,13 @@ func NewOtlpExporter(config *OtlpExporterConfig, baseConfig *config.Config) *Otl
 }
 
 func (e *OtlpExporter) IsExportData(item interface{}) bool {
-	signalSource, ok := item.(datatype.SignalSource)
+	l7, ok := item.(log_data.L7FlowLog)
 	if !ok {
 		return false
 	}
 
 	// always not export data from OTel
+	signalSource := datatype.SignalSource(l7.SignalSource)
 	if signalSource == datatype.SIGNAL_SOURCE_OTEL {
 		return false
 	}
@@ -166,6 +153,7 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 			if flow == nil {
 				if batchCount > 0 {
 					if err := e.grpcExport(ctx, queueID, ptraceotlp.NewExportRequestFromTraces(traces)); err == nil {
+						// todo the counter is not atomic without lock
 						e.counter.SendCounter += int64(batchCount)
 					}
 					batchCount = 0

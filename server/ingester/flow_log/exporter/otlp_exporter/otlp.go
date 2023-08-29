@@ -497,7 +497,7 @@ func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 }
 
 func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
-	spanName, operation := getSQLSpanNameAndOperation(l7.RequestResource)
+	spanName, operation := exporter_common.GetSQLSpanNameAndOperation(l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "db.system", "mysql")
 	putStrWithoutEmpty(spanAttrs, "db.operation", operation)
 	putStrWithoutEmpty(spanAttrs, "db.statement", l7.RequestResource)
@@ -510,7 +510,7 @@ func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 }
 
 func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
-	spanName, operation := getSQLSpanNameAndOperation(l7.RequestResource)
+	spanName, operation := exporter_common.GetSQLSpanNameAndOperation(l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "db.system", "postgresql")
 	putStrWithoutEmpty(spanAttrs, "db.operation", operation)
 	putStrWithoutEmpty(spanAttrs, "db.statement", l7.RequestResource)
@@ -529,64 +529,6 @@ func setRedis(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
 	span.SetName(l7.RequestType)
-}
-
-// Return the first part after 'key' from the 'parts' array.
-// Returns an empty string if 'key' does not exist or has no next part.
-func getFirstPartAfterKey(key string, parts []string) string {
-	for i := range parts {
-		if strings.ToUpper(parts[i]) == key && len(parts) > i+1 {
-			return parts[i+1]
-		}
-	}
-	return ""
-}
-
-// Extract the database, table, and command from the SQL statement to form SpanName("${comman} ${db}.${table}")
-// Returns "unknown","" if it cannot be fetched.
-func getSQLSpanNameAndOperation(sql string) (string, string) {
-	sql = strings.TrimSpace(sql)
-	if sql == "" {
-		return "unknow", ""
-	}
-	parts := strings.Split(sql, " ")
-	if len(parts) <= 2 {
-		return parts[0], parts[0]
-	}
-
-	var command, dbTable string
-	command = parts[0]
-	parts = parts[1:]
-	switch strings.ToUpper(command) {
-	case "SELECT", "DELETE":
-		dbTable = getFirstPartAfterKey("FROM", parts)
-	case "INSERT":
-		dbTable = getFirstPartAfterKey("INTO", parts)
-	case "UPDATE":
-		dbTable = parts[0]
-	case "CREATE", "DROP":
-		createType := strings.ToUpper(parts[0])
-		if createType == "DATABASE" || createType == "TABLE" {
-			// ignore 'if not exists' or 'if exists'
-			if strings.ToUpper(parts[1]) == "IF" {
-				dbTable = getFirstPartAfterKey("EXISTS", parts)
-			} else {
-				dbTable = parts[1]
-			}
-		}
-	case "ALTER":
-		dbTable = getFirstPartAfterKey("TABLE", parts)
-	}
-
-	if dbTable == "" {
-		return command, command
-	}
-	if i := strings.Index(dbTable, "("); i > 0 {
-		dbTable = dbTable[:i]
-	} else {
-		dbTable = strings.TrimRight(dbTable, ";")
-	}
-	return strings.Join([]string{command, dbTable}, " "), command
 }
 
 func responseStatusToSpanStatus(status uint8) ptrace.StatusCode {

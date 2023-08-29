@@ -98,6 +98,7 @@ require (
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	github.com/grafana/loki-client-go v0.0.0-20230116142646-e7494d0ef70c
 	github.com/klauspost/compress v1.15.9
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/pyroscope-io/client v0.7.0
@@ -118,8 +119,8 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
+	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/golang/glog v1.0.0 // indirect
-	github.com/grafana/loki-client-go v0.0.0-20230116142646-e7494d0ef70c // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -149,7 +150,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.19 // indirect
 	github.com/aws/smithy-go v1.13.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect

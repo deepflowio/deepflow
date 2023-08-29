@@ -3,7 +3,12 @@ package common
 import (
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/op/go-logging"
+	"strings"
 )
+
+type ExportItem interface {
+	Release()
+}
 
 const (
 	UNKNOWN_DATA  = 0
@@ -96,4 +101,72 @@ func StringToExportedDataType(str string) uint32 {
 
 func ExportedDataTypeBitsToString(bits uint32) string {
 	return bitsToString(bits, exportedDataTypeStringMap)
+}
+
+// Extract the database, table, and command from the SQL statement to form SpanName("${comman} ${db}.${table}")
+// Returns "unknown","" if it cannot be fetched.
+func GetSQLSpanNameAndOperation(sql string) (string, string) {
+	sql = strings.TrimSpace(sql)
+	if sql == "" {
+		return "unknow", ""
+	}
+	parts := strings.Split(sql, " ")
+	if len(parts) <= 2 {
+		return parts[0], parts[0]
+	}
+
+	var command, dbTable string
+	command = parts[0]
+	parts = parts[1:]
+	switch strings.ToUpper(command) {
+	case "SELECT", "DELETE":
+		dbTable = GetFirstPartAfterKey("FROM", parts)
+	case "INSERT":
+		dbTable = GetFirstPartAfterKey("INTO", parts)
+	case "UPDATE":
+		dbTable = parts[0]
+	case "CREATE", "DROP":
+		createType := strings.ToUpper(parts[0])
+		if createType == "DATABASE" || createType == "TABLE" {
+			// ignore 'if not exists' or 'if exists'
+			if strings.ToUpper(parts[1]) == "IF" {
+				dbTable = GetFirstPartAfterKey("EXISTS", parts)
+			} else {
+				dbTable = parts[1]
+			}
+		}
+	case "ALTER":
+		dbTable = GetFirstPartAfterKey("TABLE", parts)
+	}
+
+	if dbTable == "" {
+		return command, command
+	}
+	if i := strings.Index(dbTable, "("); i > 0 {
+		dbTable = dbTable[:i]
+	} else {
+		dbTable = strings.TrimRight(dbTable, ";")
+	}
+	return strings.Join([]string{command, dbTable}, " "), command
+}
+
+// Return the first part after 'key' from the 'parts' array.
+// Returns an empty string if 'key' does not exist or has no next part.
+func GetFirstPartAfterKey(key string, parts []string) string {
+	for i := range parts {
+		if strings.ToUpper(parts[i]) == key && len(parts) > i+1 {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
+type Counter struct {
+	RecvCounter          int64 `statsd:"recv-count"`
+	SendCounter          int64 `statsd:"send-count"`
+	SendBatchCounter     int64 `statsd:"send-batch-count"`
+	ExportUsedTimeNs     int64 `statsd:"export-used-time-ns"`
+	DropCounter          int64 `statsd:"drop-count"`
+	DropBatchCounter     int64 `statsd:"drop-batch-count"`
+	DropNoTraceIDCounter int64 `statsd:"drop-no-traceid-count"`
 }

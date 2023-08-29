@@ -2,12 +2,19 @@ package loki_exporter
 
 import (
 	"errors"
+	"fmt"
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
+	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/grafana/loki-client-go/loki"
 	"github.com/grafana/loki-client-go/pkg/backoff"
 	"github.com/grafana/loki-client-go/pkg/labelutil"
 	"github.com/grafana/loki-client-go/pkg/urlutil"
-	promconf "github.com/prometheus/common/config"
+	"github.com/op/go-logging"
 	"github.com/prometheus/common/model"
 	"time"
 )
@@ -15,11 +22,55 @@ import (
 // Loki exporter transform flow_log to plaintext log in certain format, and push to Loki via HTTP
 // API `POST /loki/api/v1/push`.
 
+const (
+	// LokiQueueBatchLimit represent how many items worker could get from a queue.
+	// e.g.:
+	// 3000 item in queue, worker could get LokiQueueBatchLimit item at once.
+	// if only 10 item in queue, worker could get all of them at once.
+	LokiQueueBatchLimit = 1024
+)
+
+var log = logging.MustGetLogger("exporter.loki_exporter")
+
 type lokiExporter struct {
+	cfg lokiExporterConfig
+
+	// Internal Fields
+	// lokiClient a loki HTTP client
+	lokiClient *loki.Client
+	// exportDataTypeBits represent data types to be exported.
+	// e.g. "service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"
+	exportDataTypeBits uint32
+	// exportDataBits represent data to be exported.
+	// e.g. "cbpf-net-span", "ebpf-sys-span".
+	exportDataBits uint32
+
+	// exportL7ProtocolMap represent protocol to be exported.
+	// e.g. "
+	exportL7ProtocolMap map[string]bool
+	// dataQueues receive data from `Put(items ...interface{})`
+	dataQueues queue.FixedMultiQueue
+	// logHeaderFmt build from LogFmt, e.g.:
+	// - "time=%s, service_name=%s, log_level=%s, trace_id=%s, span_id=%s, "
+	// - "myTime=%s, custom_service_name_key=%s, level=%s, tid=%s, sid=%s, "
+	logHeaderFmt string
+
+	// loki exporter counter
+	counter     *exporter_common.Counter
+	lastCounter exporter_common.Counter
+
+	utils.Closable
+}
+
+type lokiExporterConfig struct {
 	// URL url of loki server
 	URL string
 	// TenantID empty string means single tenant mode
 	TenantID string
+	// QueueCount queue count which queue will be processed by different goroutine
+	QueueCount int
+	// QueueSize represent the max item could be hold in a single queue
+	QueueSize int
 	// MaxMessageWait maximum wait period before sending batch of message
 	MaxMessageWait time.Duration
 	// MaxMessageBytes maximum batch size of message to accrue before sending
@@ -32,55 +83,130 @@ type lokiExporter struct {
 	MaxBackoff time.Duration
 	// MaxRetries maximum number of retries when sending batches
 	MaxRetries int
-	// DynamicLabels labels to be parsed from logs
-	DynamicLabels []string
 	// StaticLabels labels to add to each log
 	StaticLabels model.LabelSet
-	// ClientConfig http client config
-	ClientConfig promconf.HTTPClientConfig
+	// LogFmt log format
+	LogFmt logFmt
+	// ExportOnlyWithTraceID filter flow log without trace_id
+	ExportOnlyWithTraceID bool
+}
 
-	// Internal Fields
-	// lokiClient a loki HTTP client
-	lokiClient *loki.Client
-	// exportDataTypeBits represent data types to be exported.
-	// e.g. "service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"
-	exportDataTypeBits uint32
-	// exportDataBits represent data to be exported.
-	// e.g. "cbpf-net-span", "ebpf-sys-span".
-	exportDataBits uint32
+func (le *lokiExporter) GetCounter() interface{} {
+	var counter exporter_common.Counter
+	counter, *le.counter = *le.counter, exporter_common.Counter{}
+	le.lastCounter = counter
+	return &counter
 }
 
 func NewLokiExporter(config *LokiExporterConfig) exporter.Exporter {
-	return &lokiExporter{
-		URL:             "",
-		TenantID:        "",
-		MaxMessageWait:  time.Duration(1) * time.Second,
-		MaxMessageBytes: 1024 * 1024,
-		Timeout:         time.Duration(10) * time.Second,
-		MinBackoff:      time.Duration(500) * time.Millisecond,
-		MaxBackoff:      time.Duration(5) * time.Minute,
-		MaxRetries:      10,
-		StaticLabels:    model.LabelSet{},
+	le := &lokiExporter{
+		cfg: lokiExporterConfig{
+			URL:             config.URL,
+			TenantID:        config.TenantID,
+			MaxMessageWait:  time.Duration(1) * time.Second,
+			MaxMessageBytes: 1024 * 1024,
+			Timeout:         time.Duration(10) * time.Second,
+			MinBackoff:      time.Duration(500) * time.Millisecond,
+			MaxBackoff:      time.Duration(5) * time.Minute,
+			MaxRetries:      10,
+			QueueCount:      4,
+			QueueSize:       1024,
+		},
 	}
+
+	if config.MaxMessageWait > 0 {
+		le.cfg.MaxMessageWait = time.Duration(config.MaxMessageWait) * time.Second
+	}
+
+	if config.MaxMessageBytes > 0 {
+		le.cfg.MaxMessageBytes = int(config.MaxMessageBytes)
+	}
+
+	if config.Timeout > 0 {
+		le.cfg.Timeout = time.Duration(config.Timeout) * time.Second
+	}
+
+	if config.MinBackoff > 0 {
+		le.cfg.MinBackoff = time.Duration(config.MinBackoff) * time.Second
+	}
+
+	if config.MaxBackoff > 0 {
+		le.cfg.MaxBackoff = time.Duration(config.MaxBackoff) * time.Second
+	}
+
+	if config.MaxRetries > 0 {
+		le.cfg.MaxRetries = int(config.MaxRetries)
+	}
+
+	if len(config.StaticLabels) > 0 {
+		labelSet := model.LabelSet{}
+		for k, v := range config.StaticLabels {
+			labelSet[model.LabelName(k)] = model.LabelValue(v)
+		}
+		le.cfg.StaticLabels = labelSet
+	}
+
+	exportDataBits := uint32(0)
+	if len(config.ExportDatas) == 0 {
+		config.ExportDatas = DefaultLokiExportDatas
+	}
+	for _, v := range config.ExportDatas {
+		exportDataBits |= uint32(exporter_common.StringToExportedData(v))
+	}
+	le.exportDataBits = exportDataBits
+	log.Infof("export data bits: %08b, string: %s", exportDataBits, exporter_common.ExportedDataBitsToString(exportDataBits))
+
+	exportDataTypeBits := uint32(0)
+	if len(config.ExportDataTypes) == 0 {
+		config.ExportDatas = DefaultLokiExportDataTypes
+	}
+	for _, v := range config.ExportDataTypes {
+		exportDataTypeBits |= uint32(exporter_common.StringToExportedDataType(v))
+	}
+	le.exportDataTypeBits = exportDataTypeBits
+
+	le.buildLogHeader()
+
+	clientCfg, err := le.buildLokiConfig()
+	if err != nil {
+		log.Errorf("generate loki client config err: %v", err)
+		return nil
+	}
+	client, err := loki.New(clientCfg)
+	if err != nil {
+		log.Errorf("new loki client err: %v", err)
+		return nil
+	}
+	le.lokiClient = client
+
+	dataQueues := queue.NewOverwriteQueues(
+		"loki-exporter", queue.HashKey(le.cfg.QueueCount), le.cfg.QueueSize,
+		queue.OptionFlushIndicator(time.Second),
+		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
+		common.QUEUE_STATS_MODULE_INGESTER)
+
+	le.dataQueues = dataQueues
+
+	return le
 }
 
-func (f *lokiExporter) buildLokiConfig() (loki.Config, error) {
+func (le *lokiExporter) buildLokiConfig() (loki.Config, error) {
 	config := loki.Config{
-		TenantID:  f.TenantID,
-		BatchWait: f.MaxMessageWait,
-		BatchSize: f.MaxMessageBytes,
-		Timeout:   f.Timeout,
+		TenantID:  le.cfg.TenantID,
+		BatchWait: le.cfg.MaxMessageWait,
+		BatchSize: le.cfg.MaxMessageBytes,
+		Timeout:   le.cfg.Timeout,
 		BackoffConfig: backoff.BackoffConfig{
-			MinBackoff: f.MinBackoff,
-			MaxBackoff: f.MaxBackoff,
-			MaxRetries: f.MaxRetries,
+			MinBackoff: le.cfg.MinBackoff,
+			MaxBackoff: le.cfg.MaxBackoff,
+			MaxRetries: le.cfg.MaxRetries,
 		},
 		ExternalLabels: labelutil.LabelSet{
-			LabelSet: f.StaticLabels,
+			LabelSet: le.cfg.StaticLabels,
 		},
 	}
 	var url urlutil.URLValue
-	err := url.Set(f.URL)
+	err := url.Set(le.cfg.URL)
 	if err != nil {
 		return config, errors.New("url is invalid")
 	}
@@ -90,24 +216,99 @@ func (f *lokiExporter) buildLokiConfig() (loki.Config, error) {
 
 // Start starts an exporter worker
 func (le *lokiExporter) Start() {
-	config, err := le.buildLokiConfig()
-	if err != nil {
-		return
+	for i := 0; i < le.cfg.QueueCount; i++ {
+		go le.processQueue(i)
 	}
-	client, err := loki.New(config)
-	if err != nil {
-		return
+}
+
+func (le *lokiExporter) processQueue(queueID int) {
+	defer le.stop()
+
+	flows := make([]interface{}, LokiQueueBatchLimit)
+	for {
+		n := le.dataQueues.Gets(queue.HashKey(queueID), flows)
+		for _, flow := range flows[:n] {
+			switch t := flow.(type) {
+			case *log_data.L7FlowLog:
+				f := flow.(*log_data.L7FlowLog)
+				timestamp := time.UnixMicro(f.EndTime().Microseconds())
+				err := le.lokiClient.Handle(nil, timestamp, le.FlowLogToLog(f))
+				if err != nil {
+					log.Errorf("lokiClient handle log err: %v", err)
+				}
+				// todo the counter is not atomic without lock
+				le.counter.SendCounter++
+				f.Release()
+			default:
+				log.Warningf("flow type(%T) unsupport", t)
+				continue
+			}
+		}
 	}
-	le.lokiClient = client
 }
 
 // Put sends data to the loki exporter worker. Worker transform data to plaintext log and batch in
 // buffer queue, then push it to loki via HTTP API `POST /loki/api/v1/push`
 func (le *lokiExporter) Put(items ...interface{}) {
-
+	le.counter.RecvCounter++
+	if err := le.dataQueues.Put(queue.HashKey(int(le.counter.RecvCounter)%le.cfg.QueueCount), items...); err != nil {
+		log.Errorf("queue put error: %v", err)
+	}
 }
 
 // IsExportData tell the decoder if data need to be sended to loki exporter.
-func (le *lokiExporter) IsExportData(items interface{}) bool {
-	return false
+func (le *lokiExporter) IsExportData(item interface{}) bool {
+	l7, ok := item.(log_data.L7FlowLog)
+	if !ok {
+		return false
+	}
+
+	// always not export data from OTel
+	signalSource := datatype.SignalSource(l7.SignalSource)
+	if signalSource == datatype.SIGNAL_SOURCE_OTEL {
+		return false
+	}
+
+	if (1<<uint32(signalSource))&le.exportDataBits == 0 {
+		return false
+	}
+	return true
+}
+
+func (le *lokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
+	t := time.UnixMicro(item.EndTime().Microseconds()) // time.Time
+	serviceName := item.AppService
+	logLevel := responseStatusToLogLevel(item.ResponseStatus)
+	traceId := item.TraceId
+	spanId := item.SpanId
+
+	logHeader := fmt.Sprintf(le.logHeaderFmt, t, serviceName, logLevel, traceId, spanId)
+	// compose log body while preserving original field names.
+	var logBody string
+	switch datatype.L7Protocol(item.L7Protocol) {
+	case datatype.L7_PROTOCOL_DNS:
+		logBody = buildLogBodyDNS(item)
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+		logBody = buildLogBodyHTTP(item)
+	case datatype.L7_PROTOCOL_DUBBO:
+		logBody = buildLogBodyDubbo(item)
+	case datatype.L7_PROTOCOL_GRPC:
+		logBody = buildLogBodyGRPC(item)
+	case datatype.L7_PROTOCOL_KAFKA:
+		logBody = buildLogBodyKafka(item)
+	case datatype.L7_PROTOCOL_MQTT:
+		logBody = buildLogBodyMQTT(item)
+	case datatype.L7_PROTOCOL_MYSQL:
+		logBody = buildLogBodyMySQL(item)
+	case datatype.L7_PROTOCOL_REDIS:
+		logBody = buildLogBodyRedis(item)
+	case datatype.L7_PROTOCOL_POSTGRE:
+		logBody = buildLogBodyPostgreSQL(item)
+	}
+	return logHeader + logBody
+}
+
+// stop will be executed in defer to close resources.
+func (le *lokiExporter) stop() {
+	le.lokiClient.Stop()
 }

@@ -16,7 +16,10 @@
 
 package otlp_exporter
 
-import "testing"
+import (
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
+	"testing"
+)
 
 func TestGetSQLSpanNameAndOperation(t *testing.T) {
 	cases := []struct {
@@ -57,10 +60,10 @@ func TestGetSQLSpanNameAndOperation(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		spanName, operation := getSQLSpanNameAndOperation(c.sql)
+		spanName, operation := common.GetSQLSpanNameAndOperation(c.sql)
 		got := [2]string{spanName, operation}
 		if got != c.expected {
-			t.Errorf("getSQLSpanNameAndOperation(%q) == %q, expected %q", c.sql, got, c.expected)
+			t.Errorf("GetSQLSpanNameAndOperation(%q) == %q, expected %q", c.sql, got, c.expected)
 		}
 	}
 }

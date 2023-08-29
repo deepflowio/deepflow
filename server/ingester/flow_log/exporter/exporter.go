@@ -20,6 +20,7 @@ type Exporter interface {
 	Put(items ...interface{})
 
 	// IsExportData tell the decoder if data need to be sended to specific exporter.
+	// write operation is NOT ALLOWED in this method.
 	IsExportData(items interface{}) bool
 }
 

@@ -294,13 +294,8 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 }
 
 func (d *Decoder) export(l *log_data.L7FlowLog) {
-	// todo @jiekun move back to otlp exporter
-	//if d.otlpExporter != nil && d.otlpExporter.IsExportData(datatype.SignalSource(l.SignalSource)) {
-	//	d.otlpExporter.Put(l)
-	//}
-
 	for i := range d.exporters {
-		if !d.exporters[i].IsExportData(datatype.SignalSource(l.SignalSource)) {
+		if !d.exporters[i].IsExportData(l) {
 			continue
 		}
 		l.AddReferenceCount()
