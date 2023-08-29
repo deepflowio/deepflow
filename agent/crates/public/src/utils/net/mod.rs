@@ -109,6 +109,7 @@ pub struct Link {
     pub if_type: Option<String>,
     pub peer_index: Option<u32>,
     pub link_netnsid: Option<u32>,
+    pub stats: LinkStats,
 }
 
 impl PartialEq for Link {
@@ -129,6 +130,16 @@ impl Ord for Link {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.if_index.cmp(&other.if_index)
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LinkStats {
+    pub rx_packets: u64,
+    pub tx_packets: u64,
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+    pub rx_dropped: u64,
+    pub tx_dropped: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
