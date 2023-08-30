@@ -42,9 +42,9 @@ use nix::{
 };
 #[cfg(target_os = "linux")]
 use regex::Regex;
-#[cfg(target_os = "linux")]
-use sysinfo::System;
 use sysinfo::SystemExt;
+#[cfg(target_os = "linux")]
+use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
@@ -148,6 +148,7 @@ pub struct CollectorConfig {
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub cloud_gateway_traffic: bool,
+    pub packet_delay: Duration,
 }
 
 impl fmt::Debug for CollectorConfig {
@@ -192,6 +193,7 @@ impl fmt::Debug for CollectorConfig {
             .field("trident_type", &self.trident_type)
             .field("vtap_id", &self.vtap_id)
             .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
+            .field("packet_delay", &self.packet_delay)
             .finish()
     }
 }
@@ -766,7 +768,7 @@ pub struct L7LogDynamicConfig {
     // in lowercase
     pub proxy_client: String,
     // in lowercase
-    pub x_request_id: String,
+    pub x_request_id: HashSet<String>,
 
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
@@ -789,12 +791,16 @@ impl Eq for L7LogDynamicConfig {}
 impl L7LogDynamicConfig {
     pub fn new(
         mut proxy_client: String,
-        mut x_request_id: String,
+        x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
     ) -> Self {
         proxy_client.make_ascii_lowercase();
-        x_request_id.make_ascii_lowercase();
+
+        let mut x_request_id_set = HashSet::new();
+        for t in x_request_id.iter() {
+            x_request_id_set.insert(t.trim().to_string());
+        }
 
         let mut trace_set = HashSet::new();
         for t in trace_types.iter() {
@@ -808,7 +814,7 @@ impl L7LogDynamicConfig {
 
         Self {
             proxy_client,
-            x_request_id,
+            x_request_id: x_request_id_set,
             trace_types,
             span_types,
             trace_set,
@@ -1014,6 +1020,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     tap_sides
                 },
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
+                packet_delay: conf.yaml_config.packet_delay,
             },
             handler: HandlerConfig {
                 npb_dedup_enabled: conf.npb_dedup_enabled,
@@ -1081,7 +1088,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
-                    conf.http_log_x_request_id.to_string().to_ascii_lowercase(),
+                    conf.http_log_x_request_id
+                        .split(',')
+                        .map(|x| x.to_lowercase())
+                        .collect(),
                     conf.http_log_trace_id
                         .split(',')
                         .map(|item| TraceType::from(item))
@@ -1428,19 +1438,30 @@ impl ConfigHandler {
             let mut cpu_set = CpuSet::new();
             let splits = new_config.yaml_config.cpu_affinity.split(',');
             let mut invalid_config = false;
+            let system = System::new_with_specifics(
+                RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+            );
+            let cpu_count = system.cpus().len() as usize;
             if new_config.yaml_config.cpu_affinity.len() > 0 {
                 for id in splits.into_iter() {
-                    if let Ok(id) = id.parse::<usize>() {
-                        let _ = cpu_set.set(id);
-                    } else {
-                        invalid_config = true;
-                        break;
-                    }
+                    match id.parse::<usize>() {
+                        Ok(id) if id < cpu_count => {
+                            if let Err(e) = cpu_set.set(id) {
+                                warn!(
+                                    "Invalid CPU Affinity config {}, error: {:?}",
+                                    new_config.yaml_config.cpu_affinity, e
+                                );
+                                invalid_config = true;
+                            }
+                        }
+                        _ => {
+                            invalid_config = true;
+                            break;
+                        }
+                    };
                 }
             } else {
-                let sys = System::new();
-                let n = sys.cpus().len() as usize;
-                for i in 0..n {
+                for i in 0..cpu_count {
                     let _ = cpu_set.set(i);
                 }
             }

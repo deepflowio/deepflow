@@ -110,6 +110,7 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewVTapInterface(),
 		router.NewVtapRepo(),
 		router.NewPlugin(),
+		router.NewMail(),
 
 		// resource
 		resource.NewDomain(s.controllerConfig),

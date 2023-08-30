@@ -43,6 +43,7 @@ use log::{debug, info, warn};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
+use tokio::sync::broadcast;
 
 #[cfg(target_os = "linux")]
 use crate::platform::prometheus::targets::TargetsWatcher;
@@ -467,6 +468,9 @@ impl Trident {
             remote_log_config.clone(),
         );
 
+        let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
+        let agent_id_tx = Arc::new(agent_id_tx);
+
         let synchronizer = Arc::new(Synchronizer::new(
             runtime.clone(),
             session.clone(),
@@ -481,6 +485,7 @@ impl Trident {
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
+            agent_id_tx.clone(),
         ));
         stats_collector.register_countable(
             "ntp",
@@ -490,6 +495,16 @@ impl Trident {
         synchronizer.start();
         stats_collector.set_ntp_diff(synchronizer.ntp_diff());
         let stats_collector = Arc::new(stats_collector);
+
+        let mut domain_name_listener = DomainNameListener::new(
+            stats_collector.clone(),
+            session.clone(),
+            config_handler.static_config.controller_domain_name.clone(),
+            config_handler.static_config.controller_ips.clone(),
+            sidecar_mode,
+            agent_id_tx,
+        );
+        domain_name_listener.start();
 
         let mut cgroup_mount_path = "".to_string();
         let mut is_cgroup_v2 = false;
@@ -617,9 +632,10 @@ impl Trident {
                 }
                 State::Terminated => {
                     if let Some(mut c) = components {
-                        c.stop(false);
+                        c.stop();
                         guard.stop();
                         monitor.stop();
+                        domain_name_listener.stop();
                         platform_synchronizer.stop();
                         #[cfg(target_os = "linux")]
                         api_watcher.stop();
@@ -635,7 +651,7 @@ impl Trident {
                 }
                 State::Disabled(config) => {
                     if let Some(ref mut c) = components {
-                        c.stop(true);
+                        c.stop();
                     }
                     if let Some(c) = config.take() {
                         config_handler.on_config(
@@ -676,7 +692,7 @@ impl Trident {
             if let Some(old_yaml) = yaml_conf {
                 if old_yaml != runtime_config.yaml_config {
                     if let Some(mut c) = components.take() {
-                        c.stop(false);
+                        c.stop();
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
@@ -727,7 +743,6 @@ impl Trident {
                         api_watcher.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
-                        sidecar_mode,
                         runtime.clone(),
                     )?;
 
@@ -935,13 +950,7 @@ fn parse_tap_type(components: &mut AgentComponents, tap_types: Vec<trident::TapT
 
 pub struct DomainNameListener {
     stats_collector: Arc<stats::Collector>,
-    synchronizer: Arc<Synchronizer>,
-    platform_synchronizer: Arc<PlatformSynchronizer>,
-    #[cfg(target_os = "linux")]
-    api_watcher: Arc<ApiWatcher>,
-    #[cfg(target_os = "linux")]
-    prometheus_targets_watcher: Arc<TargetsWatcher>,
-
+    session: Arc<Session>,
     ips: Vec<String>,
     domain_names: Vec<String>,
 
@@ -949,6 +958,7 @@ pub struct DomainNameListener {
 
     thread_handler: Option<JoinHandle<()>>,
     stopped: Arc<AtomicBool>,
+    agent_id_tx: Arc<broadcast::Sender<AgentId>>,
 }
 
 impl DomainNameListener {
@@ -956,22 +966,15 @@ impl DomainNameListener {
 
     fn new(
         stats_collector: Arc<stats::Collector>,
-        synchronizer: Arc<Synchronizer>,
-        platform_synchronizer: Arc<PlatformSynchronizer>,
-        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
-        #[cfg(target_os = "linux")] prometheus_targets_watcher: Arc<TargetsWatcher>,
+        session: Arc<Session>,
         domain_names: Vec<String>,
         ips: Vec<String>,
         sidecar_mode: bool,
+        agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
-            synchronizer: synchronizer.clone(),
-            platform_synchronizer: platform_synchronizer.clone(),
-            #[cfg(target_os = "linux")]
-            api_watcher: api_watcher.clone(),
-            #[cfg(target_os = "linux")]
-            prometheus_targets_watcher: prometheus_targets_watcher.clone(),
+            session,
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
@@ -980,6 +983,7 @@ impl DomainNameListener {
 
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
+            agent_id_tx,
         }
     }
 
@@ -989,14 +993,6 @@ impl DomainNameListener {
         }
         self.stopped.store(false, Ordering::Relaxed);
         self.run();
-    }
-
-    fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
-        if self.thread_handler.is_none() {
-            return None;
-        }
-        self.stopped.store(true, Ordering::Relaxed);
-        self.thread_handler.take()
     }
 
     fn stop(&mut self) {
@@ -1013,16 +1009,12 @@ impl DomainNameListener {
         if self.domain_names.len() == 0 {
             return;
         }
-        let synchronizer = self.synchronizer.clone();
-        let platform_synchronizer = self.platform_synchronizer.clone();
-        #[cfg(target_os = "linux")]
-        let api_watcher = self.api_watcher.clone();
-        #[cfg(target_os = "linux")]
-        let prometheus_targets_watcher = self.prometheus_targets_watcher.clone();
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
+        let agent_id_tx = self.agent_id_tx.clone();
+        let session = self.session.clone();
 
         #[cfg(target_os = "linux")]
         let sidecar_mode = self.sidecar_mode;
@@ -1085,12 +1077,8 @@ impl DomainNameListener {
                             #[cfg(target_os = "windows")]
                             let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
 
-                            synchronizer.reset_session(ips.clone(), agent_id);
-                            platform_synchronizer.reset_session(ips.clone());
-                            #[cfg(target_os = "linux")]
-                            api_watcher.reset_session(ips.clone());
-                            #[cfg(target_os = "linux")]
-                            prometheus_targets_watcher.reset_session(ips.clone());
+                            session.reset_server_ip(ips.clone());
+                            let _ = agent_id_tx.send(agent_id);
                         }
                     }
                 })
@@ -1108,8 +1096,6 @@ pub enum Components {
 
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
-    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
-    pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -1120,41 +1106,12 @@ pub struct WatcherComponents {
 impl WatcherComponents {
     fn new(
         config_handler: &ConfigHandler,
-        stats_collector: Arc<stats::Collector>,
-        session: &Arc<Session>,
-        synchronizer: &Arc<Synchronizer>,
-        platform_synchronizer: Arc<PlatformSynchronizer>,
-        api_watcher: Arc<ApiWatcher>,
-        exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
-        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
-        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            synchronizer.agent_id.clone(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
-
-        let domain_name_listener = DomainNameListener::new(
-            stats_collector.clone(),
-            synchronizer.clone(),
-            platform_synchronizer.clone(),
-            api_watcher.clone(),
-            prometheus_targets_watcher.clone(),
-            config_handler.static_config.controller_domain_name.clone(),
-            config_handler.static_config.controller_ips.clone(),
-            sidecar_mode,
-        );
-
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
-            prometheus_targets_watcher,
-            domain_name_listener,
             running: AtomicBool::new(false),
             tap_mode: candidate_config.tap_mode,
             agent_mode,
@@ -1166,9 +1123,6 @@ impl WatcherComponents {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
-        info!("Staring watcher components.");
-        self.domain_name_listener.start();
-        self.prometheus_targets_watcher.start();
         info!("Started watcher components.");
     }
 
@@ -1176,8 +1130,6 @@ impl WatcherComponents {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
-        self.domain_name_listener.stop();
-        self.prometheus_targets_watcher.stop();
         info!("Stopped watcher components.")
     }
 }
@@ -1217,7 +1169,6 @@ pub struct AgentComponents {
     pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub exception_handler: ExceptionHandler,
-    pub domain_name_listener: DomainNameListener,
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
@@ -1498,7 +1449,6 @@ impl AgentComponents {
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
-        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
@@ -2413,19 +2363,6 @@ impl AgentComponents {
         remote_log_config.set_threshold(candidate_config.log.log_threshold);
         remote_log_config.set_hostname(candidate_config.log.host.clone());
 
-        let domain_name_listener = DomainNameListener::new(
-            stats_collector.clone(),
-            synchronizer.clone(),
-            platform_synchronizer.clone(),
-            #[cfg(target_os = "linux")]
-            api_watcher.clone(),
-            #[cfg(target_os = "linux")]
-            prometheus_targets_watcher.clone(),
-            config_handler.static_config.controller_domain_name.clone(),
-            config_handler.static_config.controller_ips.clone(),
-            sidecar_mode,
-        );
-
         let sender_config = config_handler.sender().load();
         let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
             sender_config.bandwidth_probe_interval.as_secs(),
@@ -2478,7 +2415,6 @@ impl AgentComponents {
             tap_mode: candidate_config.tap_mode,
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
-            domain_name_listener,
             npb_bps_limit,
             handler_builders,
             compressed_otel_uniform_sender,
@@ -2570,7 +2506,6 @@ impl AgentComponents {
             }
             self.pcap_batch_uniform_sender.start();
         }
-        self.domain_name_listener.start();
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
                 y.start();
@@ -2584,7 +2519,7 @@ impl AgentComponents {
         info!("Started agent components.");
     }
 
-    fn stop(&mut self, half: bool) {
+    fn stop(&mut self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
@@ -2658,11 +2593,6 @@ impl AgentComponents {
         if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
-        if !half {
-            if let Some(h) = self.domain_name_listener.notify_stop() {
-                join_handles.push(h);
-            }
-        }
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
                 if let Some(h) = y.notify_stop() {
@@ -2723,23 +2653,11 @@ impl Components {
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
-        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
         if running_in_only_watch_k8s_mode() {
-            let components = WatcherComponents::new(
-                config_handler,
-                stats_collector,
-                session,
-                synchronizer,
-                platform_synchronizer,
-                api_watcher,
-                exception_handler,
-                agent_mode,
-                sidecar_mode,
-                runtime,
-            )?;
+            let components = WatcherComponents::new(config_handler, agent_mode, runtime)?;
             return Ok(Components::Watcher(components));
         }
         let components = AgentComponents::new(
@@ -2759,15 +2677,14 @@ impl Components {
             api_watcher,
             vm_mac_addrs,
             agent_mode,
-            sidecar_mode,
             runtime,
         )?;
         return Ok(Components::Agent(components));
     }
 
-    fn stop(&mut self, half: bool) {
+    fn stop(&mut self) {
         match self {
-            Self::Agent(a) => a.stop(half),
+            Self::Agent(a) => a.stop(),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.stop(),
             _ => {}

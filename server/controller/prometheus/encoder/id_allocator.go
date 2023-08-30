@@ -24,59 +24,30 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
+type sorter interface {
+	sort([]int)
+	sortSet(mapset.Set[int]) []int
+	getUsedIDSet(sortedUsableIDs []int, inUseIDSet mapset.Set[int]) mapset.Set[int]
+}
+
 type idAllocator struct {
 	resourceType    string
+	min             int
 	max             int
 	usableIDs       []int
 	rawDataProvider rawDataProvider
+	sorter          sorter
 }
 
-func (ia *idAllocator) refresh() error {
-	log.Infof("refresh %s id pools started", ia.resourceType)
-	inUseIDsSet, err := ia.rawDataProvider.load()
-	if err != nil {
-		return err
+func newIDAllocator(resourceType string, min, max int) idAllocator {
+	return idAllocator{
+		resourceType: resourceType,
+		min:          min,
+		max:          max,
+		usableIDs:    make([]int, 0, max-min+1),
 	}
-	allIDsSet := mapset.NewSet[int]()
-	for i := 1; i <= ia.max; i++ {
-		allIDsSet.Add(i)
-	}
-	// 可用ID = 所有ID（1~max）- db中正在使用的ID
-	// 排序原则：大于db正在使用的max值的ID（未曾被使用过的ID）优先，小于db正在使用的max值的ID（已被使用过且已回收的ID）在后
-	var usableIDs []int
-	if inUseIDsSet.Cardinality() != 0 {
-		inUseIDs := inUseIDsSet.ToSlice()
-		sort.IntSlice(inUseIDs).Sort()
-		maxInUseID := inUseIDs[len(inUseIDs)-1]
-
-		usableIDsSet := allIDsSet.Difference(inUseIDsSet)
-		usedIDs := []int{}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		for _, id := range usableIDs {
-			if id < maxInUseID {
-				usedIDs = append(usedIDs, id)
-				usableIDsSet.Remove(id)
-			} else {
-				break
-			}
-		}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		sort.IntSlice(usedIDs).Sort()
-		usableIDs = append(usableIDs, usedIDs...)
-	} else {
-		usableIDs = allIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-	}
-	ia.usableIDs = usableIDs
-
-	log.Infof("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs))
-	return nil
 }
 
-// 批量分配ID，若ID池中数量不足，分配ID池所有ID；反之分配指定个数ID。
-// 分配的ID中，若已有被实际使用的ID（闭源页面创建使用），排除已使用ID，仅分配剩余部分。
 func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) == 0 {
 		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ia.resourceType))
@@ -85,6 +56,7 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) < count {
 		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ia.resourceType))
 	}
+
 	ids = make([]int, count)
 	copy(ids, ia.usableIDs[:count])
 
@@ -95,12 +67,133 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(inUseIDs) != 0 {
 		return nil, errors.New(fmt.Sprintf("%s some ids are in use", ia.resourceType))
 	}
+
 	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids))
 	ia.usableIDs = ia.usableIDs[count:]
 	return
 }
 
+func (ia *idAllocator) refresh() error {
+	log.Infof("refresh %s id pools started", ia.resourceType)
+	inUseIDSet, err := ia.rawDataProvider.load()
+	if err != nil {
+		return err
+	}
+	ia.usableIDs = ia.getSortedUsableIDs(ia.getAllIDSet(), inUseIDSet)
+	log.Infof("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs))
+	return nil
+}
+
+func (ia *idAllocator) getAllIDSet() mapset.Set[int] {
+	allIDSet := mapset.NewSet[int]()
+	for i := ia.min; i <= ia.max; i++ {
+		allIDSet.Add(i)
+	}
+	return allIDSet
+}
+
+func (ia *idAllocator) getSortedUsableIDs(allIDSet, inUseIDSet mapset.Set[int]) []int {
+	var usableIDs []int
+	if inUseIDSet.Cardinality() == 0 {
+		usableIDs = ia.sorter.sortSet(allIDSet)
+	} else {
+		// usable ids = all ids [min, max] - ids in use in db
+		// 可用 id = 所有 id [min, max] - db 中正在使用的 id
+		usableIDSet := allIDSet.Difference(inUseIDSet)
+		usableIDs = ia.sorter.sortSet(usableIDSet)
+
+		// usable ids that have been used and returned
+		// 可用 id 中被使用过后已归还的 id
+		usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
+		usedIDs := ia.sorter.sortSet(usedIDSet)
+
+		// usable ids that have not been used
+		// 可用 id 中未被使用过的 id
+		unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+
+		// id pool allocation order: ids that have not been used first, ids that have been returned after use
+		// id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
+		usableIDs = append(unusedIDs, usedIDs...)
+	}
+	return usableIDs
+}
+
+type ascIDAllocator struct {
+	idAllocator
+}
+
+func newAscIDAllocator(resourceType string, min, max int) ascIDAllocator {
+	ia := ascIDAllocator{
+		idAllocator: newIDAllocator(resourceType, min, max),
+	}
+	ia.sorter = &ia
+	return ia
+}
+
+func (ia *ascIDAllocator) getUsedIDSet(sortedUsableIDs []int, inUseIDSet mapset.Set[int]) mapset.Set[int] {
+	maxInUseID := ia.sortSet(inUseIDSet)[inUseIDSet.Cardinality()-1]
+	usedIDSet := mapset.NewSet[int]()
+	for _, id := range sortedUsableIDs {
+		if id < maxInUseID {
+			usedIDSet.Add(id)
+		} else {
+			break
+		}
+	}
+	return usedIDSet
+}
+
+// sortSet sorts ints in set in ascending order
+func (ia *ascIDAllocator) sortSet(ints mapset.Set[int]) []int {
+	s := ints.ToSlice()
+	ia.sort(s)
+	return s
+}
+
+// sort sorts ints in set in ascending order
+func (ia *ascIDAllocator) sort(ints []int) {
+	sort.Ints(ints)
+}
+
 type rawDataProvider interface {
 	load() (mapset.Set[int], error)
 	check([]int) ([]int, error)
+}
+
+type descIDAllocator struct {
+	idAllocator
+}
+
+func newDescIDAllocator(resourceType string, min, max int) descIDAllocator {
+	ia := descIDAllocator{
+		idAllocator: newIDAllocator(resourceType, min, max),
+	}
+	ia.sorter = &ia
+	return ia
+}
+
+func (ia *descIDAllocator) getUsedIDSet(sortedUsableIDs []int, inUseIDSet mapset.Set[int]) mapset.Set[int] {
+	minInUseID := ia.sortSet(inUseIDSet)[inUseIDSet.Cardinality()-1]
+	usedIDSet := mapset.NewSet[int]()
+	for _, id := range sortedUsableIDs {
+		if id > minInUseID {
+			usedIDSet.Add(id)
+		} else {
+			break
+		}
+	}
+	return usedIDSet
+}
+
+// sortSet sorts ints in set in descending order
+func (ia *descIDAllocator) sortSet(ints mapset.Set[int]) []int {
+	s := ints.ToSlice()
+	ia.sort(s)
+	return s
+}
+
+// sort sorts ints in slice in descending order
+func (ia *descIDAllocator) sort(ints []int) {
+	sort.Ints(ints)
+	sort.Sort(sort.Reverse(sort.IntSlice(ints)))
 }

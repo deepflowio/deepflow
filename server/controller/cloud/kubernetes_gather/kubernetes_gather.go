@@ -245,10 +245,9 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	}
 	k.k8sInfo = k8sInfo
 
-	prometheusTargets, err := genesis.GenesisService.GetPrometheusResponse(k.ClusterID)
+	prometheusTargets, err := k.getPrometheusTargets()
 	if err != nil {
-		// TODO: 可能会因为采集器版本的问题阻塞正常对接，暂时只记录问题，后续调整为和k8s info相同的处理方式
-		log.Debug(err.Error())
+		return model.KubernetesGatherResource{}, err
 	}
 
 	podCluster, err := k.getPodCluster()

@@ -98,7 +98,9 @@ func (p *Profiler) Start() {
 	}
 
 	for _, decoder := range p.Decoders {
-		go decoder.Run()
+		if decoder != nil {
+			go decoder.Run()
+		}
 	}
 }
 
@@ -110,7 +112,9 @@ func (p *Profiler) Close() {
 	}
 
 	for _, decoder := range p.Decoders {
-		decoder.Close()
+		if decoder != nil {
+			decoder.Close()
+		}
 	}
 }
 

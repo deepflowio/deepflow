@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package exporter
+package otlp_exporter
 
 import (
 	crand "crypto/rand"
@@ -29,11 +29,12 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	_ "go.opentelemetry.io/proto/otlp/common/v1"
 
+	"github.com/google/gopacket/layers"
+
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/google/gopacket/layers"
 )
 
 func putStrWithoutEmpty(attrs pcommon.Map, key, value string) {
@@ -177,8 +178,17 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
 
 	if dataTypeBits&SERVICE_INFO != 0 {
+		if strings.HasPrefix(l7.TapSide, "c") {
+			putStrWithoutEmpty(resAttrs, "service.name", tags0.AutoService)
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags0.AutoInstance)
+		} else {
+			putStrWithoutEmpty(resAttrs, "service.name", tags1.AutoService)
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags1.AutoInstance)
+		}
+		// if l7.AppService/l7.AppInstance is not empty, overwrite the value
 		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
 		putStrWithoutEmpty(resAttrs, "service.instance.id", l7.AppInstance)
+
 		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
 		putIntWithoutZero(resAttrs, "process.pid_1", int64(l7.ProcessID1))
 		putStrWithoutEmpty(resAttrs, "thread.name_0", l7.ProcessKName0)

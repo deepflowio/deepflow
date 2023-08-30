@@ -59,7 +59,6 @@ static __thread stack_trace_msg_hash_kv *trace_msg_kvps;
 static __thread bool msg_clear_hash;
 
 // for flame-graph test
-static stack_trace_msg_hash_t test_fg_hash;
 static FILE *folded_file;
 #define FOLDED_FILE_PATH "./profiler.folded" 
 
@@ -499,8 +498,11 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 							stack_str_hash, matched);
 		if (trace_str) {
-			/* append 1 byte for '\0' */
-			int str_len = strlen(trace_str) + 1;
+			/*
+			 * append process/thread name to stack string
+			 * append 2 byte for ';' and '\0'
+			 */
+			int str_len = strlen(trace_str) + strlen(v->comm) + 2;
 			int len = sizeof(stack_trace_msg_t) + str_len;
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
 			if (msg == NULL) {
@@ -509,7 +511,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			}
 
 			set_stack_trace_msg(msg, v, matched, stime, netns_id, process_name);
-			snprintf((char *)&msg->data[0], str_len, "%s", trace_str);
+			snprintf((char *)&msg->data[0], str_len, "%s;%s", v->comm, trace_str);
 			msg->data_len = str_len - 1;
 			clib_mem_free(trace_str);
 			kv.msg_ptr = pointer_to_uword(msg);
@@ -904,121 +906,38 @@ int start_continuous_profiler(int freq,
 
 static u64 test_add_count, stack_count;
 static u64 test_hit_count, msg_ptr_zero_count;
-void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *msg)
 {
 	stack_count++;
-	if (unlikely(test_fg_hash.buckets == NULL)) {
-		init_stack_trace_msg_hash(&test_fg_hash,
-					  "flame_graph_test");
+	if (folded_file == NULL) {
 		unlink(FOLDED_FILE_PATH);
 		folded_file = fopen(FOLDED_FILE_PATH, "a+");
 		if (folded_file == NULL)
 			return;
 	}
 
-	stack_trace_msg_kv_t msg_kvp;
-	if (val->stime > 0) {
-		msg_kvp.k.tgid = val->pid;
-		msg_kvp.k.pid = val->tid;
-		msg_kvp.k.cpu = val->cpu;
-		msg_kvp.k.stime = val->stime;
-		msg_kvp.k.u_stack_id = val->u_stack_id;
-		msg_kvp.k.k_stack_id = val->k_stack_id;
-	} else {
-		strcpy_s_inline(msg_kvp.c_k.comm, sizeof(msg_kvp.c_k.comm),
-				val->process_name, strlen((char *)val->process_name));
-		msg_kvp.c_k.cpu = val->cpu;
-		if (val->u_stack_id >= STACK_ID_MAX)
-			msg_kvp.c_k.u_stack_id = STACK_ID_MAX;
-		else
-			msg_kvp.c_k.u_stack_id = val->u_stack_id;
+	/* Ensure that the buffer is long enough to accommodate the stack trace string. */
+	int len = msg->data_len + sizeof(msg->comm) + sizeof(msg->process_name) + 64;
+	char str[len];
+	/* profile regex match ? */
+	if (msg->stime > 0)
+		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name, msg->pid,
+			 msg->data, msg->count);
+	else
+		snprintf(str, len, "%s;%s %u\n", msg->process_name, /*msg->pid,*/
+			 msg->data, msg->count);
 
-		if (val->k_stack_id >= STACK_ID_MAX)
-			msg_kvp.c_k.k_stack_id = STACK_ID_MAX;
-		else
-			msg_kvp.c_k.k_stack_id = val->k_stack_id;
-	}
-
-	if (stack_trace_msg_hash_search(&test_fg_hash, (stack_trace_msg_hash_kv *)&msg_kvp,
-					(stack_trace_msg_hash_kv *)&msg_kvp) == 0) {
-		((stack_trace_msg_t *)msg_kvp.msg_ptr)->count += val->count;
-		test_hit_count += val->count;
-		__sync_fetch_and_add(&test_fg_hash.hit_hash_count, 1);
-		return;
-	} else {
-		int len = sizeof(*val) + val->data_len + 1;
-		char *p = clib_mem_alloc_aligned("flame_msg", len, 0, NULL);
-		if (p == NULL) return;
-		msg_kvp.msg_ptr = pointer_to_uword(p);
-		memcpy(p, val, sizeof(*val) + val->data_len);
-		p[sizeof(*val) + val->data_len] = '\0';
-		if (stack_trace_msg_hash_add_del(&test_fg_hash,
-				 (stack_trace_msg_hash_kv *)&msg_kvp,
-				 1 /* is_add */ )) {
-			clib_mem_free(p);
-			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
-		} else {
-			test_add_count += val->count;
-			__sync_fetch_and_add(&test_fg_hash.hash_elems_count, 1);
-		}
-	}
-}
-
-static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
-{
-	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
-	if (msg_kv->msg_ptr != 0) {
-		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
-
-		/* Ensure that the buffer is long enough to accommodate the stack trace string. */
-		int len = msg->data_len + sizeof(msg->comm) + sizeof(msg->process_name) + 64;
-		char str[len];
-		/* Is it a thread? */
-		if (msg->pid != msg->tid && msg->stime > 0)
-			snprintf(str, len, "%s(%d);%s;%s %u\n", msg->process_name, msg->pid,
-				 msg->comm, msg->data, msg->count);
-		else /* is process */
-			snprintf(str, len, "%s;%s %u\n", msg->process_name, /*msg->pid,*/
-				 msg->data, msg->count);
-
-		os_puts(folded_file, str, strlen(str), false);
-#ifdef CP_DEBUG
-		ebpf_debug("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
-			   "%lu cpu %u count %u comm %s datalen %u data %s\n",
-			   msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
-			   msg->k_stack_id, msg->cpu, msg->count, msg->comm,
-			   msg->data_len, msg->data);
-#endif
-		clib_mem_free((void *)msg);
-		(*(u64 *) ctx)++;
-	} else {
-		msg_ptr_zero_count++;
-	}
-
-	return BIHASH_WALK_CONTINUE;
+	os_puts(folded_file, str, strlen(str), false);
 }
 
 void release_flame_graph_hash(void)
 {
-	u64 elems_count = 0;
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
 	ebpf_info(LOG_CP_TAG "pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
 		  " bytes\n", alloc_b, free_b, alloc_b - free_b);
-
-	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
-						    gen_stack_trace_folded_file,
-						    (void *)&elems_count);
-
-	ebpf_info(LOG_CP_TAG "elems_count %lu hash_elems_count %lu "
-		  "hit_hash_count %lu\n", elems_count,
-		  test_fg_hash.hash_elems_count, test_fg_hash.hit_hash_count);
-
-	ebpf_info(LOG_CP_TAG "flame graph folded strings count %lu\n", elems_count);
 	if (folded_file)
 		fclose(folded_file);
-
-	stack_trace_msg_hash_free(&test_fg_hash);
 
 	get_mem_stat(&alloc_b, &free_b);
 #ifdef DF_MEM_DEBUG
@@ -1033,7 +952,7 @@ void release_flame_graph_hash(void)
 
 	ebpf_info(LOG_CP_TAG "Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl"
-		  " --countname=samples > profiler-test.svg\033[0m\n");
+		  " --countname=samples --inverted > profiler-test.svg\033[0m\n");
 }
 
 /*

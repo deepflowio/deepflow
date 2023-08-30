@@ -21,6 +21,8 @@ import (
 	"os"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/otlp_exporter"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -29,17 +31,13 @@ import (
 var log = logging.MustGetLogger("flow_log.config")
 
 const (
-	DefaultThrottle             = 50000
-	DefaultThrottleBucket       = 8
-	DefaultDecoderQueueCount    = 2
-	DefaultDecoderQueueSize     = 1 << 14
-	DefaultBrokerQueueSize      = 1 << 14
-	DefaultFlowLogTTL           = 72 // hour
-	DefaultOtlpExportBatchCount = 32
+	DefaultThrottle          = 50000
+	DefaultThrottleBucket    = 8
+	DefaultDecoderQueueCount = 2
+	DefaultDecoderQueueSize  = 1 << 14
+	DefaultBrokerQueueSize   = 1 << 14
+	DefaultFlowLogTTL        = 72 // hour
 )
-
-var DefaultOtlpExportDatas = []string{"cbpf-net-span", "ebpf-sys-span"}
-var DefaultOtlpExportDataTypes = []string{"service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"}
 
 type FlowLogTTL struct {
 	L4FlowLog int `yaml:"l4-flow-log"`
@@ -47,36 +45,43 @@ type FlowLogTTL struct {
 	L4Packet  int `yaml:"l4-packet"`
 }
 
-type ExporterConfig struct {
-	Enabled                     bool              `yaml:"enabled"`
-	Addr                        string            `yaml:"addr"`
-	QueueCount                  int               `yaml:"queue-count"`
-	QueueSize                   int               `yaml:"queue-size"`
-	ExportDatas                 []string          `yaml:"export-datas"`
-	ExportDataTypes             []string          `yaml:"export-data-types"`
-	ExportCustomK8sLabelsRegexp string            `yaml:"export-custom-k8s-labels-regexp"`
-	ExportOnlyWithTraceID       bool              `yaml:"export-only-with-traceid"`
-	ExportBatchCount            int               `yaml:"export-batch-count"`
-	GrpcHeaders                 map[string]string `yaml:"grpc-headers"`
-}
-
 type Config struct {
 	Base              *config.Config
-	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
-	Throttle          int                   `yaml:"throttle"`
-	ThrottleBucket    int                   `yaml:"throttle-bucket"`
-	L4Throttle        int                   `yaml:"l4-throttle"`
-	L7Throttle        int                   `yaml:"l7-throttle"`
-	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
-	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
-	Exporter          ExporterConfig        `yaml:"otlp-exporter"`
+	CKWriterConfig    config.CKWriterConfig  `yaml:"flowlog-ck-writer"`
+	Throttle          int                    `yaml:"throttle"`
+	ThrottleBucket    int                    `yaml:"throttle-bucket"`
+	L4Throttle        int                    `yaml:"l4-throttle"`
+	L7Throttle        int                    `yaml:"l7-throttle"`
+	FlowLogTTL        FlowLogTTL             `yaml:"flow-log-ttl-hour"`
+	DecoderQueueCount int                    `yaml:"flow-log-decoder-queue-count"`
+	DecoderQueueSize  int                    `yaml:"flow-log-decoder-queue-size"`
+	ExportersCfg      []exporter.ExporterCfg `yaml:"exporters"`
+
+	// OTLPExporter is moved inside ExportersCfg hence deprecated.
+	// Preserved for backward compatibility ONLY.
+	OTLPExporter otlp_exporter.OtlpExporterConfig `yaml:"otlp-exporter"`
 }
+
 type FlowLogConfig struct {
 	FlowLog Config `yaml:"ingester"`
 }
 
 func (c *Config) Validate() error {
+	// For backward compatibility reason, we must map some config
+	// to the latest field it belongs to.
+
+	// Mapping "ingester.otlp-exporter" to "ingester.exporters.otlp-exporter" with default name.
+	// This won't work when "enabled: false" is set in otlp-exporter
+	if c.OTLPExporter.Enabled {
+		log.Warning("config ingester.otlp-exporter is deprecated. mapping to ingester.exporters.otlp-exporter.")
+		c.ExportersCfg = append(c.ExportersCfg, exporter.ExporterCfg{
+			Name:         "backward-compatible-otlp-exporter",
+			Type:         exporter.OtlpExporter,
+			OtlpExporter: c.OTLPExporter,
+		})
+	}
+
+	// Begin validation.
 	if c.DecoderQueueCount == 0 {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
 	}
@@ -93,15 +98,12 @@ func (c *Config) Validate() error {
 		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
 	}
 
-	if len(c.Exporter.ExportDatas) == 0 {
-		c.Exporter.ExportDatas = DefaultOtlpExportDatas
-	}
-
-	if len(c.Exporter.ExportDataTypes) == 0 {
-		c.Exporter.ExportDataTypes = DefaultOtlpExportDataTypes
-	}
-	if c.Exporter.ExportBatchCount == 0 {
-		c.Exporter.ExportBatchCount = DefaultOtlpExportBatchCount
+	if len(c.ExportersCfg) != 0 {
+		for i := range c.ExportersCfg {
+			if err := c.ExportersCfg[i].Validate(); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -117,18 +119,7 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
-			Exporter: ExporterConfig{
-				Enabled:                     false,
-				Addr:                        "127.0.0.1:4317",
-				QueueCount:                  4,
-				QueueSize:                   100000,
-				ExportDatas:                 DefaultOtlpExportDatas,
-				ExportDataTypes:             DefaultOtlpExportDataTypes,
-				ExportCustomK8sLabelsRegexp: "",
-				ExportOnlyWithTraceID:       false,
-				ExportBatchCount:            DefaultOtlpExportBatchCount,
-				GrpcHeaders:                 nil,
-			},
+			ExportersCfg:      exporter.GetDefaultExporterCfg(),
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

@@ -38,7 +38,10 @@ use prost::Message;
 use rand::RngCore;
 use sysinfo::{System, SystemExt};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::{
+    broadcast,
+    mpsc::{self, UnboundedSender},
+};
 use tokio::task::JoinHandle;
 use tokio::time;
 
@@ -444,6 +447,7 @@ pub struct Synchronizer {
     ntp_diff: Arc<AtomicI64>,
     agent_mode: RunningMode,
     standalone_runtime_config: Option<PathBuf>,
+    agent_id_tx: Arc<broadcast::Sender<AgentId>>,
 }
 
 impl Synchronizer {
@@ -463,6 +467,7 @@ impl Synchronizer {
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
+        agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -491,16 +496,8 @@ impl Synchronizer {
             ntp_diff: Default::default(),
             agent_mode,
             standalone_runtime_config,
+            agent_id_tx,
         }
-    }
-
-    pub fn reset_session(&self, controller_ips: Vec<String>, agent_id: AgentId) {
-        self.session.reset_server_ip(controller_ips);
-
-        *self.agent_id.write() = agent_id;
-
-        self.status.write().proxy_ip = None;
-        self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
     }
 
     pub fn reset_version(&self) {
@@ -1380,10 +1377,28 @@ impl Synchronizer {
         }));
     }
 
+    async fn watch_agent_id(
+        mut agent_id_rx: broadcast::Receiver<AgentId>,
+        agent_id: Arc<RwLock<AgentId>>,
+        status: Arc<RwLock<Status>>,
+    ) {
+        while let Ok(new_agent_id) = agent_id_rx.recv().await {
+            *agent_id.write() = new_agent_id;
+            status.write().proxy_ip = None;
+            status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
+        }
+    }
+
     pub fn start(&self) {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
+        let agent_id = self.agent_id.clone();
+        let status = self.status.clone();
+        let agent_id_rx = self.agent_id_tx.subscribe();
+        self.runtime.spawn(async move {
+            Self::watch_agent_id(agent_id_rx, agent_id, status).await;
+        });
         match self.agent_mode {
             RunningMode::Managed => {
                 self.run_ntp_sync();

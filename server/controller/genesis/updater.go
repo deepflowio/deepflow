@@ -1007,31 +1007,28 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 			instance := labels.Get("instance").MustString()
 
 			labelsSlice := []string{}
-			honorLabelsConfig, ok := pJobNameToHonorLabelsConfig[job]
-			if !ok || !honorLabelsConfig {
-				labelsMap := labels.MustMap()
-				delete(labelsMap, "job")
-				delete(labelsMap, "instance")
-				keys := []string{}
-				for key := range labelsMap {
-					keys = append(keys, key)
+			honorLabelsConfig := pJobNameToHonorLabelsConfig[job]
+			labelsMap := labels.MustMap()
+			delete(labelsMap, "job")
+			delete(labelsMap, "instance")
+			keys := []string{}
+			for key := range labelsMap {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				v := labelsMap[k]
+				vString, ok := v.(string)
+				if !ok {
+					vString = ""
 				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					v := labelsMap[k]
-					vString, ok := v.(string)
-					if !ok {
-						vString = ""
-					}
-					newString := k + ":" + vString
-					labelsSlice = append(labelsSlice, newString)
-				}
+				newString := k + ":" + vString
+				labelsSlice = append(labelsSlice, newString)
 			}
 
 			otherLabelsString := strings.Join(labelsSlice, ", ")
 
 			result = append(result, cloudmodel.PrometheusTarget{
-				Lcuuid:            common.GetUUID(instance+job+otherLabelsString, uuid.Nil),
 				ScrapeURL:         scrapeUrl,
 				Job:               job,
 				Instance:          instance,

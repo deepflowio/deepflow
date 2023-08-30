@@ -87,7 +87,6 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 		fmt.Sprintf("https://%s.%s.%s/v3/auth/tokens", h.config.IAMHostPrefix, projectName, h.config.Domain), time.Duration(h.httpTimeout), authBody,
 	)
 	if err != nil {
-		log.Errorf("request failed: %+v", err)
 		return nil, err
 	}
 	return &Token{resp.Get("X-Subject-Token").MustString(), resp.Get("token").Get("expires_at").MustString()}, nil
@@ -105,7 +104,6 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 	projectIDs := []string{}
 	jProjects, err := h.getRawData(fmt.Sprintf("https://%s/v3/auth/projects", h.config.IAMHost), token.token, "projects")
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return
 	}
 	for i := range jProjects {
@@ -143,7 +141,6 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.Domain, p.id), t.token, "vpcs",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			delete(h.projectTokenMap, p)
 			continue
 		} else if len(jvpcs) == 0 {

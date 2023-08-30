@@ -800,6 +800,7 @@ type PrometheusTarget struct {
 	OtherLabels    string `gorm:"column:other_labels;type:text;default:''" json:"OTHER_LABELS"` // separated by ,
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	CreateMethod   int    `gorm:"column:create_method;type:tinyint(1);default:1" json:"CREATE_METHOD"`
 }
 
 func (PrometheusTarget) TableName() string {
@@ -1375,4 +1376,19 @@ type Plugin struct {
 
 func (Plugin) TableName() string {
 	return "plugin"
+}
+
+type MailServer struct {
+	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Status   int    `gorm:"column:status;type:int;not null" json:"STATUS"`
+	Host     string `gorm:"column:host;type:text;not null" json:"HOST"`
+	Port     int    `gorm:"column:port;type:int;not null" json:"PORT"`
+	User     string `gorm:"column:user;type:text;not null" json:"USER"`
+	Password string `gorm:"column:password;type:text;not null" json:"PASSWORD"`
+	Security string `gorm:"column:security;type:text;not null" json:"SECURITY"`
+	Lcuuid   string `gorm:"unique;column:lcuuid;type:char(64)" json:"LCUUID"`
+}
+
+func (MailServer) TableName() string {
+	return "mail_server"
 }

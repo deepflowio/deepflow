@@ -1630,10 +1630,12 @@ impl FlowMap {
         }
 
         let mut l7_stats = L7Stats::default();
+        let mut collect_stats = false;
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP)
         {
             if let Some(perf) = node.meta_flow_log.as_mut() {
+                collect_stats = true;
                 perf.copy_and_reset_l4_perf_data(flow.reversed, &mut flow);
                 let l7_timeout_count = self
                     .perf_cache
@@ -1686,9 +1688,11 @@ impl FlowMap {
             self.tagged_flow_allocator
                 .allocate_one_with(node.tagged_flow.clone()),
         );
-        l7_stats.flow = Some(tagged_flow.clone());
-        self.l7_stats_buffer
-            .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+        if collect_stats {
+            l7_stats.flow = Some(tagged_flow.clone());
+            self.l7_stats_buffer
+                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+        }
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);

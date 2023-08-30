@@ -594,6 +594,7 @@ type VTapGroupConfigurationResponse struct {
 	HTTPLogXRequestID             *string        `json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	PrometheusHttpAPIAddresses    *string        `json:"PROMETHEUS_HTTP_API_ADDRESSES"` // separate by ","
 	AnalyzerPort                  *int           `json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int           `json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             *string        `json:"PROXY_CONTROLLER_IP"`
@@ -777,8 +778,8 @@ type GenesisProcess struct {
 	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
 	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
-	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	ProcessName string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
+	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
+	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
@@ -833,4 +834,33 @@ type Plugin struct {
 	Type      int    `json:"TYPE" binding:"required"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
+}
+
+type MailServerCreate struct {
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST" binding:"required"`
+	Port     int    `json:"PORT" binding:"required"`
+	User     string `json:"USER" binding:"required"`
+	Password string `json:"PASSWORD" binding:"required"`
+	Security string `json:"SECURITY" binding:"required"`
+}
+
+type MailServerUpdate struct {
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST"`
+	Port     int    `json:"PORT"`
+	User     string `json:"USER"`
+	Password string `json:"PASSWORD"`
+	Security string `json:"SECURITY"`
+}
+
+type MailServer struct {
+	ID       int    `json:"ID"`
+	Status   int    `json:"STATUS"`
+	Host     string `json:"HOST"`
+	Port     int    `json:"PORT"`
+	User     string `json:"USER"`
+	Password string `json:"PASSWORD"`
+	Security string `json:"SECURITY"`
+	Lcuuid   string `json:"LCUUID"`
 }

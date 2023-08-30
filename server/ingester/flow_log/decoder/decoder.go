@@ -19,6 +19,7 @@ package decoder
 import (
 	"bytes"
 	"compress/zlib"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 	"io/ioutil"
 	"strconv"
 	"time"
@@ -29,7 +30,6 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -79,7 +79,7 @@ type Decoder struct {
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
 	flowTagWriter *flow_tag.FlowTagWriter
-	otlpExporter  *exporter.OtlpExporter
+	exporters     []exporter.Exporter
 	debugEnabled  bool
 
 	fieldsBuf      []interface{}
@@ -95,7 +95,7 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
-	otlpExporter *exporter.OtlpExporter,
+	exporters []exporter.Exporter,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
@@ -104,7 +104,7 @@ func NewDecoder(
 		inQueue:        inQueue,
 		throttler:      throttler,
 		flowTagWriter:  flowTagWriter,
-		otlpExporter:   otlpExporter,
+		exporters:      exporters,
 		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
 		fieldsBuf:      make([]interface{}, 0, 64),
 		fieldValuesBuf: make([]interface{}, 0, 64),
@@ -251,7 +251,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
-			d.otlpExport(l)
+			d.export(l)
 		}
 		l.Release()
 	}
@@ -293,10 +293,18 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	}
 }
 
-func (d *Decoder) otlpExport(l *log_data.L7FlowLog) {
-	if d.otlpExporter != nil && d.otlpExporter.IsExportData(datatype.SignalSource(l.SignalSource)) {
+func (d *Decoder) export(l *log_data.L7FlowLog) {
+	// todo @jiekun move back to otlp exporter
+	//if d.otlpExporter != nil && d.otlpExporter.IsExportData(datatype.SignalSource(l.SignalSource)) {
+	//	d.otlpExporter.Put(l)
+	//}
+
+	for i := range d.exporters {
+		if !d.exporters[i].IsExportData(datatype.SignalSource(l.SignalSource)) {
+			continue
+		}
 		l.AddReferenceCount()
-		d.otlpExporter.Put(l)
+		d.exporters[i].Put(l)
 	}
 }
 
@@ -314,7 +322,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 		}
-		d.otlpExport(l)
+		d.export(l)
 	} else {
 		dropped = true
 	}

@@ -360,6 +360,9 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 	// tags
 	flowTagInfo.FieldType = flow_tag.FieldTag
 	for i, name := range p.TagNames {
+		if p.TagValues[i] == "" {
+			continue
+		}
 		flowTagInfo.FieldName = name
 
 		// tag + value

@@ -34,7 +34,6 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", project.name, h.config.Domain, project.id), token.token, "vpcs",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, err
 		}
 
@@ -122,7 +121,6 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 		fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/routes", projectName, h.config.Domain), token, "routes",
 	)
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return
 	}
 
