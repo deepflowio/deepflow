@@ -28,6 +28,7 @@ use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
+use crate::plugin::CustomInfo;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -99,10 +100,49 @@ pub struct HttpInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
     #[serde(rename = "response_status")]
-    status: L7ResponseStatus,
+    pub status: L7ResponseStatus,
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+}
+
+impl HttpInfo {
+    pub fn merge_custom_to_http1(&mut self, custom: CustomInfo) {
+        // req rewrite
+        if !custom.req.domain.is_empty() {
+            self.host = custom.req.domain;
+        }
+
+        if !custom.req.req_type.is_empty() {
+            self.method = custom.req.req_type;
+        }
+
+        if !custom.req.resource.is_empty() {
+            self.path = custom.req.resource;
+        }
+
+        //req write
+        if custom.resp.code.is_some() {
+            self.status_code = custom.resp.code;
+        }
+
+        if custom.resp.status != self.status {
+            self.status = custom.resp.status;
+        }
+
+        //trace info rewrite
+        if custom.trace.trace_id.is_some() {
+            self.trace_id = custom.trace.trace_id.unwrap();
+        }
+        if custom.trace.span_id.is_some() {
+            self.span_id = custom.trace.span_id.unwrap();
+        }
+
+        // extend attribute
+        if !custom.attributes.is_empty() {
+            self.attributes.extend(custom.attributes);
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for HttpInfo {
@@ -999,12 +1039,8 @@ impl HttpLog {
             PacketDirection::ClientToServer => vm.on_http_req(payload, param, info),
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
         }
-        .map(|(trace, kv)| {
-            if let Some(trace) = trace {
-                trace.trace_id.map(|s| info.trace_id = s);
-                trace.span_id.map(|s| info.span_id = s);
-            }
-            info.attributes.extend(kv);
+        .map(|custom| {
+            info.merge_custom_to_http1(custom);
         });
     }
 }

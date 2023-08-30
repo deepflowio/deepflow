@@ -15,16 +15,15 @@
  */
 
 use crate::{
-    flow_generator::protocol_logs::pb_adapter::{KeyVal, TraceInfo},
     plugin::{wasm::IMPORT_FUNC_WASM_LOG, CustomInfo},
     wasm_error,
 };
 
 use super::{
-    read_wasm_str, StoreDataType, VmParseCtx, VmResult, IMPORT_FUNC_HOST_READ_HTTP_RESULT,
-    IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO, IMPORT_FUNC_HOST_READ_STR_RESULT,
-    IMPORT_FUNC_VM_READ_CTX_BASE, IMPORT_FUNC_VM_READ_HTTP_REQ, IMPORT_FUNC_VM_READ_HTTP_RESP,
-    IMPORT_FUNC_VM_READ_PAYLOAD, LOG_LEVEL_ERR, LOG_LEVEL_INFO, LOG_LEVEL_WARN, WASM_MODULE_NAME,
+    read_wasm_str, StoreDataType, VmParseCtx, VmResult, IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO,
+    IMPORT_FUNC_HOST_READ_STR_RESULT, IMPORT_FUNC_VM_READ_CTX_BASE, IMPORT_FUNC_VM_READ_HTTP_REQ,
+    IMPORT_FUNC_VM_READ_HTTP_RESP, IMPORT_FUNC_VM_READ_PAYLOAD, LOG_LEVEL_ERR, LOG_LEVEL_INFO,
+    LOG_LEVEL_WARN, WASM_MODULE_NAME,
 };
 
 use log::{error, info, warn};
@@ -341,116 +340,8 @@ pub(super) fn host_read_l7_protocol_info(
         .as_mut()
         .unwrap()
         .get_ctx_base_mut()
-        .set_result(VmResult::ParsePayloadResult(infos));
+        .set_result(VmResult::L7InfoResult(infos));
 
-    1
-}
-
-/*
-    import function, host read the serialized http result and deserizlize to CustomInfo.
-
-    correspond to go func signature:
-
-    //go:wasm-module deepflow
-    //export host_read_http_result
-    func hostReadHttpResult(b *byte, length int) bool
-
-
-has trace: 1 byte
-if has trace
-    trace_id, span_id, parent_span_id
-    (
-        str len: 2 bytes
-        str:     $(str len) bytes
-    ) x 3
-
-(
-    key len: 2 bytes
-    key:     $(key len) bytes
-
-    val len: 2 bytes
-    val:     $(val len) bytes
-) x n
-
-*/
-pub(super) fn host_read_http_result(
-    mut caller: Caller<'_, StoreDataType>,
-    b: i32,
-    len: i32,
-) -> i32 {
-    if !check_memory(&mut caller, b, len, IMPORT_FUNC_HOST_READ_HTTP_RESULT) {
-        return 0;
-    }
-    let mut kv = vec![];
-    let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
-    let mem = mem.data(caller.as_context());
-    let data = &mem[b as usize..(b + len) as usize];
-    let ins_name = caller.data().parse_ctx.as_ref().unwrap().get_ins_name();
-
-    let mut trace_info = None;
-    let mut off = 0;
-    let has_trace = data[off];
-    off += 1;
-
-    match has_trace {
-        0 => {}
-        1 => {
-            let mut i = TraceInfo::default();
-            if read_wasm_str(data, &mut off)
-                .and_then(|s| {
-                    if !s.is_empty() {
-                        i.trace_id = Some(s);
-                    }
-                    read_wasm_str(data, &mut off)
-                })
-                .and_then(|s| {
-                    if !s.is_empty() {
-                        i.span_id = Some(s);
-                    }
-                    read_wasm_str(data, &mut off)
-                })
-                .and_then(|s| {
-                    if !s.is_empty() {
-                        i.parent_span_id = Some(s);
-                    }
-                    Some(())
-                })
-                .is_none()
-            {
-                wasm_error!(
-                    ins_name,
-                    IMPORT_FUNC_HOST_READ_HTTP_RESULT,
-                    "read trace info fail"
-                );
-                return 0;
-            }
-            trace_info = Some(i);
-        }
-        _ => {
-            wasm_error!(
-                ins_name,
-                IMPORT_FUNC_HOST_READ_HTTP_RESULT,
-                "read http result fail, has trace is unexpected value"
-            );
-            return 0;
-        }
-    }
-
-    loop {
-        let (Some(key), Some(val)) = (read_wasm_str(data, &mut off), read_wasm_str(data, &mut off))
-        else {
-            break;
-        };
-        kv.push(KeyVal { key, val });
-    }
-
-    caller
-        .data_mut()
-        .parse_ctx
-        .as_mut()
-        .unwrap()
-        .get_ctx_base_mut()
-        .set_result(VmResult::HTTPResult(trace_info, kv));
     1
 }
 
@@ -531,13 +422,6 @@ pub(super) fn get_linker(e: Engine, store: &mut Store<StoreDataType>) -> Linker<
         WASM_MODULE_NAME,
         IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO,
         host_read_l7_protocol_info,
-    )
-    .unwrap();
-
-    link.func_wrap(
-        WASM_MODULE_NAME,
-        IMPORT_FUNC_HOST_READ_HTTP_RESULT,
-        host_read_http_result,
     )
     .unwrap();
 
