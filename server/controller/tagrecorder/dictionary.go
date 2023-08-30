@@ -73,10 +73,12 @@ func (c *TagRecorder) UpdateChDictionary() {
 		log.Warningf("no endpoints in %s", namespace)
 	}
 	endpointName := c.cfg.ClickHouseCfg.Host
+	findEndpoint := false
 	for _, endpoint := range endpoints.Items {
 		if endpoint.Name != endpointName {
 			continue
 		}
+		findEndpoint = true
 		subsets := endpoint.Subsets
 		for _, subset := range subsets {
 			for _, address := range subset.Addresses {
@@ -386,6 +388,9 @@ func (c *TagRecorder) UpdateChDictionary() {
 				}
 			}
 		}
+	}
+	if !findEndpoint {
+		log.Warningf("%s endpoint not found!", endpointName)
 	}
 	return
 }
