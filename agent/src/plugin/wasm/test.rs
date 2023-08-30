@@ -188,6 +188,7 @@ fn test_wasm_http_req() {
         assert_eq!(i.req.domain.as_str(), "rewrite domain");
         assert_eq!(i.req.req_type.as_str(), "rewrite req type");
         assert_eq!(i.req.resource.as_str(), "rewrite resource");
+        assert_eq!(i.req.endpoint.as_str(), "rewrite endpoint");
 
         let attr = i.ext_info.unwrap().attributes.unwrap();
 
@@ -245,6 +246,8 @@ fn test_wasm_http_resp() {
 
         assert_eq!(i.resp.code.unwrap(), 599);
         assert_eq!(i.resp.status, L7ResponseStatus::ServerError);
+        assert_eq!(i.resp.exception.as_str(), "rewrite exception");
+        assert_eq!(i.resp.result, "rewrite result");
 
         let attr = i.ext_info.unwrap().attributes.unwrap();
         assert_eq!(attr.len(), kv.len());
@@ -603,6 +606,7 @@ func (p parser) OnHttpReq(ctx *sdk.HttpReqCtx) sdk.Action {
         ReqType:  "rewrite req type",
         Domain:   "rewrite domain",
         Resource: "rewrite resource",
+        Endpoint: "rewrite endpoint",
     }, trace, attr)
 }
 
@@ -642,8 +646,10 @@ func (p parser) OnHttpResp(ctx *sdk.HttpRespCtx) sdk.Action {
     var code int32 = 599
     status := sdk.RespStatusServerErr
     return sdk.HttpRespActionAbortWithResult(&sdk.Response{
-        Status: &status,
-        Code:   &code,
+        Status:    &status,
+        Code:      &code,
+        Result:    "rewrite result",
+        Exception: "rewrite exception",
     }, nil, []sdk.KeyVal{
         {
             Key: "user_id",
