@@ -248,7 +248,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 			if !f.IgnoreZero {
 				field.WriteTo(buf)
 			} else {
-				buf.WriteString("arrayFilter(x -> x!=0, ")
+				buf.WriteString("arrayFilter(x -> x>0, ")
 				field.WriteTo(buf)
 				buf.WriteString(")")
 			}
