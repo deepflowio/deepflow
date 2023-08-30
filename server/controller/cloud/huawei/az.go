@@ -31,7 +31,6 @@ func (h *HuaWei) getAZs() ([]model.AZ, error) {
 			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/os-availability-zone", project.name, h.config.Domain, project.id), token.token, "availabilityZoneInfo",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, err
 		}
 

@@ -75,9 +75,11 @@ func (h *HuaWei) CheckAuth() error {
 func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	h.cloudStatsd = statsd.NewCloudStatsd()
 	h.toolDataSet = NewToolDataSet()
-	h.refreshTokenMap()
-
 	var resource model.Resource
+	err := h.refreshTokenMap()
+	if err != nil {
+		return resource, err
+	}
 
 	regions, err := h.getRegions()
 	if err != nil {

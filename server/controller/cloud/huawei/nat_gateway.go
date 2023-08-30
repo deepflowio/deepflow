@@ -35,7 +35,6 @@ func (h *HuaWei) getNATGateways() (
 			fmt.Sprintf("https://nat.%s.%s/v2/%s/nat_gateways", project.name, h.config.Domain, project.id), token.token, "nat_gateways",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, nil, err
 		}
 
@@ -115,7 +114,6 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 		fmt.Sprintf("https://nat.%s.%s/v2/%s/dnat_rules", project.name, h.config.Domain, project.id), token, "dnat_rules",
 	)
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return
 	}
 
@@ -181,7 +179,6 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 		fmt.Sprintf("https://nat.%s.%s/v2/%s/snat_rules", project.name, h.config.Domain, project.id), token, "snat_rules",
 	)
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return
 	}
 
