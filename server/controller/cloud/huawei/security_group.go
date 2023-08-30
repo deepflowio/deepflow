@@ -35,7 +35,6 @@ func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGro
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/security-groups", project.name, h.config.Domain, project.id), token.token, "security_groups",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, err
 		}
 

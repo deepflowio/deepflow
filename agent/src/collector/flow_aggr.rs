@@ -148,6 +148,7 @@ pub struct FlowAggr {
     flow_stashs: HashMap<u64, Box<TaggedFlow>>,
     timestamp_stashs: VecDeque<HashSet<u64>>,
     stash_init_capacity: usize,
+    slot_count: usize,
 
     last_flush_time: Duration,
     config: CollectorAccess,
@@ -172,8 +173,9 @@ impl FlowAggr {
         ntp_diff: Arc<AtomicI64>,
         metrics: Arc<FlowAggrCounter>,
     ) -> Self {
-        let mut timestamp_stashs = VecDeque::with_capacity(TIMESTAMP_SLOT_COUNT);
-        for _ in 0..TIMESTAMP_SLOT_COUNT {
+        let slot_count = config.load().packet_delay.as_secs() as usize + TIMESTAMP_SLOT_COUNT + 1;
+        let mut timestamp_stashs = VecDeque::with_capacity(slot_count);
+        for _ in 0..slot_count {
             timestamp_stashs.push_back(HashSet::with_capacity(Self::MIN_STASH_CAPACITY_SECOND));
         }
         Self {
@@ -188,6 +190,7 @@ impl FlowAggr {
             running,
             metrics,
             ntp_diff,
+            slot_count,
         }
     }
 
@@ -222,10 +225,10 @@ impl FlowAggr {
         }
 
         let mut time_slot = (flow_time - self.slot_start_time).as_secs() as usize;
-        if time_slot >= TIMESTAMP_SLOT_COUNT {
-            let flush_count = time_slot - TIMESTAMP_SLOT_COUNT + 1;
+        if time_slot >= self.slot_count {
+            let flush_count = time_slot - self.slot_count + 1;
             self.flush_slots(flush_count);
-            time_slot = TIMESTAMP_SLOT_COUNT - 1;
+            time_slot = self.slot_count - 1;
         }
 
         let flow_id = f.flow.flow_id;
@@ -319,13 +322,13 @@ impl FlowAggr {
     }
 
     fn flush_slots(&mut self, slot_count: usize) {
-        for _ in 0..slot_count.min(TIMESTAMP_SLOT_COUNT) {
+        for _ in 0..slot_count.min(self.slot_count) {
             self.flush_front_slot_and_rotate();
         }
 
         // 若移动数超过slot的数量后, 只需设置slot开始时间
-        if slot_count > TIMESTAMP_SLOT_COUNT {
-            self.slot_start_time += Duration::from_secs((slot_count - TIMESTAMP_SLOT_COUNT) as u64);
+        if slot_count > self.slot_count {
+            self.slot_start_time += Duration::from_secs((slot_count - self.slot_count) as u64);
             info!(
                 "now slot start time is {:?} have flushed minute slot count is {:?}",
                 self.slot_start_time, slot_count

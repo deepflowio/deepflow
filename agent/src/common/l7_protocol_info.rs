@@ -25,8 +25,8 @@ use crate::{
     common::l7_protocol_log::LogCache,
     flow_generator::{
         protocol_logs::{
-            pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-            MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+            fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo,
+            KafkaInfo, MqttInfo, MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
         },
         AppProtoHead, LogMessageType, Result,
     },
@@ -64,6 +64,7 @@ all_protocol_info!(
     MysqlInfo(MysqlInfo),
     RedisInfo(RedisInfo),
     DubboInfo(DubboInfo),
+    FastCGIInfo(FastCGIInfo),
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
     PostgreInfo(PostgreInfo),
@@ -386,6 +387,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             }
             None
         }
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        return 0;
     }
 }
 
