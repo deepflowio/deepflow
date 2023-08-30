@@ -178,8 +178,17 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
 
 	if dataTypeBits&SERVICE_INFO != 0 {
+		if isClientSide(l7.TapSide) {
+			putStrWithoutEmpty(resAttrs, "service.name", tags0.AutoService)
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags0.AutoInstance)
+		} else {
+			putStrWithoutEmpty(resAttrs, "service.name", tags1.AutoService)
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags1.AutoInstance)
+		}
+		// if l7.AppService/l7.AppInstance is not empty, overwrite the value
 		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
 		putStrWithoutEmpty(resAttrs, "service.instance.id", l7.AppInstance)
+
 		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
 		putIntWithoutZero(resAttrs, "process.pid_1", int64(l7.ProcessID1))
 		putStrWithoutEmpty(resAttrs, "thread.name_0", l7.ProcessKName0)
@@ -599,10 +608,18 @@ func responseStatusToSpanStatus(status uint8) ptrace.StatusCode {
 	}
 }
 
+func isClientSide(tapSide string) bool {
+	return strings.HasPrefix(tapSide, "c")
+}
+
+func isServerSide(tapSide string) bool {
+	return strings.HasPrefix(tapSide, "s")
+}
+
 func tapSideToSpanKind(tapSide string) ptrace.SpanKind {
-	if strings.HasPrefix(tapSide, "c") {
+	if isClientSide(tapSide) {
 		return ptrace.SpanKindClient
-	} else if strings.HasPrefix(tapSide, "s") {
+	} else if isServerSide(tapSide) {
 		return ptrace.SpanKindServer
 	}
 	return ptrace.SpanKindUnspecified
