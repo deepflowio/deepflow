@@ -30,7 +30,6 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 			fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/peerings", project.name, h.config.Domain), token.token, "peerings",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, err
 		}
 
