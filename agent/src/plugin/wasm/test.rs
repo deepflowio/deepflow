@@ -185,6 +185,10 @@ fn test_wasm_http_req() {
             "bbb"
         );
 
+        assert_eq!(i.req.domain.as_str(), "rewrite domain");
+        assert_eq!(i.req.req_type.as_str(), "rewrite req type");
+        assert_eq!(i.req.resource.as_str(), "rewrite resource");
+
         let attr = i.ext_info.unwrap().attributes.unwrap();
 
         assert_eq!(attr.len(), kv.len());
@@ -238,6 +242,9 @@ fn test_wasm_http_resp() {
                 .as_str(),
             ""
         );
+
+        assert_eq!(i.resp.code.unwrap(), 599);
+        assert_eq!(i.resp.status, L7ResponseStatus::ServerError);
 
         let attr = i.ext_info.unwrap().attributes.unwrap();
         assert_eq!(attr.len(), kv.len());
@@ -446,6 +453,7 @@ message Resp {
 
 // go wasm code, build cocmmand:
 // tinygo  build -o wasm.wasm  -target wasi -wasm-abi=generic -panic trap -scheduler=none -no-debug ./main.go
+
 /*
 package main
 
@@ -534,7 +542,7 @@ func checkEq(a, b interface{}) {
     }
 }
 
-func (p parser) OnHttpReq(ctx *sdk.HttpReqCtx) sdk.HttpAction {
+func (p parser) OnHttpReq(ctx *sdk.HttpReqCtx) sdk.Action {
     sdk.Warn("================ enter http req ==================")
     baseCtx := &ctx.BaseCtx
     payload, err := baseCtx.GetPayload()
@@ -591,10 +599,14 @@ func (p parser) OnHttpReq(ctx *sdk.HttpReqCtx) sdk.HttpAction {
         SpanID:       "bbb",
         ParentSpanID: "ccc",
     }
-    return sdk.HttpActionAbortWithResult(trace, attr)
+    return sdk.HttpReqActionAbortWithResult(&sdk.Request{
+        ReqType:  "rewrite req type",
+        Domain:   "rewrite domain",
+        Resource: "rewrite resource",
+    }, trace, attr)
 }
 
-func (p parser) OnHttpResp(ctx *sdk.HttpRespCtx) sdk.HttpAction {
+func (p parser) OnHttpResp(ctx *sdk.HttpRespCtx) sdk.Action {
     sdk.Warn("================ enter http resp ==================")
     baseCtx := &ctx.BaseCtx
     payload, err := baseCtx.GetPayload()
@@ -609,6 +621,7 @@ func (p parser) OnHttpResp(ctx *sdk.HttpRespCtx) sdk.HttpAction {
 
     checkEq(0, int(baseCtx.L7))
     checkEq(uint16(200), ctx.Code)
+    checkEq(sdk.RespStatusOk, ctx.Status)
 
     r := bufio.NewReader(bytes.NewReader(payload))
     req, err := http.ReadResponse(r, nil)
@@ -626,7 +639,12 @@ func (p parser) OnHttpResp(ctx *sdk.HttpRespCtx) sdk.HttpAction {
 
     userID := fastjson.GetInt(body, "data", "user_id")
     userName := fastjson.GetString(body, "data", "name")
-    return sdk.HttpActionAbortWithResult(nil, []sdk.KeyVal{
+    var code int32 = 599
+    status := sdk.RespStatusServerErr
+    return sdk.HttpRespActionAbortWithResult(&sdk.Response{
+        Status: &status,
+        Code:   &code,
+    }, nil, []sdk.KeyVal{
         {
             Key: "user_id",
             Val: strconv.Itoa(userID),
@@ -664,7 +682,7 @@ func (p parser) OnCheckPayload(baseCtx *sdk.ParseCtx) (uint8, string) {
     return 1, "test"
 }
 
-func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
+func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
     sdk.Warn("================ parse payload ==================")
     payload, err := baseCtx.GetPayload()
     if err != nil {
@@ -761,6 +779,7 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
         respLen := 9999
         requestID := uint32(666)
         code := int32(999)
+        status := sdk.RespStatusOk
         return sdk.ParseActionAbortWithL7Info([]*sdk.L7ProtocolInfo{
             {
                 ReqLen:    &reqLen,
@@ -768,7 +787,7 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                 RequestID: &requestID,
                 Req:       nil,
                 Resp: &sdk.Response{
-                    Status:    sdk.RespStatusOk,
+                    Status:    &status,
                     Code:      &code,
                     Result:    "result",
                     Exception: "exception",
@@ -792,7 +811,7 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                 RequestID: &requestID,
                 Req:       nil,
                 Resp: &sdk.Response{
-                    Status:    sdk.RespStatusOk,
+                    Status:    &status,
                     Code:      &code,
                     Result:    "result",
                     Exception: "exception",
@@ -819,6 +838,5 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
 func main() {
     sdk.Warn("wasm register parser")
     sdk.SetParser(parser{})
-
 }
 */
