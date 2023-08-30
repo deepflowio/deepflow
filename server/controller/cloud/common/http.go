@@ -38,12 +38,17 @@ func GetUnverifyHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
+func newErr(url, msg string) error {
+	return errors.New(fmt.Sprintf("request url: %s, %s", url, msg))
+}
+
 func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.Json, err error) {
-	log.Infof("url: %s", url)
+	log.Debugf("url: %s", url)
 	log.Debugf("token: %s", token)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Errorf("new request failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("new request failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	req.Header.Set("content-type", "application/json")
@@ -54,36 +59,40 @@ func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.
 	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("request failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Errorf("request failed: %+v", resp)
-		err = errors.New(fmt.Sprintf("request failed: %v", resp))
+		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("read failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("read failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	jsonResp, err = simplejson.NewJson(respBody)
 	if err != nil {
-		log.Errorf("jsonify failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("JSONiz failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	return
 }
 
 func RequestPost(url string, timeout time.Duration, body map[string]interface{}) (jsonResp *simplejson.Json, err error) {
-	log.Infof("url: %s", url)
+	log.Debugf("url: %s", url)
 	log.Debugf("body: %+v", body)
 	bodyStr, _ := json.Marshal(&body)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyStr))
 	if err != nil {
-		log.Errorf("new request failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("new request failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	req.Header.Set("content-type", "application/json")
@@ -92,23 +101,26 @@ func RequestPost(url string, timeout time.Duration, body map[string]interface{})
 	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("request failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		log.Errorf("request failed: %+v", resp)
-		err = errors.New(fmt.Sprintf("request failed: %v", resp))
+		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	defer resp.Body.Close()
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("read failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("read failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	jsonResp, err = simplejson.NewJson(respBody)
 	if err != nil {
-		log.Errorf("jsonify failed: %s", err.Error())
+		err = newErr(url, fmt.Sprintf("JSONiz failed: %s", err.Error()))
+		log.Errorf(err.Error())
 		return
 	}
 	jsonResp.Set("X-Subject-Token", resp.Header.Get("X-Subject-Token"))
