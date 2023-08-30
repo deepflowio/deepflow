@@ -148,6 +148,7 @@ pub struct CollectorConfig {
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub cloud_gateway_traffic: bool,
+    pub packet_delay: Duration,
 }
 
 impl fmt::Debug for CollectorConfig {
@@ -192,6 +193,7 @@ impl fmt::Debug for CollectorConfig {
             .field("trident_type", &self.trident_type)
             .field("vtap_id", &self.vtap_id)
             .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
+            .field("packet_delay", &self.packet_delay)
             .finish()
     }
 }
@@ -1018,6 +1020,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     tap_sides
                 },
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
+                packet_delay: conf.yaml_config.packet_delay,
             },
             handler: HandlerConfig {
                 npb_dedup_enabled: conf.npb_dedup_enabled,
