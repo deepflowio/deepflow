@@ -138,7 +138,7 @@ impl FastCGIInfo {
     ) -> Result<()> {
         let mut p = param_payload;
         while p.len() > 2 {
-            let Ok((off,key_len,val_len)) = read_param_kv_len(p) else {
+            let Ok((off, key_len, val_len)) = read_param_kv_len(p) else {
                 break;
             };
             p = &p[off..];
@@ -188,8 +188,9 @@ impl FastCGIInfo {
             b"HTTP_USER_AGENT" => self.user_agent = Some(String::from_utf8_lossy(val).to_string()),
             _ => {
                 // value must be valid utf8 from here
-                let (Ok(key), Ok(val)) = (std::str::from_utf8(key), std::str::from_utf8(val)) else {
-                    return Ok(())
+                let (Ok(key), Ok(val)) = (std::str::from_utf8(key), std::str::from_utf8(val))
+                else {
+                    return Ok(());
                 };
                 let lower_key = key.to_lowercase();
                 let key = lower_key.as_str();
@@ -536,7 +537,7 @@ fn read_param_kv_len(param_payload: &[u8]) -> Result<(usize, usize, usize)> {
 fn get_param_val<'a>(param_payload: &'a [u8], key: &str) -> Result<&'a [u8]> {
     let mut p = param_payload;
     while p.len() > 2 {
-        let Ok((off,key_len,val_len)) = read_param_kv_len(p) else {
+        let Ok((off, key_len, val_len)) = read_param_kv_len(p) else {
             break;
         };
         p = &p[off..];

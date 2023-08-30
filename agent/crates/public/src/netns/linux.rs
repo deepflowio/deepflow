@@ -230,18 +230,18 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
             mem::drop(fp);
 
             let Ok(links) = link_list() else {
-                    debug!("link_list() failed for file {}", path.display());
-                    continue;
-                };
+                debug!("link_list() failed for file {}", path.display());
+                continue;
+            };
             let Ok(addrs) = addr_list() else {
-                    debug!("addr_list() failed for file {}", path.display());
-                    continue;
-                };
+                debug!("addr_list() failed for file {}", path.display());
+                continue;
+            };
 
             let Ok(mut socket) = WrappedSocket::new() else {
-                    debug!("WrappedSocket::new() failed for file {}", path.display());
-                    continue;
-                };
+                debug!("WrappedSocket::new() failed for file {}", path.display());
+                continue;
+            };
 
             if links.is_empty() {
                 continue 'outer;
@@ -265,9 +265,9 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
                 trace!("check {:?}", link);
                 let tap_ns = if let Some(nsid) = link.link_netnsid {
                     let Some(tap_ns) = nsid_map.get(&(nsid as i32)) else {
-                            debug!("no tap_ns found for link {:?}", link);
-                            continue;
-                        };
+                        debug!("no tap_ns found for link {:?}", link);
+                        continue;
+                    };
                     tap_ns
                 } else {
                     match link.if_type.as_ref() {
