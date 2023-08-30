@@ -103,6 +103,7 @@ func NewFlowLogWriter(addrs []string, user, password, cluster, storagePolicy, ti
 }
 
 func (w *FlowLogWriter) Put(index int, items ...interface{}) {
+	log.Debugf("put ck writer queue: %v", items)
 	w.ckwriters[index].Put(items...)
 }
 

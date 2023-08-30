@@ -35,7 +35,7 @@ func (le *LokiExporter) buildLogHeader() {
 		if _, ok := le.cfg.LogFmt.Mapping[k]; ok {
 			v = le.cfg.LogFmt.Mapping[k]
 		}
-		strings.Replace(defaultLogHeaderFormat, "{"+k+"}", v, 1)
+		defaultLogHeaderFormat = strings.Replace(defaultLogHeaderFormat, "{"+k+"}", v, 1)
 	}
 	le.logHeaderFmt = defaultLogHeaderFormat
 	return

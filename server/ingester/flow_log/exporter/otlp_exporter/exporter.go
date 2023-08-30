@@ -38,7 +38,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
-var log = logging.MustGetLogger("flow_log.exporter")
+var log = logging.MustGetLogger("flow_log.exporter.otlp_exporter")
 
 const (
 	QUEUE_BATCH_COUNT = 1024
@@ -50,7 +50,7 @@ type OtlpExporter struct {
 	queueCount           int
 	grpcExporters        []ptraceotlp.GRPCClient
 	grpcConns            []*grpc.ClientConn
-	universalTagsManager *UniversalTagsManager
+	universalTagsManager *exporter_common.UniversalTagsManager
 	config               *OtlpExporterConfig
 	counter              *exporter_common.Counter
 	lastCounter          exporter_common.Counter
@@ -94,7 +94,7 @@ func NewOtlpExporter(config *OtlpExporterConfig, baseConfig *config.Config) *Otl
 		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
-	universalTagsManager := NewUniversalTagsManager(config, baseConfig)
+	universalTagsManager := exporter_common.NewUniversalTagsManager(config.ExportCustomK8sLabelsRegexp, baseConfig.ControllerIPs, baseConfig.ListenPort, baseConfig.GrpcBufferSize)
 	exporter := &OtlpExporter{
 		dataQueues:           dataQueues,
 		queueCount:           exportConfig.QueueCount,

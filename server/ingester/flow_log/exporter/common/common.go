@@ -23,7 +23,7 @@ var exportedDataStringMap = map[string]uint32{
 	"otel-app-span": OTEL_APP_SPAN,
 }
 
-var log = logging.MustGetLogger("exporter.common")
+var log = logging.MustGetLogger("flow_log.exporter.common")
 
 func bitsToString(bits uint32, strMap map[string]uint32) string {
 	ret := ""

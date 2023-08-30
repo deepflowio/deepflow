@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	ingester_config "github.com/deepflowio/deepflow/server/ingester/config"
 	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
@@ -29,7 +30,7 @@ const (
 	LokiQueueBatchLimit = 1024
 )
 
-var log = logging.MustGetLogger("exporter.loki_exporter")
+var log = logging.MustGetLogger("flow_log.exporter.loki_exporter")
 
 type LokiExporter struct {
 	cfg lokiExporterConfig
@@ -57,6 +58,8 @@ type LokiExporter struct {
 	// loki exporter counter
 	counter     *exporter_common.Counter
 	lastCounter exporter_common.Counter
+
+	universalTagsManager *exporter_common.UniversalTagsManager
 
 	utils.Closable
 }
@@ -97,17 +100,17 @@ func (le *LokiExporter) GetCounter() interface{} {
 	return &counter
 }
 
-func NewLokiExporter(config *LokiExporterConfig) *LokiExporter {
+func NewLokiExporter(config *LokiExporterConfig, baseCfg *ingester_config.Config) *LokiExporter {
 	le := &LokiExporter{
 		cfg: lokiExporterConfig{
 			URL:             config.URL,
 			TenantID:        config.TenantID,
 			MaxMessageWait:  time.Duration(1) * time.Second,
 			MaxMessageBytes: 1024 * 1024,
-			Timeout:         time.Duration(10) * time.Second,
+			Timeout:         time.Duration(3) * time.Second,
 			MinBackoff:      time.Duration(500) * time.Millisecond,
-			MaxBackoff:      time.Duration(5) * time.Minute,
-			MaxRetries:      10,
+			MaxBackoff:      time.Duration(5) * time.Second,
+			MaxRetries:      5,
 			QueueCount:      4,
 			QueueSize:       1024,
 		},
@@ -184,8 +187,10 @@ func NewLokiExporter(config *LokiExporterConfig) *LokiExporter {
 		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
-	le.dataQueues = dataQueues
+	le.universalTagsManager = exporter_common.NewUniversalTagsManager("", baseCfg.ControllerIPs, baseCfg.ControllerPort, baseCfg.GrpcBufferSize)
 
+	le.dataQueues = dataQueues
+	le.counter = &exporter_common.Counter{}
 	return le
 }
 
@@ -215,6 +220,7 @@ func (le *LokiExporter) buildLokiConfig() (loki.Config, error) {
 
 // Start starts an exporter worker
 func (le *LokiExporter) Start() {
+	go le.universalTagsManager.Start()
 	for i := 0; i < le.cfg.QueueCount; i++ {
 		go le.processQueue(i)
 	}
@@ -276,7 +282,7 @@ func (le *LokiExporter) IsExportData(item interface{}) bool {
 
 func (le *LokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
 	t := time.UnixMicro(item.EndTime().Microseconds()) // time.Time
-	serviceName := item.AppService
+	serviceName := le.universalTagsManager.GetServiceName(item)
 	logLevel := responseStatusToLogLevel(item.ResponseStatus)
 	traceId := item.TraceId
 	spanId := item.SpanId

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package otlp_exporter
+package common
 
 import (
 	"database/sql"
@@ -26,7 +26,6 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/debug"
@@ -221,35 +220,37 @@ func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
 }
 
 type UniversalTagsManager struct {
-	config           *OtlpExporterConfig
+	controllerIPs    []string
+	controllerPort   uint16
+	grpcBufferSize   int
 	universalTagMaps *UniversalTagMaps
 	tapPortNameMap   map[uint64]string
-	// Deprecated
-	podIDLabelsMap  map[uint32]Labels
-	k8sLabelsRegexp *regexp.Regexp
+	k8sLabelsRegexp  *regexp.Regexp
 
 	connection              *sql.DB
 	grpcSession             *grpc.GrpcSession
 	versionUniversalTagMaps uint32
 }
 
-func NewUniversalTagsManager(config *OtlpExporterConfig, baseConfig *config.Config) *UniversalTagsManager {
+func NewUniversalTagsManager(exportCustomK8sLabelsRegexp string, controllerIps []string, controllerPort uint16, grpcBufferSize int) *UniversalTagsManager {
 	universalTagMaps := &UniversalTagMaps{}
 	var k8sLabelsRegexp *regexp.Regexp
-	if config.ExportCustomK8sLabelsRegexp != "" {
+	if exportCustomK8sLabelsRegexp != "" {
 		var err error
-		k8sLabelsRegexp, err = regexp.Compile(config.ExportCustomK8sLabelsRegexp)
+		k8sLabelsRegexp, err = regexp.Compile(exportCustomK8sLabelsRegexp)
 		if err != nil {
-			log.Warningf("OTLP exporter compile k8s label regexp pattern failed: %s", err)
+			log.Warningf("exporter compile k8s label regexp pattern failed: %s, %s", exportCustomK8sLabelsRegexp, err)
 		}
 	}
 	m := &UniversalTagsManager{
-		config:           config,
+		controllerIPs:    controllerIps,
+		controllerPort:   controllerPort,
+		grpcBufferSize:   grpcBufferSize,
 		universalTagMaps: universalTagMaps,
 		tapPortNameMap:   make(map[uint64]string),
-		podIDLabelsMap:   make(map[uint32]Labels),
-		k8sLabelsRegexp:  k8sLabelsRegexp,
-		grpcSession:      &grpc.GrpcSession{},
+
+		k8sLabelsRegexp: k8sLabelsRegexp,
+		grpcSession:     &grpc.GrpcSession{},
 	}
 
 	runOnce := func() {
@@ -258,14 +259,14 @@ func NewUniversalTagsManager(config *OtlpExporterConfig, baseConfig *config.Conf
 		}
 	}
 
-	controllers := make([]net.IP, len(baseConfig.ControllerIPs))
-	for i, ipString := range baseConfig.ControllerIPs {
+	controllers := make([]net.IP, len(m.controllerIPs))
+	for i, ipString := range m.controllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	m.grpcSession.Init(controllers, baseConfig.ControllerPort, grpc.DEFAULT_SYNC_INTERVAL, baseConfig.GrpcBufferSize, runOnce)
+	m.grpcSession.Init(controllers, m.controllerPort, grpc.DEFAULT_SYNC_INTERVAL, m.grpcBufferSize, runOnce)
 	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_PLATFORMDATA, m)
 
 	return m
@@ -360,10 +361,6 @@ func (u *UniversalTagsManager) GetUniversalTagMaps(response *trident.UniversalTa
 
 func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
 	// if not configured, all are not exported
-	if len(u.config.ExportCustomK8sLabelsRegexp) == 0 {
-		return false
-	}
-
 	if u.k8sLabelsRegexp != nil && u.k8sLabelsRegexp.MatchString(name) {
 		return true
 	}
@@ -387,4 +384,18 @@ func (u *UniversalTagsManager) HandleSimpleCommand(operate uint16, arg string) s
 	sb.WriteString(fmt.Sprintf("gprocessMap: %+v\n", u.universalTagMaps.gprocessMap))
 	sb.WriteString(fmt.Sprintf("vtapMap: %+v\n", u.universalTagMaps.vtapMap))
 	return sb.String()
+}
+
+func (u *UniversalTagsManager) GetServiceName(l7FlowLog *log_data.L7FlowLog) string {
+	if u == nil || l7FlowLog == nil {
+		return ""
+	}
+
+	// So u != nil and l7FlowLog != nil, try l7FlowLog.AppService
+	if len(l7FlowLog.AppService) > 0 {
+		return l7FlowLog.AppService
+	}
+
+	// Lastly we should try to get AutoService as result.
+	return u.getAuto(DeviceType(l7FlowLog.AutoServiceType0), l7FlowLog.AutoServiceID0, l7FlowLog.IsIPv4, l7FlowLog.IP40, l7FlowLog.IP60)
 }

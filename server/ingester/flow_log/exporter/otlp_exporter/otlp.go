@@ -50,7 +50,7 @@ func putIntWithoutZero(attrs pcommon.Map, key string, value int64) {
 	}
 }
 
-func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBits uint32) {
+func putUniversalTags(attrs pcommon.Map, tags0, tags1 *exporter_common.UniversalTags, dataTypeBits uint32) {
 	if dataTypeBits&exporter_common.CLIENT_UNIVERSAL_TAG != 0 {
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
@@ -111,7 +111,7 @@ func newAttrName(prefix, name, suffix string) string {
 	return sb.String()
 }
 
-func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *UniversalTagsManager, suffix string) {
+func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *exporter_common.UniversalTagsManager, suffix string) {
 	labels := universalTagsManager.QueryCustomK8sLabels(podID)
 	if labels != nil {
 		for name, value := range labels {
@@ -120,7 +120,7 @@ func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *Univers
 	}
 }
 
-func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager *UniversalTagsManager, dataTypeBits uint32, resSpan ptrace.ResourceSpans) {
+func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager *exporter_common.UniversalTagsManager, dataTypeBits uint32, resSpan ptrace.ResourceSpans) {
 	tags0, tags1 := universalTagsManager.QueryUniversalTags(l7)
 
 	resAttrs := resSpan.Resource().Attributes()
@@ -179,7 +179,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
 
 	if dataTypeBits&exporter_common.SERVICE_INFO != 0 {
-		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
+		putStrWithoutEmpty(resAttrs, "service.name", universalTagsManager.GetServiceName(l7))
 		putStrWithoutEmpty(resAttrs, "service.instance.id", l7.AppInstance)
 		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
 		putIntWithoutZero(resAttrs, "process.pid_1", int64(l7.ProcessID1))
@@ -323,7 +323,7 @@ func newSpanId() pcommon.SpanID {
 }
 
 // use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
-func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
+func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *exporter_common.UniversalTags) {
 	if tags1.CHost != "" {
 		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.CHost)
 	} else {
@@ -358,7 +358,7 @@ func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog,
 }
 
 // use client info (_0) to fill in 'host' information, use server info (_1) to fill in 'peer' information
-func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
+func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *exporter_common.UniversalTags) {
 	if tags0.CHost != "" {
 		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.CHost)
 	} else {

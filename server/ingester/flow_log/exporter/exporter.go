@@ -27,6 +27,7 @@ type Exporter interface {
 func NewExporters(exportersCfg []ExporterCfg, baseCfg *config.Config) []Exporter {
 	log.Infof("Init Exporters: %v", exportersCfg)
 	exporters := make([]Exporter, 0, len(exportersCfg))
+
 	for i := range exportersCfg {
 		switch exportersCfg[i].Type {
 		case OtlpExporter:
@@ -34,7 +35,7 @@ func NewExporters(exportersCfg []ExporterCfg, baseCfg *config.Config) []Exporter
 				exporters = append(exporters, otlpExporter)
 			}
 		case LokiExporter:
-			if lokiExporter := loki_exporter.NewLokiExporter(&exportersCfg[i].LokiExporter); lokiExporter != nil {
+			if lokiExporter := loki_exporter.NewLokiExporter(&exportersCfg[i].LokiExporter, baseCfg); lokiExporter != nil {
 				exporters = append(exporters, lokiExporter)
 			}
 		default:
