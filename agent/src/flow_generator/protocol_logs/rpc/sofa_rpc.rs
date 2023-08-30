@@ -462,7 +462,7 @@ impl From<&[u8]> for SofaHdr {
             new_rpc_trace_context: "".to_string(),
         };
         while let Some((key, val)) = read_b32_kv(&mut payload) {
-            let Ok(key_str) = std::str::from_utf8(key) else{
+            let Ok(key_str) = std::str::from_utf8(key) else {
                 return ret;
             };
             match key_str {
@@ -548,10 +548,10 @@ pub fn decode_new_rpc_trace_context_with_type(mut payload: &[u8], id_type: u8) -
 }
 
 fn read_url_param_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])> {
-    let Ok((rest, key)) = payload.split_at_position::<_,()>(|b| b == b'=')else{
+    let Ok((rest, key)) = payload.split_at_position::<_, ()>(|b| b == b'=') else {
         return None;
     };
-    let Ok((rest, val)) = (&rest[1..]).split_at_position::<_,()>(|b| b == b'&')else{
+    let Ok((rest, val)) = (&rest[1..]).split_at_position::<_, ()>(|b| b == b'&') else {
         return None;
     };
     *payload = &rest[1..];
