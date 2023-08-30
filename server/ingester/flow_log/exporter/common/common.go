@@ -1,9 +1,19 @@
 package common
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/binary"
+	"encoding/hex"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/google/uuid"
 	"github.com/op/go-logging"
+	"go.opentelemetry.io/collector/pdata/pcommon"
+	rand2 "math/rand"
+	"reflect"
+	"strconv"
 	"strings"
+	"unsafe"
 )
 
 type ExportItem interface {
@@ -169,4 +179,143 @@ type Counter struct {
 	DropCounter          int64 `statsd:"drop-count"`
 	DropBatchCounter     int64 `statsd:"drop-batch-count"`
 	DropNoTraceIDCounter int64 `statsd:"drop-no-traceid-count"`
+}
+
+func GetTraceID(traceID string, id uint64) pcommon.TraceID {
+	if traceID == "" {
+		return genTraceID(int(id))
+	}
+
+	if traceId, err := hex.DecodeString(traceID); err == nil {
+		id := [16]byte{}
+		copy(id[:], traceId)
+		return pcommon.TraceID(id)
+	}
+
+	return swTraceIDToTraceID(traceID)
+}
+
+func GetSpanID(spanID string, id uint64) pcommon.SpanID {
+	if spanID == "" {
+		return Uint64ToSpanID(id)
+	}
+
+	if spanId, err := hex.DecodeString(spanID); err == nil {
+		id := [8]byte{}
+		copy(id[:], spanId)
+		return pcommon.SpanID(id)
+	}
+	return pcommon.NewSpanIDEmpty()
+}
+
+func NewSpanId() pcommon.SpanID {
+	var rngSeed int64
+	_ = binary.Read(rand.Reader, binary.LittleEndian, &rngSeed)
+	var randSource = rand2.New(rand2.NewSource(rngSeed))
+
+	sid := pcommon.SpanID{}
+	randSource.Read(sid[:])
+	return sid
+}
+
+func genTraceID(id int) pcommon.TraceID {
+	b := [16]byte{0}
+	binary.BigEndian.PutUint64(b[:], uint64(id))
+	return pcommon.TraceID(b)
+}
+
+// from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/c247210d319a58665f1988e231a5c5fcfc9b8383/receiver/skywalkingreceiver/internal/trace/skywalkingproto_to_traces.go#L265
+func swTraceIDToTraceID(traceID string) pcommon.TraceID {
+	// skywalking traceid format:
+	// de5980b8-fce3-4a37-aab9-b4ac3af7eedd: from browser/js-sdk/envoy/nginx-lua sdk/py-agent
+	// 56a5e1c519ae4c76a2b8b11d92cead7f.12.16563474296430001: from java-agent
+
+	if len(traceID) <= 36 { // 36: uuid length (rfc4122)
+		uid, err := uuid.Parse(traceID)
+		if err != nil {
+			return pcommon.NewTraceIDEmpty()
+		}
+		return pcommon.TraceID(uid)
+	}
+	return swStringToUUID(traceID, 0)
+}
+
+func swStringToUUID(s string, extra uint32) (dst [16]byte) {
+	// there are 2 possible formats for 's':
+	// s format = 56a5e1c519ae4c76a2b8b11d92cead7f.0000000000.000000000000000000
+	//            ^ start(length=32)               ^ mid(u32) ^ last(u64)
+	// uid = UUID(start) XOR ([4]byte(extra) . [4]byte(uint32(mid)) . [8]byte(uint64(last)))
+
+	// s format = 56a5e1c519ae4c76a2b8b11d92cead7f
+	//            ^ start(length=32)
+	// uid = UUID(start) XOR [4]byte(extra)
+
+	if len(s) < 32 {
+		return
+	}
+
+	t := unsafeGetBytes(s)
+	var uid [16]byte
+	_, err := hex.Decode(uid[:], t[:32])
+	if err != nil {
+		return uid
+	}
+
+	for i := 0; i < 4; i++ {
+		uid[i] ^= byte(extra)
+		extra >>= 8
+	}
+
+	if len(s) == 32 {
+		return uid
+	}
+
+	index1 := bytes.IndexByte(t, '.')
+	index2 := bytes.LastIndexByte(t, '.')
+	if index1 != 32 || index2 < 0 {
+		return
+	}
+
+	mid, err := strconv.Atoi(s[index1+1 : index2])
+	if err != nil {
+		return
+	}
+
+	last, err := strconv.Atoi(s[index2+1:])
+	if err != nil {
+		return
+	}
+
+	for i := 4; i < 8; i++ {
+		uid[i] ^= byte(mid)
+		mid >>= 8
+	}
+
+	for i := 8; i < 16; i++ {
+		uid[i] ^= byte(last)
+		last >>= 8
+	}
+
+	return uid
+}
+
+func uuidTo8Bytes(uuid [16]byte) [8]byte {
+	// high bit XOR low bit
+	var dst [8]byte
+	for i := 0; i < 8; i++ {
+		dst[i] = uuid[i] ^ uuid[i+8]
+	}
+	return dst
+}
+
+func unsafeGetBytes(s string) []byte {
+	return (*[0x7fff0000]byte)(unsafe.Pointer(
+		(*reflect.StringHeader)(unsafe.Pointer(&s)).Data),
+	)[:len(s):len(s)]
+}
+
+func Uint64ToSpanID(id uint64) pcommon.SpanID {
+	b := [8]byte{0}
+	binary.BigEndian.PutUint64(b[:], uint64(id))
+	return pcommon.SpanID(b)
 }

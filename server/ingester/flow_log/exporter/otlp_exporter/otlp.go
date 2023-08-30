@@ -17,11 +17,8 @@
 package otlp_exporter
 
 import (
-	crand "crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporter/common"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -154,17 +151,17 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		putStrWithoutEmpty(spanAttrs, "df.span.native.trace_id", l7.TraceId)
 		putStrWithoutEmpty(spanAttrs, "df.span.native.span_id", l7.SpanId)
 
-		span.SetTraceID(getTraceID(l7.TraceId, l7.ID()))
+		span.SetTraceID(exporter_common.GetTraceID(l7.TraceId, l7.ID()))
 		if l7.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
-			span.SetSpanID(getSpanID(l7.SpanId, l7.ID()))
+			span.SetSpanID(exporter_common.GetSpanID(l7.SpanId, l7.ID()))
 			if l7.ParentSpanId == "" {
 				span.SetParentSpanID(pcommon.NewSpanIDEmpty())
 			} else {
-				span.SetParentSpanID(getSpanID(l7.ParentSpanId, l7.ID()))
+				span.SetParentSpanID(exporter_common.GetSpanID(l7.ParentSpanId, l7.ID()))
 			}
 		} else {
-			span.SetParentSpanID(getSpanID(l7.SpanId, l7.ID()))
-			span.SetSpanID(uint64ToSpanID(l7.ID()))
+			span.SetParentSpanID(exporter_common.GetSpanID(l7.SpanId, l7.ID()))
+			span.SetSpanID(exporter_common.Uint64ToSpanID(l7.ID()))
 		}
 
 		if l7.SpanKind != uint8(ptrace.SpanKindUnspecified) {
@@ -283,43 +280,6 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 			spanAttrs.PutDouble(l7.MetricsNames[i], l7.MetricsValues[i])
 		}
 	}
-}
-
-func getTraceID(traceID string, id uint64) pcommon.TraceID {
-	if traceID == "" {
-		return genTraceID(int(id))
-	}
-
-	if traceId, err := hex.DecodeString(traceID); err == nil {
-		id := [16]byte{}
-		copy(id[:], traceId)
-		return pcommon.TraceID(id)
-	}
-
-	return swTraceIDToTraceID(traceID)
-}
-
-func getSpanID(spanID string, id uint64) pcommon.SpanID {
-	if spanID == "" {
-		return uint64ToSpanID(id)
-	}
-
-	if spanId, err := hex.DecodeString(spanID); err == nil {
-		id := [8]byte{}
-		copy(id[:], spanId)
-		return pcommon.SpanID(id)
-	}
-	return pcommon.NewSpanIDEmpty()
-}
-
-func newSpanId() pcommon.SpanID {
-	var rngSeed int64
-	_ = binary.Read(crand.Reader, binary.LittleEndian, &rngSeed)
-	var randSource = rand.New(rand.NewSource(rngSeed))
-
-	sid := pcommon.SpanID{}
-	randSource.Read(sid[:])
-	return sid
 }
 
 // use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
@@ -549,12 +509,6 @@ func tapSideToSpanKind(tapSide string) ptrace.SpanKind {
 		return ptrace.SpanKindServer
 	}
 	return ptrace.SpanKindUnspecified
-}
-
-func uint64ToSpanID(id uint64) pcommon.SpanID {
-	b := [8]byte{0}
-	binary.BigEndian.PutUint64(b[:], uint64(id))
-	return pcommon.SpanID(b)
 }
 
 func genTraceID(id int) pcommon.TraceID {

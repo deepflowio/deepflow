@@ -187,7 +187,7 @@ func NewLokiExporter(config *LokiExporterConfig, baseCfg *ingester_config.Config
 		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
-	le.universalTagsManager = exporter_common.NewUniversalTagsManager("", baseCfg.ControllerIPs, baseCfg.ControllerPort, baseCfg.GrpcBufferSize)
+	le.universalTagsManager = exporter_common.NewUniversalTagsManager(".+", baseCfg.ControllerIPs, baseCfg.ControllerPort, baseCfg.GrpcBufferSize)
 
 	le.dataQueues = dataQueues
 	le.counter = &exporter_common.Counter{}
@@ -280,37 +280,43 @@ func (le *LokiExporter) IsExportData(item interface{}) bool {
 	return true
 }
 
-func (le *LokiExporter) FlowLogToLog(item *log_data.L7FlowLog) string {
-	t := time.UnixMicro(item.EndTime().Microseconds()) // time.Time
-	serviceName := le.universalTagsManager.GetServiceName(item)
-	logLevel := responseStatusToLogLevel(item.ResponseStatus)
-	traceId := item.TraceId
-	spanId := item.SpanId
+func (le *LokiExporter) FlowLogToLog(l7 *log_data.L7FlowLog) string {
+	t := time.UnixMicro(l7.EndTime().Microseconds()) // time.Time
+	serviceName := le.universalTagsManager.GetServiceName(l7)
+	logLevel := responseStatusToLogLevel(l7.ResponseStatus)
+	spanId := l7.SpanId
+
+	traceId := exporter_common.GetTraceID(l7.TraceId, l7.ID()).String()
+	if l7.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+		spanId = exporter_common.GetSpanID(l7.SpanId, l7.ID()).String()
+	} else {
+		spanId = exporter_common.Uint64ToSpanID(l7.ID()).String()
+	}
 
 	logHeader := fmt.Sprintf(le.logHeaderFmt, t, serviceName, logLevel, traceId, spanId)
 	// compose log body while preserving original field names.
 	var logBody string
-	switch datatype.L7Protocol(item.L7Protocol) {
+	switch datatype.L7Protocol(l7.L7Protocol) {
 	case datatype.L7_PROTOCOL_DNS:
-		logBody = buildLogBodyDNS(item)
+		logBody = buildLogBodyDNS(l7)
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
-		logBody = buildLogBodyHTTP(item)
+		logBody = buildLogBodyHTTP(l7)
 	case datatype.L7_PROTOCOL_DUBBO:
-		logBody = buildLogBodyDubbo(item)
+		logBody = buildLogBodyDubbo(l7)
 	case datatype.L7_PROTOCOL_GRPC:
-		logBody = buildLogBodyGRPC(item)
+		logBody = buildLogBodyGRPC(l7)
 	case datatype.L7_PROTOCOL_KAFKA:
-		logBody = buildLogBodyKafka(item)
+		logBody = buildLogBodyKafka(l7)
 	case datatype.L7_PROTOCOL_MQTT:
-		logBody = buildLogBodyMQTT(item)
+		logBody = buildLogBodyMQTT(l7)
 	case datatype.L7_PROTOCOL_MYSQL:
-		logBody = buildLogBodyMySQL(item)
+		logBody = buildLogBodyMySQL(l7)
 	case datatype.L7_PROTOCOL_REDIS:
-		logBody = buildLogBodyRedis(item)
+		logBody = buildLogBodyRedis(l7)
 	case datatype.L7_PROTOCOL_POSTGRE:
-		logBody = buildLogBodyPostgreSQL(item)
+		logBody = buildLogBodyPostgreSQL(l7)
 	}
-	log.Infof(logHeader + logBody)
+
 	return logHeader + logBody
 }
 
