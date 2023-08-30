@@ -30,10 +30,7 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
 use crate::{
     common::l7_protocol_log::ParseParam,
     flow_generator::{
-        protocol_logs::{
-            pb_adapter::{KeyVal, TraceInfo},
-            HttpInfo,
-        },
+        protocol_logs::HttpInfo,
         Error::{self, WasmVmError},
         Result as WasmResult,
     },
@@ -63,7 +60,6 @@ pub(super) const IMPORT_FUNC_VM_READ_PAYLOAD: &str = "vm_read_payload";
 pub(super) const IMPORT_FUNC_VM_READ_HTTP_REQ: &str = "vm_read_http_req_info";
 pub(super) const IMPORT_FUNC_VM_READ_HTTP_RESP: &str = "vm_read_http_resp_info";
 pub(super) const IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO: &str = "host_read_l7_protocol_info";
-pub(super) const IMPORT_FUNC_HOST_READ_HTTP_RESULT: &str = "host_read_http_result";
 pub(super) const IMPORT_FUNC_HOST_READ_STR_RESULT: &str = "host_read_str_result";
 
 pub(super) const LOG_LEVEL_INFO: i32 = 0;
@@ -244,7 +240,7 @@ impl WasmVm {
                 .parse_ctx
                 .as_mut()
                 .unwrap()
-                .take_parse_payload_result()
+                .take_l7_info_result()
                 .map_or(Some(vec![]), |info| Some(info));
             break;
         }
@@ -259,7 +255,7 @@ impl WasmVm {
         payload: &[u8],
         param: &ParseParam,
         info: &HttpInfo,
-    ) -> Option<(Option<TraceInfo>, Vec<KeyVal>)> {
+    ) -> Option<CustomInfo> {
         if self.instance.len() == 0 {
             return None;
         }
@@ -326,8 +322,8 @@ impl WasmVm {
                 .parse_ctx
                 .as_mut()
                 .unwrap()
-                .take_http_result()
-                .map_or(None, |r| Some(r));
+                .take_l7_info_result()
+                .map_or(None, |mut r| r.pop());
 
             break;
         }
@@ -342,7 +338,7 @@ impl WasmVm {
         payload: &[u8],
         param: &ParseParam,
         info: &HttpInfo,
-    ) -> Option<(Option<TraceInfo>, Vec<KeyVal>)> {
+    ) -> Option<CustomInfo> {
         if self.instance.len() == 0 {
             return None;
         }
@@ -409,8 +405,8 @@ impl WasmVm {
                 .parse_ctx
                 .as_mut()
                 .unwrap()
-                .take_http_result()
-                .map_or(None, |r| Some(r));
+                .take_l7_info_result()
+                .map_or(None, |mut r| r.pop());
 
             break;
         }
