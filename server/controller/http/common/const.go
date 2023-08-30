@@ -66,6 +66,7 @@ const (
 	PATH_NETWORK             = "/v2/subnets"
 	PATH_DHCP_PORT           = "/v2/dhcp-ports"
 	PATH_IP                  = "/v2/ips"
+	PATH_VIP                 = "/v2/vips"
 	PATH_ALL_IP              = "/v2/all-ips"
 )
 
