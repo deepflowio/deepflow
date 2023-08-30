@@ -230,7 +230,7 @@ pub(super) fn get_all_socket(
             }
         };
 
-        let Ok(up_sec) =  proc_data.up_sec(now_sec) else {
+        let Ok(up_sec) = proc_data.up_sec(now_sec) else {
             continue;
         };
 
@@ -474,7 +474,7 @@ fn divide_tcp_entry(
                 continue;
             }
 
-            let Some((pid,fd)) = inode_pid_fd_map.get(&t.inode) else {
+            let Some((pid, fd)) = inode_pid_fd_map.get(&t.inode) else {
                 continue;
             };
 
@@ -483,7 +483,15 @@ fn divide_tcp_entry(
                 not the time that the connection create. unless os_proc_socket_min_lifetime config to 0,
                 the new connection at lease the second times scan can be recognized.
             */
-            let Ok(sock_up_sec) = sym_uptime(now_sec, &PathBuf::from_iter([proc_root.to_string(), pid.to_string(), "fd".to_string(), fd.to_string()])) else {
+            let Ok(sock_up_sec) = sym_uptime(
+                now_sec,
+                &PathBuf::from_iter([
+                    proc_root.to_string(),
+                    pid.to_string(),
+                    "fd".to_string(),
+                    fd.to_string(),
+                ]),
+            ) else {
                 continue;
             };
             if sock_up_sec < sock_min_lifetime_sec {
@@ -491,8 +499,9 @@ fn divide_tcp_entry(
             }
 
             // now only support ipv4
-            let (Some(local_address),Some(remote_address)) = (
-                convert_addr_to_v4(t.local_address),convert_addr_to_v4(t.remote_address)
+            let (Some(local_address), Some(remote_address)) = (
+                convert_addr_to_v4(t.local_address),
+                convert_addr_to_v4(t.remote_address),
             ) else {
                 continue;
             };
@@ -562,9 +571,17 @@ fn divide_udp_entry(
                 the new connection at lease the second times scan can be recognized.
             */
 
-            let Ok(sock_up_sec) = sym_uptime(now_sec, &PathBuf::from_iter([proc_root.to_string(), pid.to_string(), "fd".to_string(), fd.to_string()])) else {
-                    continue;
-                };
+            let Ok(sock_up_sec) = sym_uptime(
+                now_sec,
+                &PathBuf::from_iter([
+                    proc_root.to_string(),
+                    pid.to_string(),
+                    "fd".to_string(),
+                    fd.to_string(),
+                ]),
+            ) else {
+                continue;
+            };
             if sock_up_sec < sock_min_lifetime_sec {
                 continue;
             }
@@ -575,8 +592,9 @@ fn divide_udp_entry(
             }
 
             // now only support ipv4
-            let (Some(local_address),Some(remote_address)) = (
-                convert_addr_to_v4(u.local_address),convert_addr_to_v4(u.remote_address)
+            let (Some(local_address), Some(remote_address)) = (
+                convert_addr_to_v4(u.local_address),
+                convert_addr_to_v4(u.remote_address),
             ) else {
                 continue;
             };

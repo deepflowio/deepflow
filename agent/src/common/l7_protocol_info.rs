@@ -172,7 +172,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         msg_type: param.direction.into(),
                         time: param.time,
                         kafka_info,
-                        multi_merge_info:None,
+                        multi_merge_info: None,
                     },
                 );
 
@@ -181,7 +181,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
                     f.l7_timeout_cache_len
                         .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
-
                 });
                 return None;
             };
@@ -310,7 +309,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         };
 
         let Some(mut previous_log_info) = previous_log_info else {
-            if msg_type == LogMessageType::Request{
+            if msg_type == LogMessageType::Request {
                 *in_cached_req += 1;
             }
             perf_cache.put(
@@ -319,7 +318,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     msg_type: param.direction.into(),
                     time: param.time,
                     kafka_info: None,
-                    multi_merge_info: Some((req_end,resp_end,false)),
+                    multi_merge_info: Some((req_end, resp_end, false)),
                 },
             );
 
@@ -328,7 +327,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
                 f.l7_timeout_cache_len
                     .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
-
             });
             return None;
         };

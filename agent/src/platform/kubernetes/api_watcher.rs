@@ -278,7 +278,10 @@ impl ApiWatcher {
             if r.disabled {
                 continue;
             }
-            let Some(index) = supported_resources.iter().position(|sr| &sr.name == &r.name) else {
+            let Some(index) = supported_resources
+                .iter()
+                .position(|sr| &sr.name == &r.name)
+            else {
                 warn!("resource {} not supported", r.name);
                 continue;
             };
@@ -309,8 +312,15 @@ impl ApiWatcher {
                 }
                 continue;
             }
-            let Some(index) = sr.group_versions.iter().position(|gv| &gv.group == &r.group && &gv.version == &r.version) else {
-                warn!("resource {} in group {}/{} not supported", r.name, r.group, r.version);
+            let Some(index) = sr
+                .group_versions
+                .iter()
+                .position(|gv| &gv.group == &r.group && &gv.version == &r.version)
+            else {
+                warn!(
+                    "resource {} in group {}/{} not supported",
+                    r.name, r.group, r.version
+                );
                 continue;
             };
             resources.push(Resource {
@@ -337,7 +347,10 @@ impl ApiWatcher {
             .await
             .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
         for api_resource in core_resources.resources {
-            let Some(index) = resources.iter().position(|r| &r.name == &api_resource.name && r.group_versions.iter().any(|gv| gv.group == "core")) else {
+            let Some(index) = resources.iter().position(|r| {
+                &r.name == &api_resource.name
+                    && r.group_versions.iter().any(|gv| gv.group == "core")
+            }) else {
                 continue;
             };
             debug!(
@@ -406,13 +419,20 @@ impl ApiWatcher {
 
                         for api_resource in api_resources.unwrap().resources {
                             let resource_name = api_resource.name;
-                            let Some(index) = resources.iter().position(|r| &r.name == &resource_name && r.group_versions.iter().any(|gv| gv.group == &group.name)) else {
+                            let Some(index) = resources.iter().position(|r| {
+                                &r.name == &resource_name
+                                    && r.group_versions.iter().any(|gv| gv.group == &group.name)
+                            }) else {
                                 continue;
                             };
-                            let Some(gv_index) = resources[index].group_versions.iter().position(|gv| gv.group == &group.name && gv.version == &version.version) else {
-                                debug!("skipped {} api in group {} with other version",
-                                    resource_name,
-                                    version.group_version
+                            let Some(gv_index) =
+                                resources[index].group_versions.iter().position(|gv| {
+                                    gv.group == &group.name && gv.version == &version.version
+                                })
+                            else {
+                                debug!(
+                                    "skipped {} api in group {} with other version",
+                                    resource_name, version.group_version
                                 );
                                 continue;
                             };
