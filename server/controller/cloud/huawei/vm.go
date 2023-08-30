@@ -41,7 +41,6 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, nil, err
 		}
 
