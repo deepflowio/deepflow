@@ -247,7 +247,7 @@ message Config {
 
     // 新增基础配置参数
     optional uint32  log_retention        = 201 [default = 30]; // uint: day
-    optional bool ntp_enabled             = 203 [default = true];
+    optional bool ntp_enabled             = 203 [default = false];
     repeated DecapType decap_type         = 204;
 
     // 新增全景图配置参数
