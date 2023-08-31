@@ -17,6 +17,7 @@
 package config
 
 type Prometheus struct {
+	Limit                   string          `default:"1000000" yaml:"limit"`
 	QPSLimit                int             `default:"100" yaml:"qps-limit"`
 	SeriesLimit             int             `default:"500" yaml:"series-limit"`
 	MaxSamples              int             `default:"50000000" yaml:"max-samples"`
@@ -28,7 +29,7 @@ type Prometheus struct {
 }
 
 type PrometheusCache struct {
-	Enabled                bool    `default:"true" yaml:"enabled"`
+	Enabled                bool    `default:"false" yaml:"enabled"`
 	CacheItemSize          uint64  `default:"51200000" yaml:"cache-item-size"` // cache-item-size for each cache item, default: 50M
 	CacheMaxCount          int     `default:"1024" yaml:"cache-max-count"`     // cache-max-count for list of cache size
 	CacheMaxAllowDeviation float64 `default:"3600" yaml:"cache-max-allow-deviation"`
