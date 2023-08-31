@@ -2424,6 +2424,9 @@ CREATE TABLE IF NOT EXISTS mail_server (
     user                    TEXT NOT NULL,
     password                TEXT NOT NULL,
     security                TEXT Not NULL,
+    ntlm_enabled            int;
+    ntlm_name               TEXT,
+    ntlm_password           TEXT,
     lcuuid                  CHAR(64) DEFAULT ''
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE mail_server;

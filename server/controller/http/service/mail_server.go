@@ -44,14 +44,17 @@ func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err 
 	}
 	for _, mail := range mails {
 		mailResp := model.MailServer{
-			ID:       mail.ID,
-			Status:   mail.Status,
-			Host:     mail.Host,
-			Port:     mail.Port,
-			User:     mail.User,
-			Password: mail.Password,
-			Security: mail.Security,
-			Lcuuid:   mail.Lcuuid,
+			ID:           mail.ID,
+			Status:       mail.Status,
+			Host:         mail.Host,
+			Port:         mail.Port,
+			User:         mail.User,
+			Password:     mail.Password,
+			Security:     mail.Security,
+			NtlmEnabled:  mail.NtlmEnabled,
+			NtlmName:     mail.NtlmName,
+			NtlmPassword: mail.NtlmPassword,
+			Lcuuid:       mail.Lcuuid,
 		}
 		response = append(response, mailResp)
 	}
@@ -67,6 +70,9 @@ func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, erro
 	mailServer.User = mailCreate.User
 	mailServer.Password = mailCreate.Password
 	mailServer.Security = mailCreate.Security
+	mailServer.NtlmEnabled = mailCreate.NtlmEnabled
+	mailServer.NtlmName = mailCreate.NtlmName
+	mailServer.NtlmPassword = mailCreate.NtlmPassword
 	mailServer.Lcuuid = uuid.New().String()
 	mysql.Db.Create(&mailServer)
 
@@ -88,7 +94,7 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 
 	log.Infof("update mailServer(%s) config %v", mailServer.User, mailServerUpdate)
 
-	for _, key := range []string{"STATUS", "HOST", "PORT", "USER", "PASSWORD", "SECURITY"} {
+	for _, key := range []string{"STATUS", "HOST", "PORT", "USER", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
 		if _, ok := mailServerUpdate[key]; ok {
 			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
 		}
