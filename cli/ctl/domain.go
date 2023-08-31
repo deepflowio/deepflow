@@ -126,17 +126,21 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		fmt.Printf(string(yData))
 	} else {
 		nameMaxSize := len("NAME")
-
+		idMaxSize := len("ID")
 		for i := range response.Get("DATA").MustArray() {
 			d := response.Get("DATA").GetIndex(i)
 			nameSize := len(d.Get("NAME").MustString())
 			if nameSize > nameMaxSize {
 				nameMaxSize = nameSize
 			}
+			idSize := len(d.Get("CLUSTER_ID").MustString())
+			if idSize > idMaxSize {
+				idMaxSize = idSize
+			}
 		}
-		format := "%-*s %-14s %-37s %-17s %-15s %-22s %-22s %-8s %-10s %s\n"
+		format := "%-*s %-*s %-37s %-17s %-15s %-22s %-22s %-8s %-10s %s\n"
 		header := fmt.Sprintf(
-			format, nameMaxSize, "NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP",
+			format, nameMaxSize, "NAME", idMaxSize, "ID", "LCUUID", "TYPE", "CONTROLLER_IP",
 			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S", // TODO translate state to readable word
 		)
 		fmt.Fprint(os.Stderr, header)
@@ -150,7 +154,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 				}
 			}
 			fmt.Printf(
-				format, nameMaxSize-nameChineseCount, name, d.Get("CLUSTER_ID").MustString(), d.Get("LCUUID").MustString(),
+				format, nameMaxSize-nameChineseCount, name, idMaxSize, d.Get("CLUSTER_ID").MustString(), d.Get("LCUUID").MustString(),
 				common.DomainType(d.Get("TYPE").MustInt()), d.Get("CONTROLLER_IP").MustString(),
 				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
 				common.DomainEnabled(d.Get("ENABLED").MustInt()), common.DomainState(d.Get("STATE").MustInt()),
