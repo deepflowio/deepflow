@@ -165,11 +165,25 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 		domainNameMaxSize, "DOMAIN_NAME", domainMaxSize, "DOMAIN")
 	for i := range response.Get("DATA").MustArray() {
 		sb := response.Get("DATA").GetIndex(i)
+		name := sb.Get("NAME").MustString()
+		var nameChineseCount int
+		for _, b := range name {
+			if common.IsChineseChar(string(b)) {
+				nameChineseCount += 1
+			}
+		}
+		dName := sb.Get("DOMAIN_NAME").MustString()
+		var dNameChineseCount int
+		for _, d := range dName {
+			if common.IsChineseChar(string(d)) {
+				dNameChineseCount += 1
+			}
+		}
 		fmt.Printf(cmdFormat,
-			nameMaxSize, sb.Get("NAME").MustString(),
+			nameMaxSize-nameChineseCount, name,
 			clusterIDMaxSize, sb.Get("CLUSTER_ID").MustString(),
 			lcuuidMaxSize, sb.Get("LCUUID").MustString(),
-			domainNameMaxSize, sb.Get("DOMAIN_NAME").MustString(),
+			domainNameMaxSize-dNameChineseCount, dName,
 			domainMaxSize, sb.Get("DOMAIN").MustString())
 	}
 	return nil
