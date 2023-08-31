@@ -242,7 +242,7 @@ func (v *VTapCheck) typeCheck() {
 	}
 
 	var vms []mysql.VM
-	if err := mysql.Db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms); err != nil {
+	if err := mysql.Db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
 		log.Error(err)
 	}
 	vmIDToVMType := make(map[int]int)
