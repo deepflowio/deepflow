@@ -58,9 +58,6 @@ func (c *Counter) WriteCk(qc *ClickhouseCounter) {
 		c.ck.QueryCount++
 
 		c.ck.QueryTimeSum += qc.QueryTime
-		if c.ck.QueryCount > 0 {
-			c.ck.QueryTimeAvg = c.ck.QueryTimeSum / c.ck.QueryCount
-		}
 		if qc.QueryTime > c.ck.QueryTimeMax {
 			c.ck.QueryTimeMax = qc.QueryTime
 		}
@@ -74,9 +71,6 @@ func (c *Counter) WriteApi(qc *ClickhouseCounter) {
 		c.ck.ApiCount++
 
 		c.ck.ApiTimeSum += qc.ApiTime
-		if c.ck.ApiCount > 0 {
-			c.ck.ApiTimeAvg = c.ck.ApiTimeSum / c.ck.ApiCount
-		}
 		if qc.ApiTime > c.ck.ApiTimeMax {
 			c.ck.ApiTimeMax = qc.ApiTime
 		}
@@ -86,6 +80,12 @@ func (c *Counter) WriteApi(qc *ClickhouseCounter) {
 func (c *Counter) GetCounter() interface{} {
 	counter := &ClickhouseCounter{}
 	counter, c.ck = c.ck, counter
+	if counter.ApiCount > 0 {
+		counter.ApiTimeAvg = counter.ApiTimeSum / counter.ApiCount
+	}
+	if counter.QueryCount > 0 {
+		counter.QueryTimeAvg = counter.QueryTimeSum / counter.QueryCount
+	}
 	return counter
 }
 
@@ -128,9 +128,6 @@ func (c *ApiCounter) Write(ac *ApiStats) {
 		c.api.ApiCount++
 
 		c.api.ApiTimeSum += ac.ApiTime
-		if c.api.ApiCount > 0 {
-			c.api.ApiTimeAvg = c.api.ApiTimeSum / c.api.ApiCount
-		}
 		if ac.ApiTime > c.api.ApiTimeMax {
 			c.api.ApiTimeMax = ac.ApiTime
 		}
@@ -140,6 +137,9 @@ func (c *ApiCounter) Write(ac *ApiStats) {
 func (c *ApiCounter) GetCounter() interface{} {
 	counter := &ApiStats{}
 	counter, c.api = c.api, counter
+	if counter.ApiCount > 0 {
+		counter.ApiTimeAvg = counter.ApiTimeSum / counter.ApiCount
+	}
 	return counter
 }
 
