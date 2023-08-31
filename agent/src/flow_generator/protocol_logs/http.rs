@@ -102,6 +102,11 @@ pub struct HttpInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
+    // set by wasm plugin
+    custom_endpoint: Option<String>,
+    custom_result: Option<String>,
+    custom_exception: Option<String>,
+
     #[serde(skip)]
     attributes: Vec<KeyVal>,
 }
@@ -121,6 +126,10 @@ impl HttpInfo {
             self.path = custom.req.resource;
         }
 
+        if !custom.req.endpoint.is_empty() {
+            self.custom_endpoint = Some(custom.req.endpoint)
+        }
+
         //req write
         if custom.resp.code.is_some() {
             self.status_code = custom.resp.code;
@@ -128,6 +137,14 @@ impl HttpInfo {
 
         if custom.resp.status != self.status {
             self.status = custom.resp.status;
+        }
+
+        if !custom.resp.result.is_empty() {
+            self.custom_result = Some(custom.resp.result)
+        }
+
+        if !custom.resp.exception.is_empty() {
+            self.custom_exception = Some(custom.resp.exception)
         }
 
         //trace info rewrite
@@ -349,7 +366,12 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.path,
             )
         } else {
-            (f.method, f.path.clone(), f.host, String::new())
+            (
+                f.method,
+                f.path.clone(),
+                f.host,
+                f.custom_endpoint.unwrap_or_default(),
+            )
         };
 
         L7ProtocolSendLog {
@@ -365,7 +387,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.status,
                 code: f.status_code,
-                ..Default::default()
+                exception: f.custom_exception.unwrap_or_default(),
+                result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
                 trace_id: Some(f.trace_id),
