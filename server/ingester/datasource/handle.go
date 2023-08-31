@@ -54,7 +54,7 @@ const (
 	EVENT_EVENT                              = "event.event"
 	EVENT_PERF_EVENT                         = "event.perf_event"
 	EVENT_ALARM_EVENT                        = "event.alarm_event"
-	PROFILE                                  = "profile"
+	PROFILE                                  = "profile.in_process"
 )
 
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
