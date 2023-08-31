@@ -1723,6 +1723,7 @@ impl FlowMap {
                 return;
             }
             let mut l7_stats = L7Stats::default();
+            let mut collect_stats = false;
             if flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
                     perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
@@ -1739,6 +1740,7 @@ impl FlowMap {
                     if flow.flow_key.proto == IpProtocol::TCP
                         || flow.flow_key.proto == IpProtocol::UDP
                     {
+                        collect_stats = true;
                         l7_stats.stats = l7_perf_stats;
                         l7_stats.endpoint = flow.last_endpoint.clone();
                         l7_stats.flow_id = flow.flow_id;
@@ -1775,9 +1777,11 @@ impl FlowMap {
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),
             );
-            l7_stats.flow = Some(tagged_flow.clone());
-            self.l7_stats_buffer
-                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            if collect_stats {
+                l7_stats.flow = Some(tagged_flow.clone());
+                self.l7_stats_buffer
+                    .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            }
             self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
