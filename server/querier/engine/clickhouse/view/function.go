@@ -777,8 +777,10 @@ func (f *MinFunction) WriteTo(buf *bytes.Buffer) {
 	if !f.FillNullAsZero {
 		f.DefaultFunction.WriteTo(buf)
 	} else {
+		buf.WriteString("`")
 		buf.WriteString("min_fillnullaszero_")
 		buf.WriteString(FormatField(f.Fields[0].ToString()))
+		buf.WriteString("`")
 		buf.WriteString(f.Math)
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
