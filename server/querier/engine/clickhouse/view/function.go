@@ -236,7 +236,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 			}
 			for i, field := range f.Fields {
 				field.WriteTo(buf)
-				buf.WriteString(" != 0")
+				buf.WriteString(" > 0")
 				if i < len(f.Fields)-1 {
 					buf.WriteString(" AND ")
 				}
