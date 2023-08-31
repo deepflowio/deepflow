@@ -87,3 +87,4 @@ if ! _status $1; then
     green_echo "Done"
 else
     red_echo "Fail"
+fi

@@ -116,6 +116,13 @@ jobs:
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
 
+      - name: build TenCentBlueKing package  
+        run: |
+          cp -raf agent/output/target/release/deepflow-agent agent/pkg/TencentBlueKing/plugins_linux_x86_64/deepflow-agent/bin/
+          cd agent/pkg/TencentBlueKing/
+          sed -i "s/RELEASE_VERSION/${{ env.IMAGE_TAG_PREFIX }}/g" plugins_linux_x86_64/deepflow-agent/project.yaml
+          tar -czvf deepflow-agent.tgz *
+
       - uses: manyuanrong/setup-ossutil@v2.0
         with:
           endpoint: "oss-accelerate.aliyuncs.com"
@@ -128,6 +135,7 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent.tgz oss://deepflow-ce/tencentblueking/agent/${{ env.IMAGE_TAG_PREFIX }}/deepflow-agent.tgz
           
       - name: upload agent stable artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
@@ -136,6 +144,7 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent-${{ env.IMAGE_TAG_PREFIX }}.tgz oss://deepflow-ce/bin/agent/stable/deepflow-agent-stable.tgz
 
   build_agent_arm64:
     name: build agent arm64
@@ -461,6 +470,13 @@ jobs:
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
 
+      - name: build TenCentBlueKing package  
+        run: |
+          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/pkg/TencentBlueKing/deepflow-agent_linux_x86_64/bin/
+          cd agent/pkg/TencentBlueKing/
+          sed -i "s/RELEASE_VERSION/${{ env.IMAGE_TAG_PREFIX }}/g" deepflow-agent_linux_x86_64/project.yaml
+          tar -czvf deepflow-agent-${{ env.IMAGE_TAG_PREFIX }}.tgz *
+
       - uses: manyuanrong/setup-ossutil@v2.0
         with:
           endpoint: "oss-accelerate.aliyuncs.com"
@@ -472,12 +488,14 @@ jobs:
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent-rpm.zip
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent-${{ env.IMAGE_TAG_PREFIX }}.tgz oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/static-link/deepflow-agent-${{ env.IMAGE_TAG_PREFIX }}.tgz
           
       - name: upload agent stable artifacts
         run: |
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/static-link/amd64/deepflow-agent-rpm.zip
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/static-link/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/static-link/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent-${{ env.IMAGE_TAG_PREFIX }}.tgz oss://deepflow-ce/bin/agent/stable/static-link/deepflow-agent-stable.tgz
 
   build_agent_arm64_static_link:
     name: build agent arm64 static link 
