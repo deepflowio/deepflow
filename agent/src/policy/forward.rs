@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 use std::net::IpAddr;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
 
+use ahash::AHashMap;
 use ipnetwork::IpNetwork;
 use log::{debug, error};
 use lru::LruCache;
@@ -112,7 +112,7 @@ type TableLruCache = LruCache<L3Key, L3Item>;
 
 pub struct Forward {
     mac_ip_tables: RwLock<TableLruCache>,
-    vip_device_tables: RwLock<HashMap<u64, bool>>,
+    vip_device_tables: RwLock<AHashMap<u64, bool>>,
 
     queue_count: usize,
     capacity: usize,
@@ -123,7 +123,7 @@ impl Forward {
         assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
         Self {
             mac_ip_tables: RwLock::new(TableLruCache::new(NonZeroUsize::new(capacity).unwrap())),
-            vip_device_tables: RwLock::new(HashMap::new()),
+            vip_device_tables: RwLock::new(AHashMap::new()),
             queue_count,
             capacity,
         }
@@ -131,7 +131,7 @@ impl Forward {
 
     fn update_vip_from_platforms(
         &self,
-        table: &mut HashMap<u64, bool>,
+        table: &mut AHashMap<u64, bool>,
         platforms: &Vec<Arc<PlatformData>>,
     ) {
         for platform in platforms {
@@ -275,7 +275,7 @@ impl Forward {
         self.update_l3_from_platforms(&mut mac_ip_table, platforms);
         self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);
 
-        let mut vip_device_table = HashMap::new();
+        let mut vip_device_table = AHashMap::new();
         self.update_vip_from_platforms(&mut vip_device_table, platforms);
         *self.vip_device_tables.write().unwrap() = vip_device_table
     }
