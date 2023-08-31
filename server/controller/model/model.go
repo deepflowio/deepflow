@@ -837,30 +837,39 @@ type Plugin struct {
 }
 
 type MailServerCreate struct {
-	Status   int    `json:"STATUS"`
-	Host     string `json:"HOST" binding:"required"`
-	Port     int    `json:"PORT" binding:"required"`
-	User     string `json:"USER" binding:"required"`
-	Password string `json:"PASSWORD" binding:"required"`
-	Security string `json:"SECURITY" binding:"required"`
+	Status       int    `json:"STATUS"`
+	Host         string `json:"HOST" binding:"required"`
+	Port         int    `json:"PORT" binding:"required"`
+	User         string `json:"USER" binding:"required"`
+	Password     string `json:"PASSWORD" binding:"required"`
+	NtlmEnabled  int    `json:"NTLM_ENABLED"`
+	NtlmName     string `json:"NTLM_NAME"`
+	NtlmPassword string `json:"NTLM_PASSWORD"`
+	Security     string `json:"SECURITY" binding:"required"`
 }
 
 type MailServerUpdate struct {
-	Status   int    `json:"STATUS"`
-	Host     string `json:"HOST"`
-	Port     int    `json:"PORT"`
-	User     string `json:"USER"`
-	Password string `json:"PASSWORD"`
-	Security string `json:"SECURITY"`
+	Status       int    `json:"STATUS"`
+	Host         string `json:"HOST"`
+	Port         int    `json:"PORT"`
+	User         string `json:"USER"`
+	Password     string `json:"PASSWORD"`
+	NtlmEnabled  int    `json:"NTLM_ENABLED"`
+	NtlmName     string `json:"NTLM_NAME"`
+	NtlmPassword string `json:"NTLM_PASSWORD"`
+	Security     string `json:"SECURITY"`
 }
 
 type MailServer struct {
-	ID       int    `json:"ID"`
-	Status   int    `json:"STATUS"`
-	Host     string `json:"HOST"`
-	Port     int    `json:"PORT"`
-	User     string `json:"USER"`
-	Password string `json:"PASSWORD"`
-	Security string `json:"SECURITY"`
-	Lcuuid   string `json:"LCUUID"`
+	ID           int    `json:"ID"`
+	Status       int    `json:"STATUS"`
+	Host         string `json:"HOST"`
+	Port         int    `json:"PORT"`
+	User         string `json:"USER"`
+	Password     string `json:"PASSWORD"`
+	Security     string `json:"SECURITY"`
+	NtlmEnabled  int    `json:"NTLM_ENABLED"`
+	NtlmName     string `json:"NTLM_NAME"`
+	NtlmPassword string `json:"NTLM_PASSWORD"`
+	Lcuuid       string `json:"LCUUID"`
 }

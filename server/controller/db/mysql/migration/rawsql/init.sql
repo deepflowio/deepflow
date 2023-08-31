@@ -1885,7 +1885,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_process (
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
     lcuuid              CHAR(64) DEFAULT '',
-    name                TEXT, 
+    name                TEXT,
     process_name        TEXT,
     cmd_line            TEXT,
     user                VARCHAR(256) DEFAULT '',
@@ -2424,6 +2424,9 @@ CREATE TABLE IF NOT EXISTS mail_server (
     user                    TEXT NOT NULL,
     password                TEXT NOT NULL,
     security                TEXT Not NULL,
+    ntlm_enabled            int,
+    ntlm_name               TEXT,
+    ntlm_password           TEXT,
     lcuuid                  CHAR(64) DEFAULT ''
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE mail_server;
