@@ -28,19 +28,24 @@ pub struct MongoDBInfo {
     #[serde(skip)]
     is_tls: bool,
 
-    // Server Greeting
-    #[serde(rename = "message_length")]
-    pub message_length: u32,
+    // req_len and resp_len are from message length
+    #[serde(rename = "req_len")]
+    pub req_len: u32,
+    #[serde(rename = "resp_len")]
+    pub resp_len: u32,
+
     #[serde(rename = "request_id")]
     pub request_id: u32,
-    #[serde(rename = "response_to")]
-    pub response_to: u32,
+    #[serde(rename = "response_id")]
+    pub response_id: u32,
     #[serde(rename = "op_code")]
     pub op_code: u32,
     #[serde(skip)]
     pub op_code_name: String,
-    //#[serde(rename = "context")]
-    //pub context: String,
+    #[serde(skip)]
+    pub command: String,
+    #[serde(skip)]
+    pub response: String,
 }
 
 impl L7ProtocolInfoInterface for MongoDBInfo {
@@ -71,24 +76,42 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
 // 协议文档: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
 impl MongoDBInfo {
     fn merge(&mut self, other: Self) {
-        self.message_length = other.message_length;
+        if self.response_id == 0 {
+            self.request_id = other.request_id
+        }
         self.request_id = other.request_id;
-        self.response_to = other.response_to;
-        self.op_code = other.op_code;
-        self.op_code_name = other.op_code_name;
-        //self.context = other.context;
+
+        if other.response_id > 0 {
+            self.response_id = other.response_id;
+        }
+        self.command = other.command;
+        self.response = other.response;
+        match other.msg_type {
+            LogMessageType::Request => {
+                self.req_len = other.req_len;
+                self.op_code_name = other.op_code_name;
+                self.op_code = other.op_code;
+            }
+            LogMessageType::Response => {
+                self.resp_len = other.resp_len;
+            }
+            _ => {}
+        }
     }
 }
 
 impl From<MongoDBInfo> for L7ProtocolSendLog {
     fn from(f: MongoDBInfo) -> Self {
         let log = L7ProtocolSendLog {
+            req_len: std::option::Option::<u32>::from(f.req_len),
             req: L7Request {
                 req_type: f.op_code_name,
-                resource: f.request_id.to_string(),
+                resource: f.command.to_string(),
                 ..Default::default()
             },
+            resp_len: std::option::Option::<u32>::from(f.resp_len),
             resp: L7Response {
+                result: f.response.to_string(),
                 status: L7ResponseStatus::Ok,
                 ..Default::default()
             },
@@ -110,7 +133,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
         let mut header = MongoDBHeader::default();
@@ -130,7 +153,6 @@ impl L7ProtocolParserInterface for MongoDBLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         if self.parse(payload, param.l4_protocol, param.direction, &mut info)? {
-            // ignore greeting
             return Ok(L7ParseResult::None);
         }
         if param.parse_log {
@@ -165,10 +187,10 @@ impl MongoDBLog {
         &mut self,
         payload: &[u8],
         proto: IpProtocol,
-        direction: PacketDirection,
+        _direction: PacketDirection,
         info: &mut MongoDBInfo,
     ) -> Result<bool> {
-        if proto != IpProtocol::Tcp {
+        if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
 
@@ -177,17 +199,37 @@ impl MongoDBLog {
         if offset < 0 {
             return Err(Error::MongoDBLogParseFailed);
         }
-        info.message_length = header.length;
-        info.request_id = header.request_id;
-        info.response_to = header.response_to;
+        if header.response_to > 0 {
+            // response_to is the request_id, when 0 means the request
+            info.msg_type = LogMessageType::Response;
+            self.info.resp_len = header.length;
+            info.request_id = header.response_to;
+            info.response_id = header.request_id;
+        } else {
+            info.msg_type = LogMessageType::Request;
+            self.info.req_len = header.length;
+            info.request_id = header.request_id;
+        }
         info.op_code = header.op_code;
         info.op_code_name = header.op_code_name;
-        //let offset = offset as usize;
-        match direction {
-            PacketDirection::ServerToClient => info.msg_type = LogMessageType::Response,
-            PacketDirection::ClientToServer => info.msg_type = LogMessageType::Request,
+        // command decode
+        match info.op_code_name.as_str() {
+            "OP_MSG" => {
+                let mut msg_body = MongoOpMsg::default();
+                msg_body.decode(&payload[offset as usize..])?;
+                match info.msg_type {
+                    LogMessageType::Response => {
+                        info.response = msg_body.sections.kind_name.to_string();
+                    }
+                    _ => {
+                        info.command = msg_body.sections.kind_name.to_string();
+                    }
+                }
+            }
+            _ => {
+                info.command = info.op_code_name.clone();
+            }
         }
-
         Ok(false)
     }
 }
@@ -203,7 +245,7 @@ pub struct MongoDBHeader {
 
 impl MongoDBHeader {
     fn decode(&mut self, payload: &[u8]) -> isize {
-        if payload.len() < 32 * 4 {
+        if payload.len() < 16 {
             return -1;
         }
         self.length = bytes::read_u32_le(payload) & 0xffffff;
@@ -217,7 +259,7 @@ impl MongoDBHeader {
         }
         self.request_id = bytes::read_u32_le(&payload[4..8]);
         self.response_to = bytes::read_u32_le(&payload[8..12]);
-        return self.length as isize;
+        return self.length as isize - 16;
     }
 
     pub fn get_op_str(&self) -> &'static str {
@@ -247,8 +289,91 @@ pub struct MongoOpCompressed {
 }
 
 // TODO: support op msg
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct MongoOpMsg {
     flag: u32,
+    sections: Sections,
+    checksum: Option<u32>,
+}
+
+impl MongoOpMsg {
+    fn decode(&mut self, payload: &[u8]) -> Result<bool> {
+        // todo: decode flag
+        let mut sections = Sections::default();
+        //sections.kind = payload[4];
+        let section_len = bytes::read_u32_le(&payload[5..9]);
+        if payload.len() < 4 + section_len as usize {
+            return Ok(false);
+        }
+        let _ = sections.decode(&payload[4..4 + section_len as usize]);
+        self.sections = sections;
+        // todo: decode checksum
+        Ok(true)
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct Sections {
+    kind: u8,
+    kind_name: &'static str,
+    //doc: Option<MongoDoc>,
+}
+
+impl Sections {
+    pub fn decode(&mut self, payload: &[u8]) -> Result<bool> {
+        self.kind = payload[0];
+        self.kind_name = self.get_kind();
+        // todo: decode doc
+        Ok(true)
+    }
+    pub fn get_kind(&self) -> &'static str {
+        match self.kind {
+            0 => "Body",
+            1 => "Doc",
+            2 => "Internal",
+            _ => "Unknown",
+        }
+    }
+}
+
+pub struct MongoDoc {
+    length: u32,
+    element: Vec<u8>,
+}
+
+pub struct MongoElement {
+    etype: i8,
+}
+
+// BSON TYPE
+// todo
+impl MongoElement {
+    pub fn get_type(&self) -> &'static str {
+        match self.etype {
+            1 => "double",
+            2 => "string",
+            3 => "object",
+            4 => "array",
+            5 => "binData",
+            6 => "undefined", // Deprecated as of MongoDB 5.0.
+            7 => "objectId",
+            8 => "bool",
+            9 => "date",
+            10 => "null",
+            11 => "regex",
+            12 => "dbPointer", // Deprecated as of MongoDB 5.0.
+            13 => "javascript",
+            14 => "symbol",              // Deprecated as of MongoDB 5.0.
+            15 => "javascriptWithScope", // Deprecated as of MongoDB 4.4.
+            16 => "int",
+            17 => "timestamp",
+            18 => "long",
+            19 => "decimal",
+            -1 => "minKey",
+            127 => "maxKey",
+            _ => "unknown",
+        }
+    }
 }
 
 // Deprecated as of MongoDB 5.0.
