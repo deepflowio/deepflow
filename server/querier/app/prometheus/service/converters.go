@@ -523,13 +523,13 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 		if len(groupBy) > 0 {
 			sqlBuilder.WriteString("GROUP BY " + strings.Join(groupBy, ","))
 		}
-		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s LIMIT %s", strings.Join(orderBy, ","), config.Cfg.Limit))
+		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s LIMIT %s", strings.Join(orderBy, ","), config.Cfg.Prometheus.Limit))
 		sql = sqlBuilder.String()
 	} else {
 		sql = fmt.Sprintf("SELECT %s FROM `%s` WHERE %s ORDER BY %s LIMIT %s", strings.Join(metrics, ","),
 			table, // equals prometheus metric name
 			strings.Join(filters, " AND "),
-			strings.Join(orderBy, ","), config.Cfg.Limit)
+			strings.Join(orderBy, ","), config.Cfg.Prometheus.Limit)
 	}
 	return
 }

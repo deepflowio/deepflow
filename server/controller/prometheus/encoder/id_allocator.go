@@ -30,6 +30,11 @@ type sorter interface {
 	getUsedIDSet(sortedUsableIDs []int, inUseIDSet mapset.Set[int]) mapset.Set[int]
 }
 
+type rawDataProvider interface {
+	load() (mapset.Set[int], error)
+	check([]int) ([]int, error)
+}
+
 type idAllocator struct {
 	resourceType    string
 	min             int
@@ -73,14 +78,20 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	return
 }
 
+func (p *idAllocator) recycle(ids []int) {
+	p.sorter.sort(ids)
+	p.usableIDs = append(p.usableIDs, ids...)
+	log.Infof("recycle %s ids: %v", p.resourceType, ids)
+}
+
 func (ia *idAllocator) refresh() error {
-	log.Infof("refresh %s id pools started", ia.resourceType)
+	log.Debugf("refresh %s id pools started", ia.resourceType)
 	inUseIDSet, err := ia.rawDataProvider.load()
 	if err != nil {
 		return err
 	}
 	ia.usableIDs = ia.getSortedUsableIDs(ia.getAllIDSet(), inUseIDSet)
-	log.Infof("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs))
+	log.Debugf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs))
 	return nil
 }
 
@@ -153,11 +164,6 @@ func (ia *ascIDAllocator) sortSet(ints mapset.Set[int]) []int {
 // sort sorts ints in set in ascending order
 func (ia *ascIDAllocator) sort(ints []int) {
 	sort.Ints(ints)
-}
-
-type rawDataProvider interface {
-	load() (mapset.Set[int], error)
-	check([]int) ([]int, error)
 }
 
 type descIDAllocator struct {

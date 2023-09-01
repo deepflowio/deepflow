@@ -858,6 +858,43 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 }
 
 /*
+ * View kernel addresses exposed via /proc and other interfaces
+ * when /proc/sys/kernel/kptr_restrict has the value 1, it is
+ * necessary to set the CAP_SYSLOG capability, otherwise all k-
+ * ernel addresses are set to 0.
+ *
+ * This function is used to check if the kernel address is 0.
+ */
+static bool check_kallsyms_addr_is_zero(void)
+{
+	const int check_num = 100;
+	const int max_line_len = 256;
+	const char *check_str = "0000000000000000";
+
+	FILE *file = fopen("/proc/kallsyms", "r");
+	if (file == NULL) {
+		ebpf_warning(LOG_CP_TAG "Error opening /proc/kallsyms");
+		return false;
+	}
+
+	char line[max_line_len];
+	int count = 0;
+
+	while (fgets(line, sizeof(line), file) != NULL && count < check_num) {
+		char address[17];	// 16 characters + null terminator
+		sscanf(line, "%16s", address);
+
+		if (strcmp(address, check_str) == 0) {
+			count++;
+		}
+	}
+
+	fclose(file);
+
+	return (count == check_num);
+}
+
+/*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
  * @callback Profile data processing callback interface
@@ -877,6 +914,14 @@ int start_continuous_profiler(int freq,
 		     "Currnet linux %d.%d, not support, require Linux 4.9+\n",
 		     major, minor);
 
+		return (-1);
+	}
+
+	if (check_kallsyms_addr_is_zero()) {
+		ebpf_warning(LOG_CP_TAG
+			     "All kernel addresses in /proc/kallsyms are 0. Please add"
+			     " 'CAP_SYSLOG' permission to the container to solve the "
+			     "problem.\n");
 		return (-1);
 	}
 
