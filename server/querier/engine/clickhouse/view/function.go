@@ -235,7 +235,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 			}
 			for i, field := range f.Fields {
 				field.WriteTo(buf)
-				buf.WriteString(" != 0")
+				buf.WriteString(" > 0")
 				if i < len(f.Fields)-1 {
 					buf.WriteString(" AND ")
 				}
@@ -247,7 +247,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 			if !f.IgnoreZero {
 				field.WriteTo(buf)
 			} else {
-				buf.WriteString("arrayFilter(x -> x!=0, ")
+				buf.WriteString("arrayFilter(x -> x>0, ")
 				field.WriteTo(buf)
 				buf.WriteString(")")
 			}
@@ -630,7 +630,7 @@ func (f *ApdexFunction) Init() {
 			Fields: []Node{&countSatisfy, &divToler},
 			Nest:   true,
 		}
-		// countArray(arrayFilter(x -> (x != 0), _grouparray_rtt))
+		// countArray(arrayFilter(x -> (x > 0), _grouparray_rtt))
 		count := DefaultFunction{
 			Name:         FUNCTION_COUNT,
 			Fields:       []Node{&Field{Value: f.Fields[0].ToString()}},
