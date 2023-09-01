@@ -268,6 +268,7 @@ impl Trident {
             None => get_hostname().unwrap_or_default(),
         };
 
+        let ntp_diff = Arc::new(AtomicI64::new(0));
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -280,6 +281,7 @@ impl Trident {
             DEFAULT_INGESTER_PORT,
             base_name,
             vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
+            ntp_diff.clone(),
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
@@ -333,7 +335,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = stats::Collector::new(&hostname);
+        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -361,6 +363,7 @@ impl Trident {
                 stats_collector,
                 config_path,
                 sidecar_mode,
+                ntp_diff,
             ) {
                 warn!(
                     "Launching deepflow-agent failed: {}, deepflow-agent restart...",
@@ -379,9 +382,10 @@ impl Trident {
         version_info: &'static VersionInfo,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
-        mut stats_collector: stats::Collector,
+        stats_collector: Arc<stats::Collector>,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Environment variables: {:?}", get_env());
@@ -486,6 +490,7 @@ impl Trident {
             config_handler.static_config.agent_mode,
             config_path,
             agent_id_tx.clone(),
+            ntp_diff,
         ));
         stats_collector.register_countable(
             "ntp",
@@ -493,8 +498,6 @@ impl Trident {
             Default::default(),
         );
         synchronizer.start();
-        stats_collector.set_ntp_diff(synchronizer.ntp_diff());
-        let stats_collector = Arc::new(stats_collector);
 
         let mut domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),

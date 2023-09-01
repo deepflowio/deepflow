@@ -17,6 +17,8 @@
 package genesis
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 
@@ -28,8 +30,7 @@ func (g *Genesis) getHosts() ([]model.Host, error) {
 	hosts := []model.Host{}
 	hostsData := g.genesisData.Hosts
 
-	g.cloudStatsd.APICost["hosts"] = []int{0}
-	g.cloudStatsd.APICount["hosts"] = []int{len(hostsData)}
+	g.cloudStatsd.RefreshAPIMoniter("hosts", len(hostsData), time.Time{})
 
 	for _, h := range hostsData {
 		host := model.Host{
