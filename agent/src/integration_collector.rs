@@ -503,6 +503,7 @@ fn fill_l7_stats(
         l7: stats.clone(),
         l4_protocol,
         l7_protocol,
+        ..Default::default()
     };
     flow.flow_perf_stats = Some(flow_perf_stats);
     let mut lookup_key = LookupKey {
