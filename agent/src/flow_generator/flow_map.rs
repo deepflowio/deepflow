@@ -1114,8 +1114,8 @@ impl FlowMap {
             ebpf will pass the server port to FlowPerf use for adjuest packet direction.
             non ebpf not need this field, FlowPerf::server_port always 0.
         */
-        let (l7_proto_enum, port, from_app_tab) = if let Some((proto, port)) =
-            match meta_packet.signal_source {
+        let (l7_proto_enum, port, from_app_tab, l7_failed_count) =
+            if let Some((proto, port, l7_failed_count)) = match meta_packet.signal_source {
                 SignalSource::EBPF => {
                     let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
                         (local_epc_id, 0)
@@ -1125,19 +1125,25 @@ impl FlowMap {
                     self.app_table
                         .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
                 }
-                _ => self.app_table.get_protocol(meta_packet).map(|p| (p, 0u16)),
+                _ => self
+                    .app_table
+                    .get_protocol(meta_packet)
+                    .map(|(proto, fail_count)| (proto, 0u16, fail_count)),
             } {
-            (proto, port, true)
-        } else {
-            (L7ProtocolEnum::default(), 0, false)
-        };
+                (proto, port, true, l7_failed_count)
+            } else {
+                (L7ProtocolEnum::default(), 0, false, 0)
+            };
 
         let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
             && Self::l4_metrics_enabled(flow_config);
         let l7_enabled = Self::l7_metrics_enabled(flow_config)
             || Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key);
         if l4_enabled || l7_enabled {
-            node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats::default());
+            node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats {
+                l7_failed_count,
+                ..Default::default()
+            });
         }
 
         if flow_config.collector_enabled {

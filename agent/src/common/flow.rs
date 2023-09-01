@@ -484,6 +484,7 @@ pub struct FlowPerfStats {
     pub l7: L7PerfStats,
     pub l4_protocol: L4Protocol,
     pub l7_protocol: L7Protocol,
+    pub l7_failed_count: u32,
 }
 
 impl FlowPerfStats {
@@ -497,6 +498,9 @@ impl FlowPerfStats {
         {
             self.l7_protocol = other.l7_protocol;
         }
+
+        self.l7_failed_count = self.l7_failed_count.max(other.l7_failed_count);
+
         self.tcp.sequential_merge(&other.tcp);
         self.l7.sequential_merge(&other.l7);
     }
@@ -523,6 +527,7 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
             l7: Some(p.l7.into()),
             l4_protocol: p.l4_protocol as u32,
             l7_protocol: p.l7_protocol as u32,
+            l7_failed_count: p.l7_failed_count,
         }
     }
 }
