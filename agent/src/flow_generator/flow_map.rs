@@ -2221,7 +2221,7 @@ pub fn _new_flow_map_and_receiver(
         Arc::new(AtomicI64::new(0)),
         &config.flow,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new(""),
+        &stats::Collector::new("", Arc::new(AtomicI64::new(0))),
         false,
     );
 
