@@ -118,6 +118,7 @@ message FlowPerfStats {
     L7PerfStats l7 = 2;
     uint32 l4_protocol = 3;
     uint32 l7_protocol = 4;
+    uint32 l7_failed_count = 5;
 }
 
 message TCPPerfStats {
