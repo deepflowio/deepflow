@@ -75,19 +75,19 @@ var (
 		output: "SELECT divide(MAX(byte_tx)+1e-15, MIN(byte_tx)+1e-15) AS `rspread_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 LIMIT 1",
 	}, {
 		input:  "select Rspread(rtt) as rspread_rtt from l4_flow_log limit 1",
-		output: "SELECT divide(MAXIf(rtt, rtt != 0)+1e-15, MINIf(rtt, rtt != 0)+1e-15) AS `rspread_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT divide(MAXIf(rtt, rtt > 0)+1e-15, MINIf(rtt, rtt > 0)+1e-15) AS `rspread_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Percentile(byte_tx, 50) as percentile_byte_tx from l4_flow_log limit 1",
 		output: "SELECT quantile(50)(byte_tx) AS `percentile_byte_tx` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Avg(rtt) as avg_rtt from l4_flow_log where time >= 100+1 and time <= 102 limit 1",
-		output: "SELECT AVGIf(rtt, rtt != 0) AS `avg_rtt` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 100 + 1 AND `time` <= 102 LIMIT 1",
+		output: "SELECT AVGIf(rtt, rtt > 0) AS `avg_rtt` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 100 + 1 AND `time` <= 102 LIMIT 1",
 	}, {
 		input:  "select Max(byte_tx) as max_byte_tx, Avg(rtt) as avg_rtt from l4_flow_log limit 1",
-		output: "SELECT MAX(byte_tx) AS `max_byte_tx`, AVGIf(rtt, rtt != 0) AS `avg_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT MAX(byte_tx) AS `max_byte_tx`, AVGIf(rtt, rtt > 0) AS `avg_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select ((Max(byte_tx))+Avg(rtt ))/(1-Avg(rtt )) as avg_rtt from l4_flow_log limit 1",
-		output: "SELECT divide(plus(MAX(byte_tx), AVGIf(rtt, rtt != 0)), minus(1, AVGIf(rtt, rtt != 0))) AS `avg_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT divide(plus(MAX(byte_tx), AVGIf(rtt, rtt > 0)), minus(1, AVGIf(rtt, rtt > 0))) AS `avg_rtt` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Apdex(rtt, 100) as apdex_rtt_100 from l4_flow_log limit 1",
 		output: "WITH if(COUNT()>0, divide(plus(SUM(if(rtt<=100,1,0)), SUM(if(100<rtt AND rtt<=100*4,0.5,0))), COUNT()), null) AS `divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_` SELECT `divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_`*100 AS `apdex_rtt_100` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -105,7 +105,7 @@ var (
 		output: "SELECT divide(plus(MAX(byte_tx+byte_rx), 100), 100)*100 AS `percentage_max_byte_100` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Sum(rtt) as sum_rtt from l4_flow_log having Percentage(Max(byte), 100) >= 1 limit 1",
-		output: "SELECT SUMIf(rtt, rtt != 0) AS `sum_rtt` FROM flow_log.`l4_flow_log` HAVING divide(MAX(byte_tx+byte_rx), 100)*100 >= 1 LIMIT 1",
+		output: "SELECT SUMIf(rtt, rtt > 0) AS `sum_rtt` FROM flow_log.`l4_flow_log` HAVING divide(MAX(byte_tx+byte_rx), 100)*100 >= 1 LIMIT 1",
 	}, {
 		input:  "select time(time, 60) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, divide(plus(SUM(byte_tx+byte_rx), 100), 60) AS `persecond_max_byte_100` FROM flow_log.`l4_flow_log` GROUP BY `toi` LIMIT 1",
