@@ -148,15 +148,15 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new<S: AsRef<str>>(hostname: S) -> Self {
-        Self::with_min_interval(hostname, TICK_CYCLE)
+    pub fn new<S: AsRef<str>>(hostname: S, ntp_diff: Arc<AtomicI64>) -> Self {
+        Self::with_min_interval(hostname, TICK_CYCLE, ntp_diff)
     }
 
-    pub fn set_ntp_diff(&mut self, ntp_diff: Arc<AtomicI64>) {
-        self.ntp_diff = ntp_diff;
-    }
-
-    pub fn with_min_interval<S: AsRef<str>>(hostname: S, interval: Duration) -> Self {
+    pub fn with_min_interval<S: AsRef<str>>(
+        hostname: S,
+        interval: Duration,
+        ntp_diff: Arc<AtomicI64>,
+    ) -> Self {
         let (stats_queue_sender, stats_queue_receiver, counter) = bounded(STATS_SENDER_QUEUE_SIZE);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
@@ -175,7 +175,7 @@ impl Collector {
             thread: Mutex::new(None),
             sender: Arc::new(stats_queue_sender),
             receiver: Arc::new(stats_queue_receiver),
-            ntp_diff: Arc::new(AtomicI64::new(0)),
+            ntp_diff,
         };
         Self::register_countable(
             &s,

@@ -126,13 +126,8 @@ func NewQingCloud(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud,
 		defaultVxnetName:          "vxnet-0",
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
-		cloudStatsd: statsd.CloudStatsd{
-			APICount: make(map[string][]int),
-			APICost:  make(map[string][]int),
-			ResCount: make(map[string][]int),
-		},
-
-		debugger: cloudcommon.NewDebugger(domain.Name),
+		cloudStatsd:               statsd.NewCloudStatsd(),
+		debugger:                  cloudcommon.NewDebugger(domain.Name),
 	}, nil
 }
 
@@ -247,17 +242,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 
 	// qingcloud has a unified call API，so this could be very convenient
 	if !strings.Contains(common.CloudMonitorExceptionAPI[common.QINGCLOUD_EN], action) {
-		cost := time.Now().Sub(startTime).Milliseconds()
-		if _, ok := q.cloudStatsd.APICost[action]; !ok {
-			q.cloudStatsd.APICost[action] = []int{int(cost)}
-		} else {
-			q.cloudStatsd.APICost[action] = append(q.cloudStatsd.APICost[action], int(cost))
-		}
-		if _, ok := q.cloudStatsd.APICount[action]; !ok {
-			q.cloudStatsd.APICount[action] = []int{count}
-		} else {
-			q.cloudStatsd.APICount[action] = append(q.cloudStatsd.APICount[action], count)
-		}
+		q.cloudStatsd.RefreshAPIMoniter(action, count, startTime)
 	}
 	q.debugger.WriteJson(resultKey, " ", response)
 	return response, nil
@@ -302,9 +287,7 @@ func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 	// every tasks must init
-	q.cloudStatsd.APICount = map[string][]int{}
-	q.cloudStatsd.APICost = map[string][]int{}
-	q.cloudStatsd.ResCount = map[string][]int{}
+	q.cloudStatsd = statsd.NewCloudStatsd()
 
 	// 区域和可用区
 	regions, azs, err := q.getRegionAndAZs()
