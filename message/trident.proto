@@ -265,7 +265,7 @@ message Config {
     repeated uint32 l7_log_store_tap_types = 403;
     optional bool   l4_performance_enabled = 404 [default = true];
     optional bool   l7_metrics_enabled     = 405 [default = true];
-    optional bool external_agent_http_proxy_enabled = 406 [default = false]; // 外部Agent数据HTTP代理开关
+    optional bool external_agent_http_proxy_enabled = 406 [default = true]; // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 38086]; // 外部Agent数据HTTP代理端口
     // _ = 408; // deprecated. 408 was once occupied by prometheus_http_api_address.
     repeated string prometheus_http_api_addresses = 409;

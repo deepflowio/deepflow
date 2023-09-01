@@ -140,7 +140,7 @@ var (
 	DefaultSysFreeMemoryLimit            = 0
 	DefaultLogFileSize                   = 1000
 	DefaultHTTPLogXRequestID             = "X-Request-ID"
-	DefaultExternalAgentHTTPProxyEnabled = 1
+	DefaultExternalAgentHTTPProxyEnabled = 1 // 外部Agent数据HTTP代理开关
 	DefaultExternalAgentHTTPProxyPort    = 38086
 	DefaultPrometheusHttpAPIAddresses    = ""
 	DefaultAnalyzerPort                  = 30033
