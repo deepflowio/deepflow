@@ -468,6 +468,7 @@ impl Synchronizer {
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -493,7 +494,7 @@ impl Synchronizer {
             exception_handler,
 
             max_memory: Default::default(),
-            ntp_diff: Default::default(),
+            ntp_diff,
             agent_mode,
             standalone_runtime_config,
             agent_id_tx,
