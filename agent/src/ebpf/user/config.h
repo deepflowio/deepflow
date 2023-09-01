@@ -141,4 +141,9 @@ enum {
 
 #define PROFILER_READER_EPOLL_TIMEOUT		500 //msecs
 #define EPOLL_SHORT_TIMEOUT			100  //mescs
+
+/* Process information recalibration time, this time is the number of seconds
+ * lost from the process startup time to the current time. */
+#define PROC_INFO_VERIFY_TIME  10 // 10 seconds
+
 #endif /* DF_EBPF_CONFIG_H */
