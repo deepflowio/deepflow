@@ -18,9 +18,9 @@ package statsd
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -57,7 +57,10 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 
 	if dfstatsdClient == nil {
 		var err error
-		dfstatsdClient, err = stats.NewUDPClient(stats.UDPConfig{fmt.Sprintf("%s:%d", s.host, s.port), 1400})
+		dfstatsdClient, err = stats.NewUDPClient(stats.UDPConfig{
+			Addr:        fmt.Sprintf("%s:%d", s.host, s.port),
+			PayloadSize: 1400,
+		})
 		if err != nil {
 			log.Warningf("connect (%s:%d) stats udp server failed: %s", s.host, s.port, err.Error())
 			return
@@ -90,22 +93,22 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 
 			metricsFloatNames := []string{}
 			metricsFloatValues := []float64{}
-			var vSum int
+			var vSum float64
 			for _, v := range mfValues {
 				vSum += v
 			}
 			switch e.MetricType {
 			case "Inc":
 				metricsFloatNames = []string{"count"}
-				metricsFloatValues = []float64{float64(vSum)}
+				metricsFloatValues = []float64{vSum}
 			case "Timing":
-				vLen := len(mfValues)
-				vAVG := math.Ceil(float64(vSum / vLen))
+				vLen := float64(len(mfValues))
+				vAVG, _ := strconv.ParseFloat(fmt.Sprintf("%.3f", vSum/vLen), 64)
 				metricsFloatNames = []string{"avg", "len"}
 				if vLen == 1 && vAVG == 0 {
 					vLen = 0
 				}
-				metricsFloatValues = []float64{vAVG, float64(vLen)}
+				metricsFloatValues = []float64{vAVG, vLen}
 			default:
 				continue
 			}

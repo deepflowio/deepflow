@@ -2337,7 +2337,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (11, '网络-PCAP 数据', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (12, '系统监控数据', 'deepflow_system.*', 0, 3*24, @lcuuid);
+                 VALUES (12, '系统监控数据', 'deepflow_system.*', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (13, '外部指标数据', 'ext_metrics.*', 0, 7*24, @lcuuid);
@@ -2346,13 +2346,16 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (14, 'Prometheus 数据', 'prometheus.*', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (15, '事件-资源变更事件', 'event.event', 0, 3*24, @lcuuid);
+                 VALUES (15, '事件-资源变更事件', 'event.event', 0, 30*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 3*24, @lcuuid);
+                 VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 3*24, @lcuuid);
+                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 30*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,

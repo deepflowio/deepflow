@@ -54,6 +54,12 @@ struct symbolizer_proc_info {
 	 * system boot, (in milliseconds) */
 	u64 stime;
 	u64 netns_id;
+	/*
+	 * Sometimes the process name set by some processes will be delayed.
+	 * When the process is just started, the name may change later. This
+	 * is used to delay confirmation.
+	 */
+	bool verified;
 	/* process name */
 	char comm[TASK_COMM_LEN];
 };
