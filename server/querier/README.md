@@ -275,12 +275,12 @@ clickhouse指标量及算子特殊处理：
   - IgnoreZero为true，0值无意义
 
   ```
-  SELECT AVGArray(arrayFilter(x -> x!=0, _rtt_sum)) AS avg_rtt
+  SELECT AVGArray(arrayFilter(x -> x>0, _rtt_sum)) AS avg_rtt
   FROM
   (
       WITH if(rtt_count > 0, rtt_sum / rtt_count, 0)
       SELECT
-          groupArrayIf(rtt_sum, rtt_sum != 0) AS _rtt_sum,
+          groupArrayIf(rtt_sum, rtt_sum > 0) AS _rtt_sum,
       FROM vtap_flow_port.`1m`
   )
 
