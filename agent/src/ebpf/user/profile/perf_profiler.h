@@ -34,6 +34,8 @@
 #define stack_trace_msg_hash_key_value_pair_cb		clib_bihash_foreach_key_value_pair_cb_24_8
 #define stack_trace_msg_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_24_8
 
+#define JAVA_ATTACH_TOOL_PATH DF_JAVA_ATTACH_CMD
+
 /*
  * stack trace messages for push-hash kvp.
  */

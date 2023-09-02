@@ -161,22 +161,26 @@ $(LIBTRACE): $(STATIC_OBJS)
 $(JAVA_AGENT_GNU_SO): tools/bintobuffer
 	$(call msg,SO,$@)
 	$(Q)$(GNU_CC) $(CFLAGS) -shared -o $@ $(JAVA_AGENT_SRC)
+	@rm -rf user/profile/java_agent_so_gnu.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_gnu.c java_agent_so_gnu
 
 $(JAVA_AGENT_MUSL_SO): tools/bintobuffer
 	$(call msg,SO,$@)
 	$(Q)$(MUSL_CC) $(CFLAGS) -shared -o $@ $(JAVA_AGENT_SRC)
+	@rm -rf user/profile/java_agent_so_musl.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_musl.c java_agent_so_musl
 
 build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
 
-tools: $(LIBTRACE) $(JAVA_TOOL)
+tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(STATIC_OBJS) $(JAVA_AGENT_SO)
+$(JAVA_TOOL): $(JAVA_AGENT_SO)
 	$(call msg,TOOLS,$@)
 	$(Q)$(CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl
+	@rm -rf user/profile/deepflow_jattach_bin.c
+	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 
 rust-sample: .socket-tracer .profiler
 socket-tracer: .socket-tracer
@@ -251,7 +255,7 @@ clean:
 	$(Q)rm -rf .profiler .socket-tracer
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target
-	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL)h
+	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) tools/bintobuffer
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory

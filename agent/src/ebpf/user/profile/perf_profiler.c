@@ -21,6 +21,7 @@
  * using musl.
  */
 #ifndef AARCH64_MUSL
+#include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include "../config.h"
 #include "../common.h"
@@ -29,6 +30,7 @@
 #include "../types.h"
 #include "../vec.h"
 #include "../tracer.h"
+#include "attach.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -55,6 +57,8 @@
  */
 #include "java_agent_so_gnu.c"
 #include "java_agent_so_musl.c"
+/* use for java symbols generate */
+#include "deepflow_jattach_bin.c"
 
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
@@ -953,6 +957,31 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 		ebpf_warning(LOG_CP_TAG
 			     "Java agent so library(%s) generate failed.\n",
 			     AGENT_MUSL_LIB_SRC_PATH);
+		return (-1);
+	}
+
+	/* For java attach tool */
+	if (access(JAVA_ATTACH_TOOL_PATH, F_OK) == 0) {
+		if (unlink(JAVA_ATTACH_TOOL_PATH) != 0) {
+			ebpf_warning(LOG_CP_TAG "rm file %s failed.\n",
+				     JAVA_ATTACH_TOOL_PATH);
+			return (-1);
+		}
+	}
+
+	if (gen_file_from_mem((const char *)deepflow_jattach_bin,
+			      sizeof(deepflow_jattach_bin),
+			      (const char *)JAVA_ATTACH_TOOL_PATH)) {
+		ebpf_warning(LOG_CP_TAG
+			     "Java attach tool (%s) generate failed.\n",
+			     JAVA_ATTACH_TOOL_PATH);
+		return (-1);
+	}
+
+	if (chmod(JAVA_ATTACH_TOOL_PATH, 0755) < 0) {
+		ebpf_warning(LOG_CP_TAG
+			     "file '%s' chmod failed.\n",
+			     JAVA_ATTACH_TOOL_PATH);
 		return (-1);
 	}
 

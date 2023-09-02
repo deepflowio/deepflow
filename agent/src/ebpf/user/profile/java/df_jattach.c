@@ -198,6 +198,25 @@ static void clear_target_ns_tmp_file(const char *target_path)
 	}
 }
 
+static inline bool is_same_netns(int target_pid)
+{
+	struct stat self_st, target_st;
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/self/ns/net");
+	if (stat(path, &self_st) != 0)
+		return false;
+
+	snprintf(path, sizeof(path), "/proc/%d/ns/net", target_pid);
+	if (stat(path, &target_st) != 0)
+		return false;
+
+	if (self_st.st_ino == target_st.st_ino) {
+		return true;
+	}
+
+	return false;
+}
+
 void clear_target_ns(int pid, int target_ns_pid)
 {
 	/*
@@ -208,7 +227,7 @@ void clear_target_ns(int pid, int target_ns_pid)
 	 *  /tmp/df_java_agent_musl.so
 	 */
 
-	if (pid == target_ns_pid)
+	if (is_same_netns(pid))
 		return;
 
 	char target_path[MAX_PATH_LENGTH];
@@ -261,7 +280,7 @@ static inline void switch_to_root_ns(int root_fd)
 
 void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 {
-	if (pid == ns_pid)
+	if (is_same_netns(pid))
 		return;
 
 	char target_path[128];
@@ -319,7 +338,7 @@ int java_attach(pid_t pid)
 		return 0;
 	}
 
-	if (target_ns_pid != pid) {
+	if (!is_same_netns(pid)) {
 		/*
 		 * If the target Java process is in a subordinate namespace, copy the
 		 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace

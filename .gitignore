@@ -41,6 +41,7 @@ target/
 /agent/src/ebpf/user/profile/java_agent_so_musl.c
 /agent/src/ebpf/tools/bintobuffer
 /agent/src/ebpf/deepflow-jattach
+/agent/src/ebpf/user/profile/deepflow_jattach_bin.c
 /agent/src/ebpf/.profiler
 /agent/src/ebpf/.socket-tracer
 /agent/src/ebpf/samples/rust/profiler/target
