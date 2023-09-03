@@ -780,12 +780,12 @@ static int create_profiler(struct bpf_tracer *tracer)
 		return ETR_NORESOURCE;
 	}
 
-	/* attach perf event */
-	tracer_hooks_attach(tracer);
-
 	/* syms_cache_hash maps from pid to BCC symbol cache.
 	 * Use of void* is inherited from the BCC library. */
 	create_and_init_symbolizer_caches();
+
+	/* attach perf event */
+	tracer_hooks_attach(tracer);
 
 	/*
 	 * Start a new thread to execute the data
