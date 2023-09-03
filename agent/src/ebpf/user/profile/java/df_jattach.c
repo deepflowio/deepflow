@@ -189,7 +189,7 @@ static int attach(pid_t pid)
 	return ret;
 }
 
-static void clear_target_ns_tmp_file(const char *target_path)
+void clear_target_ns_tmp_file(const char *target_path)
 {
 	if (access(target_path, F_OK) == 0) {
 		if (unlink(target_path) != 0)

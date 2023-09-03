@@ -45,6 +45,7 @@
 #include "bddisasm/disasmtypes.h"
 #endif
 #include "libGoReSym.h"
+#include "profile/java/df_jattach.h"
 #include "profile/attach.h"
 
 static u64 add_symcache_count;
@@ -484,7 +485,19 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 	}
 
 	if (kv->v.proc_info_p) {
-		clib_mem_free((void *)kv->v.proc_info_p);
+		struct symbolizer_proc_info *p;
+		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		if (p->is_java) {
+			/* Delete Java files '/tmp/perf-<pid>.<map|log>' */
+			int pid = (int)kv->k.pid;
+			char path[MAX_PATH_LENGTH];
+			snprintf(path, sizeof(path), "/tmp/perf-%d.map", pid);
+			clear_target_ns_tmp_file(path);
+			snprintf(path, sizeof(path), "/tmp/perf-%d.log", pid);
+			clear_target_ns_tmp_file(path);
+		}
+
+		clib_mem_free((void *)p);
 		kv->v.proc_info_p = 0;
 	}
 }
@@ -609,8 +622,30 @@ u64 get_pid_stime(pid_t pid)
 	return 0;
 }
 
-void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
-			     char *name)
+static void java_proc_info_config(struct symbolizer_proc_info *p, int pid)
+{
+	if (strcmp(p->comm, "java") == 0)
+		p->is_java = true;
+	else
+		p->is_java = false;
+
+	if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
+	    PROC_INFO_VERIFY_TIME) {
+		p->verified = true;
+		/*
+		 * Ensure the Java program runs stably for a period
+		 * of time before obtaining the Java address and
+		 * symbol mapping table.
+		 */
+		if (p->is_java)
+			gen_java_symbols_file(pid);
+
+	} else {
+		p->verified = false;
+	}
+}
+
+void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 {
 	ASSERT(pid >= 0 && stime != NULL && netns_id != NULL && name != NULL);
 
@@ -655,13 +690,7 @@ void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
 			return;
 		}
 
-		if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
-		    PROC_INFO_VERIFY_TIME) {
-			p->verified = true;
-		} else {
-			p->verified = false;
-		}
-
+		java_proc_info_config(p, pid);
 		kv.v.proc_info_p = pointer_to_uword(p);
 		kv.v.cache = 0;
 		if (symbol_caches_hash_add_del
@@ -674,17 +703,40 @@ void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
 		} else
 			__sync_fetch_and_add(&h->hash_elems_count, 1);
 	} else {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p; 
-		if (!p->verified && ((current_sys_time_secs() - (p->stime / 1000ULL)) >= 
-				     PROC_INFO_VERIFY_TIME)) {
+		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		if (!p->verified
+		    && ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
+			PROC_INFO_VERIFY_TIME)) {
+			/*
+			 * To prevent the possibility of the process name being changed
+			 * shortly after the program's initial startup, as a precaution,
+			 * we will reacquire it after the program has been running stably
+			 * for a period of time to avoid such situations.
+			 */
 			p->stime = (u64) get_process_starttime_and_comm(pid,
 									p->comm,
-									sizeof(p->comm));
+									sizeof
+									(p->comm));
 			p->comm[sizeof(p->comm) - 1] = '\0';
 			if (p->stime == 0) {
-				ebpf_warning("pid %d get_process_starttime_and_comm() error\n",
-					     pid);
+				ebpf_warning
+				    ("pid %d get_process_starttime_and_comm() error\n",
+				     pid);
 			}
+
+			if (strcmp(p->comm, "java") == 0)
+				p->is_java = true;
+			else
+				p->is_java = false;
+
+			/*
+			 * We obtain the symbol table in the Java program after it has been
+			 * running for a while, rather than during the program's startup p-
+			 * rocess, to avoid situations where the symbol table cannot be re-
+			 * trieved.
+			 */
+			if (p->is_java)
+				gen_java_symbols_file(pid);
 
 			p->verified = true;
 		}
@@ -805,17 +857,7 @@ int create_and_init_symbolizer_caches(void)
 				continue;
 			}
 
-			if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
-			    PROC_INFO_VERIFY_TIME) {
-				p->verified = true;
-			} else {
-				p->verified = false;
-			}
-
-			if (strcmp(p->comm, "java") == 0) {
-				gen_java_symbols_file(pid);
-			}
-
+			java_proc_info_config(p, pid);
 			sym.v.proc_info_p = pointer_to_uword(p);
 			sym.v.cache = 0;
 			if (symbol_caches_hash_add_del
