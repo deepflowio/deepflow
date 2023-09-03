@@ -301,7 +301,7 @@ impl Default for OnCpuProfile {
             disabled: false,
             frequency: 99,
             cpu: 0,
-            regex: "^(java|deepflow-.*)$".to_string(),
+            regex: "^deepflow-.*".to_string(),
         }
     }
 }

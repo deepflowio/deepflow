@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -302,6 +302,14 @@ jint replay_callbacks(jvmtiEnv * jvmti)
 	}
 
 	error =
+	    (*jvmti)->GenerateEvents(jvmti, JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
+	if (error != JVMTI_ERROR_NONE) {
+		jvmti_err_log(jvmti, error,
+			      "GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED).");
+		return JNI_ERR;
+	}
+
+	error =
 	    (*jvmti)->GenerateEvents(jvmti, JVMTI_EVENT_COMPILED_METHOD_LOAD);
 	if (error != JVMTI_ERROR_NONE) {
 		jvmti_err_log(jvmti, error,
@@ -309,13 +317,6 @@ jint replay_callbacks(jvmtiEnv * jvmti)
 		return JNI_ERR;
 	}
 
-	error =
-	    (*jvmti)->GenerateEvents(jvmti, JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
-	if (error != JVMTI_ERROR_NONE) {
-		jvmti_err_log(jvmti, error,
-			      "GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED).");
-		return JNI_ERR;
-	}
 	return JNI_OK;
 }
 
