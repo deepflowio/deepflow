@@ -431,6 +431,11 @@ u64 get_process_starttime(pid_t pid)
 	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
+u64 current_sys_time_secs(void)
+{
+	return (get_sys_uptime() + (get_sys_btime_msecs() / 1000));
+}
+
 /*
  * Get the start time (in milliseconds) of a given PID,
  * and fetch process comm.

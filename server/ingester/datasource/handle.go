@@ -32,10 +32,53 @@ const (
 	ORIGIN_TABLE_1S = "1s"
 	FLOW_METRICS    = "vtap_flow"
 	APP_METRICS     = "vtap_app"
-	DEEPFLOW_SYSTEM = "deepflow_system"
 
 	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
+
+type DatasourceModifiedOnly string
+type DatasourceInfo struct {
+	ID     int
+	DB     string
+	Tables []string
+}
+
+const (
+	DEEPFLOW_SYSTEM   DatasourceModifiedOnly = "deepflow_system"
+	L4_FLOW_LOG                              = "flow_log.l4_flow_log"
+	L7_FLOW_LOG                              = "flow_log.l7_flow_log"
+	L4_PACKET                                = "flow_log.l4_packet"
+	L7_PACKET                                = "flow_log.l7_packet"
+	EXT_METRICS                              = "ext_metrics"
+	PROMETHEUS                               = "prometheus"
+	EVENT_EVENT                              = "event.event"
+	EVENT_PERF_EVENT                         = "event.perf_event"
+	EVENT_ALARM_EVENT                        = "event.alarm_event"
+	PROFILE                                  = "profile.in_process"
+)
+
+var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
+	DEEPFLOW_SYSTEM:   {int(zerodoc.VTAP_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
+	L4_FLOW_LOG:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
+	L7_FLOW_LOG:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
+	L4_PACKET:         {int(zerodoc.VTAP_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
+	L7_PACKET:         {int(zerodoc.VTAP_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
+	EXT_METRICS:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
+	PROMETHEUS:        {int(zerodoc.VTAP_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
+	EVENT_EVENT:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 8, "event", []string{"event"}},
+	EVENT_PERF_EVENT:  {int(zerodoc.VTAP_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
+	EVENT_ALARM_EVENT: {int(zerodoc.VTAP_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
+	PROFILE:           {int(zerodoc.VTAP_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
+}
+
+func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
+	return DatasourceModifiedOnlyIDMap[ds]
+}
+
+func IsModifiedOnlyDatasource(datasource string) bool {
+	_, ok := DatasourceModifiedOnlyIDMap[DatasourceModifiedOnly(datasource)]
+	return ok
+}
 
 // VATP_ACL数据库, 不进行数据源修改
 var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
@@ -467,7 +510,7 @@ func (m *DatasourceManager) modDeepflowSystemTables(cks basecommon.DBs, duration
 		for _, tableName := range tableNames {
 			tableLocal := fmt.Sprintf("%s.`%s`", DEEPFLOW_SYSTEM, tableName)
 			modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-				tableLocal, m.makeTTLString("time", DEEPFLOW_SYSTEM, tableName, duration))
+				tableLocal, m.makeTTLString("time", "deepflow_system", tableName, duration))
 			log.Infof("modify deepflow_system table TTL: %s", modTable)
 			_, err := ck.Exec(modTable)
 			if err != nil {
@@ -513,57 +556,65 @@ func getFlowLogDatasoureID(name string) (common.FlowLogID, uint8) {
 	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.VTAP_TABLE_ID_MAX)
 }
 
+func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {
+	tableLocal := fmt.Sprintf("%s.%s_%s", db, table, LOCAL)
+	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
+		tableLocal, m.makeTTLString("time", db, table, duration))
+	_, err := cks.ExecParallel(modTable)
+	return err
+}
+
 func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
 	if len(m.ckAddrs) == 0 {
 		return fmt.Errorf("ck addrs is empty")
 	}
 
+	if IsModifiedOnlyDatasource(dbGroup) && action == actionStrings[MOD] {
+		datasoureInfo := DatasourceModifiedOnly(dbGroup).DatasourceInfo()
+		datasourceId := datasoureInfo.ID
+		db := datasoureInfo.DB
+		tables := datasoureInfo.Tables
+
+		cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		if m.isModifyingFlags[datasourceId] {
+			return fmt.Errorf(ERR_IS_MODIFYING, dbGroup)
+		}
+		switch DatasourceModifiedOnly(dbGroup) {
+		case DEEPFLOW_SYSTEM:
+			go func(id int) {
+				m.isModifyingFlags[id] = true
+				if err := m.modDeepflowSystemTables(cks, duration); err != nil {
+					log.Error(err)
+				}
+				m.isModifyingFlags[id] = false
+				cks.Close()
+			}(datasourceId)
+		default:
+			go func(tableNames []string, id int) {
+				m.isModifyingFlags[id] = true
+				for _, tableName := range tableNames {
+					if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
+						log.Info(err)
+					}
+				}
+				m.isModifyingFlags[id] = false
+				cks.Close()
+			}(tables, datasourceId)
+		}
+
+		return nil
+	}
+
 	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	defer cks.Close()
-
-	// flow_log.x只支持mod
-	if isFlowLogGroup(dbGroup) && action == actionStrings[MOD] {
-		flowLogID, tableID := getFlowLogDatasoureID(dbGroup)
-		if m.isModifyingFlags[tableID] {
-			return fmt.Errorf(ERR_IS_MODIFYING, flowLogID)
-		}
-		go func(id common.FlowLogID) {
-			cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-			defer cks.Close()
-			m.isModifyingFlags[tableID] = true
-			if err := m.modFlowLogLocalTable(cks, id, duration); err != nil {
-				log.Info(err)
-			}
-			m.isModifyingFlags[tableID] = false
-		}(flowLogID)
-		return nil
-	} else if dbGroup == DEEPFLOW_SYSTEM && action == actionStrings[MOD] {
-		deepflowSystemID := uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.VTAP_TABLE_ID_MAX) + 1
-		if m.isModifyingFlags[deepflowSystemID] {
-			return fmt.Errorf(ERR_IS_MODIFYING, DEEPFLOW_SYSTEM)
-		}
-		go func(id uint8) {
-			cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-			defer cks.Close()
-			m.isModifyingFlags[id] = true
-			if err := m.modDeepflowSystemTables(cks, duration); err != nil {
-				log.Error(err)
-			}
-			m.isModifyingFlags[id] = false
-		}(deepflowSystemID)
-		return nil
-	}
 
 	table := baseTable
 	if table == "" {

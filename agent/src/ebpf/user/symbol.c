@@ -626,10 +626,10 @@ void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
+	struct symbolizer_proc_info *p;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) != 0) {
-		struct symbolizer_proc_info *p =
-		    clib_mem_alloc_aligned("sym_proc_info",
+		p = clib_mem_alloc_aligned("sym_proc_info",
 					   sizeof(struct symbolizer_proc_info),
 					   0, NULL);
 		if (p == NULL) {
@@ -655,6 +655,13 @@ void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
 			return;
 		}
 
+		if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
+		    PROC_INFO_VERIFY_TIME) {
+			p->verified = true;
+		} else {
+			p->verified = false;
+		}
+
 		kv.v.proc_info_p = pointer_to_uword(p);
 		kv.v.cache = 0;
 		if (symbol_caches_hash_add_del
@@ -666,6 +673,21 @@ void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id,
 			return;
 		} else
 			__sync_fetch_and_add(&h->hash_elems_count, 1);
+	} else {
+		p = (struct symbolizer_proc_info *)kv.v.proc_info_p; 
+		if (!p->verified && ((current_sys_time_secs() - (p->stime / 1000ULL)) >= 
+				     PROC_INFO_VERIFY_TIME)) {
+			p->stime = (u64) get_process_starttime_and_comm(pid,
+									p->comm,
+									sizeof(p->comm));
+			p->comm[sizeof(p->comm) - 1] = '\0';
+			if (p->stime == 0) {
+				ebpf_warning("pid %d get_process_starttime_and_comm() error\n",
+					     pid);
+			}
+
+			p->verified = true;
+		}
 	}
 
 	copy_process_name(&kv, name);
@@ -781,6 +803,13 @@ int create_and_init_symbolizer_caches(void)
 			if (p->stime == 0) {
 				clib_mem_free(p);
 				continue;
+			}
+
+			if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
+			    PROC_INFO_VERIFY_TIME) {
+				p->verified = true;
+			} else {
+				p->verified = false;
 			}
 
 			if (strcmp(p->comm, "java") == 0) {

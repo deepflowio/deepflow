@@ -9,6 +9,7 @@
 41      , gRPC            ,
 42      , ProtobufRPC     ,
 43      , SOFARPC         ,
+44      , FastCGI         ,
 60      , MySQL           ,
 61      , PostgreSQL      ,
 80      , Redis           ,

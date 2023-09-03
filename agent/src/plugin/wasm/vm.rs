@@ -20,8 +20,7 @@ use std::net::IpAddr;
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_log::ParseParam;
-use crate::flow_generator::protocol_logs::pb_adapter::{KeyVal, TraceInfo};
-use crate::flow_generator::protocol_logs::HttpInfo;
+use crate::flow_generator::protocol_logs::{HttpInfo, L7ResponseStatus};
 use crate::flow_generator::{Error, Result};
 use crate::plugin::CustomInfo;
 use crate::wasm_error;
@@ -34,10 +33,8 @@ use public::enums::IpProtocol;
 #[derive(Debug)]
 pub(super) enum VmResult {
     // result of parse_payload
-    ParsePayloadResult(Vec<CustomInfo>),
+    L7InfoResult(Vec<CustomInfo>),
     StringResult(String),
-    // result of on_http_req and on_http_resp
-    HTTPResult(Option<TraceInfo>, Vec<KeyVal>),
 }
 
 // vm parse ctx
@@ -76,24 +73,14 @@ impl VmParseCtx {
         self.get_ctx_base_mut().result.take()
     }
 
-    pub(super) fn take_parse_payload_result(&mut self) -> Option<Vec<CustomInfo>> {
+    pub(super) fn take_l7_info_result(&mut self) -> Option<Vec<CustomInfo>> {
         self.take_result().map_or(None, |r| match r {
-            VmResult::ParsePayloadResult(info) => Some(info),
+            VmResult::L7InfoResult(info) => Some(info),
             _ => {
                 wasm_error!(
                     self.get_ins_name(),
                     "parse payload result with unexpect type",
                 );
-                None
-            }
-        })
-    }
-
-    pub(super) fn take_http_result(&mut self) -> Option<(Option<TraceInfo>, Vec<KeyVal>)> {
-        self.take_result().map_or(None, |r| match r {
-            VmResult::HTTPResult(trace, kv) => Some((trace, kv)),
-            _ => {
-                wasm_error!(self.get_ins_name(), "http result with unexpect type",);
                 None
             }
         })
@@ -400,19 +387,20 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpReqCtx {
 pub struct VmHttpRespCtx {
     pub base_ctx: VmCtxBase,
     pub code: u16,
+    pub status: L7ResponseStatus,
 }
 
 impl VmHttpRespCtx {
     /*
-      code:      2bytes
+      code:      2 bytes
+      status:    1 bytes
     */
+    const BUF_SIZE: usize = 3;
     pub(super) fn serialize_to_bytes(&self, buf: &mut [u8]) -> Result<usize> {
-        let need_size = 2;
-
-        if buf.len() < need_size {
+        if buf.len() < Self::BUF_SIZE {
             return Err(Error::WasmSerializeFail(format!(
                 "serialize http resp ctx fail, need at lease {} bytes but buf only {} bytes",
-                need_size,
+                Self::BUF_SIZE,
                 buf.len()
             )));
         }
@@ -420,6 +408,8 @@ impl VmHttpRespCtx {
         let mut off = 0;
         write_u16_be(buf, self.code);
         off += 2;
+        buf[off] = self.status as u8;
+        off += 1;
         Ok(off)
     }
 }
@@ -430,6 +420,7 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpRespCtx {
         Self {
             base_ctx: VmCtxBase::from((param, 0, payload)),
             code: info.status_code.map_or(0, |c| c as u16),
+            status: info.status,
         }
     }
 }

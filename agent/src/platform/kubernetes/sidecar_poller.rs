@@ -37,7 +37,11 @@ impl SidecarPoller {
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);
         };
-        let Some(link) = links.into_iter().filter(|link| link.mac_addr == ctrl_mac).next() else {
+        let Some(link) = links
+            .into_iter()
+            .filter(|link| link.mac_addr == ctrl_mac)
+            .next()
+        else {
             warn!("cannot find ctrl interface with mac {}", ctrl_mac);
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);

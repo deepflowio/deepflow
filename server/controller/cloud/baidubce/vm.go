@@ -51,8 +51,7 @@ func (b *BaiduBce) getVMs(
 			log.Error(err)
 			return nil, nil, nil, err
 		}
-		b.cloudStatsd.APICost["ListInstances"] = append(b.cloudStatsd.APICost["ListInstances"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["ListInstances"] = append(b.cloudStatsd.APICount["ListInstances"], len(result.Instances))
+		b.cloudStatsd.RefreshAPIMoniter("ListInstances", len(result.Instances), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
@@ -199,8 +198,7 @@ func (b *BaiduBce) getVMEnis(
 				log.Error(err)
 				return nil, nil, err
 			}
-			b.cloudStatsd.APICost["ListEni"] = append(b.cloudStatsd.APICost["ListEni"], int(time.Now().Sub(startTime).Milliseconds()))
-			b.cloudStatsd.APICount["ListEni"] = append(b.cloudStatsd.APICount["ListEni"], len(result.Eni))
+			b.cloudStatsd.RefreshAPIMoniter("ListEni", len(result.Eni), startTime)
 			results = append(results, result)
 			if !result.IsTruncated {
 				break

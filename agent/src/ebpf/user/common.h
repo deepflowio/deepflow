@@ -274,4 +274,5 @@ int df_enter_ns(int pid, const char *type, int *self_fd);
 void df_exit_ns(int fd);
 int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path);
 int exec_command(const char *cmd, const char *args);
+u64 current_sys_time_secs(void);
 #endif /* DF_COMMON_H */

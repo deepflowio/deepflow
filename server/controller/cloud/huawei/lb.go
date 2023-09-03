@@ -34,7 +34,6 @@ func (h *HuaWei) getLBs() (
 			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.Domain), token.token, "loadbalancers",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, nil, nil, err
 		}
 
@@ -122,7 +121,6 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.Domain), token, "listeners",
 	)
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return nil, nil, err
 	}
 
@@ -176,7 +174,6 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.Domain, poolID.MustString()), token, "members",
 			)
 			if err != nil {
-				log.Errorf("request failed: %v", err)
 				return nil, nil, err
 			}
 			for i := range jTSs {

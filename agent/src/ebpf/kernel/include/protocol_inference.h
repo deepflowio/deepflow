@@ -1465,7 +1465,8 @@ infer_fastcgi_message(const char *buf, size_t count,
 	header = (struct fastcgi_header *)buf;
 
 	if (fastcgi_header_common_check(header) && count == 8 &&
-	    (header->type == FCGI_PARAMS || header->type == FCGI_STDOUT) &&
+	    (header->type == FCGI_BEGIN_REQUEST ||
+	     header->type == FCGI_PARAMS || header->type == FCGI_STDOUT) &&
 	    __bpf_ntohs(header->content_length) != 0) {
 		save_prev_data(buf, conn_info, 8);
 		return MSG_PRESTORE;
@@ -1491,7 +1492,7 @@ infer_fastcgi_message(const char *buf, size_t count,
 		return MSG_UNKNOWN;
 	}
 
-	if (header->type == FCGI_BEGIN_REQUEST) {
+	if (header->type == FCGI_BEGIN_REQUEST || header->type == FCGI_PARAMS) {
 		return MSG_REQUEST;
 	}
 	if (header->type == FCGI_STDOUT) {

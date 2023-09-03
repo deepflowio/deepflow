@@ -78,7 +78,7 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
 		},
 		taskCost: statsd.CloudTaskStatsd{
-			TaskCost: make(map[string][]int),
+			TaskCost: make(map[string][]float64),
 		},
 	}
 }
@@ -154,9 +154,12 @@ func (c *Cloud) getCloudGatherInterval() int {
 
 func (c *Cloud) getCloudData() {
 	var cResource model.Resource
+	var cloudCost float64
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
+		startTime := time.Now()
 		cResource, err = c.platform.GetCloudData()
+		cloudCost = time.Now().Sub(startTime).Seconds()
 		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 		if err == nil {
 			if cResource.ErrorState == 0 {
@@ -173,7 +176,7 @@ func (c *Cloud) getCloudData() {
 			}
 		}
 	} else {
-		cResource = c.getKubernetesData()
+		cResource, cloudCost = c.getKubernetesData()
 	}
 
 	if len(cResource.VMs) == 0 {
@@ -185,6 +188,14 @@ func (c *Cloud) getCloudData() {
 
 	cResource.SyncAt = time.Now()
 	c.resource = cResource
+	c.sendStatsd(cloudCost)
+}
+
+func (c *Cloud) sendStatsd(cloudCost float64) {
+	c.taskCost.TaskCost = map[string][]float64{
+		c.basicInfo.Lcuuid: []float64{cloudCost},
+	}
+	statsd.MetaStatsd.RegisterStatsdTable(c)
 }
 
 func (c *Cloud) run() {
@@ -204,16 +215,9 @@ func (c *Cloud) run() {
 	for {
 		select {
 		case <-ticker.C:
-			c.taskCost.TaskCost = map[string][]int{}
-			startTime := time.Now()
-
 			log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
 			c.getCloudData()
 			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
-
-			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Seconds())}
-			statsd.MetaStatsd.RegisterStatsdTable(c)
-
 		case <-c.cCtx.Done():
 			log.Infof("cloud (%s) stopped", c.basicInfo.Name)
 			return
@@ -439,13 +443,20 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		if !ok {
 			continue
 		}
+		var name, processName string
+		if len(sProcess.Name) > c.cfg.ProcessNameLenMax {
+			name = sProcess.Name[:c.cfg.ProcessNameLenMax]
+		}
+		if len(sProcess.ProcessName) > c.cfg.ProcessNameLenMax {
+			processName = sProcess.ProcessName[:c.cfg.ProcessNameLenMax]
+		}
 		process := model.Process{
 			Lcuuid:      sProcess.Lcuuid,
-			Name:        sProcess.Name,
+			Name:        name,
 			VTapID:      sProcess.VtapID,
 			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
-			ProcessName: sProcess.ProcessName,
+			ProcessName: processName,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,
 			ContainerID: sProcess.ContainerID,

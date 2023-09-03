@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, RwLock,
 };
 
+use ahash::AHashMap;
 use log::{info, warn};
 
 use super::fast_path::FastPath;
@@ -234,7 +234,7 @@ struct Table6Item {
 }
 
 pub struct FirstPath {
-    group_ip_map: Option<HashMap<u16, Vec<IpSegment>>>,
+    group_ip_map: Option<AHashMap<u16, Vec<IpSegment>>>,
 
     vector_4: Vector4,
     table_4: RwLock<Vec<Vec<Table4Item>>>,
@@ -263,7 +263,7 @@ impl FirstPath {
 
     pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> FirstPath {
         FirstPath {
-            group_ip_map: Some(HashMap::new()),
+            group_ip_map: Some(AHashMap::new()),
             vector_4: Vector4::default(),
             table_4: RwLock::new(
                 std::iter::repeat(Vec::new())
@@ -296,7 +296,7 @@ impl FirstPath {
     }
 
     fn generate_group_ip_map(&mut self, groups: &Vec<Arc<IpGroupData>>) {
-        let mut group_ip_map: HashMap<u16, Vec<IpSegment>> = HashMap::new();
+        let mut group_ip_map: AHashMap<u16, Vec<IpSegment>> = AHashMap::new();
 
         for group in groups {
             if group.id == 0 {

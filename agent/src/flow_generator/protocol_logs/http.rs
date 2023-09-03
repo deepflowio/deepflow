@@ -28,6 +28,7 @@ use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
+use crate::plugin::CustomInfo;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -99,10 +100,66 @@ pub struct HttpInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
     #[serde(rename = "response_status")]
-    status: L7ResponseStatus,
+    pub status: L7ResponseStatus,
+
+    // set by wasm plugin
+    custom_endpoint: Option<String>,
+    custom_result: Option<String>,
+    custom_exception: Option<String>,
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+}
+
+impl HttpInfo {
+    pub fn merge_custom_to_http1(&mut self, custom: CustomInfo) {
+        // req rewrite
+        if !custom.req.domain.is_empty() {
+            self.host = custom.req.domain;
+        }
+
+        if !custom.req.req_type.is_empty() {
+            self.method = custom.req.req_type;
+        }
+
+        if !custom.req.resource.is_empty() {
+            self.path = custom.req.resource;
+        }
+
+        if !custom.req.endpoint.is_empty() {
+            self.custom_endpoint = Some(custom.req.endpoint)
+        }
+
+        //req write
+        if custom.resp.code.is_some() {
+            self.status_code = custom.resp.code;
+        }
+
+        if custom.resp.status != self.status {
+            self.status = custom.resp.status;
+        }
+
+        if !custom.resp.result.is_empty() {
+            self.custom_result = Some(custom.resp.result)
+        }
+
+        if !custom.resp.exception.is_empty() {
+            self.custom_exception = Some(custom.resp.exception)
+        }
+
+        //trace info rewrite
+        if custom.trace.trace_id.is_some() {
+            self.trace_id = custom.trace.trace_id.unwrap();
+        }
+        if custom.trace.span_id.is_some() {
+            self.span_id = custom.trace.span_id.unwrap();
+        }
+
+        // extend attribute
+        if !custom.attributes.is_empty() {
+            self.attributes.extend(custom.attributes);
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for HttpInfo {
@@ -309,7 +366,12 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.path,
             )
         } else {
-            (f.method, f.path.clone(), f.host, String::new())
+            (
+                f.method,
+                f.path.clone(),
+                f.host,
+                f.custom_endpoint.unwrap_or_default(),
+            )
         };
 
         L7ProtocolSendLog {
@@ -325,7 +387,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.status,
                 code: f.status_code,
-                ..Default::default()
+                exception: f.custom_exception.unwrap_or_default(),
+                result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
                 trace_id: Some(f.trace_id),
@@ -897,7 +960,7 @@ impl HttpLog {
                 info.span_id = id;
             }
         }
-        if key == &config.x_request_id {
+        if config.x_request_id.contains(key) {
             if direction == PacketDirection::ClientToServer {
                 info.x_request_id_0 = val.to_owned();
             } else {
@@ -970,7 +1033,7 @@ impl HttpLog {
         tingyun::decode_trace_id(value)
     }
 
-    fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
+    pub fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
         let trace_type = TraceType::from(trace_key);
         match trace_type {
             TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => {
@@ -999,12 +1062,8 @@ impl HttpLog {
             PacketDirection::ClientToServer => vm.on_http_req(payload, param, info),
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
         }
-        .map(|(trace, kv)| {
-            if let Some(trace) = trace {
-                trace.trace_id.map(|s| info.trace_id = s);
-                trace.span_id.map(|s| info.span_id = s);
-            }
-            info.attributes.extend(kv);
+        .map(|custom| {
+            info.merge_custom_to_http1(custom);
         });
     }
 }
@@ -1250,7 +1309,7 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
         let config = L7LogDynamicConfig::new(
             "".to_owned(),
-            "".to_owned(),
+            vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
         );

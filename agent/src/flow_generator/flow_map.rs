@@ -582,7 +582,8 @@ impl FlowMap {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = self.new_flow_node(config, meta_packet);
                     if let Some(node) = node {
-                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                            .insert(pkt_key);
                         nodes.push(node);
                         max_depth += 1;
                     }
@@ -1630,10 +1631,12 @@ impl FlowMap {
         }
 
         let mut l7_stats = L7Stats::default();
+        let mut collect_stats = false;
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP)
         {
             if let Some(perf) = node.meta_flow_log.as_mut() {
+                collect_stats = true;
                 perf.copy_and_reset_l4_perf_data(flow.reversed, &mut flow);
                 let l7_timeout_count = self
                     .perf_cache
@@ -1686,9 +1689,11 @@ impl FlowMap {
             self.tagged_flow_allocator
                 .allocate_one_with(node.tagged_flow.clone()),
         );
-        l7_stats.flow = Some(tagged_flow.clone());
-        self.l7_stats_buffer
-            .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+        if collect_stats {
+            l7_stats.flow = Some(tagged_flow.clone());
+            self.l7_stats_buffer
+                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+        }
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
@@ -1719,6 +1724,7 @@ impl FlowMap {
                 return;
             }
             let mut l7_stats = L7Stats::default();
+            let mut collect_stats = false;
             if flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
                     perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
@@ -1735,6 +1741,7 @@ impl FlowMap {
                     if flow.flow_key.proto == IpProtocol::TCP
                         || flow.flow_key.proto == IpProtocol::UDP
                     {
+                        collect_stats = true;
                         l7_stats.stats = l7_perf_stats;
                         l7_stats.endpoint = flow.last_endpoint.clone();
                         l7_stats.flow_id = flow.flow_id;
@@ -1771,9 +1778,11 @@ impl FlowMap {
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),
             );
-            l7_stats.flow = Some(tagged_flow.clone());
-            self.l7_stats_buffer
-                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            if collect_stats {
+                l7_stats.flow = Some(tagged_flow.clone());
+                self.l7_stats_buffer
+                    .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+            }
             self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
@@ -2213,7 +2222,7 @@ pub fn _new_flow_map_and_receiver(
         Arc::new(AtomicI64::new(0)),
         &config.flow,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new(""),
+        &stats::Collector::new("", Arc::new(AtomicI64::new(0))),
         false,
     );
 

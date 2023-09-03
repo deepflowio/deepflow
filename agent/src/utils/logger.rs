@@ -19,10 +19,10 @@ use std::io::Result;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
     Arc, Mutex, RwLock, Weak,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Local};
 use dns_lookup::lookup_host;
@@ -72,6 +72,7 @@ pub struct RemoteLogWriter {
     hostname: Arc<Mutex<String>>,
     remote_addrs: Arc<RwLock<Vec<SocketAddr>>>,
     last_domain_name_lookup: Arc<AtomicU64>,
+    ntp_diff: Arc<AtomicI64>,
 
     tag: String,
     header: Vec<u8>,
@@ -88,6 +89,7 @@ impl RemoteLogWriter {
         port: u16,
         tag: String,
         header: Vec<u8>,
+        ntp_diff: Arc<AtomicI64>,
     ) -> (Self, RemoteLogConfig) {
         let enabled: Arc<AtomicBool> = Default::default();
         let threshold: Arc<AtomicU32> = Default::default();
@@ -97,7 +99,6 @@ impl RemoteLogWriter {
         ));
         let remote_addrs = Arc::new(RwLock::new(vec![]));
         let last_domain_name_lookup = Arc::new(AtomicU64::new(0));
-
         let remote_port = Arc::new(AtomicU16::new(port));
         (
             Self {
@@ -117,6 +118,7 @@ impl RemoteLogWriter {
                 last_domain_name_lookup: last_domain_name_lookup.clone(),
                 hourly_count: Default::default(),
                 last_hour: Default::default(),
+                ntp_diff,
             },
             RemoteLogConfig {
                 enabled,
@@ -246,10 +248,19 @@ impl LogWriter for RemoteLogWriter {
             return Ok(());
         }
         let now: SystemTime = (*now.now()).into();
+        let diff = self.ntp_diff.load(Ordering::Relaxed);
+        let now = if diff > 0 {
+            now.checked_add(Duration::from_nanos(diff as u64)).unwrap()
+        } else {
+            now.checked_sub(Duration::from_nanos(diff.abs() as u64))
+                .unwrap()
+        };
+
         if self.over_threshold(&now) {
             return Ok(());
         }
         self.domain_name_lookup(now);
+
         if let Some((file, line)) = record.file().zip(record.line()) {
             self.write_message(
                 &now,

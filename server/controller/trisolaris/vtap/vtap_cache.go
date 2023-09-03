@@ -359,28 +359,28 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		}
 	}
 
-	// if c.EnabledFunctionMonitoring() == false {
-	// 	if yamlConfig.Ebpf == nil {
-	// 		yamlConfig.Ebpf = &cmodel.EbpfConfig{}
-	// 	}
-	// 	if yamlConfig.Ebpf.OnCpuProfile == nil {
-	// 		yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
-	// 			Disabled: proto.Bool(true),
-	// 		}
-	// 	} else {
-	// 		yamlConfig.Ebpf.OnCpuProfile.Disabled = proto.Bool(true)
-	// 	}
+	if c.EnabledFunctionMonitoring() == false {
+		if yamlConfig.Ebpf == nil {
+			yamlConfig.Ebpf = &cmodel.EbpfConfig{}
+		}
+		if yamlConfig.Ebpf.OnCpuProfile == nil {
+			yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
+				Disabled: proto.Bool(true),
+			}
+		} else {
+			yamlConfig.Ebpf.OnCpuProfile.Disabled = proto.Bool(true)
+		}
 
-	// 	yamlConfig.ExternalProfileIntegrationDisabled = proto.Bool(true)
-	// }
+		yamlConfig.ExternalProfileIntegrationDisabled = proto.Bool(true)
+	}
 
-	// if c.EnabledApplicationMonitoring() == false {
-	// 	yamlConfig.ExternalTraceIntegrationDisabled = proto.Bool(true)
-	// }
+	if c.EnabledApplicationMonitoring() == false {
+		yamlConfig.ExternalTraceIntegrationDisabled = proto.Bool(true)
+	}
 
-	// if c.EnabledIndicatorMonitoring() == false {
-	// 	yamlConfig.ExternalMetricIntegrationDisabled = proto.Bool(true)
-	// }
+	if c.EnabledIndicatorMonitoring() == false {
+		yamlConfig.ExternalMetricIntegrationDisabled = proto.Bool(true)
+	}
 
 	b, err := yaml.Marshal(yamlConfig)
 	if err != nil {

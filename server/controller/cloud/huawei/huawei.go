@@ -75,9 +75,11 @@ func (h *HuaWei) CheckAuth() error {
 func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	h.cloudStatsd = statsd.NewCloudStatsd()
 	h.toolDataSet = NewToolDataSet()
-	h.refreshTokenMap()
-
 	var resource model.Resource
+	err := h.refreshTokenMap()
+	if err != nil {
+		return resource, err
+	}
 
 	regions, err := h.getRegions()
 	if err != nil {
@@ -161,7 +163,7 @@ func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, h.toolDataSet.regionLcuuidToResourceNum)
 	resource.AZs = cloudcommon.EliminateEmptyAZs(azs, h.toolDataSet.azLcuuidToResourceNum)
 
-	h.cloudStatsd.RefreshResCount(resource)
+	h.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(h)
 
 	h.debugger.Refresh()
@@ -228,8 +230,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 		}
 	}
 
-	h.cloudStatsd.RefreshAPICost(resultKey, statsdAPIStartTime)
-	h.cloudStatsd.RefreshAPICount(resultKey, statsdAPIDataCount)
+	h.cloudStatsd.RefreshAPIMoniter(resultKey, statsdAPIDataCount, statsdAPIStartTime)
 
 	h.debugger.WriteJson(resultKey, url, jsonList)
 	return

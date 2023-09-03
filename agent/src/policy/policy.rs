@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
 
+use ahash::AHashMap;
 use log::{debug, warn};
 use pnet::datalink;
 use public::enums::IpProtocol;
@@ -92,7 +92,7 @@ pub struct Policy {
     table: FirstPath,
     forward: Forward,
 
-    nat: RwLock<Vec<HashMap<u128, GpidEntry>>>,
+    nat: RwLock<Vec<AHashMap<u128, GpidEntry>>>,
 
     queue_count: usize,
     first_hit: usize,
@@ -115,7 +115,7 @@ impl Policy {
             labeler: Labeler::default(),
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
             forward: Forward::new(queue_count, forward_capacity),
-            nat: RwLock::new(vec![HashMap::new(), HashMap::new()]),
+            nat: RwLock::new(vec![AHashMap::new(), AHashMap::new()]),
             queue_count,
             first_hit: 0,
             fast_hit: 0,
@@ -462,8 +462,8 @@ impl Policy {
 
     pub fn update_gpids(&mut self, gpid_entries: &Vec<GpidEntry>) {
         let mut table = vec![
-            HashMap::with_capacity(gpid_entries.len()),
-            HashMap::with_capacity(gpid_entries.len() >> 2),
+            AHashMap::with_capacity(gpid_entries.len()),
+            AHashMap::with_capacity(gpid_entries.len() >> 2),
         ];
         for gpid_entry in gpid_entries.iter() {
             let protocol = u8::from(gpid_entry.protocol) as usize;

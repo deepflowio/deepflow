@@ -778,8 +778,8 @@ type GenesisProcess struct {
 	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
 	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
-	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	ProcessName string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
+	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
+	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`

@@ -263,6 +263,7 @@ querier:
   time-fill-limit: 20
 
   prometheus:
+    limit: 1000000
     qps-limit: 100 # setting to 0 means no limit
     series-limit: 500
     max-samples: 50000000

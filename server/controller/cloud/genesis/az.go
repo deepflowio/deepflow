@@ -17,6 +17,8 @@
 package genesis
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 
@@ -27,8 +29,7 @@ func (g *Genesis) getAZ() (model.AZ, error) {
 	log.Debug("get az starting")
 	azLcuuid := common.GetUUID(common.DEFAULT_REGION_NAME, uuid.Nil)
 
-	g.cloudStatsd.APICost["az"] = []int{0}
-	g.cloudStatsd.APICount["az"] = []int{0}
+	g.cloudStatsd.RefreshAPIMoniter("az", 0, time.Time{})
 
 	az := model.AZ{
 		Lcuuid:       azLcuuid,

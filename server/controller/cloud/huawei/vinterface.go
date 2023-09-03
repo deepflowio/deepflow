@@ -48,7 +48,6 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/ports", project.name, h.config.Domain, project.id), token.token, "ports",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, nil, nil, err
 		}
 
@@ -200,7 +199,6 @@ func (h *HuaWei) formatPublicIPs(project Project, token string) error {
 		fmt.Sprintf("https://vpc.%s.%s/v1/%s/publicips", project.name, h.config.Domain, project.id), token, "publicips",
 	)
 	if err != nil {
-		log.Errorf("request failed: %v", err)
 		return err
 	}
 
