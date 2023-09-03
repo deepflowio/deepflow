@@ -10,7 +10,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 
 # Install base dependencies
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq
-RUN yum install gcc gcc-c++ curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem -y && \
+RUN yum install gcc gcc-c++ curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem java-1.8.0-openjdk-devel -y && \
     curl https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
     source /opt/rh/devtoolset-8/enable && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-devel-1.2.2-el7.aarch64.rpm --silent -O && \
@@ -45,6 +45,7 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libelf.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libz.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libGoReSym.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libjattach.a --silent -O && \
     cp /usr/lib64/libdwarf.a ./ && \
     cd /usr/aarch64-linux-musl/include  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/elf.h --silent -O && \
@@ -67,7 +68,10 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libbcc_bpf.a --silent -o /usr/lib64/libbcc_bpf.a && \
     chmod 755 /usr/lib64/libbcc_bpf.a && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libelf.a --silent -o /usr/lib64/libelf.a && \
-    chmod 755 /usr/lib64/libelf.a
+    chmod 755 /usr/lib64/libelf.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libjattach.a --silent -o /usr/lib64/libjattach.a && \
+    chmod 755 /usr/lib64/libjattach.a
+
 
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache

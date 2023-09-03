@@ -12,7 +12,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq
 
 # 安装基础依赖#
-RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils devtoolset-11-gcc* openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git -y && \
+RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils devtoolset-11-gcc* openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git java-1.8.0-openjdk-devel -y && \
      echo "source /opt/rh/devtoolset-8/enable" >> /etc/profile && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
 RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version && \
@@ -45,6 +45,7 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libc.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libelf.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libstdc%2B%2B.a --silent -o ./libstdc++.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libjattach.a --silent -O && \
     cd /usr/x86_64-linux-musl/include  && \
     ln -s /usr/include/bcc bcc && \
     ln -s /usr/include/asm asm  && \
@@ -64,7 +65,10 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libbcc_bpf.a --silent -o /usr/lib64/libbcc_bpf.a && \
     chmod 755 /usr/lib64/libbcc_bpf.a && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libelf.a --silent -o /usr/lib64/libelf.a && \
-    chmod 755 /usr/lib64/libelf.a
+    chmod 755 /usr/lib64/libelf.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libjattach.a --silent -o /usr/lib64/libjattach.a && \
+    chmod 755 /usr/lib64/libjattach.a
+
 
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存
