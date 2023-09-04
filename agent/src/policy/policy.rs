@@ -39,9 +39,9 @@ use crate::common::platform_data::PlatformData;
 use crate::common::policy::{
     gpid_key, Acl, Cidr, GpidEntry, GpidProtocol, IpGroupData, PeerConnection,
 };
-use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
 use crate::common::TapPort;
+use crate::common::{FlowAclListener, FlowAclListenerId};
 use npb_pcap_policy::PolicyData;
 use public::proto::common::TridentType;
 use public::proto::trident::RoleType;
@@ -589,9 +589,8 @@ impl FlowAclListener for PolicySetter {
         Ok(())
     }
 
-    // TODO: 用于区别于不同的FlowAclListener
     fn id(&self) -> usize {
-        return 0;
+        u16::from(FlowAclListenerId::Policy) as usize
     }
 }
 

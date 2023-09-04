@@ -32,7 +32,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
-use crate::common::{FlowAclListener, TaggedFlow};
+use crate::common::{FlowAclListener, FlowAclListenerId, TaggedFlow};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{
@@ -266,7 +266,7 @@ impl FlowAclListener for SyncEbpfDispatcher {
     }
 
     fn id(&self) -> usize {
-        2
+        u16::from(FlowAclListenerId::EbpfDispatcher) as usize
     }
 }
 
