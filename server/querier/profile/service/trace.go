@@ -40,6 +40,7 @@ var log = logging.MustGetLogger("profile")
 var InstanceProfileEventType = []string{"inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines"}
 
 func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, debug interface{}, err error) {
+	debugs := model.ProfileDebug{}
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
@@ -74,6 +75,14 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 			log.Errorf("ExecuteQuery failed: %v", timeDebug, timeError)
 			return
 		}
+		profileTimeDebug := model.Debug{}
+		profileTimeDebug.Sql = timeSql
+		profileTimeDebug.IP = timeDebug["ip"].(string)
+		profileTimeDebug.QueryUUID = timeDebug["query_uuid"].(string)
+		profileTimeDebug.SqlCH = timeDebug["sql"].(string)
+		profileTimeDebug.Error = timeDebug["error"].(string)
+		profileTimeDebug.QueryTime = timeDebug["query_time"].(string)
+		debugs.QuerierDebug = append(debugs.QuerierDebug, profileTimeDebug)
 		var timeValue int64
 		timeValues := timeResult.Values
 		for _, value := range timeValues {
@@ -113,6 +122,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	profileDebug.SqlCH = querierDebug["sql"].(string)
 	profileDebug.Error = querierDebug["error"].(string)
 	profileDebug.QueryTime = querierDebug["query_time"].(string)
+	debugs.QuerierDebug = append(debugs.QuerierDebug, profileDebug)
 	formatStartTime := time.Now()
 	profileLocationStrIndex := -1
 	profileValueIndex := -1
@@ -203,8 +213,8 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	}
 	formatEndTime := int64(time.Since(formatStartTime))
 	formatTime := fmt.Sprintf("%.9fs", float64(formatEndTime)/1e9)
-	profileDebug.FormatTime = formatTime
-	debug = profileDebug
+	debugs.FormatTime = formatTime
+	debug = debugs
 	return
 }
 
