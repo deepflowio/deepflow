@@ -137,7 +137,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
 		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
 		ckdb.NewColumn("app_instance", ckdb.String).SetComment("应用实例名称, 用户上报"),
-		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("profile 上报的 tagnames"),
+		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("profile 上报的 tagnames"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues"),
 		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
 		ckdb.NewColumn("process_id", ckdb.UInt32).SetComment("进程 id"),
