@@ -53,6 +53,8 @@ use std::{
     sync::Arc,
 };
 
+use num_enum::IntoPrimitive;
+
 use crate::common::policy::Acl;
 use public::proto::common::TridentType;
 
@@ -75,6 +77,17 @@ impl fmt::Display for XflowKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "source_ip:{}, interface_index:{}", self.ip, self.tap_idx)
     }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, IntoPrimitive)]
+#[repr(u16)]
+pub enum FlowAclListenerId {
+    Policy = 0,
+    NpbBandWatcher = 1,
+    EbpfDispatcher = 2,
+    // There are multiple Dispatcher in Agent, and Dispatcher ID increases from FlowAclListenerId::Dispatcher.
+    // FlowAclListenerId::Dispatcher must be the last one.
+    Dispatcher = 3,
 }
 
 pub trait FlowAclListener: Send + Sync {

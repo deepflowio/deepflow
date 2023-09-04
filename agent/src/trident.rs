@@ -39,7 +39,7 @@ use flexi_logger::Duplicate;
 use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
@@ -2189,7 +2189,7 @@ impl AgentComponents {
                 &synchronizer,
             );
             l7_collectors.push(l7_collector);
-            ebpf_collector = EbpfCollector::new(
+            match EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
                 config_handler.ebpf(),
@@ -2205,16 +2205,20 @@ impl AgentComponents {
                 &queue_debugger,
                 stats_collector.clone(),
                 platform_synchronizer.clone(),
-            )
-            .ok();
-            if let Some(collector) = &ebpf_collector {
-                synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));
-                stats_collector.register_countable(
-                    "ebpf-collector",
-                    Countable::Owned(Box::new(collector.get_sync_counter())),
-                    vec![],
-                );
-            }
+            ) {
+                Ok(collector) => {
+                    synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));
+                    stats_collector.register_countable(
+                        "ebpf-collector",
+                        Countable::Owned(Box::new(collector.get_sync_counter())),
+                        vec![],
+                    );
+                    ebpf_collector = Some(collector);
+                }
+                Err(e) => {
+                    error!("ebpf collector error: {:?}", e);
+                }
+            };
         }
 
         let otel_queue_name = "1-otel-to-sender";
