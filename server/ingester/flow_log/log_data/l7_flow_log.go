@@ -271,9 +271,9 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
 		ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 
-		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
+		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
-		ckdb.NewColumn("metrics_names", ckdb.ArrayString).SetComment("额外的指标"),
+		ckdb.NewColumn("metrics_names", ckdb.ArrayLowCardinalityString).SetComment("额外的指标"),
 		ckdb.NewColumn("metrics_values", ckdb.ArrayFloat64).SetComment("额外的指标对应的值"),
 	)
 	return l7Columns
