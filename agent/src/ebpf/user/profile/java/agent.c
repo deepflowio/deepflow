@@ -238,12 +238,21 @@ cbDynamicCodeGenerated(jvmtiEnv * jvmti,
 	write_symbol(address, (unsigned int)length, name);
 }
 
+void JNICALL
+cbCompiledMethodUnload(jvmtiEnv * jvmti,
+		       jmethodID method, const void *address)
+{
+
+	write_symbol(address, 0, "");
+}
+
 jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 {
 	jvmtiEventCallbacks callbacks;
 
 	memset(&callbacks, 0, sizeof(callbacks));
 	callbacks.CompiledMethodLoad = &cbCompiledMethodLoad;
+	callbacks.CompiledMethodUnload = &cbCompiledMethodUnload;
 	callbacks.DynamicCodeGenerated = &cbDynamicCodeGenerated;
 
 	jvmtiError err = (*jvmti)->SetEventCallbacks(jvmti, &callbacks,
@@ -268,6 +277,16 @@ jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 	if (error != JVMTI_ERROR_NONE) {
 		jvmti_err_log(jvmti, error,
 			      "Unable to set notification mode for CompiledMethodLoad.");
+		return JNI_ERR;
+	}
+
+	error =
+	    (*jvmti)->SetEventNotificationMode(jvmti, mode,
+					       JVMTI_EVENT_COMPILED_METHOD_UNLOAD,
+					       NULL);
+	if (error != JVMTI_ERROR_NONE) {
+		jvmti_err_log(jvmti, error,
+			      "Unable to set notification mode for CompiledMethodUnload.");
 		return JNI_ERR;
 	}
 
