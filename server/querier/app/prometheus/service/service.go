@@ -31,7 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
-var log = logging.MustGetLogger("promethues")
+var log = logging.MustGetLogger("prometheus")
 
 type PrometheusService struct {
 	// keep only 1 instance of prometheus engine during server lifetime
