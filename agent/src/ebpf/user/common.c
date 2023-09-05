@@ -48,7 +48,7 @@ bool is_core_kernel(void)
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
-static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
+static int parse_online_cpus(const char *cpu_file, bool **mask, int *cpu_count)
 {
 	int fd, i, n, len, start, end = -1;
 	bool *tmp;
@@ -111,7 +111,7 @@ failed:
 	return -1;
 }
 
-int get_cpus_count(bool ** mask)
+int get_cpus_count(bool **mask)
 {
 	bool *online = NULL;
 	int err, n = 0;
@@ -447,9 +447,7 @@ u64 current_sys_time_secs(void)
  * @return process start time,
  * 	   if is 0, it indicates that an error has been encountered.
  */
-u64 get_process_starttime_and_comm(pid_t pid,
-				   char *name_base,
-				   int len)
+u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
@@ -466,7 +464,7 @@ u64 get_process_starttime_and_comm(pid_t pid,
 	read(fd, buff, sizeof(buff));
 	close(fd);
 
-	char *start = NULL; // process name start address;
+	char *start = NULL;	// process name start address;
 	if (sscanf(buff, "%*s %ms %*s %*s %*s %*s %*s %*s %*s %*s %*s"
 		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
 		   &start, &etime_ticks) != 2) {
@@ -602,8 +600,7 @@ static bool __is_process(int pid, bool is_user)
 
 	memset(buff, 0, 4096);
 	if (read(fd, buff, sizeof(buff)) <= 0) {
-		ebpf_warning("Read file '%s' failed, errno %d\n",
-			     file, errno);
+		ebpf_warning("Read file '%s' failed, errno %d\n", file, errno);
 		close(fd);
 		return false;
 	}
@@ -677,8 +674,7 @@ static char *__gen_datetime_str(const char *fmt, u64 ns)
 	p = localtime(&timep);
 	snprintf(str, strlen, fmt,
 		 (1900 + p->tm_year), (1 + p->tm_mon),
-		 p->tm_mday, p->tm_hour, p->tm_min,
-		 p->tm_sec, msec);
+		 p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec, msec);
 
 	return str;
 }
@@ -689,26 +685,26 @@ u32 legacy_fetch_log2_page_size(void)
 
 	u32 log2_page_size = 0;
 	FILE *fp;
-	char tmp[33] = { };
+	char tmp[33] = {};
 
-	if ((fp = fopen ("/proc/meminfo", "r")) == NULL) {
+	if ((fp = fopen("/proc/meminfo", "r")) == NULL) {
 		ebpf_warning("fopen file '/proc/meminfo' failed.\n");
 		return LOG2_PAFE_SIZE_DEF;
 	}
 
-	while (fscanf (fp, "%32s", tmp) > 0) {
-		if (strncmp ("Hugepagesize:", tmp, 13) == 0) {
+	while (fscanf(fp, "%32s", tmp) > 0) {
+		if (strncmp("Hugepagesize:", tmp, 13) == 0) {
 			u32 size;
-			if (fscanf (fp, "%u", &size) > 0)
-				log2_page_size = 10 + min_log2 (size);
+			if (fscanf(fp, "%u", &size) > 0)
+				log2_page_size = 10 + min_log2(size);
 			break;
 		}
 	}
 
-	fclose (fp);
+	fclose(fp);
 	return log2_page_size;
 }
-	
+
 char *gen_file_name_by_datetime(void)
 {
 	return __gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld", 0);
@@ -726,7 +722,6 @@ char *gen_timestamp_str(u64 ns)
 
 u64 get_netns_id_from_pid(pid_t pid)
 {
-#define MAX_PATH_LENGTH 256
 	char netns_path[MAX_PATH_LENGTH];
 	snprintf(netns_path, sizeof(netns_path), "/proc/%d/ns/net", pid);
 
@@ -735,7 +730,7 @@ u64 get_netns_id_from_pid(pid_t pid)
 	    readlink(netns_path, target_path, sizeof(target_path) - 1);
 	if (len == -1) {
 		return 0;
-	}       
+	}
 	target_path[len] = '\0';
 
 	// Extract netns_id from the target path
@@ -743,7 +738,7 @@ u64 get_netns_id_from_pid(pid_t pid)
 	if (netns_id_str_start == NULL) {
 		ebpf_warning("Failed to extract netns_id.\n");
 		return 0;
-	}       
+	}
 
 	char *netns_id_str_end = strstr(netns_id_str_start, "]");
 	if (netns_id_str_end == NULL) {
@@ -755,4 +750,207 @@ u64 get_netns_id_from_pid(pid_t pid)
 	char *netns_id_str = netns_id_str_start + 1;
 
 	return strtoull(netns_id_str, NULL, 10);
+}
+
+int get_nspid(int pid)
+{
+	int ns_pid_1, ns_pid_2;
+	char status_path[MAX_PATH_LENGTH];
+	snprintf(status_path, sizeof(status_path), "/proc/%d/status", pid);
+	if (access(status_path, F_OK)) {
+		ebpf_info("Fun %s file '%s' not exist.\n", __func__,
+			  status_path);
+		return ETR_NOTEXIST;
+	}
+
+	FILE *file = fopen(status_path, "r");
+	if (file == NULL) {
+		ebpf_info("fopen() %s error(%d)\n", status_path, errno);
+		return ETR_INVAL;
+	}
+
+	char line[MAX_PATH_LENGTH];
+	while (fgets(line, sizeof(line), file) != NULL) {
+		if (strncmp(line, "NSpid:", 6) == 0) {
+			int result =
+			    sscanf(line + 6, "\t%d\t%d\n", &ns_pid_1,
+				   &ns_pid_2);
+			if (result == 1) {
+				ns_pid_2 = ns_pid_1;
+			}
+			fclose(file);
+			return ns_pid_2;
+		}
+	}
+
+	fclose(file);
+	ebpf_info("Not find NSpid\n", status_path);
+	return ETR_NOTEXIST;
+}
+
+int get_target_uid_and_gid(int target_pid, int *uid, int *gid)
+{
+	char proc_path[MAX_PATH_LENGTH];
+	snprintf(proc_path, sizeof(proc_path), "/proc/%d", target_pid);
+	if (access(proc_path, F_OK)) {
+		ebpf_info("Fun %s file '%s' not exist.\n", __func__, proc_path);
+		return ETR_NOTEXIST;
+	}
+
+	*uid = *gid = -1;
+	struct stat sb;
+	if (stat(proc_path, &sb) == 0) {
+		*uid = sb.st_uid;
+		*gid = sb.st_gid;
+	} else {
+		ebpf_info("stat() %s error, errno %d\n", proc_path, errno);
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path)
+{
+	FILE *file_ptr = fopen(path, "wb");
+	if (file_ptr == NULL) {
+		ebpf_warning("Cannot open file '%s' failed. errno %d %s\n",
+			     path, errno, strerror(errno));
+		return ETR_INVAL;
+	}
+
+	fwrite(mem_ptr, write_bytes, 1, file_ptr);
+	fclose(file_ptr);
+
+	return ETR_OK;
+}
+
+/**
+ * Function to copy a file.
+ * @param src_file Path of the file to be copied.
+ * @param dest_file Path where the copied file will be saved.
+ * @return int 1: Copy successful; 2: Copy failed.
+ */
+int copy_file(const char *src_file, const char *dest_file)
+{
+	int ret = ETR_OK;
+	FILE *src_file_ptr;	// Pointer to the source file
+	FILE *dest_file_ptr;	// Pointer to the destination file
+	src_file_ptr = dest_file_ptr = NULL;
+	const size_t buffer_size = 4096;	// Buffer size
+	char *buffer = (char *)malloc(buffer_size);	// Allocate buffer
+	if (buffer == NULL) {
+		ebpf_warning("malloc() failed.\n");
+		return ETR_NOMEM;
+	}
+
+	size_t bytes_read;	// Actual number of bytes read
+
+	if ((src_file_ptr = fopen(src_file, "rb")) == NULL
+	    || (dest_file_ptr = fopen(dest_file, "wb")) == NULL) {
+		ebpf_warning("Cannot open file, src '%s' dest '%s'\n",
+			     src_file, dest_file);
+		ret = ETR_INVAL;
+		goto failed;
+	}
+
+	// Continuously read from src_file, place in buffer, and write buffer contents to dest_file
+	while ((bytes_read = fread(buffer, 1, buffer_size, src_file_ptr)) > 0) {
+		fwrite(buffer, bytes_read, 1, dest_file_ptr);
+	}
+
+failed:
+	free(buffer);
+	if (src_file_ptr)
+		fclose(src_file_ptr);
+
+	if (dest_file_ptr)
+		fclose(dest_file_ptr);
+
+	return ret;
+}
+
+int df_enter_ns(int pid, const char *type, int *self_fd)
+{
+#ifdef __NR_setns
+	char path[64], selfpath[64];
+	snprintf(path, sizeof(path), "/proc/%d/ns/%s", pid, type);
+	snprintf(selfpath, sizeof(selfpath), "/proc/self/ns/%s", type);
+
+	*self_fd = -1;
+	struct stat oldns_stat, newns_stat;
+	if (stat(selfpath, &oldns_stat) == 0 && stat(path, &newns_stat) == 0) {
+		// Don't try to call setns() if we're in the same namespace already
+		if (oldns_stat.st_ino != newns_stat.st_ino) {
+			int newns;
+			newns = open(path, O_RDONLY);
+			if (newns < 0) {
+				return -1;
+			}
+
+			*self_fd = open(selfpath, O_RDONLY);
+			if (*self_fd < 0) {
+				return -1;
+			}
+
+			// Some ancient Linux distributions do not have setns() function
+			int result = syscall(__NR_setns, newns, 0);
+			close(newns);
+			if (result < 0) {
+				close(*self_fd);
+				*self_fd = -1;
+			}
+			return result < 0 ? -1 : 1;
+		}
+	}
+#endif // __NR_setns
+
+	return 0;
+}
+
+void df_exit_ns(int fd)
+{
+	if (fd < 0)
+		return;
+
+	int result = syscall(__NR_setns, fd, 0);
+	if (result < 0) {
+		ebpf_warning("Fun %s setns error errno %d (%s)\n",
+			     __func__, errno, strerror(errno));
+	}
+
+	close(fd);
+}
+
+int exec_command(const char *cmd, const char *args)
+{
+	FILE *fp;
+	int rc = 0;
+	char cmd_buf[64];
+	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
+	fp = popen(cmd_buf, "r");
+	if (NULL == fp) {
+		ebpf_warning("%s '%s' execute error,[%s]\n",
+			     __func__, cmd_buf, strerror(errno));
+		return -1;
+	}
+	rc = pclose(fp);
+	if (-1 == rc) {
+		ebpf_warning("pclose error, '%s' error:%s\n",
+		    cmd_buf, strerror(errno));
+	} else {
+		if (WIFEXITED(rc)) {
+			ebpf_info("'%s' normal termination, exit status %d\n",
+				  cmd_buf, WEXITSTATUS(rc));
+			return WEXITSTATUS(rc);
+		} else if (WIFSIGNALED(rc)) {
+			ebpf_info("'%s' abnormal termination,signal number %d\n",
+				  cmd_buf, WTERMSIG(rc));
+		} else if (WIFSTOPPED(rc)) {
+			ebpf_info("'%s' process stopped, signal number %d\n",
+				  cmd_buf, WSTOPSIG(rc));
+		}
+	}
+
+	return -1;
 }
