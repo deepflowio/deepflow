@@ -277,7 +277,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		if matcher.Name == PROMETHEUS_METRICS_NAME {
 			continue
 		}
-		operation := getLabelMatcherType(matcher.Type)
+		operation, value := getLabelMatcher(matcher.Type, matcher.Value)
 		if operation == "" {
 			return ctx, "", "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
 		}
@@ -285,11 +285,11 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
 		if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
 			// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, matcher.Value))
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, value))
 		} else {
 			// for normal query
 			// for DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, matcher.Value))
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, value))
 		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
@@ -731,19 +731,32 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 }
 
 // match prometheus lable matcher type
-func getLabelMatcherType(t prompb.LabelMatcher_Type) string {
+func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, string) {
 	switch t {
 	case prompb.LabelMatcher_EQ:
-		return "="
+		return "=", v
 	case prompb.LabelMatcher_NEQ:
-		return "!="
+		return "!=", v
 	case prompb.LabelMatcher_RE:
-		return "REGEXP"
+		return "REGEXP", appendRegexRules(v)
 	case prompb.LabelMatcher_NRE:
-		return "NOT REGEXP"
+		return "NOT REGEXP", appendRegexRules(v)
 	default:
-		return ""
+		return "", v
 	}
+}
+
+func appendRegexRules(v string) string {
+	if len(v) > 0 {
+		if !strings.HasPrefix(v, "^") {
+			v = "^" + v
+		}
+		if !strings.HasSuffix(v, "$") {
+			v = v + "$"
+		}
+		return v
+	}
+	return v
 }
 
 func getValue(value interface{}) string {
