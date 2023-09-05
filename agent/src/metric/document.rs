@@ -349,7 +349,7 @@ impl From<Tagger> for metric::MiniTag {
                 l3_epc_id: t.l3_epc_id as i32,
                 l3_epc_id1: t.l3_epc_id1 as i32,
                 mac: t.mac.into(),
-                mac1: t.mac.into(),
+                mac1: t.mac1.into(),
                 direction: t.direction as u32,
                 tap_side: TapSide::from(t.direction) as u32,
                 protocol: u8::from(t.protocol) as u32,
