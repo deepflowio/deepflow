@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2023 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 use serde::Serialize;
 
 use super::super::{AppProtoHead, LogMessageType};
@@ -21,6 +37,8 @@ use crate::{
     },
     utils::bytes,
 };
+// 加载bson库
+use bson::{self, Document};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MongoDBInfo {
@@ -43,9 +61,11 @@ pub struct MongoDBInfo {
     #[serde(skip)]
     pub op_code_name: String,
     #[serde(skip)]
-    pub command: String,
+    pub request: String,
     #[serde(skip)]
     pub response: String,
+    #[serde(skip)]
+    pub exception: String,
 }
 
 impl L7ProtocolInfoInterface for MongoDBInfo {
@@ -84,7 +104,7 @@ impl MongoDBInfo {
         if other.response_id > 0 {
             self.response_id = other.response_id;
         }
-        self.command = other.command;
+        self.request = other.request;
         self.response = other.response;
         match other.msg_type {
             LogMessageType::Request => {
@@ -106,12 +126,13 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
             req_len: std::option::Option::<u32>::from(f.req_len),
             req: L7Request {
                 req_type: f.op_code_name,
-                resource: f.command.to_string(),
+                resource: f.request.to_string(),
                 ..Default::default()
             },
             resp_len: std::option::Option::<u32>::from(f.resp_len),
             resp: L7Response {
                 result: f.response.to_string(),
+                exception: f.exception.to_string(),
                 status: L7ResponseStatus::Ok,
                 ..Default::default()
             },
@@ -152,9 +173,8 @@ impl L7ProtocolParserInterface for MongoDBLog {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        if self.parse(payload, param.l4_protocol, param.direction, &mut info)? {
-            return Ok(L7ParseResult::None);
-        }
+
+        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
         } else {
@@ -168,12 +188,6 @@ impl L7ProtocolParserInterface for MongoDBLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    // TODO
-    fn reset(&mut self) {
-        self.info = MongoDBInfo::default();
-        self.perf_stats = self.perf_stats.take();
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -196,7 +210,7 @@ impl MongoDBLog {
 
         let mut header = MongoDBHeader::default();
         let offset = header.decode(payload);
-        if offset < 0 {
+        if offset <= 0 {
             return Err(Error::MongoDBLogParseFailed);
         }
         if header.response_to > 0 {
@@ -216,18 +230,19 @@ impl MongoDBLog {
         match info.op_code_name.as_str() {
             "OP_MSG" => {
                 let mut msg_body = MongoOpMsg::default();
-                msg_body.decode(&payload[offset as usize..])?;
+                msg_body.decode(&payload[16..offset as usize + 16])?;
                 match info.msg_type {
                     LogMessageType::Response => {
-                        info.response = msg_body.sections.kind_name.to_string();
+                        info.response = msg_body.sections.doc.to_string();
+                        info.exception = msg_body.sections.c_string.unwrap_or("unknown".to_string());
                     }
                     _ => {
-                        info.command = msg_body.sections.kind_name.to_string();
+                        info.request = msg_body.sections.doc.to_string();
                     }
                 }
             }
             _ => {
-                info.command = info.op_code_name.clone();
+                info.request = info.op_code_name.clone();
             }
         }
         Ok(false)
@@ -305,7 +320,7 @@ impl MongoOpMsg {
         if payload.len() < 4 + section_len as usize {
             return Ok(false);
         }
-        let _ = sections.decode(&payload[4..4 + section_len as usize]);
+        let _ = sections.decode(&payload[4..]);
         self.sections = sections;
         // todo: decode checksum
         Ok(true)
@@ -315,65 +330,69 @@ impl MongoOpMsg {
 #[derive(Clone, Debug, Default, Serialize)]
 struct Sections {
     kind: u8,
-    kind_name: &'static str,
-    //doc: Option<MongoDoc>,
+    kind_name: String,
+    // kind: 0 mean doc
+    doc: Document,
+    // kind: 1 mean body
+    size: Option<i32>,
+    c_string: Option<String>,
 }
 
 impl Sections {
     pub fn decode(&mut self, payload: &[u8]) -> Result<bool> {
+        if payload.len() < 6 {
+            return Ok(false);
+        }
         self.kind = payload[0];
-        self.kind_name = self.get_kind();
         // todo: decode doc
+        match self.kind {
+            0 => {
+                // Body
+                self.kind_name = "BODY".to_string();
+                let lenght = bytes::read_u32_le(&payload[1..5]);
+                if lenght != payload.len() as u32 - 1 {
+                    return Ok(false);
+                }
+                self.doc = Document::from_reader(&payload[1..]).unwrap_or(Document::default());
+            }
+            1 => {
+                // Doc
+                self.kind_name = "DOC".to_string();
+                self.size =
+                    std::option::Option::<i32>::from(bytes::read_u32_le(&payload[1..5]) as i32);
+                self.c_string = std::option::Option::Some(read_c_string(&payload[5..]));
+                self.doc = Document::from_reader(&payload[1..]).unwrap_or(Document::default());
+            }
+            2 => {
+                // Internal
+                self.kind_name = "INTERNAL".to_string();
+                // This section is used for internal purposes.
+                return Ok(false);
+            }
+            _ => {
+                // Unknown
+                self.kind_name = "UNKNOWN".to_string();
+                return Ok(false);
+            }
+        }
         Ok(true)
     }
-    pub fn get_kind(&self) -> &'static str {
-        match self.kind {
-            0 => "Body",
-            1 => "Doc",
-            2 => "Internal",
-            _ => "Unknown",
+}
+
+use std::ffi::CString;
+
+fn read_c_string(bytes: &[u8]) -> String {
+    let mut buffer = Vec::new();
+    for &byte in bytes.iter() {
+        if byte == 0 {
+            break;
         }
+        buffer.push(byte);
     }
-}
-
-pub struct MongoDoc {
-    length: u32,
-    element: Vec<u8>,
-}
-
-pub struct MongoElement {
-    etype: i8,
-}
-
-// BSON TYPE
-// todo
-impl MongoElement {
-    pub fn get_type(&self) -> &'static str {
-        match self.etype {
-            1 => "double",
-            2 => "string",
-            3 => "object",
-            4 => "array",
-            5 => "binData",
-            6 => "undefined", // Deprecated as of MongoDB 5.0.
-            7 => "objectId",
-            8 => "bool",
-            9 => "date",
-            10 => "null",
-            11 => "regex",
-            12 => "dbPointer", // Deprecated as of MongoDB 5.0.
-            13 => "javascript",
-            14 => "symbol",              // Deprecated as of MongoDB 5.0.
-            15 => "javascriptWithScope", // Deprecated as of MongoDB 4.4.
-            16 => "int",
-            17 => "timestamp",
-            18 => "long",
-            19 => "decimal",
-            -1 => "minKey",
-            127 => "maxKey",
-            _ => "unknown",
-        }
-    }
+    let c_string = CString::new(buffer).expect("Failed to create CString");
+    c_string
+        .into_string()
+        .expect("Failed to convert CString to String")
 }
 
 // Deprecated as of MongoDB 5.0.
