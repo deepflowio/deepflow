@@ -76,6 +76,7 @@ tonic = "0.8.1"
 envmnt = "0.10.4"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
+bson = "2.7.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"
