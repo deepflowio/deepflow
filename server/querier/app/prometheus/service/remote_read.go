@@ -50,11 +50,13 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	// promrequest trans to sql
 	// pp.Println(req)
 	var metricName string
-	var result *common.Result
-
+	var queryResult, result *common.Result
+	// should get cache result immediately
 	item, hit, metricName, start, end := cache.RemoteReadCache().Get(req)
-	if hit == cache.CacheHitFull {
+	if item != nil {
 		result = item.Data()
+	}
+	if hit == cache.CacheHitFull {
 		if strings.Contains(metricName, "__") {
 			metricsSplit := strings.Split(metricName, "__")
 			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
@@ -68,6 +70,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	} else {
 		var db, datasource string
 		var debugInfo map[string]interface{}
+		log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, start, end)
 		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end)
 		// fmt.Println(sql, db)
 		if err != nil {
@@ -108,7 +111,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 
 		ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
 		ckEngine.Init()
-		result, debugInfo, err = ckEngine.ExecuteQuery(&args)
+		queryResult, debugInfo, err = ckEngine.ExecuteQuery(&args)
 		if err != nil {
 			log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
 			return nil, "", 0, err
@@ -124,14 +127,14 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 			span.SetAttributes(attribute.Float64("query_time", duration))
 
 			// inject labels for parent span
-			targetLabels := make([]string, 0, len(result.Schemas))
-			appLabels := make([]string, 0, len(result.Schemas))
-			for i := 0; i < len(result.Schemas); i++ {
-				labelType := result.Schemas[i].LabelType
+			targetLabels := make([]string, 0, len(queryResult.Schemas))
+			appLabels := make([]string, 0, len(queryResult.Schemas))
+			for i := 0; i < len(queryResult.Schemas); i++ {
+				labelType := queryResult.Schemas[i].LabelType
 				if labelType == "app" {
-					appLabels = append(appLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+					appLabels = append(appLabels, strings.TrimPrefix(queryResult.Columns[i].(string), "tag."))
 				} else if labelType == "target" {
-					targetLabels = append(targetLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+					targetLabels = append(targetLabels, strings.TrimPrefix(queryResult.Columns[i].(string), "tag."))
 				}
 			}
 			if len(targetLabels) > 0 {
@@ -144,12 +147,30 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	}
 
 	if config.Cfg.Prometheus.Cache.Enabled {
-		// add or merge query result
-		result = cache.RemoteReadCache().AddOrMerge(req, result, item)
+		// merge result into cache
+		result = cache.RemoteReadCache().AddOrMerge(req, item, result, queryResult)
+		if len(result.Values) > 0 {
+			fv := result.Values[0].([]interface{})
+			lv := result.Values[len(result.Values)-1].([]interface{})
+			if len(fv) > 0 && len(lv) > 0 {
+				log.Debugf("metric: [%s] result merged, range: [%d-%d]", metricName, lv[0], fv[0])
+			}
+		}
+	} else {
+		// not using cache, query result would be real result
+		result = queryResult
 	}
 
 	// response trans to prom resp
 	resp, err = p.respTransToProm(ctx, metricName, result)
+	if resp != nil && len(resp.Results) > 0 {
+		if len(resp.Results[0].Timeseries) > 0 && len(resp.Results[0].Timeseries[0].Samples) > 0 {
+			log.Debugf("%s prometheus result parsed, time range: [%d-%d]", metricName,
+				resp.Results[0].Timeseries[0].Samples[0].Timestamp,
+				resp.Results[0].Timeseries[0].Samples[len(resp.Results[0].Timeseries[0].Samples)-1].Timestamp)
+		}
+	}
+
 	if err != nil {
 		log.Error(err)
 		return nil, "", 0, err
