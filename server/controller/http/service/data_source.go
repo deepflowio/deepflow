@@ -46,6 +46,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-资源变更事件",     // event.event
 	"事件-IO 事件",      // event.perf_event
 	"事件-告警事件",       // event.alarm_event
+	"应用-性能剖析",       // profile.in_process
 }
 
 func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err error) {
@@ -122,23 +123,22 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	var dataSourceCount int64
 	var err error
 
-	if ret := mysql.Db.Where("display_name = ?", dataSourceCreate.DisplayName).First(&dataSource); ret.Error == nil {
-		return model.DataSource{}, NewError(
-			httpcommon.RESOURCE_ALREADY_EXIST,
-			fmt.Sprintf("data_source (%s) already exist", dataSourceCreate.DisplayName),
-		)
-	}
-
 	if ret := mysql.Db.Where(
 		map[string]interface{}{
-			"data_table_collection": dataSourceCreate.DataTableCollection,
-			"interval":              dataSourceCreate.Interval,
+			"data_table_collection":       dataSourceCreate.DataTableCollection,
+			"interval":                    dataSourceCreate.Interval,
+			"base_data_source_id":         dataSourceCreate.BaseDataSourceID,
+			"summable_metrics_operator":   dataSourceCreate.SummableMetricsOperator,
+			"unsummable_metrics_operator": dataSourceCreate.UnSummableMetricsOperator,
 		},
 	).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
-			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval: %v) already exists",
-				dataSourceCreate.DataTableCollection, dataSourceCreate.Interval),
+			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval: %v, base_data_source_id: %v, "+
+				"summable_metrics_operator: %v, unsummable_metrics_operator: %v) already exists",
+				dataSourceCreate.DataTableCollection, dataSourceCreate.Interval, dataSourceCreate.BaseDataSourceID,
+				dataSourceCreate.SummableMetricsOperator, dataSourceCreate.UnSummableMetricsOperator,
+			),
 		)
 	}
 
