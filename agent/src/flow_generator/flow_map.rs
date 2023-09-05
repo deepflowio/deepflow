@@ -582,7 +582,8 @@ impl FlowMap {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = self.new_flow_node(config, meta_packet);
                     if let Some(node) = node {
-                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                            .insert(pkt_key);
                         nodes.push(node);
                         max_depth += 1;
                     }

@@ -235,7 +235,7 @@ pub(super) fn vm_read_http_resp_info(
     let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
     let mem_mut = mem.data_mut(caller.as_context_mut());
 
-    let  VmParseCtx::HttpRespCtx(ref resp_ctx) = ctx else {
+    let VmParseCtx::HttpRespCtx(ref resp_ctx) = ctx else {
         wasm_error!(
             ctx.get_ins_name(),
             IMPORT_FUNC_VM_READ_HTTP_RESP,
@@ -362,7 +362,7 @@ pub(super) fn host_read_str_result(mut caller: Caller<'_, StoreDataType>, b: i32
     let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
     let mem = mem.data(caller.as_context());
     let data = &mem[b as usize..(b + len) as usize];
-    let Some(str) = read_wasm_str(data,&mut 0) else {
+    let Some(str) = read_wasm_str(data, &mut 0) else {
         let ins_name = caller.data().parse_ctx.as_ref().unwrap().get_ins_name();
         wasm_error!(
             ins_name,

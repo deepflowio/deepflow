@@ -88,7 +88,9 @@ impl PassivePoller {
     fn get_ignored_interface_indice() -> HashSet<u32> {
         let mut ignored = HashSet::new();
 
-        let Ok(addrs) = addr_list() else { return ignored; };
+        let Ok(addrs) = addr_list() else {
+            return ignored;
+        };
         for addr in addrs {
             if addr.scope != RT_SCOPE_LINK {
                 ignored.insert(addr.if_index);
