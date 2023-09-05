@@ -536,6 +536,10 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 
 // querier result trans to Prom Response
 func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName string, result *common.Result) (resp *prompb.ReadResponse, err error) {
+	if result == nil || len(result.Values) == 0 {
+		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
+	}
+	log.Debugf("resTransToProm: result length: %d", len(result.Values))
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
