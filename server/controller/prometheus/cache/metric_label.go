@@ -72,6 +72,10 @@ func (ml *metricLabel) Add(batch []MetricLabelDetailKey) {
 	}
 }
 
+func (ml *metricLabel) GetMetricLabelDetailKeys() mapset.Set[MetricLabelDetailKey] {
+	return ml.metricLabelDetailKeys
+}
+
 func (ml *metricLabel) refresh(args ...interface{}) error {
 	metricLabels, err := ml.load()
 	if err != nil {

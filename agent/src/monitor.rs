@@ -25,9 +25,9 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
-use sysinfo::{
-    get_current_pid, NetworkExt, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt,
-};
+#[cfg(target_os = "windows")]
+use sysinfo::NetworkExt;
+use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 use crate::config::handler::EnvironmentAccess;
 use crate::{
@@ -330,6 +330,7 @@ impl Monitor {
 
         // register network hook
         let stats = self.stats.clone();
+        #[cfg(target_os = "windows")]
         let system = self.system.clone();
         let link_map = self.link_map.clone();
         self.stats.register_pre_hook(Box::new(move || {
@@ -355,7 +356,6 @@ impl Monitor {
                 }
             };
 
-            let mut system_guard = system.lock().unwrap();
             let mut del_monitor_list = vec![];
             link_map_guard.retain(|name, broker| {
                 let exist = links.iter().any(|link| link.name == name.as_str());
@@ -374,7 +374,7 @@ impl Monitor {
             }
 
             let mut monitor_list = vec![];
-            for link in links {
+            for link in links.iter() {
                 if link_map_guard.contains_key(&link.name) {
                     continue;
                 }
@@ -388,25 +388,42 @@ impl Monitor {
                     options,
                 );
                 link_map_guard.insert(link.name.clone(), link_broker);
-                monitor_list.push(link.name);
+                monitor_list.push(link.name.clone());
             }
 
             if !monitor_list.is_empty() {
                 debug!("adding new monitor interface list: {:?}", monitor_list);
             }
 
-            system_guard.refresh_networks_list();
-            for (interface, net_data) in system_guard.networks() {
-                if let Some(broker) = link_map_guard.get(interface) {
-                    let metric = NetMetricArg {
-                        rx: net_data.total_packets_received(),
-                        tx: net_data.total_packets_transmitted(),
-                        rx_bytes: net_data.total_received(),
-                        tx_bytes: net_data.total_transmitted(),
-                        drop_in: net_data.total_errors_on_received(),
-                        drop_out: net_data.total_errors_on_transmitted(),
-                    };
-                    broker.update(metric);
+            #[cfg(target_os = "linux")]
+            for link in links {
+                if let Some(broker) = link_map_guard.get(&link.name) {
+                    broker.update(NetMetricArg {
+                        rx: link.stats.rx_packets,
+                        tx: link.stats.tx_packets,
+                        rx_bytes: link.stats.rx_bytes,
+                        tx_bytes: link.stats.tx_bytes,
+                        drop_in: link.stats.rx_dropped,
+                        drop_out: link.stats.tx_dropped,
+                    });
+                }
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                let mut system_guard = system.lock().unwrap();
+                system_guard.refresh_networks_list();
+                for (interface, net_data) in system_guard.networks() {
+                    if let Some(broker) = link_map_guard.get(interface) {
+                        broker.update(NetMetricArg {
+                            rx: net_data.total_packets_received(),
+                            tx: net_data.total_packets_transmitted(),
+                            rx_bytes: net_data.total_received(),
+                            tx_bytes: net_data.total_transmitted(),
+                            drop_in: net_data.total_errors_on_received(),
+                            drop_out: net_data.total_errors_on_transmitted(),
+                        });
+                    }
                 }
             }
 

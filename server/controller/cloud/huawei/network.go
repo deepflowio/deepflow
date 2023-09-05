@@ -35,7 +35,6 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/subnets", project.name, h.config.Domain, project.id), token.token, "subnets",
 		)
 		if err != nil {
-			log.Errorf("request failed: %v", err)
 			return nil, nil, nil, err
 		}
 

@@ -148,12 +148,8 @@ func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, err
 		azLcuuidMap:          map[string]int{},
 		vpcIDToRegionLcuuid:  map[string]string{},
 		publicIPToVinterface: map[string]model.VInterface{},
-		cloudStatsd: statsd.CloudStatsd{
-			APICount: make(map[string][]int),
-			APICost:  make(map[string][]int),
-			ResCount: make(map[string][]int),
-		},
-		debugger: cloudcommon.NewDebugger(domain.Name),
+		cloudStatsd:          statsd.NewCloudStatsd(),
+		debugger:             cloudcommon.NewDebugger(domain.Name),
 	}, nil
 }
 
@@ -268,17 +264,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	log.Debugf("request tencent action (%s): total count is (%v)", action, totalCount)
 
 	if !strings.Contains(common.CloudMonitorExceptionAPI[common.TENCENT_EN], action) {
-		cost := time.Now().Sub(startTime).Milliseconds()
-		if _, ok := t.cloudStatsd.APICost[action]; !ok {
-			t.cloudStatsd.APICost[action] = []int{int(cost)}
-		} else {
-			t.cloudStatsd.APICost[action] = append(t.cloudStatsd.APICost[action], int(cost))
-		}
-		if _, ok := t.cloudStatsd.APICount[action]; !ok {
-			t.cloudStatsd.APICount[action] = []int{totalCount}
-		} else {
-			t.cloudStatsd.APICount[action] = append(t.cloudStatsd.APICount[action], totalCount)
-		}
+		t.cloudStatsd.RefreshAPIMoniter(action, totalCount, startTime)
 	}
 	t.debugger.WriteJson(resultKey, regionName, responses)
 	return responses, nil
@@ -318,9 +304,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 	// 任务循环执行的是同一个实例，所以这里要对关联关系进行初始化
 	t.natIDs = []string{}
-	t.cloudStatsd.APICount = map[string][]int{}
-	t.cloudStatsd.APICost = map[string][]int{}
-	t.cloudStatsd.ResCount = map[string][]int{}
+	t.cloudStatsd = statsd.NewCloudStatsd()
 	t.vpcIDToRegionLcuuid = map[string]string{}
 	t.publicIPToVinterface = map[string]model.VInterface{}
 

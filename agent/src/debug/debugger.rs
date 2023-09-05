@@ -127,15 +127,15 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(|| {
-                                match get_hostname() {
+                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
+                                || match get_hostname() {
                                     Ok(hostname) => Some(hostname),
                                     Err(e) => {
                                         warn!("get hostname failed: {}", e);
                                         None
                                     }
-                                }
-                            }) else {
+                                },
+                            ) else {
                                 continue;
                             };
 
@@ -256,15 +256,15 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(|| {
-                                match get_hostname() {
+                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
+                                || match get_hostname() {
                                     Ok(hostname) => Some(hostname),
                                     Err(e) => {
                                         warn!("get hostname failed: {}", e);
                                         None
                                     }
-                                }
-                            }) else {
+                                },
+                            ) else {
                                 continue;
                             };
 

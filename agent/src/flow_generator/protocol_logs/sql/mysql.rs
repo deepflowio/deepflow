@@ -38,6 +38,7 @@ use crate::{
     },
     utils::bytes,
 };
+use public::bytes::read_u32_le;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
@@ -72,6 +73,10 @@ pub struct MysqlInfo {
     pub status: L7ResponseStatus,
 
     rrt: u64,
+    // This field is extracted in the following message:
+    // 1. Response message corresponding to COM_STMT_PREPARE request
+    // 2. COM_STMT_EXECUTE request message
+    statement_id: u32,
 
     trace_id: Option<String>,
 }
@@ -118,6 +123,11 @@ impl MysqlInfo {
                 self.status = other.status;
                 if self.error_code.is_none() {
                     self.error_code = other.error_code;
+                }
+                if self.command == COM_STMT_PREPARE && other.statement_id > 0 {
+                    self.statement_id = other.statement_id;
+                } else {
+                    self.statement_id = 0;
                 }
             }
             _ => {}
@@ -171,6 +181,12 @@ impl MysqlInfo {
             self.trace_id = extra_sql_trace_id(self.context.as_str(), t);
         }
     }
+
+    fn statement_id(&mut self, payload: &[u8]) {
+        if payload.len() >= STATEMENT_ID_LEN {
+            self.statement_id = read_u32_le(payload)
+        }
+    }
 }
 
 impl From<MysqlInfo> for L7ProtocolSendLog {
@@ -207,6 +223,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
+                request_id: f.statement_id.into(),
                 ..Default::default()
             }),
             trace_info: if f.trace_id.is_some() {
@@ -331,9 +348,12 @@ impl MysqlLog {
         }
         info.command = payload[COMMAND_OFFSET];
         match info.command {
-            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
+            COM_QUIT | COM_FIELD_LIST | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 info.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..], trace_id);
+            }
+            COM_STMT_EXECUTE => {
+                info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
             }
             COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
@@ -406,6 +426,7 @@ impl MysqlLog {
                 info.status = L7ResponseStatus::Ok;
                 info.affected_rows =
                     MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
+                info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
             }
             _ => (),
         }

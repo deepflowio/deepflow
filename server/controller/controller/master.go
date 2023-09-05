@@ -82,7 +82,10 @@ func checkAndStartMasterFunctions(
 	// - 控制器和数据节点检查
 	// - license分配和检查
 	// - resource id manager
-	// - clean deleted resources
+	// - clean deleted/dirty resource data
+	// - prometheus encoder
+	// - prometheus app label layout updater
+	// - http resource refresh task manager
 
 	// 从区域控制器无需判断是否为master controller
 	if !IsMasterRegion(cfg) {
@@ -95,6 +98,8 @@ func checkAndStartMasterFunctions(
 	recorderResource := recorder.GetSingletonResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
+	prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)
+
 	httpService := http.GetSingleton()
 
 	masterController := ""
@@ -146,6 +151,7 @@ func checkAndStartMasterFunctions(
 				domainChecker.Start()
 
 				prometheus.Encoder.Start()
+				prometheus.APPLabelLayoutUpdater.Start()
 
 				if cfg.DFWebService.Enabled {
 					httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
@@ -176,6 +182,7 @@ func checkAndStartMasterFunctions(
 				recorderResource.IDManager.Stop()
 
 				prometheus.Encoder.Stop()
+				prometheus.APPLabelLayoutUpdater.Stop()
 
 				if cfg.DFWebService.Enabled {
 					httpService.TaskManager.Stop()

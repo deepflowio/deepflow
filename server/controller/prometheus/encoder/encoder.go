@@ -47,7 +47,7 @@ type Encoder struct {
 	metricName   *metricName
 	labelName    *labelName
 	labelValue   *labelValue
-	labelLayout  *labelLayout
+	LabelLayout  *labelLayout
 	label        *label
 	metricLabel  *metricLabel
 	metricTarget *metricTarget
@@ -70,7 +70,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.labelName = newLabelName(cfg.ResourceMaxID0)
 	e.labelValue = newLabelValue(cfg.ResourceMaxID1)
 	e.label = newLabel()
-	e.labelLayout = newLabelLayout()
+	e.LabelLayout = newLabelLayout(cfg)
 	e.metricLabel = newMetricLabel(e.label)
 	e.target = newTarget(cfg.ResourceMaxID1)
 	e.metricTarget = newMetricTarget(e.target)
@@ -90,6 +90,7 @@ func (e *Encoder) Start() error {
 	e.refresh()
 	go func() {
 		ticker := time.NewTicker(e.refreshInterval)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-e.ctx.Done():
@@ -113,16 +114,19 @@ func (e *Encoder) Stop() {
 }
 
 func (e *Encoder) refresh() error {
+	log.Info("prometheus encoder refresh started")
 	e.label.refresh()
 	eg := &errgroup.Group{}
 	AppendErrGroup(eg, e.metricName.refresh)
 	AppendErrGroup(eg, e.labelName.refresh)
 	AppendErrGroup(eg, e.labelValue.refresh)
-	AppendErrGroup(eg, e.labelLayout.refresh)
+	AppendErrGroup(eg, e.LabelLayout.refresh)
 	AppendErrGroup(eg, e.metricLabel.refresh)
 	AppendErrGroup(eg, e.metricTarget.refresh)
 	AppendErrGroup(eg, e.target.refresh)
-	return eg.Wait()
+	err := eg.Wait()
+	log.Info("prometheus encoder refresh completed")
+	return err
 }
 
 func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
@@ -181,7 +185,7 @@ func (e *Encoder) encodeLabelValue(args ...interface{}) error {
 func (e *Encoder) encodeLabelIndex(args ...interface{}) error {
 	resp := args[0].(*controller.SyncPrometheusResponse)
 	layouts := args[1].([]*controller.PrometheusMetricAPPLabelLayoutRequest)
-	lis, err := e.labelLayout.encode(layouts)
+	lis, err := e.LabelLayout.encode(layouts)
 	if err != nil {
 		return err
 	}

@@ -192,7 +192,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("auto_service_type", ckdb.UInt8),
 		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
 
-		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
+		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 	}
 	if hasMetrics {

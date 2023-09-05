@@ -372,13 +372,13 @@ fn read_attr(attr_bytes: &[u8], mut attr_len: u32) -> Vec<KeyVal> {
     let mut attr = vec![];
     let mut off = 0;
     while off < attr_bytes.len() && attr_len > 0 {
-        let Some(key_idx) = (&attr_bytes[off..]).iter().position(|b| *b==0) else {
+        let Some(key_idx) = (&attr_bytes[off..]).iter().position(|b| *b == 0) else {
             break;
         };
         let key = String::from_utf8_lossy(&attr_bytes[off..off + key_idx]).to_string();
         off += key_idx + 1;
         if off < attr_bytes.len() {
-            let Some(val_idx) = &attr_bytes[off..].iter().position(|b| *b==0) else {
+            let Some(val_idx) = &attr_bytes[off..].iter().position(|b| *b == 0) else {
                 break;
             };
             let val = String::from_utf8_lossy(&attr_bytes[off..off + val_idx]).to_string();

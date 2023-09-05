@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{
     atomic::{AtomicI32, Ordering},
     Arc, RwLock,
 };
+
+use ahash::AHashMap;
 
 use super::bit::count_trailing_zeros32;
 use crate::common::decapsulate::TunnelInfo;
@@ -41,29 +42,29 @@ struct EpcIpKey {
 pub struct Labeler {
     local_epc: AtomicI32,
     // Interface表
-    mac_table: RwLock<HashMap<u64, Arc<PlatformData>>>,
-    epc_ip_table: RwLock<HashMap<EpcIpKey, Arc<PlatformData>>>,
+    mac_table: RwLock<AHashMap<u64, Arc<PlatformData>>>,
+    epc_ip_table: RwLock<AHashMap<EpcIpKey, Arc<PlatformData>>>,
     // Interface WAN IP表
-    ip_netmask_table: RwLock<HashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
-    ip_table: RwLock<HashMap<u128, Arc<PlatformData>>>,
+    ip_netmask_table: RwLock<AHashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
+    ip_table: RwLock<AHashMap<u128, Arc<PlatformData>>>,
     // 对等连接表
-    peer_table: RwLock<HashMap<i32, Vec<i32>>>,
+    peer_table: RwLock<AHashMap<i32, Vec<i32>>>,
     // CIDR表
-    epc_cidr_table: RwLock<HashMap<i32, Vec<Arc<Cidr>>>>,
-    tunnel_cidr_table: RwLock<HashMap<u32, Vec<Arc<Cidr>>>>,
+    epc_cidr_table: RwLock<AHashMap<i32, Vec<Arc<Cidr>>>>,
+    tunnel_cidr_table: RwLock<AHashMap<u32, Vec<Arc<Cidr>>>>,
 }
 
 impl Default for Labeler {
     fn default() -> Self {
         Self {
             local_epc: AtomicI32::new(EPC_FROM_INTERNET),
-            mac_table: RwLock::new(HashMap::new()),
-            epc_ip_table: RwLock::new(HashMap::new()),
-            ip_netmask_table: RwLock::new(HashMap::new()),
-            ip_table: RwLock::new(HashMap::new()),
-            peer_table: RwLock::new(HashMap::new()),
-            epc_cidr_table: RwLock::new(HashMap::new()),
-            tunnel_cidr_table: RwLock::new(HashMap::new()),
+            mac_table: RwLock::new(AHashMap::new()),
+            epc_ip_table: RwLock::new(AHashMap::new()),
+            ip_netmask_table: RwLock::new(AHashMap::new()),
+            ip_table: RwLock::new(AHashMap::new()),
+            peer_table: RwLock::new(AHashMap::new()),
+            epc_cidr_table: RwLock::new(AHashMap::new()),
+            tunnel_cidr_table: RwLock::new(AHashMap::new()),
         }
     }
 }
@@ -89,7 +90,7 @@ impl Labeler {
     }
 
     fn update_mac_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut mac_table = HashMap::new();
+        let mut mac_table = AHashMap::new();
 
         for interface in interfaces {
             let iface = Arc::clone(interface);
@@ -127,7 +128,7 @@ impl Labeler {
     }
 
     fn update_epc_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut epc_ip_table = HashMap::new();
+        let mut epc_ip_table = AHashMap::new();
 
         for interface in interfaces {
             let mut epc_id = interface.epc_id;
@@ -178,7 +179,7 @@ impl Labeler {
     }
 
     pub fn update_peer_table(&mut self, peers: &Vec<Arc<PeerConnection>>) {
-        let mut peer_table: HashMap<i32, Vec<i32>> = HashMap::new();
+        let mut peer_table: AHashMap<i32, Vec<i32>> = AHashMap::new();
         for peer in peers {
             peer_table
                 .entry(peer.local_epc)
@@ -211,8 +212,8 @@ impl Labeler {
     }
 
     pub fn update_cidr_table(&mut self, cidrs: &Vec<Arc<Cidr>>) {
-        let mut epc_table: HashMap<i32, Vec<Arc<Cidr>>> = HashMap::new();
-        let mut tunnel_table: HashMap<u32, Vec<Arc<Cidr>>> = HashMap::new();
+        let mut epc_table: AHashMap<i32, Vec<Arc<Cidr>>> = AHashMap::new();
+        let mut tunnel_table: AHashMap<u32, Vec<Arc<Cidr>>> = AHashMap::new();
 
         for item in cidrs {
             let mut epc_id = item.epc_id;
@@ -307,8 +308,8 @@ impl Labeler {
     }
 
     fn update_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut ip_netmask_table = HashMap::new();
-        let mut ip_table = HashMap::new();
+        let mut ip_netmask_table = AHashMap::new();
+        let mut ip_table = AHashMap::new();
         for interface in interfaces {
             if interface.if_type != IfType::WAN {
                 continue;
