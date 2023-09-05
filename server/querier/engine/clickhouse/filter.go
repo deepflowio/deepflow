@@ -933,10 +933,12 @@ func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, 
 		}
 		time = int64(timeValue.(float64))
 	}
-	if compareExpr.Operator == ">=" {
+	if compareExpr.Operator == ">=" || compareExpr.Operator == ">" {
 		w.time.AddTimeStart(time)
-	} else if compareExpr.Operator == "<=" {
+		w.time.TimeStartOperator = compareExpr.Operator
+	} else if compareExpr.Operator == "<=" || compareExpr.Operator == "<" {
 		w.time.AddTimeEnd(time)
+		w.time.TimeEndOperator = compareExpr.Operator
 	}
 	return &view.Expr{Value: sqlparser.String(compareExpr)}, nil
 }
