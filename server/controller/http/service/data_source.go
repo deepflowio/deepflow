@@ -95,10 +95,10 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	var err error
 
 	// TODO: 名称只能包含数字字母和下划线的校验
-	if ret := mysql.Db.Where("name = ?", dataSourceCreate.Name).First(&dataSource); ret.Error == nil {
+	if ret := mysql.Db.Where("name = ? and tsdb_type = ?", dataSourceCreate.Name, dataSourceCreate.TsdbType).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
 			common.RESOURCE_ALREADY_EXIST,
-			fmt.Sprintf("data_source (%s) already exist", dataSourceCreate.Name),
+			fmt.Sprintf("data_source (name: %s, tsdb_type: %s) already exist", dataSourceCreate.Name, dataSourceCreate.TsdbType),
 		)
 	}
 
