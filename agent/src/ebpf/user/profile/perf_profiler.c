@@ -1176,7 +1176,7 @@ int set_profiler_cpu_aggregation(int flag)
 }
 
 #else /* defined AARCH64_MUSL */
-#include "tracer.h"
+#include "../tracer.h"
 #include "perf_profiler.h"
 
 /*
