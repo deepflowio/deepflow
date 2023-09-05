@@ -50,8 +50,10 @@ void os_puts(FILE *stream, char *string, uint32_t string_length, bool is_stdout)
 	iovs[n_iovs].iov_len = string_length;
 	n_iovs++;
 
-	if (is_stdout)
+	if (is_stdout) {
 		writev(1, iovs, n_iovs);
+		fflush(stdout);
+	}
 
 	if (!stream)
 		return;

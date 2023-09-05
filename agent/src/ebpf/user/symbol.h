@@ -60,6 +60,8 @@ struct symbolizer_proc_info {
 	 * is used to delay confirmation.
 	 */
 	bool verified;
+	/* To mark whether it is a Java process? */
+	bool is_java;
 	/* process name */
 	char comm[TASK_COMM_LEN];
 };
