@@ -443,7 +443,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		if !ok {
 			continue
 		}
-		var name, processName string
+		name, processName := sProcess.Name, sProcess.ProcessName
 		if len(sProcess.Name) > c.cfg.ProcessNameLenMax {
 			name = sProcess.Name[:c.cfg.ProcessNameLenMax]
 		}
