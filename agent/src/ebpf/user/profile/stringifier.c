@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,21 +41,21 @@
  */
 
 #ifndef AARCH64_MUSL
-#include "config.h"
-#include "common.h"
-#include "mem.h"
-#include "log.h"
-#include "types.h"
-#include "vec.h"
-#include "tracer.h"
+#include "../config.h"
+#include "../common.h"
+#include "../mem.h"
+#include "../log.h"
+#include "../types.h"
+#include "../vec.h"
+#include "../tracer.h"
 #include "perf_profiler.h"
-#include "elf.h"
-#include "load.h"
-#include "../kernel/include/perf_profiler.h"
-#include "perf_reader.h"
-#include "table.h"
-#include "bihash_8_8.h"
-#include "bihash_16_8.h"
+#include "../elf.h"
+#include "../load.h"
+#include "../../kernel/include/perf_profiler.h"
+#include "../perf_reader.h"
+#include "../table.h"
+#include "../bihash_8_8.h"
+#include "../bihash_16_8.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 

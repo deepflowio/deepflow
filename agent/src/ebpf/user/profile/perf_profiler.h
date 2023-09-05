@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
-#include "bihash_24_8.h"
+#include "../bihash_24_8.h"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -33,6 +33,8 @@
 #define stack_trace_msg_hash_free	clib_bihash_free_24_8
 #define stack_trace_msg_hash_key_value_pair_cb		clib_bihash_foreach_key_value_pair_cb_24_8
 #define stack_trace_msg_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_24_8
+
+#define JAVA_ATTACH_TOOL_PATH DF_JAVA_ATTACH_CMD
 
 /*
  * stack trace messages for push-hash kvp.
