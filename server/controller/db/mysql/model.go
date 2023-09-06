@@ -348,25 +348,25 @@ func (DHCPPort) TableName() string {
 
 type VInterface struct {
 	Base         `gorm:"embedded"`
-	Name         string    `gorm:"column:name;type:char(64);default:''" json:"NAME"`
-	Index        int       `gorm:"column:ifindex;type:int;not null" json:"IFINDEX"`
-	State        int       `gorm:"column:state;type:int;not null" json:"STATE"`                  // 1. Attached 2.Detached 3.Exception
-	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	Type         int       `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
-	Mac          string    `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
-	VMac         string    `gorm:"column:vmac;type:char(32);default:''" json:"VMAC"`
-	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
-	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
-	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
-	DeviceType   int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"`   // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
-	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
-	NetnsID      uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"` // used to associate processes with cloud and container resources
-	VtapID       uint32    `gorm:"column:vtap_id;type:int;default:0" json:"VTAP_ID"`
-	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
-	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Name         string `gorm:"column:name;type:char(64);default:''" json:"NAME"`
+	Index        int    `gorm:"column:ifindex;type:int;not null" json:"IFINDEX"`
+	State        int    `gorm:"column:state;type:int;not null" json:"STATE"`                  // 1. Attached 2.Detached 3.Exception
+	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
+	Type         int    `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
+	Mac          string `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
+	// VMac         string    `gorm:"column:vmac;type:char(32);default:''" json:"VMAC"` //  TODO(weiqiang): Uncomment after db modifications are merged.
+	TapMac     string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
+	NetworkID  int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
+	VlanTag    int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
+	DeviceType int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"`   // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
+	DeviceID   int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
+	NetnsID    uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"` // used to associate processes with cloud and container resources
+	VtapID     uint32    `gorm:"column:vtap_id;type:int;default:0" json:"VTAP_ID"`
+	SubDomain  string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain     string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	Region     string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	CreatedAt  time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt  time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
 func (VInterface) TableName() string {
