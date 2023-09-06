@@ -426,6 +426,10 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTim
 
 // querier result trans to Prom Response
 func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.ReadResponse, err error) {
+	if result == nil || len(result.Values) == 0 {
+		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
+	}
+	log.Debugf("resTransToProm: result length: %d", len(result.Values))
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
