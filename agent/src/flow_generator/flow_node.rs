@@ -21,7 +21,7 @@ use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointDataPov,
     enums::{EthernetType, TapType, TcpFlags},
-    flow::{FlowMetricsPeer, PacketDirection, SignalSource},
+    flow::{FlowMetricsPeer, L7PerfStats, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
@@ -162,6 +162,11 @@ impl FlowNode {
         flow_metrics_peer_dst.l3_byte_count = 0;
         flow_metrics_peer_dst.l4_byte_count = 0;
         flow_metrics_peer_dst.tcp_flags = TcpFlags::empty();
+
+        if let Some(ref mut flow_perf_stats) = &mut flow.flow_perf_stats {
+            flow_perf_stats.tcp = TcpPerfStats::default();
+            flow_perf_stats.l7 = L7PerfStats::default();
+        }
     }
 
     pub fn match_node(

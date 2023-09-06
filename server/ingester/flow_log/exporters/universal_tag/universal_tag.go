@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package otlp_exporter
+package universal_tag
 
 import (
-	"database/sql"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 
+	logging "github.com/op/go-logging"
 	"golang.org/x/net/context"
 
 	"github.com/deepflowio/deepflow/message/trident"
@@ -33,6 +33,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
+
+var log = logging.MustGetLogger("universal_tag")
 
 type UniversalTags struct {
 	Region       string
@@ -221,35 +223,32 @@ func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
 }
 
 type UniversalTagsManager struct {
-	config           *OtlpExporterConfig
 	universalTagMaps *UniversalTagMaps
 	tapPortNameMap   map[uint64]string
-	// Deprecated
-	podIDLabelsMap  map[uint32]Labels
-	k8sLabelsRegexp *regexp.Regexp
 
-	connection              *sql.DB
+	customK8sLabelsRegexp string
+	k8sLabelsRegexp       *regexp.Regexp
+
 	grpcSession             *grpc.GrpcSession
 	versionUniversalTagMaps uint32
 }
 
-func NewUniversalTagsManager(config *OtlpExporterConfig, baseConfig *config.Config) *UniversalTagsManager {
+func NewUniversalTagsManager(customK8sLabelsRegexp string, baseCfg *config.Config) *UniversalTagsManager {
 	universalTagMaps := &UniversalTagMaps{}
 	var k8sLabelsRegexp *regexp.Regexp
-	if config.ExportCustomK8sLabelsRegexp != "" {
+	if customK8sLabelsRegexp != "" {
 		var err error
-		k8sLabelsRegexp, err = regexp.Compile(config.ExportCustomK8sLabelsRegexp)
+		k8sLabelsRegexp, err = regexp.Compile(customK8sLabelsRegexp)
 		if err != nil {
-			log.Warningf("OTLP exporter compile k8s label regexp pattern failed: %s", err)
+			log.Warningf("exporter compile k8s label regexp pattern failed: %s", err)
 		}
 	}
 	m := &UniversalTagsManager{
-		config:           config,
-		universalTagMaps: universalTagMaps,
-		tapPortNameMap:   make(map[uint64]string),
-		podIDLabelsMap:   make(map[uint32]Labels),
-		k8sLabelsRegexp:  k8sLabelsRegexp,
-		grpcSession:      &grpc.GrpcSession{},
+		customK8sLabelsRegexp: customK8sLabelsRegexp,
+		universalTagMaps:      universalTagMaps,
+		tapPortNameMap:        make(map[uint64]string),
+		k8sLabelsRegexp:       k8sLabelsRegexp,
+		grpcSession:           &grpc.GrpcSession{},
 	}
 
 	runOnce := func() {
@@ -258,15 +257,15 @@ func NewUniversalTagsManager(config *OtlpExporterConfig, baseConfig *config.Conf
 		}
 	}
 
-	controllers := make([]net.IP, len(baseConfig.ControllerIPs))
-	for i, ipString := range baseConfig.ControllerIPs {
+	controllers := make([]net.IP, len(baseCfg.ControllerIPs))
+	for i, ipString := range baseCfg.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	m.grpcSession.Init(controllers, baseConfig.ControllerPort, grpc.DEFAULT_SYNC_INTERVAL, baseConfig.GrpcBufferSize, runOnce)
-	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_PLATFORMDATA, m)
+	m.grpcSession.Init(controllers, baseCfg.ControllerPort, grpc.DEFAULT_SYNC_INTERVAL, baseCfg.GrpcBufferSize, runOnce)
+	debug.ServerRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, m)
 
 	return m
 }
@@ -360,7 +359,7 @@ func (u *UniversalTagsManager) GetUniversalTagMaps(response *trident.UniversalTa
 
 func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
 	// if not configured, all are not exported
-	if len(u.config.ExportCustomK8sLabelsRegexp) == 0 {
+	if len(u.customK8sLabelsRegexp) == 0 {
 		return false
 	}
 

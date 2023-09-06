@@ -37,6 +37,11 @@ target/
 /agent/src/ebpf/user/socket_trace_bpf_5_2_plus.c
 /agent/src/ebpf/user/socket_trace_bpf_kylin.c
 /agent/src/ebpf/user/perf_profiler_bpf_common.c
+/agent/src/ebpf/user/profile/java_agent_so_gnu.c
+/agent/src/ebpf/user/profile/java_agent_so_musl.c
+/agent/src/ebpf/tools/bintobuffer
+/agent/src/ebpf/deepflow-jattach
+/agent/src/ebpf/user/profile/deepflow_jattach_bin.c
 /agent/src/ebpf/.profiler
 /agent/src/ebpf/.socket-tracer
 /agent/src/ebpf/samples/rust/profiler/target
@@ -45,3 +50,7 @@ target/
 /agent/src/ebpf/samples/rust/socket-tracer/target
 /agent/src/ebpf/samples/rust/socket-tracer/src/ebpf.rs
 /agent/src/ebpf/.flamegraph.pl
+
+
+
+

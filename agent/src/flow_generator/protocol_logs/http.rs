@@ -256,6 +256,14 @@ impl HttpInfo {
                     self.status_code = other.status_code;
                 }
 
+                if other.custom_exception.is_some() {
+                    self.custom_exception = other.custom_exception;
+                }
+
+                if other.custom_result.is_some() {
+                    self.custom_result = other.custom_result
+                }
+
                 if self.resp_content_length.is_none() {
                     self.resp_content_length = other.resp_content_length;
                 }

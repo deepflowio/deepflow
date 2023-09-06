@@ -64,7 +64,7 @@ func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		err = newErr(url, fmt.Sprintf("failed: %v", resp))
 		log.Errorf(err.Error())
 		return
 	}
@@ -106,7 +106,7 @@ func RequestPost(url string, timeout time.Duration, body map[string]interface{})
 		return
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
+		err = newErr(url, fmt.Sprintf("failed: %v", resp))
 		log.Errorf(err.Error())
 		return
 	}

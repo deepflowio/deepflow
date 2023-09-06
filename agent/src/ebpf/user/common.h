@@ -41,6 +41,8 @@
 #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+#define MAX_PATH_LENGTH 1024
+
 struct sysinfo {
 	long uptime;
 	unsigned long loads[3];
@@ -265,5 +267,12 @@ u64 get_process_starttime_and_comm(pid_t pid,
 				   int len);
 u32 legacy_fetch_log2_page_size(void);
 u64 get_netns_id_from_pid(pid_t pid);
+int get_nspid(int pid);
+int get_target_uid_and_gid(int target_pid, int *uid, int *gid);
+int copy_file(const char *src_file, const char *dest_file);
+int df_enter_ns(int pid, const char *type, int *self_fd);
+void df_exit_ns(int fd);
+int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path);
+int exec_command(const char *cmd, const char *args);
 u64 current_sys_time_secs(void);
 #endif /* DF_COMMON_H */
