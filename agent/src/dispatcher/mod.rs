@@ -254,11 +254,11 @@ impl DispatcherListener {
         }
     }
 
-    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr]) {
+    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr], gateway_vmac_addrs: &[MacAddr]) {
         match self {
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
-                l.on_vm_change(vm_mac_addrs);
+                l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             Self::Mirror(l) => {
                 l.on_vm_change(vm_mac_addrs);

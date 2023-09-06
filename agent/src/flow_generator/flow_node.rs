@@ -316,7 +316,7 @@ impl FlowNode {
         // return value stands different match type, defined by MAC_MATCH_*
         // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
         let is_from_isp = meta_packet.lookup_key.tap_type != TapType::Cloud;
-        if is_from_isp || ignore_mac || ignore_tor_mac {
+        if is_from_isp || ignore_mac || (meta_packet.tunnel.is_none() && ignore_tor_mac) {
             return MatchMac::None;
         }
 
