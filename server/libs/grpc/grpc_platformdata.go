@@ -30,7 +30,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	"github.com/vishvananda/netlink"
 
 	"golang.org/x/net/context"
 
@@ -888,19 +887,6 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 	}
 
 	return strings.Join(newLines, "\n")
-}
-
-func Lookup(host net.IP) (net.IP, error) {
-	routes, err := netlink.RouteGet(host)
-	if err != nil {
-		return nil, fmt.Errorf("RouteGet %v %s", host, err)
-	}
-	route := routes[0]
-	src := route.Src
-	if route.Src.To4() != nil {
-		src = route.Src.To4()
-	}
-	return src, nil
 }
 
 func (t *PlatformInfoTable) updateServices(groupsData *trident.Groups) {
