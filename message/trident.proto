@@ -283,6 +283,7 @@ message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
     repeated uint32 interface_id = 3; // mac对应的Interface id
+    repeated string vmac = 4; // if interface vmac is not null, vmac = interface vmac; else vmac = interface mac
 }
 
 message IpResource {
