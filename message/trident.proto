@@ -308,6 +308,7 @@ message Interface {
     optional uint32 pod_cluster_id = 26;
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
+    optional uint64 vmac = 101; // for gateway host vinterface, 0x0123456789ab = 01:23:45:67:89:ab
 }
 
 enum GroupType {
