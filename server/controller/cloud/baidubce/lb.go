@@ -79,8 +79,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 			log.Error(err)
 			return nil, nil, nil, err
 		}
-		b.cloudStatsd.APICost["blbDescribeLoadBalancers"] = append(b.cloudStatsd.APICost["blbDescribeLoadBalancers"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["blbDescribeLoadBalancers"] = append(b.cloudStatsd.APICount["blbDescribeLoadBalancers"], len(result.BlbList))
+		b.cloudStatsd.RefreshAPIMoniter("blbDescribeLoadBalancers", len(result.BlbList), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
@@ -146,8 +145,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 			log.Error(err)
 			return nil, nil, nil, err
 		}
-		b.cloudStatsd.APICost["appblbDescribeLoadBalancers"] = append(b.cloudStatsd.APICost["appblbDescribeLoadBalancers"], int(time.Now().Sub(startTime).Milliseconds()))
-		b.cloudStatsd.APICount["appblbDescribeLoadBalancers"] = append(b.cloudStatsd.APICount["appblbDescribeLoadBalancers"], len(result.BlbList))
+		b.cloudStatsd.RefreshAPIMoniter("appblbDescribeLoadBalancers", len(result.BlbList), startTime)
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

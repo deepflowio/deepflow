@@ -54,9 +54,17 @@ fn sk_data_str_safe(sd: *mut stack_profile_data) -> String {
 }
 
 #[allow(dead_code)]
-fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
+fn cp_comm_safe(cp: *mut stack_profile_data) -> String {
     unsafe {
         let v = &(*cp).comm;
+        String::from_utf8_lossy(v).to_string()
+    }
+}
+
+#[allow(dead_code)]
+fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
+    unsafe {
+        let v = &(*cp).process_name;
         String::from_utf8_lossy(v).to_string()
     }
 }
@@ -80,7 +88,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         increment_counter(1, 0);
         //let data = sk_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
-        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} PROCESS_NAME {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
         //         date_time((*cp).timestamp),
         //         (*cp).pid,
         //         (*cp).stime,
@@ -88,6 +96,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         //         (*cp).u_stack_id,
         //         (*cp).k_stack_id,
         //         cp_process_name_safe(cp),
+        //         cp_comm_safe(cp),
         //         (*cp).cpu,
         //         (*cp).count,
         //         (*cp).stack_data_len, data);
@@ -138,7 +147,7 @@ fn main() {
 
         set_profiler_regex(
             CString::new(
-                "^(socket_tracer|deepflow-.*)$".as_bytes(),
+                "^(socket_tracer|java|deepflow-.*)$".as_bytes(),
             )
             .unwrap()
             .as_c_str()

@@ -102,12 +102,8 @@ func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, e
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
 
-		cloudStatsd: statsd.CloudStatsd{
-			APICount: make(map[string][]int),
-			APICost:  make(map[string][]int),
-			ResCount: make(map[string][]int),
-		},
-		debugger: cloudcommon.NewDebugger(domain.Name),
+		cloudStatsd: statsd.NewCloudStatsd(),
+		debugger:    cloudcommon.NewDebugger(domain.Name),
 	}, nil
 }
 
@@ -136,9 +132,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 	var vinterfaces []model.VInterface
 	var ips []model.IP
-	b.cloudStatsd.APICount = map[string][]int{}
-	b.cloudStatsd.APICost = map[string][]int{}
-	b.cloudStatsd.ResCount = map[string][]int{}
+	b.cloudStatsd = statsd.NewCloudStatsd()
 
 	// 区域和可用区
 	regions, azs, zoneNameToAZLcuuid, err := b.getRegionAndAZs()

@@ -41,8 +41,7 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 		log.Error(err)
 		return nil, nil, nil, err
 	}
-	b.cloudStatsd.APICost["ListZone"] = []int{int(time.Now().Sub(startTime).Milliseconds())}
-	b.cloudStatsd.APICount["ListZone"] = []int{len(result.Zones)}
+	b.cloudStatsd.RefreshAPIMoniter("ListZone", len(result.Zones), startTime)
 	b.debugger.WriteJson("ListZone", " ", structToJson(result.Zones))
 	zones := result.Zones
 

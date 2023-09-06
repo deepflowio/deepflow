@@ -34,6 +34,7 @@ import (
 const (
 	query_url = "graphql"
 	// query graphql for skywalking
+	// supported skywalking-query-protocol version: v8.0.0+
 	query_trace = `query queryTrace($traceId: ID!) {
 	trace: queryTrace(traceId: $traceId) {
 		spans {
@@ -41,17 +42,6 @@ const (
 			refs { traceId parentSegmentId parentSpanId type }
 			serviceCode serviceInstanceName startTime endTime endpointName type peer component isError layer
 			tags { key value }
-			logs {
-				time
-				data { key value }
-			}
-			attachedEvents {
-				startTime { seconds nanos }
-				event
-				endTime { seconds nanos }
-				tags { key value }
-				summary { key value }
-			}
 		}
 	}
 }`
@@ -112,7 +102,7 @@ func (s *SkyWalkingAdapter) GetTrace(traceID string, c *config.ExternalAPM) (*mo
 		return nil, err
 	}
 	traces, err := s.getTrace(traceID, c, swConfig)
-	if err != nil {
+	if err != nil || traces == nil {
 		return nil, err
 	}
 	return s.skywalkingTracesToExTraces(traces), nil
@@ -142,7 +132,7 @@ func (s *SkyWalkingAdapter) getTrace(traceID string, c *config.ExternalAPM, swCo
 		scheme = "https"
 	}
 	result, err := common.DoRequest(http.MethodPost, fmt.Sprintf("%s://%s/%s", scheme, c.Addr, query_url), post_data, s.appendAuthHeader(swConfig.Auth), c.Timeout, c.TLS)
-	if err != nil {
+	if err != nil || result == nil {
 		log_sw.Errorf("query skywalking trace %s at %s failed! addr: %s, err: %s", traceID, c.Addr, err)
 		return nil, err
 	}
@@ -159,6 +149,9 @@ func (s *SkyWalkingAdapter) skywalkingTracesToExTraces(traces *query.Trace) *mod
 	exTrace.Spans = make([]model.ExSpan, 0, len(traces.Spans))
 	for i := 0; i < len(traces.Spans); i++ {
 		skywalkingSpan := traces.Spans[i]
+		if skywalkingSpan == nil {
+			continue
+		}
 		span := model.ExSpan{
 			Name:            *skywalkingSpan.EndpointName,
 			StartTimeUs:     skywalkingSpan.StartTime * 1e3,
