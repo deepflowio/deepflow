@@ -123,6 +123,7 @@ pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
+    pub gateway_vmac_addrs: Vec<MacAddr>,
     pub tap_types: Vec<trident::TapType>,
 }
 
@@ -523,6 +524,7 @@ impl Trident {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
+                gateway_vmac_addrs,
                 tap_types,
             } = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
@@ -554,6 +556,7 @@ impl Trident {
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
                         vm_mac_addrs,
+                        gateway_vmac_addrs,
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
                     )?;
@@ -574,6 +577,7 @@ impl Trident {
                         &mut components,
                         blacklist,
                         vm_mac_addrs,
+                        gateway_vmac_addrs,
                         tap_types,
                     );
                     for callback in callbacks {
@@ -606,6 +610,7 @@ fn dispatcher_listener_callback(
     components: &mut Components,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
+    gateway_vmac_addrs: Vec<MacAddr>,
     tap_types: Vec<trident::TapType>,
 ) {
     match conf.tap_mode {
@@ -664,7 +669,7 @@ fn dispatcher_listener_callback(
                     conf.trident_type,
                     &blacklist,
                 );
-                listener.on_vm_change(&vm_mac_addrs);
+                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
             }
         }
         TapMode::Mirror => {
@@ -675,7 +680,7 @@ fn dispatcher_listener_callback(
                     conf.trident_type,
                     &blacklist,
                 );
-                listener.on_vm_change(&vm_mac_addrs);
+                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
             }
         }
         TapMode::Analyzer => {
@@ -686,7 +691,7 @@ fn dispatcher_listener_callback(
                     conf.trident_type,
                     &blacklist,
                 );
-                listener.on_vm_change(&vm_mac_addrs);
+                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
             }
             parse_tap_type(components, tap_types);
         }
@@ -977,6 +982,7 @@ impl Components {
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         vm_mac_addrs: Vec<MacAddr>,
+        gateway_vmac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
@@ -1542,7 +1548,7 @@ impl Components {
                 candidate_config.dispatcher.trident_type,
                 &vec![],
             );
-            dispatcher_listener.on_vm_change(&vm_mac_addrs);
+            dispatcher_listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
 
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
