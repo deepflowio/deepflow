@@ -57,4 +57,5 @@ type PlatformData struct {
 	// 适配青云场景，同子网跨宿主机时采集中间网卡流量，流量MAC地址均为虚拟机MAC（可以打上L3end），但是无法打上L2end为了区分需要
 	// 链路追踪具体统计哪一端，引入该字段
 	IsLocal bool // 平台数据为当前宿主机的虚拟机（local segment）设置为true
+	VMac    uint64
 }
