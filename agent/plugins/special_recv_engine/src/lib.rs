@@ -19,7 +19,6 @@
 use std::sync::Arc;
 
 use public::counter;
-#[cfg(target_os = "linux")]
 use public::debug::QueueDebugger;
 use public::error::Result;
 use public::packet;
@@ -36,13 +35,7 @@ impl counter::RefCountable for LibpcapCounter {
 pub struct Libpcap;
 
 impl Libpcap {
-    #[cfg(target_os = "linux")]
     pub fn new(_: Vec<(&str, isize)>, _: usize, _: usize, _: &QueueDebugger) -> Result<Self> {
-        unimplemented!();
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn new(_: Vec<(&str, isize)>, _: usize, _: usize) -> Result<Self> {
         unimplemented!();
     }
 

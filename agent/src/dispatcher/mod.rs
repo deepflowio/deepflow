@@ -1088,7 +1088,6 @@ impl DispatcherBuilder {
                     "Libpcap init with: {:?} {} {}",
                     &src_ifaces, options.packet_blocks, options.snap_len
                 );
-                #[cfg(target_os = "linux")]
                 let libpcap = Libpcap::new(
                     src_ifaces,
                     options.packet_blocks,
@@ -1096,9 +1095,6 @@ impl DispatcherBuilder {
                     queue_debugger,
                 )
                 .map_err(|e| error::Error::Libpcap(e.to_string()))?;
-                #[cfg(target_os = "windows")]
-                let libpcap = Libpcap::new(src_ifaces, options.packet_blocks, options.snap_len)
-                    .map_err(|e| error::Error::Libpcap(e.to_string()))?;
                 Ok(RecvEngine::Libpcap(Some(libpcap)))
             }
             #[cfg(target_os = "linux")]
