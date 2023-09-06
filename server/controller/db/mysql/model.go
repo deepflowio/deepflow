@@ -330,6 +330,7 @@ type VInterface struct {
 	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Type         int       `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
 	Mac          string    `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
+	VMac         string    `gorm:"column:vmac;type:char(32);default:''" json:"VMAC"`
 	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
 	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
 	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
