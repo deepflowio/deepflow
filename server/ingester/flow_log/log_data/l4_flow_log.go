@@ -465,6 +465,7 @@ type Metrics struct {
 	TotalByteRx   uint64 `json:"total_byte_rx,omitempty"`
 	L7Request     uint32 `json:"l7_request,omitempty"`
 	L7Response    uint32 `json:"l7_response,omitempty"`
+	L7ParseFailed uint32 `json:"l7_parse_failed,omitempty"`
 
 	RTT          uint32 `json:"rtt,omitempty"` // us
 	RTTClientSum uint32 `json:"rtt_client_sum,omitempty"`
@@ -518,6 +519,7 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("total_byte_rx", ckdb.UInt64),
 	ckdb.NewColumn("l7_request", ckdb.UInt32),
 	ckdb.NewColumn("l7_response", ckdb.UInt32),
+	ckdb.NewColumn("l7_parse_failed", ckdb.UInt32),
 
 	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
@@ -571,6 +573,7 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) {
 		m.TotalByteRx,
 		m.L7Request,
 		m.L7Response,
+		m.L7ParseFailed,
 
 		float64(m.RTT),
 		float64(m.RTTClientSum),
@@ -893,6 +896,7 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.L7ServerError = p.L7.ErrServerCount
 		m.L7ServerTimeout = p.L7.ErrTimeout
 		m.L7Error = m.L7ClientError + m.L7ServerError
+		m.L7ParseFailed = p.L7FailedCount
 
 		m.RTT = p.Tcp.Rtt
 		m.RTTClientSum = p.Tcp.RttClientSum
