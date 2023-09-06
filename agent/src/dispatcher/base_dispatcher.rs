@@ -255,7 +255,6 @@ impl BaseDispatcher {
                 .iter()
                 .map(|src_iface| (src_iface.name.as_str(), src_iface.if_index as isize))
                 .collect();
-            #[cfg(target_os = "linux")]
             let libpcap = Libpcap::new(
                 src_ifaces.clone(),
                 options.packet_blocks,
@@ -263,9 +262,6 @@ impl BaseDispatcher {
                 &self.queue_debugger,
             )
             .map_err(|e| Error::Libpcap(e.to_string()))?;
-            #[cfg(target_os = "windows")]
-            let libpcap = Libpcap::new(src_ifaces.clone(), options.packet_blocks, options.snap_len)
-                .map_err(|e| Error::Libpcap(e.to_string()))?;
             info!(
                 "libpcap init with {:?} block {} snap {}",
                 src_ifaces, options.packet_blocks, options.snap_len
