@@ -320,6 +320,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     iftype              INTEGER DEFAULT 0 COMMENT '0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool',
     mac                 CHAR(32) DEFAULT '',
+    vmac                CHAR(32) DEFAULT '',
     tap_mac             CHAR(32) DEFAULT '',
     subnetid            INTEGER DEFAULT 0 COMMENT 'vl2 id',
     vlantag             INTEGER DEFAULT 0,
