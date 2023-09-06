@@ -36,6 +36,8 @@ func (p *ResourceInfoTable) QueryResourceInfo(resourceType uint32, resourceID ui
 		return p.podNodeInfos[resourceID]
 	case trident.DeviceType_DEVICE_TYPE_HOST_DEVICE:
 		return p.hostInfos[resourceID]
+	case trident.DeviceType_DEVICE_TYPE_VM:
+		return p.vmInfos[resourceID]
 	default:
 		return p.resourceInfos[uint64(resourceType)<<32|uint64(resourceID)]
 	}
@@ -73,6 +75,7 @@ type ResourceInfoTable struct {
 	podInfos      map[uint32]*ResourceInfo
 	podNodeInfos  map[uint32]*ResourceInfo
 	hostInfos     map[uint32]*ResourceInfo
+	vmInfos       map[uint32]*ResourceInfo
 }
 
 func NewResourceInfoTable(ips []net.IP, port, rpcMaxMsgSize int) *ResourceInfoTable {
@@ -82,6 +85,7 @@ func NewResourceInfoTable(ips []net.IP, port, rpcMaxMsgSize int) *ResourceInfoTa
 		podInfos:      make(map[uint32]*ResourceInfo),
 		podNodeInfos:  make(map[uint32]*ResourceInfo),
 		hostInfos:     make(map[uint32]*ResourceInfo),
+		vmInfos:       make(map[uint32]*ResourceInfo),
 	}
 	runOnce := func() {
 		if err := info.Reload(); err != nil {
@@ -145,20 +149,22 @@ func (p *ResourceInfoTable) Reload() error {
 	podInfos := make(map[uint32]*ResourceInfo)
 	podNodeInfos := make(map[uint32]*ResourceInfo)
 	hostInfos := make(map[uint32]*ResourceInfo)
+	vmInfos := make(map[uint32]*ResourceInfo)
 	for _, intf := range platformData.GetInterfaces() {
-		updateResourceInfos(resourceInfos, podInfos, podNodeInfos, hostInfos, intf)
+		updateResourceInfos(resourceInfos, podInfos, podNodeInfos, hostInfos, vmInfos, intf)
 	}
 	p.resourceInfos = resourceInfos
 	p.podInfos = podInfos
 	p.podNodeInfos = podNodeInfos
 	p.hostInfos = hostInfos
+	p.vmInfos = vmInfos
 
 	log.Infof("Event update rpc platformdata version %d -> %d", p.versionPlatformData, newVersion)
 
 	return nil
 }
 
-func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNodeInfos, hostInfos map[uint32]*ResourceInfo, intf *trident.Interface) {
+func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNodeInfos, hostInfos, vmInfos map[uint32]*ResourceInfo, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
 	if epcID == 0 {
 		tmp := datatype.EPC_FROM_DEEPFLOW
@@ -200,4 +206,9 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNod
 	hostInfo.PodGroupID = 0
 	hostInfo.PodClusterID = 0
 	hostInfos[hostID] = &hostInfo
+
+	if deviceType == uint32(trident.DeviceType_DEVICE_TYPE_VM) {
+		vmInfo := hostInfo
+		vmInfos[deviceID] = &vmInfo
+	}
 }
