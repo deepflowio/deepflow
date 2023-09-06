@@ -40,15 +40,17 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-var log = logging.MustGetLogger("promethues")
+var log = logging.MustGetLogger("prometheus")
 
 func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	var result *common.Result
+	var queryResult, result *common.Result
 	item, hit, metricName, start, end := cache.RemoteReadCache().Get(req)
-	if hit == cache.CacheHitFull {
+	if item != nil {
 		result = item.Data()
+	}
+	if hit == cache.CacheHitFull {
 		if strings.Contains(metricName, "__") {
 			metricsSplit := strings.Split(metricName, "__")
 			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
@@ -62,6 +64,7 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	} else {
 		var sql, db, datasource string
 		var debug map[string]interface{}
+		log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, start, end)
 		ctx, sql, db, datasource, err = PromReaderTransToSQL(ctx, req, start, end)
 		// fmt.Println(sql, db)
 		if err != nil {
@@ -90,7 +93,7 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 
 		ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
 		ckEngine.Init()
-		result, debug, err = ckEngine.ExecuteQuery(&args)
+		queryResult, debug, err = ckEngine.ExecuteQuery(&args)
 		if err != nil {
 			// TODO
 			log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debug, err)
@@ -105,12 +108,31 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	}
 
 	if config.Cfg.Prometheus.Cache.Enabled {
-		// add or merge query result
-		result = cache.RemoteReadCache().AddOrMerge(req, result, item)
+		// merge result into cache
+		result = cache.RemoteReadCache().AddOrMerge(req, item, result, queryResult)
+		if len(result.Values) > 0 {
+			fv := result.Values[0].([]interface{})
+			lv := result.Values[len(result.Values)-1].([]interface{})
+			if len(fv) > 0 && len(lv) > 0 {
+				log.Debugf("metric: [%s] result merged, range: [%d-%d]", metricName, lv[0], fv[0])
+			}
+		}
+	} else {
+		// not using cache, query result would be real result
+		result = queryResult
 	}
 
 	// response trans to prom resp
 	resp, err = RespTransToProm(ctx, result)
+
+	if resp != nil && len(resp.Results) > 0 {
+		if len(resp.Results[0].Timeseries) > 0 && len(resp.Results[0].Timeseries[0].Samples) > 0 {
+			log.Debugf("%s prometheus result parsed, time range: [%d-%d]", metricName,
+				resp.Results[0].Timeseries[0].Samples[0].Timestamp,
+				resp.Results[0].Timeseries[0].Samples[len(resp.Results[0].Timeseries[0].Samples)-1].Timestamp)
+		}
+	}
+
 	if err != nil {
 		log.Error(err)
 		return nil, err
