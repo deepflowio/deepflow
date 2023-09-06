@@ -40,7 +40,7 @@ type LokiExporter struct {
 	lokiClient *loki.Client
 	// exportDataTypeBits represent data types to be exported.
 	// e.g. "service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"
-	exportDataTypeBits uint32
+	//exportDataTypeBits uint32
 	// exportDataBits represent data to be exported.
 	// e.g. "cbpf-net-span", "ebpf-sys-span".
 	exportDataBits uint32
@@ -103,16 +103,17 @@ func (le *LokiExporter) GetCounter() interface{} {
 func NewLokiExporter(config *LokiExporterConfig, baseCfg *ingester_config.Config) *LokiExporter {
 	le := &LokiExporter{
 		cfg: lokiExporterConfig{
-			URL:             config.URL,
-			TenantID:        config.TenantID,
-			MaxMessageWait:  time.Duration(1) * time.Second,
-			MaxMessageBytes: 1024 * 1024,
-			Timeout:         time.Duration(3) * time.Second,
-			MinBackoff:      time.Duration(500) * time.Millisecond,
-			MaxBackoff:      time.Duration(5) * time.Second,
-			MaxRetries:      5,
-			QueueCount:      4,
-			QueueSize:       1024,
+			URL:                   config.URL,
+			TenantID:              config.TenantID,
+			QueueCount:            4,
+			QueueSize:             1024,
+			MaxMessageWait:        time.Duration(1) * time.Second,
+			MaxMessageBytes:       1024 * 1024,
+			Timeout:               time.Duration(3) * time.Second,
+			MinBackoff:            time.Duration(500) * time.Millisecond,
+			MaxBackoff:            time.Duration(5) * time.Second,
+			MaxRetries:            5,
+			ExportOnlyWithTraceID: config.ExportOnlyWithTraceID,
 		},
 	}
 
@@ -158,14 +159,15 @@ func NewLokiExporter(config *LokiExporterConfig, baseCfg *ingester_config.Config
 	le.exportDataBits = exportDataBits
 	log.Infof("export data bits: %08b, string: %s", exportDataBits, exporter_common.ExportedDataBitsToString(exportDataBits))
 
-	exportDataTypeBits := uint32(0)
-	if len(config.ExportDataTypes) == 0 {
-		config.ExportDatas = DefaultLokiExportDataTypes
-	}
-	for _, v := range config.ExportDataTypes {
-		exportDataTypeBits |= uint32(exporter_common.StringToExportedDataType(v))
-	}
-	le.exportDataTypeBits = exportDataTypeBits
+	// todo ExportDataTypes is not implemented now.
+	//exportDataTypeBits := uint32(0)
+	//if len(config.ExportDataTypes) == 0 {
+	//	config.ExportDatas = DefaultLokiExportDataTypes
+	//}
+	//for _, v := range config.ExportDataTypes {
+	//	exportDataTypeBits |= uint32(exporter_common.StringToExportedDataType(v))
+	//}
+	//le.exportDataTypeBits = exportDataTypeBits
 
 	le.buildLogHeader()
 
@@ -269,6 +271,10 @@ func (le *LokiExporter) Put(items ...interface{}) {
 func (le *LokiExporter) IsExportData(item interface{}) bool {
 	l7, ok := item.(*log_data.L7FlowLog)
 	if !ok {
+		return false
+	}
+
+	if le.cfg.ExportOnlyWithTraceID && l7.TraceId == "" {
 		return false
 	}
 

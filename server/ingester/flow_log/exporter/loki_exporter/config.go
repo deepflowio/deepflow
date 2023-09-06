@@ -31,7 +31,8 @@ type LokiExporterConfig struct {
 	ExportDatas []string `yaml:"export-datas"`
 	// ExportDataTypes export data type enums,
 	// e.g.: "service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"
-	ExportDataTypes []string `yaml:"export-data-types"`
+	// todo ExportDataTypes is not implemented now.
+	//ExportDataTypes []string `yaml:"export-data-types"`
 	// ExportOnlyWithTraceID filter flow log without trace_id
 	ExportOnlyWithTraceID bool `yaml:"export-only-with-traceid"`
 	// Log format
@@ -44,7 +45,8 @@ type LogFmt struct {
 }
 
 var DefaultLokiExportDatas = []string{"cbpf-net-span", "ebpf-sys-span"}
-var DefaultLokiExportDataTypes = []string{"service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"}
+
+//var DefaultLokiExportDataTypes = []string{"service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"}
 
 func Validate(cfg LokiExporterConfig) error {
 	if cfg.URL == "" {

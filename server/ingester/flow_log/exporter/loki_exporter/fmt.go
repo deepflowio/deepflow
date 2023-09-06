@@ -55,40 +55,40 @@ func responseStatusToLogLevel(status uint8) LogLevel {
 func buildLogBodyDNS(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`request_type="%s",request_resource="%s",response_code=%d,response_exception="%s",response_result=%s`,
-		l7.RequestType, l7.RequestResource, l7.ResponseCode, l7.ResponseException, l7.ResponseResult,
+		l7.RequestType, l7.RequestResource, *l7.ResponseCode, l7.ResponseException, l7.ResponseResult,
 	)
 }
 
 func buildLogBodyHTTP(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`method="%s",name="%s",path="%s",status_code=%d,response_exception=%s`,
-		l7.RequestType, l7.RequestDomain, l7.RequestResource, l7.ResponseCode, l7.ResponseException,
+		l7.RequestType, l7.RequestDomain, l7.RequestResource, *l7.ResponseCode, l7.ResponseException,
 	)
 }
 func buildLogBodyDubbo(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`rpc_system="apache_dubbo",service="%s",method="%s",request_domain="%s",dubbo_version="%s",response_code=%d,response_exception=%s`,
-		l7.RequestResource, l7.RequestType, l7.RequestDomain, l7.Version, l7.ResponseCode, l7.ResponseException,
+		l7.RequestResource, l7.RequestType, l7.RequestDomain, l7.Version, *l7.ResponseCode, l7.ResponseException,
 	)
 }
 func buildLogBodyGRPC(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`rpc_system="grpc",service="%s",method="%s",request_domain="%s",http_flavor="%s",response_code=%d,response_exception=%s`,
-		l7.RequestResource, l7.RequestType, l7.RequestDomain, l7.Version, l7.ResponseCode, l7.ResponseException,
+		l7.RequestResource, l7.RequestType, l7.RequestDomain, l7.Version, *l7.ResponseCode, l7.ResponseException,
 	)
 }
 
 func buildLogBodyKafka(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`messaging_system="kafka",request_type="%s",request_resource="%s",request_domain="%s",response_code=%d,response_exception=%s`,
-		l7.RequestType, l7.RequestResource, l7.RequestDomain, l7.ResponseCode, l7.ResponseException,
+		l7.RequestType, l7.RequestResource, l7.RequestDomain, *l7.ResponseCode, l7.ResponseException,
 	)
 }
 
 func buildLogBodyMQTT(l7 *log_data.L7FlowLog) string {
 	return fmt.Sprintf(
 		`messaging_system="mqtt",request_type="%s",request_resource="%s",request_domain="%s",response_code=%d,response_exception=%s`,
-		l7.RequestType, l7.RequestResource, l7.RequestDomain, l7.ResponseCode, l7.ResponseException,
+		l7.RequestType, l7.RequestResource, l7.RequestDomain, *l7.ResponseCode, l7.ResponseException,
 	)
 }
 
