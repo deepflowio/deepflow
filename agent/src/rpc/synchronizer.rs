@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -285,10 +285,11 @@ impl Status {
         if config.tap_mode == TapMode::Analyzer {
             return;
         }
-        let mut local_mac_map = HashMap::new();
+        let mut local_mac_map = HashSet::new();
         for mac in macs {
-            let _ = local_mac_map.insert(u64::from(*mac), true);
+            let _ = local_mac_map.insert(u64::from(*mac));
         }
+
         let region_id = config.region_id;
         let pod_cluster_id = config.pod_cluster_id;
         let mut vinterfaces = Vec::new();
@@ -304,9 +305,7 @@ impl Status {
                 viface.skip_mac = !is_tap_interface;
             }
 
-            if let Some(v) = local_mac_map.get(&viface.mac) {
-                viface.is_local = *v;
-            }
+            viface.is_local = local_mac_map.contains(&viface.mac);
             vinterfaces.push(Arc::new(viface));
         }
 
@@ -640,7 +639,7 @@ impl Synchronizer {
     fn parse_segment(
         tap_mode: tp::TapMode,
         resp: &tp::SyncResponse,
-    ) -> (Vec<tp::Segment>, Vec<MacAddr>) {
+    ) -> (Vec<tp::Segment>, Vec<MacAddr>, Vec<MacAddr>) {
         let segments = if tap_mode == tp::TapMode::Analyzer {
             resp.remote_segments.clone()
         } else {
@@ -651,8 +650,18 @@ impl Synchronizer {
             warn!("Segment is empty, in {:?} mode.", tap_mode);
         }
         let mut macs = Vec::new();
+        let mut gateway_vmacs = Vec::new();
         for segment in &segments {
-            for mac_str in &segment.mac {
+            let vm_macs = &segment.mac;
+            let vmacs = &segment.vmac;
+            if vm_macs.len() != vmacs.len() {
+                warn!(
+                    "Invalid segment the length of vmMacs and vMacs is inconsistent: {:?}",
+                    segment
+                );
+                continue;
+            }
+            for (mac_str, vmac_str) in vm_macs.iter().zip(vmacs) {
                 let mac = MacAddr::from_str(mac_str.as_str());
                 if mac.is_err() {
                     warn!(
@@ -662,10 +671,21 @@ impl Synchronizer {
                     );
                     continue;
                 }
+
+                let vmac = MacAddr::from_str(vmac_str.as_str());
+                if vmac.is_err() {
+                    warn!(
+                        "Malformed VM vmac {}, response rejected: {}",
+                        vmac_str,
+                        vmac.unwrap_err()
+                    );
+                    continue;
+                }
                 macs.push(mac.unwrap());
+                gateway_vmacs.push(vmac.unwrap());
             }
         }
-        return (segments, macs);
+        return (segments, macs, gateway_vmacs);
     }
 
     // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
@@ -721,7 +741,7 @@ impl Synchronizer {
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
-        let (_, macs) = Self::parse_segment(runtime_config.tap_mode, &resp);
+        let (_, macs, gateway_vmac_addrs) = Self::parse_segment(runtime_config.tap_mode, &resp);
 
         let mut status_guard = status.write();
         status_guard.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
@@ -794,6 +814,7 @@ impl Synchronizer {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs: macs,
+                gateway_vmac_addrs,
                 tap_types: resp.tap_types,
             });
         }
