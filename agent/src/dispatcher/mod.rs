@@ -66,7 +66,9 @@ use crate::config::handler::CollectorAccess;
 use crate::platform::GenericPoller;
 use crate::utils::environment::get_mac_by_name;
 use crate::{
-    common::{enums::TapType, flow::L7Stats, FlowAclListener, TaggedFlow, TapTyper},
+    common::{
+        enums::TapType, flow::L7Stats, FlowAclListener, FlowAclListenerId, TaggedFlow, TapTyper,
+    },
     config::{
         handler::{FlowAccess, LogParserAccess},
         DispatcherConfig,
@@ -232,7 +234,7 @@ impl FlowAclListener for DispatcherListener {
             DispatcherListener::Mirror(a) => a.id(),
             DispatcherListener::Analyzer(a) => a.id(),
         };
-        3 + id
+        u16::from(FlowAclListenerId::Dispatcher) as usize + id
     }
 }
 

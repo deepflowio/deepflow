@@ -27,7 +27,7 @@ use sysinfo::{NetworkExt, System, SystemExt};
 
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
-use crate::common::FlowAclListener;
+use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use npb_pcap_policy::{NpbTunnelType, NOT_SUPPORT};
@@ -349,6 +349,6 @@ impl FlowAclListener for Arc<NpbBandwidthWatcher> {
     }
 
     fn id(&self) -> usize {
-        1
+        u16::from(FlowAclListenerId::NpbBandWatcher) as usize
     }
 }
