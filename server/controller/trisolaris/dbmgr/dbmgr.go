@@ -19,6 +19,7 @@ package dbmgr
 import (
 	"context"
 	"fmt"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -219,6 +220,11 @@ func (obj *_DBMgr[M]) UpdateBulk(data []*M) (err error) {
 	for _, d := range data {
 		err = obj.DB.WithContext(obj.ctx).Save(&d).Error
 	}
+	return
+}
+
+func (obj *_DBMgr[M]) Updates(data *M, values map[string]interface{}) (err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(&data).Updates(values).Error
 	return
 }
 
