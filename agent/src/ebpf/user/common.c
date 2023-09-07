@@ -934,6 +934,13 @@ int exec_command(const char *cmd, const char *args)
 			     __func__, cmd_buf, strerror(errno));
 		return -1;
 	}
+
+	/* Read and print the output */
+	char buffer[1024];
+	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+		ebpf_info("%s", buffer);
+	}
+
 	rc = pclose(fp);
 	if (-1 == rc) {
 		ebpf_warning("pclose error, '%s' error:%s\n",
