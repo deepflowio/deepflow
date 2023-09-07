@@ -11,8 +11,8 @@ BEGIN
 
     IF vmac_column = '' THEN
         ALTER TABLE `vinterface` ADD COLUMN `vmac` CHAR(32) DEFAULT '' AFTER `mac`;
-        UPDATE db_version SET version='6.2.1.45';
     END IF;
+    UPDATE db_version SET version='6.2.1.45';
 END;
 
 CALL add_vinterface_vmac();
