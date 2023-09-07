@@ -391,6 +391,7 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.Time = event.GetTimestamp()
 	s.Lcuuid = event.GetLcuuid()
 	s.User = event.GetUser()
+	s.UserId = event.GetUserId()
 
 	s.PolicyId = event.GetPolicyId()
 	s.PolicyName = event.GetPolicyName()
