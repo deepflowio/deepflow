@@ -1114,8 +1114,8 @@ impl FlowMap {
             ebpf will pass the server port to FlowPerf use for adjuest packet direction.
             non ebpf not need this field, FlowPerf::server_port always 0.
         */
-        let (l7_proto_enum, port, from_app_tab, l7_failed_count) =
-            if let Some((proto, port, l7_failed_count)) = match meta_packet.signal_source {
+        let (l7_proto_enum, port, is_skip, l7_failed_count, last) =
+            if let Some((proto, port, l7_failed_count, last)) = match meta_packet.signal_source {
                 SignalSource::EBPF => {
                     let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
                         (local_epc_id, 0)
@@ -1128,11 +1128,21 @@ impl FlowMap {
                 _ => self
                     .app_table
                     .get_protocol(meta_packet)
-                    .map(|(proto, fail_count)| (proto, 0u16, fail_count)),
+                    .map(|(proto, fail_count, last)| (proto, 0u16, fail_count, last)),
             } {
-                (proto, port, true, l7_failed_count)
+                (
+                    proto.clone(),
+                    port,
+                    proto.get_l7_protocol() == L7Protocol::Unknown,
+                    l7_failed_count,
+                    if proto.get_l7_protocol() == L7Protocol::Unknown {
+                        Some(last)
+                    } else {
+                        None
+                    },
+                )
             } else {
-                (L7ProtocolEnum::default(), 0, false, 0)
+                (L7ProtocolEnum::default(), 0, false, 0, None)
             };
 
         let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
@@ -1154,7 +1164,7 @@ impl FlowMap {
                 self.perf_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
-                from_app_tab,
+                is_skip,
                 self.flow_perf_counter.clone(),
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
@@ -1168,6 +1178,9 @@ impl FlowMap {
                     IpProtocol::UDP => flow_config.rrt_udp_timeout,
                     _ => 0,
                 },
+                flow_config.l7_protocol_inference_ttl as u64,
+                last,
+                self.ntp_diff.clone(),
             )
             .map(|o| Box::new(o));
         }
