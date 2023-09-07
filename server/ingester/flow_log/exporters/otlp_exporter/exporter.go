@@ -55,7 +55,6 @@ type OtlpExporter struct {
 	config               *exporters_cfg.OtlpExporterConfig
 	counter              *Counter
 	lastCounter          Counter
-	exportDataTypeBits   uint32
 	running              bool
 
 	utils.Closable
@@ -98,7 +97,6 @@ func NewOtlpExporter(config *exporters_cfg.ExportersCfg, universalTagsManager *u
 		grpcConns:            make([]*grpc.ClientConn, otlpConfig.QueueCount),
 		grpcExporters:        make([]ptraceotlp.GRPCClient, otlpConfig.QueueCount),
 		config:               &otlpConfig,
-		exportDataTypeBits:   config.ExportDataTypeBits,
 		counter:              &Counter{},
 	}
 	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, exporter)
@@ -109,6 +107,14 @@ func NewOtlpExporter(config *exporters_cfg.ExportersCfg, universalTagsManager *u
 }
 
 func (e *OtlpExporter) IsExportData(l *log_data.L7FlowLog) bool {
+	if e.config.ExportOnlyWithTraceID != nil && *e.config.ExportOnlyWithTraceID && l.TraceId == "" {
+		return false
+	}
+
+	if (1<<uint32(l.SignalSource))&e.config.ExportDataBits == 0 {
+		return false
+	}
+
 	// always not export data from OTel
 	if l.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
 		e.counter.DropCounter++
@@ -164,7 +170,7 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 			switch t := flow.(type) {
 			case (*log_data.L7FlowLog):
 				f := flow.(*log_data.L7FlowLog)
-				L7FlowLogToExportResourceSpans(f, e.universalTagsManager, e.exportDataTypeBits, traces.ResourceSpans().AppendEmpty())
+				L7FlowLogToExportResourceSpans(f, e.universalTagsManager, e.config.ExportDataTypeBits, traces.ResourceSpans().AppendEmpty())
 				batchCount++
 				if batchCount >= e.config.ExportBatchCount {
 					if err := e.grpcExport(ctx, queueID, ptraceotlp.NewExportRequestFromTraces(traces)); err == nil {

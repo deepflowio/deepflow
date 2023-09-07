@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/gogo/protobuf/proto"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -26,11 +27,13 @@ func TestConfig(t *testing.T) {
 	expect := baseConfig{
 		Config: ingesterConfig{
 			ExportersCfg: ExportersCfg{
-				Enabled:                     false,
-				ExportDatas:                 []string{"cbpf-net-span", "ebpf-sys-span"},
-				ExportDataTypes:             []string{"service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"},
-				ExportCustomK8sLabelsRegexp: "",
-				ExportOnlyWithTraceID:       false,
+				OverridableCfg: OverridableCfg{
+					ExportDatas:                 []string{"cbpf-net-span"},
+					ExportDataTypes:             []string{"service_info"},
+					ExportCustomK8sLabelsRegexp: "",
+					ExportOnlyWithTraceID:       nil,
+				},
+				Enabled: false,
 				OtlpExporterCfg: OtlpExporterConfig{
 					Enabled:          true,
 					Addr:             "127.0.0.1:4317",
@@ -40,6 +43,12 @@ func TestConfig(t *testing.T) {
 					GrpcHeaders: map[string]string{
 						"key1": "value1",
 						"key2": "value2",
+					},
+					OverridableCfg: OverridableCfg{
+						ExportDatas:                 []string{"ebpf-sys-span"},
+						ExportDataTypes:             []string{"tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"},
+						ExportCustomK8sLabelsRegexp: "",
+						ExportOnlyWithTraceID:       proto.Bool(true),
 					},
 				},
 			},
