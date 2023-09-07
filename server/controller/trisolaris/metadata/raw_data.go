@@ -1186,10 +1186,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 		NetnsId:        proto.Uint32(vif.NetnsID),
 		VtapId:         proto.Uint32(vif.VtapID),
 	}
-	vMacU64, err := MacStrToU64(vif.VMac)
-	if err != nil {
-		log.Error(err, vif.VMac)
-	}
 	sInterface := &trident.Interface{
 		Id:             proto.Uint32(uint32(vif.ID)),
 		Mac:            proto.Uint64(macU64),
@@ -1201,7 +1197,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
 		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
-		Vmac:           proto.Uint64(vMacU64),
 	}
 
 	return &InterfaceProto{aInterface: aInterface, sInterface: sInterface}, nil
