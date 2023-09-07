@@ -105,25 +105,13 @@ func (es *Exporters) Close() {
 	}
 }
 
-func (es *Exporters) IsExportData(l *log_data.L7FlowLog) bool {
-	if es.config.ExportOnlyWithTraceID && l.TraceId == "" {
-		return false
-	}
-	if (1<<uint32(l.SignalSource))&es.config.ExportDataBits == 0 {
-		return false
-	}
-	return true
-}
-
 // parallel put
 func (es *Exporters) Put(l *log_data.L7FlowLog, decoderIndex int) {
 	if l == nil {
 		es.Flush(decoderIndex)
 		return
 	}
-	if !es.IsExportData(l) {
-		return
-	}
+
 	exportersCache := es.putCaches[decoderIndex]
 	for i, e := range es.exporters {
 		if e.IsExportData(l) {
