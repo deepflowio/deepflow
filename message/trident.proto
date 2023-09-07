@@ -283,6 +283,7 @@ message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
     repeated uint32 interface_id = 3; // mac对应的Interface id
+    repeated string vmac = 4; // if interface vmac is not null, vmac = interface vmac; else vmac = interface mac
 }
 
 message IpResource {
@@ -331,7 +332,6 @@ message Interface {
     optional uint32 vtap_id = 28; // 限制在64000
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
-    optional uint64 vmac = 101; // for gateway host vinterface, 0x0123456789ab = 01:23:45:67:89:ab
 }
 
 enum GroupType {
