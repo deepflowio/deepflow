@@ -83,6 +83,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
+		jattach_log("cp '%s' to '%s' failed.\n", AGENT_LIB_SRC_PATH,
+			    copy_target_path);
 		return ret;
 	}
 
@@ -93,6 +95,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
+		jattach_log("cp '%s' to '%s' failed.\n",
+			    AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
 		return ret;
 	}
 
@@ -146,7 +150,7 @@ bool test_dl_open(const char *so_lib_file_path)
 		return false;
 	}
 
-	jattach_log(JAVA_LOG_TAG "%s: Success for %s.", __func__,
+	jattach_log(JAVA_LOG_TAG "%s: Success for %s.\n", __func__,
 		    so_lib_file_path);
 	return true;
 }
@@ -206,15 +210,15 @@ void clear_target_ns_tmp_file(const char *target_path)
 	}
 }
 
-static inline bool is_same_netns(int target_pid)
+static inline bool __is_same_ns(int target_pid, const char *tag)
 {
 	struct stat self_st, target_st;
 	char path[64];
-	snprintf(path, sizeof(path), "/proc/self/ns/net");
+	snprintf(path, sizeof(path), "/proc/self/ns/%s", tag);
 	if (stat(path, &self_st) != 0)
 		return false;
 
-	snprintf(path, sizeof(path), "/proc/%d/ns/net", target_pid);
+	snprintf(path, sizeof(path), "/proc/%d/ns/%s", target_pid, tag);
 	if (stat(path, &target_st) != 0)
 		return false;
 
@@ -223,6 +227,16 @@ static inline bool is_same_netns(int target_pid)
 	}
 
 	return false;
+}
+
+static bool __unused is_same_netns(int target_pid)
+{
+	return __is_same_ns(target_pid, "net");
+}
+
+static bool is_same_mntns(int target_pid)
+{
+	return __is_same_ns(target_pid, "mnt");
 }
 
 void clear_target_ns(int pid, int target_ns_pid)
@@ -235,7 +249,7 @@ void clear_target_ns(int pid, int target_ns_pid)
 	 *  /tmp/df_java_agent_musl.so
 	 */
 
-	if (is_same_netns(pid))
+	if (is_same_mntns(pid))
 		return;
 
 	char target_path[MAX_PATH_LENGTH];
@@ -288,7 +302,7 @@ static inline void switch_to_root_ns(int root_fd)
 
 void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 {
-	if (is_same_netns(pid))
+	if (is_same_mntns(pid))
 		return;
 
 	char target_path[128];
@@ -346,15 +360,25 @@ int java_attach(pid_t pid)
 		return 0;
 	}
 
-	if (!is_same_netns(pid)) {
+	/*
+	 * Here, the original method of determination (based on whether the net
+	 * namespace is the same) is modified to use the mnt namespace for comparison,
+	 * thus avoiding situations where both the net namespace and pid namespace are
+	 * the same but the file system is different.
+	 */
+	if (!is_same_mntns(pid)) {
 		/*
 		 * If the target Java process is in a subordinate namespace, copy the
 		 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
 		 * (for visibility to the target process).
 		 */
+		jattach_log("[PID %d] copy agent os library ...\n", pid);
 		if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
+			jattach_log("[PID %d] copy agent os library failed.\n",
+				    pid);
 			goto failed;
 		}
+		jattach_log("[PID %d] copy agent os library success.\n", pid);
 	}
 
 	/*
