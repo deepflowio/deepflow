@@ -189,7 +189,11 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 		mgr.DeleteBatchFromID(deleteIDs)
 	}
 	if len(updateData) > 0 {
-		mgr.UpdateBulk(updateData)
+		for _, data := range updateData {
+			mgr.Updates(&models.KubernetesCluster{ID: data.ID}, map[string]interface{}{
+				"synced_at": data.SyncedAt,
+			})
+		}
 	}
 	k.updateCache(keyToCache)
 
