@@ -924,7 +924,7 @@ vtap_group_id: g-xxxxxx
   #rrt-udp-timeout: 150s
 
   ## Maximum Fail Count
-  ## Note: deepflow-agent will mark the application protocol for each
+  ## Note: deepflow-agent will mark the long live stream and application protocol for each
   ##   <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
   ##   to be identified for many times (for multiple packets, Socket Data, Function Data),
   ##   the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
