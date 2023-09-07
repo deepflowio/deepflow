@@ -21,18 +21,20 @@ type OverridableCfg struct {
 type ExportersCfg struct {
 	Enabled bool `yaml:"enabled"`
 
-	// OtlpExporter config for OTLP exporter
-	OtlpExporterCfg OtlpExporterConfig `yaml:"otlp-exporter"`
-
-	// other exporter config ...
-
 	// global config, could be overridden by same fields under each exporter.
 	OverridableCfg `yaml:",inline"`
+
+	// OtlpExporter config for OTLP exporters
+	OtlpExporterCfgs []OtlpExporterConfig `yaml:"otlp-exporters"`
+
+	// other exporter configs ...
 }
 
 func (ec *ExportersCfg) Validate() error {
-	if err := ec.OtlpExporterCfg.Validate(ec.OverridableCfg); err != nil {
-		return err
+	for i := range ec.OtlpExporterCfgs {
+		if err := ec.OtlpExporterCfgs[i].Validate(ec.OverridableCfg); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -47,7 +49,7 @@ func NewDefaultExportersCfg() ExportersCfg {
 			ExportDatas:     DefaultOtlpExportDatas,
 			ExportDataTypes: DefaultOtlpExportDataTypes,
 		},
-		OtlpExporterCfg: NewOtlpDefaultConfig(),
+		OtlpExporterCfgs: []OtlpExporterConfig{NewOtlpDefaultConfig()},
 	}
 }
 
