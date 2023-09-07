@@ -23,13 +23,19 @@
 #include "../../log.h"
 #include "df_jattach.h"
 
+#define jattach_log(fmt, ...)				\
+	do {						\
+		fprintf(stdout, fmt, ##__VA_ARGS__);	\
+		fflush(stdout);				\
+	} while(0)
+
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
 
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
 	if (access(src, F_OK)) {
-		ebpf_info("Fun %s src file '%s' not exist.\n", __func__, src);
+		jattach_log("Fun %s src file '%s' not exist.\n", __func__, src);
 		return ETR_NOTEXIST;
 	}
 
@@ -38,7 +44,7 @@ static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 	}
 
 	if (chown(dst, uid, gid) != 0) {
-		ebpf_warning
+		jattach_log
 		    ("Failed to change ownership and group. file '%s'\n", dst);
 		return ETR_INVAL;
 	}
@@ -63,8 +69,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 			   "/proc/%d/root/tmp", target_pid);
 	if (access(copy_target_path, F_OK)) {
 		if (mkdir(copy_target_path, 0777) != 0) {
-			ebpf_info(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
-				  __func__, copy_target_path);
+			jattach_log(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
+				    __func__, copy_target_path);
 
 			return ETR_NOTEXIST;
 		}
@@ -96,8 +102,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 bool test_dl_open(const char *so_lib_file_path)
 {
 	if (access(so_lib_file_path, F_OK)) {
-		ebpf_info(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
-			  __func__, so_lib_file_path);
+		jattach_log(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
+			    __func__, so_lib_file_path);
 
 		return false;
 	}
@@ -112,8 +118,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	void *h = dlopen(so_lib_file_path, RTLD_LAZY);
 
 	if (h == NULL) {
-		ebpf_info(JAVA_LOG_TAG "Fuc '%s' dlopen() path %s failure: %s.",
-			  __func__, so_lib_file_path, dlerror());
+		jattach_log(JAVA_LOG_TAG
+			    "Fuc '%s' dlopen() path %s failure: %s.", __func__,
+			    so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -122,8 +129,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	    (uint64_t(*)(void))dlsym(h, "df_java_agent_so_libs_test");
 
 	if (test_fn == NULL) {
-		ebpf_info(JAVA_LOG_TAG "Func '%s' dlsym() path %s failure: %s.",
-			  __func__, so_lib_file_path, dlerror());
+		jattach_log(JAVA_LOG_TAG
+			    "Func '%s' dlsym() path %s failure: %s.", __func__,
+			    so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -131,15 +139,15 @@ bool test_dl_open(const char *so_lib_file_path)
 	const uint64_t observed_test_fn_result = test_fn();
 
 	if (observed_test_fn_result != expected_test_fn_result) {
-		ebpf_info(JAVA_LOG_TAG
-			  "%s test '%s' function returned: %lu, expected %lu.",
-			  __func__, so_lib_file_path, observed_test_fn_result,
-			  expected_test_fn_result);
+		jattach_log(JAVA_LOG_TAG
+			    "%s test '%s' function returned: %lu, expected %lu.",
+			    __func__, so_lib_file_path, observed_test_fn_result,
+			    expected_test_fn_result);
 		return false;
 	}
 
-	ebpf_info(JAVA_LOG_TAG "%s: Success for %s.", __func__,
-		  so_lib_file_path);
+	jattach_log(JAVA_LOG_TAG "%s: Success for %s.", __func__,
+		    so_lib_file_path);
 	return true;
 }
 
@@ -155,22 +163,22 @@ static void select_sitable_agent_lib(pid_t pid)
 	if (test_dl_open(AGENT_LIB_SRC_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
 			 AGENT_LIB_SRC_PATH);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n", __func__,
-			  pid, AGENT_LIB_SRC_PATH);
+		jattach_log(JAVA_LOG_TAG
+			    "Func %s target PID %d test %s, success.\n",
+			    __func__, pid, AGENT_LIB_SRC_PATH);
 		goto found;
 	}
 
 	if (test_dl_open(AGENT_MUSL_LIB_SRC_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
 			 AGENT_MUSL_LIB_SRC_PATH);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n", __func__,
-			  pid, AGENT_MUSL_LIB_SRC_PATH);
+		jattach_log(JAVA_LOG_TAG
+			    "Func %s target PID %d test %s, success.\n",
+			    __func__, pid, AGENT_MUSL_LIB_SRC_PATH);
 		goto found;
 	}
 
-	ebpf_warning(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
+	jattach_log(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
 
 found:
 	df_exit_ns(pid_self_fd);
@@ -182,9 +190,9 @@ static int attach(pid_t pid)
 	char *argv[] = { "load", agent_lib_so_path, "true" };
 	int argc = sizeof(argv) / sizeof(argv[0]);
 	int ret = jattach(pid, argc, (char **)argv);
-	ebpf_info(JAVA_LOG_TAG
-		  "jattach pid %d argv: \"load %s true\" return %d\n", pid,
-		  agent_lib_so_path, ret);
+	jattach_log(JAVA_LOG_TAG
+		    "jattach pid %d argv: \"load %s true\" return %d\n", pid,
+		    agent_lib_so_path, ret);
 
 	return ret;
 }
@@ -193,8 +201,8 @@ void clear_target_ns_tmp_file(const char *target_path)
 {
 	if (access(target_path, F_OK) == 0) {
 		if (unlink(target_path) != 0)
-			ebpf_info(JAVA_LOG_TAG "rm file %s failed\n",
-				  target_path);
+			jattach_log(JAVA_LOG_TAG "rm file %s failed\n",
+				    target_path);
 	}
 }
 
@@ -300,8 +308,8 @@ void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 	}
 
 	if (copy_file(src_path, target_path)) {
-		ebpf_warning("Copy '%s' to '%s' failed.\n", src_path,
-			     target_path);
+		jattach_log("Copy '%s' to '%s' failed.\n", src_path,
+			    target_path);
 	}
 }
 

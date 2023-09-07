@@ -713,16 +713,24 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 			 * we will reacquire it after the program has been running stably
 			 * for a period of time to avoid such situations.
 			 */
-			p->stime = (u64) get_process_starttime_and_comm(pid,
-									p->comm,
-									sizeof
-									(p->comm));
-			p->comm[sizeof(p->comm) - 1] = '\0';
-			if (p->stime == 0) {
-				ebpf_warning
-				    ("pid %d get_process_starttime_and_comm() error\n",
-				     pid);
+			char comm[sizeof(p->comm)];
+			u64 stime =
+				(u64)get_process_starttime_and_comm(pid,
+								    comm,
+								    sizeof(comm));
+			if (stime == 0) {
+				/* 
+				 * Here, indicate that during the symbolization process,
+				 * the process has already terminated, but the process
+				 * information has not yet been cleared. In this case, we
+				 * continue to use the previously retained information.
+				 */
+				goto fetch_proc_info;
 			}
+
+			p->stime = stime;
+			memcpy(p->comm, comm, sizeof(p->comm));
+			p->comm[sizeof(p->comm) - 1] = '\0';
 
 			if (strcmp(p->comm, "java") == 0)
 				p->is_java = true;
@@ -742,6 +750,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 		}
 	}
 
+fetch_proc_info:
 	copy_process_name(&kv, name);
 	*stime = cache_process_stime(&kv);
 	*netns_id = cache_process_netns_id(&kv);
