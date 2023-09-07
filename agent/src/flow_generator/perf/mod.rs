@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::slice;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
@@ -44,6 +45,7 @@ use crate::common::{
 use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
+use crate::rpc::get_timestamp;
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -190,7 +192,6 @@ pub struct FlowLog {
     // we use the server_port to judge packet's direction.
     pub server_port: u16,
 
-    is_from_app: bool,
     is_success: bool,
     is_skip: bool,
 
@@ -201,10 +202,28 @@ pub struct FlowLog {
     so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
+
+    // the timestamp sec of accumulate fail exceed l7_protocol_inference_max_fail_count
+    last_fail: Option<u64>,
+    l7_protocol_inference_ttl: u64,
+
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl FlowLog {
     const PROTOCOL_CHECK_LIMIT: usize = 5;
+
+    // if flow parse fail exceed l7_protocol_inference_max_fail_count and time exceed l7_protocol_inference_ttl,
+    // recover the flow check and parse
+    fn check_fail_recover(&mut self) {
+        if self.is_skip {
+            let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+            if now.as_secs() > self.last_fail.unwrap() + self.l7_protocol_inference_ttl {
+                self.last_fail = None;
+                self.is_skip = false;
+            }
+        }
+    }
 
     fn l7_parse_log(
         &mut self,
@@ -215,10 +234,6 @@ impl FlowLog {
         local_epc: i32,
         remote_epc: i32,
     ) -> Result<L7ParseResult> {
-        if self.is_skip {
-            return Err(Error::L7ProtocolParseLimit);
-        }
-
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
 
@@ -258,6 +273,9 @@ impl FlowLog {
                 }
                 if !self.is_success {
                     self.is_skip = cache_proto(L7ProtocolEnum::default());
+                    if self.is_skip {
+                        self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
+                    }
                 }
             }
             return ret;
@@ -278,10 +296,6 @@ impl FlowLog {
         remote_epc: i32,
         checker: &L7ProtocolChecker,
     ) -> Result<L7ParseResult> {
-        if self.is_skip {
-            return Err(Error::L7ProtocolCheckLimit);
-        }
-
         if let Some(payload) = packet.get_l4_payload() {
             let pkt_size = flow_config.l7_log_packet_size as usize;
 
@@ -364,6 +378,9 @@ impl FlowLog {
                 ),
                 _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
             };
+            if self.is_skip {
+                self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
+            }
         }
 
         return Err(Error::L7ProtocolUnknown);
@@ -381,6 +398,11 @@ impl FlowLog {
         remote_epc: i32,
         checker: &L7ProtocolChecker,
     ) -> Result<L7ParseResult> {
+        self.check_fail_recover();
+        if self.is_skip {
+            return Err(Error::L7ProtocolParseLimit);
+        }
+
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
             // direction by comparing self.server_port with packet.lookup_key.dst_port When check_payload()
@@ -414,10 +436,6 @@ impl FlowLog {
             return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
         }
 
-        if self.is_from_app {
-            return Err(Error::L7ProtocolUnknown);
-        }
-
         if packet.l4_payload_len() < 2 {
             return Err(Error::L7ProtocolUnknown);
         }
@@ -442,7 +460,7 @@ impl FlowLog {
         perf_cache: Rc<RefCell<L7PerfCache>>,
         l4_proto: L4Protocol,
         l7_protocol_enum: L7ProtocolEnum,
-        is_from_app_tab: bool,
+        is_skip: bool,
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
@@ -450,6 +468,9 @@ impl FlowLog {
         #[cfg(target_os = "linux")] so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
+        l7_protocol_inference_ttl: u64,
+        last_time: Option<u64>,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -473,10 +494,9 @@ impl FlowLog {
             l7_protocol_log_parser: get_parser(l7_protocol_enum.clone()).map(|o| Box::new(o)),
             perf_cache,
             l7_protocol_enum,
-            is_from_app: is_from_app_tab,
-            is_success: false,
-            is_skip: false,
             server_port: server_port,
+            is_success: false,
+            is_skip,
             wasm_vm,
             #[cfg(target_os = "linux")]
             so_plugin,
@@ -484,6 +504,9 @@ impl FlowLog {
             so_plugin_counter,
             stats_counter: stats_counter,
             rrt_timeout: rrt_timeout,
+            last_fail: last_time,
+            l7_protocol_inference_ttl,
+            ntp_diff,
         })
     }
 
