@@ -45,6 +45,7 @@ FILE *perf_map_log_file_ptr = NULL;
 #define _(e)                                                                \
 	if (e != JNI_OK) {                                                  \
 		df_log("DF java agent failed, %s, error code: %d.", #e, e); \
+		close_files();                                              \
 		return e;                                                   \
 	}
 
@@ -345,12 +346,14 @@ Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 	jvmtiEnv *jvmti;
 	_(open_perf_map_log_file(getpid()));
 	_(open_perf_map_file(getpid()));
+	df_log("Start agent ...");
 	_(get_jvmti_env(vm, &jvmti));
 	_(enable_capabilities(jvmti));
 	_(set_callback_funs(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_ENABLE));
 	_(replay_callbacks(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_DISABLE));
+	df_log("Finish");
 	_(close_files());
 
 	return 0;
