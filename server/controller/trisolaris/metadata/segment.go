@@ -340,7 +340,11 @@ func (s *Segment) generateGatewayHostSegments() {
 				if !isMacNullOrDefault(macID.Mac) {
 					macs = append(macs, macID.Mac)
 					vifIDs = append(vifIDs, uint32(macID.ID))
-					vmacs = append(vmacs, macID.VMac)
+					if macID.VMac == "" {
+						vmacs = append(vmacs, macID.Mac)
+					} else {
+						vmacs = append(vmacs, macID.VMac)
+					}
 				}
 			}
 			segment := &trident.Segment{

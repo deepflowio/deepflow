@@ -300,7 +300,7 @@ func (r *PlatformRawData) ConvertDBVInterface(dbDataCache *DBDataCache) {
 			} else {
 				r.hostIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
 			}
-			if Find[int](r.gatewayHostIDs, vif.ID) {
+			if Find[int](r.gatewayHostIDs, vif.DeviceID) {
 				if vifs, ok := r.gatewayHostIDToVifs[vif.DeviceID]; ok {
 					vifs.Add(vif)
 				} else {
@@ -613,7 +613,7 @@ func (r *PlatformRawData) ConvertHost(dbDataCache *DBDataCache) {
 			AZ:             host.AZ,
 			Type:           VIF_DEVICE_TYPE_HOST,
 		}
-		if host.Type == HOST_HTYPE_GATEWAY {
+		if host.HType == HOST_HTYPE_GATEWAY {
 			r.gatewayHostIDs = append(r.gatewayHostIDs, host.ID)
 		}
 	}
