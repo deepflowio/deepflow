@@ -45,6 +45,7 @@ type AlarmEventStore struct {
 	Time   uint32
 	Lcuuid string
 	User   string
+	UserId uint32
 
 	PolicyId                uint32
 	PolicyName              string
@@ -76,6 +77,7 @@ func AlarmEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("lccuid", ckdb.String),
 		ckdb.NewColumn("user", ckdb.LowCardinalityString),
+		ckdb.NewColumn("user_id", ckdb.UInt32),
 
 		ckdb.NewColumn("policy_id", ckdb.UInt32),
 		ckdb.NewColumn("policy_name", ckdb.LowCardinalityString),
@@ -108,6 +110,7 @@ func (e *AlarmEventStore) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		e.Lcuuid,
 		e.User,
+		e.UserId,
 		e.PolicyId,
 		e.PolicyName,
 		e.PolicyLevel,
