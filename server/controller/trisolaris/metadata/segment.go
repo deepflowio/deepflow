@@ -26,14 +26,16 @@ import (
 )
 
 type MacID struct {
-	Mac string
-	ID  int
+	Mac  string
+	VMac string
+	ID   int
 }
 
 func newMacID(vif *models.VInterface) *MacID {
 	return &MacID{
-		Mac: vif.Mac,
-		ID:  vif.ID,
+		Mac:  vif.Mac,
+		ID:   vif.ID,
+		VMac: vif.VMac,
 	}
 }
 
@@ -332,16 +334,23 @@ func (s *Segment) generateGatewayHostSegments() {
 	for _, hostSegments := range s.gatewayHostIDToSegments {
 		for _, macIDs := range hostSegments {
 			macs := make([]string, 0, len(macIDs))
+			vmacs := make([]string, 0, len(macIDs))
 			vifIDs := make([]uint32, 0, len(macIDs))
 			for _, macID := range macIDs {
 				if !isMacNullOrDefault(macID.Mac) {
 					macs = append(macs, macID.Mac)
 					vifIDs = append(vifIDs, uint32(macID.ID))
+					if macID.VMac == "" {
+						vmacs = append(vmacs, macID.Mac)
+					} else {
+						vmacs = append(vmacs, macID.VMac)
+					}
 				}
 			}
 			segment := &trident.Segment{
 				Id:          proto.Uint32(uint32(1)),
 				Mac:         macs,
+				Vmac:        vmacs,
 				InterfaceId: vifIDs,
 			}
 			segments = append(segments, segment)
