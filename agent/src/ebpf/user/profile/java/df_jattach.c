@@ -23,13 +23,19 @@
 #include "../../log.h"
 #include "df_jattach.h"
 
+#define jattach_log(fmt, ...)				\
+	do {						\
+		fprintf(stdout, fmt, ##__VA_ARGS__);	\
+		fflush(stdout);				\
+	} while(0)
+
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
 
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
 	if (access(src, F_OK)) {
-		ebpf_info("Fun %s src file '%s' not exist.\n", __func__, src);
+		jattach_log("Fun %s src file '%s' not exist.\n", __func__, src);
 		return ETR_NOTEXIST;
 	}
 
@@ -38,7 +44,7 @@ static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 	}
 
 	if (chown(dst, uid, gid) != 0) {
-		ebpf_warning
+		jattach_log
 		    ("Failed to change ownership and group. file '%s'\n", dst);
 		return ETR_INVAL;
 	}
@@ -63,8 +69,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 			   "/proc/%d/root/tmp", target_pid);
 	if (access(copy_target_path, F_OK)) {
 		if (mkdir(copy_target_path, 0777) != 0) {
-			ebpf_info(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
-				  __func__, copy_target_path);
+			jattach_log(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
+				    __func__, copy_target_path);
 
 			return ETR_NOTEXIST;
 		}
@@ -77,6 +83,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
+		jattach_log("cp '%s' to '%s' failed.\n", AGENT_LIB_SRC_PATH,
+			    copy_target_path);
 		return ret;
 	}
 
@@ -87,6 +95,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
+		jattach_log("cp '%s' to '%s' failed.\n",
+			    AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
 		return ret;
 	}
 
@@ -96,8 +106,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 bool test_dl_open(const char *so_lib_file_path)
 {
 	if (access(so_lib_file_path, F_OK)) {
-		ebpf_info(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
-			  __func__, so_lib_file_path);
+		jattach_log(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
+			    __func__, so_lib_file_path);
 
 		return false;
 	}
@@ -112,8 +122,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	void *h = dlopen(so_lib_file_path, RTLD_LAZY);
 
 	if (h == NULL) {
-		ebpf_info(JAVA_LOG_TAG "Fuc '%s' dlopen() path %s failure: %s.",
-			  __func__, so_lib_file_path, dlerror());
+		jattach_log(JAVA_LOG_TAG
+			    "Fuc '%s' dlopen() path %s failure: %s.", __func__,
+			    so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -122,8 +133,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	    (uint64_t(*)(void))dlsym(h, "df_java_agent_so_libs_test");
 
 	if (test_fn == NULL) {
-		ebpf_info(JAVA_LOG_TAG "Func '%s' dlsym() path %s failure: %s.",
-			  __func__, so_lib_file_path, dlerror());
+		jattach_log(JAVA_LOG_TAG
+			    "Func '%s' dlsym() path %s failure: %s.", __func__,
+			    so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -131,15 +143,15 @@ bool test_dl_open(const char *so_lib_file_path)
 	const uint64_t observed_test_fn_result = test_fn();
 
 	if (observed_test_fn_result != expected_test_fn_result) {
-		ebpf_info(JAVA_LOG_TAG
-			  "%s test '%s' function returned: %lu, expected %lu.",
-			  __func__, so_lib_file_path, observed_test_fn_result,
-			  expected_test_fn_result);
+		jattach_log(JAVA_LOG_TAG
+			    "%s test '%s' function returned: %lu, expected %lu.",
+			    __func__, so_lib_file_path, observed_test_fn_result,
+			    expected_test_fn_result);
 		return false;
 	}
 
-	ebpf_info(JAVA_LOG_TAG "%s: Success for %s.", __func__,
-		  so_lib_file_path);
+	jattach_log(JAVA_LOG_TAG "%s: Success for %s.\n", __func__,
+		    so_lib_file_path);
 	return true;
 }
 
@@ -155,22 +167,22 @@ static void select_sitable_agent_lib(pid_t pid)
 	if (test_dl_open(AGENT_LIB_SRC_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
 			 AGENT_LIB_SRC_PATH);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n", __func__,
-			  pid, AGENT_LIB_SRC_PATH);
+		jattach_log(JAVA_LOG_TAG
+			    "Func %s target PID %d test %s, success.\n",
+			    __func__, pid, AGENT_LIB_SRC_PATH);
 		goto found;
 	}
 
 	if (test_dl_open(AGENT_MUSL_LIB_SRC_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
 			 AGENT_MUSL_LIB_SRC_PATH);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n", __func__,
-			  pid, AGENT_MUSL_LIB_SRC_PATH);
+		jattach_log(JAVA_LOG_TAG
+			    "Func %s target PID %d test %s, success.\n",
+			    __func__, pid, AGENT_MUSL_LIB_SRC_PATH);
 		goto found;
 	}
 
-	ebpf_warning(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
+	jattach_log(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
 
 found:
 	df_exit_ns(pid_self_fd);
@@ -182,9 +194,9 @@ static int attach(pid_t pid)
 	char *argv[] = { "load", agent_lib_so_path, "true" };
 	int argc = sizeof(argv) / sizeof(argv[0]);
 	int ret = jattach(pid, argc, (char **)argv);
-	ebpf_info(JAVA_LOG_TAG
-		  "jattach pid %d argv: \"load %s true\" return %d\n", pid,
-		  agent_lib_so_path, ret);
+	jattach_log(JAVA_LOG_TAG
+		    "jattach pid %d argv: \"load %s true\" return %d\n", pid,
+		    agent_lib_so_path, ret);
 
 	return ret;
 }
@@ -193,20 +205,20 @@ void clear_target_ns_tmp_file(const char *target_path)
 {
 	if (access(target_path, F_OK) == 0) {
 		if (unlink(target_path) != 0)
-			ebpf_info(JAVA_LOG_TAG "rm file %s failed\n",
-				  target_path);
+			jattach_log(JAVA_LOG_TAG "rm file %s failed\n",
+				    target_path);
 	}
 }
 
-static inline bool is_same_netns(int target_pid)
+static inline bool __is_same_ns(int target_pid, const char *tag)
 {
 	struct stat self_st, target_st;
 	char path[64];
-	snprintf(path, sizeof(path), "/proc/self/ns/net");
+	snprintf(path, sizeof(path), "/proc/self/ns/%s", tag);
 	if (stat(path, &self_st) != 0)
 		return false;
 
-	snprintf(path, sizeof(path), "/proc/%d/ns/net", target_pid);
+	snprintf(path, sizeof(path), "/proc/%d/ns/%s", target_pid, tag);
 	if (stat(path, &target_st) != 0)
 		return false;
 
@@ -215,6 +227,16 @@ static inline bool is_same_netns(int target_pid)
 	}
 
 	return false;
+}
+
+static bool __unused is_same_netns(int target_pid)
+{
+	return __is_same_ns(target_pid, "net");
+}
+
+static bool is_same_mntns(int target_pid)
+{
+	return __is_same_ns(target_pid, "mnt");
 }
 
 void clear_target_ns(int pid, int target_ns_pid)
@@ -227,7 +249,7 @@ void clear_target_ns(int pid, int target_ns_pid)
 	 *  /tmp/df_java_agent_musl.so
 	 */
 
-	if (is_same_netns(pid))
+	if (is_same_mntns(pid))
 		return;
 
 	char target_path[MAX_PATH_LENGTH];
@@ -280,7 +302,7 @@ static inline void switch_to_root_ns(int root_fd)
 
 void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 {
-	if (is_same_netns(pid))
+	if (is_same_mntns(pid))
 		return;
 
 	char target_path[128];
@@ -300,8 +322,8 @@ void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 	}
 
 	if (copy_file(src_path, target_path)) {
-		ebpf_warning("Copy '%s' to '%s' failed.\n", src_path,
-			     target_path);
+		jattach_log("Copy '%s' to '%s' failed.\n", src_path,
+			    target_path);
 	}
 }
 
@@ -338,15 +360,25 @@ int java_attach(pid_t pid)
 		return 0;
 	}
 
-	if (!is_same_netns(pid)) {
+	/*
+	 * Here, the original method of determination (based on whether the net
+	 * namespace is the same) is modified to use the mnt namespace for comparison,
+	 * thus avoiding situations where both the net namespace and pid namespace are
+	 * the same but the file system is different.
+	 */
+	if (!is_same_mntns(pid)) {
 		/*
 		 * If the target Java process is in a subordinate namespace, copy the
 		 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
 		 * (for visibility to the target process).
 		 */
+		jattach_log("[PID %d] copy agent os library ...\n", pid);
 		if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
+			jattach_log("[PID %d] copy agent os library failed.\n",
+				    pid);
 			goto failed;
 		}
+		jattach_log("[PID %d] copy agent os library success.\n", pid);
 	}
 
 	/*

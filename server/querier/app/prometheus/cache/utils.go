@@ -35,8 +35,8 @@ const (
 
 // start time & end time align to 0 second
 // e.g.: query 13s-117s, cache 0s-120s
-func timeAlign(startMs int64, endMs int64) (int64, int64) {
-	return startMs - startMs%60000, endMs + (60000 - endMs%60000)
+func timeAlign(startMs int64) int64 {
+	return startMs - startMs%60000
 }
 
 func promRequestToCacheKey(q *prompb.Query) (string, string, int64, int64) {

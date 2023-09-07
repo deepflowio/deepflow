@@ -74,11 +74,13 @@ func (c *Config) Validate() error {
 	if c.OtlpDeprecated.Enabled {
 		log.Warning("config ingester.otlp-exporter is deprecated. mapping to ingester.exporters.otlp-exporter.")
 		c.ExportersCfg = exporters_cfg.ExportersCfg{
-			Enabled:                     true,
-			ExportDatas:                 c.OtlpDeprecated.ExportDatas,
-			ExportDataTypes:             c.OtlpDeprecated.ExportDataTypes,
-			ExportCustomK8sLabelsRegexp: c.OtlpDeprecated.ExportCustomK8sLabelsRegexp,
-			ExportOnlyWithTraceID:       c.OtlpDeprecated.ExportOnlyWithTraceID,
+			Enabled: true,
+			OverridableCfg: exporters_cfg.OverridableCfg{
+				ExportDatas:                 c.OtlpDeprecated.ExportDatas,
+				ExportDataTypes:             c.OtlpDeprecated.ExportDataTypes,
+				ExportCustomK8sLabelsRegexp: c.OtlpDeprecated.ExportCustomK8sLabelsRegexp,
+				ExportOnlyWithTraceID:       &c.OtlpDeprecated.ExportOnlyWithTraceID,
+			},
 			OtlpExporterCfg: exporters_cfg.OtlpExporterConfig{
 				Enabled:          true,
 				Addr:             c.OtlpDeprecated.Addr,

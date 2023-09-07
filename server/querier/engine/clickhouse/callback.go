@@ -96,8 +96,16 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 		groups := client.Group(seriesSort.Series, seriesSort.SortIndex[:len(seriesSort.SortIndex)-1], result.Schemas)
 
 		// fix start and end
-		start := (int(m.Time.TimeStart)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		end := (int(m.Time.TimeEnd)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
+		newTimeStart := int(m.Time.TimeStart)
+		newTimeEnd := int(m.Time.TimeEnd)
+		if m.Time.TimeStartOperator == ">" {
+			newTimeStart = int(m.Time.TimeStart) + m.Time.Interval
+		}
+		if m.Time.TimeEndOperator == "<" {
+			newTimeEnd = int(m.Time.TimeEnd) - m.Time.Interval
+		}
+		start := (newTimeStart+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
+		end := (newTimeEnd+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
 		end += (m.Time.WindowSize - 1) * m.Time.Interval
 		// length after fix
 		intervalLength := (end-start)/m.Time.Interval + 1

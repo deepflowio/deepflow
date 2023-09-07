@@ -103,6 +103,7 @@ l7_server_timeout           , l7_server_timeout    , counter    , Application   
 l7_error_ratio              ,                      , percentage , Application    , 111
 l7_client_error_ratio       ,                      , percentage , Application    , 111
 l7_server_error_ratio       ,                      , percentage , Application    , 111
+l7_parse_failed             , l7_parse_failed      , counter    , Application    , 111
 
 vpc_0                       ,                      , tag        , Cardinality    , 111
 subnet_0                    ,                      , tag        , Cardinality    , 111

@@ -19,7 +19,6 @@ package view
 import (
 	"bytes"
 	"strings"
-	"time"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 )
@@ -105,6 +104,8 @@ type Time struct {
 	WindowSize         int
 	Fill               string
 	Alias              string
+	TimeStartOperator  string
+	TimeEndOperator    string
 }
 
 func (t *Time) AddTimeStart(timeStart int64) {
@@ -114,7 +115,7 @@ func (t *Time) AddTimeStart(timeStart int64) {
 }
 
 func (t *Time) AddTimeEnd(timeEnd int64) {
-	if timeEnd < t.TimeEnd {
+	if t.TimeEnd == 0 || timeEnd < t.TimeEnd {
 		t.TimeEnd = timeEnd
 	}
 }
@@ -137,9 +138,11 @@ func (t *Time) AddAlias(alias string) {
 
 func NewTime() *Time {
 	return &Time{
-		TimeEnd:            time.Now().Unix(),
+		TimeEnd:            0,
 		DatasourceInterval: 1,
 		WindowSize:         1,
+		TimeStartOperator:  ">=",
+		TimeEndOperator:    "<=",
 	}
 }
 

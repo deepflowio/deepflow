@@ -354,7 +354,6 @@ type VInterface struct {
 	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Type         int       `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
 	Mac          string    `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
-	VMac         string    `gorm:"column:vmac;type:char(32);default:''" json:"VMAC"`
 	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
 	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
 	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
@@ -1380,14 +1379,17 @@ func (Plugin) TableName() string {
 }
 
 type MailServer struct {
-	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Status   int    `gorm:"column:status;type:int;not null" json:"STATUS"`
-	Host     string `gorm:"column:host;type:text;not null" json:"HOST"`
-	Port     int    `gorm:"column:port;type:int;not null" json:"PORT"`
-	User     string `gorm:"column:user;type:text;not null" json:"USER"`
-	Password string `gorm:"column:password;type:text;not null" json:"PASSWORD"`
-	Security string `gorm:"column:security;type:text;not null" json:"SECURITY"`
-	Lcuuid   string `gorm:"unique;column:lcuuid;type:char(64)" json:"LCUUID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Status       int    `gorm:"column:status;type:int;not null" json:"STATUS"`
+	Host         string `gorm:"column:host;type:text;not null" json:"HOST"`
+	Port         int    `gorm:"column:port;type:int;not null" json:"PORT"`
+	User         string `gorm:"column:user;type:text;not null" json:"USER"`
+	Password     string `gorm:"column:password;type:text;not null" json:"PASSWORD"`
+	Security     string `gorm:"column:security;type:text;not null" json:"SECURITY"`
+	NtlmEnabled  int    `gorm:"column:ntlm_enabled;type:int" json:"NTLM_ENABLED"`
+	NtlmName     string `gorm:"column:ntlm_name;type:text" json:"NTLM_NAME"`
+	NtlmPassword string `gorm:"column:ntlm_password;type:text" json:"NTLM_PASSWORD"`
+	Lcuuid       string `gorm:"unique;column:lcuuid;type:char(64)" json:"LCUUID"`
 }
 
 func (MailServer) TableName() string {
