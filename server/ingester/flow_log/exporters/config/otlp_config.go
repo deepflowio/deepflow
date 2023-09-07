@@ -50,6 +50,8 @@ type OtlpExporterConfig struct {
 	QueueSize        int               `yaml:"queue-size"`
 	ExportBatchCount int               `yaml:"export-batch-count"`
 	GrpcHeaders      map[string]string `yaml:"grpc-headers"`
+
+	OverridableCfg `yaml:",inline"`
 }
 
 const (
@@ -58,7 +60,13 @@ const (
 	DefaultOtlpExportQueueSize  = 100000
 )
 
-func (cfg *OtlpExporterConfig) Validate() error {
+func (cfg *OtlpExporterConfig) Validate(overridableCfg OverridableCfg) error {
+	if !cfg.Enabled {
+		return nil
+	}
+
+	cfg.calcDataBits()
+
 	if cfg.ExportBatchCount == 0 {
 		cfg.ExportBatchCount = DefaultOtlpExportBatchCount
 	}
@@ -70,7 +78,38 @@ func (cfg *OtlpExporterConfig) Validate() error {
 		cfg.QueueSize = DefaultOtlpExportQueueSize
 	}
 
+	// overwritten params
+	if cfg.ExportCustomK8sLabelsRegexp == "" {
+		cfg.ExportCustomK8sLabelsRegexp = overridableCfg.ExportCustomK8sLabelsRegexp
+	}
+
+	if len(cfg.ExportDatas) == 0 {
+		cfg.ExportDatas = overridableCfg.ExportDatas
+	}
+
+	if len(cfg.ExportDataTypes) == 0 {
+		cfg.ExportDataTypes = overridableCfg.ExportDataTypes
+	}
+
+	if cfg.ExportOnlyWithTraceID != nil {
+		cfg.ExportOnlyWithTraceID = overridableCfg.ExportOnlyWithTraceID
+	}
 	return nil
+}
+
+func (cfg *OtlpExporterConfig) calcDataBits() {
+	for _, v := range cfg.ExportDatas {
+		cfg.ExportDataBits |= uint32(StringToExportedData(v))
+	}
+	log.Infof("export data bits: %08b, string: %s", cfg.ExportDataBits, ExportedDataBitsToString(cfg.ExportDataBits))
+
+	for _, v := range cfg.ExportDataTypes {
+		cfg.ExportDataTypeBits |= uint32(StringToExportedDataType(v))
+	}
+	if cfg.ExportCustomK8sLabelsRegexp != "" {
+		cfg.ExportDataTypeBits |= K8S_LABEL
+	}
+	log.Infof("export data type bits: %08b, string: %s", cfg.ExportDataTypeBits, ExportedDataTypeBitsToString(cfg.ExportDataTypeBits))
 }
 
 func NewOtlpDefaultConfig() OtlpExporterConfig {
