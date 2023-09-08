@@ -68,6 +68,8 @@ pub struct MongoDBInfo {
     pub response_code: i32,
     #[serde(skip)]
     pub exception: String,
+
+    rrt: u64,
 }
 
 impl L7ProtocolInfoInterface for MongoDBInfo {
@@ -86,7 +88,7 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
         Some(AppProtoHead {
             proto: L7Protocol::MongoDB,
             msg_type: self.msg_type,
-            rrt: 0,
+            rrt: self.rrt,
         })
     }
 
@@ -181,6 +183,10 @@ impl L7ProtocolParserInterface for MongoDBLog {
         };
 
         self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+        });
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
         } else {
@@ -234,8 +240,9 @@ impl MongoDBLog {
         info.op_code = header.op_code;
         info.op_code_name = header.op_code_name;
         // command decode
-        match info.op_code_name.as_str() {
-            "OP_MSG" => {
+        match info.op_code {
+            2013 => {
+                // OP_MSG
                 let mut msg_body = MongoOpMsg::default();
                 msg_body.decode(&payload[16..offset as usize + 16])?;
                 match info.msg_type {
@@ -254,7 +261,8 @@ impl MongoDBLog {
                     }
                 }
             }
-            "OP_REPLY" => {
+            1 => {
+                // "OP_REPLY"
                 let mut msg_body = MongoOpReply::default();
                 msg_body.decode(&payload[16..])?;
                 if !msg_body.reply_ok {
@@ -263,11 +271,34 @@ impl MongoDBLog {
                 info.response = msg_body.doc.to_string();
                 info.exception = msg_body.response_msg;
             }
-            "OP_QUERY" => {
+            2001 => {
+                // "OP_UPDATE"
                 info.exception = read_c_string(&payload[20..]);
-                let query = Document::from_reader(&payload[28 + info.request.len() + 1..])
+                let update = Document::from_reader(&payload[24 + info.exception.len() + 1..])
+                    .unwrap_or(Document::default());
+                info.request = update.to_string();
+            }
+            2002 => {
+                // OP_INSERT
+                info.exception = read_c_string(&payload[20..]);
+                let insert = Document::from_reader(&payload[20 + info.exception.len() + 1..])
+                    .unwrap_or(Document::default());
+                info.request = insert.to_string();
+            }
+            2004 => {
+                // "OP_QUERY"
+                info.exception = read_c_string(&payload[20..]);
+                let query = Document::from_reader(&payload[28 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = query.to_string();
+            }
+            2005 => {
+                // OP_GET_MORE
+                info.request = read_c_string(&payload[20..]);
+            }
+            2006 => {
+                // OP_DELETE
+                info.request = read_c_string(&payload[20..]);
             }
             _ => {
                 info.request = info.op_code_name.clone();
@@ -309,15 +340,17 @@ impl MongoDBHeader {
         match self.op_code {
             1 => "OP_REPLY",
             1000 => "DB_MSG",
-            2001 => "OP_UPDATE",
-            2002 => "OP_INSERT",
+            2001 => "OP_UPDATE", // 用于更新集合中的文档
+            2002 => "OP_INSERT", // 用于将一个或多个文档插入集合中。
             2003 => "RESERVED",
-            2004 => "OP_QUERY",
-            2005 => "OP_GET_MORE",
-            2006 => "OP_DELETE",
-            2007 => "OP_KILL_CURSORS",
+            2004 => "OP_QUERY",        // 用于在数据库中查询集合中的文档。
+            2005 => "OP_GET_MORE",     // 用于在数据库中查询集合中的文档。
+            2006 => "OP_DELETE",       // 用于从集合中删除一个或多个文档。
+            2007 => "OP_KILL_CURSORS", // 用于关闭数据库中的活动游标。这是确保在查询结束时回收数据库资源所必需的。
+            2010 => "OP_COMMAND",      // 表示命令请求的集群内部协议。已过时
+            2011 => "OP_COMMANDREPLY", // 群内部协议表示对OP_COMMAND的回复。已过时
             2012 => "OP_COMPRESSED",
-            2013 => "OP_MSG",
+            2013 => "OP_MSG", // 使用MongoDB 3.6中引入的格式发送消息
             _ => "OP_UNKNOWN",
         }
     }
