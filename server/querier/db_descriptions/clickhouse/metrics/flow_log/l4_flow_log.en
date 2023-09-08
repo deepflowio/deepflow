@@ -103,7 +103,7 @@ l7_server_timeout           , App. Server Timeout         ,    ,
 l7_error_ratio              , App. Error %                , %  ,
 l7_client_error_ratio       , App. Client Error %         , %  ,
 l7_server_error_ratio       , App. Server Error %         , %  ,
-l7_parse_failed             , L7 Protocol Parse Failed    , Packet , Cumulative number of application protocol parsing failures, maximum value 65535
+l7_parse_failed             , L7 Protocol Parse Failed    , Packet , Cumulative number of application protocol parsing failures, maximum value MAX_U32
 
 vpc_0                       , Client VPC                  ,    ,
 subnet_0                    , Client Subnet               ,    ,
