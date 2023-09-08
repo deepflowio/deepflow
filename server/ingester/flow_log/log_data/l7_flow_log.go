@@ -374,7 +374,10 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 		h.ResponseResult = l.Resp.Result
 		h.responseCode = l.Resp.Code
 		h.ResponseStatus = uint8(l.Resp.Status)
-		h.fillExceptionDesc(l)
+		h.ResponseException = l.Resp.Exception
+		if h.ResponseException == "" {
+			h.fillExceptionDesc(l)
+		}
 
 		if h.responseCode != datatype.L7PROTOCOL_LOG_RESP_CODE_NONE {
 			h.ResponseCode = &h.responseCode
