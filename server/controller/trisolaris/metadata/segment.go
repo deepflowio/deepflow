@@ -361,12 +361,14 @@ func (s *Segment) generateGatewayHostSegments() {
 
 func (s *Segment) GenerateNoVTapUsedSegments(rawData *PlatformRawData) {
 	macs := []string{}
+	vmacs := []string{}
 	vifIDs := []uint32{}
 	segments := make([]*trident.Segment, 0, 1)
 	for _, vif := range rawData.deviceVifs {
 		if !s.vtapUsedVInterfaceIDs.Contains(vif.ID) {
 			if !isMacNullOrDefault(vif.Mac) {
 				macs = append(macs, vif.Mac)
+				vmacs = append(vmacs, vif.Mac)
 				vifIDs = append(vifIDs, uint32(vif.ID))
 			}
 		}
@@ -376,6 +378,7 @@ func (s *Segment) GenerateNoVTapUsedSegments(rawData *PlatformRawData) {
 		segment := &trident.Segment{
 			Id:          proto.Uint32(uint32(1)),
 			Mac:         macs,
+			Vmac:        vmacs,
 			InterfaceId: vifIDs,
 		}
 		segments = append(segments, segment)
