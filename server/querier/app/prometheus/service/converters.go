@@ -126,11 +126,6 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		return ctx, "", "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
 	}
 	q := queriers[0]
-	startTime = startTime / 1000
-	endTime = endTime / 1000
-	if q.EndTimestampMs%1000 > 0 {
-		endTime += 1
-	}
 
 	prefixType, metricName, db, table, dataPrecision, metricAlias, queryMetric, err := parseMetric(q.Matchers)
 	ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixType)
@@ -535,7 +530,7 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 }
 
 // querier result trans to Prom Response
-func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName string, result *common.Result) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName string, start, end int64, result *common.Result) (resp *prompb.ReadResponse, err error) {
 	if result == nil || len(result.Values) == 0 {
 		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
 	}
@@ -589,6 +584,11 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	tagsStrList := make([]string, 0, len(allDeepFlowNativeTags))
 	for i, v := range result.Values {
 		values := v.([]interface{})
+		// don't append series if it's outside query time range
+		currentTimestamp := int64(values[timeIndex].(int))
+		if currentTimestamp < start || currentTimestamp > end {
+			continue
+		}
 
 		// merge and serialize all tags as map key
 		var deepflowNativeTagString, promTagJson string
@@ -699,6 +699,11 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 
 		// get metrics
 		values := result.Values[i].([]interface{})
+		// don't append series if it's outside query time range
+		currentTimestamp := int64(values[timeIndex].(int))
+		if currentTimestamp < start || currentTimestamp > end {
+			continue
+		}
 		var metricsValue float64
 		if values[metricsIndex] == nil {
 			metricsValue = 0
@@ -718,9 +723,14 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		if cap(series.Samples) == 0 {
 			series.Samples = make([]prompb.Sample, 0, seriesSampleCount[seriesIndex])
 		}
+		currentTimestampMs := currentTimestamp * 1000
+		// ignore repeat data points, it may cause calculation error by irate/idelta
+		if len(series.Samples) > 0 && series.Samples[len(series.Samples)-1].Timestamp == currentTimestampMs {
+			continue
+		}
 		series.Samples = append(
 			series.Samples, prompb.Sample{
-				Timestamp: int64(values[timeIndex].(int)) * 1000,
+				Timestamp: currentTimestampMs,
 				Value:     metricsValue,
 			},
 		)
