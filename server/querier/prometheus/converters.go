@@ -123,12 +123,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTim
 		return ctx, "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
 	}
 	q := queriers[0]
-	// pp.Println(q)
-	startTime = startTime / 1000
-	endTime = endTime / 1000
-	if q.EndTimestampMs%1000 > 0 {
-		endTime += 1
-	}
+
 	timeFilter := fmt.Sprintf("(time >= %d AND time <= %d)", startTime, endTime)
 	filters := []string{timeFilter}
 	metrics := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", EXT_METRICS_TIME_COLUMNS)}
@@ -425,7 +420,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTim
 }
 
 // querier result trans to Prom Response
-func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.ReadResponse, err error) {
+func RespTransToProm(ctx context.Context, start, end int64, result *common.Result) (resp *prompb.ReadResponse, err error) {
 	if result == nil || len(result.Values) == 0 {
 		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
 	}
@@ -478,6 +473,11 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 	tagsStrList := make([]string, 0, len(allDeepFlowNativeTags))
 	for i, v := range result.Values {
 		values := v.([]interface{})
+		// don't append series if it's outside query time range
+		currentTimestamp := int64(values[timeIndex].(int))
+		if currentTimestamp < start || currentTimestamp > end {
+			continue
+		}
 
 		// merge and serialize all tags as map key
 		var deepflowNativeTagString, promTagJson string
@@ -581,6 +581,11 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 
 		// get metrics
 		values := result.Values[i].([]interface{})
+		// don't append series if it's outside query time range
+		currentTimestamp := int64(values[timeIndex].(int))
+		if currentTimestamp < start || currentTimestamp > end {
+			continue
+		}
 		var metricsValue float64
 		if values[metricsIndex] == nil {
 			metricsValue = 0
@@ -600,9 +605,14 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 		if cap(series.Samples) == 0 {
 			series.Samples = make([]prompb.Sample, 0, seriesSampleCount[seriesIndex])
 		}
+		currentTimestampMs := currentTimestamp * 1000
+		// ignore repeat data points, it may cause calculation error by irate/idelta
+		if len(series.Samples) > 0 && series.Samples[len(series.Samples)-1].Timestamp == currentTimestampMs {
+			continue
+		}
 		series.Samples = append(
 			series.Samples, prompb.Sample{
-				Timestamp: int64(values[timeIndex].(int)) * 1000,
+				Timestamp: currentTimestampMs,
 				Value:     metricsValue,
 			},
 		)
