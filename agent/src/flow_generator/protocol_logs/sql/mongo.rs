@@ -65,6 +65,8 @@ pub struct MongoDBInfo {
     #[serde(skip)]
     pub response: String,
     #[serde(skip)]
+    pub response_code: i32,
+    #[serde(skip)]
     pub exception: String,
 }
 
@@ -97,15 +99,16 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
 impl MongoDBInfo {
     fn merge(&mut self, other: Self) {
         if self.response_id == 0 {
-            self.request_id = other.request_id
+            self.request_id = other.request_id;
+            self.request = other.request;
         }
-        self.request_id = other.request_id;
+        //self.request_id = other.request_id;
 
-        if other.response_id > 0 {
+        if self.response_id == 0 {
             self.response_id = other.response_id;
+            self.response = other.response;
         }
-        self.request = other.request;
-        self.response = other.response;
+
         match other.msg_type {
             LogMessageType::Request => {
                 self.req_len = other.req_len;
@@ -113,7 +116,9 @@ impl MongoDBInfo {
                 self.op_code = other.op_code;
             }
             LogMessageType::Response => {
+                self.response_code = other.response_code;
                 self.resp_len = other.resp_len;
+                self.exception = other.exception;
             }
             _ => {}
         }
@@ -133,6 +138,7 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 result: f.response.to_string(),
                 exception: f.exception.to_string(),
+                code: std::option::Option::<i32>::from(f.response_code),
                 status: L7ResponseStatus::Ok,
                 ..Default::default()
             },
@@ -223,6 +229,7 @@ impl MongoDBLog {
             info.msg_type = LogMessageType::Request;
             self.info.req_len = header.length;
             info.request_id = header.request_id;
+            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
         info.op_code = header.op_code;
         info.op_code_name = header.op_code_name;
@@ -234,12 +241,33 @@ impl MongoDBLog {
                 match info.msg_type {
                     LogMessageType::Response => {
                         info.response = msg_body.sections.doc.to_string();
-                        info.exception = msg_body.sections.c_string.unwrap_or("unknown".to_string());
+                        info.exception =
+                            msg_body.sections.c_string.unwrap_or("unknown".to_string());
+                        info.response_code =
+                            msg_body.sections.doc.get_f64("code").unwrap_or(0.0) as i32;
+                        if info.response_code > 0 {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                        }
                     }
                     _ => {
                         info.request = msg_body.sections.doc.to_string();
                     }
                 }
+            }
+            "OP_REPLY" => {
+                let mut msg_body = MongoOpReply::default();
+                msg_body.decode(&payload[16..])?;
+                if !msg_body.reply_ok {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                }
+                info.response = msg_body.doc.to_string();
+                info.exception = msg_body.response_msg;
+            }
+            "OP_QUERY" => {
+                info.exception = read_c_string(&payload[20..]);
+                let query = Document::from_reader(&payload[28 + info.request.len() + 1..])
+                    .unwrap_or(Document::default());
+                info.request = query.to_string();
             }
             _ => {
                 info.request = info.op_code_name.clone();
@@ -296,6 +324,7 @@ impl MongoDBHeader {
 }
 
 // TODO: support compressed
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct MongoOpCompressed {
     original_op_code: u32,
     uncompressed_size: u32,
@@ -397,40 +426,77 @@ fn read_c_string(bytes: &[u8]) -> String {
 
 // Deprecated as of MongoDB 5.0.
 // Unsupported as of MongoDB 5.1.
-// TODO: support
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct MongoOpReply {
+    response_flags: u32,
+    response_msg: String,
+    reply_ok: bool,
+    //cursor_id: u64,
+    //starting_from: u32,
+    //number_to_return: u32,
+    doc: Document,
+}
+
+impl MongoOpReply {
+    pub fn decode(&mut self, payload: &[u8]) -> Result<bool> {
+        if payload.len() < 20 {
+            return Ok(false);
+        }
+        self.response_flags = bytes::read_u32_le(&payload[0..4]);
+        // todo: decode doc
+        match self.response_flags {
+            0 => {
+                // CursorNotFound
+                self.response_msg = "CursorNotFound".to_string();
+                self.reply_ok = true;
+            }
+            1 => {
+                // QueryFailure
+                self.response_msg = "QueryFailure".to_string();
+                self.reply_ok = false;
+            }
+            2 => {
+                // ShardConfigStale
+                self.response_msg = "ShardConfigStale".to_string();
+                self.reply_ok = true;
+            }
+            _ => {
+                // Unknown is Undecoded
+                self.response_msg = "UNKNOWN".to_string();
+                self.reply_ok = true;
+            }
+        }
+        self.doc = Document::from_reader(&payload[20..]).unwrap_or(Document::default());
+        Ok(true)
+    }
+}
+// TODO: support or Simple decoding
+/*
 pub struct MongoOpDel {
     zero: u32,
 }
 
-// TODO: support
 pub struct MongoOpGetMore {
     zero: u32,
 }
 
-// TODO: support
 pub struct MongoOpInsert {
     zero: u32,
 }
 
-// TODO: support
 pub struct MongoOpKillCursors {
     zero: u32,
 }
 
-// TODO: support
 pub struct MongoOpQuery {
     flags: u32,
-}
-
-// TODO: support
-pub struct MongoOpReply {
-    response_flags: u32,
-    cursor_id: u64,
-    starting_from: u32,
+    full_collection_name: String,
+    number_to_skip: u32,
     number_to_return: u32,
+    query: Document,
 }
 
-// TODO: support
 pub struct MongoOpUpdate {
     zero: u32,
 }
+*/
