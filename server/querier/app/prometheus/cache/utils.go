@@ -35,11 +35,22 @@ const (
 
 // start time & end time align to 0 second
 // e.g.: query 13s-117s, cache 0s-120s
-func timeAlign(startMs int64) int64 {
-	return startMs - startMs%60000
+func timeAlign(startSeconds int64) int64 {
+	return startSeconds - startSeconds%60
 }
 
-func promRequestToCacheKey(q *prompb.Query) (string, string, int64, int64) {
+func GetPromRequestQueryTime(q *prompb.Query) (int64, int64) {
+	// remind that we storage seconds for prometheus samples
+	// if the sample storage changes to milliseconds, it shoudld remove `/1000` here
+	endTime := q.Hints.EndMs / 1000
+	// if endTime is not multiple of 1000, add 1 for endTime for data points outside end
+	if q.Hints.EndMs%1000 > 0 {
+		endTime += 1
+	}
+	return q.Hints.StartMs / 1000, endTime
+}
+
+func promRequestToCacheKey(q *prompb.Query) (string, string) {
 	matcher := &strings.Builder{}
 	var metric string
 	for i := 0; i < len(q.Matchers); i++ {
@@ -50,7 +61,7 @@ func promRequestToCacheKey(q *prompb.Query) (string, string, int64, int64) {
 			metric = q.Matchers[i].Value
 		}
 	}
-	return matcher.String(), metric, q.Hints.StartMs, q.Hints.EndMs
+	return matcher.String(), metric
 }
 
 func unsafeSize(d *common.Result) uint64 {
