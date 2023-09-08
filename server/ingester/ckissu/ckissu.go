@@ -928,6 +928,18 @@ var ColumnAdd635 = []*ColumnAdds{
 		ColumnNames: []string{"netns_id"},
 		ColumnType:  ckdb.UInt32,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"l7_parse_failed"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alarm_event", "alarm_event_local"},
+		ColumnNames: []string{"user_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var ColumnDrops635 = []*ColumnDrops{
