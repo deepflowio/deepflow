@@ -17,6 +17,7 @@
 package encoder
 
 import (
+	"fmt"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -36,14 +37,14 @@ type indexAllocator struct {
 }
 
 func newIndexAllocator(metricName string, max int) *indexAllocator {
-	ln := &indexAllocator{
-		resourceType: "app_label_index",
+	ia := &indexAllocator{
+		resourceType: fmt.Sprintf("%s app_label_index", metricName),
 		metricName:   metricName,
 		strToIdx:     make(map[string]int),
 	}
-	ln.ascIDAllocator = newAscIDAllocator(ln.resourceType, 1, max)
-	ln.rawDataProvider = ln
-	return ln
+	ia.ascIDAllocator = newAscIDAllocator(ia.resourceType, 1, max)
+	ia.rawDataProvider = ia
+	return ia
 }
 
 func (ia *indexAllocator) refresh(labelNameToIdx map[string]int) error {
@@ -101,7 +102,7 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 
 func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusMetricAPPLabelLayout
-	err = mysql.Db.Where("metric_name = ? AND id IN (?)", ia.metricName, ids).Find(&dbItems).Error
+	err = mysql.Db.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ia.resourceType, err)
 		return
@@ -156,12 +157,12 @@ func (ll *labelLayout) refresh(args ...interface{}) error {
 	}
 
 	for mn, lnToIdx := range mnToLnIdx {
-		ll.metricNameToIdxAllocator[mn], _ = ll.createIndexAllocatorIfNotExists(mn)
-		ll.metricNameToIdxAllocator[mn].refresh(lnToIdx)
+		ia, _ := ll.createIndexAllocatorIfNotExists(mn)
+		ia.refresh(lnToIdx)
 	}
-	for mn := range ll.metricNameToIdxAllocator {
+	for mn, ia := range ll.metricNameToIdxAllocator {
 		if _, ok := mnToLnIdx[mn]; !ok {
-			ll.metricNameToIdxAllocator[mn].refresh(make(map[string]int))
+			ia.refresh(make(map[string]int))
 		}
 	}
 	return nil
@@ -194,8 +195,8 @@ func (ll *labelLayout) createIndexAllocatorIfNotExists(metricName string) (*inde
 	if allocator, ok := ll.metricNameToIdxAllocator[metricName]; ok {
 		return allocator, nil
 	}
-	allocator := newIndexAllocator(metricName, ll.appLabelIndexMax)
-	return allocator, nil
+	ll.metricNameToIdxAllocator[metricName] = newIndexAllocator(metricName, ll.appLabelIndexMax)
+	return ll.metricNameToIdxAllocator[metricName], nil
 }
 
 func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bool) {
@@ -207,8 +208,8 @@ func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bo
 
 func (ll *labelLayout) SingleEncode(metricName string, labelNames []string) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
 	log.Infof("encode metric: %s app label names: %v", metricName, labelNames)
-	ll.metricNameToIdxAllocator[metricName], _ = ll.createIndexAllocatorIfNotExists(metricName)
-	return ll.metricNameToIdxAllocator[metricName].encode(labelNames)
+	ia, _ := ll.createIndexAllocatorIfNotExists(metricName)
+	return ia.encode(labelNames)
 }
 
 func (ll *labelLayout) SingleRelease(metricName string, indexes []int) error {
