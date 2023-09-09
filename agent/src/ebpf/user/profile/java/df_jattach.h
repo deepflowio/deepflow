@@ -30,4 +30,5 @@ typedef uint64_t(*agent_test_t) (void);
 void clear_target_ns_tmp_file(const char *target_path);
 void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);
 void clear_target_ns(int pid, int target_ns_pid);
+void clear_target_ns_so(int pid, int target_ns_pid);
 #endif /* DF_JATTACH_H */
