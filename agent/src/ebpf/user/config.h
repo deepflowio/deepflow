@@ -151,4 +151,10 @@ enum {
  */
 #define PROC_INFO_VERIFY_TIME  60 // 60 seconds
 
+/*
+ * This value is used to determine which type of Java agent's so library to
+ * attach JVM (GNU or musl libc agent.so).
+ */
+#define JAVA_AGENT_LIBS_TEST_FUN_RET_VAL 3302
+
 #endif /* DF_EBPF_CONFIG_H */

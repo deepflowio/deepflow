@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 
+#include "../../config.h"
 #include "../../common.h"
 #include "../../log.h"
 #include "df_jattach.h"
@@ -139,7 +140,8 @@ bool test_dl_open(const char *so_lib_file_path)
 		return false;
 	}
 
-	const uint64_t expected_test_fn_result = 3302;
+	const uint64_t expected_test_fn_result =
+	    JAVA_AGENT_LIBS_TEST_FUN_RET_VAL;
 	const uint64_t observed_test_fn_result = test_fn();
 
 	if (observed_test_fn_result != expected_test_fn_result) {
@@ -155,7 +157,7 @@ bool test_dl_open(const char *so_lib_file_path)
 	return true;
 }
 
-static void select_sitable_agent_lib(pid_t pid)
+static void select_sitable_agent_lib(pid_t pid, bool is_same_mntns)
 {
 	/* Enter pid & mount namespace for target pid,
 	 * and use dlopen() in that namespace.*/
@@ -185,6 +187,15 @@ static void select_sitable_agent_lib(pid_t pid)
 	jattach_log(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
 
 found:
+
+	if (!is_same_mntns) {
+		if (strcmp(agent_lib_so_path, AGENT_LIB_SRC_PATH) == 0) {
+			clear_target_ns_tmp_file(AGENT_MUSL_LIB_SRC_PATH);
+		} else {
+			clear_target_ns_tmp_file(AGENT_LIB_SRC_PATH);
+		}
+	}
+
 	df_exit_ns(pid_self_fd);
 	df_exit_ns(mnt_self_fd);
 }
@@ -259,6 +270,24 @@ void clear_target_ns(int pid, int target_ns_pid)
 	snprintf(target_path, sizeof(target_path),
 		 "/proc/%d/root/tmp/perf-%d.log", pid, target_ns_pid);
 	clear_target_ns_tmp_file(target_path);
+	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
+		 AGENT_MUSL_LIB_SRC_PATH);
+	clear_target_ns_tmp_file(target_path);
+	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
+		 AGENT_LIB_SRC_PATH);
+	clear_target_ns_tmp_file(target_path);
+}
+
+void clear_target_ns_so(int pid, int target_ns_pid)
+{
+	/*
+	 * Delete files: df_java_agent.so and df_java_agent_musl.so
+	 */
+
+	if (is_same_mntns(pid))
+		return;
+
+	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
 		 AGENT_MUSL_LIB_SRC_PATH);
 	clear_target_ns_tmp_file(target_path);
@@ -344,20 +373,18 @@ int java_attach(pid_t pid)
 		return -1;
 	}
 
-	char path[128];
-	snprintf(path, sizeof(path), "/tmp/perf-%d.map", pid);
-	/* If it already exists in the root namespace, it will return directly. */
-	if (access(path, F_OK) == 0) {
-		return 0;
-	}
+	bool is_same_mnt = is_same_mntns(pid);
+	if (is_same_mnt) {
+		char path[128];
+		snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.map",
+			 pid, target_ns_pid);
+		clear_target_ns_tmp_file(path);
+		snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.log",
+			 pid, target_ns_pid);
+		clear_target_ns_tmp_file(path);
 
-	snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.map",
-		 pid, target_ns_pid);
-	/* If the file already exists, it will simply perform the copy operation and
-	 * then exit successfully.*/
-	if (access(path, F_OK) == 0) {
-		copy_file_from_target_ns(pid, target_ns_pid, "map");
-		return 0;
+	} else {
+		clear_target_ns(pid, target_ns_pid);
 	}
 
 	/*
@@ -366,7 +393,7 @@ int java_attach(pid_t pid)
 	 * thus avoiding situations where both the net namespace and pid namespace are
 	 * the same but the file system is different.
 	 */
-	if (!is_same_mntns(pid)) {
+	if (!is_same_mnt) {
 		/*
 		 * If the target Java process is in a subordinate namespace, copy the
 		 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
@@ -388,7 +415,7 @@ int java_attach(pid_t pid)
 	 * his, we need to enter the target process's namespace and test each library
 	 * until we find one that can be successfully loaded using dlopen.
 	 */
-	select_sitable_agent_lib(pid);
+	select_sitable_agent_lib(pid, is_same_mnt);
 
 	if (strlen(agent_lib_so_path) == 0)
 		goto failed;
