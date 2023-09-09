@@ -28,10 +28,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <jni.h>
 #include <jvmti.h>
 #include <jvmticmlr.h>
+
+#include "../../config.h"
 
 #define STRING_BUFFER_SIZE 2000
 #define BIG_STRING_BUFFER_SIZE 20000
@@ -39,8 +42,10 @@
 #define PERF_MAP_FILE_FMT "/tmp/perf-%d.map"
 #define PERF_MAP_LOG_FILE_FMT "/tmp/perf-%d.log"
 
-FILE *perf_map_file_ptr = NULL;
-FILE *perf_map_log_file_ptr = NULL;
+static pthread_mutex_t g_lock;
+
+static FILE *perf_map_file_ptr = NULL;
+static FILE *perf_map_log_file_ptr = NULL;
 
 #define _(e)                                                                \
 	if (e != JNI_OK) {                                                  \
@@ -49,7 +54,7 @@ FILE *perf_map_log_file_ptr = NULL;
 		return e;                                                   \
 	}
 
-void df_log(const char *format, ...)
+static void df_log(const char *format, ...)
 {
 	if (perf_map_log_file_ptr) {
 		va_list ap;
@@ -61,7 +66,7 @@ void df_log(const char *format, ...)
 	}
 }
 
-jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
+static jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 {
 	FILE *file_ptr;
 	char filename[50];	// Assuming the filename won't exceed 50 characters
@@ -81,17 +86,17 @@ jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 	return JNI_OK;
 }
 
-jint open_perf_map_file(pid_t pid)
+static jint open_perf_map_file(pid_t pid)
 {
 	return df_open_file(pid, PERF_MAP_FILE_FMT, &perf_map_file_ptr);
 }
 
-jint open_perf_map_log_file(pid_t pid)
+static jint open_perf_map_log_file(pid_t pid)
 {
 	return df_open_file(pid, PERF_MAP_LOG_FILE_FMT, &perf_map_log_file_ptr);
 }
 
-jint close_files(void)
+static jint close_files(void)
 {
 	if (perf_map_file_ptr)
 		fclose(perf_map_file_ptr);
@@ -104,12 +109,12 @@ jint close_files(void)
 
 JNIEXPORT uint64_t df_java_agent_so_libs_test(void)
 {
-       /*
-	* This function is used during the attach phase to select which
-	* agent shared object libraries (GNU or musl libc) to use, using
-	* dlopen() and dlsym().
-	*/
-	return 3302;
+	/*
+	 * This function is used during the attach phase to select which
+	 * agent shared object libraries (GNU or musl libc) to use, using
+	 * dlopen() and dlsym().
+	 */
+	return JAVA_AGENT_LIBS_TEST_FUN_RET_VAL;
 }
 
 jint get_jvmti_env(JavaVM * jvm, jvmtiEnv ** jvmti)
@@ -126,8 +131,8 @@ jint get_jvmti_env(JavaVM * jvm, jvmtiEnv ** jvmti)
 	return JNI_OK;
 }
 
-void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
-		   const char *help_msg_or_null)
+static void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
+			  const char *help_msg_or_null)
 {
 	if (err_num == JVMTI_ERROR_NONE) {
 		return;		// No need to log if there's no error
@@ -147,7 +152,7 @@ void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
 	df_log("[error][%d] %s: %s.", err_num, err_name_str, help_message);
 }
 
-jint enable_capabilities(jvmtiEnv * jvmti)
+static jint enable_capabilities(jvmtiEnv * jvmti)
 {
 	jvmtiCapabilities capabilities;
 	memset(&capabilities, 0, sizeof(jvmtiCapabilities));
@@ -166,22 +171,25 @@ jint enable_capabilities(jvmtiEnv * jvmti)
 	return JNI_OK;
 }
 
-void deallocate(jvmtiEnv * jvmti, void *string)
+static void deallocate(jvmtiEnv * jvmti, void *string)
 {
 	if (string != NULL)
 		(*jvmti)->Deallocate(jvmti, (unsigned char *)string);
 }
 
-void write_symbol(const void *code_addr, unsigned int code_size,
-		  const char *entry)
+static void write_symbol(const void *code_addr, unsigned int code_size,
+			 const char *entry)
 {
+	pthread_mutex_lock(&g_lock);
 	fprintf(perf_map_file_ptr, "%lx %x %s\n", (unsigned long)code_addr,
 		code_size, entry);
+	fflush(perf_map_file_ptr);
+	pthread_mutex_unlock(&g_lock);
 }
 
-void generate_single_entry(jvmtiEnv * jvmti,
-			   jmethodID method, const void *code_addr,
-			   jint code_size)
+static void generate_single_entry(jvmtiEnv * jvmti,
+				  jmethodID method, const void *code_addr,
+				  jint code_size)
 {
 	jclass class;
 	char *method_name = NULL;
@@ -231,7 +239,7 @@ cbCompiledMethodLoad(jvmtiEnv * jvmti,
 	generate_single_entry(jvmti, method, code_addr, code_size);
 }
 
-void JNICALL
+static void JNICALL
 cbDynamicCodeGenerated(jvmtiEnv * jvmti,
 		       const char *name, const void *address, jint length)
 {
@@ -239,15 +247,14 @@ cbDynamicCodeGenerated(jvmtiEnv * jvmti,
 	write_symbol(address, (unsigned int)length, name);
 }
 
-void JNICALL
-cbCompiledMethodUnload(jvmtiEnv * jvmti,
-		       jmethodID method, const void *address)
+static void JNICALL
+cbCompiledMethodUnload(jvmtiEnv * jvmti, jmethodID method, const void *address)
 {
 
 	write_symbol(address, 0, "");
 }
 
-jvmtiError set_callback_funs(jvmtiEnv * jvmti)
+static jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 {
 	jvmtiEventCallbacks callbacks;
 
@@ -267,7 +274,7 @@ jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 	return JNI_OK;
 }
 
-jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
+static jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 {
 	jvmtiError error;
 
@@ -304,7 +311,7 @@ jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 	return JNI_OK;
 }
 
-jint replay_callbacks(jvmtiEnv * jvmti)
+static jint replay_callbacks(jvmtiEnv * jvmti)
 {
 	jvmtiError error;
 	jvmtiPhase phase;
@@ -344,17 +351,18 @@ JNIEXPORT jint JNICALL
 Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 {
 	jvmtiEnv *jvmti;
+	pthread_mutex_init(&g_lock, NULL);
 	_(open_perf_map_log_file(getpid()));
 	_(open_perf_map_file(getpid()));
-	df_log("Start agent ...");
 	_(get_jvmti_env(vm, &jvmti));
 	_(enable_capabilities(jvmti));
 	_(set_callback_funs(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_ENABLE));
 	_(replay_callbacks(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_DISABLE));
-	df_log("Finish");
-	_(close_files());
 
+	df_log("JVMTI symbolization agent startup sequence complete.");
+
+	close_files();
 	return 0;
 }
