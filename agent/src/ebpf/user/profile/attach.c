@@ -32,31 +32,17 @@ void gen_java_symbols_file(int pid)
 	}
 
 	char path[128];
-	snprintf(path, sizeof(path), "/tmp/perf-%d.map", pid);
-	/* If it already exists in the deepflow agent namespace, it will delete it. */
-	clear_target_ns_tmp_file(path);
-
-	snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.log",
-		 pid, target_ns_pid);
-	if (access(path, F_OK) == 0) {
-		copy_file_from_target_ns(pid, target_ns_pid, "log");
-	}
-
 	snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.map",
 		 pid, target_ns_pid);
-	/* If the file already exists, it will simply perform the copy operation and
-	 * then exit successfully.*/
+	/* If the file already exists, no action required. */
 	if (access(path, F_OK) == 0) {
-		copy_file_from_target_ns(pid, target_ns_pid, "map");
+		ebpf_info("Java symbols file '%s' is existed.\n", path);
 		return;
 	}
 
 	char args[32];
 	snprintf(args, sizeof(args), "%d", pid);
-
 	exec_command(DF_JAVA_ATTACH_CMD, args);
 
-	copy_file_from_target_ns(pid, target_ns_pid, "map");
-	copy_file_from_target_ns(pid, target_ns_pid, "log");
-	clear_target_ns(pid, target_ns_pid);
+	clear_target_ns_so(pid, target_ns_pid);
 }
