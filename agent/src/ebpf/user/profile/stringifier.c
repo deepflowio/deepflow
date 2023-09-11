@@ -187,7 +187,7 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-static char *resolve_addr(pid_t pid, u64 address, bool is_create)
+static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 {
 	ASSERT(pid >= 0);
 
@@ -229,6 +229,12 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 			 sym.module);
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
+		if (info_p) {
+			struct symbolizer_proc_info *p = info_p;
+			if (p->is_java) {
+				p->unknown_syms_found = true;
+			}
+		}
 		goto finish;
 	}
 
@@ -265,7 +271,8 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t *h,
 				      bool new_cache,
-				      int *ret_val)
+				      int *ret_val,
+				      void *info_p)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -299,7 +306,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
 
-		str = resolve_addr(pid, ips[i], new_cache);
+		str = resolve_addr(pid, ips[i], new_cache, info_p);
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
@@ -346,7 +353,8 @@ folded_stack_trace_string(struct bpf_tracer *t,
 			  pid_t pid,
 			  const char *stack_map_name,
 			  stack_str_hash_t *h,
-			  bool new_cache)
+			  bool new_cache,
+			  void *info_p)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -365,7 +373,7 @@ folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val);
+				       h, new_cache, &ret_val, info_p);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -426,7 +434,8 @@ resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
 				stack_str_hash_t *h,
-				bool new_cache)
+				bool new_cache,
+				void *info_p)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -451,14 +460,18 @@ resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h, new_cache);
+							h,
+							new_cache,
+							info_p);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
 							stack_map_name,
-							h, new_cache);
+							h,
+							new_cache,
+							info_p);
 	}
 
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */

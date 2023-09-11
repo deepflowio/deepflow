@@ -44,6 +44,6 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
 				      stack_str_hash_t *h,
-				      bool new_cache);
+				      bool new_cache, void *info_p);
 #endif /* AARCH64_MUSL */
 #endif /* DF_USER_STRINGIFIER_H */

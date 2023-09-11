@@ -31,15 +31,6 @@ void gen_java_symbols_file(int pid)
 		return;
 	}
 
-	char path[128];
-	snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.map",
-		 pid, target_ns_pid);
-	/* If the file already exists, no action required. */
-	if (access(path, F_OK) == 0) {
-		ebpf_info("Java symbols file '%s' is existed.\n", path);
-		return;
-	}
-
 	char args[32];
 	snprintf(args, sizeof(args), "%d", pid);
 	exec_command(DF_JAVA_ATTACH_CMD, args);
