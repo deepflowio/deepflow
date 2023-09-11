@@ -106,6 +106,12 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
         if let L7ProtocolInfo::FastCGIInfo(info) = other {
             self.status = info.status;
             self.status_code = info.status_code;
+            if self.trace_id.is_empty() {
+                self.trace_id = info.trace_id;
+            }
+            if self.span_id.is_empty() {
+                self.span_id = info.span_id;
+            }
         }
 
         Ok(())
@@ -435,6 +441,12 @@ impl L7ProtocolParserInterface for FastCGILog {
                             is_hdr = true;
                             let key = &i[..col_index];
                             let value = &i[col_index + 1..];
+                            info.on_param(
+                                key.as_bytes(),
+                                value.as_bytes(),
+                                PacketDirection::ServerToClient,
+                                config,
+                            )?;
 
                             if key == "Status" {
                                 if value.len() < 4 {
