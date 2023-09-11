@@ -37,10 +37,11 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	QUEUE_BATCH_SIZE   = 1024
-	EXT_METRICS_DB     = "ext_metrics"
-	EXT_METRICS_TABLE  = "metrics"
-	DEEPFLOW_SYSTEM_DB = "deepflow_system"
+	QUEUE_BATCH_SIZE      = 1024
+	EXT_METRICS_DB        = "ext_metrics"
+	EXT_METRICS_TABLE     = "metrics"
+	DEEPFLOW_SYSTEM_DB    = "deepflow_system"
+	DEEPFLOW_SYSTEM_TABLE = "deepflow_system"
 )
 
 type ClusterNode struct {
@@ -244,18 +245,7 @@ func NewExtMetricsWriter(
 	db string,
 	config *config.Config) (*ExtMetricsWriter, error) {
 
-	// adjust CKWriterConfig
 	ckWriterConfig := config.CKWriterConfig
-	if msgType == datatype.MESSAGE_TYPE_DFSTATS {
-		// FIXME: At present, there are hundreds of tables in the deepflow_system database,
-		// and the amount of data is not large. Adjust the queue size to reduce memory consumption.
-		// In the future, it is necessary to merge the data tables in deepflow_system with
-		// reference to the ext_metrics database.
-		ckWriterConfig.QueueCount = 1
-		ckWriterConfig.QueueSize >>= 3
-		ckWriterConfig.BatchSize >>= 3
-	}
-
 	// FlowTagWriter
 	flowTagWriterConfig := baseconfig.CKWriterConfig{
 		QueueCount:   1,                        // Allocate one FlowTagWriter for each ExtMetricsWriter.

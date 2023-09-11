@@ -935,7 +935,7 @@ func (r *Receiver) Start() {
 		go r.ProcessTCPServer()
 	}
 
-	stats.RegisterCountableWithModulePrefix("ingester.", "recviver", r)
+	stats.RegisterCountableWithModulePrefix("ingester_", "recviver", r)
 }
 
 func (r *Receiver) Close() error {
