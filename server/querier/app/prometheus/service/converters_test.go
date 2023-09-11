@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 	// init runtime objects for tests
 	QPSLeakyBucket = new(datastructure.LeakyBucket)
 	QPSLeakyBucket.Init(1e9)
-	config.Cfg = &config.QuerierConfig{Limit: "10000", Prometheus: cfg.Prometheus{AutoTaggingPrefix: "df_"}}
+	config.Cfg = &config.QuerierConfig{Limit: "10000", Prometheus: cfg.Prometheus{AutoTaggingPrefix: "df_", ExternalTagCacheSize: 1024, ExternalTagLoadInterval: 300}}
 
 	// run for test
 	m.Run()
