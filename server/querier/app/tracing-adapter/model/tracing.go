@@ -18,6 +18,7 @@ package model
 
 type ExSpan struct {
 	Name            string `json:"name"`
+	ID              uint64 `json:"_id"`           // unique id
 	StartTimeUs     int64  `json:"start_time_us"` // microseconds
 	EndTimeUs       int64  `json:"end_time_us"`
 	TapSide         string `json:"tap_side"` // spankind=server: s-app/ spankind=client: c-app/ spankind=internal: app
