@@ -103,7 +103,7 @@ l7_server_timeout           , 应用服务端超时          , 个   ,
 l7_error_ratio              , 应用异常比例            , %    ,
 l7_client_error_ratio       , 应用客户端异常比例      , %    ,
 l7_server_error_ratio       , 应用服务端异常比例      , %    ,
-l7_parse_failed             , 应用协议解析失败        , 包   , 累计应用协议解析失败次数，最大值 65535
+l7_parse_failed             , 应用协议解析失败        , 包   , 累计应用协议解析失败次数，最大值 MAX_U32
 
 vpc_0                       , 客户端 VPC 个数         , 个   ,
 subnet_0                    , 客户端子网个数          , 个   ,
