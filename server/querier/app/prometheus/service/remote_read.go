@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -52,7 +53,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	var metricName string
 	var queryResult, result *common.Result
 	// should get cache result immediately
-	item, hit, metricName, start, end := cache.RemoteReadCache().Get(req)
+	item, hit, metricName, storage_query_start, storage_query_end := cache.RemoteReadCache().Get(req)
 	if item != nil {
 		result = item.Data()
 	}
@@ -70,8 +71,8 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	} else {
 		var db, datasource string
 		var debugInfo map[string]interface{}
-		log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, start, end)
-		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end)
+		log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, storage_query_start, storage_query_end)
+		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end)
 		// fmt.Println(sql, db)
 		if err != nil {
 			return nil, "", 0, err
@@ -161,8 +162,12 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		result = queryResult
 	}
 
+	if req == nil || len(req.Queries) == 0 {
+		return nil, "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
+	}
+	api_query_start, api_query_end := cache.GetPromRequestQueryTime(req.Queries[0])
 	// response trans to prom resp
-	resp, err = p.respTransToProm(ctx, metricName, result)
+	resp, err = p.respTransToProm(ctx, metricName, api_query_start, api_query_end, result)
 	if resp != nil && len(resp.Results) > 0 {
 		if len(resp.Results[0].Timeseries) > 0 && len(resp.Results[0].Timeseries[0].Samples) > 0 {
 			log.Debugf("%s prometheus result parsed, time range: [%d-%d]", metricName,

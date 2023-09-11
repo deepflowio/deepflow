@@ -63,10 +63,10 @@ type parseCacheItemOutput struct {
 }
 
 type cacheHitResultOutput struct {
-	hit     CacheHit
-	extern  cacheExternDirection
-	startms int64
-	endms   int64
+	hit    CacheHit
+	extern cacheExternDirection
+	starts int64
+	ends   int64
 }
 
 func TestMain(m *testing.M) {
@@ -99,8 +99,8 @@ func TestMain(m *testing.M) {
 			output: &parseCacheItemOutput{
 				key:    "__name__EQnode_cpu_seconds_total-",
 				metric: "node_cpu_seconds_total",
-				start:  t.UnixMilli(),
-				end:    t.Add(30 * time.Minute).UnixMilli(),
+				start:  t.Unix(),
+				end:    t.Add(30 * time.Minute).Unix(),
 			},
 		},
 		// __name__job
@@ -123,8 +123,8 @@ func TestMain(m *testing.M) {
 			output: &parseCacheItemOutput{
 				key:    "__name__EQnode_cpu_seconds_total-jobREprometheus.*-",
 				metric: "node_cpu_seconds_total",
-				start:  t.UnixMilli(),
-				end:    t.Add(30 * time.Minute).UnixMilli(),
+				start:  t.Unix(),
+				end:    t.Add(30 * time.Minute).Unix(),
 			},
 		},
 		// __name__instance
@@ -147,8 +147,8 @@ func TestMain(m *testing.M) {
 			output: &parseCacheItemOutput{
 				key:    "__name__EQnode_cpu_seconds_total-instanceNRE0.0.0.0-",
 				metric: "node_cpu_seconds_total",
-				start:  t.UnixMilli(),
-				end:    t.Add(30 * time.Minute).UnixMilli(),
+				start:  t.Unix(),
+				end:    t.Add(30 * time.Minute).Unix(),
 			},
 		})
 
@@ -166,14 +166,14 @@ func TestMain(m *testing.M) {
 						//                merge
 						// new:  [-10, 5] ====> [-10, 30]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(-10 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(5 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(-10 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(5 * time.Minute).UnixMilli(),
 							StepMs:  3000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externLeft, startms: leftAlign(t.Add(-10 * time.Minute).UnixMilli()), endms: rightAlign(t.Add(5 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externLeft, starts: leftAlignSeconds(t.Add(-10 * time.Minute).Unix()), ends: t.Add(5 * time.Minute).Unix()},
 		},
 		{
 			input: &prompb.ReadRequest{
@@ -186,14 +186,14 @@ func TestMain(m *testing.M) {
 						//               merge
 						// new:  [0, 40] ====> [0, 40]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.UnixMilli()),
-							EndMs:   rightAlign(t.Add(40 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.UnixMilli()),
+							EndMs:   t.Add(40 * time.Minute).UnixMilli(),
 							StepMs:  5000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externRight, startms: leftAlign(t.UnixMilli()), endms: rightAlign(t.Add(40 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externRight, starts: leftAlignSeconds(t.Unix()), ends: t.Add(40 * time.Minute).Unix()},
 		},
 		{
 			input: &prompb.ReadRequest{
@@ -206,14 +206,14 @@ func TestMain(m *testing.M) {
 						//                 merge
 						// new:  [-40, 45] ====> [-40, 45]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(-40 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(45 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(-40 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(45 * time.Minute).UnixMilli(),
 							StepMs:  5000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externBoth, startms: leftAlign(t.Add(-40 * time.Minute).UnixMilli()), endms: rightAlign(t.Add(45 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externBoth, starts: leftAlignSeconds(t.Add(-40 * time.Minute).Unix()), ends: t.Add(45 * time.Minute).Unix()},
 		},
 	}
 
@@ -231,14 +231,14 @@ func TestMain(m *testing.M) {
 						//                none
 						// new:  [5, 15] ======> [0, 30]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(5 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(15 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(5 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(15 * time.Minute).UnixMilli(),
 							StepMs:  300,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, startms: leftAlign(t.UnixMilli()), endms: rightAlign(t.Add(30 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, starts: leftAlignSeconds(t.Unix()), ends: t.Add(30 * time.Minute).Unix()},
 		},
 		{
 			input: &prompb.ReadRequest{
@@ -252,14 +252,14 @@ func TestMain(m *testing.M) {
 						//                 replace
 						// new:  [-10, -5] =======> [-10, -5]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(-10 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(-5 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(-10 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(-5 * time.Minute).UnixMilli(),
 							StepMs:  1000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheMiss, extern: externNone, startms: leftAlign(t.Add(-10 * time.Minute).UnixMilli()), endms: rightAlign(t.Add(-5 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheMiss, extern: externNone, starts: leftAlignSeconds(t.Add(-10 * time.Minute).Unix()), ends: t.Add(-5 * time.Minute).Unix()},
 		},
 		{
 			input: &prompb.ReadRequest{
@@ -273,14 +273,14 @@ func TestMain(m *testing.M) {
 						//                replace
 						// new:  [35, 40] =======> [35, 40]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(35 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(40 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(35 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(40 * time.Minute).UnixMilli(),
 							StepMs:  200,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheMiss, extern: externNone, startms: leftAlign(t.Add(35 * time.Minute).UnixMilli()), endms: rightAlign(t.Add(40 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheMiss, extern: externNone, starts: leftAlignSeconds(t.Add(35 * time.Minute).Unix()), ends: t.Add(40 * time.Minute).Unix()},
 		},
 	}
 
@@ -298,14 +298,14 @@ func TestMain(m *testing.M) {
 						//               merge
 						// new:  [0, 45] =====> [0, 45]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.UnixMilli()),
-							EndMs:   rightAlign(t.Add(45 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.UnixMilli()),
+							EndMs:   t.Add(45 * time.Minute).UnixMilli(),
 							StepMs:  300,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externRight, startms: leftAlign(t.UnixMilli()), endms: rightAlign(t.Add(45 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externRight, starts: leftAlignSeconds(t.Unix()), ends: t.Add(45 * time.Minute).Unix()},
 		},
 		// backoff
 		{
@@ -317,14 +317,14 @@ func TestMain(m *testing.M) {
 							{Type: prompb.LabelMatcher_NRE, Name: "instance", Value: "0.0.0.0"},
 						},
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.UnixMilli()),
-							EndMs:   rightAlign(t.Add(30 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.UnixMilli()),
+							EndMs:   t.Add(30 * time.Minute).UnixMilli(),
 							StepMs:  2000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, startms: leftAlign(t.UnixMilli()), endms: rightAlign(t.Add(30 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, starts: leftAlignSeconds(t.Unix()), ends: t.Add(30 * time.Minute).Unix()},
 		},
 
 		// query backward
@@ -340,14 +340,14 @@ func TestMain(m *testing.M) {
 						//                 merge
 						// new:  [-15, 30] =====> [-15, 30]
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.Add(-15 * time.Minute).UnixMilli()),
-							EndMs:   rightAlign(t.Add(30 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.Add(-15 * time.Minute).UnixMilli()),
+							EndMs:   t.Add(30 * time.Minute).UnixMilli(),
 							StepMs:  2000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externLeft, startms: leftAlign(t.Add(-15 * time.Minute).UnixMilli()), endms: rightAlign(t.Add(30 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitPart, extern: externLeft, starts: leftAlignSeconds(t.Add(-15 * time.Minute).Unix()), ends: t.Add(30 * time.Minute).Unix()},
 		},
 		// backoff
 		{
@@ -359,14 +359,14 @@ func TestMain(m *testing.M) {
 							{Type: prompb.LabelMatcher_NRE, Name: "instance", Value: "0.0.0.0"},
 						},
 						Hints: &prompb.ReadHints{
-							StartMs: leftAlign(t.UnixMilli()),
-							EndMs:   rightAlign(t.Add(30 * time.Minute).UnixMilli()),
+							StartMs: leftAlignMs(t.UnixMilli()),
+							EndMs:   t.Add(30 * time.Minute).UnixMilli(),
 							StepMs:  2000,
 						},
 					},
 				},
 			},
-			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, startms: leftAlign(t.UnixMilli()), endms: rightAlign(t.Add(30 * time.Minute).UnixMilli())},
+			output: &cacheHitResultOutput{hit: CacheHitFull, extern: externNone, starts: leftAlignSeconds(t.Unix()), ends: t.Add(30 * time.Minute).Unix()},
 		},
 	}
 
@@ -381,17 +381,18 @@ func TestMain(m *testing.M) {
 func TestPromRequestToCacheKey(t *testing.T) {
 	Convey("TestPromRequestToCacheKey", t, func() {
 		for i := 0; i < len(parsePrometheusRequestTestCases); i++ {
-			key, m, start, end := promRequestToCacheKey(parsePrometheusRequestTestCases[i].input.Queries[0])
+			start, end := GetPromRequestQueryTime(parsePrometheusRequestTestCases[i].input.Queries[0])
+			key, m := promRequestToCacheKey(parsePrometheusRequestTestCases[i].input.Queries[0])
 			So(key, ShouldEqual, parsePrometheusRequestTestCases[i].output.key)
 			So(start, ShouldEqual, parsePrometheusRequestTestCases[i].output.start)
-			So(end, ShouldEqual, parsePrometheusRequestTestCases[i].output.end)
+			So(end, ShouldBeGreaterThanOrEqualTo, parsePrometheusRequestTestCases[i].output.end)
 			So(m, ShouldEqual, parsePrometheusRequestTestCases[i].output.metric)
 
 			for j := 0; j < len(parsePrometheusRequestTestCases); j++ {
 				if i == j {
 					continue
 				}
-				innerKey, _, _, _ := promRequestToCacheKey(parsePrometheusRequestTestCases[j].input.Queries[0])
+				innerKey, _ := promRequestToCacheKey(parsePrometheusRequestTestCases[j].input.Queries[0])
 				So(key, ShouldNotEqual, innerKey)
 			}
 		}
@@ -425,12 +426,12 @@ func asyncCacheGenerator() chan CacheHit {
 	return c
 }
 
-func leftAlign(t int64) int64 {
+func leftAlignMs(t int64) int64 {
 	return t - t%60000
 }
 
-func rightAlign(t int64) int64 {
-	return t + (60000 - t%60000)
+func leftAlignSeconds(t int64) int64 {
+	return t - t%60
 }
 
 func TestCacheHit(t *testing.T) {
@@ -442,13 +443,17 @@ func TestCacheHit(t *testing.T) {
 
 		for _, v := range uniquePromReqs {
 			item, hit, _, start, end := remoteReadCacheTestStorage.Get(v)
-			start_align := timeAlign(v.Queries[0].Hints.StartMs)
+			start_align := timeAlign(v.Queries[0].Hints.StartMs / 1000)
+			end_align := v.Queries[0].Hints.EndMs / 1000
+			if v.Queries[0].Hints.EndMs%1000 != 0 {
+				end_align += 1
+			}
 
 			So(hit, ShouldEqual, CacheHitFull)
 			So(item, ShouldNotBeNil)
 			So(len(item.data.Values), ShouldBeGreaterThan, 0)
 			So(start, ShouldEqual, start_align)
-			So(end, ShouldEqual, v.Queries[0].Hints.EndMs)
+			So(end, ShouldEqual, end_align)
 		}
 	})
 }
@@ -482,12 +487,17 @@ func TestCacheIntegration(t *testing.T) {
 		for _, v := range uniquePromReqs {
 			item, hit, _, start, end := remoteReadCacheTestStorage.Get(v)
 
-			start_align := timeAlign(v.Queries[0].Hints.StartMs)
+			start_align := timeAlign(v.Queries[0].Hints.StartMs / 1000)
+			end_align := v.Queries[0].Hints.EndMs / 1000
+			if v.Queries[0].Hints.EndMs%1000 != 0 {
+				end_align += 1
+			}
+
 			So(hit, ShouldEqual, CacheHitFull)
 			So(item, ShouldNotBeNil)
 			So(len(item.data.Values), ShouldBeGreaterThan, 0)
 			So(start, ShouldEqual, start_align)
-			So(end, ShouldEqual, v.Queries[0].Hints.EndMs)
+			So(end, ShouldEqual, end_align)
 		}
 	})
 	Convey("TestCacheIntegration_goroutine_10", t, func() {
@@ -522,23 +532,23 @@ func iterateTestCases(t *testing.T) {
 			if item != nil {
 				resetCacheItem(k, item, start, end)
 			}
-			output_start_align := timeAlign(v[i].output.startms)
+			output_start_align := timeAlign(v[i].output.starts)
 			switch v[i].output.extern {
 			case externNone:
 				if hit == CacheHitFull {
 					So(newStart, ShouldBeGreaterThanOrEqualTo, output_start_align)
-					So(newEnd, ShouldBeLessThanOrEqualTo, v[i].output.endms)
+					So(newEnd, ShouldBeLessThanOrEqualTo, v[i].output.ends)
 				} else if hit == CacheMiss {
 					So(newStart, ShouldEqual, output_start_align)
-					So(newEnd, ShouldEqual, v[i].output.endms)
+					So(newEnd, ShouldEqual, v[i].output.ends)
 				}
 			case externLeft:
 				So(newStart, ShouldEqual, output_start_align)
 			case externRight:
-				So(newEnd, ShouldEqual, v[i].output.endms)
+				So(newEnd, ShouldEqual, v[i].output.ends)
 			case externBoth:
 				So(newStart, ShouldEqual, output_start_align)
-				So(newEnd, ShouldEqual, v[i].output.endms)
+				So(newEnd, ShouldEqual, v[i].output.ends)
 			}
 		}
 	}
@@ -575,8 +585,8 @@ func iterateCacheReplaseTestCases(key string, randomWait time.Duration) {
 			cache = item.Data()
 		}
 		time.Sleep(randomWait)
-		_ = remoteReadCacheTestStorage.AddOrMerge(v.input, item, cache, buildCacheItem(v.output.startms, v.output.endms, i, m))
-		hit := item.Hit(v.output.startms, v.output.endms)
+		_ = remoteReadCacheTestStorage.AddOrMerge(v.input, item, cache, buildCacheItem(v.output.starts, v.output.ends, i, m))
+		hit := item.Hit(v.output.starts, v.output.ends)
 		if hit != CacheHitFull {
 			panic("cache result is modify by another goroutine")
 		}

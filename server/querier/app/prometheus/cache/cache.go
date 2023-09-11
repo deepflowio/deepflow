@@ -107,7 +107,7 @@ func (c *CacheItem) Deviation(start int64, end int64) (int64, int64) {
 	// if the deviation between start & c.start > maxAllowDeviation, directy query all data to replace cache
 	// add left data
 	if end <= c.endTime && end > c.startTime && start < c.startTime {
-		if math.Abs(float64(c.startTime-start)/1000) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
+		if math.Abs(float64(c.startTime-start)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
 			return start, end
 		} else {
 			return start, c.startTime
@@ -116,7 +116,7 @@ func (c *CacheItem) Deviation(start int64, end int64) (int64, int64) {
 
 	// add right data
 	if start < c.endTime && start >= c.startTime && end > c.endTime {
-		if math.Abs(float64(c.endTime-end)/1000) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
+		if math.Abs(float64(c.endTime-end)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
 			return start, end
 		} else {
 			return c.endTime, end
@@ -164,7 +164,7 @@ func (c *CacheItem) MergeCache(start, end int64, cache *common.Result, query *co
 	// cached:   [0, N]
 	// replaced: [-X, Y] (0<Y<=N, X<0)
 	if end <= c.endTime && end > c.startTime && start < c.startTime {
-		if math.Abs(float64(c.startTime-start)/1000) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
+		if math.Abs(float64(c.startTime-start)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
 			log.Debugf("cache replace due to deviation too large, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
 			c.startTime = start
 			c.endTime = end
@@ -194,7 +194,7 @@ func (c *CacheItem) MergeCache(start, end int64, cache *common.Result, query *co
 	// cached:   [0, N]
 	// replaced: [X,Y] (0<=X<N, Y>N)
 	if start < c.endTime && start >= c.startTime && end > c.endTime {
-		if math.Abs(float64(c.endTime-end)/1000) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
+		if math.Abs(float64(c.endTime-end)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
 			log.Debugf("cache replace due to deviation too large, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
 			c.startTime = start
 			c.endTime = end
@@ -258,7 +258,8 @@ func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, item *CacheIt
 		return query
 	}
 
-	key, _, start, end := promRequestToCacheKey(q)
+	key, _ := promRequestToCacheKey(q)
+	start, end := GetPromRequestQueryTime(q)
 	start = timeAlign(start)
 	if item == nil {
 		// cache miss
@@ -289,18 +290,19 @@ func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*CacheItem, CacheHi
 		return nil, CacheMiss, "", 0, 0
 	}
 	q := req.Queries[0]
+	start, end := GetPromRequestQueryTime(q)
 	if q.Hints.Func == "series" {
 		// for series api, don't use cache
 		// not count cache miss here
-		return nil, CacheMiss, "", q.Hints.StartMs, q.Hints.EndMs
+		return nil, CacheMiss, "", start, end
 	}
 
 	if !config.Cfg.Prometheus.Cache.Enabled {
-		return nil, CacheMiss, "", q.Hints.StartMs, q.Hints.EndMs
+		return nil, CacheMiss, "", start, end
 	}
 
 	// for query api, cache query samples
-	key, metric, start, end := promRequestToCacheKey(q)
+	key, metric := promRequestToCacheKey(q)
 	if strings.Contains(metric, "__") {
 		// for DeepFlow Native metrics, don't use cache
 		return nil, CacheMiss, metric, start, end
