@@ -81,13 +81,15 @@ func (c *Config) Validate() error {
 				ExportCustomK8sLabelsRegexp: c.OtlpDeprecated.ExportCustomK8sLabelsRegexp,
 				ExportOnlyWithTraceID:       &c.OtlpDeprecated.ExportOnlyWithTraceID,
 			},
-			OtlpExporterCfg: exporters_cfg.OtlpExporterConfig{
-				Enabled:          true,
-				Addr:             c.OtlpDeprecated.Addr,
-				QueueCount:       c.OtlpDeprecated.QueueCount,
-				QueueSize:        c.OtlpDeprecated.QueueSize,
-				ExportBatchCount: c.OtlpDeprecated.ExportBatchCount,
-				GrpcHeaders:      c.OtlpDeprecated.GrpcHeaders,
+			OtlpExporterCfgs: []exporters_cfg.OtlpExporterConfig{
+				{
+					Enabled:          true,
+					Addr:             c.OtlpDeprecated.Addr,
+					QueueCount:       c.OtlpDeprecated.QueueCount,
+					QueueSize:        c.OtlpDeprecated.QueueSize,
+					ExportBatchCount: c.OtlpDeprecated.ExportBatchCount,
+					GrpcHeaders:      c.OtlpDeprecated.GrpcHeaders,
+				},
 			},
 		}
 	}

@@ -934,6 +934,12 @@ var ColumnAdd635 = []*ColumnAdds{
 		ColumnNames: []string{"l7_parse_failed"},
 		ColumnType:  ckdb.UInt32,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alarm_event", "alarm_event_local"},
+		ColumnNames: []string{"user_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var ColumnDrops635 = []*ColumnDrops{

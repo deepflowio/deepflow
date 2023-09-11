@@ -68,9 +68,11 @@ func NewExporters(flowlogCfg *config.Config) *Exporters {
 
 	universalTagManager := universal_tag.NewUniversalTagsManager(exportersCfg.ExportCustomK8sLabelsRegexp, flowlogCfg.Base)
 
-	if exportersCfg.OtlpExporterCfg.Enabled {
-		otlpExporter := otlp_exporter.NewOtlpExporter(exportersCfg, universalTagManager)
-		exporters = append(exporters, otlpExporter)
+	for i := range exportersCfg.OtlpExporterCfgs {
+		if exportersCfg.OtlpExporterCfgs[i].Enabled {
+			otlpExporter := otlp_exporter.NewOtlpExporter(i, exportersCfg, universalTagManager)
+			exporters = append(exporters, otlpExporter)
+		}
 	}
 
 	// todo add other exporters....
