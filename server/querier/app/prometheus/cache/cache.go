@@ -290,19 +290,19 @@ func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*CacheItem, CacheHi
 		return nil, CacheMiss, "", 0, 0
 	}
 	q := req.Queries[0]
+	start, end := GetPromRequestQueryTime(q)
 	if q.Hints.Func == "series" {
 		// for series api, don't use cache
 		// not count cache miss here
-		return nil, CacheMiss, "", q.Hints.StartMs, q.Hints.EndMs
+		return nil, CacheMiss, "", start, end
 	}
 
 	if !config.Cfg.Prometheus.Cache.Enabled {
-		return nil, CacheMiss, "", q.Hints.StartMs, q.Hints.EndMs
+		return nil, CacheMiss, "", start, end
 	}
 
 	// for query api, cache query samples
 	key, metric := promRequestToCacheKey(q)
-	start, end := GetPromRequestQueryTime(q)
 	if strings.Contains(metric, "__") {
 		// for DeepFlow Native metrics, don't use cache
 		return nil, CacheMiss, metric, start, end
