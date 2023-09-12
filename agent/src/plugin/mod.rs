@@ -19,7 +19,11 @@ pub mod c_ffi;
 pub mod shared_obj;
 pub mod wasm;
 
-use public::{bytes::read_u32_be, l7_protocol::L7Protocol};
+use bitflags::bitflags;
+use public::{
+    bytes::{read_u16_be, read_u32_be},
+    l7_protocol::L7Protocol,
+};
 use serde::Serialize;
 
 use crate::{
@@ -60,6 +64,11 @@ pub struct CustomInfoTrace {
 }
 
 #[derive(Debug, Default, Serialize, Clone)]
+pub struct CustomExtInfo {
+    pub row_effect: Option<u32>,
+}
+
+#[derive(Debug, Default, Serialize, Clone)]
 pub struct CustomInfo {
     #[serde(skip)]
     pub(super) proto: u8,
@@ -78,6 +87,7 @@ pub struct CustomInfo {
     pub resp: CustomInfoResp,
 
     pub trace: CustomInfoTrace,
+    pub ext_info: CustomExtInfo,
 
     pub need_protocol_merge: bool,
     pub is_req_end: bool,
@@ -87,13 +97,22 @@ pub struct CustomInfo {
     pub attributes: Vec<KeyVal>,
 }
 
+bitflags! {
+    struct InfoFlag: u8 {
+        const HAS_REQ_ID = 1<<7;
+        const HAS_TRACE = 1 << 6;
+        const HAS_EXT_INFO = 1 << 5;
+        const HAS_KV = 1 << 4;
+    }
+}
+
 impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
     /*
         req len:        4 bytes: | 1 bit: is nil? | 31bit length |
 
         resp len:       4 bytes: | 1 bit: is nil? | 31bit length |
 
-        has request id: 1 bytes:  0 or 1
+        bit flag:       1 bytes: | has req_id | has trace |  has ext_info | has kv | 4 bit reserve |
 
         if has request id:
 
@@ -129,8 +148,6 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
 
         need_protocol_merge: 1 byte, the msb indicate is need protocol merge, the lsb indicate is end, such as 1 000000 1
 
-        has trace: 1 byte
-
         if has trace:
 
             trace_id, span_id, parent_span_id
@@ -144,7 +161,12 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
 
             ) x 3
 
-        has kv:  1 byte
+
+        if has ext info:
+            ext info size: 2 bytes
+
+            row_effect:    4 bytes
+
         if has kv
             (
                 key len: 2 bytes
@@ -178,24 +200,24 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
         }
         off += 4;
 
+        let flags = InfoFlag::from_bits_truncate(buf[off]);
+        let (has_req_id, has_trace, has_kv, has_ext) = (
+            flags.contains(InfoFlag::HAS_REQ_ID),
+            flags.contains(InfoFlag::HAS_TRACE),
+            flags.contains(InfoFlag::HAS_KV),
+            flags.contains(InfoFlag::HAS_EXT_INFO),
+        );
+        off += 1;
+
         // parse request id
-        match buf[off] {
-            0 => off += 1,
-            1 => {
-                off += 1;
-                if off + 4 > buf.len() {
-                    return Err(Error::WasmSerializeFail(
-                        "buf len too short when parse request id".to_string(),
-                    ));
-                }
-                info.request_id = Some(read_u32_be(&buf[off..off + 4]));
-                off += 4
-            }
-            _ => {
+        if has_req_id {
+            if off + 4 > buf.len() {
                 return Err(Error::WasmSerializeFail(
-                    "has request_id must 0 or 1".to_string(),
-                ))
+                    "buf len too short when parse request id".to_string(),
+                ));
             }
+            info.request_id = Some(read_u32_be(&buf[off..off + 4]));
+            off += 4
         }
 
         match dir {
@@ -297,55 +319,52 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
         off += 1;
 
         // trace info
-        if off + 1 > buf.len() {
-            return Err(Error::WasmSerializeFail(
-                "buf len too short when parse has trace info".to_string(),
-            ));
-        }
-        let has_trace = buf[off];
-        off += 1;
-        match has_trace {
-            0 => {}
-            1 => {
-                if read_wasm_str(buf, &mut off)
-                    .and_then(|s| {
-                        info.trace.trace_id = Some(s);
-                        read_wasm_str(buf, &mut off)
-                    })
-                    .and_then(|s| {
-                        info.trace.span_id = Some(s);
-                        read_wasm_str(buf, &mut off)
-                    })
-                    .and_then(|s| {
-                        info.trace.parent_span_id = Some(s);
-                        Some(())
-                    })
-                    .is_none()
-                {
-                    return Err(Error::WasmSerializeFail(
-                        "buf len too short when parse trace info".to_string(),
-                    ));
-                }
-            }
-            _ => {
+        if has_trace {
+            if read_wasm_str(buf, &mut off)
+                .and_then(|s| {
+                    info.trace.trace_id = Some(s);
+                    read_wasm_str(buf, &mut off)
+                })
+                .and_then(|s| {
+                    info.trace.span_id = Some(s);
+                    read_wasm_str(buf, &mut off)
+                })
+                .and_then(|s| {
+                    info.trace.parent_span_id = Some(s);
+                    Some(())
+                })
+                .is_none()
+            {
                 return Err(Error::WasmSerializeFail(
-                    "has trace return unexpected value".to_string(),
+                    "buf len too short when parse trace info".to_string(),
                 ));
             }
         }
 
-        // key val
-        if off + 1 > buf.len() {
-            return Err(Error::WasmSerializeFail(
-                "buf len too short when parse key val".to_string(),
+        // ext info
+        if has_ext {
+            let err = Err(Error::WasmSerializeFail(
+                "buf len too short when parse ext info".to_string(),
             ));
-        }
-        let has_kv = buf[off];
-        off += 1;
 
-        match has_kv {
-            0 => {}
-            1 => loop {
+            if off + 2 > buf.len() {
+                return err;
+            }
+
+            let ext_len = read_u16_be(&buf[off..off + 2]) as usize;
+            off += 2;
+            if off + ext_len > buf.len() || ext_len < 4 {
+                return err;
+            }
+
+            info.ext_info.row_effect = Some(read_u32_be(&buf[off..off + 4]));
+
+            off += ext_len;
+        }
+
+        // key val
+        if has_kv {
+            loop {
                 if let (Some(key), Some(val)) =
                     (read_wasm_str(buf, &mut off), read_wasm_str(buf, &mut off))
                 {
@@ -353,11 +372,6 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                 } else {
                     break;
                 }
-            },
-            _ => {
-                return Err(Error::WasmSerializeFail(
-                    "has kv return unexpected value".to_string(),
-                ))
             }
         }
         Ok(info)
@@ -431,6 +445,12 @@ impl L7ProtocolInfoInterface for CustomInfo {
             if self.trace.parent_span_id.is_none() {
                 self.trace.parent_span_id = w.trace.parent_span_id;
             }
+
+            // ext info
+            if self.ext_info.row_effect.is_none() {
+                self.ext_info.row_effect = w.ext_info.row_effect;
+            }
+
             self.attributes.extend(w.attributes);
         }
         Ok(())
@@ -497,6 +517,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 protocol_str: Some(w.proto_str),
                 ..Default::default()
             }),
+            row_effect: w.ext_info.row_effect.unwrap_or_default(),
             ..Default::default()
         }
     }

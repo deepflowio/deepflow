@@ -314,6 +314,9 @@ fn test_wasm_parse_payload_req() {
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, false);
+
         let attr1 = ci.attributes.get(0).unwrap();
         let attr2 = ci.attributes.get(1).unwrap();
         assert_eq!(attr1.key.as_str(), "k1");
@@ -321,9 +324,6 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k2");
         assert_eq!(attr2.val.as_str(), "v2");
-
-        assert_eq!(ci.need_protocol_merge, true);
-        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -347,6 +347,11 @@ fn test_wasm_parse_payload_req() {
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, true);
+
+        assert_eq!(ci.ext_info.row_effect.unwrap(), 1234);
+
         let attr1 = ci.attributes.get(0).unwrap();
         let attr2 = ci.attributes.get(1).unwrap();
         assert_eq!(attr1.key.as_str(), "k3");
@@ -354,9 +359,6 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k4");
         assert_eq!(attr2.val.as_str(), "v4");
-
-        assert_eq!(ci.need_protocol_merge, true);
-        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -389,6 +391,11 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_resp_end, true);
+
+        assert_eq!(ci.ext_info.row_effect.unwrap(), 9999);
+
         let attr1 = ci.attributes.get(0).unwrap();
         let attr2 = ci.attributes.get(1).unwrap();
         assert_eq!(attr1.key.as_str(), "k1");
@@ -417,6 +424,9 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.trace.trace_id.unwrap(), "11111");
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
+
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end | ci.is_resp_end, false);
 
         let attr1 = ci.attributes.get(0).unwrap();
         let attr2 = ci.attributes.get(1).unwrap();
@@ -742,7 +752,7 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
                     },
                 },
                 ProtocolMerge: true,
-                IsEnd:         true,
+                IsEnd:         false,
             },
             {
                 ReqLen:    &reqLen,
@@ -756,6 +766,9 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
                 },
                 Resp:  nil,
                 Trace: trace,
+                ExtInfo: &sdk.ExtInfo{
+                    RowEffect: 1234,
+                },
                 Kv: []sdk.KeyVal{
                     {
                         Key: "k3",
@@ -799,6 +812,9 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
                     Exception: "exception",
                 },
                 Trace: trace,
+                ExtInfo: &sdk.ExtInfo{
+                    RowEffect: 9999,
+                },
                 Kv: []sdk.KeyVal{
                     {
                         Key: "k1",
@@ -833,7 +849,7 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
                     },
                 },
                 ProtocolMerge: true,
-                IsEnd:         true,
+                IsEnd:         false,
             },
         })
     default:
@@ -844,5 +860,6 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.Action {
 func main() {
     sdk.Warn("wasm register parser")
     sdk.SetParser(parser{})
+
 }
 */
