@@ -487,7 +487,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	// No internal sql required when only star grouping
 	if len(innerSelectSlice) > 0 {
 		if strings.Contains(outerTransSql, " PREWHERE ") {
-			oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
+			oldWhereSlice := strings.SplitN(outerTransSql, " PREWHERE ", 2)
 			outerSlice = append(outerSlice, oldWhereSlice[0])
 			if sorderByTag != "" {
 				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
@@ -497,7 +497,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			outerSlice = append(outerSlice, oldWhereSlice[1])
 			outerSql = strings.Join(outerSlice, "")
 		} else if strings.Contains(outerTransSql, " WHERE ") {
-			oldWhereSlice := strings.Split(outerTransSql, " WHERE ")
+			oldWhereSlice := strings.SplitN(outerTransSql, " WHERE ", 2)
 			outerSlice = append(outerSlice, oldWhereSlice[0])
 			if sorderByTag != "" {
 				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
