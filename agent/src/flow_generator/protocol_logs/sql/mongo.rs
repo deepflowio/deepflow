@@ -39,6 +39,7 @@ use crate::{
 };
 // 加载bson库
 use bson::{self, Document};
+use std::ffi::CStr;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MongoDBInfo {
@@ -207,6 +208,14 @@ impl L7ProtocolParserInterface for MongoDBLog {
     }
 }
 
+const _OP_REPLY: u32 = 1;
+const _OP_MSG: u32 = 2013;
+const _OP_UPDATE: u32 = 2001;
+const _OP_INSERT: u32 = 2002;
+const _OP_QUERY: u32 = 2004;
+const _OP_GET_MORE: u32 = 2005;
+const _OP_DELETE: u32 = 2006;
+
 impl MongoDBLog {
     // TODO: tracing
     fn parse(
@@ -225,23 +234,11 @@ impl MongoDBLog {
         if offset <= 0 {
             return Err(Error::MongoDBLogParseFailed);
         }
-        if header.response_to > 0 {
-            // response_to is the request_id, when 0 means the request
-            info.msg_type = LogMessageType::Response;
-            self.info.resp_len = header.length;
-            info.request_id = header.response_to;
-            info.response_id = header.request_id;
-        } else {
-            info.msg_type = LogMessageType::Request;
-            self.info.req_len = header.length;
-            info.request_id = header.request_id;
-            self.perf_stats.as_mut().map(|p| p.inc_req());
-        }
         info.op_code = header.op_code;
         info.op_code_name = header.op_code_name;
         // command decode
         match info.op_code {
-            2013 => {
+            _OP_MSG => {
                 // OP_MSG
                 let mut msg_body = MongoOpMsg::default();
                 msg_body.decode(&payload[16..offset as usize + 16])?;
@@ -261,7 +258,7 @@ impl MongoDBLog {
                     }
                 }
             }
-            1 => {
+            _OP_REPLY => {
                 // "OP_REPLY"
                 let mut msg_body = MongoOpReply::default();
                 msg_body.decode(&payload[16..])?;
@@ -271,39 +268,66 @@ impl MongoDBLog {
                 info.response = msg_body.doc.to_string();
                 info.exception = msg_body.response_msg;
             }
-            2001 => {
+            _OP_UPDATE => {
                 // "OP_UPDATE"
-                info.exception = read_c_string(&payload[20..]);
+                info.exception = unsafe {
+                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                };
                 let update = Document::from_reader(&payload[24 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = update.to_string();
             }
-            2002 => {
+            _OP_INSERT => {
                 // OP_INSERT
-                info.exception = read_c_string(&payload[20..]);
+                info.exception = unsafe {
+                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                };
                 let insert = Document::from_reader(&payload[20 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = insert.to_string();
             }
-            2004 => {
+            _OP_QUERY => {
                 // "OP_QUERY"
-                info.exception = read_c_string(&payload[20..]);
+                info.exception = unsafe {
+                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                };
                 let query = Document::from_reader(&payload[28 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = query.to_string();
             }
-            2005 => {
+            _OP_GET_MORE | _OP_DELETE => {
                 // OP_GET_MORE
-                info.request = read_c_string(&payload[20..]);
-            }
-            2006 => {
-                // OP_DELETE
-                info.request = read_c_string(&payload[20..]);
+                info.request = unsafe {
+                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                };
             }
             _ => {
                 info.request = info.op_code_name.clone();
             }
         }
+
+        if header.response_to > 0 {
+            // response_to is the request_id, when 0 means the request
+            info.msg_type = LogMessageType::Response;
+            self.info.resp_len = header.length;
+            info.request_id = header.response_to;
+            info.response_id = header.request_id;
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
+        } else {
+            info.msg_type = LogMessageType::Request;
+            self.info.req_len = header.length;
+            info.request_id = header.request_id;
+            self.perf_stats.as_mut().map(|p| p.inc_req());
+        }
+
         Ok(false)
     }
 }
@@ -422,7 +446,12 @@ impl Sections {
                 self.kind_name = "DOC".to_string();
                 self.size =
                     std::option::Option::<i32>::from(bytes::read_u32_le(&payload[1..5]) as i32);
-                self.c_string = std::option::Option::Some(read_c_string(&payload[5..]));
+                //self.c_string = std::option::Option::Some(read_c_string(&payload[5..]));
+                self.c_string = Some(unsafe {
+                    CStr::from_ptr(payload[5..].as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                });
                 self.doc = Document::from_reader(&payload[1..]).unwrap_or(Document::default());
             }
             2 => {
@@ -439,22 +468,6 @@ impl Sections {
         }
         Ok(true)
     }
-}
-
-use std::ffi::CString;
-
-fn read_c_string(bytes: &[u8]) -> String {
-    let mut buffer = Vec::new();
-    for &byte in bytes.iter() {
-        if byte == 0 {
-            break;
-        }
-        buffer.push(byte);
-    }
-    let c_string = CString::new(buffer).expect("Failed to create CString");
-    c_string
-        .into_string()
-        .expect("Failed to convert CString to String")
 }
 
 // Deprecated as of MongoDB 5.0.
