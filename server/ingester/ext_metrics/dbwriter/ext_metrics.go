@@ -97,9 +97,9 @@ func (m *ExtMetrics) Columns() []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名k"))
 	}
 	columns = append(columns,
-		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
-		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
-		ckdb.NewColumn("metrics_float_names", ckdb.ArrayString).SetComment("额外的float类型metrics"),
+		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("额外的tag"),
+		ckdb.NewColumn("tag_values", ckdb.ArrayLowCardinalityString).SetComment("额外的tag对应的值"),
+		ckdb.NewColumn("metrics_float_names", ckdb.ArrayLowCardinalityString).SetComment("额外的float类型metrics"),
 		ckdb.NewColumn("metrics_float_values", ckdb.ArrayFloat64).SetComment("额外的float metrics值"),
 	)
 
