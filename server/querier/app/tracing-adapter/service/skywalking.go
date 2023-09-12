@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/common"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/model"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/op/go-logging"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -154,6 +155,7 @@ func (s *SkyWalkingAdapter) skywalkingTracesToExTraces(traces *query.Trace) *mod
 		}
 		span := model.ExSpan{
 			Name:            *skywalkingSpan.EndpointName,
+			ID:              s.generateSwUniqueID(skywalkingSpan.SegmentID, skywalkingSpan.SpanID, skywalkingSpan.StartTime*1e3, i),
 			StartTimeUs:     skywalkingSpan.StartTime * 1e3,
 			EndTimeUs:       skywalkingSpan.EndTime * 1e3,
 			TapSide:         s.swSpanTypeToTapSide(skywalkingSpan.Type),
@@ -172,6 +174,28 @@ func (s *SkyWalkingAdapter) skywalkingTracesToExTraces(traces *query.Trace) *mod
 		exTrace.Spans = append(exTrace.Spans, span)
 	}
 	return exTrace
+}
+
+func (s *SkyWalkingAdapter) generateSwUniqueID(segmentID string, spanID int, startTimeUs int64, index int) uint64 {
+	swSegmentUUID := segmentID
+	if len(segmentID) > 36 {
+		// uuid length 36: see in rfc4122
+		// for segmentID like [9be33fe4ae364a2492e4e59f56cef454.49.16944286788056842], only need first part
+		swSegmentUUID = segmentID[:32]
+	}
+	// try to parse segmentID, if failed, use startime as parse segmentID
+	uid, err := uuid.Parse(swSegmentUUID)
+	var encodeID uint64
+	if err == nil {
+		encodeID = uint64(uid.ID())
+	} else {
+		encodeID = uint64(startTimeUs)
+	}
+	// high 32 bits: encodeID
+	// mid 8 bits: spanID
+	// last 24 bits: index * 0xfff1
+	// should confirm ID is unique in one trace, and 0xfff1 is the biggest prime number in 0-65535, it means nothing
+	return encodeID<<32 | uint64(spanID&0xff)<<16 | uint64(index*0xfff1)&0xffffff
 }
 
 func (s *SkyWalkingAdapter) swSpanIDToDFSpanID(segmentID string, spanID int) string {
