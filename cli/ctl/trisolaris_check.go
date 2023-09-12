@@ -527,10 +527,10 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
-	format := "Id: %d Mac: %s VMac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
+	format := "Id: %d Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
 		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, " +
 		"PodNsId: %d, PodId: %d, PodClusterId: %d, NetnsId: %d, VtapId: %d, IsVipInterface: %t "
-	buffer.WriteString(fmt.Sprintf(format, data.GetId(), Uint64ToMac(data.GetMac()), Uint64ToMac(data.GetVmac()),
+	buffer.WriteString(fmt.Sprintf(format, data.GetId(), Uint64ToMac(data.GetMac()),
 		data.GetEpcId(), data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
 		data.GetAzId(), data.GetPodGroupId(), data.GetPodNsId(), data.GetPodId(),
