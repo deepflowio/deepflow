@@ -1,7 +1,8 @@
 <p align="center">
   <img src="./docs/deepflow-logo.png" alt="DeepFlow" width="300" />
 
-  <p align="center">DeepFlow is an automated observability platform for cloud-native developers.</p>
+  <p align="center">Instant Observability for Cloud-Native Applications</p>
+  <p align="center">Zero Code, Full Stack, eBPF & Wasm</p>
 </p>
 <p align="center">
     <a href="https://zenodo.org/badge/latestdoi/448599559"><img src="https://zenodo.org/badge/448599559.svg" alt="DOI"></a>
@@ -16,16 +17,15 @@
 
 # 什么是 DeepFlow
 
-DeepFlow 是一款面向云原生开发者的**高度自动化**的可观测性平台。使用 **eBPF**、WASM、OpenTelemetry 等新技术，DeepFlow 创新的实现了 **AutoTracing**、**AutoMetrics**、**AutoTagging**、**SmartEncoding** 等核心机制，极大的避免了埋点插码，显著的降低了后端数仓的资源开销。基于 DeepFlow 的可编程性和开放接口，开发者可以快速将其融入到自己的可观测性技术栈中。
+DeepFlow 开源项目旨在为复杂的云基础设施及云原生应用提供深度可观测性。DeepFlow 基于 eBPF 实现了**零侵扰**（**Zero Code**）的指标、分布式追踪、调用日志、函数剖析数据采集，并结合智能标签（**SmartEncoding**）技术实现了所有观测数据的**全栈**（**Full Stack**）关联和高效存取。使用 DeepFlow，可以让云原生应用自动具有深度可观测性，从而消除开发者不断插桩的沉重负担，并为 DevOps/SRE 团队提供从代码到基础设施的监控及诊断能力。
 
-# 六大主要特性
+# 核心特性
 
-- **全栈**：DeepFlow 使用 eBPF 和 cBPF 技术实现的 **AutoMetrics** 机制，可以自动采集任何应用的 RED（Request、Error、Delay）性能指标，精细至每一次应用调用，覆盖从应用到基础设施的所有软件技术栈。在云原生环境中，DeepFlow 的 **AutoTagging** 机制自动发现服务、实例、API 的属性信息，自动为每个观测数据注入丰富的标签，从而消除数据孤岛，并释放数据的下钻能力。
-- **全链路**：DeepFlow 使用 eBPF 技术创新的实现了 **AutoTracing** 机制，在云原生环境中自动追踪任意微服务、基础设施服务的分布式调用链。在此基础上，通过集成并自动关联来自 OpenTelemetry 的数据，DeepFlow 实现了完整的全栈、全链路分布式追踪，消除了所有盲点。
-- **高性能**：DeepFlow 创新的 **SmartEncoding** 标签注入机制，能够将数据存储性能提升 10 倍，从此告别高基数和采样的焦虑。DeepFlow 使用 Rust 实现 Agent，拥有极致处理性能的同时保证内存安全。DeepFlow 使用 Golang 实现 Server，重写了 Golang 的 map、pool 基础库，数据查询和内存 GC 均有近 10 倍的性能提升。
-- **可编程**：DeepFlow 目前支持了对 HTTP(S)、Dubbo、MySQL、PostgreSQL、Redis、Kafka、MQTT、DNS 协议的解析，并将保持迭代增加更多的应用协议支持。除此之外，DeepFlow 基于 WASM 技术提供了可编程接口，让开发者可以快速具备对私有协议的解析能力，并可用于构建特定场景的业务分析能力，例如 5GC 信令分析、金融交易分析、车机通信分析等。
-- **开放接口**：DeepFlow 拥抱开源社区，支持接收广泛的可观测数据源，并利用 AutoTagging 和 SmartEncoding 提供高性能、统一的标签注入能力。DeepFlow 支持插件式的数据库接口，开发者可自由增加和替换最合适的数据库。DeepFlow 为所有观测数据提供统一的标准 SQL 查询能力，便于使用者快速集成到自己的可观测性平台中。
-- **易于维护**：DeepFlow 的内核仅由 Agent、Server 两个组件构成，将复杂度隐藏在进程内部，将维护难度降低至极致。DeepFlow Server 集群可对多个 Kubernetes 集群、传统服务器集群、云服务器集群进行统一监控，且无需依赖任何外部组件即可实现水平扩展与负载均衡。
+- **任意 Service 的全景图**：利用 eBPF **零侵扰**绘制生产环境的全景图，包括任意语言开发的服务、未知代码的第三方服务、所有的云原生基础设施服务。内置标准协议解析能力，并提供 Wasm 插件机制扩展解析任意私有协议。零侵扰计算每一次调用在应用程序和基础设施中的**全栈**黄金指标，快速定界性能瓶颈。
+- **任意 Request 的分布式追踪**：基于 eBPF 的**零侵扰**分布式追踪能力，支持任意语言的应用程序，并完整覆盖网关、服务网格、数据库、消息队列、DNS、网卡等各类基础设施，不留下任何追踪盲点。**全栈**，自动采集每个 Span 关联的网络性能指标和文件读写事件。从此，分布式追踪进入零插桩的新时代。
+- **任意 Function 的持续性能剖析**：以低于 1% 的开销零侵扰采集生产环境进程的性能剖析数据，绘制函数粒度的 OnCPU、OffCPU 火焰图，快速定位应用函数、库函数、内核函数的全栈性能瓶颈，并自动关联至分布式追踪数据。即使在 2.6+ 内核版本下，仍然可提供网络性能剖析能力，洞察代码性能瓶颈。
+- **无缝集成流行的可观测性技术栈**：可作为 Prometheus、OpenTelemetry、SkyWalking、Pyroscope 的存储后端，亦可提供 **SQL、PromQL、OTLP** 等数据接口作为流行技术栈的数据源。自动为所有观测信号注入统一标签，包括云资源、K8s 容器资源、K8s Label/Annotation、CMDB 中的业务属性等，消除数据孤岛。
+- **存储性能10x ClickHouse**：基于 **SmartEncoding** 机制，向所有观测信号注入标准化的、预编码的元标签，相比 ClickHouse 的 String 或 LowCard 方案均可将存储开销降低 10x。自定义标签与观测数据分离存储，从此你可安心注入近乎无限维度和基数的标签，且可获得像 **BigTable** 一样的轻松查询体验。
 
 # 文档
 
@@ -46,13 +46,9 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
-## 体验 DeepFlow Cloud
-
-[DeepFlow Cloud](https://deepflow.yunshan.net/) 是 DeepFlow 的全托管 SaaS 服务，目前处于测试阶段，仅支持中文。
-
 ## 体验 DeepFlow Enterprise
 
-[DeepFlow Enterprise](https://www.yunshan.net/products/deepflow.html) 支持对混合云的全栈、全链路监控，覆盖容器、云服务器、宿主机、NFV网关，目前仅支持中文，欢迎联系我们进行体验。
+你可以访问 [DeepFlow Enterprise Demo](https://deepflow.yunshan.net/)，目前仅支持中文。
 
 # 从源码编译 DeepFlow
 
@@ -60,7 +56,7 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 # 软件架构
 
-DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、传统服务器或云服务器中运行一个 Agent ，负责该服务器上所有应用进程的 AutoMetrics 和 AutoTracing 数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、标签注入、数据写入、数据查询服务。
+DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、传统服务器或云服务器中运行一个 Agent ，负责该服务器上所有应用进程的数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、标签注入、数据写入、数据查询服务。
 
 ![DeepFlow 软件架构](./docs/deepflow-architecture.png)
 
@@ -80,7 +76,8 @@ DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 
 - 感谢 [eBPF](https://ebpf.io/)，革命性的 Linux 内核技术
 - 感谢 [OpenTelemetry](https://opentelemetry.io/)，提供了采集应用可观测性数据的标准 API
 
-# Landscapes
+# 荣誉
 
+- DeepFlow 的论文 [Network-Centric Distributed Tracing with DeepFlow: Troubleshooting Your Microservices in Zero Code](https://dl.acm.org/doi/10.1145/3603269.3604823) 已被国际顶会 ACM SIGCOMM 2023 录用
 - DeepFlow 已加入 <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>
 - DeepFlow 已加入 <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>
