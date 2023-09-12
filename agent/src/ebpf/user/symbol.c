@@ -758,6 +758,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 					}
 				}
 
+				p->unknown_syms_found = false;
 				p->update_syms_table_time = 0;
 				ebpf_info
 				    ("Update java symbols table, (Pid %d)\n",
