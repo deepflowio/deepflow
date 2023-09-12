@@ -194,6 +194,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("SOFARPC");
         } else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
             proto_tag.push_str("FASTCGI");
+        } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
+            proto_tag.push_str("MONGO");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -328,6 +330,7 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
+	    /*
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
@@ -341,6 +344,8 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
+	*/
+	enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
 
         set_feature_regex(
             FEATURE_UPROBE_OPENSSL,
