@@ -123,7 +123,7 @@ index 5358d96..f4a0892 100644
  	switch v := v.(type) {
  	case reflect.Value:
 diff --git a/lib/column/column.go b/lib/column/column.go
-index 6994106..2f1e375 100644
+index 6994106..5951410 100644
 --- a/lib/column/column.go
 +++ b/lib/column/column.go
 @@ -75,12 +75,257 @@ type Interface interface {
@@ -172,7 +172,7 @@ index 6994106..2f1e375 100644
 +	return fmt.Errorf("unsupport")
 +}
 +func (col *LowCardinality) AppendStringRow(v string) error {
-+	return fmt.Errorf("unsupport")
++	return col.AppendRow(v)
 +}
 +func (col *Tuple) AppendStringRow(v string) error {
 +	return fmt.Errorf("unsupport")
