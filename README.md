@@ -17,7 +17,7 @@ English | [简体中文](./README-CN.md)
 
 # What is DeepFlow
 
-The DeepFlow open-source project aims to provide deep observability for complex cloud infrastructures and cloud-native applications. DeepFlow is built on eBPF technology, enabling **Zero Code** metrics, distributed tracing, request logs, and function profiling data collection, all with the integration of **SmartEncoding** technology for **Full Stack** correlation and efficient access to all observability data. With DeepFlow, cloud-native applications automatically gain deep observability, eliminating the heavy burden of developers continually instrumenting code and providing monitoring and diagnostic capabilities for DevOps/SRE teams, covering everything from code to infrastructure.
+The DeepFlow open-source project aims to provide deep observability for complex cloud infrastructures and cloud-native applications. DeepFlow implemented **Zero Code** data collection with eBPF for metrics, distributed tracing, request logs and function profiling, and is further intergrated with **SmartEncoding** to achieve **Full Stack** correlation and efficient access to all observability data. With DeepFlow, cloud-native applications automatically gain deep observability, removing the heavy burden of developers continually instrumenting code and providing monitoring and diagnostic capabilities covering everything from code to infrastructure for DevOps/SRE teams.
 
 # Key Features
 
