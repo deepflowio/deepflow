@@ -196,6 +196,10 @@ impl AnalyzerModeDispatcher {
             tunnel_info.tier > 0 || !MacAddr::is_multicast(&overlay_packet[..].to_vec()); // Consider unicast when there is a tunnel
 
         if src_remote && dst_remote && is_unicast {
+            if cloud_gateway_traffic {
+                let gateway_vmac_addr = src_gateway_vmac_addr.max(dst_gateway_vmac_addr);
+                tap_port = TapPort::from_gateway_mac(tunnel_info.tunnel_type, gateway_vmac_addr);
+            }
             (tap_port, true, true)
         } else if src_remote {
             if cloud_gateway_traffic {
