@@ -91,7 +91,7 @@ func (cfg *OtlpExporterConfig) Validate(overridableCfg OverridableCfg) error {
 		cfg.ExportDataTypes = overridableCfg.ExportDataTypes
 	}
 
-	if cfg.ExportOnlyWithTraceID != nil {
+	if cfg.ExportOnlyWithTraceID == nil {
 		cfg.ExportOnlyWithTraceID = overridableCfg.ExportOnlyWithTraceID
 	}
 	return nil
