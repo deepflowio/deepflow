@@ -41,18 +41,19 @@ type PrometheusService struct {
 
 func NewPrometheusService() *PrometheusService {
 	// query.max-samples set to same default value in prometheus, ref settings: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L407
+	opts := promql.EngineOpts{
+		Logger:                   newPrometheusLogger(),
+		Reg:                      nil,
+		MaxSamples:               config.Cfg.Prometheus.MaxSamples,
+		Timeout:                  100 * time.Second,
+		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
+		EnableAtModifier:         true,
+		EnableNegativeOffset:     true,
+		EnablePerStepStats:       true,
+	}
 	return &PrometheusService{
-		engine: promql.NewEngine(promql.EngineOpts{
-			Logger:                   newPrometheusLogger(),
-			Reg:                      nil,
-			MaxSamples:               config.Cfg.Prometheus.MaxSamples,
-			Timeout:                  100 * time.Second,
-			NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
-			EnableAtModifier:         true,
-			EnableNegativeOffset:     true,
-			EnablePerStepStats:       true,
-		}),
-		executor: NewPrometheusExecutor(),
+		engine:   promql.NewEngine(opts),
+		executor: NewPrometheusExecutor(opts.LookbackDelta),
 	}
 }
 

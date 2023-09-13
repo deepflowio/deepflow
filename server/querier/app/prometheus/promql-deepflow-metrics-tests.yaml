@@ -10,7 +10,7 @@ test_target_config:
   query_url: http://deepflow-server.deepflow:20416/prom
 
 query_time_parameters:
-  end_time: 1683442312
+  end_time: 1694672773
   range_in_seconds: 14
 
 test_cases:
@@ -39,8 +39,10 @@ test_cases:
     should_fail: true
   - query: '{{.simpleAggrOp}}(nonexistent_metric_name)'
     variant_args: ['simpleAggrOp']
+    should_fail: true
   - query: '{{.simpleAggrOp}} by() (nonexistent_metric_name)'
     variant_args: ['simpleAggrOp']
+    should_fail: true
   - query: 'sum by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
   - query: 'avg by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
   - query: 'min by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
@@ -73,7 +75,6 @@ test_cases:
     should_fail: true
   - query: '{{.topBottomOp}} by(auto_instance) (2, flow_metrics__vtap_app_port__request__1m)'
     variant_args: ['topBottomOp']
-    should_fail: true
   - query: '{{.topBottomOp}} without(auto_instance) (2, flow_metrics__vtap_app_port__request__1m)'
     variant_args: ['topBottomOp']
     should_fail: true
@@ -119,6 +120,7 @@ test_cases:
     variant_args: ['simpleMathFunc']
   - query: '{{.extrapolatedRateFunc}}(nonexistent_metric[5m])'
     variant_args: ['extrapolatedRateFunc']
+    should_fail: true
   - query: '{{.extrapolatedRateFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
     variant_args: ['extrapolatedRateFunc', 'range']
   - query: 'deriv(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
@@ -175,6 +177,7 @@ test_cases:
   - query: 'histogram_quantile({{.quantile}}, rate(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[1m:1m]))'
     variant_args: ['quantile']
   - query: 'histogram_quantile(0.9, nonexistent_metric)'
+    should_fail: true
   - # Missing "le" label.
     query: 'histogram_quantile(0.9, sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
   # - # Missing "le" label only in some series of the same grouping.
@@ -184,6 +187,7 @@ test_cases:
   - query: 'count_values("value", sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
   - query: 'absent(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
   - query: 'absent(nonexistent_metric_name)'
+    should_fail: true
 
   # Subqueries.
   - query: 'max_over_time((time() - max(flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) by(auto_instance, auto_service) < 1000)[5m:10s] offset 5m)'
