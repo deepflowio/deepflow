@@ -39,6 +39,7 @@ test_cases:
   - query: '{__name__=~".*"}'
     should_fail: true
   - query: "nonexistent_metric_name"
+    should_fail: true
   - query: 'node_cpu_seconds_total offset {{.offset}}'
     variant_args: ['offset']
   - query: 'node_cpu_seconds_total offset -{{.offset}}'
@@ -49,6 +50,7 @@ test_cases:
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}}(nonexistent_metric_name)'
     variant_args: ['simpleAggrOp']
+    should_fail: true
   - query: '{{.simpleAggrOp}} by() (node_cpu_seconds_total)'
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}} by(instance) (node_cpu_seconds_total)'
@@ -153,6 +155,7 @@ test_cases:
     variant_args: ['simpleMathFunc']
   - query: '{{.extrapolatedRateFunc}}(nonexistent_metric[5m])'
     variant_args: ['extrapolatedRateFunc']
+    should_fail: true
   - query: '{{.extrapolatedRateFunc}}(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
     variant_args: ['extrapolatedRateFunc', 'range']
   - query: 'deriv(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
@@ -161,38 +164,37 @@ test_cases:
     variant_args: ['range']
   - query: 'time()'
     # label_replace does a full-string match and replace.
-  - query: 'label_replace(demo_num_cpus, "job", "destination-value-$1", "instance", "10.34.0.237:(.*)")'
+  - query: 'label_replace(kube_node_info, "job", "destination-value-$1", "instance", "10.34.0.237:(.*)")'
     # label_replace does not do a sub-string match.
-  - query: 'label_replace(demo_num_cpus, "job", "destination-value-$1", "instance", "host:(.*)")'
+  - query: 'label_replace(kube_node_info, "job", "destination-value-$1", "instance", "host:(.*)")'
     # label_replace works with multiple capture groups.
-  - query: 'label_replace(demo_num_cpus, "job", "$1-$2", "instance", "local(.*):(.*)")'
+  - query: 'label_replace(kube_node_info, "job", "$1-$2", "instance", "local(.*):(.*)")'
     # label_replace does not overwrite the destination label if the source label does not exist.
-  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "nonexistent-src", "source-value-(.*)")'
+  - query: 'label_replace(kube_node_info, "job", "value-$1", "nonexistent-src", "source-value-(.*)")'
     # label_replace overwrites the destination label if the source label is empty, but matched.
-  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "nonexistent-src", "(.*)")'
+  - query: 'label_replace(kube_node_info, "job", "value-$1", "nonexistent-src", "(.*)")'
     # label_replace does not overwrite the destination label if the source label is not matched.
-  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "instance", "non-matching-regex")'
+  - query: 'label_replace(kube_node_info, "job", "value-$1", "instance", "non-matching-regex")'
     # label_replace drops labels that are set to empty values.
-  - query: 'label_replace(demo_num_cpus, "job", "", "dst", ".*")'
+  - query: 'label_replace(kube_node_info, "job", "", "dst", ".*")'
     # label_replace fails when the regex is invalid.
-  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "src", "(.*")'
+  - query: 'label_replace(kube_node_info, "job", "value-$1", "src", "(.*")'
     should_fail: true
     # label_replace fails when the destination label name is not a valid Prometheus label name.
-  - query: 'label_replace(demo_num_cpus, "~invalid", "", "src", "(.*)")'
+  - query: 'label_replace(kube_node_info, "~invalid", "", "src", "(.*)")'
     should_fail: true
     # label_replace fails when there would be duplicated identical output label sets.
-  - query: 'label_replace(demo_num_cpus, "instance", "", "", "")'
-    should_fail: true
-  - query: 'label_join(demo_num_cpus, "new_label", "-", "instance", "job")'
-  - query: 'label_join(demo_num_cpus, "job", "-", "instance", "job")'
-  - query: 'label_join(demo_num_cpus, "job", "-", "instance")'
-  - query: 'label_join(demo_num_cpus, "~invalid", "-", "instance")'
+  - query: 'label_replace(kube_node_info, "instance", "", "", "")'
+  - query: 'label_join(kube_node_info, "new_label", "-", "instance", "job")'
+  - query: 'label_join(kube_node_info, "job", "-", "instance", "job")'
+  - query: 'label_join(kube_node_info, "job", "-", "instance")'
+  - query: 'label_join(kube_node_info, "~invalid", "-", "instance")'
     should_fail: true
   - query: '{{.dateFunc}}()'
     variant_args: ['dateFunc']
-  - query: '{{.dateFunc}}(demo_batch_last_success_timestamp_seconds offset {{.offset}})'
+  - query: '{{.dateFunc}}(kube_node_info offset {{.offset}})'
     variant_args: ['dateFunc', 'offset']
-  - query: '{{.instantRateFunc}}(demo_cpu_usage_seconds_total[{{.range}}])'
+  - query: '{{.instantRateFunc}}(node_cpu_seconds_total[{{.range}}])'
     variant_args: ['instantRateFunc', 'range']
   - query: '{{.clampFunc}}(node_cpu_seconds_total{mode="system", cpu="0"}, 2)'
     variant_args: ['clampFunc']
@@ -206,18 +208,20 @@ test_cases:
     variant_args: ['range']
   - query: 'vector(1.23)'
   - query: 'vector(time())'
-  - query: 'histogram_quantile({{.quantile}}, rate(demo_api_request_duration_seconds_bucket[1m]))'
+  - query: 'histogram_quantile({{.quantile}}, rate(apiserver_request_duration_seconds_bucket[1m]))'
     variant_args: ['quantile']
   - query: 'histogram_quantile(0.9, nonexistent_metric)'
+    should_fail: true
   - # Missing "le" label.
     query: 'histogram_quantile(0.9, node_cpu_seconds_total{mode="system", cpu="0"})'
   # - # Missing "le" label only in some series of the same grouping.
-  #  query: 'histogram_quantile(0.9, {__name__=~"demo_api_request_duration_seconds_.+"})'
+  #  query: 'histogram_quantile(0.9, {__name__=~"apiserver_request_duration_seconds_bucket.+"})'
   - query: 'holt_winters(node_cpu_seconds_total{mode="system", cpu="0"}[10m], {{.smoothingFactor}}, {{.trendFactor}})'
     variant_args: ['smoothingFactor', 'trendFactor']
-  - query: 'count_values("value", demo_api_request_duration_seconds_bucket)'
+  - query: 'count_values("value", apiserver_request_duration_seconds_bucket)'
   - query: 'absent(node_cpu_seconds_total{mode="system", cpu="0"})'
   - query: 'absent(nonexistent_metric_name)'
+    should_fail: true
 
   # Subqueries.
   - query: 'max_over_time((time() - max(node_cpu_seconds_total{mode="system", cpu="0"}) < 1000)[5m:10s] offset 5m)'
