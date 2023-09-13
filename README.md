@@ -1,7 +1,8 @@
 <p align="center">
   <img src="./docs/deepflow-logo.png" alt="DeepFlow" width="300" />
 
-  <p align="center">DeepFlow is an automated observability platform for cloud-native developers.</p>
+  <p align="center">Instant Observability for Cloud-Native Applications</p>
+  <p align="center">Zero Code, Full Stack, eBPF & Wasm</p>
 </p>
 <p align="center">
     <a href="https://zenodo.org/badge/latestdoi/448599559"><img src="https://zenodo.org/badge/448599559.svg" alt="DOI"></a>
@@ -16,16 +17,15 @@ English | [简体中文](./README-CN.md)
 
 # What is DeepFlow
 
-DeepFlow is a **highly automated** observability platform for cloud-native developers. Using new technologies such as **eBPF**, WASM, and OpenTelemetry, DeepFlow innovatively implements core mechanisms such as **AutoTracing**, **AutoMetrics**, **AutoTagging**, and **SmartEncoding**, which greatly avoids code instrumentation and significantly reduces the resource overhead of back-end data warehouses. With the programmability and open API of DeepFlow, developers can quickly integrate it into their own observability stack.
+The DeepFlow open-source project aims to provide deep observability for complex cloud infrastructures and cloud-native applications. DeepFlow implemented **Zero Code** data collection with eBPF for metrics, distributed tracing, request logs and function profiling, and is further intergrated with **SmartEncoding** to achieve **Full Stack** correlation and efficient access to all observability data. With DeepFlow, cloud-native applications automatically gain deep observability, removing the heavy burden of developers continually instrumenting code and providing monitoring and diagnostic capabilities covering everything from code to infrastructure for DevOps/SRE teams.
 
 # Key Features
 
-- **Any Stack**: With the **AutoMetrics** mechanism implemented by **eBPF** and cBPF, DeepFlow can automatically collect RED (Request, Error, Delay) performance metrics of any application, down to every request, covering all software technologie stacks from application to infrastructure. In cloud-native environments, the **AutoTagging** mechanism automatically discovers the attributes of services, instances and APIs, and automatically injects rich tags into each observability data, thereby eliminating data silos and releasing data drill-down capabilities.
-- **End to End**: DeepFlow innovatively implements the **AutoTracing** mechanism using **eBPF** technology. It automatically traces the distributed request of any application and infrastructure service in cloud-native environments. On this basis, by integrating and automatically correlating data from OpenTelemetry, DeepFlow implements a complete full-stack, full-path distributed tracing, eliminating all blind spots.
-- **High Performance**: The innovative **SmartEncoding** tag injection mechanism can improve the storage performance by 10 times, no more high-cardinality and sampling anxiety. DeepFlow Agent is implemented in Rust for extreme processing performance and memory safety. DeepFlow Server is implemented in Golang, and rewrites standard library map and pool for a nearly 10x performance in data query and memory GC.
-- **Programmability**: DeepFlow supports collect HTTP(S), Dubbo, MySQL, PostgreSQL, Redis, Kafka, MQTT and DNS at the moment, and will iterate to support more application protocols. In addition, DeepFlow provides a programmable interface based on WASM technology, allowing developers to add private protocols quickly, and can be used to construct business analysis capabilities for specific scenarios, such as 5GC signaling analysis, financial transaction analysis, vehicle computer communication analysis, etc.
-- **Open Interface**: DeepFlow embraces the open source community, supports a wide range of observability data sources, and uses AutoTagging and SmartEncoding to provide high-performance, unified tag injection capabilities. DeepFlow has a plugable database interface, developers can freely add and replace the most suitable database. DeepFlow provides a unified standard SQL query capability for all observability data, which is convenient for users to quickly integrate into their own observability platform.
-- **Easy to Maintain**: The core of DeepFlow only consists of two components, Agent and Server, hiding the complexity within the process and reduces the maintenance difficulty to the extreme. The DeepFlow Servers can manage Agents in multiple kubernetes clusters, legacy hosts and cloud hosts in a unified manner, and can achieve horizontal scaling and load balancing without any external components.
+- **Universal Map for Any Service**: DeepFlow provides a universal map with **Zero Code** by eBPF for production environments, including your services in any language, third-party services without code and all cloud-native infrastructure services. In addition to analyzing common protocols, Wasm plugins are supported for your private protocols. **Full Stack** golden signals of applications and infrastructures are calculated, pinpointing performance bottlenecks at ease.
+- **Distributed Tracing for Any Request**: **Zero Code** distributed tracing powered by eBPF supports applications in any language and infrastructures including gateways, service meshes, databases, message queues, DNS and NICs, leaving no blind spots. **Full Stack** network performance metrics and file I/O events are automatically collected for each Span. Distributed tracing enters a new era: Zero Instrumentation.
+- **Continuous Profiling for Any Function**: DeepFlow collects profiling data at a cost of below 1% with **Zero Code**, plots OnCPU/OffCPU function call stack flame graphs, locates **Full Stack** performance bottleneck in application, library and kernel functions, and automatically relates them to distrubuted tracing data. DeepFlow can even analyze code performance through network profiling under old version kernels (2.6+).
+- **Seamless Integration with Popular Stack**: DeepFlow can serve as storage backed for Prometheus, OpenTelemetry, SkyWalking and Pyroscope. It also provides **SQL, PromQL and OLTP** APIs to work as data source in popular observability stacks. It injects meta tags for all obervability signals including cloud resource, K8s container, K8s labels, K8s annotations, CMDB business attributes, etc., eliminating data silos.
+- **Performance 10x ClickHouse**: **SmartEncoding** injects standardized and pre-encoded meta tags into all observability data, reducing storage overhead by 10x compared to ClickHouse String or LowCard method. Custom tags and observability data are stored separately, making tags available for almost unlimited dimensions and cardinalities with uncompromised query experience like **BigTable**.
 
 # Documentation
 
@@ -46,13 +46,9 @@ Please refer to [the deployment documentation](https://deepflow.yunshan.net/docs
 
 At the same time, we have also built a complete [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github), welcome to experience it. Login account/password: deepflow/deepflow.
 
-## DeepFlow Cloud
-
-[DeepFlow Cloud](https://deepflow.yunshan.net/) is the fully-managed service of DeepFlow, currently in beta and only supports Chinese.
-
 ## DeepFlow Enterprise
 
-[DeepFlow Enterprise](https://www.yunshan.net/products/deepflow.html) supports full-stack and end-to-end monitoring of hybrid cloud, covering containers, cloud servers, hosts, and NFV gateways, currently only supports Chinese, welcome to contact us for experience.
+You can visit the [DeepFlow Enterprise Demo](https://deepflow.yunshan.net/), currently available in Chinese only.
 
 # Compile DeepFlow from Source
 
@@ -80,7 +76,8 @@ Here is our [future feature plan](https://deepflow.yunshan.net/docs/about/milest
 - Thanks [eBPF](https://ebpf.io/), a revolutionary Linux kernel technology.
 - Thanks [OpenTelemetry](https://opentelemetry.io/), provides vendor-neutral APIs to collect application telemetry data.
 
-# Landscapes
+# Honors
 
+- The paper [Network-Centric Distributed Tracing with DeepFlow: Troubleshooting Your Microservices in Zero Code](https://dl.acm.org/doi/10.1145/3603269.3604823) has been accepted by ACM SIGCOMM 2023.
 - DeepFlow enriches the <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>.
 - DeepFlow enriches the <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>.

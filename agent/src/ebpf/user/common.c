@@ -43,6 +43,8 @@
 #include "log.h"
 #include "string.h"
 
+static u64 g_sys_btime_msecs;
+
 bool is_core_kernel(void)
 {
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
@@ -382,6 +384,9 @@ uint64_t gettime(clockid_t clk_id, int flag)
  */
 u64 get_sys_btime_msecs(void)
 {
+	if (g_sys_btime_msecs > 0)
+		goto done;
+ 
 	char buff[4096];
 
 	FILE *fp = fopen("/proc/stat", "r");
@@ -396,7 +401,11 @@ u64 get_sys_btime_msecs(void)
 	fclose(fp);
 	ASSERT(sys_boot > 0);
 
-	return (sys_boot * 1000UL);
+	if (g_sys_btime_msecs == 0)
+		g_sys_btime_msecs = sys_boot * 1000UL;
+
+done:
+	return g_sys_btime_msecs;
 }
 
 /*
@@ -935,11 +944,13 @@ int exec_command(const char *cmd, const char *args)
 		return -1;
 	}
 
+#ifdef PROFILE_JAVA_DEBUG
 	/* Read and print the output */
 	char buffer[1024];
 	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
 		ebpf_info("%s", buffer);
 	}
+#endif
 
 	rc = pclose(fp);
 	if (-1 == rc) {
