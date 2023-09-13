@@ -2059,7 +2059,7 @@ TRUNCATE TABLE ch_pod;
 CREATE TABLE IF NOT EXISTS ch_device (
     devicetype              INTEGER NOT NULL,
     deviceid                INTEGER NOT NULL,
-    name                    VARCHAR(256),
+    name                    TEXT,
     uid                     CHAR(64),
     icon_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
