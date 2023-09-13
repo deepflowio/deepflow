@@ -44,7 +44,7 @@ func (ChVPC) TableName() string {
 type ChDevice struct {
 	DeviceType int    `gorm:"primaryKey;column:devicetype;type:int;not null" json:"DEVICETYPE"`
 	DeviceID   int    `gorm:"primaryKey;column:deviceid;type:int;not null" json:"DEVICEID"`
-	Name       string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	Name       string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID     int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	UID        string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
 }
