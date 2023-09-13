@@ -1473,5 +1473,22 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 		return false
 	}
 
+	if len(r.gatewayHostIDToVifs) != len(o.gatewayHostIDToVifs) {
+		log.Info("platform gateway host vinterface changed")
+		return false
+	} else {
+		for id, vif := range r.gatewayHostIDToVifs {
+			if ovif, ok := o.gatewayHostIDToVifs[id]; ok {
+				if !vif.Equal(ovif) {
+					log.Info("platform gateway host vinterface changed")
+					return false
+				}
+			} else {
+				log.Info("platform gateway host vinterface changed")
+				return false
+			}
+		}
+	}
+
 	return true
 }
