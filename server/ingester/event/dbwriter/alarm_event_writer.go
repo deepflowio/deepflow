@@ -60,7 +60,7 @@ type AlarmEventStore struct {
 	PolicyTargetField       string
 	PolicyEndpoints         string
 	TriggerCondition        string
-	TriggerValue            int64
+	TriggerValue            float64
 	ValueUnit               string
 	EventLevel              uint32
 	AlarmTarget             string
@@ -92,7 +92,7 @@ func AlarmEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("policy_target_field", ckdb.String),
 		ckdb.NewColumn("policy_endpoints", ckdb.LowCardinalityString),
 		ckdb.NewColumn("trigger_condition", ckdb.String),
-		ckdb.NewColumn("trigger_value", ckdb.Int64),
+		ckdb.NewColumn("trigger_value", ckdb.Float64),
 		ckdb.NewColumn("value_unit", ckdb.LowCardinalityString),
 		ckdb.NewColumn("event_level", ckdb.UInt32),
 		ckdb.NewColumn("alarm_target", ckdb.LowCardinalityString),

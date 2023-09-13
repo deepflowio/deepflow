@@ -21,7 +21,7 @@ message AlarmEvent {
     optional string policy_target_field = 14;
     optional string policy_endpoints = 15;
     optional string trigger_condition = 16; 
-    optional int64 trigger_value = 17; 
+    optional double trigger_value = 17;
     optional string value_unit = 18; 
     optional uint32 event_level = 19;
     optional string alarm_target = 20;
