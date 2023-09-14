@@ -479,8 +479,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		stack_trace_msg_kv_t kv;
 		char name[TASK_COMM_LEN];
 		u64 stime, netns_id;
+		void *info_p = NULL;
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
-					(char *)name);
+					(char *)name, &info_p);
 		char *process_name = NULL;
 		bool matched = false;
 
@@ -523,7 +524,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-						    stack_str_hash, matched);
+						    stack_str_hash, matched, info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string

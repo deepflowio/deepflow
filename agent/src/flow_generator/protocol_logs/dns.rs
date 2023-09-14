@@ -155,7 +155,9 @@ impl L7ProtocolParserInterface for DnsLog {
             return false;
         }
         let mut info = DnsInfo::default();
-        self.parse(payload, &mut info, param).is_ok() && info.msg_type == LogMessageType::Request
+        self.parse(payload, &mut info, param).is_ok()
+            && info.msg_type == LogMessageType::Request
+            && !info.query_name.is_empty()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

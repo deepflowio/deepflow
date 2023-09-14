@@ -124,7 +124,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 
 func (ln *target) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusTarget
-	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
+	err = mysql.Db.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err)
 		return nil, err

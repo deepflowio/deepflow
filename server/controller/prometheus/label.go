@@ -110,12 +110,9 @@ func (s *LabelSynchronizer) generateDataToEncode(req *trident.PrometheusLabelReq
 	toEncode := newDataToEncode()
 	for _, m := range req.GetRequestLabels() {
 		mn := m.GetMetricName()
-		if mn == "" {
-			continue
-		}
-		targetKey, targetID, ok := s.getTargetInfoFromLabels(m.GetLabels())
 		toEncode.tryAppendMetricName(mn)
-		if ok {
+		targetKey, targetID, targetExists := s.getTargetInfoFromLabels(m.GetLabels())
+		if targetExists {
 			toEncode.tryAppendMetricTarget(mn, targetID)
 		} else {
 			toEncode.appendMetricTarget(mn, targetKey)
@@ -123,9 +120,6 @@ func (s *LabelSynchronizer) generateDataToEncode(req *trident.PrometheusLabelReq
 
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
-			if ln == "" {
-				continue
-			}
 			lv := l.GetValue()
 			toEncode.tryAppendLabelName(ln)
 			toEncode.tryAppendLabelValue(lv)
@@ -134,7 +128,7 @@ func (s *LabelSynchronizer) generateDataToEncode(req *trident.PrometheusLabelReq
 			if ln == TargetLabelInstance || ln == TargetLabelJob {
 				continue
 			}
-			if ok {
+			if targetExists {
 				toEncode.tryAppendMetricAPPLabelLayout(mn, ln)
 			} else {
 				toEncode.appendMetricAPPLabelLayout(mn, ln)
@@ -241,15 +235,19 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 
 func (s *LabelSynchronizer) getTargetInfoFromLabels(labels []*trident.LabelRequest) (cache.TargetKey, int, bool) {
 	var instanceValue string
+	var insGetted bool
 	var jobValue string
+	var jobGetted bool
 	for _, l := range labels {
 		ln := l.GetName()
 		if ln == TargetLabelInstance {
 			instanceValue = l.GetValue()
+			insGetted = true
 		} else if ln == TargetLabelJob {
 			jobValue = l.GetValue()
+			jobGetted = true
 		}
-		if instanceValue != "" && jobValue != "" {
+		if insGetted && jobGetted {
 			break
 		}
 	}

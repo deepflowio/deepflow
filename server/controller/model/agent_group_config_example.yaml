@@ -1058,7 +1058,8 @@ vtap_group_id: g-xxxxxx
       ##   take ten minutes.
       #golang-symbol: ""
 
-      ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection.
+      ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection
+      ##   and auto-tracing. go auto-tracing also dependent go-tracing-timeout.
       ##   The default value is "", which means it is disabled for all Golang processes.
       #golang: ""
 

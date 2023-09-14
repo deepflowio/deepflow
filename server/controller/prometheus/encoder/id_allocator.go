@@ -55,11 +55,11 @@ func newIDAllocator(resourceType string, min, max int) idAllocator {
 
 func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) == 0 {
-		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ia.resourceType))
+		return nil, errors.New(fmt.Sprintf("%s has no more usable ids, usable ids count: 0", ia.resourceType))
 	}
 
 	if len(ia.usableIDs) < count {
-		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ia.resourceType))
+		return nil, errors.New(fmt.Sprintf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count))
 	}
 
 	ids = make([]int, count)
@@ -70,7 +70,7 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 		return
 	}
 	if len(inUseIDs) != 0 {
-		return nil, errors.New(fmt.Sprintf("%s some ids are in use", ia.resourceType))
+		return nil, errors.New(fmt.Sprintf("%s ids: %v are in use", ia.resourceType, inUseIDs))
 	}
 
 	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids))

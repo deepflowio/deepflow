@@ -4,8 +4,8 @@ ingester:
     export-datas: [cbpf-net-span]
     export-data-types: [service_info]
     export-custom-k8s-labels-regexp:
-    otlp-exporter:
-      enabled: true
+    otlp-exporters:
+    - enabled: true
       addr: 127.0.0.1:4317
       queue-count: 4
       queue-size: 100000

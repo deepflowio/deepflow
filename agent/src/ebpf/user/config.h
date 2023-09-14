@@ -151,4 +151,20 @@ enum {
  */
 #define PROC_INFO_VERIFY_TIME  60 // 60 seconds
 
+/*
+ * This value is used to determine which type of Java agent's so library to
+ * attach JVM (GNU or musl libc agent.so).
+ */
+#define JAVA_AGENT_LIBS_TEST_FUN_RET_VAL 3302
+
+/*
+ * Java symbol table update delay time.
+ * When an unknown Frame is encountered during the symbolization process of
+ * the Java process, it will be delayed for a fixed time (if the unknown f-
+ * rame is encountered again during this period, it will be ignored) to up-
+ * date the Java symbol table. This is done The purpose is to avoid freque-
+ * nt updates of the java symbol table.
+ */
+#define JAVA_SYMS_TABLE_UPDATE_PERIOD 300 // 300 seconds
+
 #endif /* DF_EBPF_CONFIG_H */
