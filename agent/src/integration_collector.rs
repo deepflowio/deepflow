@@ -355,6 +355,7 @@ fn fill_tagged_flow(
     let mut l7_protocol = L7Protocol::Other;
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
+    let (mut l2_end_0, mut l2_end_1) = (false, false);
 
     let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow.signal_source = SignalSource::OTel;
@@ -364,8 +365,10 @@ fn fill_tagged_flow(
     tagged_flow.flow.eth_type = eth_type;
     tagged_flow.flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
     if tagged_flow.flow.tap_side == TapSide::ClientApp {
+        l2_end_0 = true;
         ip0 = ip;
     } else {
+        l2_end_1 = true;
         ip1 = ip;
     }
     for attr in &span.attributes {
@@ -503,6 +506,8 @@ fn fill_tagged_flow(
     let mut lookup_key = LookupKey {
         src_ip: tagged_flow.flow.flow_key.ip_src,
         dst_ip: tagged_flow.flow.flow_key.ip_dst,
+        l2_end_0,
+        l2_end_1,
         ..Default::default()
     };
     let (endpoint, _) = policy_getter
