@@ -244,6 +244,7 @@ impl NpbBandwidthWatcher {
 
     pub fn set_npb_rate(&self, threshold: u64) {
         self.watcher.npb_bps_threshold.store(threshold, Relaxed);
+        self.watcher.npb_leaky_bucket.set_rate(Some(threshold));
     }
 
     pub fn set_nic_rate(&self, mut threshold: u64) {
