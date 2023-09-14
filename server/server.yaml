@@ -435,6 +435,9 @@ ingester:
   ## profile process database data retention time(unit: hour)
   #profile-ttl-hour: 72
 
+  ## profile compression algorithm, default is zstd, empty string for not compress
+  #profile-compression-algorithm: "zstd"
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 

@@ -79,6 +79,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
+			*config.CompressionAlgorithm,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			profileWriter,
