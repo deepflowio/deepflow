@@ -28,6 +28,7 @@ import (
 
 	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
+	l7_tracing "github.com/deepflowio/deepflow/server/querier/l7_tracing/config"
 	profile "github.com/deepflowio/deepflow/server/querier/profile/config"
 )
 
@@ -42,8 +43,9 @@ type QuerierConfig struct {
 	LogFile                         string                        `default:"/var/log/querier.log" yaml:"log-file"`
 	LogLevel                        string                        `default:"info" yaml:"log-level"`
 	ListenPort                      int                           `default:"20416" yaml:"listen-port"`
-	Clickhouse                      Clickhouse                    `yaml:clickhouse`
-	Profile                         profile.ProfileConfig         `yaml:profile`
+	Clickhouse                      Clickhouse                    `yaml:"clickhouse"`
+	Profile                         profile.ProfileConfig         `yaml:"profile"`
+	L7Tracing                       l7_tracing.L7TracingConfig    `yaml:"l7_tracing"`
 	DeepflowApp                     DeepflowApp                   `yaml:"deepflow-app"`
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`

@@ -252,11 +252,20 @@ querier:
   # profile相关配置
   profile:
     flame_query_limit: 1000000
-
-  # deepflow-app相关配置
-  deepflow-app:
-    host: deepflow-app
-    port: 20418
+  
+  # l7_tracing相关配置
+  l7_tracing:
+    log-file: /var/log/deepflow/l7_tracing.log
+    log-level: info
+    listen-port: 20418
+    http_request_timeout: 600
+    http_response_timeout: 600
+    
+    spec:
+      l7_tracing_limit: 100
+      network_delay_us: 1000000
+      allow_multiple_trace_ids_in_tracing_result: false
+      call_apm_api_to_supplement_trace: false
 
   otel-endpoint: http://deepflow-agent/api/v1/otel/trace
   limit: 10000
