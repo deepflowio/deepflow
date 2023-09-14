@@ -488,13 +488,12 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		if (p->is_java) {
-			/* Delete Java files '/tmp/perf-<pid>.<map|log>' */
+			/* Delete target ns Java files */
 			int pid = (int)kv->k.pid;
-			char path[MAX_PATH_LENGTH];
-			snprintf(path, sizeof(path), "/tmp/perf-%d.map", pid);
-			clear_target_ns_tmp_file(path);
-			snprintf(path, sizeof(path), "/tmp/perf-%d.log", pid);
-			clear_target_ns_tmp_file(path);
+			int target_ns_pid = get_nspid(pid);
+			if (target_ns_pid > 0) {
+				clear_target_ns(pid, target_ns_pid);
+			}
 		}
 
 		clib_mem_free((void *)p);
@@ -513,9 +512,27 @@ static inline void symbol_cache_pids_unlock(void)
 	__atomic_clear(cache_del_pids.lock, __ATOMIC_RELEASE);
 }
 
+static inline bool pid_is_already_existed(int pid)
+{
+	/*
+	 * Make sure that there are no duplicate items of 'pid' in
+	 * 'cache del pids.pid caches', so as to avoid program crashes
+	 * caused by repeated release of occupied memory resources.
+	 */
+	struct symbolizer_cache_kvp *kv_tmp;
+	vec_foreach(kv_tmp, cache_del_pids.pid_caches) {
+		if ((int)kv_tmp->k.pid == pid) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /*
  * When a process exits, synchronize and update its corresponding
- * symbol cache.
+ * symbol cache. In addition, updating the Java process symbol t-
+ * able also requires calling this interface.
  *
  * @pid : The process ID (PID) that occurs when a process exits.
  */
@@ -535,17 +552,9 @@ void update_symbol_cache(pid_t pid)
 		int ret = VEC_OK;
 
 		symbol_cache_pids_lock();
-		/*
-		 * Make sure that there are no duplicate items of 'pid' in
-		 * 'cache del pids.pid caches', so as to avoid program crashes
-		 * caused by repeated release of occupied memory resources.
-		 */
-		struct symbolizer_cache_kvp *kv_tmp;
-		vec_foreach(kv_tmp, cache_del_pids.pid_caches) {
-			if (kv_tmp->k.pid == kv.k.pid) {
-				symbol_cache_pids_unlock();
-				return;
-			}
+		if (pid_is_already_existed((int)kv.k.pid)) {
+			symbol_cache_pids_unlock();
+			return;
 		}
 
 		vec_add1(cache_del_pids.pid_caches, kv, ret);
@@ -645,11 +654,20 @@ static void java_proc_info_config(struct symbolizer_proc_info *p, int pid)
 	}
 }
 
-void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
+static struct bcc_symbol_option lazy_opt = {
+	.use_debug_file = false,
+	.check_debug_file_crc = false,
+	.lazy_symbolize = true,
+	.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
+};
+
+void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
+			     void **ptr)
 {
 	ASSERT(pid >= 0 && stime != NULL && netns_id != NULL && name != NULL);
 
 	*stime = *netns_id = 0;
+	*ptr = NULL;
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
@@ -661,7 +679,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
-	struct symbolizer_proc_info *p;
+	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) != 0) {
 		p = clib_mem_alloc_aligned("sym_proc_info",
@@ -674,6 +692,8 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 			return;
 		}
 
+		memset(p, 0, sizeof(*p));
+		p->unknown_syms_found = false;
 		p->netns_id = get_netns_id_from_pid(pid);
 		if (p->netns_id == 0) {
 			clib_mem_free(p);
@@ -704,9 +724,52 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 			__sync_fetch_and_add(&h->hash_elems_count, 1);
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		if (!p->verified
-		    && ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
-			PROC_INFO_VERIFY_TIME)) {
+		u64 curr_time = current_sys_time_secs();
+		if (p->verified) {
+			/*
+			 * If an unknown frame appears during the process of symbolizing
+			 * the address of the Java process, we need to re-obtain the sy-
+			 * mbols table of the Java process after a delay.
+			 */
+			if (p->is_java && p->unknown_syms_found
+			    && p->update_syms_table_time == 0) {
+				p->update_syms_table_time =
+				    curr_time + JAVA_SYMS_TABLE_UPDATE_PERIOD;
+			}
+
+			if (p->update_syms_table_time > 0
+			    && curr_time >= p->update_syms_table_time) {
+				/* Update java symbols table, will be executed during
+				 * the next Java symbolication */
+				gen_java_symbols_file(pid);
+				if (kv.v.cache) {
+					bcc_free_symcache((void *)kv.v.cache,
+							  kv.k.pid);
+					kv.v.cache =
+					    pointer_to_uword(bcc_symcache_new
+							     ((int)kv.k.pid,
+							      &lazy_opt));
+					if (symbol_caches_hash_add_del
+					    (h, (symbol_caches_hash_kv *) & kv,
+					     1 /* is_add */ )) {
+						ebpf_warning
+						    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+						     (int)kv.k.pid);
+					}
+				}
+
+				p->unknown_syms_found = false;
+				p->update_syms_table_time = 0;
+				ebpf_info
+				    ("Update java symbols table, (Pid %d)\n",
+				     (int)kv.k.pid);
+			}
+		} else {
+			if (((curr_time - (p->stime / 1000ULL)) <
+			     PROC_INFO_VERIFY_TIME)) {
+				goto fetch_proc_info;
+			}
+
 			/*
 			 * To prevent the possibility of the process name being changed
 			 * shortly after the program's initial startup, as a precaution,
@@ -714,10 +777,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 			 * for a period of time to avoid such situations.
 			 */
 			char comm[sizeof(p->comm)];
-			u64 stime =
-				(u64)get_process_starttime_and_comm(pid,
-								    comm,
-								    sizeof(comm));
+			u64 stime = (u64)
+			    get_process_starttime_and_comm(pid,
+							   comm,
+							   sizeof(comm));
 			if (stime == 0) {
 				/* 
 				 * Here, indicate that during the symbolization process,
@@ -748,12 +811,14 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name)
 
 			p->verified = true;
 		}
+
 	}
 
 fetch_proc_info:
 	copy_process_name(&kv, name);
 	*stime = cache_process_stime(&kv);
 	*netns_id = cache_process_netns_id(&kv);
+	*ptr = p;
 }
 
 /*
@@ -770,13 +835,6 @@ fetch_proc_info:
 void *get_symbol_cache(pid_t pid, bool new_cache)
 {
 	ASSERT(pid >= 0);
-
-	static struct bcc_symbol_option lazy_opt = {
-		.use_debug_file = false,
-		.check_debug_file_crc = false,
-		.lazy_symbolize = true,
-		.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
-	};
 
 	if (k_resolver == NULL && pid == 0) {
 		k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
@@ -850,6 +908,8 @@ int create_and_init_symbolizer_caches(void)
 				return ETR_NOMEM;
 			}
 
+			memset(p, 0, sizeof(*p));
+			p->unknown_syms_found = false;
 			p->netns_id = get_netns_id_from_pid(pid);
 			if (p->netns_id == 0) {
 				clib_mem_free(p);
@@ -857,7 +917,8 @@ int create_and_init_symbolizer_caches(void)
 			}
 
 			p->stime =
-			    (u64) get_process_starttime_and_comm(pid, p->comm,
+			    (u64) get_process_starttime_and_comm(pid,
+								 p->comm,
 								 sizeof
 								 (p->comm));
 			p->comm[sizeof(p->comm) - 1] = '\0';
@@ -878,8 +939,8 @@ int create_and_init_symbolizer_caches(void)
 			} else {
 				ebpf_debug
 				    ("Process '%s'(pid %d start time %lu) has been"
-				     " brought under management.\n", p->comm,
-				     pid, p->stime);
+				     " brought under management.\n",
+				     p->comm, pid, p->stime);
 				__sync_fetch_and_add(&h->hash_elems_count, 1);
 			}
 		}
@@ -908,7 +969,8 @@ void release_symbol_caches(void)
 	ebpf_info("Release symbol_caches %lu elements\n", h->hash_elems_count);
 
 	symbol_cache_pids_lock();
-	symbol_caches_hash_foreach_key_value_pair(h, free_symbolizer_kvp_cb,
+	symbol_caches_hash_foreach_key_value_pair(h,
+						  free_symbolizer_kvp_cb,
 						  (void *)&elems_count);
 	print_hash_symbol_caches(h);
 	symbol_caches_hash_free(h);

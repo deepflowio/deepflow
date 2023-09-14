@@ -62,6 +62,11 @@ struct symbolizer_proc_info {
 	bool verified;
 	/* To mark whether it is a Java process? */
 	bool is_java;
+	/* Unknown symbols was found, and it is currently mainly used to
+	 * obtain the match of the Java process.*/
+	bool unknown_syms_found;
+	/* Expiration time (in seconds) for updating the Java symbol table */
+	u64 update_syms_table_time;
 	/* process name */
 	char comm[TASK_COMM_LEN];
 };
@@ -166,7 +171,8 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid);
 uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
-void get_process_info_by_pid(pid_t pid, u64 *stime, u64 *netns_id, char *name);
+void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
+			     void **ptr);
 #ifndef AARCH64_MUSL
 void *get_symbol_cache(pid_t pid, bool new_cache);
 int create_and_init_symbolizer_caches(void);

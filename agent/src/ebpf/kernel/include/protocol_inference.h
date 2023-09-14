@@ -896,12 +896,13 @@ static __inline enum message_type infer_dns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
+	bool update_tcp_dns_prev_count = false;
 	struct dns_header *dns = (struct dns_header *)buf;
 	if (conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 		if (__bpf_ntohs(dns->id) + 2 == count) {
 			dns = (void *)dns + 2;
 		} else {
-			conn_info->prev_count = 2;
+			update_tcp_dns_prev_count = true;
 		}
 	}
 
@@ -941,7 +942,12 @@ static __inline enum message_type infer_dns_message(const char *buf,
 			break;
 		}
 	}
-
+	// coreDNS will first send the length in two bytes. If it recognizes
+	// that it is TCP DNS and does not have a length field, it will modify
+	// the offset to correct the TCP sequence number.
+	if (update_tcp_dns_prev_count) {
+		conn_info->prev_count = 2;
+	}
 	return (qr == 0) ? MSG_REQUEST : MSG_RESPONSE;
 }
 
