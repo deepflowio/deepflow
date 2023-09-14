@@ -604,6 +604,7 @@ func (p *PlatformDataOP) generatePodIPS() {
 				EpcId:        proto.Uint32(uint32(pod.VPCID)),
 				Ip:           proto.String(ips[0].GetIp()),
 				PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
+				ContainerIds: strings.Split(pod.ContainerIDs, ", "),
 			}
 			podIPs = append(podIPs, data)
 			return true
