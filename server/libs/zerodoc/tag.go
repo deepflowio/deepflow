@@ -956,7 +956,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4).SetComment("IPv4地址"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6).SetComment("IPV6地址"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax).SetComment("是否IPV4地址. 0: 否, ip6字段有效, 1: 是, ip4字段有效"))
-		columns = append(columns, ckdb.NewColumn("tag_source", ckdb.UInt8).SetComment("tag来源"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_source", ckdb.UInt8).SetComment("tag来源"))
 	}
 	if code&IPPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_0", ckdb.IPv4))
@@ -964,8 +964,8 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_0", ckdb.IPv6))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_1", ckdb.IPv6))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax))
-		columns = append(columns, ckdb.NewColumn("tag_source_0", ckdb.UInt8).SetComment("ip_0对应的tag来源"))
-		columns = append(columns, ckdb.NewColumn("tag_source_1", ckdb.UInt8).SetComment("ip_1对应的tag来源"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_source_0", ckdb.UInt8).SetComment("ip_0对应的tag来源"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_source_1", ckdb.UInt8).SetComment("ip_1对应的tag来源"))
 	}
 
 	if code&IsKeyService != 0 {
