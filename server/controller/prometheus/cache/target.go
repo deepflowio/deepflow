@@ -207,11 +207,11 @@ func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
 }
 
 func (t *target) load() (recorderTargets, selfTargets []*mysql.PrometheusTarget, err error) {
-	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
+	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Order("id ASC").Find(&recorderTargets).Error
 	if err != nil {
 		return
 	}
-	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
+	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Order("id ASC").Find(&selfTargets).Error
 	return
 }
 
