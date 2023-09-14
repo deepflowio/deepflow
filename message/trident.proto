@@ -468,6 +468,7 @@ message PodIp {
     optional uint32 epc_id = 3;
     optional string ip = 4;
     optional uint32 pod_cluster_id = 5;
+    repeated string container_ids = 6;
 }
 
 message VtapIp {
