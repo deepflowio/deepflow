@@ -35,7 +35,7 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230906040243-dcfa4360cf64
+	github.com/deepflowio/deepflow/message v0.0.0-20230915074606-4ef3a83065dc
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
@@ -56,7 +56,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/pebbe/zmq4 v1.2.9
 	github.com/pkg/errors v0.9.1
