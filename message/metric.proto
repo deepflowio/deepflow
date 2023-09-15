@@ -220,6 +220,7 @@ message Profile {
     uint32 cpu = 29;
     uint32 count = 30;
     uint64 netns_id = 31;
+    bytes container_id = 32;
 }
 
 enum IoOperation {
