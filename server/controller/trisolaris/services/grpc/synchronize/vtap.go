@@ -196,6 +196,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 
 		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
+
 	}
 
 	if configure.GetProxyControllerIp() == "" {

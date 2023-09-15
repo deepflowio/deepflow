@@ -24,6 +24,9 @@ controller:
   #listen-node-port: 30417
   ## grpc server port
   #grpc-port: 20035
+  #ssl-grpc-port: 20135
+  #agent_ssl_cert_file: /etc/ssl/server.key
+  #agent_ssl_key_file: /etc/ssl/server.pem
   #ingester-port: 20033
   #grpc-node-port: 30035
   # grpc max message lenth default 100M
