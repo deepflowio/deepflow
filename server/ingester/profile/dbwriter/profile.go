@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/google/gopacket/layers"
 	"github.com/pyroscope-io/pyroscope/pkg/storage"
 )
@@ -263,6 +264,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
 	vtapID uint16,
 	netNsID uint64,
+	containerID string,
 	profileName string,
 	eventType string,
 	location string,
@@ -278,6 +280,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.Time = uint32(input.StartTime.Unix())
 	p._id = genID(uint32(input.StartTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
 	p.VtapID = vtapID
+	p.NetnsID = uint32(netNsID)
 	p.AppService = profileName
 	p.ProfileLocationStr = location
 	p.CompressionAlgo = compressionAlgo
@@ -298,7 +301,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
-	p.fillResource(uint32(vtapID), netNsID, platformData)
+	p.fillResource(uint32(vtapID), containerID, platformData)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -306,22 +309,42 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func (p *InProcessProfile) fillResource(vtapID uint32, netNsID uint64, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
+	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
 		p.L3EpcID = vtapInfo.EpcId
 		p.PodClusterID = uint16(vtapInfo.PodClusterId)
+		vtapIP := net.ParseIP(vtapInfo.Ip)
+		// get vtap platformInfo, incase can not find Pod by container (maybe containerID is empty)
+		if vtapIP != nil {
+			if ip4 := vtapIP.To4(); ip4 != nil {
+				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, utils.IpToUint32(ip4))
+			} else {
+				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, vtapIP)
+			}
+		}
 	}
 
 	var info *grpc.Info
 	if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 		// ebpf profile will submit netns from agent
-		if netNsID != 0 {
-			info = platformData.QueryNetnsIdInfo(vtapID, uint32(netNsID))
-			p.NetnsID = uint32(netNsID)
+		// 1. try to find platform info by netnsid
+		if p.NetnsID != 0 {
+			info = platformData.QueryNetnsIdInfo(vtapID, p.NetnsID)
 		}
-	} else {
-		// app profile will submit IP from agent
+		// 2. if find nothing, try to find platform info by containerid
+		if info == nil {
+			p.fillPodInfo(vtapID, containerID, platformData)
+			info = platformData.QueryEpcIDPodInfo(p.L3EpcID, p.PodID)
+		}
+	}
+
+	// 3. try to fix platform info by IP
+	if info == nil {
+		// app profile: submit IP from agent
+		// ebpf profile: submit netns from agent, info != nil
+		// ebpf profile with hostnetwork: when PodID get nil infos, try to get info from PodNodeID
 		if p.IsIPv4 {
 			info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
 		} else {
@@ -334,7 +357,9 @@ func (p *InProcessProfile) fillResource(vtapID uint32, netNsID uint64, platformD
 		p.AZID = uint16(info.AZID)
 		p.SubnetID = uint16(info.SubnetID)
 		p.HostID = uint16(info.HostID)
-		p.PodID = info.PodID
+		if p.PodID == 0 {
+			p.PodID = info.PodID
+		}
 		p.PodNodeID = info.PodNodeID
 		p.PodNSID = uint16(info.PodNSID)
 		if p.PodClusterID == 0 {
@@ -344,6 +369,50 @@ func (p *InProcessProfile) fillResource(vtapID uint32, netNsID uint64, platformD
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
 		p.ServiceID = platformData.QueryService(p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
+	}
+
+	// fix up when all resource match failed
+	if vtapPlatformInfo != nil {
+		p.fillInfraInfo(vtapPlatformInfo)
+	}
+}
+
+func (p *InProcessProfile) fillPodInfo(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
+	if containerID == "" {
+		return
+	}
+	podInfo := platformData.QueryPodContainerInfo(vtapID, containerID)
+	if podInfo != nil {
+		p.PodID = podInfo.PodId
+		// when using containerID to get pod, it means pod maybe `hostNetwork` and PodIP equals NodeIP
+		ip := net.ParseIP(podInfo.Ip)
+		if ip != nil {
+			if ip4 := ip.To4(); ip4 != nil {
+				p.IsIPv4 = true
+				p.IP4 = utils.IpToUint32(ip4)
+			} else {
+				p.IP6 = ip
+			}
+		}
+	}
+}
+
+func (p *InProcessProfile) fillInfraInfo(vtapPlatformInfo *grpc.Info) {
+	// when all resource match failed, still confirm pod is run on vtap node
+	if p.RegionID == 0 {
+		p.RegionID = uint16(vtapPlatformInfo.RegionID)
+	}
+	if p.AZID == 0 {
+		p.AZID = uint16(vtapPlatformInfo.AZID)
+	}
+	if p.SubnetID == 0 {
+		p.SubnetID = uint16(vtapPlatformInfo.SubnetID)
+	}
+	if p.HostID == 0 {
+		p.HostID = uint16(vtapPlatformInfo.HostID)
+	}
+	if p.PodNodeID == 0 {
+		p.PodNodeID = vtapPlatformInfo.PodNodeID
 	}
 }
 

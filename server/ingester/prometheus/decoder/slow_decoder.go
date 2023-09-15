@@ -282,6 +282,12 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, vtapId u
 			addLabel(labelReq, l.Name, l.Value)
 		}
 	}
+	if job == "" {
+		addLabel(labelReq, model.JobLabel, "")
+	}
+	if instance == "" {
+		addLabel(labelReq, model.InstanceLabel, "")
+	}
 
 	instanceId, hasInstanceId := d.labelTable.QueryLabelValueID(instance)
 	if !hasInstanceId {

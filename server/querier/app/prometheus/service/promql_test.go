@@ -19,6 +19,7 @@ package service
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 
@@ -60,7 +61,7 @@ func TestParseMatchersParam(t *testing.T) {
 }
 
 func TestParsePromQL(t *testing.T) {
-	executor := NewPrometheusExecutor()
+	executor := NewPrometheusExecutor(5 * time.Minute)
 	Convey("TestCase_ParsePromQL_Success_1", t, func() {
 		res, err := executor.parsePromQL("max(kube_pod_info{job=\"kube-state-metrics\"} * on(node, cluster) group_left(role) kube_node_role{job=\"kube-state-metrics\", role=\"master\"} or on(pod, namespace, cluster) kube_pod_info{job=\"kube-state-metrics\"}) by (node, namespace, host_ip, role, pod, cluster)")
 		So(err, ShouldBeNil)

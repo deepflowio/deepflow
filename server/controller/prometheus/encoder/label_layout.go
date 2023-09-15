@@ -117,6 +117,9 @@ func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 }
 
 func (ia *indexAllocator) release(ids []int) error {
+	ia.lock.Lock()
+	defer ia.lock.Unlock()
+
 	err := mysql.Db.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Delete(&mysql.PrometheusMetricAPPLabelLayout{}).Error
 	if err != nil {
 		return err
@@ -195,7 +198,9 @@ func (ll *labelLayout) createIndexAllocatorIfNotExists(metricName string) (*inde
 	if allocator, ok := ll.metricNameToIdxAllocator[metricName]; ok {
 		return allocator, nil
 	}
-	ll.metricNameToIdxAllocator[metricName] = newIndexAllocator(metricName, ll.appLabelIndexMax)
+	ia := newIndexAllocator(metricName, ll.appLabelIndexMax)
+	ia.refresh(make(map[string]int))
+	ll.metricNameToIdxAllocator[metricName] = ia
 	return ll.metricNameToIdxAllocator[metricName], nil
 }
 
