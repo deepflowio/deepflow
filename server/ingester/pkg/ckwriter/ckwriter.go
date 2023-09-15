@@ -254,9 +254,9 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 func (w *CKWriter) ResetConnection(connID int) error {
 	var err error
+	// FIXME: do reset actually
 	if !IsNil(w.conns[connID]) {
-		w.conns[connID].Close()
-		w.conns[connID] = nil
+		return nil
 	}
 	w.conns[connID], err = clickhouse.Open(&clickhouse.Options{
 		Addr: []string{w.addrs[connID]},
