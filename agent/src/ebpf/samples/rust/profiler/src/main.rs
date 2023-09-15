@@ -69,6 +69,14 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
     }
 }
 
+#[allow(dead_code)]
+fn cp_container_id_safe(cp: *mut stack_profile_data) -> String {
+    unsafe {
+        let v = &(*cp).container_id;
+        String::from_utf8_lossy(v).to_string()
+    }
+}
+
 fn increment_counter(num: u32, counter_type: u32) {
     if counter_type == 0 {
         let mut counter = COUNTER.lock().unwrap();
@@ -88,7 +96,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         increment_counter(1, 0);
         //let data = sk_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
-        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} PROCESS_NAME {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} PROCESS_NAME {} COMM {} CONTAINER {} CPU {} COUNT {} LEN {} \n  - {}",
         //         date_time((*cp).timestamp),
         //         (*cp).pid,
         //         (*cp).stime,
@@ -97,6 +105,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
         //         (*cp).k_stack_id,
         //         cp_process_name_safe(cp),
         //         cp_comm_safe(cp),
+        //         cp_container_id_safe(cp),
         //         (*cp).cpu,
         //         (*cp).count,
         //         (*cp).stack_data_len, data);

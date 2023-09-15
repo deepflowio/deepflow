@@ -69,6 +69,8 @@ struct symbolizer_proc_info {
 	u64 update_syms_table_time;
 	/* process name */
 	char comm[TASK_COMM_LEN];
+	/* container id */
+	char container_id[CONTAINER_ID_SIZE];
 };
 
 struct symbolizer_cache_kvp {
