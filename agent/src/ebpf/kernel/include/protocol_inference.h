@@ -740,6 +740,18 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	return infer_pgsql_query_message(infer_buf, buf, count);
 }
 
+static __inline bool sofarpc_check_character(__u8 val)
+{
+	// 0 - 9, a - z, A - Z, '.' '_' '-' '*'
+	if ((val >= 48 && val <= 57) || (val >= 65 && val <= 90)
+	    || (val >= 97 && val <= 122) || val == '.' || val == '_'
+	    || val == '-' || val == '*') {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * Request command protocol for v1
  * 0     1     2           4           6           8          10           12          14         16
@@ -766,6 +778,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
  * +-----------------------------------------------------------------------------------------------+
  *
  * ref: https://github.com/sofastack/sofa-bolt/blob/42e4e3d756b7655c0d4a058989c66d9eb09591fa/plugins/wireshark/bolt.lua
+ *      https://www.cnblogs.com/throwable/p/15113352.html
  */
 static __inline enum message_type infer_sofarpc_message(const char *buf,
 							size_t count,
@@ -784,7 +797,7 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	static const __u8 codec_protobuf = 11;
 	static const __u8 codec_json = 12;
 
-	if (count < 20 || !is_protocol_enabled(PROTO_SOFARPC))
+	if (count < bolt_resp_header_len || !is_protocol_enabled(PROTO_SOFARPC))
 		return MSG_UNKNOWN;
 
 	const __u8 *infer_buf = (const __u8 *)buf;
@@ -806,34 +819,56 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	      && (type == type_req || type == type_resp)
 	      && (cmdcode == cmd_code_req || cmdcode == cmd_code_resp)
 	      && (codec == codec_hessian || codec == codec_hessian2
-		  || codec == codec_protobuf || codec == codec_json)))
+		  || codec == codec_protobuf || codec == codec_json))) {
 		return MSG_UNKNOWN;
-
+	}
 	// length of request or response class name
 	// length of header
-	__u16 class_len, header_len;
+	short class_len, header_len;
+	int content_len;
 
 	// bolt_ver_v1
 	if (type == type_req) {
-		class_len = __bpf_ntohs(*(__u16 *) & infer_buf[14]);
-		header_len = __bpf_ntohs(*(__u16 *) & infer_buf[16]);
-		if ((bolt_req_header_len + class_len + header_len) > count)
+		class_len = (short)__bpf_ntohs(*(__u16 *) & infer_buf[14]);
+		header_len = (short)__bpf_ntohs(*(__u16 *) & infer_buf[16]);
+		content_len = (int)__bpf_ntohl(*(__u32 *) & infer_buf[18]);
+		if (class_len < 0 || header_len < 0 || content_len < 0
+		    || bolt_req_header_len > count) {
 			return MSG_UNKNOWN;
+		}
+		// check className first character
+		if (count >= 23 && class_len >= 1
+		    && !sofarpc_check_character(infer_buf[22])) {
+			return MSG_UNKNOWN;;
+		}
+
+		goto out;
 	}
 
 	if (cmdcode == cmd_code_resp) {
 		// (resp)respStatus: response status
 		__u16 resp_status = __bpf_ntohl(*(__u16 *) & infer_buf[10]);
-		if (!(resp_status >= 0 && resp_status <= 18))
+		if (!((resp_status >= 0 && resp_status <= 9) ||
+		      (resp_status >= 16 && resp_status <= 18))) {
 			return MSG_UNKNOWN;
-		class_len = __bpf_ntohs(*(__u16 *) & infer_buf[12]);
-		header_len = __bpf_ntohs(*(__u16 *) & infer_buf[14]);
-		//content_len = __bpf_ntohl(*(__u32 *)&infer_buf[16]);
-		if ((bolt_resp_header_len + class_len + header_len) > count)
-			return MSG_UNKNOWN;
+		}
 
+		class_len = (short)__bpf_ntohs(*(__u16 *) & infer_buf[12]);
+		header_len = (short)__bpf_ntohs(*(__u16 *) & infer_buf[14]);
+		content_len = (int)__bpf_ntohl(*(__u32 *) & infer_buf[16]);
+		if (class_len < 0 || header_len < 0 || content_len < 0) {
+			return MSG_UNKNOWN;
+		}
+		// check className first character
+		if (count >= 21 && class_len >= 1
+		    && !sofarpc_check_character(infer_buf[20])) {
+			return MSG_UNKNOWN;;
+		}
+
+		goto out;
 	}
 
+	return MSG_UNKNOWN;
 out:
 	return type == type_req ? MSG_REQUEST : MSG_RESPONSE;
 }
@@ -1691,6 +1726,14 @@ infer_protocol(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_SOFARPC:
+			if ((inferred_message.type =
+			     infer_sofarpc_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_SOFARPC;
+				return inferred_message;
+			}
+			break;
 		case PROTO_FASTCGI:
 			if ((inferred_message.type =
 			     infer_fastcgi_message(infer_buf, count,
@@ -1698,14 +1741,6 @@ infer_protocol(struct ctx_info_s *ctx,
 				if (inferred_message.type == MSG_PRESTORE)
 					return inferred_message;
 				inferred_message.protocol = PROTO_FASTCGI;
-				return inferred_message;
-			}
-			break;		
-		case PROTO_SOFARPC:
-			if ((inferred_message.type =
-			     infer_sofarpc_message(infer_buf, count,
-						   conn_info)) != MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_SOFARPC;
 				return inferred_message;
 			}
 			break;
@@ -1822,6 +1857,14 @@ infer_protocol(struct ctx_info_s *ctx,
 			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
 #ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_sofarpc_message(infer_buf, count,
+					  conn_info)) != MSG_UNKNOWN){
+		inferred_message.protocol = PROTO_SOFARPC;
+#ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_FASTCGI && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -1831,14 +1874,6 @@ infer_protocol(struct ctx_info_s *ctx,
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_FASTCGI;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_sofarpc_message(infer_buf, count,
-					  conn_info)) != MSG_UNKNOWN){
-		inferred_message.protocol = PROTO_SOFARPC;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
 #else
