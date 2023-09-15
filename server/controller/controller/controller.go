@@ -169,6 +169,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
 	go grpc.Run(ctx, cfg)
+	go grpc.RunTLS(ctx, cfg)
 }
 
 func setGlobalConfig(cfg *config.ControllerConfig) {
