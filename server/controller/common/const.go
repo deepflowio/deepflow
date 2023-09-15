@@ -277,6 +277,7 @@ const (
 	MICROSOFT_ACS     = 24
 	BAIDU_BCE         = 25
 	ESHORE            = 26
+	CLOUD_TOWER       = 27
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -304,6 +305,7 @@ const (
 	AGENT_SYNC_EN        = "genesis"
 	MICROSOFT_ACS_EN     = "microsoft_acs"
 	BAIDU_BCE_EN         = "baidu_bce"
+	CLOUD_TOWER_EN       = "cloudtower"
 
 	TENCENT_CH          = "腾讯云"
 	PINGAN_CH           = "平安云"
@@ -315,12 +317,13 @@ const (
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
 
-	OPENSTACK_CH  = "OpenStack"
-	VSPHERE_CH    = "vSphere"
-	NSP_CH        = "NSP"
-	AWS_CH        = "AWS"
-	ZSTACK_CH     = "ZStack"
-	KUBERNETES_CH = "Kubernetes"
+	OPENSTACK_CH   = "OpenStack"
+	VSPHERE_CH     = "vSphere"
+	NSP_CH         = "NSP"
+	AWS_CH         = "AWS"
+	ZSTACK_CH      = "ZStack"
+	KUBERNETES_CH  = "Kubernetes"
+	CLOUD_TOWER_CH = "CloudTower"
 )
 
 var DomainTypeToIconID = map[int]int{
