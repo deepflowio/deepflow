@@ -336,7 +336,9 @@ func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platf
 		// 2. if find nothing, try to find platform info by containerid
 		if info == nil {
 			p.fillPodInfo(vtapID, containerID, platformData)
-			info = platformData.QueryEpcIDPodInfo(p.L3EpcID, p.PodID)
+			if p.PodID != 0 {
+				info = platformData.QueryEpcIDPodInfo(p.L3EpcID, p.PodID)
+			}
 		}
 	}
 
