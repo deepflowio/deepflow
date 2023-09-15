@@ -74,6 +74,9 @@ type ControllerConfig struct {
 	MasterControllerName           string `default:"" yaml:"master-controller-name"`
 	GrpcMaxMessageLength           int    `default:"104857600" yaml:"grpc-max-message-length"`
 	GrpcPort                       string `default:"20035" yaml:"grpc-port"`
+	SSLGrpcPort                    string `default:"20135" yaml:"ssl-grpc-port"`
+	AgentSSLCertFile               string `default:"/etc/ssl/server.key" yaml:"agent_ssl_cert_file"`
+	AgentSSLKeyFile                string `default:"/etc/ssl/server.pem" yaml:"agent_ssl_key_file"`
 	IngesterPort                   string `default:"20033" yaml:"ingester-port"`
 	GrpcNodePort                   string `default:"30035" yaml:"grpc-node-port"`
 	Kubeconfig                     string `yaml:"kubeconfig"`
