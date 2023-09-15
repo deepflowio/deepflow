@@ -248,6 +248,7 @@ func (c *Config) Validate() error {
 			log.Warningf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
 			continue
 		}
+		c.CKDB.ActualAddrs = c.CKDB.ActualAddrs[:0]
 		for _, endpoint := range endpoints {
 			// if it is an IPv6 address, it needs to be enclosed in []
 			if strings.Contains(endpoint.Host, ":") {
