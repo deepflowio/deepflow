@@ -41,7 +41,8 @@ pub use rpc::{
     SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
-    decode, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
+    decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog,
+    RedisInfo, RedisLog,
 };
 
 use std::{

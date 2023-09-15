@@ -235,19 +235,19 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 
 func (s *LabelSynchronizer) getTargetInfoFromLabels(labels []*trident.LabelRequest) (cache.TargetKey, int, bool) {
 	var instanceValue string
-	var insGetted bool
+	var insGot bool
 	var jobValue string
-	var jobGetted bool
+	var jobGot bool
 	for _, l := range labels {
 		ln := l.GetName()
 		if ln == TargetLabelInstance {
 			instanceValue = l.GetValue()
-			insGetted = true
+			insGot = true
 		} else if ln == TargetLabelJob {
 			jobValue = l.GetValue()
-			jobGetted = true
+			jobGot = true
 		}
-		if insGetted && jobGetted {
+		if insGot && jobGot {
 			break
 		}
 	}
@@ -478,9 +478,9 @@ func (d *dataToEncode) tryAppendLabelName(name string) {
 	}
 }
 
-func (d *dataToEncode) tryAppendLabelValue(name string) {
-	if _, ok := d.cache.LabelValue.GetIDByValue(name); !ok {
-		d.labelValues.Add(name)
+func (d *dataToEncode) tryAppendLabelValue(value string) {
+	if _, ok := d.cache.LabelValue.GetIDByValue(value); !ok {
+		d.labelValues.Add(value)
 	}
 }
 
