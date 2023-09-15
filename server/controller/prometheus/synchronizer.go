@@ -17,6 +17,8 @@
 package prometheus
 
 import (
+	"sort"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
@@ -105,33 +107,49 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 	nonJobs := mapset.NewSet[string]()
 	targets := make([]*trident.TargetResponse, 0)
 	for tk, targetID := range s.cache.Target.Get() {
-		tInstanceID, ok := s.cache.LabelValue.GetIDByValue(tk.Instance)
+		targetKey := tk
+		tInstanceID, ok := s.cache.LabelValue.GetIDByValue(targetKey.Instance)
 		if !ok {
-			nonInstances.Add(tk.Instance)
+			nonInstances.Add(targetKey.Instance)
 			continue
 		}
-		tJobID, ok := s.cache.LabelValue.GetIDByValue(tk.Job)
+		tJobID, ok := s.cache.LabelValue.GetIDByValue(targetKey.Job)
 		if !ok {
-			nonJobs.Add(tk.Job)
+			nonJobs.Add(targetKey.Job)
 			continue
 		}
+
 		var labelNIDs []uint32
 		for _, n := range s.cache.Target.GetLabelNamesByID(targetID) {
 			if id, ok := s.cache.LabelName.GetIDByName(n); ok {
 				labelNIDs = append(labelNIDs, uint32(id))
 			}
 		}
+		sort.Slice(labelNIDs, func(i, j int) bool {
+			return labelNIDs[i] < labelNIDs[j]
+		})
+
+		metricIDs := s.cache.MetricTarget.GetMetricIDsByTargetID(targetID)
+		sort.Slice(metricIDs, func(i, j int) bool {
+			return metricIDs[i] < metricIDs[j]
+		})
+
 		targets = append(targets, &trident.TargetResponse{
-			Instance:           &tk.Instance,
-			Job:                &tk.Job,
+			Instance:           &targetKey.Instance,
+			Job:                &targetKey.Job,
 			InstanceId:         proto.Uint32(uint32(tInstanceID)),
 			JobId:              proto.Uint32(uint32(tJobID)),
 			TargetId:           proto.Uint32(uint32(targetID)),
-			MetricIds:          s.cache.MetricTarget.GetMetricIDsByTargetID(targetID),
+			MetricIds:          metricIDs,
 			TargetLabelNameIds: labelNIDs,
 		})
 		s.counter.SendTargetCount++
 	}
+
+	sort.Slice(targets, func(i, j int) bool {
+		return targets[i].GetTargetId() < targets[j].GetTargetId()
+	})
+
 	if nonInstances.Cardinality() > 0 {
 		log.Warningf("target instance id not found, instances: %v", nonInstances.ToSlice())
 	}
