@@ -50,7 +50,7 @@ bool is_core_kernel(void)
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
-static int parse_online_cpus(const char *cpu_file, bool **mask, int *cpu_count)
+static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
 {
 	int fd, i, n, len, start, end = -1;
 	bool *tmp;
@@ -113,7 +113,7 @@ failed:
 	return -1;
 }
 
-int get_cpus_count(bool **mask)
+int get_cpus_count(bool ** mask)
 {
 	bool *online = NULL;
 	int err, n = 0;
@@ -386,7 +386,7 @@ u64 get_sys_btime_msecs(void)
 {
 	if (g_sys_btime_msecs > 0)
 		goto done;
- 
+
 	char buff[4096];
 
 	FILE *fp = fopen("/proc/stat", "r");
@@ -781,9 +781,8 @@ int get_nspid(int pid)
 	char line[MAX_PATH_LENGTH];
 	while (fgets(line, sizeof(line), file) != NULL) {
 		if (strncmp(line, "NSpid:", 6) == 0) {
-			int result =
-			    sscanf(line + 6, "\t%d\t%d\n", &ns_pid_1,
-				   &ns_pid_2);
+			int result = sscanf(line + 6, "\t%d\t%d\n", &ns_pid_1,
+					    &ns_pid_2);
 			if (result == 1) {
 				ns_pid_2 = ns_pid_1;
 			}
@@ -862,7 +861,6 @@ int copy_file(const char *src_file, const char *dest_file)
 		ret = ETR_INVAL;
 		goto failed;
 	}
-
 	// Continuously read from src_file, place in buffer, and write buffer contents to dest_file
 	while ((bytes_read = fread(buffer, 1, buffer_size, src_file_ptr)) > 0) {
 		fwrite(buffer, bytes_read, 1, dest_file_ptr);
@@ -901,7 +899,6 @@ int df_enter_ns(int pid, const char *type, int *self_fd)
 			if (*self_fd < 0) {
 				return -1;
 			}
-
 			// Some ancient Linux distributions do not have setns() function
 			int result = syscall(__NR_setns, newns, 0);
 			close(newns);
@@ -943,7 +940,6 @@ int exec_command(const char *cmd, const char *args)
 			     __func__, cmd_buf, strerror(errno));
 		return -1;
 	}
-
 #ifdef PROFILE_JAVA_DEBUG
 	/* Read and print the output */
 	char buffer[1024];
@@ -955,15 +951,16 @@ int exec_command(const char *cmd, const char *args)
 	rc = pclose(fp);
 	if (-1 == rc) {
 		ebpf_warning("pclose error, '%s' error:%s\n",
-		    cmd_buf, strerror(errno));
+			     cmd_buf, strerror(errno));
 	} else {
 		if (WIFEXITED(rc)) {
 			ebpf_info("'%s' normal termination, exit status %d\n",
 				  cmd_buf, WEXITSTATUS(rc));
 			return WEXITSTATUS(rc);
 		} else if (WIFSIGNALED(rc)) {
-			ebpf_info("'%s' abnormal termination,signal number %d\n",
-				  cmd_buf, WTERMSIG(rc));
+			ebpf_info
+			    ("'%s' abnormal termination,signal number %d\n",
+			     cmd_buf, WTERMSIG(rc));
 		} else if (WIFSTOPPED(rc)) {
 			ebpf_info("'%s' process stopped, signal number %d\n",
 				  cmd_buf, WSTOPSIG(rc));
@@ -971,4 +968,52 @@ int exec_command(const char *cmd, const char *args)
 	}
 
 	return -1;
+}
+
+int fetch_container_id(pid_t pid, char *id, int copy_bytes)
+{
+	static const int scope_len = 5;
+	static const int cid_len = 64;
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	memset(buff, 0, sizeof(buff));
+	snprintf(file, sizeof(file), "/proc/%d/cgroup", pid);
+	if (access(file, F_OK))
+		return -1;
+
+	fd = open(file, O_RDONLY);
+	if (fd <= 2)
+		return -1;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	char *p;
+	if ((p = strchr(buff, '\n')) == NULL)
+		return -1;
+
+	*p = '\0';
+	if (strlen(buff) < (scope_len + 1 + cid_len)) {
+		return -1;
+	}
+
+	if ((p = strstr(buff, ".scope"))) {
+		*p = '\0';
+		p = strstr(buff, "containerd-");
+		if (p == NULL)
+			return -1;
+		p += strlen("containerd-");
+		goto done;
+
+	} else if ((p = strstr(buff, "/docker/"))) {
+		p += strlen("/docker/");
+		goto done;
+	}
+
+	return -1;
+done:
+	if (strlen(p) != cid_len)
+		return -1;
+	memcpy_s_inline((void *)id, copy_bytes, (void *)p, cid_len);
+	return 0;
 }

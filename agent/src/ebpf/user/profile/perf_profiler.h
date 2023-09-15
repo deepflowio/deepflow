@@ -111,6 +111,8 @@ typedef struct {
  *   If the capture is a thread, fill in the thread name.
  * @process_name
  *   process name
+ * @container_id
+ *   container id fetch from /proc/[pid]/cgroup
  * @data_len
  *   stack data length
  * @data_ptr
@@ -133,6 +135,7 @@ typedef struct {
 	u32 count;
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
+	u8 container_id[CONTAINER_ID_SIZE];
 	u32 data_len;
 	u64 data_ptr;
 	u8 data[0];
