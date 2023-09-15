@@ -13,6 +13,7 @@
 60      , MySQL           ,
 61      , PostgreSQL      ,
 80      , Redis           ,
+81      , MongoDB           ,
 100     , Kafka           ,
 101     , MQTT            ,
 120     , DNS             ,
