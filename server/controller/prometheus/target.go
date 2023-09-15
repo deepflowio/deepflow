@@ -59,6 +59,7 @@ func (s *TargetSynchronizer) GetTargets(in *trident.PrometheusTargetRequest) (*t
 	if in.GetVersion() == version {
 		return resp, nil
 	}
+	log.Infof("target version update from %d to %d", in.GetVersion(), version)
 
 	resp.ResponseTargetIds = ts
 	resp.Version = &version
@@ -72,16 +73,21 @@ func (s *TargetSynchronizer) refreshVersionIfChanged() ([]*trident.TargetRespons
 	}
 
 	resp := &trident.PrometheusTargetResponse{ResponseTargetIds: ts}
-	respStr, err := resp.Marshal()
+	respBytes, err := resp.Marshal()
+	log.Infof("%v", ts)
+	log.Infof("%s", respBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "refreshVersionIfChanged")
 	}
 
 	h64 := fnv.New64()
-	h64.Write(respStr)
-	if h64.Sum64() != atomic.LoadUint64(&targetCacheHash) {
+	h64.Write(respBytes)
+	log.Info(h64.Sum64())
+	log.Info(atomic.LoadUint64(&targetCacheHash))
+	newHash := h64.Sum64()
+	if newHash != atomic.LoadUint64(&targetCacheHash) {
 		atomic.AddUint32(&targetCacheVersion, 1)
-		atomic.StoreUint64(&targetCacheHash, h64.Sum64())
+		atomic.StoreUint64(&targetCacheHash, newHash)
 	}
 	return ts, nil
 }
