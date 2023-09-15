@@ -100,6 +100,7 @@ type PodInfo struct {
 	Ip           string
 	EpcId        int32
 	PodClusterId uint32
+	ContainerIds []string
 }
 
 type VtapInfo struct {
@@ -116,14 +117,17 @@ type Counter struct {
 	UpdateCount         int64 `statsd:"update-count"`
 	UpdateServicesCount int64 `statsd:"update-services-count"`
 
-	IP4TotalCount int64 `statsd:"ip4-total-count"`
-	IP4HitCount   int64 `statsd:"ip4-hit-count"`
-	IP6TotalCount int64 `statsd:"ip6-total-count"`
-	IP6HitCount   int64 `statsd:"ip6-hit-count"`
-	IP4MissCount  int64 `statsd:"ip4-miss-count"`
-	IP6MissCount  int64 `statsd:"ip6-miss-count"`
-	MacMissCount  int64 `statsd:"mac-miss-count"`
-	EpcMissCount  int64 `statsd:"epc-miss-count"`
+	IP4TotalCount       int64 `statsd:"ip4-total-count"`
+	IP4HitCount         int64 `statsd:"ip4-hit-count"`
+	IP6TotalCount       int64 `statsd:"ip6-total-count"`
+	IP6HitCount         int64 `statsd:"ip6-hit-count"`
+	IP4MissCount        int64 `statsd:"ip4-miss-count"`
+	IP6MissCount        int64 `statsd:"ip6-miss-count"`
+	MacMissCount        int64 `statsd:"mac-miss-count"`
+	EpcMissCount        int64 `statsd:"epc-miss-count"`
+	ContainerTotalCount int64 `statsd:"container-total-count"`
+	ContainerHitCount   int64 `statsd:"container-hit-count"`
+	ContainerMissCount  int64 `statsd:"container-miss-count"`
 }
 
 type PlatformInfoTable struct {
@@ -151,6 +155,7 @@ type PlatformInfoTable struct {
 
 	netnsIdInfos  map[uint64]*Info
 	gprocessInfos map[uint32]uint64
+	epcIDPodInfos map[uint64]*Info
 
 	bootTime            uint32
 	moduleName          string
@@ -163,8 +168,10 @@ type PlatformInfoTable struct {
 	versionGroups uint64
 	*ServiceTable
 
-	podNameInfos map[string][]*PodInfo
-	vtapIdInfos  map[uint32]*VtapInfo
+	podNameInfos       map[string][]*PodInfo
+	vtapIdInfos        map[uint32]*VtapInfo
+	containerInfos     map[string][]*PodInfo
+	containerMissCount map[string]*uint64
 
 	peerConnections map[int32][]int32
 
@@ -311,6 +318,14 @@ func (t *PlatformInfoTable) QueryNetnsIdInfo(vtapId, netnsId uint32) *Info {
 	return nil
 }
 
+func (t *PlatformInfoTable) QueryEpcIDPodInfo(epcID int32, podID uint32) *Info {
+	if info, ok := t.epcIDPodInfos[uint64(epcID)<<32|uint64(podID)]; ok {
+		atomic.AddUint64(info.HitCount, 1)
+		return info
+	}
+	return nil
+}
+
 type PlatformDataManager struct {
 	masterTable       *PlatformInfoTable
 	tableLock         sync.Mutex
@@ -388,15 +403,18 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		epcIDBaseMissCount: make(map[int32]*uint64),
 		netnsIdInfos:       make(map[uint64]*Info),
 		gprocessInfos:      make(map[uint32]uint64),
+		epcIDPodInfos:      make(map[uint64]*Info),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
 		ServiceTable:       NewServiceTable(nil),
 
-		podNameInfos:    make(map[string][]*PodInfo),
-		vtapIdInfos:     make(map[uint32]*VtapInfo),
-		peerConnections: make(map[int32][]int32),
-		ctlIP:           nodeIP,
-		counter:         &Counter{},
+		podNameInfos:       make(map[string][]*PodInfo),
+		vtapIdInfos:        make(map[uint32]*VtapInfo),
+		containerInfos:     make(map[string][]*PodInfo),
+		containerMissCount: make(map[string]*uint64),
+		peerConnections:    make(map[int32][]int32),
+		ctlIP:              nodeIP,
+		counter:            &Counter{},
 	}
 	runOnce := func() {
 		var err error
@@ -840,6 +858,15 @@ func (t *PlatformInfoTable) String() string {
 		fmt.Fprintf(sb, "  %-15d  %d\n", epcID, *missCount)
 	}
 
+	if len(t.containerMissCount) > 0 {
+		sb.WriteString("\n9 *containerID         miss  (使用containerID无法匹配到pod信息的统计)\n")
+		sb.WriteString("--------------------------------\n")
+	}
+
+	for containerID, missCount := range t.containerMissCount {
+		fmt.Fprintf(sb, "  %-20s  %d\n", containerID, *missCount)
+	}
+
 	return sb.String()
 }
 
@@ -856,6 +883,8 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 		return t.ServiceTable.String()
 	} else if arg == "gprocess-" {
 		return t.gprocessInfosString()
+	} else if arg == "container-" {
+		return t.containersString()
 	}
 
 	all := t.String()
@@ -916,9 +945,10 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
 	newNetnsIdInfos := make(map[uint64]*Info)
+	newEpcIDPodInfos := make(map[uint64]*Info)
 
 	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, newNetnsIdInfos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, newNetnsIdInfos, newEpcIDPodInfos, intf)
 	}
 	for _, cidr := range platformData.GetCidrs() {
 		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
@@ -943,6 +973,7 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	t.epcIDBaseMissCount = make(map[int32]*uint64)
 
 	t.netnsIdInfos = newNetnsIdInfos
+	t.epcIDPodInfos = newEpcIDPodInfos
 }
 
 func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
@@ -985,6 +1016,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 		t.peerConnections = masterTable.peerConnections
 		t.gprocessInfos = masterTable.gprocessInfos
 		t.netnsIdInfos = masterTable.netnsIdInfos
+		t.epcIDPodInfos = masterTable.epcIDPodInfos
 
 		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
 		t.epcIDIPV4CidrInfos = masterTable.epcIDIPV4CidrInfos
@@ -1010,6 +1042,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 	t.podNameInfos = masterTable.podNameInfos
 	t.regionID = masterTable.regionID
 	t.analyzerID = masterTable.analyzerID
+	t.containerInfos = masterTable.containerInfos
 
 	return nil
 }
@@ -1218,7 +1251,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, netnsIdInfos map[uint64]*Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, netnsIdInfos map[uint64]*Info, epcIDPodInfos map[uint64]*Info, intf *trident.Interface) {
 	// intf.GetEpcId() in range (0,64000], when convert to int32, 0 need convert to datatype.EPC_FROM_INTERNET
 	epcID := int32(intf.GetEpcId())
 	// 由于doc中epcID为-2，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-2，便于doc数据查找
@@ -1287,6 +1320,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			}
 			epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipU32)] = info
 			netnsIdInfos[uint64(vtapId)<<32|uint64(netnsId)] = info
+			epcIDPodInfos[uint64(epcID)<<32|uint64(podID)] = info
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
 				epcIDIPV4Infos[uint64(ipU32)] = &Info{
@@ -1328,6 +1362,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 
 			epcIDIPV6Infos[epcIDIPV6] = info
 			netnsIdInfos[uint64(vtapId)<<32|uint64(netnsId)] = info
+			epcIDPodInfos[uint64(epcID)<<32|uint64(podID)] = info
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
 				binary.LittleEndian.PutUint32(epcIDIPV6[:4], 0)
@@ -1464,8 +1499,35 @@ func (t *PlatformInfoTable) QueryPodInfo(vtapId uint32, podName string) *PodInfo
 	return nil
 }
 
+func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint32, containerID string) *PodInfo {
+	if vtapInfo, ok := t.vtapIdInfos[vtapID]; ok {
+		podClusterId := vtapInfo.PodClusterId
+		atomic.AddInt64(&t.counter.ContainerTotalCount, 1)
+		// assume containerid will not repeat in one cluster
+		if containerInfos, ok := t.containerInfos[containerID]; ok {
+			atomic.AddInt64(&t.counter.ContainerHitCount, int64(len(containerInfos)))
+			for _, podInfo := range containerInfos {
+				if podInfo.PodClusterId == podClusterId {
+					return podInfo
+				}
+			}
+		} else {
+			log.Debugf("can't find PodInfo from containerID(%s) and vtapID(%d)", containerID, vtapID)
+			missCount, ok := t.containerMissCount[containerID]
+			if !ok {
+				missCount = new(uint64)
+				t.containerMissCount[containerID] = missCount
+			}
+			atomic.AddUint64(missCount, 1)
+			atomic.AddInt64(&t.counter.ContainerMissCount, int64(len(containerInfos)))
+		}
+	}
+	return nil
+}
+
 func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	podNameInfos := make(map[string][]*PodInfo)
+	containerInfos := make(map[string][]*PodInfo)
 	for _, podIp := range podIps {
 		podName := podIp.GetPodName()
 		// podIp.GetEpcId() in range [0,64000], convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
@@ -1473,19 +1535,29 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 		if epcId == 0 {
 			epcId = datatype.EPC_FROM_INTERNET
 		}
+		containerIds := podIp.GetContainerIds()
 		podInfo := &PodInfo{
 			PodId:        podIp.GetPodId(),
 			PodName:      podIp.GetPodName(),
 			EpcId:        epcId,
 			Ip:           podIp.GetIp(),
-			PodClusterId: podIp.GetPodClusterId()}
+			PodClusterId: podIp.GetPodClusterId(),
+			ContainerIds: containerIds}
 		if podInfos, ok := podNameInfos[podName]; ok {
 			podNameInfos[podName] = append(podInfos, podInfo)
 		} else {
 			podNameInfos[podName] = []*PodInfo{podInfo}
 		}
+		for _, containerId := range containerIds {
+			if podInfos, ok := containerInfos[containerId]; ok {
+				containerInfos[containerId] = append(podInfos, podInfo)
+			} else {
+				containerInfos[containerId] = []*PodInfo{podInfo}
+			}
+		}
 	}
 	t.podNameInfos = podNameInfos
+	t.containerInfos = containerInfos
 }
 
 func (t *PlatformInfoTable) podsString() string {
@@ -1493,6 +1565,16 @@ func (t *PlatformInfoTable) podsString() string {
 	for podName, podInfos := range t.podNameInfos {
 		for _, podInfo := range podInfos {
 			sb.WriteString(fmt.Sprintf("%s %+v\n", podName, *podInfo))
+		}
+	}
+	return sb.String()
+}
+
+func (t *PlatformInfoTable) containersString() string {
+	sb := &strings.Builder{}
+	for containerId, podInfos := range t.containerInfos {
+		for _, podInfo := range podInfos {
+			sb.WriteString(fmt.Sprintf("%s %+v\n", containerId, *podInfo))
 		}
 	}
 	return sb.String()
