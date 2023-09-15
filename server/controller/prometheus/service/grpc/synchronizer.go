@@ -57,8 +57,5 @@ func (e *SynchronizerEvent) GetPrometheusTargets(ctx context.Context, in *triden
 		log.Errorf("target error: %+v", err)
 		return &trident.PrometheusTargetResponse{}, nil
 	}
-	if in.GetVersion() != resp.GetVersion() {
-		log.Infof("target version update from %d to %d", in.GetVersion(), resp.GetVersion())
-	}
 	return resp, err
 }
