@@ -1213,12 +1213,22 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
-				ColumnNames: []string{"role"},
+				ColumnNames: []string{"role", "tag_source"},
 				ColumnType:  ckdb.UInt8,
 			},
 		}...)
 
+	} else {
+		columnAddss633 = append(columnAddss633, []*ColumnAdds{
+			&ColumnAdds{
+				Dbs:         []string{d.db},
+				Tables:      []string{d.name, d.name + "_agg"},
+				ColumnNames: []string{"tag_source_0", "tag_source_1"},
+				ColumnType:  ckdb.UInt8,
+			},
+		}...)
 	}
+
 	if isAppTable {
 		if isEdgeTable {
 			columnAddss633 = append(columnAddss633, []*ColumnAdds{
