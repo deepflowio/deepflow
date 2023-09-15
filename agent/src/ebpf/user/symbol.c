@@ -661,6 +661,28 @@ static struct bcc_symbol_option lazy_opt = {
 	.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
 };
 
+static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
+{
+	memset(p, 0, sizeof(*p));
+	p->unknown_syms_found = false;
+	p->netns_id = get_netns_id_from_pid(pid);
+	if (p->netns_id == 0)
+		return ETR_INVAL;
+
+	if (fetch_container_id(pid, p->container_id, sizeof(p->container_id)) <
+	    0)
+		return ETR_INVAL;
+
+	p->stime = (u64) get_process_starttime_and_comm(pid,
+							p->comm,
+							sizeof(p->comm));
+	p->comm[sizeof(p->comm) - 1] = '\0';
+	if (p->stime == 0)
+		return ETR_INVAL;
+
+	return ETR_OK;
+}
+
 void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			     void **ptr)
 {
@@ -692,20 +714,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			return;
 		}
 
-		memset(p, 0, sizeof(*p));
-		p->unknown_syms_found = false;
-		p->netns_id = get_netns_id_from_pid(pid);
-		if (p->netns_id == 0) {
-			clib_mem_free(p);
-			return;
-		}
-
-		p->stime = (u64) get_process_starttime_and_comm(pid,
-								p->comm,
-								sizeof
-								(p->comm));
-		p->comm[sizeof(p->comm) - 1] = '\0';
-		if (p->stime == 0) {
+		if (config_symbolizer_proc_info(p, pid) != ETR_OK) {
 			clib_mem_free(p);
 			return;
 		}
@@ -908,21 +917,7 @@ int create_and_init_symbolizer_caches(void)
 				return ETR_NOMEM;
 			}
 
-			memset(p, 0, sizeof(*p));
-			p->unknown_syms_found = false;
-			p->netns_id = get_netns_id_from_pid(pid);
-			if (p->netns_id == 0) {
-				clib_mem_free(p);
-				continue;
-			}
-
-			p->stime =
-			    (u64) get_process_starttime_and_comm(pid,
-								 p->comm,
-								 sizeof
-								 (p->comm));
-			p->comm[sizeof(p->comm) - 1] = '\0';
-			if (p->stime == 0) {
+			if (config_symbolizer_proc_info(p, pid) != ETR_OK) {
 				clib_mem_free(p);
 				continue;
 			}

@@ -30,6 +30,7 @@ pub const CAP_LEN_MAX: usize = 8192;
 
 // process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
 pub const PACKET_KNAME_MAX_PADDING: usize = 15;
+pub const CONTAINER_ID_SIZE: usize = 65;
 
 //方向
 #[allow(dead_code)]
@@ -369,6 +370,7 @@ pub struct stack_profile_data {
      */
     pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1],
     pub process_name: [u8; PACKET_KNAME_MAX_PADDING + 1], // process name
+    pub container_id: [u8; CONTAINER_ID_SIZE],            // container id
     pub stack_data_len: u32,                              // stack data length
 
     /*
