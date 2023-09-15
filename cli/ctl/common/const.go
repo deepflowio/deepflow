@@ -59,6 +59,7 @@ const (
 	DOMAIN_TYPE_MICROSOFT_ACS     DomainType = 24 // microsoft_acs
 	DOMAIN_TYPE_BAIDU_BCE         DomainType = 25 // baidu_bce
 	DOMAIN_TYPE_ESHORE            DomainType = 26 // eshore
+	DOMAIN_TYPE_CLOUD_TOWER       DomainType = 27 // cloudtower
 )
 
 var DomainTypes []DomainType = []DomainType{
@@ -81,6 +82,7 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_MICROSOFT_ACS,
 	DOMAIN_TYPE_BAIDU_BCE,
 	DOMAIN_TYPE_ESHORE,
+	DOMAIN_TYPE_CLOUD_TOWER,
 }
 
 func GetDomainTypeByName(domainTypeName string) DomainType {
