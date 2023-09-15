@@ -2,7 +2,9 @@ START TRANSACTION;
 
 -- modify start, add upgrade sql
 
-DELETE FROM alarm_policy WHERE app_type=1;
+CREATE TABLE IF NOT EXISTS alarm_policy_backups AS SELECT * FROM alarm_policy;
+
+DELETE FROM alarm_policy;
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
