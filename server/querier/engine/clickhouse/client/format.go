@@ -115,6 +115,8 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		return *v, VALUE_TYPE_STRING, nil
 	case *[]interface{}:
 		return *v, VALUE_TYPE_TUPLE, nil
+	case *[][]interface{}:
+		return *v, columnDatabaseTypeName, nil
 	default:
 		// unkown type field return origin type
 		return value, columnDatabaseTypeName, nil
