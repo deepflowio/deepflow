@@ -139,7 +139,8 @@ func (s *LabelSynchronizer) generateDataToEncode(req *trident.PrometheusLabelReq
 	for _, t := range req.GetRequestTargets() {
 		tk := cache.NewTargetKey(t.GetInstance(), t.GetJob())
 		if _, ok := s.cache.Target.GetIDByKey(tk); !ok {
-			toEncode.appendTarget(t.GetVtapId(), tk)
+			// FIXME @zhengya
+			// toEncode.appendTarget(t.GetVtapId(), tk)
 		}
 	}
 	return toEncode
