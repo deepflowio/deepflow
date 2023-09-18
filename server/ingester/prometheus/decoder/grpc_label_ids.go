@@ -39,15 +39,18 @@ import (
 
 const (
 	METRICID_OFFSET = 32 // when generate columnIndexKey/metricTargetPairKey, high32 is metricID, low32 can be labelNameID/targetID
-	JOBID_OFFSET    = 32 // when generate targetIdKey, high32 is JobId, low32 is instanceId
+
+	// when generate targetIdKey, high16 is podClusterId, mid24 is JobId, low24 is instanceId
+	POD_CLUSTER_ID_OFFSET = 48
+	JOBID_OFFSET          = 24
 )
 
 func columnIndexKey(metricID, labelNameID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(labelNameID)
 }
 
-func targetIdKey(jobID, instanceID uint32) uint64 {
-	return uint64(jobID)<<JOBID_OFFSET | uint64(instanceID)
+func targetIdKey(podClusterId uint16, jobID, instanceID uint32) uint64 {
+	return uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET | uint64(jobID)<<JOBID_OFFSET | uint64(instanceID)
 }
 
 func nameValueKey(nameID, valueID uint32) uint64 {
@@ -79,8 +82,8 @@ func (t *PrometheusLabelTable) QueryColumnIndex(metricID, labelNameID uint32) (u
 	return t.labelColumnIndexs.Get(columnIndexKey(metricID, labelNameID))
 }
 
-func (t *PrometheusLabelTable) QueryTargetID(jobID, instanceID uint32) (uint32, bool) {
-	return t.targetIDs.Get(targetIdKey(jobID, instanceID))
+func (t *PrometheusLabelTable) QueryTargetID(podClusterId uint16, jobID, instanceID uint32) (uint32, bool) {
+	return t.targetIDs.Get(targetIdKey(podClusterId, jobID, instanceID))
 }
 
 func (t *PrometheusLabelTable) QueryMetricTargetPair(metricID, targetID uint32) bool {
@@ -232,12 +235,13 @@ func (t *PrometheusLabelTable) updatePrometheusTargets(targetIds []*trident.Targ
 		}
 		jobId := target.GetJobId()
 		instanceId := target.GetInstanceId()
+		podClusterId := target.GetPodClusterId()
 		t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
 		t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
 		for _, metricId := range target.GetMetricIds() {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
-		t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
+		t.targetIDs.Set(targetIdKey(uint16(podClusterId), jobId, instanceId), targetId)
 		t.updateTargetLabelIds(targetId, target.GetTargetLabelNameIds())
 	}
 }
@@ -343,7 +347,12 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			t.labelColumnIndexs.Set(columnIndexKey(metricId, nameId), cIndex)
 		}
 
-		targetId, ok := t.targetIDs.Get(targetIdKey(jobId, instanceId))
+		// when response all metric labels at starting, pod cluster id is 0
+		podClusterId := metric.GetPodClusterId()
+		if podClusterId == 0 {
+			continue
+		}
+		targetId, ok := t.targetIDs.Get(targetIdKey(uint16(podClusterId), jobId, instanceId))
 		if !ok {
 			if t.counter.TargetIdZero == 0 {
 				log.Warningf("prometheus label response label target invalid: jobId: %d, instanceId: %d, metric: %s", jobId, instanceId, metric)
@@ -436,11 +445,12 @@ func (t *PrometheusLabelTable) columnIndexString(filter string) string {
 
 func (t *PrometheusLabelTable) targetString(filter string) string {
 	sb := &strings.Builder{}
-	sb.WriteString("\ntargetId     job                                                              jobId    instance                             instanceId                       target_label_ids\n")
+	sb.WriteString("\ntargetId     clusterId  job                                                              jobId    instance                             instanceId                       target_label_ids\n")
 	sb.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 
 	t.targetIDs.Range(func(k uint64, v uint32) bool {
-		jobId := k >> 32
+		podClusterId := k >> POD_CLUSTER_ID_OFFSET
+		jobId := k << (64 - POD_CLUSTER_ID_OFFSET) >> (64 - POD_CLUSTER_ID_OFFSET) >> JOBID_OFFSET
 		instanceId := k << (64 - JOBID_OFFSET) >> (64 - JOBID_OFFSET)
 		job, instance := "", ""
 		t.labelValueIDs.Range(func(n string, i uint32) bool {
@@ -455,7 +465,7 @@ func (t *PrometheusLabelTable) targetString(filter string) string {
 			return true
 		})
 		targetLabebs, _ := t.targetLabelIDs.Get(v)
-		row := fmt.Sprintf("%-10d   %-64s  %-5d   %-32s     %-32d %v\n", v, job, jobId, instance, instanceId, targetLabebs)
+		row := fmt.Sprintf("%-10d   %-9d  %-64s  %-5d   %-32s     %-32d %v\n", v, podClusterId, job, jobId, instance, instanceId, targetLabebs)
 		if strings.Contains(row, filter) {
 			sb.WriteString(row)
 		}
@@ -529,6 +539,7 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	metricReq := &trident.MetricLabelRequest{}
 	targetReq := &trident.TargetRequest{}
 	keyValues := strings.Split(request, ",")
+	clusterId := 0
 	for _, kv := range keyValues {
 		kv := strings.Split(kv, "=")
 		if len(kv) != 2 {
@@ -544,10 +555,14 @@ func (t *PrometheusLabelTable) testString(request string) string {
 			instance := kv[1]
 			targetReq.Instance = &instance
 			addLabel(metricReq, kv[0], kv[1])
+		} else if kv[0] == "clusterId" {
+			clusterId, _ = strconv.Atoi(kv[1])
 		} else {
 			addLabel(metricReq, kv[0], kv[1])
 		}
 	}
+	metricReq.PodClusterId = proto.Uint32(uint32(clusterId))
+	targetReq.PodClusterId = proto.Uint32(uint32(clusterId))
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
 	resp, err := t.RequestLabelIDs(req)
@@ -599,7 +614,7 @@ func (t *PrometheusLabelTable) explainString(str string) string {
 		if v != targetId {
 			return true
 		}
-		jobId := k >> 32
+		jobId := k << (64 - POD_CLUSTER_ID_OFFSET) >> (64 - POD_CLUSTER_ID_OFFSET) >> JOBID_OFFSET
 		instanceId := k << (64 - JOBID_OFFSET) >> (64 - JOBID_OFFSET)
 		t.labelValueIDs.Range(func(n string, i uint32) bool {
 			if i == uint32(jobId) {
