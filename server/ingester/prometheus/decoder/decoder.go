@@ -381,6 +381,18 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		return false, fmt.Errorf("prometheum metric name(%s) is empty", metricName)
 	}
 
+	if jobID == 0 {
+		if jobID, ok = b.labelTable.QueryLabelValueID(""); !ok {
+			b.counter.ValueMiss++
+			return true, nil
+		}
+	}
+	if instanceID == 0 {
+		if instanceID, ok = b.labelTable.QueryLabelValueID(""); !ok {
+			b.counter.ValueMiss++
+			return true, nil
+		}
+	}
 	targetID, ok := b.labelTable.QueryTargetID(jobID, instanceID)
 	if !ok {
 		b.counter.TargetMiss++
