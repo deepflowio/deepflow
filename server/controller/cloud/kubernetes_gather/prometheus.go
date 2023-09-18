@@ -38,7 +38,7 @@ func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, err
 			otherLabelsString = p.OtherLabels
 		}
 		prometheusTargets = append(prometheusTargets, cloudmodel.PrometheusTarget{
-			Lcuuid:      common.GetUUID(p.Instance+p.Job+otherLabelsString, uuid.Nil),
+			Lcuuid:      common.GetUUID(k.ClusterID+p.Instance+p.Job+otherLabelsString, uuid.Nil),
 			Job:         p.Job,
 			Instance:    p.Instance,
 			ScrapeURL:   p.ScrapeURL,
