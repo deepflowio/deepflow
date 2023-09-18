@@ -512,8 +512,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			whereFilters := []string{}
 			for _, valueStr := range idSlice {
 				valueStr = strings.Trim(t.Value, "'")
-				valueInt, err := strconv.Atoi(valueStr)
+				valueInt, err := strconv.ParseUint(valueStr, 10, 64)
 				if err != nil {
+					log.Error(err)
 					return nil, err
 				}
 				idFilter := fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
