@@ -975,13 +975,9 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			if (trace_info_ptr->is_trace_id_zero) {
 				return;
 			}
-			/*
-			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
-			 */
-			if (socket_id != trace_info_ptr->socket_id) {
-				*thread_trace_id =
+
+			*thread_trace_id =
 				    trace_info_ptr->thread_trace_id;
-			}
 
 			if (!trace_map__delete(trace_key)) {
 				__sync_fetch_and_add(&trace_stats->
