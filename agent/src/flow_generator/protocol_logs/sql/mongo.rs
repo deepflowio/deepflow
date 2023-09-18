@@ -270,44 +270,41 @@ impl MongoDBLog {
             }
             _OP_UPDATE => {
                 // "OP_UPDATE"
-                info.exception = unsafe {
-                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                };
+                info.exception = CStr::from_bytes_until_nul(&payload[20..])
+                    .map_err(|_| Error::L7ProtocolUnknown)?
+                    .to_string_lossy()
+                    .into_owned();
                 let update = Document::from_reader(&payload[24 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = update.to_string();
             }
             _OP_INSERT => {
                 // OP_INSERT
-                info.exception = unsafe {
-                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                };
+                info.exception = CStr::from_bytes_until_nul(&payload[20..])
+                    .map_err(|_| Error::L7ProtocolUnknown)?
+                    .to_string_lossy()
+                    .into_owned();
                 let insert = Document::from_reader(&payload[20 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = insert.to_string();
             }
             _OP_QUERY => {
                 // "OP_QUERY"
-                info.exception = unsafe {
-                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                };
+                info.exception = CStr::from_bytes_until_nul(&payload[..20])
+                    .map_err(|_| Error::L7ProtocolUnknown)?
+                    .to_string_lossy()
+                    .into_owned();
+
                 let query = Document::from_reader(&payload[28 + info.exception.len() + 1..])
                     .unwrap_or(Document::default());
                 info.request = query.to_string();
             }
             _OP_GET_MORE | _OP_DELETE => {
                 // OP_GET_MORE
-                info.request = unsafe {
-                    CStr::from_ptr(payload[20..].as_ptr() as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                };
+                info.request = CStr::from_bytes_until_nul(&payload[..20])
+                    .map_err(|_| Error::L7ProtocolUnknown)?
+                    .to_string_lossy()
+                    .into_owned();
             }
             _ => {
                 info.request = info.op_code_name.clone();
@@ -446,12 +443,13 @@ impl Sections {
                 self.kind_name = "DOC".to_string();
                 self.size =
                     std::option::Option::<i32>::from(bytes::read_u32_le(&payload[1..5]) as i32);
-                //self.c_string = std::option::Option::Some(read_c_string(&payload[5..]));
-                self.c_string = Some(unsafe {
-                    CStr::from_ptr(payload[5..].as_ptr() as *const i8)
+                self.c_string = Some(
+                    CStr::from_bytes_until_nul(&payload[5..])
+                        .map_err(|_| Error::L7ProtocolUnknown)?
                         .to_string_lossy()
-                        .into_owned()
-                });
+                        .into_owned(),
+                );
+
                 self.doc = Document::from_reader(&payload[1..]).unwrap_or(Document::default());
             }
             2 => {
