@@ -21,9 +21,9 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/deepflowio/deepflow/server/querier/profile/common"
-	"github.com/deepflowio/deepflow/server/querier/profile/model"
-	"github.com/deepflowio/deepflow/server/querier/profile/service"
+	"github.com/deepflowio/deepflow/server/querier/l7_tracing/common"
+	"github.com/deepflowio/deepflow/server/querier/l7_tracing/model"
+	"github.com/deepflowio/deepflow/server/querier/l7_tracing/service"
 	"github.com/deepflowio/deepflow/server/querier/router"
 )
 
@@ -34,7 +34,7 @@ func L7TracingRouter(e *gin.Engine, cfg *config.QuerierConfig) {
 
 func l7FlowTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		var l7Tracing model.ProfileTracing
+		var l7Tracing model.L7Tracing
 
 		// 参数校验
 		err := c.ShouldBindBodyWith(&l7Tracing, binding.JSON)
