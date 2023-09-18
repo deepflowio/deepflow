@@ -293,7 +293,7 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, vtapId u
 	if !hasInstanceId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
-		targetReq.VtapId = proto.Uint32(uint32(vtapId))
+		// targetReq.VtapId = proto.Uint32(uint32(vtapId))
 		return labelReq, targetReq
 	}
 
@@ -301,14 +301,14 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, vtapId u
 	if !hasJobId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
-		targetReq.VtapId = proto.Uint32(uint32(vtapId))
+		// targetReq.VtapId = proto.Uint32(uint32(vtapId))
 		return labelReq, targetReq
 	}
 
 	if _, hasTargetId := d.labelTable.QueryTargetID(jobId, instanceId); !hasTargetId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
-		targetReq.VtapId = proto.Uint32(uint32(vtapId))
+		// targetReq.VtapId = proto.Uint32(uint32(vtapId))
 	}
 	return labelReq, targetReq
 }
