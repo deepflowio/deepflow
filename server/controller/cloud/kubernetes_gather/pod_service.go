@@ -110,7 +110,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				VPCLcuuid:          k.VPCUuid,
 				AZLcuuid:           k.azLcuuid,
 				RegionLcuuid:       k.RegionUuid,
-				PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
+				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
 			specPorts := sData.Get("spec").Get("ports")
 			var hasPodGroup bool

@@ -801,6 +801,7 @@ type PrometheusTarget struct {
 	OtherLabels    string `gorm:"column:other_labels;type:text;default:''" json:"OTHER_LABELS"` // separated by ,
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	CreateMethod   int    `gorm:"column:create_method;type:tinyint(1);default:1" json:"CREATE_METHOD"`
 }
 
