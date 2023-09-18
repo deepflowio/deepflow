@@ -531,6 +531,8 @@ func (f *TagFunction) Check() error {
 func (f *TagFunction) Trans(m *view.Model) view.Node {
 	fields := f.Args
 	switch f.Name {
+	case TAG_FUNCTION_ANY:
+		f.Name = "topK(1)"
 	case TAG_FUNCTION_TOPK:
 		f.Name = fmt.Sprintf("topK(%s)", f.Args[len(f.Args)-1])
 		fields = fields[:len(f.Args)-1]
@@ -634,6 +636,8 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	if len(fields) > 1 {
 		if f.Name == "if" {
 			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
+		} else if strings.HasPrefix(f.Name, "topK") {
+			withValue = fmt.Sprintf("%s((%s))", f.Name, strings.Join(values, ","))
 		} else {
 			withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))
 		}
