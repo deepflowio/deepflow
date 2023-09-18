@@ -497,6 +497,7 @@ type PrometheusTarget struct {
 	Job               string `json:"job" binding:"required"`
 	OtherLabels       string `json:"other_labels" binding:"required"`
 	SubDomainLcuuid   string `json:"sub_domain_lcuuid,omitempty"`
+	PodClusterLcuuid  string `json:"pod_cluster_lcuuid" binding:"required"`
 	HonorLabelsConfig bool   `json:"honor_labels_config" binding:"required"`
 }
 

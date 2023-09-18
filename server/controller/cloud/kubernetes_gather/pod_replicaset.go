@@ -19,13 +19,11 @@ package kubernetes_gather
 import (
 	"strings"
 
+	"github.com/bitly/go-simplejson"
+	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	"github.com/bitly/go-simplejson"
-	mapset "github.com/deckarep/golang-set"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, err error) {
@@ -114,7 +112,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 				RegionLcuuid:       k.RegionUuid,
 				AZLcuuid:           k.azLcuuid,
 				PodNamespaceLcuuid: namespaceLcuuid,
-				PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
+				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
 			podRSCs = append(podRSCs, podRSC)
 		}
@@ -127,7 +125,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			RegionLcuuid:       k.RegionUuid,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,
-			PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
+			PodClusterLcuuid:   k.podClusterLcuuid,
 		}
 		podRSs = append(podRSs, podRS)
 		k.rsLcuuidToPodGroupLcuuid[uID] = podGroupLcuuid
