@@ -20,11 +20,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -110,7 +109,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			VPCLcuuid:        k.VPCUuid,
 			AZLcuuid:         k.azLcuuid,
 			RegionLcuuid:     k.RegionUuid,
-			PodClusterLcuuid: common.GetUUID(k.UuidGenerate, uuid.Nil),
+			PodClusterLcuuid: k.podClusterLcuuid,
 		}
 		podNodes = append(podNodes, podNode)
 		k.nodeIPToLcuuid[nodeIP] = uID

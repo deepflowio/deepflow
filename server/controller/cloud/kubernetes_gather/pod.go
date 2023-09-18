@@ -203,7 +203,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			CreatedAt:           created,
 			AZLcuuid:            k.azLcuuid,
 			RegionLcuuid:        k.RegionUuid,
-			PodClusterLcuuid:    common.GetUUID(k.UuidGenerate, uuid.Nil),
+			PodClusterLcuuid:    k.podClusterLcuuid,
 		}
 		pods = append(pods, pod)
 		podIP := pData.Get("status").Get("podIP").MustString()
@@ -225,9 +225,8 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 	}
 
 	for nodeIP := range abstractNodes {
-		podClusterLcuuid := common.GetUUID(k.UuidGenerate, uuid.Nil)
 		nodes = append(nodes, model.PodNode{
-			Lcuuid:           common.GetUUID(nodeIP+podClusterLcuuid, uuid.Nil),
+			Lcuuid:           common.GetUUID(nodeIP+k.podClusterLcuuid, uuid.Nil),
 			Name:             nodeIP,
 			Type:             common.POD_NODE_TYPE_NODE,
 			ServerType:       common.POD_NODE_SERVER_TYPE_HOST,
@@ -236,7 +235,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			VPCLcuuid:        k.VPCUuid,
 			AZLcuuid:         k.azLcuuid,
 			RegionLcuuid:     k.RegionUuid,
-			PodClusterLcuuid: common.GetUUID(k.UuidGenerate, uuid.Nil),
+			PodClusterLcuuid: k.podClusterLcuuid,
 		})
 	}
 	log.Debug("get pods complete")

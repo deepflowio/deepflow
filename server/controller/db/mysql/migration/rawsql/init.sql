@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS prometheus_target (
     other_labels        TEXT COMMENT 'separated by ,',
     domain              CHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
+    pod_cluster_id      INTEGER,
     create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
