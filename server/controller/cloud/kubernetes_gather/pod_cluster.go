@@ -32,8 +32,9 @@ func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 		log.Errorf("pod cluster initialization version json error: (%s)", vErr.Error())
 		return model.PodCluster{}, vErr
 	}
+	k.podClusterLcuuid = common.GetUUID(k.UuidGenerate, uuid.Nil)
 	podCluster := model.PodCluster{
-		Lcuuid:       common.GetUUID(k.UuidGenerate, uuid.Nil),
+		Lcuuid:       k.podClusterLcuuid,
 		Version:      K8S_VERSION_PREFIX + " " + vJson.Get("gitVersion").MustString(),
 		Name:         k.Name,
 		VPCLcuuid:    k.VPCUuid,
