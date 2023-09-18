@@ -64,6 +64,7 @@ type Counter struct {
 type BuilderCounter struct {
 	TimeSeriesIn      int64 `statsd:"time-series-in"`
 	TimeSeriesInvaild int64 `statsd:"time-series-invalid"`
+	PodClusterMiss    int64 `statsd:"pod-cluster-miss"`
 	LabelCount        int64 `statsd:"label-in"`
 	MetricMiss        int64 `statsd:"metirc-miss"`
 	NameMiss          int64 `statsd:"name-miss"`
@@ -289,8 +290,18 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
 	if len(ts.Samples) == 0 {
 		b.counter.TimeSeriesInvaild++
-		return false, nil
+		return false, fmt.Errorf("prometheum samples of time serries(%s) is empty.", ts)
 	}
+
+	// get pod cluster id
+	podClusterId := uint16(0)
+	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
+		podClusterId = uint16(vtapInfo.PodClusterId)
+	} else {
+		b.counter.PodClusterMiss++
+		return false, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
+	}
+
 	b.counter.TimeSeriesIn++
 
 	b.samplesBuffer = b.samplesBuffer[:0]
@@ -393,7 +404,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			return true, nil
 		}
 	}
-	targetID, ok := b.labelTable.QueryTargetID(jobID, instanceID)
+	targetID, ok := b.labelTable.QueryTargetID(podClusterId, jobID, instanceID)
 	if !ok {
 		b.counter.TargetMiss++
 		return true, nil
