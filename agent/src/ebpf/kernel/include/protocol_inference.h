@@ -1542,6 +1542,58 @@ infer_fastcgi_message(const char *buf, size_t count,
 	return MSG_UNKNOWN;
 }
 
+// https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
+#define MONGO_OP_REPLY 1
+#define MONGO_OP_UPDATE 2001
+#define MONGO_OP_INSERT 2002
+#define MONGO_RESERVED 2003
+#define MONGO_OP_QUERY 2004
+#define MONGO_OP_GET_MORE 2005
+#define MONGO_OP_DELETE 2006
+#define MONGO_OP_KILL_CURSORS 2007
+#define MONGO_OP_COMPRESSED 2012
+#define MONGO_OP_MSG 2013
+
+struct mongo_header {
+    __s32   message_length;
+    __s32   request_id;
+    __s32   response_to;
+    __s32   op_code;
+};
+
+static __inline enum message_type
+infer_mongo_message(const char *buf, size_t count,
+		    struct conn_info_t *conn_info)
+{
+	if (!is_protocol_enabled(PROTO_MONGO)) {
+		return MSG_UNKNOWN;
+	}
+	if (count < sizeof(struct mongo_header)) {
+		return MSG_UNKNOWN;
+	}
+	struct mongo_header header = {};
+	bpf_probe_read(&header, sizeof(header), buf);
+	if (header.message_length < count) {
+		return MSG_UNKNOWN;
+	}
+	if (header.request_id < 0) {
+		return MSG_UNKNOWN;
+	}
+	if (header.op_code < MONGO_OP_UPDATE) {
+		return MSG_UNKNOWN;
+	}
+	if (header.op_code > MONGO_OP_KILL_CURSORS && header.op_code < MONGO_OP_COMPRESSED) {
+		return MSG_UNKNOWN;
+	}
+	if (header.op_code > MONGO_OP_MSG) {
+		return MSG_UNKNOWN;
+	}
+	if (header.op_code == MONGO_OP_REPLY) {
+		return MSG_RESPONSE;
+	}
+	return MSG_REQUEST;
+}
+
 static __inline bool drop_msg_by_comm(void)
 {
 	char comm[TASK_COMM_LEN];
@@ -1761,6 +1813,14 @@ infer_protocol(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_MONGO:
+			if ((inferred_message.type =
+			     infer_mongo_message(syscall_infer_buf, syscall_infer_len,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_MONGO;
+				return inferred_message;
+			}
+			break;
 		default:
 			break;
 		}
@@ -1831,6 +1891,14 @@ infer_protocol(struct ctx_info_s *ctx,
 		    infer_dns_message(infer_buf, count,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_mongo_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MONGO;
 	}
 
 	if (inferred_message.protocol != MSG_UNKNOWN)
