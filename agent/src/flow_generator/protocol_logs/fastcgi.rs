@@ -98,8 +98,7 @@ pub struct FastCGIInfo {
 
 impl L7ProtocolInfoInterface for FastCGIInfo {
     fn session_id(&self) -> Option<u32> {
-        // Some(self.request_id)
-        None
+        Some(self.request_id)
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
