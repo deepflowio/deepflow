@@ -98,8 +98,7 @@ pub struct FastCGIInfo {
 
 impl L7ProtocolInfoInterface for FastCGIInfo {
     fn session_id(&self) -> Option<u32> {
-        // Some(self.request_id)
-        None
+        Some(self.request_id)
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
@@ -406,6 +405,7 @@ impl L7ProtocolParserInterface for FastCGILog {
                 for (record, record_payload, off) in RecordIter::new(payload) {
                     if record.record_type == FCGI_PARAMS {
                         info.request_id = record.request_id as u32;
+                        info.version = record.version;
                         if record.content_len > 0 {
                             info.fill_from_param(record_payload, param.direction, config)?;
                             info.seq_off = off as u32;
@@ -426,7 +426,7 @@ impl L7ProtocolParserInterface for FastCGILog {
                     info.seq_off = off as u32;
                     if record.record_type == FCGI_STDOUT {
                         info.request_id = record.request_id as u32;
-
+                        info.version = record.version;
                         let mut is_hdr = false;
 
                         for i in parse_v1_headers(record_payload) {
