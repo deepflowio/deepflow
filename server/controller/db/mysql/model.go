@@ -799,6 +799,7 @@ type PrometheusTarget struct {
 	Job            string `gorm:"column:job;type:varchar(255);default:''" json:"JOB"`
 	ScrapeURL      string `gorm:"column:scrape_url;type:varchar(2083);default:''" json:"SCRAPE_URL"`
 	OtherLabels    string `gorm:"column:other_labels;type:text;default:''" json:"OTHER_LABELS"` // separated by ,
+	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	CreateMethod   int    `gorm:"column:create_method;type:tinyint(1);default:1" json:"CREATE_METHOD"`
