@@ -23,6 +23,7 @@ import (
 
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
@@ -48,13 +49,7 @@ func Add(r interface{}) {
 }
 
 func Run(ctx context.Context, cfg *config.ControllerConfig) {
-
-	maxMsgSize := cfg.GrpcMaxMessageLength
-	server := grpc.NewServer(
-		grpc.MaxMsgSize(maxMsgSize),
-		grpc.MaxRecvMsgSize(maxMsgSize),
-		grpc.MaxSendMsgSize(maxMsgSize),
-	)
+	server := newServer(cfg.GrpcMaxMessageLength)
 	for _, registration := range register.r {
 		registration.Register(server)
 	}
@@ -74,4 +69,39 @@ func Run(ctx context.Context, cfg *config.ControllerConfig) {
 	<-ctx.Done()
 	server.Stop()
 	log.Info("grpc server shutdown")
+}
+
+func newServer(maxMsgSize int, opts ...grpc.ServerOption) *grpc.Server {
+	opts = append(opts, grpc.MaxMsgSize(maxMsgSize))
+	opts = append(opts, grpc.MaxRecvMsgSize(maxMsgSize))
+	opts = append(opts, grpc.MaxSendMsgSize(maxMsgSize))
+	return grpc.NewServer(opts...)
+}
+
+func RunTLS(ctx context.Context, cfg *config.ControllerConfig) {
+	creds, err := credentials.NewServerTLSFromFile(cfg.AgentSSLKeyFile, cfg.AgentSSLCertFile)
+	if err != nil {
+		log.Errorf("failed to generate credentials %v, key file: %s, cert file: %s", err, cfg.AgentSSLKeyFile, cfg.AgentSSLCertFile)
+		return
+	}
+	sslServer := newServer(cfg.GrpcMaxMessageLength, grpc.Creds(creds))
+	for _, registration := range register.r {
+		registration.Register(sslServer)
+	}
+
+	addr := net.JoinHostPort("", cfg.SSLGrpcPort)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Errorf("ssl net.Listen err: %v", err)
+		return
+	}
+	go sslServer.Serve(lis)
+	log.Infof("listening and serving SSL GRPC on: %s", cfg.SSLGrpcPort)
+
+	wg := utils.GetWaitGroupInCtx(ctx)
+	wg.Add(1)
+	defer wg.Done()
+	<-ctx.Done()
+	sslServer.Stop()
+	log.Info("grpc ssl server shutdown")
 }
