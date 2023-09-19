@@ -882,6 +882,7 @@ func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int)
 		RegionLcuuid:    dbItem.Region,
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
+		Label:           dbItem.Label,
 	}
 	log.Info(addDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
 }
