@@ -264,9 +264,9 @@ impl Trident {
             }
         };
 
-        let hostname = match &config.override_os_hostname {
+        let hostname = match config.override_os_hostname.as_ref() {
             Some(name) => name.to_owned(),
-            None => get_hostname().unwrap_or("unknown-host".to_owned()),
+            None => get_hostname().unwrap_or_default(),
         };
 
         let ntp_diff = Arc::new(AtomicI64::new(0));
