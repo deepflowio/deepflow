@@ -48,6 +48,7 @@ type SlowCounter struct {
 }
 
 type SlowItem struct {
+	vtapId       uint16
 	podClusterId uint16
 	ts           prompb.TimeSeries
 }
@@ -56,8 +57,9 @@ var slowItemPool = pool.NewLockFreePool(func() interface{} {
 	return &SlowItem{}
 })
 
-func AcquireSlowItem(podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
+func AcquireSlowItem(vtapId, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
 	s := slowItemPool.Get().(*SlowItem)
+	s.vtapId = podClusterId
 	s.podClusterId = podClusterId
 
 	for _, l := range append(extraLabels, ts.Labels...) {
@@ -159,7 +161,7 @@ func (d *SlowDecoder) Run() {
 		}
 
 		for _, item := range slowItems {
-			d.sendPrometheusSamples(item.podClusterId, &item.ts)
+			d.sendPrometheusSamples(item.vtapId, item.podClusterId, &item.ts)
 			ReleaseSlowItem(item)
 		}
 		req.RequestLabels = req.RequestLabels[:0]
@@ -315,11 +317,11 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, podClust
 	return labelReq, targetReq
 }
 
-func (d *SlowDecoder) sendPrometheusSamples(vtapID uint16, ts *prompb.TimeSeries) {
+func (d *SlowDecoder) sendPrometheusSamples(vtapID, podClusterId uint16, ts *prompb.TimeSeries) {
 	if d.debugEnabled {
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts, nil)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, nil)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
