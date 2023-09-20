@@ -44,7 +44,7 @@ use super::{
 use crate::error;
 #[cfg(target_os = "linux")]
 use crate::{
-    common::ebpf::GO_HTTP2_UPROBE,
+    common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
         MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
         SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
