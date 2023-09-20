@@ -318,6 +318,22 @@ clickhouse指标量及算子特殊处理：
   )
   ```
 
+- Map类
+  - 不支持算子
+
+  ```
+  SELECT toJSONString(CAST((metrics_names, metrics_values), 'Map(String, Float64)')) AS `metrics` 
+  FROM flow_log.`l7_flow_log`
+  ```
+
+- Row类
+  - 仅支持Count算子
+
+  ```
+  SELECT COUNT(1) AS `row` 
+  FROM flow_log.`l7_flow_log`
+  ```
+
 注意事项
 ====================
 

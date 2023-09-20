@@ -17,6 +17,7 @@
 package encoder
 
 import (
+	"fmt"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -27,8 +28,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
-
-type targetKeyToID map[cache.TargetKey]int
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type target struct {
@@ -69,27 +68,28 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 
 	resp := make([]*controller.PrometheusTarget, 0)
 	var dbToAdd []*mysql.PrometheusTarget
+	podClusterIDToDomainInfo, err := getPodClusterIDToDomainInfo()
 	for i := range ts {
 		t := ts[i]
-		di, err := getDomainInfoByVTapID(int(t.GetVtapId()))
-		if err != nil {
-			return nil, err
-		}
 		ins := t.GetInstance()
 		job := t.GetJob()
-		if id, ok := ln.keyToID.Load(cache.NewTargetKey(ins, job)); ok {
+		podClusterID := int(t.GetPodClusterId())
+		if id, ok := ln.keyToID.Load(cache.NewTargetKey(ins, job, podClusterID)); ok {
 			resp = append(resp, &controller.PrometheusTarget{
-				Id:       proto.Uint32(uint32(id.(int))),
-				Instance: &ins,
-				Job:      &job,
+				Id:           proto.Uint32(uint32(id.(int))),
+				Instance:     &ins,
+				Job:          &job,
+				PodClusterId: proto.Uint32(uint32(podClusterID)),
 			})
 			continue
 		}
+		di := podClusterIDToDomainInfo[podClusterID]
 		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{ // TODO  id 复用
-			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + "prometheus")},
+			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d", podClusterID) + "prometheus")},
 			CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS,
 			Instance:     ins,
 			Job:          job,
+			PodClusterID: podClusterID,
 			Domain:       di.domain,
 			SubDomain:    di.subDomain,
 		})
@@ -111,12 +111,13 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	}
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
-		k := cache.NewTargetKey(dbToAdd[i].Instance, dbToAdd[i].Job)
+		k := cache.NewTargetKey(dbToAdd[i].Instance, dbToAdd[i].Job, dbToAdd[i].PodClusterID)
 		ln.keyToID.Store(k, id)
 		resp = append(resp, &controller.PrometheusTarget{
-			Id:       proto.Uint32(uint32(id)),
-			Instance: &k.Instance,
-			Job:      &k.Job,
+			Id:           proto.Uint32(uint32(id)),
+			Instance:     &k.Instance,
+			Job:          &k.Job,
+			PodClusterId: proto.Uint32(uint32(k.PodClusterID)),
 		})
 	}
 	return resp, nil
@@ -129,10 +130,11 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err)
 		return nil, err
 	}
+
 	inUseIDSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDSet.Add(item.ID)
-		ln.keyToID.Store(cache.NewTargetKey(item.Instance, item.Job), item.ID)
+		ln.keyToID.Store(cache.NewTargetKey(item.Instance, item.Job, item.PodClusterID), item.ID)
 	}
 	return inUseIDSet, nil
 }
@@ -158,37 +160,16 @@ type domainInfo struct {
 	subDomain string
 }
 
-func getDomainInfoByVTapID(id int) (*domainInfo, error) {
-	vtap, err := getByID[mysql.VTap](id)
+func getPodClusterIDToDomainInfo() (podClusterIDToDomainInfo map[int]domainInfo, err error) {
+	var podClusters []*mysql.PodCluster
+	err = mysql.Db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		return nil, err
+		log.Errorf("db query pod cluster failed: %v", err)
+		return
 	}
-	di := new(domainInfo)
-	switch common.VTAP_TYPE_TO_DEVICE_TYPE[vtap.Type] {
-	case common.VIF_DEVICE_TYPE_HOST:
-		var device *mysql.Host
-		device, err = getByID[mysql.Host](vtap.LaunchServerID)
-		di.domain = device.Domain
-	case common.VIF_DEVICE_TYPE_VM:
-		var device *mysql.VM
-		device, err = getByID[mysql.VM](vtap.LaunchServerID)
-		di.domain = device.Domain
-	case common.VIF_DEVICE_TYPE_POD_NODE:
-		var device *mysql.PodNode
-		device, err = getByID[mysql.PodNode](vtap.LaunchServerID)
-		di.domain = device.Domain
-		di.subDomain = device.SubDomain
-	case common.VIF_DEVICE_TYPE_POD:
-		var device *mysql.Pod
-		device, err = getByID[mysql.Pod](vtap.LaunchServerID)
-		di.domain = device.Domain
-		di.subDomain = device.SubDomain
+	podClusterIDToDomainInfo = make(map[int]domainInfo)
+	for _, podCluster := range podClusters {
+		podClusterIDToDomainInfo[podCluster.ID] = domainInfo{domain: podCluster.Domain, subDomain: podCluster.SubDomain}
 	}
-	return di, err
-}
-
-func getByID[T any](id int) (*T, error) {
-	var item *T
-	err := mysql.Db.Where("id = ?", id).Find(&item).Error
-	return item, err
+	return
 }

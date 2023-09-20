@@ -64,7 +64,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 		mn := item.GetMetricName()
 		ti := int(item.GetTargetId())
 		if ti == 0 {
-			ti, _ = mt.targetEncoder.getID(cache.NewTargetKey(item.GetInstance(), item.GetJob()))
+			ti, _ = mt.targetEncoder.getID(cache.NewTargetKey(item.GetInstance(), item.GetJob(), int(item.GetPodClusterId())))
 		}
 		if ti != 0 {
 			if ok := mt.metricTargets.Contains(cache.NewMetricTargetKey(mn, ti)); ok {

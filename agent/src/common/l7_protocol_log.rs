@@ -86,8 +86,8 @@ macro_rules! impl_protocol_parser {
                 match self {
                     Self::Http(p) => {
                         match p.protocol() {
-                            L7Protocol::Http1 => return "HTTP",
-                            L7Protocol::Http2 => return "HTTP2",
+                            L7Protocol::Http1|L7Protocol::Http1TLS => return "HTTP",
+                            L7Protocol::Http2|L7Protocol::Http2TLS => return "HTTP2",
                             _ => unreachable!()
                         }
                     },
@@ -544,7 +544,20 @@ impl From<&Vec<String>> for L7ProtocolBitmap {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
             if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
-                bitmap.set_enabled(p.protocol());
+                let protocol = p.protocol();
+                match protocol {
+                    L7Protocol::Http1 => {
+                        bitmap.set_enabled(L7Protocol::Http1);
+                        bitmap.set_enabled(L7Protocol::Http1TLS);
+                    }
+                    L7Protocol::Http2 => {
+                        bitmap.set_enabled(L7Protocol::Http2);
+                        bitmap.set_enabled(L7Protocol::Http2TLS);
+                    }
+                    _ => {
+                        bitmap.set_enabled(protocol);
+                    }
+                }
             }
         }
         bitmap
