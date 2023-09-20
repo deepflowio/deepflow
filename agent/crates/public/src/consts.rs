@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::time::Duration;
+
 #[cfg(target_os = "linux")]
 pub const PROCESS_NAME: &str = "deepflow-agent";
 #[cfg(target_os = "windows")]
@@ -404,3 +406,7 @@ pub const L7_PROTOCOL_INFERENCE_TTL: usize = 60;
 // RawPcap
 pub const PCAP_MAGIC: u32 = 0xa1b2c3d4;
 pub const RECORD_HEADER_LEN: usize = 16;
+
+// GRPC
+pub const GRPC_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
+pub const GRPC_SESSION_TIMEOUT: Duration = Duration::from_secs(30);
