@@ -268,7 +268,17 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts, extraLabels)
+
+	podClusterId, err := d.samplesBuilder.GetPodClusterId(vtapID)
+	if err != nil {
+		if d.counter.TimeSeriesErr == 0 {
+			log.Warning(err)
+		}
+		d.counter.TimeSeriesErr++
+		return
+	}
+
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, extraLabels)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -279,7 +289,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	builder := d.samplesBuilder
 	if isSlowItem {
 		d.counter.TimeSeriesSlow++
-		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, ts, extraLabels))
+		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, podClusterId, ts, extraLabels))
 		return
 	}
 	d.prometheusWriter.WriteBatch(builder.samplesBuffer, builder.metricName, builder.timeSeriesBuffer, extraLabels, builder.tsLabelNameIDsBuffer, builder.tsLabelValueIDsBuffer)
@@ -287,21 +297,22 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	d.counter.TimeSeriesOut++
 }
 
-func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
-	if len(ts.Samples) == 0 {
-		b.counter.TimeSeriesInvaild++
-		return false, fmt.Errorf("prometheum samples of time serries(%s) is empty.", ts)
-	}
-
-	// get pod cluster id
+func (b *PrometheusSamplesBuilder) GetPodClusterId(vtapID uint16) (uint16, error) {
 	podClusterId := uint16(0)
 	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
 		podClusterId = uint16(vtapInfo.PodClusterId)
 	} else {
 		b.counter.PodClusterMiss++
-		return false, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
+		return 0, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
 	}
+	return podClusterId, nil
+}
 
+func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
+	if len(ts.Samples) == 0 {
+		b.counter.TimeSeriesInvaild++
+		return false, fmt.Errorf("prometheum samples of time serries(%s) is empty.", ts)
+	}
 	b.counter.TimeSeriesIn++
 
 	b.samplesBuffer = b.samplesBuffer[:0]
