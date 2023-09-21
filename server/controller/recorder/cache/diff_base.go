@@ -674,6 +674,7 @@ func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int)
 		State:        dbItem.State,
 		PublicHost:   dbItem.PublicHost,
 		RegionLcuuid: dbItem.Region,
+		AZLcuuid:     dbItem.AZ,
 	}
 	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
 }
@@ -884,6 +885,7 @@ func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int)
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:            dbItem.Name,
+		Label:           dbItem.Label,
 		PodNum:          dbItem.PodNum,
 		RegionLcuuid:    dbItem.Region,
 		AZLcuuid:        dbItem.AZ,
@@ -1109,7 +1111,6 @@ func (n *Network) Update(cloudItem *cloudmodel.Network) {
 	n.VPCLcuuid = cloudItem.VPCLcuuid
 	n.RegionLcuuid = cloudItem.RegionLcuuid
 	n.AZLcuuid = cloudItem.AZLcuuid
-	n.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_NETWORK_EN, n))
 }
 
@@ -1123,7 +1124,6 @@ type Subnet struct {
 func (s *Subnet) Update(cloudItem *cloudmodel.Subnet) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
-	s.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_SUBNET_EN, s))
 }
 
@@ -1189,7 +1189,6 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.TapMac = cloudItem.TapMac
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	v.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))
 }
 
@@ -1202,7 +1201,6 @@ type WANIP struct {
 
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
-	w.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	w.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_WAN_IP_EN, w))
 }
@@ -1214,7 +1212,6 @@ type LANIP struct {
 }
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
-	l.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	l.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
 }
@@ -1421,7 +1418,6 @@ func (p *PodCluster) Update(cloudItem *cloudmodel.PodCluster) {
 	p.ClusterName = cloudItem.ClusterName
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, p))
 }
 
@@ -1441,7 +1437,6 @@ func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
 	p.MemTotal = cloudItem.MemTotal
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NODE_EN, p))
 }
 
@@ -1449,14 +1444,13 @@ type PodNamespace struct {
 	DiffBase
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuu"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 	CloudTags       string `json:"cloud_tags"`
 }
 
 func (p *PodNamespace) Update(cloudItem *cloudmodel.PodNamespace) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	p.CloudTags = cloudItem.CloudTags
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, p))
 }
@@ -1466,14 +1460,13 @@ type PodIngress struct {
 	Name            string `json:"name"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuu"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
 func (p *PodIngress) Update(cloudItem *cloudmodel.PodIngress) {
 	p.Name = cloudItem.Name
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, p))
 }
 
@@ -1482,19 +1475,9 @@ type PodIngressRule struct {
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
-func (p *PodIngressRule) Update(cloudItem *cloudmodel.PodIngressRule) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, p))
-}
-
 type PodIngressRuleBackend struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *PodIngressRuleBackend) Update(cloudItem *cloudmodel.PodIngressRuleBackend) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, p))
 }
 
 type PodService struct {
@@ -1517,7 +1500,6 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, p))
 }
 
@@ -1529,7 +1511,6 @@ type PodServicePort struct {
 
 func (p *PodServicePort) Update(cloudItem *cloudmodel.PodServicePort) {
 	p.Name = cloudItem.Name
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, p))
 }
 
@@ -1551,7 +1532,6 @@ func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup) {
 	p.Type = cloudItem.Type
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_EN, p))
 }
 
@@ -1563,7 +1543,6 @@ type PodGroupPort struct {
 
 func (p *PodGroupPort) Update(cloudItem *cloudmodel.PodGroupPort) {
 	p.Name = cloudItem.Name
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
 }
 
@@ -1583,7 +1562,6 @@ func (p *PodReplicaSet) Update(cloudItem *cloudmodel.PodReplicaSet) {
 	p.PodNum = cloudItem.PodNum
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, p))
 }
 
@@ -1613,18 +1591,12 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.VPCLcuuid = cloudItem.VPCLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_EN, p))
 }
 
 type VMPodNodeConnection struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *VMPodNodeConnection) Update(cloudItem *cloudmodel.VMPodNodeConnection) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, p))
 }
 
 type NATVMConnection struct {
