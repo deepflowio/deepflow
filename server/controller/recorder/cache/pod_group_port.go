@@ -47,6 +47,5 @@ type PodGroupPort struct {
 
 func (p *PodGroupPort) Update(cloudItem *cloudmodel.PodGroupPort) {
 	p.Name = cloudItem.Name
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
 }
