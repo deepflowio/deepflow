@@ -485,19 +485,19 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 
 	for _, podGroup := range podGroups {
 		key := DeviceKey{
-			DeviceType: CH_DEVICE_TYPE_POD_GROUP,
+			DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 			DeviceID:   podGroup.ID,
 		}
 		if podGroup.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_POD_GROUP,
+				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				DeviceID:   podGroup.ID,
 				Name:       podGroup.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_POD_GROUP,
+				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				DeviceID:   podGroup.ID,
 				Name:       podGroup.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],

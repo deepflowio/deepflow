@@ -48,15 +48,17 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 	for _, podGroup := range podGroups {
 		if podGroup.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
-				ID:     podGroup.ID,
-				Name:   podGroup.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				ID:           podGroup.ID,
+				Name:         podGroup.Name + " (deleted)",
+				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 			}
 		} else {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
-				ID:     podGroup.ID,
-				Name:   podGroup.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				ID:           podGroup.ID,
+				Name:         podGroup.Name,
+				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 			}
 		}
 	}
@@ -71,6 +73,9 @@ func (p *ChPodGroup) generateUpdateInfo(oldItem, newItem mysql.ChPodGroup) (map[
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
+	}
+	if oldItem.PodGroupType != newItem.PodGroupType {
+		updateInfo["pod_group_type"] = newItem.PodGroupType
 	}
 	if oldItem.IconID != newItem.IconID {
 		updateInfo["icon_id"] = newItem.IconID

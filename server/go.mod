@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.7.0
 	go.opentelemetry.io/proto/otlp v0.18.0
 	golang.org/x/net v0.7.0
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.13.0
 	google.golang.org/grpc v1.53.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -86,7 +86,10 @@ require (
 	k8s.io/client-go v0.24.0
 )
 
-require github.com/go-redis/redis/v9 v9.0.0-rc.2
+require (
+	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+)
 
 require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
