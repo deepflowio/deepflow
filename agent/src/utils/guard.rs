@@ -229,10 +229,10 @@ impl Guard {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
                 let cpu_limit = config.max_cpus;
-                match get_file_and_size_sum(log_dir.clone()) {
+                match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
                         let log_file_size = config.log_file_size; // Log file size limit (unit: M)
-                        let file_sizes_sum = file_and_size_sum.file_sizes_sum.clone(); // Total size of current log files (unit: B)
+                        let file_sizes_sum = file_and_size_sum.file_sizes_sum; // Total size of current log files (unit: B)
                         debug!(
                             "current log files' size: {}B, log_file_size_limit: {}B",
                             file_sizes_sum,
