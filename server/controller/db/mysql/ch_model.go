@@ -224,9 +224,10 @@ type ChPodCluster struct {
 }
 
 type ChPodGroup struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	PodGroupType int    `gorm:"column:pod_group_type;type:int;default:null" json:"POD_GROUP_TYPE"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 }
 
 type ChPodNamespace struct {
