@@ -24,6 +24,7 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
+use public::l7_protocol::DEFAULT_DNS_PORT;
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -32,6 +33,8 @@ use serde::{
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
+use crate::common::l7_protocol_log::L7ProtocolParser;
+use crate::flow_generator::DnsLog;
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -717,6 +720,14 @@ impl YamlConfig {
             ));
         }
         port_bitmap.sort_unstable_by_key(|p| p.0.clone());
+
+        let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
+        // dns default only parse 53 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
+        if !self.l7_protocol_ports.contains_key(dns_str) {
+            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
+            bitmap.set(DEFAULT_DNS_PORT as usize, true).unwrap();
+            port_bitmap.push((dns_str.to_string(), bitmap));
+        }
         port_bitmap
     }
 }

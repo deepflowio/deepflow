@@ -69,6 +69,5 @@ func (n *Network) Update(cloudItem *cloudmodel.Network) {
 	n.VPCLcuuid = cloudItem.VPCLcuuid
 	n.RegionLcuuid = cloudItem.RegionLcuuid
 	n.AZLcuuid = cloudItem.AZLcuuid
-	n.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_NETWORK_EN, n))
 }

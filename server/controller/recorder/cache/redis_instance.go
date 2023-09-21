@@ -32,6 +32,7 @@ func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int)
 		State:        dbItem.State,
 		PublicHost:   dbItem.PublicHost,
 		RegionLcuuid: dbItem.Region,
+		AZLcuuid:     dbItem.AZ,
 	}
 	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
 }

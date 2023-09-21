@@ -50,6 +50,5 @@ type Subnet struct {
 func (s *Subnet) Update(cloudItem *cloudmodel.Subnet) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
-	s.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_SUBNET_EN, s))
 }

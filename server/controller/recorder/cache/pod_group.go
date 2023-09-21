@@ -62,6 +62,5 @@ func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup) {
 	p.Type = cloudItem.Type
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_EN, p))
 }
