@@ -265,6 +265,9 @@ var (
 		input:  "SELECT node_type(is_internet_0) as `client_node_type` , icon_id(is_internet_0) as `client_icon_id`,  node_type(is_internet_1) as `server_node_type`, is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
 		output: "WITH if(l3_epc_id_0=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999))),0) AS `client_icon_id` SELECT if(l3_epc_id_0=-2,'internet','') AS `client_node_type`, `client_icon_id`, if(l3_epc_id_1=-2,'internet','') AS `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY `client_node_type`, `client_icon_id`, `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
 	}, {
+		input:  "select Enum(pod_group_type_0) ,pod_group_type_0 from l7_flow_log where Enum(pod_group_type_0)!='Deployment' limit 10",
+		output: "WITH dictGetOrDefault(flow_tag.int_enum_map, 'name', ('pod_group_type',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) AS `Enum(pod_group_type_0)` SELECT `Enum(pod_group_type_0)`, dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))) AS `pod_group_type_0` FROM flow_log.`l7_flow_log` PREWHERE (not(toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name = 'Deployment' and tag_name='pod_group_type') AND pod_group_id_0!=0)) LIMIT 10",
+	}, {
 		index:  "count_1",
 		input:  "select Count(row) as a from l7_flow_log having a > 0 ",
 		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
