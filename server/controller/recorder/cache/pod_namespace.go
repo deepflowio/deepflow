@@ -45,14 +45,13 @@ type PodNamespace struct {
 	DiffBase
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuu"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 	CloudTags       string `json:"cloud_tags"`
 }
 
 func (p *PodNamespace) Update(cloudItem *cloudmodel.PodNamespace) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	p.CloudTags = cloudItem.CloudTags
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, p))
 }

@@ -17,7 +17,6 @@
 package cache
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
@@ -41,9 +40,4 @@ func (b *DiffBaseDataSet) deleteVMPodNodeConnection(lcuuid string) {
 type VMPodNodeConnection struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *VMPodNodeConnection) Update(cloudItem *cloudmodel.VMPodNodeConnection) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, p))
 }
