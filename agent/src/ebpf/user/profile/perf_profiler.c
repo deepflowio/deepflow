@@ -83,10 +83,6 @@ static FILE *folded_file;
 static char *flame_graph_start_time;
 static char *flame_graph_end_time;
 
-/* "Maximum data push interval time (in seconds). */
-#define MAX_PUSH_MSG_TIME_INTERVAL 10
-/* "Maximum data push messages count. */
-#define MAX_PUSH_MSG_COUNT 1000
 /* profiler start time(monotonic seconds). */
 static u64 start_time;
 /* Record the time of the last data push
@@ -373,23 +369,19 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	ASSERT(profiler_tracer != NULL);
 
 	u64 curr_time, elapsed;
-	curr_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
+	curr_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 	elapsed = curr_time - last_push_time;
 	/*
 	 * If the aggregated stack trace data obtained by the profiler
 	 * satisfies one of the following conditions, it should be pushed
 	 * to the upper-level processing:
 	 *
-	 * 1 If the aggregated count exceeds or equals the maximum push
-	 *   count (MAX_PUSH_MSG_COUNT).
-	 *
-	 * 2 If the time interval since the last push exceeds or equals
+	 *   If the time interval since the last push exceeds or equals
 	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL).
 	 *
 	 * Otherwise, it should return directly.
 	 */
-	if (!((h->hash_elems_count >= MAX_PUSH_MSG_COUNT) ||
-	      (elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
+	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
 		return;
 
 	/* update last push time. */
