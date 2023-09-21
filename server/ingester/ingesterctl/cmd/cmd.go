@@ -100,7 +100,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	}))
 
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"stats", "show otlp exporter stats"}, nil))
-	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
+	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }
