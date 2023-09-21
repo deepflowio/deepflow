@@ -114,10 +114,17 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 
 	__u64 id = bpf_get_current_pid_tgid();
 	struct stack_trace_key_t key = { 0 };
-	key.cpu = bpf_get_smp_processor_id();
-	bpf_get_current_comm(&key.comm, sizeof(key.comm));
 	key.tgid = id >> 32;
 	key.pid = (__u32)id;
+
+	/*
+	 * CPU idle stacks will not be collected. 
+	 */
+	if (key.tgid == key.pid && key.pid == 0)
+		return 0;
+
+	key.cpu = bpf_get_smp_processor_id();
+	bpf_get_current_comm(&key.comm, sizeof(key.comm));
 	key.timestamp = bpf_ktime_get_ns();
 
 	/*
@@ -151,6 +158,9 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 		if (-EEXIST == key.userstack)
 			__sync_fetch_and_add(drop_count_ptr, 1);
 
+		if (key.userstack < 0 && key.kernstack < 0)
+			return 0;
+
 		sample_count = *sample_count_a_ptr;
 		__sync_fetch_and_add(sample_count_a_ptr, 1);
 
@@ -172,6 +182,9 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 
 		if (-EEXIST == key.userstack)
 			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (key.userstack < 0 && key.kernstack < 0)
+			return 0;
 
 		sample_count = *sample_count_b_ptr;
 		__sync_fetch_and_add(sample_count_b_ptr, 1);
