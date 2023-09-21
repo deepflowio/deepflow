@@ -31,21 +31,21 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 
 use super::{
-    acc_flow::AccumulatedFlow,
     consts::{QUEUE_BATCH_SIZE, RCV_TIMEOUT},
+    types::{AppMeterWithFlow, FlowMeterWithFlow, MiniFlow},
     MetricsType, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
 };
 use crate::{
     common::{
         enums::{EthernetType, IpProtocol},
-        flow::{get_direction, Flow, L7Protocol, SignalSource},
+        flow::{L7Protocol, SignalSource},
     },
     config::handler::{CollectorAccess, CollectorConfig},
     metric::{
         document::{
             BoxedDocument, Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide,
         },
-        meter::{AppMeter, AppMeterWithFlow, FlowMeter, Meter, UsageMeter},
+        meter::{AppMeter, FlowMeter, Meter, UsageMeter},
     },
     rpc::get_timestamp,
     utils::stats::{
@@ -376,7 +376,7 @@ impl Stash {
 
     fn collect_l4(
         &mut self,
-        acc_flow: Option<AccumulatedFlow>,
+        acc_flow: Option<FlowMeterWithFlow>,
         mut time_in_second: u64,
         config: &CollectorConfig,
     ) {
@@ -433,7 +433,7 @@ impl Stash {
             Some(f) => f,
             None => return,
         };
-        let flow = &acc_flow.tagged_flow.flow;
+        let flow = &acc_flow.flow;
 
         // PCAP and Distribution Policy Statistics
         if self.context.metric_type == MetricsType::MINUTE
@@ -489,14 +489,13 @@ impl Stash {
             return;
         }
 
-        let directions = get_direction(flow, config.trident_type, config.cloud_gateway_traffic);
-        self.fill_l4_stats(&acc_flow, directions, config);
+        self.fill_l4_stats(&acc_flow, &acc_flow.flow.directions, config);
     }
 
     fn fill_l4_stats(
         &mut self,
-        acc_flow: &AccumulatedFlow,
-        directions: [Direction; 2],
+        acc_flow: &FlowMeterWithFlow,
+        directions: &[Direction; 2],
         config: &CollectorConfig,
     ) {
         for ep in 0..2 {
@@ -518,7 +517,7 @@ impl Stash {
                 };
                 let tagger = get_single_tagger(
                     self.global_thread_id,
-                    &acc_flow.tagged_flow.flow,
+                    &acc_flow.flow,
                     ep,
                     directions[ep],
                     is_active_host,
@@ -530,7 +529,7 @@ impl Stash {
             }
             let tagger = get_edge_tagger(
                 self.global_thread_id,
-                &acc_flow.tagged_flow.flow,
+                &acc_flow.flow,
                 directions[ep],
                 acc_flow.is_active_host0,
                 acc_flow.is_active_host1,
@@ -546,14 +545,14 @@ impl Stash {
         // statistical data with direction=0 (corresponding tap-side=rest)
         if directions[0] == Direction::None && directions[1] == Direction::None {
             // if otel data's directions are unknown, set direction =  Direction::App
-            let direction = if acc_flow.tagged_flow.flow.signal_source == SignalSource::OTel {
+            let direction = if acc_flow.flow.signal_source == SignalSource::OTel {
                 Direction::App
             } else {
                 Direction::None
             };
             let tagger = get_edge_tagger(
                 self.global_thread_id,
-                &acc_flow.tagged_flow.flow,
+                &acc_flow.flow,
                 direction,
                 acc_flow.is_active_host0,
                 acc_flow.is_active_host1,
@@ -654,23 +653,18 @@ impl Stash {
             return;
         }
 
-        let directions = get_direction(
-            &meter.flow.as_ref().flow,
-            config.trident_type,
-            config.cloud_gateway_traffic,
-        );
-        self.fill_l7_stats(&meter, directions, &config);
+        self.fill_l7_stats(&meter, &meter.flow.directions, &config);
     }
 
-    // When generating doc data, use flow.flow_metrics_peers[x].nat_real_ip/port,
+    // When generating doc data, use flow.peers[x].nat_real_ip/port,
     // The tag is to use the real client before NAT and the real server after NAT
     fn fill_l7_stats(
         &mut self,
         meter: &AppMeterWithFlow,
-        directions: [Direction; 2],
+        directions: &[Direction; 2],
         config: &CollectorConfig,
     ) {
-        let flow = &meter.flow.as_ref().flow;
+        let flow = &meter.flow;
         for ep in 0..2 {
             // Do not count the data of None direction
             if directions[ep] == Direction::None {
@@ -685,7 +679,7 @@ impl Stash {
             if config.inactive_ip_enabled || is_active_host {
                 let mut tagger = get_single_tagger(
                     self.global_thread_id,
-                    flow,
+                    &flow,
                     ep,
                     directions[ep],
                     is_active_host,
@@ -698,7 +692,7 @@ impl Stash {
             }
             let mut tagger = get_edge_tagger(
                 self.global_thread_id,
-                flow,
+                &flow,
                 directions[ep],
                 meter.is_active_host0,
                 meter.is_active_host1,
@@ -722,7 +716,7 @@ impl Stash {
             };
             let mut tagger = get_edge_tagger(
                 self.global_thread_id,
-                flow,
+                &flow,
                 direction,
                 meter.is_active_host0,
                 meter.is_active_host1,
@@ -818,14 +812,14 @@ impl Stash {
 // server_port is ignored when is_active_service and inactive_server_port_enabled is turned off
 // is_active_service and SFlow,NetFlow data, ignoring service port
 // ignore the server for non-TCP/UDP traffic
-fn ignore_server_port(flow: &Flow, inactive_server_port_enabled: bool) -> bool {
+fn ignore_server_port(flow: &MiniFlow, inactive_server_port_enabled: bool) -> bool {
     (!flow.is_active_service && !inactive_server_port_enabled)
         || (flow.flow_key.proto != IpProtocol::TCP && flow.flow_key.proto != IpProtocol::UDP)
 }
 
 fn get_single_tagger(
     global_thread_id: u8,
-    flow: &Flow,
+    flow: &MiniFlow,
     ep: usize,
     direction: Direction,
     is_active_host: bool,
@@ -834,7 +828,7 @@ fn get_single_tagger(
     l7_protocol: L7Protocol,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
-    let side = &flow.flow_metrics_peers[ep];
+    let side = &flow.peers[ep];
     let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
     let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
@@ -845,8 +839,8 @@ fn get_single_tagger(
             Ipv4Addr::UNSPECIFIED.into()
         }
     } else if ep == FLOW_METRICS_PEER_SRC {
-        if flow.flow_metrics_peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-            flow.flow_metrics_peers[0].nat_real_ip
+        if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+            flow.peers[0].nat_real_ip
         } else {
             if is_ipv6 {
                 Ipv6Addr::UNSPECIFIED.into()
@@ -855,8 +849,8 @@ fn get_single_tagger(
             }
         }
     } else {
-        if flow.flow_metrics_peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-            flow.flow_metrics_peers[1].nat_real_ip
+        if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+            flow.peers[1].nat_real_ip
         } else {
             if is_ipv6 {
                 Ipv6Addr::UNSPECIFIED.into()
@@ -889,7 +883,7 @@ fn get_single_tagger(
         {
             0
         } else {
-            flow.flow_metrics_peers[1].nat_real_port
+            flow.peers[1].nat_real_port
         },
         is_ipv6,
         code: {
@@ -919,7 +913,7 @@ fn get_single_tagger(
 
 fn get_edge_tagger(
     global_thread_id: u8,
-    flow: &Flow,
+    flow: &MiniFlow,
     direction: Direction,
     is_active_host0: bool,
     is_active_host1: bool,
@@ -928,16 +922,13 @@ fn get_edge_tagger(
     l7_protocol: L7Protocol,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
-    let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
-    let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
+    let src_ep = &flow.peers[FLOW_METRICS_PEER_SRC];
+    let dst_ep = &flow.peers[FLOW_METRICS_PEER_DST];
 
     let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
     let (src_ip, dst_ip) = {
-        let (mut src_ip, mut dst_ip) = (
-            flow.flow_metrics_peers[0].nat_real_ip,
-            flow.flow_metrics_peers[1].nat_real_ip,
-        );
+        let (mut src_ip, mut dst_ip) = (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip);
         if !config.inactive_ip_enabled {
             if !is_active_host0 {
                 src_ip = if is_ipv6 {
@@ -959,16 +950,14 @@ fn get_edge_tagger(
             // except for otel data
             // =======================================
             // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
-            if flow.flow_metrics_peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel
-            {
+            if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
                 src_ip = if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
                 } else {
                     Ipv4Addr::UNSPECIFIED.into()
                 };
             }
-            if flow.flow_metrics_peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel
-            {
+            if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
                 dst_ip = if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
                 } else {
@@ -1064,7 +1053,7 @@ pub struct Collector {
     counter: Arc<CollectorCounter>,
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    receiver: Arc<Receiver<Box<AccumulatedFlow>>>,
+    receiver: Arc<Receiver<Box<FlowMeterWithFlow>>>,
     sender: DebugSender<BoxedDocument>,
     config: CollectorAccess,
     context: Context,
@@ -1073,7 +1062,7 @@ pub struct Collector {
 impl Collector {
     pub fn new(
         id: u32,
-        receiver: Receiver<Box<AccumulatedFlow>>,
+        receiver: Receiver<Box<FlowMeterWithFlow>>,
         sender: DebugSender<BoxedDocument>,
         metric_type: MetricsType,
         delay_seconds: u32,
@@ -1146,7 +1135,7 @@ impl Collector {
                     match receiver.recv_all(&mut batch, Some(RCV_TIMEOUT)) {
                         Ok(_) => {
                             for flow in batch.drain(..) {
-                                let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
+                                let time_in_second = flow.time_in_second.as_secs();
                                 stash.collect_l4(Some(*flow), time_in_second, &config);
                             }
                             stash.calc_stash_counters();
@@ -1276,9 +1265,8 @@ impl L7Collector {
                     match l7_receiver.recv_all(&mut l7_batch, Some(RCV_TIMEOUT)) {
                         Ok(_) => {
                             for meter in l7_batch.drain(..) {
-                                let time_in_second =
-                                    meter.flow.as_ref().flow.flow_stat_time.as_secs();
-                                stash.collect_l7(Some(*meter), time_in_second, &config);
+                                let ts = meter.time_in_second.as_secs();
+                                stash.collect_l7(Some(*meter), ts, &config);
                             }
                             stash.calc_stash_counters();
                         }

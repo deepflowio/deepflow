@@ -14,17 +14,87 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt, net::IpAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, net::IpAddr};
 
 use super::quadruple_generator::QgKey;
 
-use crate::common::flow::{L7Protocol, SignalSource};
-use crate::common::tagged_flow::TaggedFlow;
-use crate::metric::meter::FlowMeter;
-use public::buffer::BatchedBox;
+use crate::{
+    common::{
+        enums::EthernetType,
+        flow::{Flow, FlowKey, FlowMetricsPeer, L7Protocol, SignalSource},
+        tagged_flow::TaggedFlow,
+        Timestamp,
+    },
+    metric::{
+        document::Direction,
+        meter::{AppMeter, FlowMeter},
+    },
+};
 
-pub struct AccumulatedFlow {
-    pub tagged_flow: Arc<BatchedBox<TaggedFlow>>,
+#[derive(Clone, Debug)]
+pub struct MiniFlow {
+    pub flow_key: FlowKey,
+    pub eth_type: EthernetType,
+    pub peers: [PeerInfo; 2],
+    pub signal_source: SignalSource,
+    pub directions: [Direction; 2],
+    pub is_active_service: bool,
+
+    pub otel_service: Option<String>,
+    pub otel_instance: Option<String>,
+    pub netns_id: u32,
+}
+
+impl From<&Flow> for MiniFlow {
+    fn from(flow: &Flow) -> Self {
+        Self {
+            flow_key: flow.flow_key.clone(),
+            eth_type: flow.eth_type,
+            peers: [
+                (&flow.flow_metrics_peers[0]).into(),
+                (&flow.flow_metrics_peers[1]).into(),
+            ],
+            signal_source: flow.signal_source,
+            directions: Default::default(),
+            is_active_service: flow.is_active_service,
+
+            otel_service: flow.otel_service.clone(),
+            otel_instance: flow.otel_instance.clone(),
+            netns_id: flow.netns_id,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PeerInfo {
+    pub l3_epc_id: i32,
+    pub is_active_host: bool,
+    pub is_device: bool,
+    pub is_vip_interface: bool,
+    pub has_packets: bool,
+
+    pub gpid: u32,
+    pub nat_real_ip: IpAddr,
+    pub nat_real_port: u16,
+}
+
+impl From<&FlowMetricsPeer> for PeerInfo {
+    fn from(fmp: &FlowMetricsPeer) -> Self {
+        Self {
+            l3_epc_id: fmp.l3_epc_id,
+            is_active_host: fmp.is_active_host,
+            is_device: fmp.is_device,
+            is_vip_interface: fmp.is_vip_interface,
+            has_packets: fmp.total_packet_count > 0,
+            gpid: fmp.gpid,
+            nat_real_ip: fmp.nat_real_ip,
+            nat_real_port: fmp.nat_real_port,
+        }
+    }
+}
+
+pub struct FlowMeterWithFlow {
+    pub flow: MiniFlow,
     pub l7_protocol: L7Protocol,
     pub is_active_host0: bool,
     pub is_active_host1: bool,
@@ -32,33 +102,31 @@ pub struct AccumulatedFlow {
     pub id_maps: [HashMap<u16, u16>; 2],
     pub flow_meter: FlowMeter,
     pub key: QgKey,
-    pub time_in_second: Duration,
-    pub nat_real_ip_0: IpAddr,
-    pub nat_real_ip_1: IpAddr,
-    pub nat_real_port_0: u16,
-    pub nat_real_port_1: u16,
+    pub time_in_second: Timestamp,
 }
 
-impl fmt::Display for AccumulatedFlow {
+impl fmt::Display for FlowMeterWithFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let peer0 = &self.flow.peers[0];
+        let peer1 = &self.flow.peers[1];
         write!(
             f,
-            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
-            self.time_in_second, &self.flow_meter, &self.nat_real_ip_0, &self.nat_real_ip_1,  &self.nat_real_port_0, &self.nat_real_port_1,
+            "FlowMeterWithFlow: time: {:?}, flow_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
+            self.time_in_second, &self.flow_meter, &peer0.nat_real_ip, &peer1.nat_real_ip,  &peer0.nat_real_port, &peer1.nat_real_port,
         )
     }
 }
 
-impl fmt::Debug for AccumulatedFlow {
+impl fmt::Debug for FlowMeterWithFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }
 }
 
-impl AccumulatedFlow {
+impl FlowMeterWithFlow {
     pub fn merge(
         &mut self,
-        time_in_second: Duration,
+        time_in_second: Timestamp,
         flow_meter: &FlowMeter,
         id_maps: &[HashMap<u16, u16>; 2],
         tagged_flow: &TaggedFlow,
@@ -76,6 +144,19 @@ impl AccumulatedFlow {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct AppMeterWithFlow {
+    pub flow: MiniFlow,
+    pub l7_protocol: L7Protocol,
+    pub endpoint_hash: u32,
+    pub endpoint: Option<String>,
+    pub is_active_host0: bool,
+    pub is_active_host1: bool,
+
+    pub app_meter: AppMeter,
+    pub time_in_second: Timestamp,
 }
 
 #[derive(Clone)]

@@ -286,11 +286,23 @@ impl FlowMap {
             time_set_slot_size,
             tagged_flow_allocator: {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
-                Allocator::new(n.max(1))
+                let allocator = Allocator::new(n.max(1));
+                stats_collector.register_countable(
+                    "allocator",
+                    Countable::Ref(allocator.counter()),
+                    vec![StatsOption::Tag("type", "TaggedFlow".to_owned())],
+                );
+                allocator
             },
             l7_stats_allocator: {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<L7Stats>();
-                Allocator::new(n.max(1))
+                let allocator = Allocator::new(n.max(1));
+                stats_collector.register_countable(
+                    "allocator",
+                    Countable::Ref(allocator.counter()),
+                    vec![StatsOption::Tag("type", "L7Stats".to_owned())],
+                );
+                allocator
             },
             output_queue,
             out_log_queue: app_proto_log_queue,
