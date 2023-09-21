@@ -521,7 +521,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = equalFilter
 			}
-		case "pod_service_id", "pod_service_id_0", "pod_service_id_1":
+		case "pod_service_id", "pod_service_id_0", "pod_service_id_1", "pod_group_type", "pod_group_type_0", "pod_group_type_1":
+
 			switch strings.ToLower(op) {
 			case "not ilike":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
@@ -674,7 +675,12 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						if strings.Contains(tagName, "pod_group_type") {
+							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
+							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") OR " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						}
 					} else {
 						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName)
 					}
@@ -687,9 +693,18 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						if strings.Contains(tagName, "pod_group_type") {
+							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						}
 					} else {
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
+						if strings.Contains(tagName, "pod_group_type") {
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+						}
 					}
 				} else {
 					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + f.Value
