@@ -56,6 +56,5 @@ func (p *PodCluster) Update(cloudItem *cloudmodel.PodCluster) {
 	p.ClusterName = cloudItem.ClusterName
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, p))
 }
