@@ -44,7 +44,7 @@ use super::{
 use crate::error;
 #[cfg(target_os = "linux")]
 use crate::{
-    common::ebpf::GO_HTTP2_UPROBE,
+    common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
         MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
         SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
@@ -903,7 +903,7 @@ impl<'a> MetaPacket<'a> {
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
-        if data.source == GO_HTTP2_UPROBE {
+        if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {
             if data.l7_protocol_hint == SOCK_DATA_HTTP2
                 || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
             {

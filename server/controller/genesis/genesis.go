@@ -52,26 +52,22 @@ type Genesis struct {
 	grpcMaxMSGLength int
 	cfg              gconfig.GenesisConfig
 	genesisSyncData  atomic.Value
-	kubernetesData   atomic.Value
-	prometheusData   atomic.Value
+	kubernetesData   sync.Map
+	prometheusData   sync.Map
 	genesisStatsd    statsd.GenesisStatsd
 }
 
 func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 	var sData atomic.Value
 	sData.Store(GenesisSyncData{})
-	var kData atomic.Value
-	kData.Store(map[string]KubernetesInfo{})
-	var pData atomic.Value
-	pData.Store(map[string]PrometheusInfo{})
 	GenesisService = &Genesis{
 		mutex:            sync.RWMutex{},
 		grpcPort:         cfg.GrpcPort,
 		grpcMaxMSGLength: cfg.GrpcMaxMessageLength,
 		cfg:              cfg.GenesisCfg,
 		genesisSyncData:  sData,
-		kubernetesData:   kData,
-		prometheusData:   pData,
+		kubernetesData:   sync.Map{},
+		prometheusData:   sync.Map{},
 		genesisStatsd: statsd.GenesisStatsd{
 			K8SInfoDelay: make(map[string][]float64),
 		},
@@ -423,20 +419,31 @@ func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
 	for {
 		select {
 		case k := <-kChan:
-			g.kubernetesData.Store(k)
+			for key, value := range k {
+				g.kubernetesData.Store(key, value)
+			}
 		}
 	}
 }
 
-func (g *Genesis) GetKubernetesData() map[string]KubernetesInfo {
-	return g.kubernetesData.Load().(map[string]KubernetesInfo)
+func (g *Genesis) GetKubernetesData(clusterID string) (KubernetesInfo, bool) {
+	k8sInterface, ok := g.kubernetesData.Load(clusterID)
+	if !ok {
+		log.Warningf("kubernetes data not found cluster id (%s)", clusterID)
+		return KubernetesInfo{}, false
+	}
+	k8sData, ok := k8sInterface.(KubernetesInfo)
+	if !ok {
+		log.Warning("kubernetes data interface assert failed")
+		return KubernetesInfo{}, false
+	}
+	return k8sData, true
 }
 
 func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
 	k8sResp := map[string][]string{}
 
-	localK8sDatas := g.GetKubernetesData()
-	k8sInfo, ok := localK8sDatas[clusterID]
+	k8sInfo, ok := g.GetKubernetesData(clusterID)
 
 	serverIPs, err := g.GetServerIPs()
 	if err != nil {
@@ -519,20 +526,31 @@ func (g *Genesis) receivePrometheusData(pChan chan map[string]PrometheusInfo) {
 	for {
 		select {
 		case p := <-pChan:
-			g.prometheusData.Store(p)
+			for k, v := range p {
+				g.prometheusData.Store(k, v)
+			}
 		}
 	}
 }
 
-func (g *Genesis) GetPrometheusData() map[string]PrometheusInfo {
-	return g.prometheusData.Load().(map[string]PrometheusInfo)
+func (g *Genesis) GetPrometheusData(clusterID string) (PrometheusInfo, bool) {
+	prometheusInterface, ok := g.prometheusData.Load(clusterID)
+	if !ok {
+		log.Warningf("prometheus data not found cluster id (%s)", clusterID)
+		return PrometheusInfo{}, false
+	}
+	prometheusData, ok := prometheusInterface.(PrometheusInfo)
+	if !ok {
+		log.Warning("prometheus data interface assert failed")
+		return PrometheusInfo{}, false
+	}
+	return prometheusData, true
 }
 
 func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.PrometheusTarget, error) {
 	prometheusEntries := []cloudmodel.PrometheusTarget{}
 
-	localPrometheusDatas := g.GetPrometheusData()
-	prometheusInfo, ok := localPrometheusDatas[clusterID]
+	prometheusInfo, ok := g.GetPrometheusData(clusterID)
 
 	serverIPs, err := g.GetServerIPs()
 	if err != nil {
