@@ -20,8 +20,14 @@ use std::{
     mem,
     ops::{Deref, DerefMut, Range},
     ptr, slice,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Weak,
+    },
+    time::Instant,
 };
+
+use crate::counter::{Counter, CounterType, CounterValue, RefCountable};
 
 struct Buffer<T: Sized> {
     size: usize,
@@ -61,6 +67,31 @@ impl<T> Drop for Buffer<T> {
 struct RefCounter<T> {
     ref_count: AtomicUsize,
     buffer: Buffer<T>,
+
+    stats: Arc<StatsCounter>,
+    creation_time: Instant,
+}
+
+impl<T> RefCounter<T> {
+    fn new(capacity: usize, stats: Arc<StatsCounter>) -> Self {
+        stats.concurrent.fetch_add(1, Ordering::Relaxed);
+        Self {
+            ref_count: AtomicUsize::new(1),
+            buffer: Buffer::new(capacity),
+            stats,
+            creation_time: Instant::now(),
+        }
+    }
+}
+
+impl<T> Drop for RefCounter<T> {
+    fn drop(&mut self) {
+        self.stats.concurrent.fetch_sub(1, Ordering::Relaxed);
+        self.stats.max_alive.fetch_max(
+            self.creation_time.elapsed().as_nanos() as u64,
+            Ordering::Relaxed,
+        );
+    }
 }
 
 struct InnerAllocator<T> {
@@ -69,13 +100,10 @@ struct InnerAllocator<T> {
 }
 
 impl<T> InnerAllocator<T> {
-    fn new(capacity: usize) -> Self {
+    fn new(capacity: usize, stats: Arc<StatsCounter>) -> Self {
         Self {
             allocated: 0,
-            counter: Box::into_raw(Box::new(RefCounter {
-                ref_count: AtomicUsize::new(1),
-                buffer: Buffer::new(capacity),
-            })),
+            counter: Box::into_raw(Box::new(RefCounter::new(capacity, stats))),
         }
     }
 
@@ -124,20 +152,74 @@ impl<T> Drop for InnerAllocator<T> {
 pub struct Allocator<T> {
     capacity: usize,
     inner: InnerAllocator<T>,
+
+    stats: Arc<StatsCounter>,
+}
+
+#[derive(Default)]
+pub struct StatsCounter {
+    batch_size: usize,
+
+    new: AtomicU64,
+    concurrent: AtomicU64,
+
+    max_alive: AtomicU64,
+}
+
+impl RefCountable for StatsCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let (new, concurrent) = (
+            self.new.swap(0, Ordering::Relaxed),
+            self.concurrent.load(Ordering::Relaxed),
+        );
+        vec![
+            ("new", CounterType::Counted, CounterValue::Unsigned(new)),
+            (
+                "new_bytes",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.batch_size as u64 * new),
+            ),
+            (
+                "concurrent",
+                CounterType::Counted,
+                CounterValue::Unsigned(concurrent),
+            ),
+            (
+                "concurrent_bytes",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.batch_size as u64 * concurrent),
+            ),
+            (
+                "max_alive",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.max_alive.swap(0, Ordering::Relaxed)),
+            ),
+        ]
+    }
 }
 
 impl<T> Allocator<T> {
     pub fn new(capacity: usize) -> Self {
+        let stats = Arc::new(StatsCounter {
+            batch_size: capacity * mem::size_of::<T>(),
+            ..Default::default()
+        });
         Self {
             capacity,
-            inner: InnerAllocator::new(capacity),
+            inner: InnerAllocator::new(capacity, stats.clone()),
+            stats,
         }
+    }
+
+    pub fn counter(&self) -> Weak<StatsCounter> {
+        Arc::downgrade(&self.stats)
     }
 
     fn ensure_capacity(&mut self, size: usize) {
         if self.inner.allocated + size > self.capacity {
-            self.inner = InnerAllocator::new(self.capacity);
             // old `InnerAllocator` will drop
+            self.inner = InnerAllocator::new(self.capacity, self.stats.clone());
+            self.stats.new.fetch_add(1, Ordering::Relaxed);
         }
     }
 

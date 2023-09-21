@@ -30,7 +30,7 @@ use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::consts::*;
 
-use crate::collector::acc_flow::U16Set;
+use crate::collector::types::U16Set;
 use crate::common::Timestamp;
 use crate::common::{
     enums::TapType,

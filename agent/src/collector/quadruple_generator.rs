@@ -27,16 +27,21 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::{acc_flow::AccumulatedFlow, check_active_host, consts::*, MetricsType};
+use super::{
+    check_active_host,
+    consts::*,
+    round_to_minute,
+    types::{FlowMeterWithFlow, MiniFlow},
+    MetricsType,
+};
 
-use crate::collector::round_to_minute;
 use crate::common::{
     endpoint::EPC_FROM_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
-    flow::{CloseType, L7Protocol, SignalSource},
+    flow::{get_direction, CloseType, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
 };
-use crate::config::handler::CollectorAccess;
+use crate::config::handler::{CollectorAccess, CollectorConfig};
 use crate::metric::meter::{FlowMeter, Latency, Performance, Traffic};
 use crate::platform::process_info_enabled;
 use crate::rpc::get_timestamp;
@@ -63,8 +68,8 @@ pub struct QgCounter {
 }
 
 struct QuadrupleStash {
-    v4_flows: HashMap<[u8; IPV4_LRU_KEY_SIZE], AccumulatedFlow>,
-    v6_flows: HashMap<[u8; IPV6_LRU_KEY_SIZE], AccumulatedFlow>,
+    v4_flows: HashMap<[u8; IPV4_LRU_KEY_SIZE], FlowMeterWithFlow>,
+    v6_flows: HashMap<[u8; IPV6_LRU_KEY_SIZE], FlowMeterWithFlow>,
 }
 
 #[derive(Clone)]
@@ -270,7 +275,7 @@ impl ConcurrentConnection {
 struct SubQuadGen {
     id: usize,
 
-    output: DebugSender<Box<AccumulatedFlow>>,
+    output: DebugSender<Box<FlowMeterWithFlow>>,
 
     counter: Arc<QgCounter>,
     metrics_type: MetricsType,
@@ -385,11 +390,11 @@ impl SubQuadGen {
     }
 
     fn set_connection(
-        flows: &mut Vec<Box<AccumulatedFlow>>,
+        flows: &mut Vec<Box<FlowMeterWithFlow>>,
         connection: &mut ConcurrentConnection,
         possible_host: &mut PossibleHost,
     ) {
-        if flows.len() == 0 || flows[0].tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if flows.len() == 0 || flows[0].flow.signal_source == SignalSource::EBPF {
             // eBPF data has no L4 info
             // A SubQuadGen only process one type of data, so here we can return.
             return;
@@ -398,21 +403,21 @@ impl SubQuadGen {
             acc_flow.is_active_host0 = check_active_host(
                 acc_flow.time_in_second.as_secs(),
                 possible_host,
-                &acc_flow.tagged_flow.flow.flow_metrics_peers[0],
-                &acc_flow.tagged_flow.flow.flow_key.ip_src,
+                &acc_flow.flow.peers[0],
+                &acc_flow.flow.flow_key.ip_src,
             );
             acc_flow.is_active_host1 = check_active_host(
                 acc_flow.time_in_second.as_secs(),
                 possible_host,
-                &acc_flow.tagged_flow.flow.flow_metrics_peers[1],
-                &acc_flow.tagged_flow.flow.flow_key.ip_dst,
+                &acc_flow.flow.peers[1],
+                &acc_flow.flow.flow_key.ip_dst,
             );
 
-            if acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::TCP
-                || acc_flow.tagged_flow.flow.flow_key.proto == IpProtocol::UDP
+            if acc_flow.flow.flow_key.proto == IpProtocol::TCP
+                || acc_flow.flow.flow_key.proto == IpProtocol::UDP
             {
                 acc_flow.flow_meter.flow_load.load =
-                    connection.get_concurrent(acc_flow.time_in_second, &mut acc_flow.key);
+                    connection.get_concurrent(acc_flow.time_in_second.into(), &mut acc_flow.key);
                 acc_flow.flow_meter.flow_load.flow_count = if acc_flow.flow_meter.flow_load.load
                     > acc_flow.flow_meter.traffic.closed_flow
                 {
@@ -433,7 +438,7 @@ impl SubQuadGen {
         self.stashs.push_back(QuadrupleStash::new());
         let stash = self.stashs.swap_remove_back(stash_index).unwrap();
         if !stash.v4_flows.is_empty() {
-            let mut v4_flows: Vec<Box<AccumulatedFlow>> =
+            let mut v4_flows: Vec<Box<FlowMeterWithFlow>> =
                 stash.v4_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v4_flows, connection, possible_host);
             if let Err(_) = self.output.send_large(v4_flows) {
@@ -442,7 +447,7 @@ impl SubQuadGen {
         }
 
         if !stash.v6_flows.is_empty() {
-            let mut v6_flows: Vec<Box<AccumulatedFlow>> =
+            let mut v6_flows: Vec<Box<FlowMeterWithFlow>> =
                 stash.v6_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v6_flows, connection, possible_host);
             if let Err(_) = self.output.send_large(v6_flows) {
@@ -479,6 +484,7 @@ impl SubQuadGen {
 
     pub fn inject_flow(
         &mut self,
+        config: &CollectorConfig,
         tagged_flow: Arc<BatchedBox<TaggedFlow>>,
         flow_meter: &FlowMeter,
         id_maps: &[HashMap<u16, u16>; 2],
@@ -508,29 +514,28 @@ impl SubQuadGen {
             QgKey::V4(k) => stash.v4_flows.get_mut(k),
         };
         if let Some(acc_flow) = value {
-            acc_flow.merge(time_in_second, flow_meter, id_maps, &tagged_flow);
+            acc_flow.merge(time_in_second.into(), flow_meter, id_maps, &tagged_flow);
         } else {
-            let nat_real_ip_0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_ip;
-            let nat_real_port_0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_port;
-            let nat_real_ip_1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_ip;
-            let nat_real_port_1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_port;
             let l7_protocol = if let Some(p) = tagged_flow.flow.flow_perf_stats.as_ref() {
                 p.l7_protocol
             } else {
                 L7Protocol::Unknown
             };
-            let acc_flow = AccumulatedFlow {
-                tagged_flow,
+            let mut flow = MiniFlow::from(&tagged_flow.flow);
+            // TODO: Move direction into tagged_flow to avoid redundant `get_direction` call
+            flow.directions = get_direction(
+                &tagged_flow.flow,
+                config.trident_type,
+                config.cloud_gateway_traffic,
+            );
+            let acc_flow = FlowMeterWithFlow {
+                flow,
                 l7_protocol,
                 is_active_host0: true,
                 is_active_host1: true,
                 id_maps: id_maps.clone(),
                 flow_meter: *flow_meter,
-                time_in_second,
-                nat_real_ip_0,
-                nat_real_ip_1,
-                nat_real_port_0,
-                nat_real_port_1,
+                time_in_second: time_in_second.into(),
                 key: key.clone(),
             };
             match key {
@@ -544,8 +549,8 @@ impl SubQuadGen {
 pub struct QuadrupleGeneratorThread {
     id: usize,
     input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
-    second_output: DebugSender<Box<AccumulatedFlow>>,
-    minute_output: DebugSender<Box<AccumulatedFlow>>,
+    second_output: DebugSender<Box<FlowMeterWithFlow>>,
+    minute_output: DebugSender<Box<FlowMeterWithFlow>>,
     toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
     flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
     connection_lru_capacity: usize,
@@ -553,9 +558,6 @@ pub struct QuadrupleGeneratorThread {
     second_delay_seconds: u64,
     minute_delay_seconds: u64,
     possible_host_size: usize,
-    l7_metrics_enabled: Arc<AtomicBool>,
-    vtap_flow_1s_enabled: Arc<AtomicBool>,
-    collector_enabled: Arc<AtomicBool>,
 
     thread_handle: Option<JoinHandle<()>>,
 
@@ -570,8 +572,8 @@ impl QuadrupleGeneratorThread {
     pub fn new(
         id: usize,
         input: Receiver<Arc<BatchedBox<TaggedFlow>>>,
-        second_output: DebugSender<Box<AccumulatedFlow>>,
-        minute_output: DebugSender<Box<AccumulatedFlow>>,
+        second_output: DebugSender<Box<FlowMeterWithFlow>>,
+        minute_output: DebugSender<Box<FlowMeterWithFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         connection_lru_capacity: usize,
@@ -584,7 +586,6 @@ impl QuadrupleGeneratorThread {
         stats: Arc<Collector>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
-        let conf = config.load();
         Self {
             id,
             input: Arc::new(input),
@@ -597,45 +598,11 @@ impl QuadrupleGeneratorThread {
             second_delay_seconds,
             minute_delay_seconds,
             possible_host_size,
-            l7_metrics_enabled: Arc::new(AtomicBool::new(conf.l7_metrics_enabled)),
-            vtap_flow_1s_enabled: Arc::new(AtomicBool::new(conf.vtap_flow_1s_enabled)),
-            collector_enabled: Arc::new(AtomicBool::new(conf.enabled)),
             thread_handle: None,
             running,
             config,
             ntp_diff,
             stats,
-        }
-    }
-
-    pub fn update_config(&self) {
-        let conf = self.config.load();
-        let l7_metrics_enabled = conf.l7_metrics_enabled;
-        let vtap_flow_1s_enabled = conf.vtap_flow_1s_enabled;
-        let collector_enabled = conf.enabled;
-        if self.l7_metrics_enabled.load(Ordering::Relaxed) != l7_metrics_enabled {
-            info!(
-                "quadruple generator update l7_metrics_enabled to {}",
-                l7_metrics_enabled
-            );
-            self.l7_metrics_enabled
-                .store(l7_metrics_enabled, Ordering::Relaxed);
-        }
-        if self.vtap_flow_1s_enabled.load(Ordering::Relaxed) != vtap_flow_1s_enabled {
-            info!(
-                "quadruple generator update vtap_flow_1s_enabled to {}",
-                vtap_flow_1s_enabled
-            );
-            self.vtap_flow_1s_enabled
-                .store(vtap_flow_1s_enabled, Ordering::Relaxed);
-        }
-        if self.collector_enabled.load(Ordering::Relaxed) != collector_enabled {
-            info!(
-                "quadruple generator update collector_enabled to {}",
-                collector_enabled
-            );
-            self.collector_enabled
-                .store(collector_enabled, Ordering::Relaxed);
         }
     }
 
@@ -661,10 +628,8 @@ impl QuadrupleGeneratorThread {
             self.second_delay_seconds,
             self.minute_delay_seconds,
             self.possible_host_size,
-            self.l7_metrics_enabled.clone(),
-            self.vtap_flow_1s_enabled.clone(),
-            self.collector_enabled.clone(),
             self.running.clone(),
+            self.config.clone(),
             self.ntp_diff.clone(),
             self.stats.clone(),
         );
@@ -716,11 +681,8 @@ pub struct QuadrupleGenerator {
     id_maps: [HashMap<u16, u16>; 2],
     output_flow: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
-    l7_metrics_enabled: Arc<AtomicBool>,
-    vtap_flow_1s_enabled: Arc<AtomicBool>,
-    collector_enabled: Arc<AtomicBool>,
-
     running: Arc<AtomicBool>,
+    config: CollectorAccess,
     ntp_diff: Arc<AtomicI64>,
 
     stats: Arc<Collector>,
@@ -736,8 +698,8 @@ impl QuadrupleGenerator {
     pub fn new(
         id: usize,
         input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
-        second_output: DebugSender<Box<AccumulatedFlow>>,
-        minute_output: DebugSender<Box<AccumulatedFlow>>,
+        second_output: DebugSender<Box<FlowMeterWithFlow>>,
+        minute_output: DebugSender<Box<FlowMeterWithFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         proc_sync_enable: bool,
         flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
@@ -747,14 +709,13 @@ impl QuadrupleGenerator {
         minute_delay_seconds: u64,
         possible_host_size: usize,
         // traffic_setter: TrafficSetter,
-        l7_metrics_enabled: Arc<AtomicBool>,
-        vtap_flow_1s_enabled: Arc<AtomicBool>,
-        collector_enabled: Arc<AtomicBool>,
         running: Arc<AtomicBool>,
+        config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
         stats: Arc<Collector>,
     ) -> Self {
-        info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, l7_metrics_enabled.load(Ordering::Relaxed), vtap_flow_1s_enabled.load(Ordering::Relaxed), collector_enabled.load(Ordering::Relaxed));
+        let conf = config.load();
+        info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, conf.l7_metrics_enabled, conf.vtap_flow_1s_enabled, conf.enabled);
         if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
         {
             panic!("minute_delay_seconds须在[60, 120)秒内")
@@ -858,10 +819,8 @@ impl QuadrupleGenerator {
             id_maps: [HashMap::new(), HashMap::new()],
             output_flow: flow_output,
 
-            l7_metrics_enabled,
-            vtap_flow_1s_enabled,
-            collector_enabled,
             running,
+            config,
             ntp_diff,
             stats,
 
@@ -872,13 +831,14 @@ impl QuadrupleGenerator {
 
     fn handle(
         &mut self,
+        config: &CollectorConfig,
         tagged_flow: Option<Arc<BatchedBox<TaggedFlow>>>,
         time_in_second: Duration,
     ) {
         let mut second_inject = false;
         let mut minute_inject = false;
         if let Some(s) = self.second_quad_gen.as_mut() {
-            if self.vtap_flow_1s_enabled.load(Ordering::Relaxed) {
+            if config.vtap_flow_1s_enabled {
                 second_inject = s.move_window(time_in_second, &mut self.possible_host);
             }
         }
@@ -918,10 +878,11 @@ impl QuadrupleGenerator {
         self.id_maps[0].clear();
         self.id_maps[1].clear();
 
-        let flow_meter = Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
+        let flow_meter = Self::generate_meter(config, &tagged_flow);
 
         if second_inject {
             self.second_quad_gen.as_mut().unwrap().inject_flow(
+                config,
                 tagged_flow.clone(),
                 &flow_meter,
                 &self.id_maps,
@@ -942,6 +903,7 @@ impl QuadrupleGenerator {
                 }
             }
             self.minute_quad_gen.as_mut().unwrap().inject_flow(
+                config,
                 tagged_flow,
                 &flow_meter,
                 &self.id_maps,
@@ -951,7 +913,7 @@ impl QuadrupleGenerator {
         }
     }
 
-    fn generate_meter(tagged_flow: &TaggedFlow, l7_metrics_enabled: Arc<AtomicBool>) -> FlowMeter {
+    fn generate_meter(config: &CollectorConfig, tagged_flow: &TaggedFlow) -> FlowMeter {
         let mut flow_meter = FlowMeter::default();
 
         let src = &tagged_flow.flow.flow_metrics_peers[0];
@@ -1056,7 +1018,7 @@ impl QuadrupleGenerator {
                 flow_meter.latency.art_count = stats.tcp.art_max;
             }
 
-            if !l7_metrics_enabled.load(Ordering::Relaxed) {
+            if !config.l7_metrics_enabled {
                 return flow_meter;
             }
         }
@@ -1168,14 +1130,16 @@ impl QuadrupleGenerator {
         let mut recv_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         let mut send_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
+            let config = self.config.load();
             match self.input.recv_all(&mut recv_batch, Some(RCV_TIMEOUT)) {
                 Ok(_) => {
                     for tagged_flow in recv_batch.drain(..) {
                         if self.output_flow.is_some() {
                             send_batch.push(tagged_flow.clone());
                         }
-                        if self.collector_enabled.load(Ordering::Relaxed) {
+                        if config.enabled {
                             self.handle(
+                                &config,
                                 Some(tagged_flow.clone()),
                                 tagged_flow.flow.flow_stat_time.into(),
                             );
@@ -1205,7 +1169,11 @@ impl QuadrupleGenerator {
                     }
                 }
                 Err(Error::Timeout) => {
-                    self.handle(None, get_timestamp(self.ntp_diff.load(Ordering::Relaxed)));
+                    self.handle(
+                        &config,
+                        None,
+                        get_timestamp(self.ntp_diff.load(Ordering::Relaxed)),
+                    );
                 }
                 Err(Error::Terminated(_, _)) => {
                     if let Some(g) = self.second_quad_gen.as_mut() {
@@ -1224,26 +1192,22 @@ impl QuadrupleGenerator {
 
 #[cfg(test)]
 mod test {
-    use std::net::Ipv4Addr;
-
     use super::*;
+
+    use crate::config::handler::ModuleConfig;
 
     use public::{buffer::Allocator, debug::QueueDebugger, queue};
 
-    fn new_acc_flow(tagged_flow: Arc<BatchedBox<TaggedFlow>>) -> AccumulatedFlow {
-        AccumulatedFlow {
-            tagged_flow: tagged_flow.clone(),
+    fn new_acc_flow(tagged_flow: Arc<BatchedBox<TaggedFlow>>) -> FlowMeterWithFlow {
+        FlowMeterWithFlow {
+            flow: MiniFlow::from(&tagged_flow.flow),
             l7_protocol: L7Protocol::Unknown,
             is_active_host0: true,
             is_active_host1: true,
             id_maps: [HashMap::new(), HashMap::new()],
             flow_meter: FlowMeter::default(),
             key: QuadrupleGenerator::get_key(&tagged_flow),
-            time_in_second: Duration::from_secs(0),
-            nat_real_ip_0: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            nat_real_port_0: 0,
-            nat_real_ip_1: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            nat_real_port_1: 0,
+            time_in_second: Default::default(),
         }
     }
 
@@ -1284,7 +1248,9 @@ mod test {
         let flow_meter = FlowMeter::default();
         let id_maps = [HashMap::new(), HashMap::new()];
         let mut key = QuadrupleGenerator::get_key(&tagged_flow);
+        let config = ModuleConfig::default();
         quad_gen.inject_flow(
+            &config.collector,
             tagged_flow.clone(),
             &flow_meter,
             &id_maps,
@@ -1293,6 +1259,7 @@ mod test {
         );
 
         quad_gen.inject_flow(
+            &config.collector,
             tagged_flow.clone(),
             &flow_meter,
             &id_maps,
