@@ -95,6 +95,5 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.VPCLcuuid = cloudItem.VPCLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_EN, p))
 }

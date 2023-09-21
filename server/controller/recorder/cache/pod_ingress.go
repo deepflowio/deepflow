@@ -46,13 +46,12 @@ type PodIngress struct {
 	Name            string `json:"name"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuu"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
 func (p *PodIngress) Update(cloudItem *cloudmodel.PodIngress) {
 	p.Name = cloudItem.Name
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, p))
 }
