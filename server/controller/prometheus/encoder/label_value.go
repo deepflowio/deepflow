@@ -25,11 +25,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-type strID struct {
-	str string
-	id  int
-}
-
 type labelValue struct {
 	lock         sync.Mutex
 	resourceType string
