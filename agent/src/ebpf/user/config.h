@@ -167,4 +167,6 @@ enum {
  */
 #define JAVA_SYMS_TABLE_UPDATE_PERIOD 300 // 300 seconds
 
+/* Profiler - maximum data push interval time (in nanosecond). */
+#define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */ 
 #endif /* DF_EBPF_CONFIG_H */
