@@ -44,7 +44,7 @@ var TAP_PORT_DEVICE_MAP = map[string]int{
 }
 
 var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type"}
-var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"}
+var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type", "pod_group_type"}
 var STRING_ENUM_TAG = []string{"tap_side", "event_type", "profile_language_type"}
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
@@ -876,6 +876,19 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 		)}
+	// pod_group_type
+	for _, suffix := range []string{"", "_0", "_1"} {
+		podGroupIDSuffix := "pod_group_id" + suffix
+		podGroupTypeSuffix := "pod_group_type" + suffix
+		tagResourceMap[podGroupTypeSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))",
+				"",
+				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s)",
+				"",
+			),
+		}
+	}
 	// enum_tag
 	for _, enumName := range INT_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
