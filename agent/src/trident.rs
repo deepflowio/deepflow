@@ -968,7 +968,7 @@ pub struct DomainNameListener {
 }
 
 impl DomainNameListener {
-    const INTERVAL: u64 = 5;
+    const INTERVAL: Duration = Duration::from_secs(5);
 
     fn new(
         stats_collector: Arc<stats::Collector>,
@@ -979,14 +979,11 @@ impl DomainNameListener {
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
         Self {
-            stats_collector: stats_collector.clone(),
+            stats_collector,
             session,
-
-            domain_names: domain_names.clone(),
-            ips: ips.clone(),
-
+            domain_names,
+            ips,
             sidecar_mode,
-
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
             agent_id_tx,
@@ -1035,7 +1032,7 @@ impl DomainNameListener {
                 .name("domain-name-listener".to_owned())
                 .spawn(move || {
                     while !stopped.swap(false, Ordering::Relaxed) {
-                        thread::sleep(Duration::from_secs(Self::INTERVAL));
+                        thread::sleep(Self::INTERVAL);
 
                         let mut changed = false;
                         for i in 0..domain_names.len() {

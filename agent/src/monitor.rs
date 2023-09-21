@@ -233,7 +233,7 @@ impl RefCountable for SysStatusBroker {
             CounterValue::Unsigned(self.config.load().sys_free_memory_limit as u64),
         ));
 
-        match get_file_and_size_sum(self.log_dir.clone()) {
+        match get_file_and_size_sum(&self.log_dir) {
             Ok(file_and_size_sum) => {
                 metrics.push((
                     "log_file_size_sum",
