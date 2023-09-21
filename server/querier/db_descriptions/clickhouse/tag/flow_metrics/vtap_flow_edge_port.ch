@@ -19,6 +19,7 @@ pod_ns                     , K8s 命名空间               ,
 pod_node                   , K8s 容器节点               ,
 pod_ingress                , K8s Ingress                ,
 pod_service                , K8s 容器服务               ,
+pod_group_type             , K8s 工作负载类型           ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,

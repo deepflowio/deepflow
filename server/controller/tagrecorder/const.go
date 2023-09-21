@@ -78,20 +78,27 @@ const (
 	RESOURCE_TYPE_CH_IP_PORT        = "ch_ip_port"
 	RESOURCE_TYPE_CH_DEVICE_PORT    = "ch_device_port"
 
-	RESOURCE_TYPE_CH_NETWORK       = "ch_network"
-	RESOURCE_TYPE_CH_POD           = "ch_pod"
-	RESOURCE_TYPE_CH_POD_GROUP     = "ch_pod_group"
-	RESOURCE_TYPE_CH_POD_INGRESS   = "ch_pod_ingress"
-	RESOURCE_TYPE_CH_POD_NAMESPACE = "ch_pod_namespace"
-	RESOURCE_TYPE_CH_POD_NODE      = "ch_pod_node"
-	RESOURCE_TYPE_TAP_TYPE         = "ch_tap_type"
-	RESOURCE_TYPE_CH_VTAP          = "ch_vtap"
-	RESOURCE_TYPE_CH_VTAP_PORT     = "ch_vtap_port"
-	RESOURCE_TYPE_CH_LB_LISTENER   = "ch_lb_listener"
-	RESOURCE_TYPE_CH_STRING_ENUM   = "ch_string_enum"
-	RESOURCE_TYPE_CH_INT_ENUM      = "ch_int_enum"
-	RESOURCE_TYPE_CH_NODE_TYPE     = "ch_node_type"
-	RESOURCE_TYPE_CH_GPROCESS      = "ch_gprocess"
+	RESOURCE_TYPE_CH_NETWORK        = "ch_network"
+	RESOURCE_TYPE_CH_POD            = "ch_pod"
+	RESOURCE_TYPE_CH_POD_GROUP      = "ch_pod_group"
+	RESOURCE_TYPE_CH_POD_GROUP_TYPE = "ch_pod_group_type"
+	RESOURCE_TYPE_CH_POD_INGRESS    = "ch_pod_ingress"
+	RESOURCE_TYPE_CH_POD_NAMESPACE  = "ch_pod_namespace"
+	RESOURCE_TYPE_CH_POD_NODE       = "ch_pod_node"
+	RESOURCE_TYPE_TAP_TYPE          = "ch_tap_type"
+	RESOURCE_TYPE_CH_VTAP           = "ch_vtap"
+	RESOURCE_TYPE_CH_VTAP_PORT      = "ch_vtap_port"
+	RESOURCE_TYPE_CH_LB_LISTENER    = "ch_lb_listener"
+	RESOURCE_TYPE_CH_STRING_ENUM    = "ch_string_enum"
+	RESOURCE_TYPE_CH_INT_ENUM       = "ch_int_enum"
+	RESOURCE_TYPE_CH_NODE_TYPE      = "ch_node_type"
+	RESOURCE_TYPE_CH_GPROCESS       = "ch_gprocess"
+
+	RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
+	RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
+	RESOURCE_TYPE_CH_POD_GROUP_RC                    = "pod_group_rc"
+	RESOURCE_TYPE_CH_POD_GROUP_DAEMON_SET            = "pod_group_daemon_set"
+	RESOURCE_TYPE_CH_POD_GROUP_REPLICASET_CONTROLLER = "pod_group_replicaset_controller"
 )
 
 const (
@@ -462,6 +469,18 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
+
+	CREATE_CH_POD_GROUP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `pod_group_type` UInt64,\n" +
+		"    `icon_id` Int64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -514,7 +533,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_CLUSTER:            CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NAMESPACE:          CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NODE:               CREATE_DICTIONARY_SQL,
-	CH_DICTIONARY_POD_GROUP:              CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_GROUP:              CREATE_CH_POD_GROUP_DICTIONARY_SQL,
 	CH_DICTIONARY_POD:                    CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_DEVICE:                 CREATE_DEVICE_DICTIONARY_SQL,
 	CH_DICTIONARY_VTAP_PORT:              CREATE_VTAP_PORT_DICTIONARY_SQL,
@@ -557,20 +576,33 @@ var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 }
 
 var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
-	common.VIF_DEVICE_TYPE_VM:             "chost",
-	common.VIF_DEVICE_TYPE_VROUTER:        "router",
-	common.VIF_DEVICE_TYPE_HOST:           RESOURCE_TYPE_HOST,
-	common.VIF_DEVICE_TYPE_DHCP_PORT:      "dhcpgw",
-	common.VIF_DEVICE_TYPE_POD:            RESOURCE_TYPE_POD,
-	common.VIF_DEVICE_TYPE_POD_SERVICE:    RESOURCE_TYPE_POD_SERVICE,
-	common.VIF_DEVICE_TYPE_REDIS_INSTANCE: "redis",
-	common.VIF_DEVICE_TYPE_RDS_INSTANCE:   "rds",
-	common.VIF_DEVICE_TYPE_POD_NODE:       RESOURCE_TYPE_POD_NODE,
-	common.VIF_DEVICE_TYPE_LB:             RESOURCE_TYPE_LB,
-	common.VIF_DEVICE_TYPE_NAT_GATEWAY:    "natgw",
-	common.VIF_DEVICE_TYPE_INTERNET:       RESOURCE_TYPE_INTERNET_IP,
-	common.VIF_DEVICE_TYPE_POD_GROUP:      RESOURCE_TYPE_POD_GROUP,
-	common.VIF_DEVICE_TYPE_SERVICE:        RESOURCE_TYPE_SERVICE,
-	common.VIF_DEVICE_TYPE_GPROCESS:       RESOURCE_TYPE_GPROCESS,
-	common.VIF_DEVICE_TYPE_IP:             RESOURCE_TYPE_IP,
+	common.VIF_DEVICE_TYPE_VM:                              "chost",
+	common.VIF_DEVICE_TYPE_VROUTER:                         "router",
+	common.VIF_DEVICE_TYPE_HOST:                            RESOURCE_TYPE_HOST,
+	common.VIF_DEVICE_TYPE_DHCP_PORT:                       "dhcpgw",
+	common.VIF_DEVICE_TYPE_POD:                             RESOURCE_TYPE_POD,
+	common.VIF_DEVICE_TYPE_POD_SERVICE:                     RESOURCE_TYPE_POD_SERVICE,
+	common.VIF_DEVICE_TYPE_REDIS_INSTANCE:                  "redis",
+	common.VIF_DEVICE_TYPE_RDS_INSTANCE:                    "rds",
+	common.VIF_DEVICE_TYPE_POD_NODE:                        RESOURCE_TYPE_POD_NODE,
+	common.VIF_DEVICE_TYPE_LB:                              RESOURCE_TYPE_LB,
+	common.VIF_DEVICE_TYPE_NAT_GATEWAY:                     "natgw",
+	common.VIF_DEVICE_TYPE_INTERNET:                        RESOURCE_TYPE_INTERNET_IP,
+	common.VIF_DEVICE_TYPE_POD_GROUP:                       RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_SERVICE:                         RESOURCE_TYPE_SERVICE,
+	common.VIF_DEVICE_TYPE_GPROCESS:                        RESOURCE_TYPE_GPROCESS,
+	common.VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT:            RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET:           RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_POD_GROUP_RC:                    RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET:            RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER: RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_IP:                              RESOURCE_TYPE_IP,
+}
+
+var RESOURCE_POD_GROUP_TYPE_MAP = map[int]int{
+	common.POD_GROUP_DEPLOYMENT:            common.VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT,
+	common.POD_GROUP_STATEFULSET:           common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
+	common.POD_GROUP_RC:                    common.VIF_DEVICE_TYPE_POD_GROUP_RC,
+	common.POD_GROUP_DAEMON_SET:            common.VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET,
+	common.POD_GROUP_REPLICASET_CONTROLLER: common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
 }

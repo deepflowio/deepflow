@@ -227,6 +227,9 @@ var (
 	}, {
 		input:  "SELECT `cloud.tag.xx` from l4_flow_log WHERE NOT exist(`cloud.tag.xx`) LIMIT 1",
 		output: "SELECT if(if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), '')!='',if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id),'xx')) ) AS `cloud.tag.xx` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type=1) OR (toUInt64(pod_ns_id) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1",
+	}, {
+		input:  "select Enum(pod_group_type_0) ,pod_group_type_0 from l7_flow_log where Enum(pod_group_type_0)!='Deployment' limit 10",
+		output: "WITH dictGetOrDefault(flow_tag.int_enum_map, 'name', ('pod_group_type',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) AS `Enum(pod_group_type_0)` SELECT `Enum(pod_group_type_0)`, dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))) AS `pod_group_type_0` FROM flow_log.`l7_flow_log` PREWHERE (not(toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name = 'Deployment' and tag_name='pod_group_type') AND pod_group_id_0!=0)) LIMIT 10",
 	}}
 )
 
