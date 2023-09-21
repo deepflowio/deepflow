@@ -17,6 +17,8 @@
 use num_enum::FromPrimitive;
 use serde::Serialize;
 
+pub const DEFAULT_DNS_PORT: u16 = 53;
+
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq, FromPrimitive, num_enum::Default)]
 #[repr(u8)]
 pub enum L7Protocol {
