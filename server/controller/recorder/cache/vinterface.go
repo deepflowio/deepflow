@@ -34,6 +34,8 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		},
 		Name:            dbItem.Name,
 		Type:            dbItem.Type,
+		VtapID:          dbItem.VtapID,
+		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
 		NetworkLcuuid:   networkLcuuid,
 		RegionLcuuid:    dbItem.Region,
