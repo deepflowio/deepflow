@@ -451,9 +451,18 @@ impl L7ProtocolParserInterface for HttpLog {
                     return false;
                 };
                 match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe => self
-                        .parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)
-                        .is_ok(),
+                    EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
+                        if param.direction == PacketDirection::ServerToClient {
+                            return false;
+                        }
+                        self.parse_http2_go_uprobe(
+                            &config.l7_log_dynamic,
+                            payload,
+                            param,
+                            &mut info,
+                        )
+                        .is_ok()
+                    }
                     _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
                 }
             }
