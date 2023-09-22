@@ -2601,10 +2601,10 @@ CREATE TABLE IF NOT EXISTS prometheus_label_name (
 TRUNCATE TABLE prometheus_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_value (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `value`         VARCHAR(256) NOT NULL UNIQUE,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_label (
