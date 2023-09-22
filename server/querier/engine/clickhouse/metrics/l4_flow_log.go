@@ -142,7 +142,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 
 	"vpc_0":         NewReplaceMetrics("l3_epc_id_0", "NOT (l3_epc_id_0 = -2)"),
 	"subnet_0":      NewReplaceMetrics("subnet_id_0", "NOT (subnet_id_0 = 0)"),
-	"ip_0":          NewReplaceMetrics("[toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)]", "NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))"),
+	"ip_0":          NewReplaceMetrics("[toString(ip4_0), toString(is_ipv4), toString(ip6_0)]", "NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))"),
 	"pod_cluster_0": NewReplaceMetrics("pod_cluster_id_0", "NOT (pod_cluster_id_0 = 0)"),
 	"pod_node_0":    NewReplaceMetrics("pod_node_id_0", "NOT (pod_node_id_0 = 0)"),
 	"pod_ns_0":      NewReplaceMetrics("pod_ns_id_0", "NOT (pod_ns_id_0 = 0)"),
