@@ -2666,7 +2666,7 @@ TRUNCATE TABLE ch_pod_k8s_envs;
 CREATE TABLE IF NOT EXISTS ch_app_label (
     `label_name_id`      INT(10) NOT NULL,
     `label_value_id`     INT(10) NOT NULL,
-    `label_value`        VARCHAR(256) NOT NULL,
+    `label_value`        TEXT,
     `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (label_name_id, label_value_id)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
