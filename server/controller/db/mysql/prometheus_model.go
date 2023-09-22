@@ -38,29 +38,29 @@ type PrometheusLabelName struct {
 
 type PrometheusLabelValue struct {
 	IDField `gorm:"embedded"`
-	Value   string `gorm:"column:value;type:varchar(256);unique;not null"`
+	Value   string `gorm:"column:value;type:text;unique;default:''"`
 }
 
 type PrometheusLabel struct {
-	IDField `gorm:"embedded"`
-	Name    string `gorm:"column:name;type:varchar(256);not null"`
-	Value   string `gorm:"column:value;type:varchar(256);not null"`
+	ID    int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
+	Name  string `gorm:"column:name;type:varchar(256);not null"`
+	Value string `gorm:"column:value;type:text;default:''"`
 }
 
 type PrometheusMetricLabel struct {
-	IDField    `gorm:"embedded"`
+	ID         int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
 	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
 	LabelID    int    `gorm:"column:label_id;type:int(10);not null"`
 }
 
 type PrometheusMetricTarget struct {
-	IDField    `gorm:"embedded"`
+	ID         int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
 	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
 	TargetID   int    `gorm:"column:target_id;type:int(10);not null"`
 }
 
 type PrometheusMetricAPPLabelLayout struct {
-	IDField             `gorm:"embedded"`
+	ID                  int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
 	MetricName          string `gorm:"column:metric_name;type:varchar(256);not null"`
 	APPLabelName        string `gorm:"column:app_label_name;type:varchar(256);not null"`
 	APPLabelColumnIndex uint8  `gorm:"column:app_label_column_index;type:tinyint(3) unsigned;not null"`
