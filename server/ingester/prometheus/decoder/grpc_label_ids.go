@@ -533,15 +533,16 @@ func (t *PrometheusLabelTable) HandleSimpleCommand(op uint16, arg string) string
 	return t.statsString()
 }
 
-// request string as: metric=xxx,job=xxx,instance=xxx,label1=xxx,label2=xxx
+// request string as: metric=xxx,,job==xxx,,instance==xxx,,label1==xxx,,label2==xxx
 func (t *PrometheusLabelTable) testString(request string) string {
 	req := &trident.PrometheusLabelRequest{}
 	metricReq := &trident.MetricLabelRequest{}
 	targetReq := &trident.TargetRequest{}
-	keyValues := strings.Split(request, ",")
+
+	keyValues := strings.Split(request, ",,")
 	clusterId := 0
 	for _, kv := range keyValues {
-		kv := strings.Split(kv, "=")
+		kv := strings.Split(kv, "==")
 		if len(kv) != 2 {
 			continue
 		}
