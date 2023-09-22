@@ -1013,6 +1013,9 @@ static __inline enum message_type infer_redis_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (count < 4)
+		return MSG_UNKNOWN;
+
 	if (!is_protocol_enabled(PROTO_REDIS)) {
 		return MSG_UNKNOWN;
 	}
@@ -1090,6 +1093,9 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 						     struct conn_info_t
 						     *conn_info)
 {
+	if (count < 4)
+		return MSG_UNKNOWN;
+
 	if (!is_protocol_enabled(PROTO_MQTT)) {
 		return MSG_UNKNOWN;
 	}
@@ -1596,7 +1602,7 @@ infer_protocol(struct ctx_info_s *ctx,
 		return inferred_message;
 	}
 
-	if (count < 4 || conn_info->sk == NULL)
+	if (conn_info->sk == NULL)
 		return inferred_message;
 
 	// 明确被判定了协议的socket不进入drop_msg_by_comm
