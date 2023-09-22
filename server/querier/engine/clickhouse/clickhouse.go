@@ -647,7 +647,7 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 				return expr, nil
 			} else if filter == INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY {
 				sql := strings.Join(trgetTransFilters, " INTERSECT ")
-				targetFilter := fmt.Sprintf("target_id IN (%s)", sql)
+				targetFilter := fmt.Sprintf("toUInt64(target_id) IN (%s)", sql)
 				rightExpr := &view.Expr{Value: targetFilter}
 				op := view.Operator{Type: view.AND}
 				expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
@@ -697,7 +697,7 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 			entryValue := common.EntryValue{Time: time.Now(), Filter: INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY}
 			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
 
-			targetFilter := fmt.Sprintf("target_id IN (%s)", sql)
+			targetFilter := fmt.Sprintf("toUInt64(target_id) IN (%s)", sql)
 			rightExpr := &view.Expr{Value: targetFilter}
 			op := view.Operator{Type: view.AND}
 			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
