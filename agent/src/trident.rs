@@ -615,7 +615,7 @@ impl Trident {
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
-        let mut components: Option<Components> = None;
+        let mut components: Option<AgentComponents> = None;
         let mut yaml_conf: Option<YamlConfig> = None;
 
         loop {
@@ -682,6 +682,11 @@ impl Trident {
                 }
                 _ => (),
             }
+            // If `running_in_only_watch_k8s_mode` is set to true, no need to update components
+            if running_in_only_watch_k8s_mode() {
+                continue;
+            }
+
             let mut new_state = State::Running;
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
@@ -708,66 +713,7 @@ impl Trident {
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
-                None => {
-                    let callbacks = config_handler.on_config(
-                        runtime_config,
-                        &exception_handler,
-                        None,
-                        #[cfg(target_os = "linux")]
-                        &api_watcher,
-                    );
-
-                    #[cfg(target_os = "linux")]
-                    if config_handler
-                        .candidate_config
-                        .platform
-                        .kubernetes_api_enabled
-                    {
-                        api_watcher.start();
-                    } else {
-                        api_watcher.stop();
-                    }
-
-                    let agent_id = synchronizer.agent_id.read().clone();
-                    config_handler.load_plugin(&runtime, &session, &agent_id);
-
-                    let mut comp = Components::new(
-                        &version_info,
-                        &config_handler,
-                        stats_collector.clone(),
-                        &session,
-                        &synchronizer,
-                        exception_handler.clone(),
-                        remote_log_config.clone(),
-                        #[cfg(target_os = "linux")]
-                        libvirt_xml_extractor.clone(),
-                        platform_synchronizer.clone(),
-                        #[cfg(target_os = "linux")]
-                        sidecar_poller.clone(),
-                        #[cfg(target_os = "linux")]
-                        api_watcher.clone(),
-                        vm_mac_addrs,
-                        gateway_vmac_addrs,
-                        config_handler.static_config.agent_mode,
-                        runtime.clone(),
-                    )?;
-
-                    comp.start();
-
-                    if let Components::Agent(components) = &mut comp {
-                        if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
-                        {
-                            parse_tap_type(components, tap_types);
-                        }
-
-                        for callback in callbacks {
-                            callback(&config_handler, components);
-                        }
-                    }
-
-                    components.replace(comp);
-                }
-                Some(Components::Agent(components)) => {
+                Some(components) => {
                     let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = config_handler
                         .on_config(
                             runtime_config,
@@ -806,8 +752,8 @@ impl Trident {
                         listener.on_config_change(&config_handler.candidate_config.dispatcher);
                     }
                 }
-                _ => {
-                    config_handler.on_config(
+                None => {
+                    let callbacks = config_handler.on_config(
                         runtime_config,
                         &exception_handler,
                         None,
@@ -825,6 +771,42 @@ impl Trident {
                     } else {
                         api_watcher.stop();
                     }
+
+                    let agent_id = synchronizer.agent_id.read().clone();
+                    config_handler.load_plugin(&runtime, &session, &agent_id);
+
+                    let mut comp = AgentComponents::new(
+                        &version_info,
+                        &config_handler,
+                        stats_collector.clone(),
+                        &session,
+                        &synchronizer,
+                        exception_handler.clone(),
+                        remote_log_config.clone(),
+                        #[cfg(target_os = "linux")]
+                        libvirt_xml_extractor.clone(),
+                        platform_synchronizer.clone(),
+                        #[cfg(target_os = "linux")]
+                        sidecar_poller.clone(),
+                        #[cfg(target_os = "linux")]
+                        api_watcher.clone(),
+                        vm_mac_addrs,
+                        gateway_vmac_addrs,
+                        config_handler.static_config.agent_mode,
+                        runtime.clone(),
+                    )?;
+
+                    comp.start();
+
+                    if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
+                        parse_tap_type(&mut comp, tap_types);
+                    }
+
+                    for callback in callbacks {
+                        callback(&config_handler, &mut comp);
+                    }
+
+                    components.replace(comp);
                 }
             }
             state_guard = state.lock().unwrap();
@@ -1093,52 +1075,52 @@ impl DomainNameListener {
     }
 }
 
-pub enum Components {
-    Agent(AgentComponents),
-    #[cfg(target_os = "linux")]
-    Watcher(WatcherComponents),
-    Other,
-}
+// pub enum Components {
+//     Agent(AgentComponents),
+//     #[cfg(target_os = "linux")]
+//     Watcher(WatcherComponents),
+//     Other,
+// }
 
-#[cfg(target_os = "linux")]
-pub struct WatcherComponents {
-    pub running: AtomicBool,
-    tap_mode: TapMode,
-    agent_mode: RunningMode,
-    runtime: Arc<Runtime>,
-}
+// #[cfg(target_os = "linux")]
+// pub struct WatcherComponents {
+//     pub running: AtomicBool,
+//     tap_mode: TapMode,
+//     agent_mode: RunningMode,
+//     runtime: Arc<Runtime>,
+// }
 
-#[cfg(target_os = "linux")]
-impl WatcherComponents {
-    fn new(
-        config_handler: &ConfigHandler,
-        agent_mode: RunningMode,
-        runtime: Arc<Runtime>,
-    ) -> Result<Self> {
-        let candidate_config = &config_handler.candidate_config;
-        info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
-        Ok(WatcherComponents {
-            running: AtomicBool::new(false),
-            tap_mode: candidate_config.tap_mode,
-            agent_mode,
-            runtime,
-        })
-    }
+// #[cfg(target_os = "linux")]
+// impl WatcherComponents {
+//     fn new(
+//         config_handler: &ConfigHandler,
+//         agent_mode: RunningMode,
+//         runtime: Arc<Runtime>,
+//     ) -> Result<Self> {
+//         let candidate_config = &config_handler.candidate_config;
+//         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
+//         Ok(WatcherComponents {
+//             running: AtomicBool::new(false),
+//             tap_mode: candidate_config.tap_mode,
+//             agent_mode,
+//             runtime,
+//         })
+//     }
 
-    fn start(&mut self) {
-        if self.running.swap(true, Ordering::Relaxed) {
-            return;
-        }
-        info!("Started watcher components.");
-    }
+//     fn start(&mut self) {
+//         if self.running.swap(true, Ordering::Relaxed) {
+//             return;
+//         }
+//         info!("Started watcher components.");
+//     }
 
-    fn stop(&mut self) {
-        if !self.running.swap(false, Ordering::Relaxed) {
-            return;
-        }
-        info!("Stopped watcher components.")
-    }
-}
+//     fn stop(&mut self) {
+//         if !self.running.swap(false, Ordering::Relaxed) {
+//             return;
+//         }
+//         info!("Stopped watcher components.")
+//     }
+// }
 
 pub struct AgentComponents {
     pub config: ModuleConfig,
@@ -2640,70 +2622,70 @@ impl AgentComponents {
     }
 }
 
-impl Components {
-    fn start(&mut self) {
-        match self {
-            Self::Agent(a) => a.start(),
-            #[cfg(target_os = "linux")]
-            Self::Watcher(w) => w.start(),
-            _ => {}
-        }
-    }
+// impl Components {
+//     fn start(&mut self) {
+//         match self {
+//             Self::Agent(a) => a.start(),
+//             #[cfg(target_os = "linux")]
+//             Self::Watcher(w) => w.start(),
+//             _ => {}
+//         }
+//     }
 
-    fn new(
-        version_info: &VersionInfo,
-        config_handler: &ConfigHandler,
-        stats_collector: Arc<stats::Collector>,
-        session: &Arc<Session>,
-        synchronizer: &Arc<Synchronizer>,
-        exception_handler: ExceptionHandler,
-        remote_log_config: RemoteLogConfig,
-        #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-        platform_synchronizer: Arc<PlatformSynchronizer>,
-        #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
-        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
-        vm_mac_addrs: Vec<MacAddr>,
-        gateway_vmac_addrs: Vec<MacAddr>,
-        agent_mode: RunningMode,
-        runtime: Arc<Runtime>,
-    ) -> Result<Self> {
-        #[cfg(target_os = "linux")]
-        if running_in_only_watch_k8s_mode() {
-            let components = WatcherComponents::new(config_handler, agent_mode, runtime)?;
-            return Ok(Components::Watcher(components));
-        }
-        let components = AgentComponents::new(
-            version_info,
-            config_handler,
-            stats_collector,
-            session,
-            synchronizer,
-            exception_handler,
-            remote_log_config,
-            #[cfg(target_os = "linux")]
-            libvirt_xml_extractor,
-            platform_synchronizer,
-            #[cfg(target_os = "linux")]
-            sidecar_poller,
-            #[cfg(target_os = "linux")]
-            api_watcher,
-            vm_mac_addrs,
-            gateway_vmac_addrs,
-            agent_mode,
-            runtime,
-        )?;
-        return Ok(Components::Agent(components));
-    }
+//     fn new(
+//         version_info: &VersionInfo,
+//         config_handler: &ConfigHandler,
+//         stats_collector: Arc<stats::Collector>,
+//         session: &Arc<Session>,
+//         synchronizer: &Arc<Synchronizer>,
+//         exception_handler: ExceptionHandler,
+//         remote_log_config: RemoteLogConfig,
+//         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+//         platform_synchronizer: Arc<PlatformSynchronizer>,
+//         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
+//         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
+//         vm_mac_addrs: Vec<MacAddr>,
+//         gateway_vmac_addrs: Vec<MacAddr>,
+//         agent_mode: RunningMode,
+//         runtime: Arc<Runtime>,
+//     ) -> Result<Self> {
+//         #[cfg(target_os = "linux")]
+//         if running_in_only_watch_k8s_mode() {
+//             let components = WatcherComponents::new(config_handler, agent_mode, runtime)?;
+//             return Ok(Components::Watcher(components));
+//         }
+//         let components = AgentComponents::new(
+//             version_info,
+//             config_handler,
+//             stats_collector,
+//             session,
+//             synchronizer,
+//             exception_handler,
+//             remote_log_config,
+//             #[cfg(target_os = "linux")]
+//             libvirt_xml_extractor,
+//             platform_synchronizer,
+//             #[cfg(target_os = "linux")]
+//             sidecar_poller,
+//             #[cfg(target_os = "linux")]
+//             api_watcher,
+//             vm_mac_addrs,
+//             gateway_vmac_addrs,
+//             agent_mode,
+//             runtime,
+//         )?;
+//         return Ok(Components::Agent(components));
+//     }
 
-    fn stop(&mut self) {
-        match self {
-            Self::Agent(a) => a.stop(),
-            #[cfg(target_os = "linux")]
-            Self::Watcher(w) => w.stop(),
-            _ => {}
-        }
-    }
-}
+//     fn stop(&mut self) {
+//         match self {
+//             Self::Agent(a) => a.stop(),
+//             #[cfg(target_os = "linux")]
+//             Self::Watcher(w) => w.stop(),
+//             _ => {}
+//         }
+//     }
+// }
 
 fn build_pcap_assembler(
     enabled: bool,
