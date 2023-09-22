@@ -17,6 +17,8 @@
 package encoder
 
 import (
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/constraint"
 )
@@ -35,7 +37,7 @@ func addBatch[T constraint.OperateBatchModel](toAdd []*T, resourceType string) e
 			end = count
 		}
 		oneP := toAdd[start:end]
-		err := mysql.Db.Create(&oneP).Error
+		err := mysql.Db.Clauses(clause.Returning{}).Create(&oneP).Error
 		if err != nil {
 			return err
 		}

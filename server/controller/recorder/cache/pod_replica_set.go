@@ -29,6 +29,7 @@ func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int)
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:            dbItem.Name,
+		Label:           dbItem.Label,
 		PodNum:          dbItem.PodNum,
 		RegionLcuuid:    dbItem.Region,
 		AZLcuuid:        dbItem.AZ,
@@ -58,6 +59,5 @@ func (p *PodReplicaSet) Update(cloudItem *cloudmodel.PodReplicaSet) {
 	p.PodNum = cloudItem.PodNum
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, p))
 }

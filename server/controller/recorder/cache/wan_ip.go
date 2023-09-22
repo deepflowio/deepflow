@@ -53,7 +53,6 @@ type WANIP struct {
 
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
-	w.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	w.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_WAN_IP_EN, w))
 }

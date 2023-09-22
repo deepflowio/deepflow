@@ -17,7 +17,6 @@
 package cache
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
@@ -41,9 +40,4 @@ func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
 type PodIngressRuleBackend struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *PodIngressRuleBackend) Update(cloudItem *cloudmodel.PodIngressRuleBackend) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, p))
 }

@@ -59,6 +59,5 @@ func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
 	p.MemTotal = cloudItem.MemTotal
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NODE_EN, p))
 }

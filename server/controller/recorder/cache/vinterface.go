@@ -69,6 +69,5 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.VtapID = cloudItem.VTapID
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	v.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))
 }
