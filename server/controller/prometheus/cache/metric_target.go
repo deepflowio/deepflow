@@ -56,7 +56,11 @@ func (k *metricNameToTargetIDs) Load(id string) (mapset.Set[int], bool) {
 func (k *metricNameToTargetIDs) Get() map[string]mapset.Set[int] {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	return k.data
+	data := make(map[string]mapset.Set[int])
+	for k, v := range k.data {
+		data[k] = v
+	}
+	return data
 }
 
 func (k *metricNameToTargetIDs) Append(name string, id int) {

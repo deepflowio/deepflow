@@ -67,7 +67,11 @@ func (k *keyToTargetID) Load(tk TargetKey) (int, bool) {
 func (k *keyToTargetID) Get() map[TargetKey]int {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	return k.data
+	data := make(map[TargetKey]int)
+	for k, v := range k.data {
+		data[k] = v
+	}
+	return data
 }
 
 func (k *keyToTargetID) Store(tk TargetKey, v int) {
@@ -103,7 +107,11 @@ func (t *targetIDToLabelNames) Contains(id int, labelName string) bool {
 func (t *targetIDToLabelNames) Get() map[int]mapset.Set[string] {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.data
+	data := make(map[int]mapset.Set[string])
+	for k, v := range t.data {
+		data[k] = v
+	}
+	return data
 }
 
 func (t *targetIDToLabelNames) Coverage(data map[int]mapset.Set[string]) {
