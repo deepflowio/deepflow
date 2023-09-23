@@ -448,7 +448,7 @@ type ChPrometheusMetricAPPLabelLayout struct {
 type ChAPPLabel struct {
 	LabelNameID  int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
 	LabelValueID int    `gorm:"primaryKey;column:label_value_id;type:int unsigned;not null" json:"LABEL_VALUE_ID"`
-	LabelValue   string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+	LabelValue   string `gorm:"column:label_value;type:text;not null" json:"LABEL_VALUE"`
 }
 
 func (ChAPPLabel) TableName() string {
