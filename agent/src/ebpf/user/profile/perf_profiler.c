@@ -960,9 +960,12 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 
 	if (check_kallsyms_addr_is_zero()) {
 		ebpf_warning(LOG_CP_TAG
-			     "All kernel addresses in /proc/kallsyms are 0. Please add"
-			     " 'CAP_SYSLOG' permission to the container to solve the "
-			     "problem.\n");
+			     "All kernel addresses in /proc/kallsyms are 0, Please"
+			     " follow the steps below to resolve:\n"
+			     "1 Make sure the content of the '/proc/sys/kernel/kpt"
+			     "r_restrict' file is not 2, if it is 2 please set it "
+			     "to 1.\n2 Add 'CAP_SYSLOG' permission to the containe"
+			     "r.\n3 Restart the pod.");
 		return (-1);
 	}
 
