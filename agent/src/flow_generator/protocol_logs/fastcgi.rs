@@ -263,6 +263,7 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 x_request_id_0: Some(f.x_request_id_0),
                 x_request_id_1: Some(f.x_request_id_1),
+                request_id: Some(f.request_id),
                 ..Default::default()
             }),
             ..Default::default()
