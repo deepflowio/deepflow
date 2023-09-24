@@ -322,7 +322,7 @@ func (d *SlowDecoder) sendPrometheusSamples(vtapID, podClusterId uint16, ts *pro
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
 	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, nil)
-	if err != nil {
+	if !isSlowItem && err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
 		}
@@ -331,7 +331,7 @@ func (d *SlowDecoder) sendPrometheusSamples(vtapID, podClusterId uint16, ts *pro
 	}
 	if isSlowItem {
 		if d.counter.TimeSeriesDrop == 0 {
-			log.Warningf("drop prometheus time series: %s", ts)
+			log.Warningf("drop prometheus time series: %s, err: %s", ts, err)
 		}
 		d.counter.TimeSeriesDrop++
 		return
