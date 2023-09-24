@@ -259,38 +259,29 @@ impl FlowNode {
             && flow_key.port_src == meta_lookup_key.src_port
             && flow_key.port_dst == meta_lookup_key.dst_port
         {
-            meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
-            Self::endpoint_match_with_direction(
-                &flow.flow_metrics_peers,
-                meta_packet,
-                PacketDirection::ClientToServer,
-            ) && Self::mac_match_with_direction(
-                meta_packet,
-                flow_key.mac_src,
-                flow_key.mac_dst,
-                mac_match,
-                PacketDirection::ClientToServer,
-            )
+            // l3 protocols, such as icmp, can determine the direction of packets according
+            // to icmp type, so there is no need to correct the direction of packets
+            if meta_lookup_key.is_tcp() || meta_lookup_key.is_udp() {
+                meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
+            }
         } else if flow_key.ip_src == meta_lookup_key.dst_ip
             && flow_key.ip_dst == meta_lookup_key.src_ip
             && flow_key.port_src == meta_lookup_key.dst_port
             && flow_key.port_dst == meta_lookup_key.src_port
         {
-            meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
-            Self::endpoint_match_with_direction(
-                &flow.flow_metrics_peers,
-                meta_packet,
-                PacketDirection::ServerToClient,
-            ) && Self::mac_match_with_direction(
+            if meta_lookup_key.is_tcp() || meta_lookup_key.is_udp() {
+                meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+        } else {
+            return false;
+        }
+        Self::endpoint_match_with_direction(&flow.flow_metrics_peers, meta_packet)
+            && Self::mac_match_with_direction(
                 meta_packet,
                 flow_key.mac_src,
                 flow_key.mac_dst,
                 mac_match,
-                PacketDirection::ServerToClient,
             )
-        } else {
-            false
-        }
     }
 
     fn is_hyper_v(trident_type: TridentType) -> bool {
@@ -344,9 +335,8 @@ impl FlowNode {
         flow_mac_src: MacAddr,
         flow_mac_dst: MacAddr,
         match_mac: MatchMac,
-        direction: PacketDirection,
     ) -> bool {
-        let (src_mac, dst_mac) = match direction {
+        let (src_mac, dst_mac) = match meta_packet.lookup_key.direction {
             PacketDirection::ClientToServer => (flow_mac_src, flow_mac_dst),
             PacketDirection::ServerToClient => (flow_mac_dst, flow_mac_src),
         };
@@ -365,7 +355,6 @@ impl FlowNode {
     fn endpoint_match_with_direction(
         peers: &[FlowMetricsPeer; 2],
         meta_packet: &MetaPacket,
-        direction: PacketDirection,
     ) -> bool {
         if meta_packet.tunnel.is_none() {
             return true;
@@ -374,7 +363,7 @@ impl FlowNode {
         // 同一个TapPort上的流量，如果有隧道的话，当Port做发卡弯转发时，进出的内层流量完全一样
         // 此时需要额外比较L2End确定哪股是进入的哪股是出去的
         let lookup_key = &meta_packet.lookup_key;
-        match direction {
+        match meta_packet.lookup_key.direction {
             PacketDirection::ClientToServer => {
                 lookup_key.l2_end_0 == peers[0].is_l2_end
                     && lookup_key.l2_end_1 == peers[1].is_l2_end

@@ -127,6 +127,7 @@ pub enum L4Protocol {
     Unknown = 0,
     Tcp = 1,
     Udp = 2,
+    Icmp = 3,
 }
 
 impl From<IpProtocol> for L4Protocol {
@@ -134,6 +135,7 @@ impl From<IpProtocol> for L4Protocol {
         match proto {
             IpProtocol::TCP => Self::Tcp,
             IpProtocol::UDP => Self::Udp,
+            IpProtocol::ICMPV4 | IpProtocol::ICMPV6 => Self::Icmp,
             _ => Self::Unknown,
         }
     }
