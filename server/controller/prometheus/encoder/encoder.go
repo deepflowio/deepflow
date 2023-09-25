@@ -71,7 +71,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.labelValue = newLabelValue(cfg.ResourceMaxID1)
 	e.label = newLabel()
 	e.LabelLayout = newLabelLayout(cfg)
-	e.metricLabel = newMetricLabel(e.label)
+	e.metricLabel = newMetricLabel(e.metricName, e.label)
 	e.target = newTarget(cfg.ResourceMaxID1)
 	e.metricTarget = newMetricTarget(e.target)
 	e.refreshInterval = time.Duration(cfg.EncoderCacheRefreshInterval) * time.Second
@@ -143,7 +143,7 @@ func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.Syn
 	AppendErrGroup(eg, e.encodeMetricName, resp, req.GetMetricNames())
 	AppendErrGroup(eg, e.encodeLabelName, resp, req.GetLabelNames())
 	AppendErrGroup(eg, e.encodeLabelValue, resp, req.GetLabelValues())
-	AppendErrGroup(eg, e.encodeMetricLabel, req.GetMetricLabels())
+	AppendErrGroup(eg, e.encodeMetricLabel, resp, req.GetMetricLabels())
 	AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
 	err = eg.Wait()
 	return resp, err
@@ -205,11 +205,13 @@ func (e *Encoder) encodeLabel(args ...interface{}) error {
 }
 
 func (e *Encoder) encodeMetricLabel(args ...interface{}) error {
-	mls := args[0].([]*controller.PrometheusMetricLabelRequest)
-	err := e.metricLabel.encode(mls)
+	resp := args[0].(*controller.SyncPrometheusResponse)
+	metricLabels := args[1].([]*controller.PrometheusMetricLabelRequest)
+	mls, err := e.metricLabel.encode(metricLabels)
 	if err != nil {
 		return err
 	}
+	resp.MetricLabels = mls
 	return nil
 }
 
