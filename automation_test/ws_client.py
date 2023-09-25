@@ -6,7 +6,6 @@ import time
 import sys
 import getopt
 import os
-import logging
 
 UUID = ""
 execed = False
@@ -43,7 +42,7 @@ params_env_key = {
     "BRANCH": "CI_COMMIT_BRANCH",
     "UUID": "TEST_EXEC_UUID",
     "TIMESTAMP": "TEST_EXEC_TIMESTAMP",
-    "USER": "GITLAB_USER_LOGIN",
+    "USER": "GITHUB_ACTOR",
     "DEBUG": "DEBUG"
 }
 for _, key in params_env_key.items():
@@ -94,7 +93,7 @@ if __name__ == '__main__':
     url = os.environ.get("AUTOMATION_TEST_PUBLIC_URL", "")
     token = os.environ.get("AUTOMATION_TEST_TOKEN", "")
     if not url or not token:
-        return
+        sys.exit(1)
     if not params.get("UUID"):
         params["UUID"] = UUID
     for key in keys:
@@ -107,5 +106,5 @@ if __name__ == '__main__':
                 params[key] = params_default[key]
     print(params)
     params["AUTOMATION_TEST_TOKEN"] = token
-    sio.connect(f'ws://{url}')
+    sio.connect(f'ws://{url}',  wait_timeout = 10)
     sio.wait()
