@@ -19,6 +19,7 @@ package encoder
 import (
 	"sync"
 
+	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/protobuf/proto"
 
@@ -30,18 +31,22 @@ import (
 type metricName struct {
 	lock         sync.Mutex
 	resourceType string
-	strToID      map[string]int
+	strToID      *hashmap.Map[string, int]
 	ascIDAllocator
 }
 
 func newMetricName(max int) *metricName {
 	mn := &metricName{
 		resourceType: "metric_name",
-		strToID:      make(map[string]int),
+		strToID:      hashmap.New[string, int](),
 	}
 	mn.ascIDAllocator = newAscIDAllocator(mn.resourceType, 1, max)
 	mn.rawDataProvider = mn
 	return mn
+}
+
+func (mn *metricName) getID(str string) (int, bool) {
+	return mn.strToID.Get(str)
 }
 
 func (mn *metricName) refresh(args ...interface{}) error {
@@ -59,7 +64,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	dbToAdd := make([]*mysql.PrometheusMetricName, 0)
 	for i := range strs {
 		str := strs[i]
-		if id, ok := mn.strToID[str]; ok {
+		if id, ok := mn.strToID.Get(str); ok {
 			resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
@@ -83,7 +88,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
 		str := dbToAdd[i].Name
-		mn.strToID[str] = id
+		mn.strToID.Set(str, id)
 		resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(id))})
 	}
 	return resp, nil
@@ -99,7 +104,7 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDsSet.Add(item.ID)
-		mn.strToID[item.Name] = item.ID
+		mn.strToID.Set(item.Name, item.ID)
 	}
 	return inUseIDsSet, nil
 }
