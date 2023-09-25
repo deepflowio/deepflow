@@ -165,11 +165,18 @@ strcpy_s_inline(void *__restrict__ dest, rsize_t dmax,
 		const void *__restrict__ src, rsize_t n)
 {
 	errno_t err;
+
+	if (n > dmax)
+		n = dmax;
+
 	err = memcpy_s_inline(dest, dmax, src, n);
 	if (err == 0) {
 		rsize_t no_use_n = dmax - n;
 		if (no_use_n > 0) {
 			memset(dest + n, 0, no_use_n);
+		} else {
+			char *_d = dest;
+			_d[dmax - 1] = '\0';
 		}
 	}
 
