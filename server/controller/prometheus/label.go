@@ -100,7 +100,7 @@ func (s *LabelSynchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	AppendErrGroup(eg, s.addLabelValueCache, syncResp.GetLabelValues())
 	AppendErrGroup(eg, s.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
 	AppendErrGroup(eg, s.addLabelCache, syncResp.GetLabels())
-	AppendErrGroup(eg, s.addMetricLabelCache, toEncode.metricToMetricLabels)
+	AppendErrGroup(eg, s.addMetricLabelCache, syncResp.GetMetricLabels())
 	AppendErrGroup(eg, s.addMetricTargetCache, syncResp.GetMetricTargets())
 	AppendErrGroup(eg, s.addTargetCache, syncResp.GetTargets())
 	return eg.Wait()
@@ -170,7 +170,7 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 			return res
 		}(toEncode.labels.ToSlice()),
 
-		MetricLabels: func(m map[string]mapset.Set[cache.MetricLabelDetailKey]) []*controller.PrometheusMetricLabelRequest {
+		MetricLabels: func(m map[string]mapset.Set[cache.LabelKey]) []*controller.PrometheusMetricLabelRequest {
 			res := make([]*controller.PrometheusMetricLabelRequest, 0, len(m))
 			for mn, lks := range m {
 				rmn := mn
@@ -178,8 +178,8 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 				lkl := lks.ToSlice()
 				for i := range lkl {
 					ls = append(ls, &controller.PrometheusLabelRequest{
-						Name:  &lkl[i].LabelName,
-						Value: &lkl[i].LabelValue,
+						Name:  &lkl[i].Name,
+						Value: &lkl[i].Value,
 					})
 				}
 				res = append(res, &controller.PrometheusMetricLabelRequest{
@@ -188,7 +188,7 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 				})
 			}
 			return res
-		}(toEncode.metricToMetricLabels),
+		}(toEncode.metricNameToLabelKeys),
 
 		MetricTargets: func(ks []cache.MetricTargetKey, iks map[string]mapset.Set[cache.TargetKey]) []*controller.PrometheusMetricTargetRequest {
 			res := make([]*controller.PrometheusMetricTargetRequest, 0, len(ks))
@@ -408,10 +408,8 @@ func (s *LabelSynchronizer) addLabelCache(arg ...interface{}) error {
 }
 
 func (s *LabelSynchronizer) addMetricLabelCache(arg ...interface{}) error {
-	m := arg[0].(map[string]mapset.Set[cache.MetricLabelDetailKey])
-	for _, ks := range m {
-		s.cache.MetricLabel.Add(ks.ToSlice())
-	}
+	mls := arg[0].([]*controller.PrometheusMetricLabel)
+	s.cache.MetricLabel.Add(mls)
 	return nil
 }
 
@@ -435,7 +433,7 @@ type dataToEncode struct {
 	labelValues           mapset.Set[string]
 	metricAPPLabelLayouts mapset.Set[cache.LayoutKey]
 	labels                mapset.Set[cache.LabelKey]
-	metricToMetricLabels  map[string]mapset.Set[cache.MetricLabelDetailKey]
+	metricNameToLabelKeys map[string]mapset.Set[cache.LabelKey]
 	metricTargets         mapset.Set[cache.MetricTargetKey]
 	metricToTargets       map[string]mapset.Set[cache.TargetKey]
 	targets               mapset.Set[cache.TargetKey]
@@ -450,7 +448,7 @@ func newDataToEncode() *dataToEncode {
 		labelValues:           mapset.NewSet[string](),
 		metricAPPLabelLayouts: mapset.NewSet[cache.LayoutKey](),
 		labels:                mapset.NewSet[cache.LabelKey](),
-		metricToMetricLabels:  make(map[string]mapset.Set[cache.MetricLabelDetailKey], 0),
+		metricNameToLabelKeys: make(map[string]mapset.Set[cache.LabelKey], 0),
 		metricTargets:         mapset.NewSet[cache.MetricTargetKey](),
 		metricToTargets:       make(map[string]mapset.Set[cache.TargetKey], 0),
 		targets:               mapset.NewSet[cache.TargetKey](),
@@ -459,7 +457,7 @@ func newDataToEncode() *dataToEncode {
 
 func (d *dataToEncode) cardinality() int {
 	return d.metricNames.Cardinality() + d.labelNames.Cardinality() + d.labelValues.Cardinality() +
-		d.metricAPPLabelLayouts.Cardinality() + d.labels.Cardinality() + len(d.metricToMetricLabels) +
+		d.metricAPPLabelLayouts.Cardinality() + d.labels.Cardinality() + len(d.metricNameToLabelKeys) +
 		d.metricTargets.Cardinality() + len(d.metricToTargets) + d.targets.Cardinality()
 }
 
@@ -496,19 +494,23 @@ func (d *dataToEncode) appendMetricAPPLabelLayout(metricName, labelName string) 
 }
 
 func (d *dataToEncode) tryAppendLabel(name, value string) {
-	if ok := d.cache.Label.IfKeyExists(cache.NewLabelKey(name, value)); !ok {
+	if _, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(name, value)); !ok {
 		d.labels.Add(cache.NewLabelKey(name, value))
 	}
 }
 
 func (d *dataToEncode) tryAppendMetricLabel(metricName, labelName, labelValue string) {
-	mlk := cache.NewMetricLabelDetailKey(metricName, labelName, labelValue)
-	if ok := d.cache.MetricLabel.IfKeyExists(mlk); !ok {
-		if _, ok := d.metricToMetricLabels[metricName]; !ok {
-			d.metricToMetricLabels[metricName] = mapset.NewSet[cache.MetricLabelDetailKey]()
+	if mi, ok := d.cache.MetricName.GetIDByName(metricName); ok {
+		if li, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(labelName, labelValue)); ok {
+			if ok := d.cache.MetricLabel.IfLinked(mi, li); ok {
+				return
+			}
 		}
-		d.metricToMetricLabels[metricName].Add(mlk)
 	}
+	if _, ok := d.metricNameToLabelKeys[metricName]; !ok {
+		d.metricNameToLabelKeys[metricName] = mapset.NewSet[cache.LabelKey]()
+	}
+	d.metricNameToLabelKeys[metricName].Add(cache.NewLabelKey(labelName, labelValue))
 }
 
 func (d *dataToEncode) tryAppendMetricTarget(metricName string, targetID int) {

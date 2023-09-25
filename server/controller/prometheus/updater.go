@@ -174,12 +174,18 @@ func (td *toolData) load() error {
 		td.layoutKeyToIndex[cache.NewLayoutKey(item.MetricName, item.APPLabelName)] = item.APPLabelColumnIndex
 	}
 
-	metricLabelKeys := td.cache.MetricLabel.GetMetricLabelDetailKeys().ToSlice()
-	for _, item := range metricLabelKeys {
-		if _, ok := td.metricNameToLabelNames[item.MetricName]; !ok {
-			td.metricNameToLabelNames[item.MetricName] = mapset.NewSet[string]()
+	td.cache.MetricLabel.GetMetricNameIDToLabelIDs().Range(func(mni int, lis mapset.Set[int]) bool {
+		if mn, ok := td.cache.MetricName.GetNameByID(mni); ok {
+			for _, li := range lis.ToSlice() {
+				if lk, ok := td.cache.Label.GetKeyByID(li); ok {
+					if _, ok := td.metricNameToLabelNames[mn]; !ok {
+						td.metricNameToLabelNames[mn] = mapset.NewSet[string]()
+					}
+					td.metricNameToLabelNames[mn].Add(lk.Name)
+				}
+			}
 		}
-		td.metricNameToLabelNames[item.MetricName].Add(item.LabelName)
-	}
+		return true
+	})
 	return nil
 }
