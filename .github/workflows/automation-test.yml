@@ -75,6 +75,8 @@ jobs:
         echo "DEEPFLOW_AGENT_IMAGE_TAG=${{ github.event.inputs.DEEPFLOW_AGENT_IMAGE_TAG }}" >> $GITHUB_ENV
         echo "DF_TEST_BRANCH=${{ github.event.inputs.DF_TEST_BRANCH }}" >> $GITHUB_ENV
         echo "DEBUG=${{ github.event.inputs.DEBUG }}" >> $GITHUB_ENV
+        echo "AUTOMATION_TEST_TOKEN=${{ secrets.AUTOMATION_TEST_TOKEN }}" >> $GITHUB_ENV
+        echo "AUTOMATION_TEST_PUBLIC_URL=${{ secrets.AUTOMATION_TEST_PUBLIC_URL }}" >> $GITHUB_ENV
 
     # - name: Setup Debug Session
     #   uses: csexton/debugger-action@master
