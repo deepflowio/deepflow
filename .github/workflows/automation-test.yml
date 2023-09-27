@@ -20,7 +20,9 @@ on:
         required: false
         default: '1'
       TEST_CASE:
-        description: 'case name, support:\n [basic, querier, cloud_k8s, cloud_workloadv, upgrade]'
+        description: |
+          case name, support: 
+          [basic, querier, cloud_k8s, cloud_workloadv, upgrade]
         required: false
         default: 'basic'
       DF_TEST_BRANCH:
@@ -37,21 +39,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 200
     steps:
-    - name: Check Parameter Max Value
-      run: |
-        worker_num="${{ github.event.inputs.WORKER_NUMBER }}"
-        df_env_num="${{ github.event.inputs.DF_ENV_NUMBER }}"
-        worker_max_value=10
-        env_max_value=5
-        if [ "$worker_num" -gt "$worker_max_value" ]; then
-          echo "Parameter exceeds the maximum value of $worker_max_value."
-          exit 1
-        fi
-        if [ "$df_env_num" -gt "$env_max_value" ]; then
-          echo "Parameter exceeds the maximum value of $env_max_value."
-          exit 1
-        fi
-      
     - name: Check Server And Agent Image
       run: |
         server_tag="${{ github.event.inputs.DEEPFLOW_SERVER_IMAGE_TAG }}"
@@ -100,5 +87,7 @@ jobs:
     # - name: Setup Debug Session
     #   uses: csexton/debugger-action@master
     - name: run client
-      run: python3 automation_test/ws_client.py
+      run: |
+        export PYTHONUNBUFFERED=1
+        python3 automation_test/ws_client.py
   
