@@ -135,7 +135,9 @@ if __name__ == '__main__':
                 params[key] = os.environ.get(env_key)
             else:
                 params[key] = params_default[key]
-    params["USER"] = f"{params['USER']}(Github)"
+    params["USER"] = f"{params['USER']}\(Github\)"
+    if params["TEST_CASE"] == "upgrade":
+        params["DF_ENV_FIXED"] = 1
     print(params)
     params["AUTOMATION_TEST_TOKEN"] = token
     check_variables(params)
