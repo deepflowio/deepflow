@@ -1,4 +1,4 @@
-name: automation_test
+name: automation test
 
 on:
   workflow_dispatch:
@@ -11,26 +11,26 @@ on:
         description: 'agent image tag'
         required: true
         default: 'latest'
-      PYTEST_XDIST_WORKER_NUMBER:
+      WORKER_NUMBER:
         description: 'Worker number, recommend 3-6'
         required: false
         default: '3'
-      PYTEST_DF_ENV_NUMBER:
+      DF_ENV_NUMBER:
         description: 'Deepflow env number, recommend 1-3'
         required: false
         default: '1'
       TEST_CASE:
-        description: 'case name'
+        description: 'case name, support:\n [basic, querier, cloud_k8s, cloud_workloadv, upgrade]'
         required: false
         default: 'basic'
       DF_TEST_BRANCH:
-          description: 'df-test branch'
-          required: false
-          default: 'master'
+        description: 'df-test branch'
+        required: false
+        default: 'master'
       DEBUG:
-          description: 'reserve case environment, 1 means reserve'
-          required: false
-          default: '0'
+        description: 'reserve case environment at end of the use case, 1 means reserve'
+        required: false
+        default: '0'
 
 jobs:
   test:
@@ -39,8 +39,8 @@ jobs:
     steps:
     - name: Check Parameter Max Value
       run: |
-        worker_num="${{ github.event.inputs.PYTEST_XDIST_WORKER_NUMBER }}"
-        df_env_num="${{ github.event.inputs.PYTEST_DF_ENV_NUMBER }}"
+        worker_num="${{ github.event.inputs.WORKER_NUMBER }}"
+        df_env_num="${{ github.event.inputs.DF_ENV_NUMBER }}"
         worker_max_value=10
         env_max_value=5
         if [ "$worker_num" -gt "$worker_max_value" ]; then
@@ -51,6 +51,25 @@ jobs:
           echo "Parameter exceeds the maximum value of $env_max_value."
           exit 1
         fi
+      
+    - name: Check Server And Agent Image
+      run: |
+        server_tag="${{ github.event.inputs.DEEPFLOW_SERVER_IMAGE_TAG }}"
+        server=$(skopeo inspect docker://registry.cn-beijing.aliyuncs.com/deepflow-ce/deepflow-agent:${server_tag} 2>&1 | grep "Error parsing image name" || :)
+        if [ -n "$server" ]; then
+          echo "Get Server Image Failed: "
+          echo "$server"
+          exit 1
+        fi
+        agent_tag="${{ github.event.inputs.DEEPFLOW_AGENT_IMAGE_TAG }}"
+        agent=$(skopeo inspect docker://registry.cn-beijing.aliyuncs.com/deepflow-ce/deepflow-agent:${agent_tag} 2>&1 | grep "Error parsing image name" || :)
+        if [ -n "$agent" ]; then
+          echo "Get Agent Image Failed: "
+          echo "$agent"
+          exit 1
+        fi
+        exit 0
+
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -68,8 +87,8 @@ jobs:
     - name: set environment vars
       run: |
         echo "LC_ALL=en_US.utf8" >> $GITHUB_ENV
-        echo "PYTEST_XDIST_WORKER_NUMBER=${{ github.event.inputs.PYTEST_XDIST_WORKER_NUMBER }}" >> $GITHUB_ENV
-        echo "PYTEST_DF_ENV_NUMBER=${{ github.event.inputs.PYTEST_DF_ENV_NUMBER }}" >> $GITHUB_ENV
+        echo "WORKER_NUMBER=${{ github.event.inputs.WORKER_NUMBER }}" >> $GITHUB_ENV
+        echo "DF_ENV_NUMBER=${{ github.event.inputs.DF_ENV_NUMBER }}" >> $GITHUB_ENV
         echo "TEST_CASE=${{ github.event.inputs.TEST_CASE }}" >> $GITHUB_ENV
         echo "DEEPFLOW_SERVER_IMAGE_TAG=${{ github.event.inputs.DEEPFLOW_SERVER_IMAGE_TAG }}" >> $GITHUB_ENV
         echo "DEEPFLOW_AGENT_IMAGE_TAG=${{ github.event.inputs.DEEPFLOW_AGENT_IMAGE_TAG }}" >> $GITHUB_ENV
