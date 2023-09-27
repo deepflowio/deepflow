@@ -103,13 +103,13 @@ def check_variables(params):
 
     # check WORKER_NUMBER
     worker_number = params.get("WORKER_NUMBER")
-    if worker_number > public_supoort_worker_number_max:
+    if int(worker_number) > int(public_supoort_worker_number_max):
         print(f"WORKER_NUMBER {worker_number} over limit")
         assert False
 
     # check DF_ENV_NUMBER
     df_env_number = params.get("DF_ENV_NUMBER")
-    if df_env_number > public_supoort_df_env_number_max:
+    if int(df_env_number) > int(public_supoort_df_env_number_max):
         print(f"DF_ENV_NUMBER {df_env_number} over limit")
         assert False
 
