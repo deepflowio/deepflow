@@ -30,6 +30,14 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
+var PodGroupTypeMap = map[int]uint32{
+	POD_GROUP_DEPLOYMENT:            uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_DEPLOYMENT),
+	POD_GROUP_STATEFULSET:           uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_STATEFULSET),
+	POD_GROUP_RC:                    uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_RC),
+	POD_GROUP_DAEMON_SET:            uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_DAEMON_SET),
+	POD_GROUP_REPLICASET_CONTROLLER: uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER),
+}
+
 type TypeIDData struct {
 	LaunchServer   string
 	LaunchServerID int
@@ -97,6 +105,7 @@ type PlatformRawData struct {
 	peerConnIDs                   mapset.Set
 	cenIDs                        mapset.Set
 	podServiceIDs                 mapset.Set
+	podGroupIDs                   mapset.Set
 	redisInstanceIDs              mapset.Set
 	rdsInstanceIDs                mapset.Set
 	podNodeIDs                    mapset.Set
@@ -119,6 +128,7 @@ type PlatformRawData struct {
 	podServiceIDToPorts map[int][]*models.PodServicePort
 	idToPodNode         map[int]*models.PodNode
 	idToPodService      map[int]*models.PodService
+	idToPodGroup        map[int]*models.PodGroup
 
 	vmIDToVifs            map[int]mapset.Set
 	vRouterIDToVifs       map[int]mapset.Set
@@ -162,6 +172,7 @@ func NewPlatformRawData() *PlatformRawData {
 		peerConnIDs:                   mapset.NewSet(),
 		cenIDs:                        mapset.NewSet(),
 		podServiceIDs:                 mapset.NewSet(),
+		podGroupIDs:                   mapset.NewSet(),
 		redisInstanceIDs:              mapset.NewSet(),
 		rdsInstanceIDs:                mapset.NewSet(),
 		podNodeIDs:                    mapset.NewSet(),
@@ -194,6 +205,7 @@ func NewPlatformRawData() *PlatformRawData {
 		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
 		idToPodNode:            make(map[int]*models.PodNode),
 		idToPodService:         make(map[int]*models.PodService),
+		idToPodGroup:           make(map[int]*models.PodGroup),
 
 		vmIDToVifs:                    make(map[int]mapset.Set),
 		vRouterIDToVifs:               make(map[int]mapset.Set),
@@ -700,6 +712,17 @@ func (r *PlatformRawData) ConvertDBPodService(dbDataCache *DBDataCache) {
 	}
 }
 
+func (r *PlatformRawData) ConvertDBPodGroup(dbDataCache *DBDataCache) {
+	podGroups := dbDataCache.GetPodGroups()
+	if podGroups == nil {
+		return
+	}
+	for _, pg := range podGroups {
+		r.idToPodGroup[pg.ID] = pg
+		r.podGroupIDs.Add(pg.ID)
+	}
+}
+
 func (r *PlatformRawData) ConvertDBPodServicePort(dbDataCache *DBDataCache) {
 	podServicePorts := dbDataCache.GetPodServicePorts()
 	if podServicePorts == nil {
@@ -1037,6 +1060,7 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBPeerConnection(dbDataCache)
 	r.ConvertDBCEN(dbDataCache)
 	r.ConvertDBPodService(dbDataCache)
+	r.ConvertDBPodGroup(dbDataCache)
 	r.ConvertDBPodServicePort(dbDataCache)
 	r.ConvertDBRedisInstance(dbDataCache)
 	r.ConvertDBRdsInstance(dbDataCache)
@@ -1096,6 +1120,11 @@ func (r *PlatformRawData) vInterfaceToProto(
 	if err != nil {
 		log.Error(err, vif.Mac)
 	}
+	podGroupType := uint32(0)
+	podGroup := r.idToPodGroup[device.PodGroupID]
+	if podGroup != nil {
+		podGroupType = PodGroupTypeMap[podGroup.Type]
+	}
 	aInterface := &trident.Interface{
 		Id:             proto.Uint32(uint32(vif.ID)),
 		Mac:            proto.Uint64(macU64),
@@ -1114,6 +1143,7 @@ func (r *PlatformRawData) vInterfaceToProto(
 		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
 		PodId:          proto.Uint32(uint32(device.PodID)),
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
+		PodGroupType:   proto.Uint32(podGroupType),
 	}
 
 	sInterface := &trident.Interface{
@@ -1384,6 +1414,11 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 
 	if !r.podServiceIDs.Equal(o.podServiceIDs) {
 		log.Info("platform pod service changed")
+		return false
+	}
+
+	if !r.podGroupIDs.Equal(o.podGroupIDs) {
+		log.Info("platform pod group changed")
 		return false
 	}
 
