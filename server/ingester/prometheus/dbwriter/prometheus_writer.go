@@ -156,6 +156,15 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	if err != nil {
 		return nil, err
 	}
+	maxLabelColumnIndex, err := w.getMaxAppLabelColumnIndex()
+	if err != nil {
+		log.Warning(err)
+	}
+
+	if currentCount != maxLabelColumnIndex {
+		log.Infof("current app label count(%d) smaller than max app label index(%d)", currentCount, maxLabelColumnIndex)
+		currentCount = 0
+	}
 
 	if currentCount < appLabelCount {
 		startIndex, endIndex := currentCount+1, appLabelCount
@@ -247,6 +256,31 @@ func (w *PrometheusWriter) getCurrentAppLabelColumnCount() (int, error) {
 		}
 	}
 	return count, nil
+}
+
+func (w *PrometheusWriter) getMaxAppLabelColumnIndex() (int, error) {
+	var name string
+	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.columns where table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.columns where table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", PROMETHEUS_TABLE, PROMETHEUS_TABLE)
+	log.Info(sql)
+	rows, err := w.ckdbConn.Query(sql)
+	if err != nil {
+		w.ckdbConn = nil
+		return 0, err
+	}
+	for rows.Next() {
+		err := rows.Scan(&name)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	prefixLen := len("app_label_value_id_")
+	if name == "" || len(name) <= prefixLen {
+		return 0, fmt.Errorf("get max column name(%s) invalid", name)
+	}
+
+	indexStr := name[prefixLen:]
+	return strconv.Atoi(indexStr)
 }
 
 func (w *PrometheusWriter) GetCounter() interface{} {
