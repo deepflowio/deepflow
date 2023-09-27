@@ -88,7 +88,7 @@ def error(data):
 
 @sio.on('runner-logs-finished')
 def finished(data):
-    print('client receive:', data)
+    print('client receive: runner-logs-finished', data)
     sio.disconnect()
 
 
@@ -135,6 +135,7 @@ if __name__ == '__main__':
                 params[key] = os.environ.get(env_key)
             else:
                 params[key] = params_default[key]
+    params["USER"] = f"{params['USER']}(Github)"
     print(params)
     params["AUTOMATION_TEST_TOKEN"] = token
     check_variables(params)
