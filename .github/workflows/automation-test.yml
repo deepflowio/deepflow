@@ -20,7 +20,7 @@ on:
         required: false
         default: '1'
       TEST_CASE:
-        description: 'case name, support [basic, querier, cloud_k8s, cloud_workloadv, upgrade]'
+        description: 'case name, support:\n [basic, querier, cloud_k8s, cloud_workloadv, upgrade]'
         required: false
         default: 'basic'
       DF_TEST_BRANCH:
