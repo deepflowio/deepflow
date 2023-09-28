@@ -144,8 +144,7 @@ const (
 	PodType     = 10
 	PodNodeType = 14
 
-	PodGroupType = 101
-	ServiceType  = 102
+	ServiceType = 102
 
 	ProcessType = 120
 )
@@ -166,11 +165,11 @@ func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uin
 	return 0, IpType
 }
 
-func GetAutoService(serviceID, podGroupID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
+func GetAutoService(serviceID, podGroupID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if serviceID > 0 {
 		return serviceID, ServiceType
 	} else if podGroupID > 0 {
-		return podGroupID, PodGroupType
+		return podGroupID, podGroupType
 	} else if gpID > 0 {
 		return gpID, ProcessType
 	} else if podNodeID > 0 {

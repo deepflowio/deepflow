@@ -239,6 +239,8 @@ type KnowledgeGraph struct {
 	PodNSID1      uint16 `json:"pod_ns_id_1"`
 	PodGroupID0   uint32 `json:"pod_group_id_0"`
 	PodGroupID1   uint32 `json:"pod_group_id_1"`
+	PodGroupType0 uint8  `json:"pod_group_type_0"` // no need to store
+	PodGroupType1 uint8  `json:"pod_group_type_1"` // no need to store
 	PodID0        uint32 `json:"pod_id_0"`
 	PodID1        uint32 `json:"pod_id_1"`
 	PodClusterID0 uint16 `json:"pod_cluster_id_0"`
@@ -759,6 +761,7 @@ func (k *KnowledgeGraph) fill(
 		k.PodNodeID0 = info0.PodNodeID
 		k.PodNSID0 = uint16(info0.PodNSID)
 		k.PodGroupID0 = info0.PodGroupID
+		k.PodGroupType0 = info0.PodGroupType
 		k.PodID0 = info0.PodID
 		k.PodClusterID0 = uint16(info0.PodClusterID)
 		k.SubnetID0 = uint16(info0.SubnetID)
@@ -772,6 +775,7 @@ func (k *KnowledgeGraph) fill(
 		k.PodNodeID1 = info1.PodNodeID
 		k.PodNSID1 = uint16(info1.PodNSID)
 		k.PodGroupID1 = info1.PodGroupID
+		k.PodGroupType1 = info1.PodGroupType
 		k.PodID1 = info1.PodID
 		k.PodClusterID1 = uint16(info1.PodClusterID)
 		k.SubnetID1 = uint16(info1.SubnetID)
@@ -793,10 +797,10 @@ func (k *KnowledgeGraph) fill(
 	}
 
 	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
-	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
+	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
-	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
+	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
