@@ -163,7 +163,6 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		eventStore.PodGroupID = event.PodGroupID
 		eventStore.L3DeviceType = uint8(event.L3DeviceType)
 		eventStore.L3DeviceID = event.L3DeviceID
-
 	}
 	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
 		eventStore.ServiceID = event.InstanceID

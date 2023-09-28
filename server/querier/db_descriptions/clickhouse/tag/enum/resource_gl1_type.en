@@ -11,4 +11,10 @@
 15      , Load Balancer
 16      , NAT Gateway
 101     , K8s Workload
+130     , Deployment
+131     , StatefulSet
+132     , ReplicationController
+133     , DaemonSet
+134     , ReplicaSetController
+135     , CloneSet
 255     , IP

@@ -90,6 +90,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		} else {
 			info, info1 = platformData.QueryIPV4InfosPair(t.L3EpcID, t.IP, t.L3EpcID1, t.IP1)
 		}
+		podGroupType := uint8(0)
 		if info1 != nil {
 			t.RegionID1 = uint16(info1.RegionID)
 			t.HostID1 = uint16(info1.HostID)
@@ -100,6 +101,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			t.PodNSID1 = uint16(info1.PodNSID)
 			t.AZID1 = uint16(info1.AZID)
 			t.PodGroupID1 = info1.PodGroupID
+			podGroupType = info1.PodGroupType
 			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
 			if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
@@ -127,8 +129,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			}
 		}
 		t.ResourceGl0ID1, t.ResourceGl0Type1 = common.GetResourceGl0(t.PodID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.ResourceGl1ID1, t.ResourceGl1Type1 = common.GetResourceGl1(t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.ResourceGl2ID1, t.ResourceGl2Type1 = common.GetResourceGl2(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+		t.ResourceGl1ID1, t.ResourceGl1Type1 = common.GetResourceGl1(t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), podGroupType, t.L3EpcID1)
+		t.ResourceGl2ID1, t.ResourceGl2Type1 = common.GetResourceGl2(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), podGroupType, t.L3EpcID1)
 	} else {
 		t.Code |= MainAddCode
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
@@ -147,6 +149,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		}
 	}
 
+	podGroupType := uint8(0)
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
 		t.HostID = uint16(info.HostID)
@@ -157,6 +160,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.PodNSID = uint16(info.PodNSID)
 		t.AZID = uint16(info.AZID)
 		t.PodGroupID = info.PodGroupID
+		podGroupType = info.PodGroupType
 		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
@@ -197,8 +201,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			}
 		}
 		t.ResourceGl0ID, t.ResourceGl0Type = common.GetResourceGl0(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.ResourceGl2ID, t.ResourceGl2Type = common.GetResourceGl2(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
+		t.ResourceGl2ID, t.ResourceGl2Type = common.GetResourceGl2(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 	}
 
 	return nil

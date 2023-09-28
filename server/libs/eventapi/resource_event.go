@@ -51,6 +51,7 @@ type ResourceEvent struct {
 	PodNodeID    uint32
 	PodServiceID uint32
 	PodGroupID   uint32
+	PodGroupType uint8
 	PodID        uint32
 }
 
