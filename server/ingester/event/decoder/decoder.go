@@ -243,6 +243,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 
 	}
 
+	podGroupType := uint8(0)
 	if event.IfNeedTagged {
 		eventStore.Tagged = 1
 		resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
@@ -256,6 +257,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.PodNSID = uint16(resourceInfo.PodNSID)
 			eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
 			eventStore.PodGroupID = resourceInfo.PodGroupID
+			podGroupType = resourceInfo.PodGroupType
 			eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
 			eventStore.L3DeviceID = resourceInfo.L3DeviceID
 		}
@@ -274,9 +276,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		eventStore.PodNSID = uint16(event.PodNSID)
 		eventStore.PodClusterID = uint16(event.PodClusterID)
 		eventStore.PodGroupID = event.PodGroupID
+		podGroupType = event.PodGroupType
 		eventStore.L3DeviceType = uint8(event.L3DeviceType)
 		eventStore.L3DeviceID = event.L3DeviceID
-
 	}
 	eventStore.SubnetID = uint16(event.SubnetID)
 	eventStore.IsIPv4 = true
@@ -313,6 +315,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.PodNodeID,
 			eventStore.L3DeviceID,
 			eventStore.L3DeviceType,
+			podGroupType,
 			eventStore.L3EpcID,
 		)
 
