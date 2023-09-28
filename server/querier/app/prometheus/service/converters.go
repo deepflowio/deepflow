@@ -626,17 +626,18 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 				tagMap := make(map[string]string)
 				json.Unmarshal([]byte(promTagJson), &tagMap)
 				pairs = make([]prompb.Label, 0, 1+len(tagMap)+len(allDeepFlowNativeTags))
-				if prefix == prefixTag {
-					// prometheus tag for deepflow metrics
-					for k, v := range tagMap {
+				for k, v := range tagMap {
+					if k == "" || v == "" {
+						continue
+					}
+					if prefix == prefixTag {
+						// prometheus tag for deepflow metrics
 						pairs = append(pairs, prompb.Label{
 							Name:  appendPrometheusPrefix(k),
 							Value: v,
 						})
-					}
-				} else {
-					// no prefix, use prometheus native tag
-					for k, v := range tagMap {
+					} else {
+						// no prefix, use prometheus native tag
 						pairs = append(pairs, prompb.Label{
 							Name:  k,
 							Value: v,
