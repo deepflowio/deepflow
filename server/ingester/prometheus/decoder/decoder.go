@@ -576,11 +576,13 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	} else {
 		info = b.platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 	}
+	podGroupType := uint8(0)
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
 		t.AZID = uint16(info.AZID)
 		t.HostID = uint16(info.HostID)
 		t.PodGroupID = info.PodGroupID
+		podGroupType = uint8(info.PodGroupType)
 		t.PodNSID = uint16(info.PodNSID)
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
@@ -598,7 +600,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.ServiceID = b.platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 	}
 }
 
