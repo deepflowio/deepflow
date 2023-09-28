@@ -428,6 +428,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct HttpLog {
     proto: L7Protocol,
+    is_tls: bool,
     perf_stats: Option<L7PerfStats>,
 }
 
@@ -450,9 +451,18 @@ impl L7ProtocolParserInterface for HttpLog {
                     return false;
                 };
                 match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe => self
-                        .parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)
-                        .is_ok(),
+                    EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
+                        if param.direction == PacketDirection::ServerToClient {
+                            return false;
+                        }
+                        self.parse_http2_go_uprobe(
+                            &config.l7_log_dynamic,
+                            payload,
+                            param,
+                            &mut info,
+                        )
+                        .is_ok()
+                    }
                     _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
                 }
             }
@@ -468,6 +478,7 @@ impl L7ProtocolParserInterface for HttpLog {
         let mut info = HttpInfo::default();
         info.proto = self.proto;
         info.is_tls = param.is_tls();
+        self.is_tls = param.is_tls();
 
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
@@ -502,10 +513,20 @@ impl L7ProtocolParserInterface for HttpLog {
 
     fn protocol(&self) -> L7Protocol {
         match self.proto {
-            L7Protocol::Http1 => L7Protocol::Http1,
-
-            L7Protocol::Http2 => L7Protocol::Http2,
-
+            L7Protocol::Http1 => {
+                if self.is_tls {
+                    L7Protocol::Http1TLS
+                } else {
+                    L7Protocol::Http1
+                }
+            }
+            L7Protocol::Http2 => {
+                if self.is_tls {
+                    L7Protocol::Http2TLS
+                } else {
+                    L7Protocol::Http2
+                }
+            }
             L7Protocol::Grpc => L7Protocol::Grpc,
             _ => unreachable!(),
         }

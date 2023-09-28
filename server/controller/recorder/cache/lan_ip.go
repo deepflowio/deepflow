@@ -47,7 +47,6 @@ type LANIP struct {
 }
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
-	l.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	l.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
 }

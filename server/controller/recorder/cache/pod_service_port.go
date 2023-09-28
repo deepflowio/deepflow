@@ -47,6 +47,5 @@ type PodServicePort struct {
 
 func (p *PodServicePort) Update(cloudItem *cloudmodel.PodServicePort) {
 	p.Name = cloudItem.Name
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, p))
 }

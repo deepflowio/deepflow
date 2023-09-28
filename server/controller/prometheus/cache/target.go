@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 var (
@@ -34,14 +35,16 @@ var (
 )
 
 type TargetKey struct {
-	Instance string
-	Job      string
+	Instance     string
+	Job          string
+	PodClusterID int
 }
 
-func NewTargetKey(instance, job string) TargetKey {
+func NewTargetKey(instance, job string, podClusterID int) TargetKey {
 	return TargetKey{
-		Instance: instance,
-		Job:      job,
+		Instance:     instance,
+		Job:          job,
+		PodClusterID: podClusterID,
 	}
 }
 
@@ -64,7 +67,11 @@ func (k *keyToTargetID) Load(tk TargetKey) (int, bool) {
 func (k *keyToTargetID) Get() map[TargetKey]int {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	return k.data
+	data := make(map[TargetKey]int)
+	for k, v := range k.data {
+		data[k] = v
+	}
+	return data
 }
 
 func (k *keyToTargetID) Store(tk TargetKey, v int) {
@@ -100,7 +107,11 @@ func (t *targetIDToLabelNames) Contains(id int, labelName string) bool {
 func (t *targetIDToLabelNames) Get() map[int]mapset.Set[string] {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.data
+	data := make(map[int]mapset.Set[string])
+	for k, v := range t.data {
+		data[k] = v
+	}
+	return data
 }
 
 func (t *targetIDToLabelNames) Coverage(data map[int]mapset.Set[string]) {
@@ -152,7 +163,7 @@ func (t *target) GetLabelNamesByID(id int) []string {
 
 func (t *target) Add(batch []*controller.PrometheusTarget) {
 	for _, item := range batch {
-		t.keyToTargetID.Store(NewTargetKey(item.GetInstance(), item.GetJob()), int(item.GetId()))
+		t.keyToTargetID.Store(NewTargetKey(item.GetInstance(), item.GetJob(), int(item.GetPodClusterId())), int(item.GetId()))
 	}
 }
 
@@ -165,20 +176,22 @@ func (t *target) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	keyToTargetID := make(map[TargetKey]int)
 	targetIDToLabelNames := make(map[int]mapset.Set[string])
 	for _, item := range recorderTargets {
-		keyToTargetID[NewTargetKey(item.Instance, item.Job)] = item.ID
+		keyToTargetID[NewTargetKey(item.Instance, item.Job, item.PodClusterID)] = item.ID
 		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
 	}
 
 	dupKeyIDs := make([]int, 0)
 	for _, item := range selfTargets {
-		if _, ok := keyToTargetID[NewTargetKey(item.Instance, item.Job)]; ok {
+		tk := NewTargetKey(item.Instance, item.Job, item.PodClusterID)
+		if _, ok := keyToTargetID[tk]; ok {
 			dupKeyIDs = append(dupKeyIDs, item.ID)
 			continue
 		}
-		keyToTargetID[NewTargetKey(item.Instance, item.Job)] = item.ID
+		keyToTargetID[tk] = item.ID
 		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
 	}
 	if len(dupKeyIDs) != 0 {
@@ -191,7 +204,7 @@ func (t *target) refresh(args ...interface{}) error {
 }
 
 func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
-	lns := []string{"instance", "job"}
+	lns := []string{TargetLabelInstance, TargetLabelJob}
 	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
 			continue

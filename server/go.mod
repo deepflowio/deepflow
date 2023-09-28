@@ -35,7 +35,7 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230915085230-6b0e68f463f8
+	github.com/deepflowio/deepflow/message v0.0.0-20230927071530-6d75b95973e7
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
@@ -46,7 +46,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.3
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -77,9 +77,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.7.0
 	go.opentelemetry.io/otel/sdk v1.13.0
 	go.opentelemetry.io/proto/otlp v0.19.0
-	golang.org/x/net v0.7.0
-	golang.org/x/sys v0.5.0
-	google.golang.org/grpc v1.53.0
+	golang.org/x/net v0.12.0
+	golang.org/x/sys v0.10.0
+	google.golang.org/grpc v1.58.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
@@ -118,7 +118,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
-	github.com/golang/glog v1.0.0 // indirect
+	github.com/golang/glog v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -130,6 +130,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.13.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 )
 
 require (
@@ -219,14 +221,14 @@ require (
 	go.uber.org/goleak v1.1.12 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230426161633-7e06285ff160 // indirect
-	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/oauth2 v0.4.0 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/crypto v0.11.0 // indirect
+	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/sync v0.3.0
+	golang.org/x/term v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc // indirect
+	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

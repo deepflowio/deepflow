@@ -17,11 +17,11 @@
 package kubernetes_gather
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"strconv"
 
 	"github.com/bitly/go-simplejson"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -70,7 +70,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			PodNamespaceLcuuid: namespaceLcuuid,
 			AZLcuuid:           k.azLcuuid,
 			RegionLcuuid:       k.RegionUuid,
-			PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
+			PodClusterLcuuid:   k.podClusterLcuuid,
 		}
 		ingresses = append(ingresses, ingress)
 		rules := iData.Get("spec").Get("rules")

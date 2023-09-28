@@ -375,9 +375,8 @@ func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *tri
 
 func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *controller.GenesisSharingK8SRequest) (*controller.GenesisSharingK8SResponse, error) {
 	clusterID := request.GetClusterId()
-	k8sDatas := GenesisService.GetKubernetesData()
 
-	if k8sData, ok := k8sDatas[clusterID]; ok {
+	if k8sData, ok := GenesisService.GetKubernetesData(clusterID); ok {
 		epochStr := k8sData.Epoch.Format(controllercommon.GO_BIRTHDAY)
 		return &controller.GenesisSharingK8SResponse{
 			Epoch:    &epochStr,
@@ -391,9 +390,8 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 
 func (g *SynchronizerServer) GenesisSharingPrometheus(ctx context.Context, request *controller.GenesisSharingPrometheusRequest) (*controller.GenesisSharingPrometheusResponse, error) {
 	clusterID := request.GetClusterId()
-	prometheusDatas := GenesisService.GetPrometheusData()
 
-	if prometheusData, ok := prometheusDatas[clusterID]; ok {
+	if prometheusData, ok := GenesisService.GetPrometheusData(clusterID); ok {
 		epochStr := prometheusData.Epoch.Format(controllercommon.GO_BIRTHDAY)
 		entriesByte, _ := json.Marshal(prometheusData.Entries)
 		return &controller.GenesisSharingPrometheusResponse{

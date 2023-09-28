@@ -214,6 +214,11 @@ message PrometheusMetricLabelRequest {
     repeated PrometheusLabelRequest labels = 2;
 }
 
+message PrometheusMetricLabel {
+    optional uint32 metric_name_id = 1;
+    repeated uint32 label_ids = 2;
+}
+
 message PrometheusMetricAPPLabelLayout {
     required string metric_name = 1;
     required string app_label_name = 2;
@@ -235,6 +240,7 @@ message PrometheusMetricTargetRequest {
     optional uint32 target_id = 2;
     optional string instance = 3;
     optional string job = 4;
+    optional uint32 pod_cluster_id = 5;
 }
 
 message PrometheusMetricTarget {
@@ -251,13 +257,14 @@ message PrometheusLabel {
 message PrometheusTargetRequest {
     optional string instance = 1;
     optional string job = 2;
-    optional uint32 vtap_id = 3;
+    optional uint32 pod_cluster_id = 3;
 }
 
 message PrometheusTarget {
     optional uint32 id = 1;
     optional string instance = 2;
     optional string job = 3;
+    optional uint32 pod_cluster_id = 4;
 }
 
 message SyncPrometheusRequest {
@@ -280,6 +287,7 @@ message SyncPrometheusResponse {
     repeated PrometheusLabel labels = 6;
     repeated PrometheusMetricTarget metric_targets = 7;
     repeated PrometheusTarget targets = 8;
+    repeated PrometheusMetricLabel metric_labels = 9;
 }
 
 service PrometheusDebug {

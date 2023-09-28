@@ -64,6 +64,7 @@ type Counter struct {
 type BuilderCounter struct {
 	TimeSeriesIn      int64 `statsd:"time-series-in"`
 	TimeSeriesInvaild int64 `statsd:"time-series-invalid"`
+	PodClusterMiss    int64 `statsd:"pod-cluster-miss"`
 	LabelCount        int64 `statsd:"label-in"`
 	MetricMiss        int64 `statsd:"metirc-miss"`
 	NameMiss          int64 `statsd:"name-miss"`
@@ -267,8 +268,18 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts, extraLabels)
+
+	podClusterId, err := d.samplesBuilder.GetPodClusterId(vtapID)
 	if err != nil {
+		if d.counter.TimeSeriesErr == 0 {
+			log.Warning(err)
+		}
+		d.counter.TimeSeriesErr++
+		return
+	}
+
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, extraLabels)
+	if !isSlowItem && err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
 		}
@@ -278,7 +289,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	builder := d.samplesBuilder
 	if isSlowItem {
 		d.counter.TimeSeriesSlow++
-		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, ts, extraLabels))
+		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, podClusterId, ts, extraLabels))
 		return
 	}
 	d.prometheusWriter.WriteBatch(builder.samplesBuffer, builder.metricName, builder.timeSeriesBuffer, extraLabels, builder.tsLabelNameIDsBuffer, builder.tsLabelValueIDsBuffer)
@@ -286,10 +297,24 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	d.counter.TimeSeriesOut++
 }
 
-func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
+func (b *PrometheusSamplesBuilder) GetPodClusterId(vtapID uint16) (uint16, error) {
+	podClusterId := uint16(0)
+	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
+		podClusterId = uint16(vtapInfo.PodClusterId)
+	} else {
+		b.counter.PodClusterMiss++
+		return 0, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
+	}
+	return podClusterId, nil
+}
+
+// if success,return false,nil
+// if failed, return false,err
+// if isSlow, return true,slowReason
+func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
 	if len(ts.Samples) == 0 {
 		b.counter.TimeSeriesInvaild++
-		return false, nil
+		return false, fmt.Errorf("prometheum samples of time serries(%s) is empty.", ts)
 	}
 	b.counter.TimeSeriesIn++
 
@@ -312,7 +337,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			metricID, ok = b.labelTable.QueryMetricID(metricName)
 			if !ok {
 				b.counter.MetricMiss++
-				return true, nil
+				return true, fmt.Errorf("metric name %s miss", metricName)
 			}
 			break
 		}
@@ -335,18 +360,18 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		nameID, ok := b.labelTable.QueryLabelNameID(l.Name)
 		if !ok {
 			b.counter.NameMiss++
-			return true, nil
+			return true, fmt.Errorf("label name %s miss", l.Name)
 		}
 		valueID, ok := b.labelTable.QueryLabelValueID(l.Value)
 		if !ok {
 			b.counter.ValueMiss++
-			return true, nil
+			return true, fmt.Errorf("label value %s miss", l.Value)
 		}
 
 		// the Controller needs to get all the Value lists contained in the Name for filtering when querying
 		if !b.labelTable.QueryLabelNameValue(nameID, valueID) {
 			b.counter.NameValueMiss++
-			return true, nil
+			return true, fmt.Errorf("label name(%s) id(%d) value(%s) id(%d) miss", l.Name, nameID, l.Value, valueID)
 		}
 
 		if podName == "" && l.Name == PROMETHEUS_POD {
@@ -364,7 +389,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			columnIndex, ok = b.labelTable.QueryColumnIndex(metricID, nameID)
 			if !ok {
 				b.counter.ColumnMiss++
-				return true, nil
+				return true, fmt.Errorf("column metric(%s) id(%d) label name(%s) id(%d) index miss", metricName, metricID, l.Name, nameID)
 			}
 		}
 
@@ -381,15 +406,27 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		return false, fmt.Errorf("prometheum metric name(%s) is empty", metricName)
 	}
 
-	targetID, ok := b.labelTable.QueryTargetID(jobID, instanceID)
+	if jobID == 0 {
+		if jobID, ok = b.labelTable.QueryLabelValueID(""); !ok {
+			b.counter.ValueMiss++
+			return true, fmt.Errorf("label job %s miss", l.Value)
+		}
+	}
+	if instanceID == 0 {
+		if instanceID, ok = b.labelTable.QueryLabelValueID(""); !ok {
+			b.counter.ValueMiss++
+			return true, fmt.Errorf("label instance %s miss", l.Value)
+		}
+	}
+	targetID, ok := b.labelTable.QueryTargetID(podClusterId, jobID, instanceID)
 	if !ok {
 		b.counter.TargetMiss++
-		return true, nil
+		return true, fmt.Errorf("target pod cluster id(%d),jobID(%d),instanceID(%d) miss", podClusterId, jobID, instanceID)
 	}
 
 	if !b.labelTable.QueryMetricTargetPair(metricID, targetID) {
 		b.counter.MetricTargetMiss++
-		return true, nil
+		return true, fmt.Errorf("metric target pair metricID(%d),targetID(%d) miss", metricID, targetID)
 	}
 
 	b.appLabelValueIDsBuffer = append(b.appLabelValueIDsBuffer,

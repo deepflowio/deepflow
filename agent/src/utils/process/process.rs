@@ -68,10 +68,10 @@ impl Ord for FileInfo {
 }
 
 /// 获取指定路径下的所有文件的信息及文件大小总和（单位：B）
-pub fn get_file_and_size_sum(dir: String) -> io::Result<FileAndSizeSum> {
+pub fn get_file_and_size_sum(dir: &String) -> io::Result<FileAndSizeSum> {
     let mut file_and_size_sum = FileAndSizeSum::new();
     let mut file_infos = Vec::new();
-    let dir = Path::new(dir.as_str());
+    let dir = Path::new(dir);
     for item in fs::read_dir(dir)? {
         let file = match item {
             Ok(f) => f,

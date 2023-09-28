@@ -34,6 +34,8 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		},
 		Name:            dbItem.Name,
 		Type:            dbItem.Type,
+		VtapID:          dbItem.VtapID,
+		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
 		NetworkLcuuid:   networkLcuuid,
 		RegionLcuuid:    dbItem.Region,
@@ -67,6 +69,5 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.VtapID = cloudItem.VTapID
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	v.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))
 }

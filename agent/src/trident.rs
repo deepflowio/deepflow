@@ -767,67 +767,65 @@ impl Trident {
 
                     components.replace(comp);
                 }
-                Some(components) => match components {
-                    Components::Agent(components) => {
-                        let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> =
-                            config_handler.on_config(
-                                runtime_config,
-                                &exception_handler,
-                                Some(components),
-                                #[cfg(target_os = "linux")]
-                                &api_watcher,
-                            );
-
-                        #[cfg(target_os = "linux")]
-                        if config_handler
-                            .candidate_config
-                            .platform
-                            .kubernetes_api_enabled
-                        {
-                            api_watcher.start();
-                        } else {
-                            api_watcher.stop();
-                        }
-
-                        components.start();
-                        components.config = config_handler.candidate_config.clone();
-                        dispatcher_listener_callback(
-                            &config_handler.candidate_config.dispatcher,
-                            components,
-                            blacklist,
-                            vm_mac_addrs,
-                            gateway_vmac_addrs,
-                            tap_types,
-                        );
-                        for callback in callbacks {
-                            callback(&config_handler, components);
-                        }
-
-                        for listener in components.dispatcher_listeners.iter_mut() {
-                            listener.on_config_change(&config_handler.candidate_config.dispatcher);
-                        }
-                    }
-                    _ => {
-                        config_handler.on_config(
+                Some(Components::Agent(components)) => {
+                    let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = config_handler
+                        .on_config(
                             runtime_config,
                             &exception_handler,
-                            None,
+                            Some(components),
                             #[cfg(target_os = "linux")]
                             &api_watcher,
                         );
 
-                        #[cfg(target_os = "linux")]
-                        if config_handler
-                            .candidate_config
-                            .platform
-                            .kubernetes_api_enabled
-                        {
-                            api_watcher.start();
-                        } else {
-                            api_watcher.stop();
-                        }
+                    #[cfg(target_os = "linux")]
+                    if config_handler
+                        .candidate_config
+                        .platform
+                        .kubernetes_api_enabled
+                    {
+                        api_watcher.start();
+                    } else {
+                        api_watcher.stop();
                     }
-                },
+
+                    components.start();
+                    components.config = config_handler.candidate_config.clone();
+                    dispatcher_listener_callback(
+                        &config_handler.candidate_config.dispatcher,
+                        components,
+                        blacklist,
+                        vm_mac_addrs,
+                        gateway_vmac_addrs,
+                        tap_types,
+                    );
+                    for callback in callbacks {
+                        callback(&config_handler, components);
+                    }
+
+                    for listener in components.dispatcher_listeners.iter_mut() {
+                        listener.on_config_change(&config_handler.candidate_config.dispatcher);
+                    }
+                }
+                _ => {
+                    config_handler.on_config(
+                        runtime_config,
+                        &exception_handler,
+                        None,
+                        #[cfg(target_os = "linux")]
+                        &api_watcher,
+                    );
+
+                    #[cfg(target_os = "linux")]
+                    if config_handler
+                        .candidate_config
+                        .platform
+                        .kubernetes_api_enabled
+                    {
+                        api_watcher.start();
+                    } else {
+                        api_watcher.stop();
+                    }
+                }
             }
             state_guard = state.lock().unwrap();
         }
@@ -970,7 +968,7 @@ pub struct DomainNameListener {
 }
 
 impl DomainNameListener {
-    const INTERVAL: u64 = 5;
+    const INTERVAL: Duration = Duration::from_secs(5);
 
     fn new(
         stats_collector: Arc<stats::Collector>,
@@ -981,14 +979,11 @@ impl DomainNameListener {
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
         Self {
-            stats_collector: stats_collector.clone(),
+            stats_collector,
             session,
-
-            domain_names: domain_names.clone(),
-            ips: ips.clone(),
-
+            domain_names,
+            ips,
             sidecar_mode,
-
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
             agent_id_tx,
@@ -1037,7 +1032,7 @@ impl DomainNameListener {
                 .name("domain-name-listener".to_owned())
                 .spawn(move || {
                     while !stopped.swap(false, Ordering::Relaxed) {
-                        thread::sleep(Duration::from_secs(Self::INTERVAL));
+                        thread::sleep(Self::INTERVAL);
 
                         let mut changed = false;
                         for i in 0..domain_names.len() {

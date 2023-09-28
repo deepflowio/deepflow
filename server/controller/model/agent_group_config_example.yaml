@@ -1143,7 +1143,13 @@ vtap_group_id: g-xxxxxx
       ## Default: 99
       #frequency: 99
 
-      ## CPUID will not be included in the aggregation of stack trace data.
+      ## Whether to obtain the value of CPUID and decide whether to participate in aggregation.
+      ## Set to 1:
+      ##    Obtain the value of CPUID and will be included in the aggregation of stack trace data.
+      ## Set to 0:
+      ##    It will not be included in the aggregation. Any other value is considered invalid,
+      ##    the CPU value for stack trace data reporting is a special value (CPU_INVALID:0xfff)
+      ##    used to indicate that it is an invalid value.
       ## Default: 0
       #cpu: 0
 

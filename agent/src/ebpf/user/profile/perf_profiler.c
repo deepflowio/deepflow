@@ -83,10 +83,6 @@ static FILE *folded_file;
 static char *flame_graph_start_time;
 static char *flame_graph_end_time;
 
-/* "Maximum data push interval time (in seconds). */
-#define MAX_PUSH_MSG_TIME_INTERVAL 10
-/* "Maximum data push messages count. */
-#define MAX_PUSH_MSG_COUNT 1000
 /* profiler start time(monotonic seconds). */
 static u64 start_time;
 /* Record the time of the last data push
@@ -373,23 +369,19 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	ASSERT(profiler_tracer != NULL);
 
 	u64 curr_time, elapsed;
-	curr_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
+	curr_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 	elapsed = curr_time - last_push_time;
 	/*
 	 * If the aggregated stack trace data obtained by the profiler
 	 * satisfies one of the following conditions, it should be pushed
 	 * to the upper-level processing:
 	 *
-	 * 1 If the aggregated count exceeds or equals the maximum push
-	 *   count (MAX_PUSH_MSG_COUNT).
-	 *
-	 * 2 If the time interval since the last push exceeds or equals
+	 *   If the time interval since the last push exceeds or equals
 	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL).
 	 *
 	 * Otherwise, it should return directly.
 	 */
-	if (!((h->hash_elems_count >= MAX_PUSH_MSG_COUNT) ||
-	      (elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
+	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
 		return;
 
 	/* update last push time. */
@@ -968,9 +960,12 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 
 	if (check_kallsyms_addr_is_zero()) {
 		ebpf_warning(LOG_CP_TAG
-			     "All kernel addresses in /proc/kallsyms are 0. Please add"
-			     " 'CAP_SYSLOG' permission to the container to solve the "
-			     "problem.\n");
+			     "All kernel addresses in /proc/kallsyms are 0, Please"
+			     " follow the steps below to resolve:\n"
+			     "1 Make sure the content of the '/proc/sys/kernel/kpt"
+			     "r_restrict' file is not 2, if it is 2 please set it "
+			     "to 1.\n2 Add 'CAP_SYSLOG' permission to the containe"
+			     "r.\n3 Restart the pod.");
 		return (-1);
 	}
 

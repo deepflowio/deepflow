@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -46,13 +47,22 @@ func (p *PrometheusTarget) getDiffBaseByCloudItem(cloudItem *cloudmodel.Promethe
 }
 
 func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusTarget) (*mysql.PrometheusTarget, bool) {
+	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	if !exists {
+		log.Errorf(resourceAForResourceBNotFound(
+			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			common.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.PrometheusTarget{
-		Instance:    cloudItem.Instance,
-		Job:         cloudItem.Job,
-		ScrapeURL:   cloudItem.ScrapeURL,
-		OtherLabels: cloudItem.OtherLabels,
-		Domain:      p.cache.DomainLcuuid,
-		SubDomain:   cloudItem.SubDomainLcuuid,
+		Instance:     cloudItem.Instance,
+		Job:          cloudItem.Job,
+		ScrapeURL:    cloudItem.ScrapeURL,
+		OtherLabels:  cloudItem.OtherLabels,
+		Domain:       p.cache.DomainLcuuid,
+		SubDomain:    cloudItem.SubDomainLcuuid,
+		PodClusterID: podClusterID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 

@@ -53,6 +53,7 @@ type KubernetesGather struct {
 	customTagLenMax              int
 	isSubDomain                  bool
 	azLcuuid                     string
+	podClusterLcuuid             string
 	podGroupLcuuids              mapset.Set
 	podNetworkLcuuidCIDRs        networkLcuuidCIDRs
 	nodeNetworkLcuuidCIDRs       networkLcuuidCIDRs

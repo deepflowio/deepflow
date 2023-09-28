@@ -52,14 +52,20 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	var err error
 	nonLabelNames := mapset.NewSet[string]()
 	nonLabelValues := mapset.NewSet[string]()
+	nonLabelIDs := mapset.NewSet[int]()
 	mLabels := make([]*trident.MetricLabelResponse, 0)
 	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
 		var labels []*trident.LabelResponse
 		metricName := k.(string)
 		metricID := v.(int)
-		labelKeys := s.cache.MetricLabel.GetLabelsByMetricName(metricName)
-		for i := range labelKeys {
-			lk := labelKeys[i]
+		labelIDs := s.cache.MetricLabel.GetLabelsByMetricName(metricName)
+		for i := range labelIDs {
+			li := labelIDs[i]
+			lk, ok := s.cache.Label.GetKeyByID(li)
+			if !ok {
+				nonLabelIDs.Add(li)
+				continue
+			}
 			if slices.Contains([]string{TargetLabelInstance, TargetLabelJob}, lk.Name) {
 				continue
 			}
@@ -97,6 +103,9 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	}
 	if nonLabelValues.Cardinality() > 0 {
 		log.Warningf("label value id not found, values: %v", nonLabelValues.ToSlice())
+	}
+	if nonLabelIDs.Cardinality() > 0 {
+		log.Warningf("label id not found, ids: %v", nonLabelIDs.ToSlice())
 	}
 	return mLabels, err
 }
@@ -142,6 +151,7 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 			TargetId:           proto.Uint32(uint32(targetID)),
 			MetricIds:          metricIDs,
 			TargetLabelNameIds: labelNIDs,
+			PodClusterId:       proto.Uint32(uint32(targetKey.PodClusterID)),
 		})
 		s.counter.SendTargetCount++
 	}

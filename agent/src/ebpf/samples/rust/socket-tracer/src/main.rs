@@ -194,12 +194,14 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("SOFARPC");
         } else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
             proto_tag.push_str("FASTCGI");
+        } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
+            proto_tag.push_str("MONGO");
         } else {
             proto_tag.push_str("UNSPEC");
         }
 
         println!("+ --------------------------------- +");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
+        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 || sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
             let data = sk_data_str_safe(sd);
             println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
@@ -250,6 +252,10 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 5 {
                 print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
+            } else if sk_proto_safe(sd) == SOCK_DATA_OTHER {
+                for x in data.into_iter() {
+                    print!("{} ", format!("{:02x}", x));
+                }
             } else {
                 for x in data.into_iter() {
                     if x < 32 || x > 126 {
@@ -341,6 +347,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
+	enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
 
         set_feature_regex(
             FEATURE_UPROBE_OPENSSL,

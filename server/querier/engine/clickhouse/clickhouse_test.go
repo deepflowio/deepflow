@@ -103,7 +103,7 @@ var (
 		output: "WITH toStartOfInterval(time, toIntervalDay(1)) + toIntervalDay(arrayJoin([0]) * 1) AS `_time_120` SELECT toUnixTimestamp(`_time_120`) AS `time_120`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` GROUP BY `time_120` HAVING MIN(byte_tx+byte_rx) >= 0 LIMIT 1",
 	}, {
 		input:  "select Max(byte) as 'max_byte',region_0,chost_id_1 from l4_flow_log group by region_0,chost_id_1 limit 1",
-		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` LIMIT 1",
+		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` PREWHERE (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` LIMIT 1",
 	}, {
 		input:  "select Percentage(Max(byte)+100,100) as percentage_max_byte_100 from l4_flow_log limit 1",
 		output: "SELECT divide(plus(MAX(byte_tx+byte_rx), 100), 100)*100 AS `percentage_max_byte_100` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -121,19 +121,19 @@ var (
 		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` LIMIT 10000",
 	}, {
 		input:  "select region_id_0 from l7_flow_log where pod_ingress_0 !='xx' group by region_id_0",
-		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) AND (region_id_0!=0) GROUP BY `region_id_0` LIMIT 10000",
+		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) GROUP BY `region_id_0` LIMIT 10000",
 	}, {
 		input:  "select node_type(region_0) as `node_type_0`,mask(ip_0,33) as `mask_ip_0` from l7_flow_log group by `mask_ip_0`,`node_type_0`",
 		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS `mask_ip_0` SELECT 'region' AS `node_type_0`, `mask_ip_0` FROM flow_log.`l7_flow_log` GROUP BY `mask_ip_0`, `node_type_0` LIMIT 10000",
 	}, {
 		input:  "select region_id_0 from l7_flow_log group by region_id_0,chost_id_1",
-		output: "SELECT region_id_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` FROM flow_log.`l7_flow_log` PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY `region_id_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` LIMIT 10000",
+		output: "SELECT region_id_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` FROM flow_log.`l7_flow_log` PREWHERE (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY `region_id_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` LIMIT 10000",
 	}, {
 		input:  "SELECT ip_0 FROM l4_flow_log WHERE  ((is_internet_1=1) OR (is_internet_0=1)) GROUP BY ip_0 limit 1",
 		output: "SELECT if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` FROM flow_log.`l4_flow_log` PREWHERE (((l3_epc_id_1 = -2)) OR ((l3_epc_id_0 = -2))) GROUP BY if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` LIMIT 1",
 	}, {
 		input:  "select Sum(byte) as `流量总量`, region_0 as `区域` from l4_flow_log where 1=1 group by `区域` order by `流量总量` desc",
-		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `区域`, SUM(byte_tx+byte_rx) AS `流量总量` FROM flow_log.`l4_flow_log` PREWHERE 1 = 1 AND (region_id_0!=0) GROUP BY `区域` ORDER BY `流量总量` desc LIMIT 10000",
+		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `区域`, SUM(byte_tx+byte_rx) AS `流量总量` FROM flow_log.`l4_flow_log` PREWHERE 1 = 1 GROUP BY `区域` ORDER BY `流量总量` desc LIMIT 10000",
 	}, {
 		input:  "select byte as `123` from l4_flow_log where 1=1 group by `123` order by `123` limit 1 ",
 		output: "SELECT byte_tx+byte_rx AS `123` FROM flow_log.`l4_flow_log` PREWHERE 1 = 1 GROUP BY `123` ORDER BY `123` asc LIMIT 1",
@@ -189,7 +189,7 @@ var (
 		output: "WITH dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)` SELECT `Enum(tap_side)` FROM flow_log.`l7_flow_log` LIMIT 0, 50",
 	}, {
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port group by region_0 limit 1",
-		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` LIMIT 1",
+		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
 		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
@@ -269,8 +269,32 @@ var (
 	}, {
 		index:  "count_3",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
-		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
-		db:     "flow_metrics"}}
+		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
+		db:     "flow_metrics",
+	}, {
+		index:  "topk_1",
+		db:     "flow_metrics",
+		input:  "select pod_ns, topK(pod, 10) from `vtap_app_port.1h` WHERE time>=1687315761 AND time<=1687316661 group by pod_ns limit 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1687315761 AND `time` <= 1687316661 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+	}, {
+		index:  "topk_2",
+		db:     "flow_metrics",
+		input:  "select pod_ns, topK(pod, pod_cluster_id, service_id, 10) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+	}, {
+		index:  "any_1",
+		db:     "flow_metrics",
+		input:  "select pod_ns, any(pod) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(1)(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+	}, {
+		index:  "any_2",
+		db:     "flow_metrics",
+		input:  "select pod_ns, any(pod, pod_cluster_id, service_id) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(1)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+	}, {
+		input:  "SELECT is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
+		output: "SELECT if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
+	}}
 )
 
 func TestGetSql(t *testing.T) {

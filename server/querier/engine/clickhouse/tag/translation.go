@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
@@ -53,10 +55,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		for _, suffix := range []string{"", "_0", "_1"} {
 			resourceIDSuffix := resourceStr + "_id" + suffix
 			resourceNameSuffix := resourceStr + suffix
+			groupNotNullFilter := ""
+			if !slices.Contains[string]([]string{"region", "az", "subnet", "pod_cluster"}, resourceStr) {
+				groupNotNullFilter = resourceIDSuffix + "!=0"
+			}
 			tagResourceMap[resourceIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"",
-					resourceIDSuffix+"!=0",
+					groupNotNullFilter,
 					"",
 					"",
 				),
@@ -64,7 +70,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet(flow_tag."+resourceStr+"_map, 'name', (toUInt64("+resourceIDSuffix+")))",
-					resourceIDSuffix+"!=0",
+					groupNotNullFilter,
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
 				),

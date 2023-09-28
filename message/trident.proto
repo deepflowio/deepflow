@@ -311,6 +311,32 @@ enum DeviceType {
     DEVICE_TYPE_NAT_GATEWAY= 16;
 }
 
+enum AutoServiceType {
+    AUTO_SERVICE_TYPE_INTERNET_IP = 0;
+    AUTO_SERVICE_TYPE_CHOST = 1;
+    AUTO_SERVICE_TYPE_VGATEWAY = 5;
+    AUTO_SERVICE_TYPE_HOST = 6;
+    AUTO_SERVICE_TYPE_DHCP_PORT = 9;
+    AUTO_SERVICE_TYPE_POD_SERVICE = 11;
+    AUTO_SERVICE_TYPE_REDIS_INSTANCE= 12;
+    AUTO_SERVICE_TYPE_RDS_INSTANCE = 13;
+    AUTO_SERVICE_TYPE_POD_NODE= 14;
+    AUTO_SERVICE_TYPE_LOAD_BALANCE= 15;
+    AUTO_SERVICE_TYPE_NAT_GATEWAY= 16;
+
+    AUTO_SERVICE_TYPE_POD_GROUP = 101;
+    AUTO_SERVICE_TYPE_SERVICE = 102;
+    AUTO_SERVICE_TYPE_PROCESS = 120;
+    AUTO_SERVICE_TYPE_POD_GROUP_DEPLOYMENT = 130;
+    AUTO_SERVICE_TYPE_POD_GROUP_STATEFULSET = 131;
+    AUTO_SERVICE_TYPE_POD_GROUP_RC = 132;
+    AUTO_SERVICE_TYPE_POD_GROUP_DAEMON_SET = 133;
+    AUTO_SERVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER = 134;
+    AUTO_SERVICE_TYPE_POD_GROUP_CLONESET = 135;
+
+    AUTO_SERVICE_TYPE_IP = 255;
+}
+
 message Interface {
     optional uint32 id = 1;
     optional uint32 device_type = 2;
@@ -330,6 +356,7 @@ message Interface {
     optional uint32 pod_cluster_id = 26;
     optional uint32 netns_id = 27 [default = 0];
     optional uint32 vtap_id = 28; // 限制在64000
+    optional uint32 pod_group_type = 29;
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
 }
@@ -844,19 +871,21 @@ message LabelResponse {
 
 message MetricLabelRequest {
     optional string metric_name = 1;
-    repeated LabelRequest labels = 2;  // must contain instance and job label
+    optional uint32 pod_cluster_id = 2;
+    repeated LabelRequest labels = 3;  // must contain instance and job label
 }
 
 message MetricLabelResponse {
     optional string metric_name = 1;
     optional uint32 metric_id = 2;
-    repeated LabelResponse label_ids = 3;
+    optional uint32 pod_cluster_id = 3;
+    repeated LabelResponse label_ids = 4;
 }
 
 message TargetRequest {
     optional string job = 1;
     optional string instance = 2;
-    optional uint32 vtap_id = 3;
+    optional uint32 pod_cluster_id = 3;
 }
 
 message TargetResponse {
@@ -864,9 +893,10 @@ message TargetResponse {
     optional string instance = 2;
     optional uint32 job_id = 3;
     optional uint32 instance_id = 4;
-    optional uint32 target_id = 5; // when the Controller cannot determine the target_id, fill in 0
-    repeated uint32 metric_ids = 6; // when requesting all prometheus information, you need to carry the metric list related to the target
-    repeated uint32 target_label_name_ids = 7; // when the target labels change, it needs to be synchronized to Ingester regularly
+    optional uint32 pod_cluster_id = 5;
+    optional uint32 target_id = 6; // when the Controller cannot determine the target_id, fill in 0
+    repeated uint32 metric_ids = 7; // when requesting all prometheus information, you need to carry the metric list related to the target
+    repeated uint32 target_label_name_ids = 8; // when the target labels change, it needs to be synchronized to Ingester regularly
 }
 
 // when the request content is empty, it means requesting all metric label and target information
