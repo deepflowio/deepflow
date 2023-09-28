@@ -144,8 +144,7 @@ const (
 	PodType     = 10
 	PodNodeType = 14
 
-	PodGroupType = 101
-	ServiceType  = 102
+	ServiceType = 102
 )
 
 func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
@@ -162,9 +161,9 @@ func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3E
 	return 0, IpType
 }
 
-func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
+func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if podGroupID > 0 {
-		return podGroupID, PodGroupType
+		return podGroupID, podGroupType
 	} else if podNodeID > 0 {
 		return podNodeID, PodNodeType
 	} else if l3DeviceID > 0 {
@@ -175,11 +174,11 @@ func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8
 	return 0, IpType
 }
 
-func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
+func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if serviceID > 0 {
 		return serviceID, ServiceType
 	}
-	return GetResourceGl1(podGroupID, podNodeID, l3DeviceID, l3DeviceType, l3EpcID)
+	return GetResourceGl1(podGroupID, podNodeID, l3DeviceID, l3DeviceType, podGroupType, l3EpcID)
 }
 
 func IsPodServiceIP(deviceType zerodoc.DeviceType, podId, podNodeId uint32) bool {

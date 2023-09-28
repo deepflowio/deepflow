@@ -12,4 +12,10 @@
 16      , NAT 网关
 101     , 工作负载
 102     , 服务
+130     , Deployment
+131     , StatefulSet
+132     , ReplicationController
+133     , DaemonSet
+134     , ReplicaSetController
+135     , CloneSet
 255     , IP
