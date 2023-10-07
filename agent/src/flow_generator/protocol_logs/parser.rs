@@ -41,6 +41,7 @@ use crate::{
         enums::EthernetType,
         flow::{get_uniq_flow_id_in_one_minute, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        meta_packet::ProtocolData,
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
@@ -150,8 +151,13 @@ impl MetaAppProto {
             }
         }
 
+        let seq = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data.seq
+        } else {
+            0
+        };
         if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
-            base_info.req_tcp_seq = meta_packet.tcp_data.seq + l7_info.tcp_seq_offset();
+            base_info.req_tcp_seq = seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_request = meta_packet.syscall_trace_id;
@@ -167,7 +173,7 @@ impl MetaAppProto {
                 );
             }
 
-            base_info.resp_tcp_seq = meta_packet.tcp_data.seq + l7_info.tcp_seq_offset();
+            base_info.resp_tcp_seq = seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_response = meta_packet.syscall_trace_id;

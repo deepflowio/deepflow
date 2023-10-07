@@ -349,16 +349,6 @@ func (g *GroupTag) Format(m *view.Model) {
 				m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
 			}
 		}
-		// internet增加epc分组
-		internetSuffix := "is_internet" + suffix
-		epcSuffix := "l3_epc_id" + suffix
-		if preAsOK {
-			if preAsTag == internetSuffix {
-				m.AddGroup(&view.Group{Value: epcSuffix})
-			}
-		} else if g.Alias == internetSuffix {
-			m.AddGroup(&view.Group{Value: epcSuffix})
-		}
 	}
 	for _, tag := range []string{"client_node_type", "server_node_type", "node_type"} {
 		if g.Value == tag {

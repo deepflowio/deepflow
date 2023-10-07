@@ -17,63 +17,59 @@
 package cache
 
 import (
+	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-type MetricLabelDetailKey struct {
-	MetricName string
-	LabelName  string
-	LabelValue string
-}
-
-func NewMetricLabelDetailKey(metricName, labelName, labelValue string) MetricLabelDetailKey {
-	return MetricLabelDetailKey{
-		MetricName: metricName,
-		LabelName:  labelName,
-		LabelValue: labelValue,
-	}
-}
-
 type metricLabel struct {
-	labelCache            *label
-	metricLabelDetailKeys mapset.Set[MetricLabelDetailKey] // for metric_label check
-	metricNameToLabelIDs  map[string][]int                 // only for fully assembled
+	metricNameCache *metricName
+	labelCache      *label
+
+	metricNameIDToLabelIDs *hashmap.Map[int, mapset.Set[int]]
 }
 
-func newMetricLabel(l *label) *metricLabel {
+func newMetricLabel(mn *metricName, l *label) *metricLabel {
 	return &metricLabel{
-		labelCache:            l,
-		metricLabelDetailKeys: mapset.NewSet[MetricLabelDetailKey](),
-		metricNameToLabelIDs:  make(map[string][]int),
+		metricNameCache: mn,
+		labelCache:      l,
+
+		metricNameIDToLabelIDs: hashmap.New[int, mapset.Set[int]](),
 	}
 }
 
-func (ml *metricLabel) IfKeyExists(k MetricLabelDetailKey) bool {
-	return ml.metricLabelDetailKeys.Contains(k)
+func (ml *metricLabel) IfLinked(metricID, labelID int) bool {
+	if labelIDs, ok := ml.metricNameIDToLabelIDs.Get(metricID); ok {
+		return labelIDs.(mapset.Set[int]).Contains(labelID)
+	}
+	return false
 }
 
-func (ml *metricLabel) GetLabelsByMetricName(metricName string) []LabelKey {
-	var ret []LabelKey
-	if labelIDs, ok := ml.metricNameToLabelIDs[metricName]; ok {
-		for _, labelID := range labelIDs {
-			if labelKey, ok := ml.labelCache.GetKeyByID(labelID); ok {
-				ret = append(ret, labelKey)
-			}
+func (ml *metricLabel) GetLabelsByMetricName(metricName string) []int {
+	mni, ok := ml.metricNameCache.GetIDByName(metricName)
+	if !ok {
+		log.Debugf("metric_name: %s id not found", metricName)
+		return nil
+	}
+	if labelIDs, ok := ml.metricNameIDToLabelIDs.Get(mni); ok {
+		return labelIDs.ToSlice()
+	}
+	log.Debugf("metric_name: %s label_ids not found", metricName)
+	return []int{}
+}
+
+func (mi *metricLabel) GetMetricNameIDToLabelIDs() *hashmap.Map[int, mapset.Set[int]] {
+	return mi.metricNameIDToLabelIDs
+}
+
+func (ml *metricLabel) Add(batch []*controller.PrometheusMetricLabel) {
+	for _, item := range batch {
+		for _, li := range item.GetLabelIds() {
+			ml.metricNameIDToLabelIDs.GetOrInsert(int(item.GetMetricNameId()), mapset.NewSet(int(li)))
 		}
 	}
-	return ret
-}
-
-func (ml *metricLabel) Add(batch []MetricLabelDetailKey) {
-	for _, item := range batch {
-		ml.metricLabelDetailKeys.Add(item)
-	}
-}
-
-func (ml *metricLabel) GetMetricLabelDetailKeys() mapset.Set[MetricLabelDetailKey] {
-	return ml.metricLabelDetailKeys
 }
 
 func (ml *metricLabel) refresh(args ...interface{}) error {
@@ -81,21 +77,16 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	metricNameToLabelIDs := make(map[string][]int)
 	for _, item := range metricLabels {
-		if lk, ok := ml.labelCache.GetKeyByID(item.LabelID); ok {
-			ml.metricLabelDetailKeys.Add(NewMetricLabelDetailKey(item.MetricName, lk.Name, lk.Value))
-		}
-		if _, ok := ml.labelCache.GetKeyByID(item.LabelID); ok {
-			metricNameToLabelIDs[item.MetricName] = append(metricNameToLabelIDs[item.MetricName], item.LabelID)
+		if mni, ok := ml.metricNameCache.GetIDByName(item.MetricName); ok {
+			ml.metricNameIDToLabelIDs.GetOrInsert(mni, mapset.NewSet(item.LabelID))
 		}
 	}
-	ml.metricNameToLabelIDs = metricNameToLabelIDs
 	return nil
 }
 
 func (ml *metricLabel) load() ([]*mysql.PrometheusMetricLabel, error) {
 	var metricLabels []*mysql.PrometheusMetricLabel
-	err := mysql.Db.Find(&metricLabels).Error
+	err := mysql.Db.Select("metric_name", "label_id").Find(&metricLabels).Error
 	return metricLabels, err
 }

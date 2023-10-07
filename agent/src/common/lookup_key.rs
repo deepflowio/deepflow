@@ -206,6 +206,10 @@ impl LookupKey {
         self.proto == IpProtocol::TCP
     }
 
+    pub fn is_udp(&self) -> bool {
+        self.proto == IpProtocol::UDP
+    }
+
     pub fn is_ipv4(&self) -> bool {
         self.eth_type == EthernetType::IPV4
     }

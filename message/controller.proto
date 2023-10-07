@@ -214,6 +214,11 @@ message PrometheusMetricLabelRequest {
     repeated PrometheusLabelRequest labels = 2;
 }
 
+message PrometheusMetricLabel {
+    optional uint32 metric_name_id = 1;
+    repeated uint32 label_ids = 2;
+}
+
 message PrometheusMetricAPPLabelLayout {
     required string metric_name = 1;
     required string app_label_name = 2;
@@ -282,6 +287,7 @@ message SyncPrometheusResponse {
     repeated PrometheusLabel labels = 6;
     repeated PrometheusMetricTarget metric_targets = 7;
     repeated PrometheusTarget targets = 8;
+    repeated PrometheusMetricLabel metric_labels = 9;
 }
 
 service PrometheusDebug {

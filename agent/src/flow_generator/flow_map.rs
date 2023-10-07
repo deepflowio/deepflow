@@ -60,7 +60,7 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
-        meta_packet::{MetaPacket, MetaPacketTcpHeader},
+        meta_packet::{MetaPacket, MetaPacketTcpHeader, ProtocolData},
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
         Timestamp,
@@ -703,24 +703,26 @@ impl FlowMap {
             )));
         }
 
-        let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
-            node.tagged_flow.flow.flow_id,
-            meta_packet.lookup_key.direction as u8,
-            meta_packet.lookup_key.timestamp.into(),
-            meta_packet.payload_len,
-            meta_packet.tcp_data.seq,
-            meta_packet.tcp_data.ack,
-            meta_packet.tcp_data.win_size,
-            meta_packet.tcp_data.mss,
-            meta_packet.tcp_data.flags.bits(),
-            meta_packet.tcp_data.win_scale,
-            meta_packet.tcp_data.sack_permitted,
-            &meta_packet.tcp_data.sack,
-        );
-        node.packet_sequence_block
-            .as_mut()
-            .unwrap()
-            .append_packet(mini_meta_packet, config.packet_sequence_flag);
+        if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
+                node.tagged_flow.flow.flow_id,
+                meta_packet.lookup_key.direction as u8,
+                meta_packet.lookup_key.timestamp.into(),
+                meta_packet.payload_len,
+                tcp_data.seq,
+                tcp_data.ack,
+                tcp_data.win_size,
+                tcp_data.mss,
+                tcp_data.flags.bits(),
+                tcp_data.win_scale,
+                tcp_data.sack_permitted,
+                &tcp_data.sack,
+            );
+            node.packet_sequence_block
+                .as_mut()
+                .unwrap()
+                .append_packet(mini_meta_packet, config.packet_sequence_flag);
+        }
     }
 
     fn update_tcp_node(
@@ -813,7 +815,9 @@ impl FlowMap {
         {
             node.timeout = config.flow.flow_timeout.established_rst;
         }
-
+        if let Some(meta_flow_log) = node.meta_flow_log.as_mut() {
+            let _ = meta_flow_log.parse_l3(meta_packet);
+        }
         false
     }
 
@@ -832,7 +836,11 @@ impl FlowMap {
     ) -> bool {
         let flow_config = config.flow;
         let direction = meta_packet.lookup_key.direction;
-        let pkt_tcp_flags = meta_packet.tcp_data.flags;
+        let pkt_tcp_flags = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data.flags
+        } else {
+            unreachable!();
+        };
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].total_tcp_flags |=
             pkt_tcp_flags;
@@ -873,42 +881,47 @@ impl FlowMap {
 
         let (next_tcp_seq0, next_tcp_seq1) = (node.next_tcp_seq0, node.next_tcp_seq1);
 
+        let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         // 记录下一次TCP Seq
         match meta_packet.lookup_key.direction {
-            PacketDirection::ClientToServer => node.next_tcp_seq1 = meta_packet.tcp_data.ack,
-            PacketDirection::ServerToClient => node.next_tcp_seq0 = meta_packet.tcp_data.ack,
+            PacketDirection::ClientToServer => node.next_tcp_seq1 = tcp_data.ack,
+            PacketDirection::ServerToClient => node.next_tcp_seq0 = tcp_data.ack,
         }
         // TCP Keepalive报文判断，并记录其TCP Seq
         if meta_packet.payload_len > 1 {
             return;
         }
 
-        if meta_packet.tcp_data.flags & (TcpFlags::SYN | TcpFlags::FIN | TcpFlags::RST)
-            != TcpFlags::empty()
-        {
+        if tcp_data.flags & (TcpFlags::SYN | TcpFlags::FIN | TcpFlags::RST) != TcpFlags::empty() {
             return;
         }
 
-        let (seq, ack) = (meta_packet.tcp_data.seq, meta_packet.tcp_data.ack);
-
         if meta_packet.lookup_key.direction == PacketDirection::ClientToServer
-            && seq.wrapping_add(1) == next_tcp_seq0
+            && tcp_data.seq.wrapping_add(1) == next_tcp_seq0
             || meta_packet.lookup_key.direction == PacketDirection::ServerToClient
-                && seq.wrapping_add(1) == next_tcp_seq1
+                && tcp_data.seq.wrapping_add(1) == next_tcp_seq1
         {
             let flow = &mut node.tagged_flow.flow;
-            flow.last_keepalive_seq = seq;
-            flow.last_keepalive_ack = ack;
+            flow.last_keepalive_seq = tcp_data.seq;
+            flow.last_keepalive_ack = tcp_data.ack;
         }
     }
 
     fn update_syn_or_syn_ack_seq(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
-        let tcp_flag = meta_packet.tcp_data.flags;
+        let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         let flow = &mut node.tagged_flow.flow;
-        if tcp_flag == TcpFlags::SYN {
-            flow.syn_seq = meta_packet.tcp_data.seq;
-        } else if tcp_flag == TcpFlags::SYN_ACK && meta_packet.payload_len == 0 {
-            flow.synack_seq = meta_packet.tcp_data.seq;
+        if tcp_data.flags == TcpFlags::SYN {
+            flow.syn_seq = tcp_data.seq;
+        } else if tcp_data.flags == TcpFlags::SYN_ACK && meta_packet.payload_len == 0 {
+            flow.synack_seq = tcp_data.seq;
         }
     }
 
@@ -1013,6 +1026,11 @@ impl FlowMap {
         } else {
             false
         };
+        let flags = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data.flags
+        } else {
+            TcpFlags::default()
+        };
         let flow = Flow {
             flow_key: FlowKey {
                 vtap_id: flow_config.vtap_id,
@@ -1063,8 +1081,8 @@ impl FlowMap {
                     l4_byte_count: meta_packet.l4_payload_len() as u64,
                     first: lookup_key.timestamp.into(),
                     last: lookup_key.timestamp.into(),
-                    tcp_flags: meta_packet.tcp_data.flags,
-                    total_tcp_flags: meta_packet.tcp_data.flags,
+                    tcp_flags: flags,
+                    total_tcp_flags: flags,
                     ..Default::default()
                 },
                 FlowMetricsPeer::default(),
@@ -1490,8 +1508,12 @@ impl FlowMap {
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true);
 
-            let pkt_tcp_flags = meta_packet.tcp_data.flags;
-            if pkt_tcp_flags.is_invalid() {
+            let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+                tcp_data
+            } else {
+                unreachable!()
+            };
+            if tcp_data.flags.is_invalid() {
                 // exception timeout
                 node.timeout = flow_config.flow_timeout.exception;
                 node.flow_state = FlowState::Exception;
@@ -1499,7 +1521,7 @@ impl FlowMap {
             self.update_flow_state_machine(
                 flow_config,
                 &mut node,
-                pkt_tcp_flags,
+                tcp_data.flags,
                 meta_packet.lookup_key.direction,
             );
             self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
@@ -1669,7 +1691,10 @@ impl FlowMap {
         let mut l7_stats = L7Stats::default();
         let mut collect_stats = false;
         if config.collector_enabled
-            && (flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP)
+            && (flow.flow_key.proto == IpProtocol::TCP
+                || flow.flow_key.proto == IpProtocol::UDP
+                || flow.flow_key.proto == IpProtocol::ICMPV4
+                || flow.flow_key.proto == IpProtocol::ICMPV6)
         {
             if let Some(perf) = node.meta_flow_log.as_mut() {
                 collect_stats = true;
@@ -1761,7 +1786,11 @@ impl FlowMap {
             }
             let mut l7_stats = L7Stats::default();
             let mut collect_stats = false;
-            if flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP {
+            if flow.flow_key.proto == IpProtocol::TCP
+                || flow.flow_key.proto == IpProtocol::UDP
+                || flow.flow_key.proto == IpProtocol::ICMPV4
+                || flow.flow_key.proto == IpProtocol::ICMPV6
+            {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
                     perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
                     let l7_timeout_count = self
@@ -1774,17 +1803,13 @@ impl FlowMap {
                     let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
                     flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
                     flow_perf_stats.l7_protocol = l7_protocol;
-                    if flow.flow_key.proto == IpProtocol::TCP
-                        || flow.flow_key.proto == IpProtocol::UDP
-                    {
-                        collect_stats = true;
-                        l7_stats.stats = l7_perf_stats;
-                        l7_stats.endpoint = flow.last_endpoint.clone();
-                        l7_stats.flow_id = flow.flow_id;
-                        l7_stats.signal_source = flow.signal_source;
-                        l7_stats.time_in_second = flow.flow_stat_time.into();
-                        l7_stats.l7_protocol = l7_protocol;
-                    }
+                    collect_stats = true;
+                    l7_stats.stats = l7_perf_stats;
+                    l7_stats.endpoint = flow.last_endpoint.clone();
+                    l7_stats.flow_id = flow.flow_id;
+                    l7_stats.signal_source = flow.signal_source;
+                    l7_stats.time_in_second = flow.flow_stat_time.into();
+                    l7_stats.l7_protocol = l7_protocol;
                 }
             }
             // Unknown application only counts metrics, and the judgment condition needs to consider
@@ -1876,12 +1901,17 @@ impl FlowMap {
         let (mut flow_src_score, mut flow_dst_score) = match lookup_key.proto {
             // TCP/UDP
             IpProtocol::TCP => {
-                let flags = meta_packet.tcp_data.flags;
+                let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data
+                {
+                    tcp_data
+                } else {
+                    unreachable!()
+                };
                 self.service_table.get_tcp_score(
                     is_first_packet,
                     meta_packet.need_reverse_flow,
                     lookup_key.direction,
-                    flags,
+                    tcp_data.flags,
                     false,
                     false,
                     flow_src_key,
@@ -2286,13 +2316,13 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
     packet.header_type = HeaderType::Ipv4Tcp;
     packet.tap_port = TapPort(65533);
     packet.packet_len = 128;
-    packet.tcp_data = MetaPacketTcpHeader {
+    packet.protocol_data = ProtocolData::TcpHeader(MetaPacketTcpHeader {
         data_offset: 5,
         flags: TcpFlags::SYN,
         ack: 0,
         seq: 0,
         ..Default::default()
-    };
+    });
     packet.endpoint_data = Some(EndpointDataPov::new(Arc::new(EndpointData {
         src_info: EndpointInfo {
             real_ip: Ipv4Addr::UNSPECIFIED.into(),
@@ -2361,7 +2391,9 @@ mod tests {
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&config, &mut packet0);
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.flags = TcpFlags::RST;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.flags = TcpFlags::RST;
+        }
         _reverse_meta_packet(&mut packet1);
         packet1.lookup_key.timestamp += DEFAULT_DURATION.into();
         let flush_timestamp = packet1.lookup_key.timestamp.into();
@@ -2398,11 +2430,15 @@ mod tests {
         flow_map.inject_meta_packet(&config, &mut packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.flags = TcpFlags::PSH_ACK;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.flags = TcpFlags::PSH_ACK;
+        }
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         let mut packet2 = _new_meta_packet();
-        packet2.tcp_data.flags = TcpFlags::FIN_ACK;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet2.protocol_data {
+            tcp_data.flags = TcpFlags::FIN_ACK;
+        }
         packet2.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet2);
         let flush_timestamp = packet2.lookup_key.timestamp.into();
@@ -2435,8 +2471,10 @@ mod tests {
             ebpf: None,
         };
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.seq = 1111;
-        packet1.tcp_data.ack = 112;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.seq = 1111;
+            tcp_data.ack = 112;
+        }
         packet1.lookup_key.timestamp = packet1.lookup_key.timestamp.round_to(TIME_UNIT.into());
         let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
@@ -2462,24 +2500,45 @@ mod tests {
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
-        packet0.tcp_data.flags = TcpFlags::SYN;
-        packet0.tcp_data.seq = 111;
-        packet0.tcp_data.ack = 0;
+        let tcp_data0 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet0.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
+        tcp_data0.flags = TcpFlags::SYN;
+        tcp_data0.seq = 111;
+        tcp_data0.ack = 0;
         flow_map.inject_meta_packet(&config, &mut packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.flags = TcpFlags::SYN_ACK;
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
+        tcp_data1.flags = TcpFlags::SYN_ACK;
         packet1.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet1);
-        packet1.tcp_data.seq = 1111;
-        packet1.tcp_data.ack = 112;
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
+        tcp_data1.seq = 1111;
+        tcp_data1.ack = 112;
+
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         let mut packet2 = _new_meta_packet();
-        packet2.tcp_data.flags = TcpFlags::ACK;
+        let tcp_data2 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet2.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
+        tcp_data2.flags = TcpFlags::ACK;
         packet2.lookup_key.timestamp += Timestamp::from_millis(10 * 2);
-        packet2.tcp_data.seq = 112;
-        packet2.tcp_data.ack = 1112;
+        tcp_data2.seq = 112;
+        tcp_data2.ack = 1112;
         let flush_timestamp = packet2.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet2);
 
@@ -2528,7 +2587,9 @@ mod tests {
         let mut policy_data1 = PolicyData::default();
         policy_data1.merge_npb_action(&vec![npb_action], 11, None);
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.flags = TcpFlags::SYN_ACK;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.flags = TcpFlags::SYN_ACK;
+        }
         _reverse_meta_packet(&mut packet1);
         packet1.lookup_key.direction = PacketDirection::ServerToClient;
         packet1.policy_data.replace(Arc::new(policy_data1));
@@ -2562,13 +2623,17 @@ mod tests {
         flow_map.inject_meta_packet(&config, &mut packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.tcp_data.flags = TcpFlags::SYN_ACK;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.flags = TcpFlags::SYN_ACK;
+        }
         packet1.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         let mut packet2 = _new_meta_packet();
-        packet2.tcp_data.flags = TcpFlags::ACK;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet2.protocol_data {
+            tcp_data.flags = TcpFlags::ACK;
+        }
         packet2.lookup_key.timestamp += Timestamp::from_millis(10);
         let flush_timestamp = packet2.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet2);
@@ -2640,7 +2705,9 @@ mod tests {
 
         let mut packet1 = _new_meta_packet();
         packet1.lookup_key.tap_type = TapType::Cloud;
-        packet1.tcp_data.flags = TcpFlags::RST;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data.flags = TcpFlags::RST;
+        }
         _reverse_meta_packet(&mut packet1);
         let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
@@ -2668,7 +2735,9 @@ mod tests {
         packet3.tap_port = TapPort(0x1234);
         packet3.lookup_key.l2_end_0 = true;
         packet3.lookup_key.l2_end_1 = false;
-        packet3.tcp_data.flags = TcpFlags::RST;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet3.protocol_data {
+            tcp_data.flags = TcpFlags::RST;
+        }
         _reverse_meta_packet(&mut packet3);
         let flush_timestamp = packet3.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet3);
@@ -2774,27 +2843,47 @@ mod tests {
 
         // SYN|ACK
         let mut packet1 = _new_meta_packet();
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         packet1.lookup_key.timestamp = flush_timestamp;
-        packet1.tcp_data.flags = TcpFlags::SYN_ACK;
+        tcp_data1.flags = TcpFlags::SYN_ACK;
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         // ACK
         let mut packet1 = _new_meta_packet();
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         packet1.lookup_key.timestamp = flush_timestamp;
-        packet1.tcp_data.flags = TcpFlags::ACK;
+        tcp_data1.flags = TcpFlags::ACK;
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         // FIN
         let mut packet1 = _new_meta_packet();
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         packet1.lookup_key.timestamp = flush_timestamp;
-        packet1.tcp_data.flags = TcpFlags::FIN;
+        tcp_data1.flags = TcpFlags::FIN;
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
         // FIN
         let mut packet1 = _new_meta_packet();
+        let tcp_data1 = if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         packet1.lookup_key.timestamp = flush_timestamp;
-        packet1.tcp_data.flags = TcpFlags::FIN;
+        tcp_data1.flags = TcpFlags::FIN;
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
 

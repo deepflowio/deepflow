@@ -48,6 +48,8 @@ const (
 	FUNCTION_PERCENTAG   = "Percentage"
 	FUNCTION_HISTOGRAM   = "Histogram"
 	FUNCTION_LAST        = "Last"
+	FUNCTION_TOPK        = "TopK"
+	FUNCTION_ANY         = "Any"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -68,6 +70,8 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_UNIQ:        "uniq",
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
 	FUNCTION_LAST:        "last_value",
+	FUNCTION_TOPK:        "topK",
+	FUNCTION_ANY:         "topK", // because need to set any to topK(1), and '(1)' may be appended after 'If' in func (f *DefaultFunction) WriteTo(buf *bytes.Buffer)
 }
 
 var MATH_FUNCTIONS = []string{
@@ -207,11 +211,17 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString("If")
 	}
 
-	if len(f.Args) > 0 {
+	args := f.Args
+	if f.Name == FUNCTION_TOPK {
+		args = f.Args[len(f.Args)-1:]
+	} else if f.Name == FUNCTION_ANY {
+		args = []string{"1"}
+	}
+	if len(args) > 0 {
 		buf.WriteString("(")
-		for i, arg := range f.Args {
+		for i, arg := range args {
 			buf.WriteString(arg)
-			if i < len(f.Args)-1 {
+			if i < len(args)-1 {
 				buf.WriteString(", ")
 			}
 		}

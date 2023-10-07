@@ -59,13 +59,17 @@ func (s *GrpcSession) SetSyncInterval(syncInterval time.Duration) {
 
 func (s *GrpcSession) nextServer() error {
 	s.CloseConnection()
-	s.ipIndex++
-	if s.ipIndex >= len(s.ips) {
+	// fix where multi thread run, may cause s.ipIndex++ >= s.ips and cause panic
+	ipIndex := s.ipIndex + 1
+	if ipIndex >= len(s.ips) {
 		s.ipIndex = 0
+		ipIndex = 0
+	} else {
+		s.ipIndex = ipIndex
 	}
-	server := fmt.Sprintf("%s:%d", s.ips[s.ipIndex], s.port)
-	if s.ips[s.ipIndex].To4() == nil {
-		server = fmt.Sprintf("[%s]:%d", s.ips[s.ipIndex], s.port)
+	server := fmt.Sprintf("%s:%d", s.ips[ipIndex], s.port)
+	if s.ips[ipIndex].To4() == nil {
+		server = fmt.Sprintf("[%s]:%d", s.ips[ipIndex], s.port)
 	}
 	options := make([]grpc.DialOption, 0, 4)
 	options = append(options, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval),

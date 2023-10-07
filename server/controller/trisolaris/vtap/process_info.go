@@ -241,6 +241,7 @@ func (d EntryData) addData(agentId uint32, entry *trident.GPIDSyncEntry, p *Proc
 		if pid1 > 0 {
 			entry.setPid1(pid1, agentId)
 		}
+		releasePidPair(value)
 	}
 }
 

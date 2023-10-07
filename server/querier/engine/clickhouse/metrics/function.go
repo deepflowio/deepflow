@@ -65,6 +65,8 @@ var METRICS_FUNCTIONS_MAP = map[string]*Function{
 	view.FUNCTION_PERSECOND:  NewFunction(view.FUNCTION_PERSECOND, FUNCTION_TYPE_MATH, nil, "$unit/s", 0),
 	view.FUNCTION_HISTOGRAM:  NewFunction(view.FUNCTION_HISTOGRAM, FUNCTION_TYPE_MATH, nil, "", 1),
 	view.FUNCTION_LAST:       NewFunction(view.FUNCTION_LAST, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER, METRICS_TYPE_GAUGE, METRICS_TYPE_DELAY, METRICS_TYPE_PERCENTAGE, METRICS_TYPE_QUOTIENT}, "", 0),
+	view.FUNCTION_TOPK:       NewFunction(view.FUNCTION_TOPK, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
+	view.FUNCTION_ANY:        NewFunction(view.FUNCTION_ANY, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
 }
 
 func GetFunctionDescriptions() (*common.Result, error) {
