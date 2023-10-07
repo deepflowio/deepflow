@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type LBVMConnection struct {
@@ -28,7 +28,7 @@ type LBVMConnection struct {
 func NewLBVMConnection() *LBVMConnection {
 	return &LBVMConnection{
 		OperatorBase[mysql.LBVMConnection]{
-			resourceTypeName: common.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

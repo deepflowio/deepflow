@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addSubnet(dbItem *mysql.Subnet, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addSubnet(dbItem *mysql.Subnet, seq int) {
 		Label:           dbItem.Label,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSubnet(lcuuid string) {
 	delete(b.Subnets, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_SUBNET_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid))
 }
 
 type Subnet struct {
@@ -50,5 +50,5 @@ type Subnet struct {
 func (s *Subnet) Update(cloudItem *cloudmodel.Subnet) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
-	log.Info(updateDiffBase(RESOURCE_TYPE_SUBNET_EN, s))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, s))
 }

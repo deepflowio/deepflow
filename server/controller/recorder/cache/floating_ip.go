@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolDataSet *ToolDataSet) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolD
 		RegionLcuuid: dbItem.Region,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteFloatingIP(lcuuid string) {
 	delete(b.FloatingIPs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, lcuuid))
 }
 
 type FloatingIP struct {
@@ -49,5 +49,5 @@ type FloatingIP struct {
 func (f *FloatingIP) Update(cloudItem *cloudmodel.FloatingIP) {
 	f.RegionLcuuid = cloudItem.RegionLcuuid
 	f.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, f))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, f))
 }

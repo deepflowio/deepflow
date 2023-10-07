@@ -18,9 +18,10 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +32,7 @@ type Subnet struct {
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	updater := &Subnet{
 		UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *cache.Subnet]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSubnet(),
 			diffBaseData: wholeCache.Subnets,
@@ -50,14 +52,14 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-			common.RESOURCE_TYPE_SUBNET_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
-	prefix, netmask, err := common.CIDRToPreNetMask(cloudItem.CIDR)
+	prefix, netmask, err := rcommon.CIDRToPreNetMask(cloudItem.CIDR)
 	if err != nil {
-		log.Errorf("convert %s cidr: %s failed: %v", common.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err)
+		log.Errorf("convert %s cidr: %s failed: %v", ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err)
 		return nil, false
 	}
 

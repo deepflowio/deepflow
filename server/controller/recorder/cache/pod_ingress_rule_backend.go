@@ -17,8 +17,8 @@
 package cache
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodIngressRuleBackend(dbItem *mysql.PodIngressRuleBackend, seq int) {
@@ -29,12 +29,12 @@ func (b *DiffBaseDataSet) addPodIngressRuleBackend(dbItem *mysql.PodIngressRuleB
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
 	delete(b.PodIngressRuleBackends, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, lcuuid))
 }
 
 type PodIngressRuleBackend struct {

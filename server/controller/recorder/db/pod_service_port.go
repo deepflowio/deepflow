@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodServicePort struct {
@@ -28,7 +28,7 @@ type PodServicePort struct {
 func NewPodServicePort() *PodServicePort {
 	return &PodServicePort{
 		OperatorBase[mysql.PodServicePort]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

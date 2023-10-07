@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type NATVMConnection struct {
@@ -28,7 +28,7 @@ type NATVMConnection struct {
 func NewNATVMConnection() *NATVMConnection {
 	return &NATVMConnection{
 		OperatorBase[mysql.NATVMConnection]{
-			resourceTypeName: common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

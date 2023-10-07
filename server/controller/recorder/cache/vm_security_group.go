@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVMSecurityGroup(dbItem *mysql.VMSecurityGroup, seq int) {
@@ -30,12 +30,12 @@ func (b *DiffBaseDataSet) addVMSecurityGroup(dbItem *mysql.VMSecurityGroup, seq 
 		},
 		Priority: dbItem.Priority,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMSecurityGroup(lcuuid string) {
 	delete(b.VMSecurityGroups, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, lcuuid))
 }
 
 type VMSecurityGroup struct {
@@ -45,5 +45,5 @@ type VMSecurityGroup struct {
 
 func (s *VMSecurityGroup) Update(cloudItem *cloudmodel.VMSecurityGroup) {
 	s.Priority = cloudItem.Priority
-	log.Info(updateDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, s))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, s))
 }

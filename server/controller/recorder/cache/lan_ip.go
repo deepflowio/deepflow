@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *ToolDataSet) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *To
 		SubDomainLcuuid: dbItem.SubDomain,
 		SubnetLcuuid:    subnetLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLANIP(lcuuid string) {
 	delete(b.LANIPs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 }
 
 type LANIP struct {
@@ -48,5 +48,5 @@ type LANIP struct {
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
 	l.SubnetLcuuid = cloudItem.SubnetLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, l))
 }

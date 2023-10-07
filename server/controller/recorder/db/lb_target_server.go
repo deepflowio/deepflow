@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type LBTargetServer struct {
@@ -28,7 +28,7 @@ type LBTargetServer struct {
 func NewLBTargetServer() *LBTargetServer {
 	return &LBTargetServer{
 		OperatorBase[mysql.LBTargetServer]{
-			resourceTypeName: common.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

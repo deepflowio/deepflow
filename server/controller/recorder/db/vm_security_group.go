@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type VMSecurityGroup struct {
@@ -28,7 +28,7 @@ type VMSecurityGroup struct {
 func NewVMSecurityGroup() *VMSecurityGroup {
 	return &VMSecurityGroup{
 		OperatorBase[mysql.VMSecurityGroup]{
-			resourceTypeName: common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

@@ -17,8 +17,8 @@
 package cache
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addNATRule(dbItem *mysql.NATRule, seq int) {
@@ -28,12 +28,12 @@ func (b *DiffBaseDataSet) addNATRule(dbItem *mysql.NATRule, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATRule(lcuuid string) {
 	delete(b.NATRules, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, lcuuid))
 }
 
 type NATRule struct {

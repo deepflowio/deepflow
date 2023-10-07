@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PeerConnection struct {
@@ -28,7 +28,7 @@ type PeerConnection struct {
 func NewPeerConnection() *PeerConnection {
 	operater := &PeerConnection{
 		OperatorBase[mysql.PeerConnection]{
-			resourceTypeName: common.RESOURCE_TYPE_PEER_CONNECTION_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			softDelete:       true,
 			allocateID:       false,
 		},

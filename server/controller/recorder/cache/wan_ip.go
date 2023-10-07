@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *ToolDataSet) {
@@ -36,12 +36,12 @@ func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *To
 		SubDomainLcuuid: dbItem.SubDomain,
 		SubnetLcuuid:    subnetLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteWANIP(lcuuid string) {
 	delete(b.WANIPs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 }
 
 type WANIP struct {
@@ -54,5 +54,5 @@ type WANIP struct {
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
 	w.SubnetLcuuid = cloudItem.SubnetLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_WAN_IP_EN, w))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, w))
 }

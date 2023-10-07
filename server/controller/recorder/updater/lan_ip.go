@@ -18,9 +18,10 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +32,7 @@ type LANIP struct {
 func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) *LANIP {
 	updater := &LANIP{
 		UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
+			resourceType:      ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			cache:             wholeCache,
 			domainToolDataSet: domainToolDataSet,
 			dbOperator:        db.NewLANIP(),
@@ -54,8 +56,8 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	vinterfaceID, exists := i.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -66,8 +68,8 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		}
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -79,16 +81,16 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		}
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
 	}
-	ip := common.FormatIP(cloudItem.IP)
+	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
-			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
+			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
 		))
 		return nil, false
 	}
@@ -114,8 +116,8 @@ func (i *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.
 			}
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-					common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
 				))
 				return nil, false
 			}

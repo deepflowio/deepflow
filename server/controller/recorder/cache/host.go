@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addHost(dbItem *mysql.Host, seq int) {
@@ -37,12 +37,12 @@ func (b *DiffBaseDataSet) addHost(dbItem *mysql.Host, seq int) {
 		MemTotal:     dbItem.MemTotal,
 		ExtraInfo:    dbItem.ExtraInfo,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteHost(lcuuid string) {
 	delete(b.Hosts, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_HOST_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid))
 }
 
 type Host struct {
@@ -66,5 +66,5 @@ func (h *Host) Update(cloudItem *cloudmodel.Host) {
 	h.ExtraInfo = cloudItem.ExtraInfo
 	h.RegionLcuuid = cloudItem.RegionLcuuid
 	h.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_HOST_EN, h))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, h))
 }

@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
@@ -31,12 +31,12 @@ func (b *DiffBaseDataSet) addPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodGroupPort(lcuuid string) {
 	delete(b.PodGroupPorts, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid))
 }
 
 type PodGroupPort struct {
@@ -47,5 +47,5 @@ type PodGroupPort struct {
 
 func (p *PodGroupPort) Update(cloudItem *cloudmodel.PodGroupPort) {
 	p.Name = cloudItem.Name
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
 }
