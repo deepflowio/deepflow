@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodIngressRuleBackend struct {
@@ -28,7 +28,7 @@ type PodIngressRuleBackend struct {
 func NewPodIngressRuleBackend() *PodIngressRuleBackend {
 	return &PodIngressRuleBackend{
 		OperatorBase[mysql.PodIngressRuleBackend]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

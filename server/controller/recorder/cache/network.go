@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addNetwork(dbItem *mysql.Network, seq int, toolDataSet *ToolDataSet) {
@@ -39,12 +39,12 @@ func (b *DiffBaseDataSet) addNetwork(dbItem *mysql.Network, seq int, toolDataSet
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNetwork(lcuuid string) {
 	delete(b.Networks, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_NETWORK_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid))
 }
 
 type Network struct {
@@ -69,5 +69,5 @@ func (n *Network) Update(cloudItem *cloudmodel.Network) {
 	n.VPCLcuuid = cloudItem.VPCLcuuid
 	n.RegionLcuuid = cloudItem.RegionLcuuid
 	n.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_NETWORK_EN, n))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, n))
 }

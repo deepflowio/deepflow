@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type LB struct {
 func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	updater := &LB{
 		UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLB(),
 			diffBaseData: wholeCache.LBs,
@@ -50,8 +51,8 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_LB_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

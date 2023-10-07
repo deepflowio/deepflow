@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type SecurityGroupRule struct {
 func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroupRule) *SecurityGroupRule {
 	updater := &SecurityGroupRule{
 		UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *cache.SecurityGroupRule]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSecurityGroupRule(),
 			diffBaseData: wholeCache.SecurityGroupRules,
@@ -50,8 +51,8 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 	securityGroupID, exists := r.cache.ToolDataSet.GetSecurityGroupIDByLcuuid(cloudItem.SecurityGroupLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
-			common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

@@ -22,9 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
@@ -97,7 +96,7 @@ func forceDelete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 
 func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
-	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
+	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY))
 	forceDelete[mysql.Region](expiredAt)
 	forceDelete[mysql.AZ](expiredAt)
 	forceDelete[mysql.Host](expiredAt)
@@ -173,7 +172,7 @@ func (c *Cleaner) cleanNetworkDirty() {
 		mysql.Db.Where("vl2id NOT IN ?", networkIDs).Find(&subnets)
 		if len(subnets) != 0 {
 			mysql.Db.Delete(&subnets)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_SUBNET_EN, RESOURCE_TYPE_NETWORK_EN, subnets)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, subnets)
 		}
 	}
 }
@@ -185,7 +184,7 @@ func (c *Cleaner) cleanVRouterDirty() {
 		mysql.Db.Where("vnet_id NOT IN ?", vrouterIDs).Find(&rts)
 		if len(rts) != 0 {
 			mysql.Db.Delete(&rts)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_ROUTING_TABLE_EN, RESOURCE_TYPE_VROUTER_EN, rts)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts)
 		}
 	}
 }
@@ -196,14 +195,14 @@ func (c *Cleaner) cleanSecurityGroupDirty() {
 		mysql.Db.Where("sg_id NOT IN ?", securityGroupIDs).Find(&sgRules)
 		if len(sgRules) != 0 {
 			mysql.Db.Delete(&sgRules)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, RESOURCE_TYPE_SECURITY_GROUP_EN, sgRules)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, sgRules)
 		}
 
 		var vmSGs []mysql.VMSecurityGroup
 		mysql.Db.Where("sg_id NOT IN ?", securityGroupIDs).Find(&vmSGs)
 		if len(vmSGs) != 0 {
 			mysql.Db.Delete(&vmSGs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, RESOURCE_TYPE_SECURITY_GROUP_EN, vmSGs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, vmSGs)
 		}
 	}
 }
@@ -215,14 +214,14 @@ func (c *Cleaner) cleanPodIngressDirty() {
 		mysql.Db.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRules)
 		if len(podIngressRules) != 0 {
 			mysql.Db.Delete(&podIngressRules)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_POD_INGRESS_RULE_EN, RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules)
 		}
 
 		var podIngressRuleBkds []mysql.PodIngressRuleBackend
 		mysql.Db.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRuleBkds)
 		if len(podIngressRuleBkds) != 0 {
 			mysql.Db.Delete(&podIngressRuleBkds)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds)
 		}
 	}
 }
@@ -234,21 +233,21 @@ func (c *Cleaner) cleanPodServiceDirty() {
 		mysql.Db.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podServicePorts)
 		if len(podServicePorts) != 0 {
 			mysql.Db.Delete(&podServicePorts)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_POD_SERVICE_PORT_EN, RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts)
 		}
 
 		var podGroupPorts []mysql.PodGroupPort
 		mysql.Db.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podGroupPorts)
 		if len(podGroupPorts) != 0 {
 			mysql.Db.Delete(&podGroupPorts)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_POD_GROUP_PORT_EN, RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts)
 		}
 
 		var vifs []mysql.VInterface
-		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", common.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs).Find(&vifs)
+		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			mysql.Db.Delete(&vifs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_POD_SERVICE_EN, vifs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs)
 		}
 	}
 }
@@ -257,24 +256,24 @@ func (c *Cleaner) cleanPodNodeDirty() {
 	podNodeIDs := getIDs[mysql.PodNode]()
 	if len(podNodeIDs) != 0 {
 		var vifs []mysql.VInterface
-		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", common.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
+		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			mysql.Db.Delete(&vifs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_POD_NODE_EN, vifs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs)
 		}
 
 		var vmPodNodeConns []mysql.VMPodNodeConnection
 		mysql.Db.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&vmPodNodeConns)
 		if len(vmPodNodeConns) != 0 {
 			mysql.Db.Delete(&vmPodNodeConns)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)
 		}
 
 		var pods []mysql.Pod
 		mysql.Db.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
 		if len(pods) != 0 {
 			mysql.Db.Delete(&pods)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_POD_NODE_EN, pods)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)
 		}
 	}
 }
@@ -283,10 +282,10 @@ func (c *Cleaner) cleanPodDirty() {
 	podIDs := getIDs[mysql.Pod]()
 	if len(podIDs) != 0 {
 		var vifs []mysql.VInterface
-		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", common.VIF_DEVICE_TYPE_POD, podIDs).Find(&vifs)
+		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			mysql.Db.Delete(&vifs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_POD_EN, vifs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs)
 		}
 	}
 }
@@ -298,13 +297,13 @@ func (c *Cleaner) cleanVInterfaceDirty() {
 		mysql.Db.Where("vifid NOT IN ?", vifIDs).Find(&lanIPs)
 		if len(lanIPs) != 0 {
 			mysql.Db.Delete(&lanIPs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_LAN_IP_EN, RESOURCE_TYPE_VINTERFACE_EN, lanIPs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs)
 		}
 		var wanIPs []mysql.WANIP
 		mysql.Db.Where("vifid NOT IN ?", vifIDs).Find(&wanIPs)
 		if len(wanIPs) != 0 {
 			mysql.Db.Delete(&wanIPs)
-			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(RESOURCE_TYPE_WAN_IP_EN, RESOURCE_TYPE_VINTERFACE_EN, wanIPs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs)
 		}
 	}
 }

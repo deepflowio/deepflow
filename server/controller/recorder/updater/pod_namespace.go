@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodNamespace struct {
 func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespace) *PodNamespace {
 	updater := &PodNamespace{
 		UpdaterBase[cloudmodel.PodNamespace, mysql.PodNamespace, *cache.PodNamespace]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodNamespace(),
 			diffBaseData: wholeCache.PodNamespaces,
@@ -50,8 +51,8 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

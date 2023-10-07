@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodReplicaSet struct {
 func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplicaSet) *PodReplicaSet {
 	updater := &PodReplicaSet{
 		UpdaterBase[cloudmodel.PodReplicaSet, mysql.PodReplicaSet, *cache.PodReplicaSet]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodReplicaSet(),
 			diffBaseData: wholeCache.PodReplicaSets,
@@ -50,24 +51,24 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
-			common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podClusterID, exists := r.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podGroupID, exists := r.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
-			common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

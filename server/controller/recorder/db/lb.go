@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type LB struct {
@@ -28,7 +28,7 @@ type LB struct {
 func NewLB() *LB {
 	operater := &LB{
 		OperatorBase[mysql.LB]{
-			resourceTypeName: common.RESOURCE_TYPE_LB_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

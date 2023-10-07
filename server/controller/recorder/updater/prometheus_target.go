@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PrometheusTarget struct {
 func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.PrometheusTarget) *PrometheusTarget {
 	updater := &PrometheusTarget{
 		UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *cache.PrometheusTarget]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPrometheusTarget(),
 			diffBaseData: wholeCache.PrometheusTarget,
@@ -50,8 +51,8 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

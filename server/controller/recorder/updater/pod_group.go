@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodGroup struct {
 func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodGroup {
 	updater := &PodGroup{
 		UpdaterBase[cloudmodel.PodGroup, mysql.PodGroup, *cache.PodGroup]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodGroup(),
 			diffBaseData: wholeCache.PodGroups,
@@ -50,16 +51,16 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysql.P
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
-			common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
