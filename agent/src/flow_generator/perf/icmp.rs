@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::cmp::max;
+use std::{cmp::max, collections::VecDeque};
 
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
@@ -45,14 +45,30 @@ pub struct IcmpPerf {
     srt_max: Timestamp,
     srt_sum: Timestamp,
     srt_count: u32,
-    last_requests: Vec<LastIcmp>,
-    last_replies: Vec<LastIcmp>,
+    last_requests: VecDeque<LastIcmp>,
+    last_replies: VecDeque<LastIcmp>,
     data_update_flag: bool,
 }
 
 impl IcmpPerf {
     pub fn new() -> Self {
         IcmpPerf::default()
+    }
+
+    fn set_srt(&mut self, srt: Timestamp) {
+        if srt <= ART_MAX {
+            self.srt_max = max(self.srt_max, srt);
+            self.srt_sum += srt;
+            self.srt_count += 1;
+            self.data_update_flag = true;
+        }
+    }
+
+    fn reset(&mut self) {
+        self.srt_max = Timestamp::default();
+        self.srt_sum = Timestamp::default();
+        self.srt_count = 0;
+        self.data_update_flag = false;
     }
 }
 
@@ -89,19 +105,14 @@ impl L4FlowPerf for IcmpPerf {
             {
                 if pkt_timestamp <= self.last_replies[i].timestamp {
                     let srt = Timestamp::from(self.last_replies[i].timestamp - pkt_timestamp);
-                    if srt <= ART_MAX {
-                        self.srt_max = max(self.srt_max, srt);
-                        self.srt_sum += srt;
-                        self.srt_count += 1;
-                        self.data_update_flag = true;
-                    }
+                    self.set_srt(srt);
                 }
                 self.last_replies.remove(i);
             } else {
                 if self.last_requests.len() >= MAX_CACHE_COUNT {
-                    self.last_requests.remove(0);
+                    let _ = self.last_requests.pop_front();
                 }
-                self.last_requests.push(LastIcmp {
+                self.last_requests.push_back(LastIcmp {
                     timestamp: pkt_timestamp,
                     id_and_seq: icmp_data.echo_id_seq,
                 });
@@ -114,19 +125,14 @@ impl L4FlowPerf for IcmpPerf {
             {
                 if pkt_timestamp >= self.last_requests[i].timestamp {
                     let srt = Timestamp::from(pkt_timestamp - self.last_requests[i].timestamp);
-                    if srt <= ART_MAX {
-                        self.srt_max = max(self.srt_max, srt);
-                        self.srt_sum += srt;
-                        self.srt_count += 1;
-                        self.data_update_flag = true;
-                    }
+                    self.set_srt(srt);
                 }
                 self.last_requests.remove(i);
             } else {
                 if self.last_replies.len() >= MAX_CACHE_COUNT {
-                    self.last_replies.remove(0);
+                    let _ = self.last_replies.pop_front();
                 }
-                self.last_replies.push(LastIcmp {
+                self.last_replies.push_back(LastIcmp {
                     timestamp: pkt_timestamp,
                     id_and_seq: icmp_data.echo_id_seq,
                 });
@@ -140,12 +146,35 @@ impl L4FlowPerf for IcmpPerf {
     }
 
     fn copy_and_reset_data(&mut self, _: bool) -> FlowPerfStats {
+        for request_index in (0..self.last_requests.len()).rev() {
+            let request = &self.last_requests[request_index];
+            if let Some(reply_index) = self
+                .last_replies
+                .iter()
+                .position(|reply| request.id_and_seq == reply.id_and_seq)
+            {
+                let reply = &self.last_replies[reply_index];
+                if request.timestamp <= reply.timestamp {
+                    let srt = Timestamp::from(reply.timestamp - request.timestamp);
+                    if srt <= ART_MAX {
+                        self.srt_max = max(self.srt_max, srt);
+                        self.srt_sum += srt;
+                        self.srt_count += 1;
+                        self.data_update_flag = true;
+                    }
+                }
+
+                self.last_requests.remove(request_index);
+                self.last_replies.remove(reply_index);
+            }
+        }
+
         let mut stats = FlowPerfStats::default();
         stats.l4_protocol = L4Protocol::Icmp;
         stats.tcp.srt_max = (self.srt_max.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
         stats.tcp.srt_sum = (self.srt_sum.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
         stats.tcp.srt_count = self.srt_count;
-        *self = IcmpPerf::default();
+        self.reset();
 
         stats
     }
