@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolDataSet *ToolDataSet) {
@@ -42,12 +42,12 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodService(lcuuid string) {
 	delete(b.PodServices, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 }
 
 type PodService struct {
@@ -72,5 +72,5 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, p))
 }

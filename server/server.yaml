@@ -170,7 +170,13 @@ controller:
         resource_max_id_0: 64000
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
-
+        # local debug log
+        log_debug: 
+          enabled: false
+          detail_enabled: false
+          resource_type:
+          #  - all
+          #  - vpc
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000

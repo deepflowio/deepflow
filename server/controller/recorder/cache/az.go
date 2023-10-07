@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addAZ(dbItem *mysql.AZ, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addAZ(dbItem *mysql.AZ, seq int) {
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteAZ(lcuuid string) {
 	delete(b.AZs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_AZ_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, lcuuid))
 }
 
 type AZ struct {
@@ -51,5 +51,5 @@ func (a *AZ) Update(cloudItem *cloudmodel.AZ) {
 	a.Name = cloudItem.Name
 	a.Label = cloudItem.Label
 	a.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_AZ_EN, a))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, a))
 }

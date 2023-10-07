@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type LBTargetServer struct {
 func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetServer) *LBTargetServer {
 	updater := &LBTargetServer{
 		UpdaterBase[cloudmodel.LBTargetServer, mysql.LBTargetServer, *cache.LBTargetServer]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLBTargetServer(),
 			diffBaseData: wholeCache.LBTargetServers,
@@ -50,16 +51,16 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
-			common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	lbListenerID, exists := s.cache.ToolDataSet.GetLBListenerIDByLcuuid(cloudItem.LBListenerLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.LBListenerLcuuid,
-			common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.LBListenerLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -68,8 +69,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 		vmID, exists = s.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
-				common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -77,8 +78,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		))
 	}
 

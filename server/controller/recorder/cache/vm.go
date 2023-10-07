@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVM(dbItem *mysql.VM, seq int, toolDataSet *ToolDataSet) {
@@ -40,12 +40,12 @@ func (b *DiffBaseDataSet) addVM(dbItem *mysql.VM, seq int, toolDataSet *ToolData
 		CloudTags:    dbItem.CloudTags,
 	}
 	b.VMs[dbItem.Lcuuid] = newItem
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVM(lcuuid string) {
 	delete(b.VMs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid))
 }
 
 type VM struct {
@@ -71,5 +71,5 @@ func (v *VM) Update(cloudItem *cloudmodel.VM) {
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.AZLcuuid = cloudItem.AZLcuuid
 	v.CloudTags = cloudItem.CloudTags
-	log.Info(updateDiffBase(RESOURCE_TYPE_VM_EN, v))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, v))
 }

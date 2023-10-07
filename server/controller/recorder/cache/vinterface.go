@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *ToolDataSet) {
@@ -41,12 +41,12 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVInterface(lcuuid string) {
 	delete(b.VInterfaces, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 }
 
 type VInterface struct {
@@ -69,5 +69,5 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.VtapID = cloudItem.VTapID
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, v))
 }

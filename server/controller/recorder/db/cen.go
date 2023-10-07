@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type CEN struct {
@@ -28,7 +28,7 @@ type CEN struct {
 func NewCEN() *CEN {
 	operater := &CEN{
 		OperatorBase[mysql.CEN]{
-			resourceTypeName: common.RESOURCE_TYPE_CEN_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			softDelete:       true,
 			allocateID:       false,
 		},

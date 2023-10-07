@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPeerConnection(dbItem *mysql.PeerConnection, seq int, toolDataSet *ToolDataSet) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addPeerConnection(dbItem *mysql.PeerConnection, seq in
 		RemoteRegionLcuuid: remoteRegionLcuuid,
 		LocalRegionLcuuid:  localRegionLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePeerConnection(lcuuid string) {
 	delete(b.PeerConnections, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid))
 }
 
 type PeerConnection struct {
@@ -53,5 +53,5 @@ func (p *PeerConnection) Update(cloudItem *cloudmodel.PeerConnection) {
 	p.Name = cloudItem.Name
 	p.RemoteRegionLcuuid = cloudItem.RemoteRegionLcuuid
 	p.LocalRegionLcuuid = cloudItem.LocalRegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, p))
 }

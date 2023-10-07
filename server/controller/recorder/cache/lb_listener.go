@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addLBListener(dbItem *mysql.LBListener, seq int) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addLBListener(dbItem *mysql.LBListener, seq int) {
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBListener(lcuuid string) {
 	delete(b.LBListeners, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
 }
 
 type LBListener struct {
@@ -57,5 +57,5 @@ func (l *LBListener) Update(cloudItem *cloudmodel.LBListener) {
 	l.SNATIPs = cloudItem.SNATIPs
 	l.Port = cloudItem.Port
 	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, l))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, l))
 }

@@ -25,10 +25,9 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/op/go-logging"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
@@ -58,32 +57,32 @@ func (m *IDManager) Init(cfg *RecorderConfig) *IDManager {
 	log.Info("init id mananger")
 	idMNG.ctx, idMNG.cancel = context.WithCancel(context.Background())
 	idMNG.resourceTypeToIDPool = map[string]IDPoolUpdater{
-		RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_HOST_EN:          &IDPool[mysql.Host]{resourceType: RESOURCE_TYPE_HOST_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_VPC_EN:           &IDPool[mysql.VPC]{resourceType: RESOURCE_TYPE_VPC_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_NETWORK_EN:       &IDPool[mysql.Network]{resourceType: RESOURCE_TYPE_NETWORK_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_POD_CLUSTER_EN:   &IDPool[mysql.PodCluster]{resourceType: RESOURCE_TYPE_POD_CLUSTER_EN, max: cfg.ResourceMaxID0},
-		RESOURCE_TYPE_POD_NAMESPACE_EN: &IDPool[mysql.PodNamespace]{resourceType: RESOURCE_TYPE_POD_NAMESPACE_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: ctrlrcommon.RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: ctrlrcommon.RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_HOST_EN:          &IDPool[mysql.Host]{resourceType: ctrlrcommon.RESOURCE_TYPE_HOST_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_VPC_EN:           &IDPool[mysql.VPC]{resourceType: ctrlrcommon.RESOURCE_TYPE_VPC_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_NETWORK_EN:       &IDPool[mysql.Network]{resourceType: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN:   &IDPool[mysql.PodCluster]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, max: cfg.ResourceMaxID0},
+		ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN: &IDPool[mysql.PodNamespace]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, max: cfg.ResourceMaxID0},
 
-		RESOURCE_TYPE_VM_EN:              &IDPool[mysql.VM]{resourceType: RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_VROUTER_EN:         &IDPool[mysql.VRouter]{resourceType: RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_DHCP_PORT_EN:       &IDPool[mysql.DHCPPort]{resourceType: RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_RDS_INSTANCE_EN:    &IDPool[mysql.RDSInstance]{resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_REDIS_INSTANCE_EN:  &IDPool[mysql.RedisInstance]{resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_NAT_GATEWAY_EN:     &IDPool[mysql.NATGateway]{resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_LB_EN:              &IDPool[mysql.LB]{resourceType: RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_NODE_EN:        &IDPool[mysql.PodNode]{resourceType: RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_SERVICE_EN:     &IDPool[mysql.PodService]{resourceType: RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_EN:             &IDPool[mysql.Pod]{resourceType: RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_INGRESS_EN:     &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_GROUP_EN:       &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
-		RESOURCE_TYPE_PROCESS_EN:         &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_VM_EN:              &IDPool[mysql.VM]{resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_VROUTER_EN:         &IDPool[mysql.VRouter]{resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN:       &IDPool[mysql.DHCPPort]{resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN:    &IDPool[mysql.RDSInstance]{resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN:  &IDPool[mysql.RedisInstance]{resourceType: ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN:     &IDPool[mysql.NATGateway]{resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_LB_EN:              &IDPool[mysql.LB]{resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN:        &IDPool[mysql.PodNode]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN:     &IDPool[mysql.PodService]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_EN:             &IDPool[mysql.Pod]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN:     &IDPool[mysql.PodIngress]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       &IDPool[mysql.PodGroup]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         &IDPool[mysql.Process]{resourceType: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
 
 		// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
 		// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
-		RESOURCE_TYPE_PROMETHEUS_TARGET_EN: &IDPool[mysql.PrometheusTarget]{resourceType: RESOURCE_TYPE_PROMETHEUS_TARGET_EN, max: cfg.ResourceMaxID1/2 + cfg.ResourceMaxID1%2},
+		ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN: &IDPool[mysql.PrometheusTarget]{resourceType: ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, max: cfg.ResourceMaxID1/2 + cfg.ResourceMaxID1%2},
 	}
 	return m
 }
@@ -176,10 +175,10 @@ func (p *IDPool[MT]) refresh() error {
 	var items []*MT
 	var err error
 	// TODO do not handle concrete resource in common, create new type IDPool for process and target
-	if p.resourceType == RESOURCE_TYPE_PROCESS_EN {
+	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROCESS_EN {
 		items, err = query.FindInBatches[MT](mysql.Db.Unscoped().Select("id"))
-	} else if p.resourceType == RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
-		err = mysql.Db.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Select("id").Find(&items).Error
+	} else if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
+		err = mysql.Db.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Select("id").Find(&items).Error
 	} else {
 		err = mysql.Db.Unscoped().Select("id").Find(&items).Error
 	}

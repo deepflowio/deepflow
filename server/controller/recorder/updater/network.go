@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type Network struct {
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
 	updater := &Network{
 		UpdaterBase[cloudmodel.Network, mysql.Network, *cache.Network]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNetwork(),
 			diffBaseData: wholeCache.Networks,
@@ -50,8 +51,8 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -79,8 +80,8 @@ func (n *Network) generateUpdateInfo(diffBase *cache.Network, cloudItem *cloudmo
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				common.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

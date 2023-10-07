@@ -17,8 +17,8 @@
 package cache
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addNATVMConnection(dbItem *mysql.NATVMConnection, seq int) {
@@ -28,12 +28,12 @@ func (b *DiffBaseDataSet) addNATVMConnection(dbItem *mysql.NATVMConnection, seq 
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATVMConnection(lcuuid string) {
 	delete(b.NATVMConnections, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid))
 }
 
 type NATVMConnection struct {

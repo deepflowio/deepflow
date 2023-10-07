@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodGroupPort struct {
@@ -28,7 +28,7 @@ type PodGroupPort struct {
 func NewPodGroupPort() *PodGroupPort {
 	return &PodGroupPort{
 		OperatorBase[mysql.PodGroupPort]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_GROUP_PORT_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

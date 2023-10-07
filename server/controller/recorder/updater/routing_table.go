@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type RoutingTable struct {
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
 	updater := &RoutingTable{
 		UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *cache.RoutingTable]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRoutingTable(),
 			diffBaseData: wholeCache.RoutingTables,
@@ -50,8 +51,8 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,
-			common.RESOURCE_TYPE_ROUTING_TABLE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

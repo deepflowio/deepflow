@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addRDSInstance(dbItem *mysql.RDSInstance, seq int) {
@@ -35,12 +35,12 @@ func (b *DiffBaseDataSet) addRDSInstance(dbItem *mysql.RDSInstance, seq int) {
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRDSInstance(lcuuid string) {
 	delete(b.RDSInstances, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
 }
 
 type RDSInstance struct {
@@ -62,5 +62,5 @@ func (r *RDSInstance) Update(cloudItem *cloudmodel.RDSInstance) {
 	r.VPCLcuuid = cloudItem.VPCLcuuid
 	r.RegionLcuuid = cloudItem.RegionLcuuid
 	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, r))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, r))
 }

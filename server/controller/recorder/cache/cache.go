@@ -20,10 +20,10 @@ import (
 	"github.com/op/go-logging"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 // 为支持domain及其sub_domain的独立刷新，将缓存拆分成对应的独立Cache
@@ -40,7 +40,7 @@ func NewCacheManager(domainLcuuid string) *CacheManager {
 	var subDomains []*mysql.SubDomain
 	err := mysql.Db.Where("domain = ?", domainLcuuid).Find(&subDomains).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_SUB_DOMAIN_EN, err))
+		log.Errorf(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, err))
 		return cacheManager
 	}
 	for _, subDomain := range subDomains {
@@ -120,7 +120,7 @@ func (c *Cache) SetLogLevel(level logging.Level) {
 func (c *Cache) getConditonDomainCreateMethod() map[string]interface{} {
 	return map[string]interface{}{
 		"domain":        c.DomainLcuuid,
-		"create_method": common.CREATE_METHOD_LEARN,
+		"create_method": ctrlrcommon.CREATE_METHOD_LEARN,
 	}
 }
 
@@ -141,7 +141,7 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 	return map[string]interface{}{
 		"domain":        c.DomainLcuuid,
 		"sub_domain":    c.SubDomainLcuuid,
-		"create_method": common.CREATE_METHOD_LEARN,
+		"create_method": ctrlrcommon.CREATE_METHOD_LEARN,
 	}
 }
 
@@ -149,7 +149,6 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 func (c *Cache) Refresh() {
 	c.DiffBaseDataSet = NewDiffBaseDataSet()
 	c.ToolDataSet = NewToolDataSet()
-	c.SetLogLevel(logging.DEBUG)
 
 	// 分类刷新资源的相关缓存
 
@@ -228,27 +227,27 @@ func (c *Cache) DeleteRegions(lcuuids []string) {
 }
 
 func (c *Cache) refreshRegions() {
-	log.Infof(refreshResource(RESOURCE_TYPE_REGION_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_REGION_EN))
 	var regions []*mysql.Region
 
 	// 使用az获取domain关联的region数据，排除“系统默认”region
 	var azs []*mysql.AZ
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_AZ_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_AZ_EN, err))
 		return
 	}
 	var regionLcuuids []string
 	for _, az := range azs {
-		if az.Region != common.DEFAULT_REGION {
+		if az.Region != ctrlrcommon.DEFAULT_REGION {
 			regionLcuuids = append(regionLcuuids, az.Region)
 		}
 	}
 	err = mysql.Db.Where(
-		"create_method = ? AND lcuuid IN ?", common.CREATE_METHOD_LEARN, regionLcuuids,
+		"create_method = ? AND lcuuid IN ?", ctrlrcommon.CREATE_METHOD_LEARN, regionLcuuids,
 	).Find(&regions).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_REGION_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_REGION_EN, err))
 		return
 	}
 
@@ -278,12 +277,12 @@ func (c *Cache) DeleteAZs(lcuuids []string) {
 }
 
 func (c *Cache) refreshAZs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_AZ_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_AZ_EN))
 	var azs []*mysql.AZ
 
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_AZ_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_AZ_EN, err))
 		return
 	}
 
@@ -311,12 +310,12 @@ func (c *Cache) DeleteSubDomains(lcuuids []string) {
 }
 
 func (c *Cache) refreshSubDomains() {
-	log.Infof(refreshResource(RESOURCE_TYPE_SUB_DOMAIN_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN))
 	var subDomains []*mysql.SubDomain
 
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&subDomains).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_SUB_DOMAIN_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, err))
 		return
 	}
 
@@ -350,21 +349,21 @@ func (c *Cache) UpdateHost(cloudItem *cloudmodel.Host) {
 }
 
 func (c *Cache) refreshHosts() {
-	log.Infof(refreshResource(RESOURCE_TYPE_HOST_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_HOST_EN))
 	var hosts []*mysql.Host
 
 	err := mysql.Db.Where(
 		map[string]interface{}{
 			"domain":        c.DomainLcuuid,
-			"create_method": common.CREATE_METHOD_LEARN,
+			"create_method": ctrlrcommon.CREATE_METHOD_LEARN,
 		},
 	).Not(
 		map[string]interface{}{
-			"type": common.HOST_TYPE_DFI,
+			"type": ctrlrcommon.HOST_TYPE_DFI,
 		},
 	).Find(&hosts).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_HOST_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_HOST_EN, err))
 		return
 	}
 
@@ -398,12 +397,12 @@ func (c *Cache) DeleteVMs(lcuuids []string) {
 }
 
 func (c *Cache) refreshVMs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_VM_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_EN))
 	var vms []*mysql.VM
 
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&vms).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_EN, err))
 		return
 	}
 
@@ -425,12 +424,12 @@ func (c *Cache) DeleteVPCs(lcuuids []string) {
 }
 
 func (c *Cache) refreshVPCs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_VPC_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VPC_EN))
 	var vpcs []*mysql.VPC
 
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&vpcs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VPC_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VPC_EN, err))
 		return
 	}
 
@@ -460,13 +459,13 @@ func (c *Cache) DeleteNetworks(lcuuids []string) {
 }
 
 func (c *Cache) refreshNetworks() []int {
-	log.Infof(refreshResource(RESOURCE_TYPE_NETWORK_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN))
 	var networks []*mysql.Network
 	networkIDs := []int{}
 
-	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.CREATE_METHOD_LEARN).Find(&networks).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&networks).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NETWORK_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err))
 		return networkIDs
 	}
 
@@ -476,9 +475,9 @@ func (c *Cache) refreshNetworks() []int {
 	}
 
 	var publicNetwork *mysql.Network
-	err = mysql.Db.Where("lcuuid = ?", PUBLIC_NETWORK_LCUUID).First(&publicNetwork).Error
+	err = mysql.Db.Where("lcuuid = ?", rcommon.PUBLIC_NETWORK_LCUUID).First(&publicNetwork).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NETWORK_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err))
 		return networkIDs
 	}
 	c.ToolDataSet.publicNetworkID = publicNetwork.ID
@@ -501,12 +500,12 @@ func (c *Cache) DeleteSubnets(lcuuids []string) {
 }
 
 func (c *Cache) refreshSubnets(networkIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_SUBNET_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN))
 	var subnets []*mysql.Subnet
 
 	err := mysql.Db.Where(map[string]interface{}{"vl2id": networkIDs}).Find(&subnets).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_SUBNET_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, err))
 		return
 	}
 
@@ -536,13 +535,13 @@ func (c *Cache) DeleteVRouters(lcuuids []string) {
 }
 
 func (c *Cache) refreshVRouters() []int {
-	log.Infof(refreshResource(RESOURCE_TYPE_VROUTER_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN))
 	var vrouters []*mysql.VRouter
 	vrouterIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&vrouters).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VROUTER_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, err))
 		return vrouterIDs
 	}
 
@@ -566,12 +565,12 @@ func (c *Cache) DeleteRoutingTables(lcuuids []string) {
 }
 
 func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_ROUTING_TABLE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN))
 	var routingTables []*mysql.RoutingTable
 
 	err := mysql.Db.Where(map[string]interface{}{"vnet_id": vrouterIDs}).Find(&routingTables).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_ROUTING_TABLE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, err))
 		return
 	}
 
@@ -597,12 +596,12 @@ func (c *Cache) DeleteDHCPPorts(lcuuids []string) {
 }
 
 func (c *Cache) refreshDHCPPorts() {
-	log.Infof(refreshResource(RESOURCE_TYPE_DHCP_PORT_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN))
 	var dhcpPorts []*mysql.DHCPPort
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&dhcpPorts).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_DHCP_PORT_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, err))
 		return
 	}
 
@@ -628,12 +627,12 @@ func (c *Cache) DeleteVInterfaces(lcuuids []string) {
 }
 
 func (c *Cache) refreshVInterfaces() {
-	log.Infof(refreshResource(RESOURCE_TYPE_VINTERFACE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN))
 	var vifs []*mysql.VInterface
 
-	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.CREATE_METHOD_LEARN).Find(&vifs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&vifs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VINTERFACE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, err))
 		return
 	}
 
@@ -655,12 +654,12 @@ func (c *Cache) DeleteWANIPs(lcuuids []string) {
 }
 
 func (c *Cache) refreshWANIPs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_WAN_IP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN))
 	var wanIPs []*mysql.WANIP
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&wanIPs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WAN_IP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, err))
 		return
 	}
 
@@ -682,12 +681,12 @@ func (c *Cache) DeleteLANIPs(lcuuids []string) {
 }
 
 func (c *Cache) refreshLANIPs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_LAN_IP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN))
 	var lanIPs []*mysql.LANIP
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&lanIPs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LAN_IP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, err))
 		return
 	}
 
@@ -707,12 +706,12 @@ func (c *Cache) DeleteFloatingIPs(lcuuids []string) {
 }
 
 func (c *Cache) refreshFloatingIPs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_FLOATING_IP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN))
 	var floatingIPs []*mysql.FloatingIP
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&floatingIPs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_FLOATING_IP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, err))
 		return
 	}
 
@@ -738,13 +737,13 @@ func (c *Cache) DeleteSecurityGroups(lcuuids []string) {
 }
 
 func (c *Cache) refreshSecurityGroups() []int {
-	log.Infof(refreshResource(RESOURCE_TYPE_SECURITY_GROUP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN))
 	var securityGroups []*mysql.SecurityGroup
 	securityGroupIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&securityGroups).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_SECURITY_GROUP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, err))
 		return securityGroupIDs
 	}
 
@@ -768,12 +767,12 @@ func (c *Cache) DeleteSecurityGroupRules(lcuuids []string) {
 }
 
 func (c *Cache) refreshSecurityGroupRules(securityGroupIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN))
 	var securityGroupRules []*mysql.SecurityGroupRule
 
 	err := mysql.Db.Where(map[string]interface{}{"sg_id": securityGroupIDs}).Find(&securityGroupRules).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, err))
 		return
 	}
 
@@ -793,12 +792,12 @@ func (c *Cache) DeleteVMSecurityGroups(lcuuids []string) {
 }
 
 func (c *Cache) refreshVMSecurityGroups(securityGroupIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_VM_SECURITY_GROUP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN))
 	var vmsg []*mysql.VMSecurityGroup
 
 	err := mysql.Db.Where(map[string]interface{}{"sg_id": securityGroupIDs}).Find(&vmsg).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, err))
 		return
 	}
 
@@ -824,12 +823,12 @@ func (c *Cache) DeleteNATGateways(lcuuids []string) {
 }
 
 func (c *Cache) refreshNATGateways() {
-	log.Infof(refreshResource(RESOURCE_TYPE_NAT_GATEWAY_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN))
 	var natGateways []*mysql.NATGateway
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&natGateways).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, err))
 		return
 	}
 
@@ -849,12 +848,12 @@ func (c *Cache) DeleteNATVMConnections(lcuuids []string) {
 }
 
 func (c *Cache) refreshNATVMConnections() {
-	log.Infof(refreshResource(RESOURCE_TYPE_NAT_VM_CONNECTION_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN))
 	var natVMConnections []*mysql.NATVMConnection
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&natVMConnections).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, err))
 		return
 	}
 
@@ -874,12 +873,12 @@ func (c *Cache) DeleteNATRules(lcuuids []string) {
 }
 
 func (c *Cache) refreshNATRules() {
-	log.Infof(refreshResource(RESOURCE_TYPE_NAT_RULE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN))
 	var natRules []*mysql.NATRule
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&natRules).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, err))
 		return
 	}
 
@@ -905,12 +904,12 @@ func (c *Cache) DeleteLBs(lcuuids []string) {
 }
 
 func (c *Cache) refreshLBs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_LB_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_EN))
 	var lbs []*mysql.LB
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&lbs).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_EN, err))
 		return
 	}
 
@@ -930,12 +929,12 @@ func (c *Cache) DeleteLBVMConnections(lcuuids []string) {
 }
 
 func (c *Cache) refreshLBVMConnections() {
-	log.Infof(refreshResource(RESOURCE_TYPE_LB_VM_CONNECTION_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN))
 	var lbVMConnections []*mysql.LBVMConnection
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&lbVMConnections).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, err))
 		return
 	}
 
@@ -957,12 +956,12 @@ func (c *Cache) DeleteLBListeners(lcuuids []string) {
 }
 
 func (c *Cache) refreshLBListeners() {
-	log.Infof(refreshResource(RESOURCE_TYPE_LB_LISTENER_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN))
 	var listeners []*mysql.LBListener
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&listeners).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, err))
 		return
 	}
 
@@ -982,12 +981,12 @@ func (c *Cache) DeleteLBTargetServers(lcuuids []string) {
 }
 
 func (c *Cache) refreshLBTargetServers() {
-	log.Infof(refreshResource(RESOURCE_TYPE_LB_TARGET_SERVER_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN))
 	var servers []*mysql.LBTargetServer
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&servers).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, err))
 		return
 	}
 
@@ -1007,12 +1006,12 @@ func (c *Cache) DeletePeerConnections(lcuuids []string) {
 }
 
 func (c *Cache) refreshPeeConnections() {
-	log.Infof(refreshResource(RESOURCE_TYPE_PEER_CONNECTION_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN))
 	var peerConnections []*mysql.PeerConnection
 
 	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&peerConnections).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PEER_CONNECTION_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, err))
 		return
 	}
 
@@ -1032,12 +1031,12 @@ func (c *Cache) DeleteCENs(lcuuids []string) {
 }
 
 func (c *Cache) refreshCENs() {
-	log.Infof(refreshResource(RESOURCE_TYPE_CEN_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_CEN_EN))
 	var cens []*mysql.CEN
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&cens).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_CEN_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CEN_EN, err))
 		return
 	}
 
@@ -1063,12 +1062,12 @@ func (c *Cache) DeleteRDSInstances(lcuuids []string) {
 }
 
 func (c *Cache) refreshRDSInstances() {
-	log.Infof(refreshResource(RESOURCE_TYPE_RDS_INSTANCE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN))
 	var instances []*mysql.RDSInstance
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_RDS_INSTANCE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, err))
 		return
 	}
 
@@ -1094,12 +1093,12 @@ func (c *Cache) DeleteRedisInstances(lcuuids []string) {
 }
 
 func (c *Cache) refreshRedisInstances() {
-	log.Infof(refreshResource(RESOURCE_TYPE_REDIS_INSTANCE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN))
 	var instances []*mysql.RedisInstance
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_REDIS_INSTANCE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, err))
 		return
 	}
 
@@ -1121,12 +1120,12 @@ func (c *Cache) DeletePodClusters(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodClusters() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_CLUSTER_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN))
 	var podClusters []*mysql.PodCluster
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podClusters).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_CLUSTER_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, err))
 		return
 	}
 
@@ -1152,12 +1151,12 @@ func (c *Cache) DeletePodNodes(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodNodes() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_NODE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN))
 	var podNodes []*mysql.PodNode
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podNodes).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_NODE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, err))
 		return
 	}
 
@@ -1177,12 +1176,12 @@ func (c *Cache) DeleteVMPodNodeConnections(lcuuids []string) {
 }
 
 func (c *Cache) refreshVMPodNodeConnections() {
-	log.Infof(refreshResource(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN))
 	var connections []*mysql.VMPodNodeConnection
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&connections).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, err))
 		return
 	}
 
@@ -1204,12 +1203,12 @@ func (c *Cache) DeletePodNamespaces(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodNamespaces() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_NAMESPACE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN))
 	var podNamespaces []*mysql.PodNamespace
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podNamespaces).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_NAMESPACE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, err))
 		return
 	}
 
@@ -1235,13 +1234,13 @@ func (c *Cache) DeletePodIngresses(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodIngresses() []int {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_INGRESS_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN))
 	var podIngresses []*mysql.PodIngress
 	podIngressIDs := []int{}
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podIngresses).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, err))
 		return podIngressIDs
 	}
 
@@ -1267,7 +1266,7 @@ func (c *Cache) DeletePodIngressRules(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_INGRESS_RULE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN))
 	if len(podIngressIDs) == 0 {
 		return
 	}
@@ -1275,7 +1274,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 
 	err := mysql.Db.Where("pod_ingress_id IN ?", podIngressIDs).Find(&podIngressRules).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS_RULE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, err))
 		return
 	}
 
@@ -1295,7 +1294,7 @@ func (c *Cache) DeletePodIngressRuleBackends(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN))
 	if len(podIngressIDs) == 0 {
 		return
 	}
@@ -1303,7 +1302,7 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 
 	err := mysql.Db.Where("pod_ingress_id IN ?", podIngressIDs).Find(&podIngressRuleBackends).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, err))
 		return
 	}
 
@@ -1333,13 +1332,13 @@ func (c *Cache) DeletePodServices(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodServices() []int {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_SERVICE_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN))
 	var podServices []*mysql.PodService
 	podServiceIDs := []int{}
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podServices).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, err))
 		return podServiceIDs
 	}
 
@@ -1363,7 +1362,7 @@ func (c *Cache) DeletePodServicePorts(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_SERVICE_PORT_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN))
 	if len(podServiceIDs) == 0 {
 		return
 	}
@@ -1371,7 +1370,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 
 	err := mysql.Db.Where("pod_service_id IN ?", podServiceIDs).Find(&podServicePorts).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE_PORT_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, err))
 		return
 	}
 
@@ -1393,12 +1392,12 @@ func (c *Cache) DeletePodGroups(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodGroups() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_GROUP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN))
 	var podGroups []*mysql.PodGroup
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podGroups).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, err))
 		return
 	}
 
@@ -1418,7 +1417,7 @@ func (c *Cache) DeletePodGroupPorts(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_GROUP_PORT_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN))
 	if len(podServiceIDs) == 0 {
 		return
 	}
@@ -1426,7 +1425,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 
 	err := mysql.Db.Where("pod_service_id IN ?", podServiceIDs).Find(&podGroupPorts).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, err))
 		return
 	}
 
@@ -1448,12 +1447,12 @@ func (c *Cache) DeletePodReplicaSets(lcuuids []string) {
 }
 
 func (c *Cache) refreshPodReplicaSets() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_REPLICA_SET_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN))
 	var podReplicaSets []*mysql.PodReplicaSet
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podReplicaSets).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_REPLICA_SET_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, err))
 		return
 	}
 
@@ -1479,12 +1478,12 @@ func (c *Cache) DeletePods(lcuuids []string) {
 }
 
 func (c *Cache) refreshPods() {
-	log.Infof(refreshResource(RESOURCE_TYPE_POD_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_EN))
 	var pods []*mysql.Pod
 
 	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&pods).Error
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_EN, err))
 		return
 	}
 
@@ -1506,11 +1505,11 @@ func (c *Cache) DeleteProcesses(lcuuids []string) {
 }
 
 func (c *Cache) refreshProcesses() {
-	log.Infof(refreshResource(RESOURCE_TYPE_PROCESS_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN))
 	var processes []*mysql.Process
 	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid))
 	if err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROCESS_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, err))
 		return
 	}
 
@@ -1530,10 +1529,10 @@ func (c *Cache) DeletePrometheusTargets(lcuuids []string) {
 }
 
 func (c *Cache) refreshPrometheusTarget() {
-	log.Infof(refreshResource(RESOURCE_TYPE_PROMETHEUS_TARGET_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN))
 	var prometheusTargets []*mysql.PrometheusTarget
-	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).Find(&prometheusTargets).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, err))
+	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).Find(&prometheusTargets).Error; err != nil {
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, err))
 		return
 	}
 
@@ -1553,10 +1552,10 @@ func (c *Cache) DeleteVIPs(lcuuids []string) {
 }
 
 func (c *Cache) refreshVIP() {
-	log.Infof(refreshResource(RESOURCE_TYPE_VIP_EN))
+	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_VIP_EN))
 	var vips []*mysql.VIP
 	if err := mysql.Db.Where("domain = ?", c.DomainLcuuid).Find(&vips).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VIP_EN, err))
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VIP_EN, err))
 		return
 	}
 

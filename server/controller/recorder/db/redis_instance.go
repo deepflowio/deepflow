@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type RedisInstance struct {
@@ -28,7 +28,7 @@ type RedisInstance struct {
 func NewRedisInstance() *RedisInstance {
 	operater := &RedisInstance{
 		OperatorBase[mysql.RedisInstance]{
-			resourceTypeName: common.RESOURCE_TYPE_REDIS_INSTANCE_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

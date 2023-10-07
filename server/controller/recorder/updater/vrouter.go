@@ -18,9 +18,10 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +32,7 @@ type VRouter struct {
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
 	updater := &VRouter{
 		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVRouter(),
 			diffBaseData: wholeCache.VRouters,
@@ -50,15 +52,15 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRo
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	dbItem := &mysql.VRouter{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
-		State:          common.VROUTER_STATE_RUNNING,
+		State:          rcommon.VROUTER_STATE_RUNNING,
 		GWLaunchServer: cloudItem.GWLaunchServer,
 		Domain:         r.cache.DomainLcuuid,
 		Region:         cloudItem.RegionLcuuid,
@@ -74,8 +76,8 @@ func (r *VRouter) generateUpdateInfo(diffBase *cache.VRouter, cloudItem *cloudmo
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				common.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

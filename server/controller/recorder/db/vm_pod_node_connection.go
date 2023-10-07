@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type VMPodNodeConnection struct {
@@ -28,7 +28,7 @@ type VMPodNodeConnection struct {
 func NewVMPodNodeConnection() *VMPodNodeConnection {
 	return &VMPodNodeConnection{
 		OperatorBase[mysql.VMPodNodeConnection]{
-			resourceTypeName: common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

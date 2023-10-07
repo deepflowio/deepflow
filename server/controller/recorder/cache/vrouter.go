@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVRouter(dbItem *mysql.VRouter, seq int, toolDataSet *ToolDataSet) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addVRouter(dbItem *mysql.VRouter, seq int, toolDataSet
 		VPCLcuuid:    vpcLcuuid,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVRouter(lcuuid string) {
 	delete(b.VRouters, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VROUTER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid))
 }
 
 type VRouter struct {
@@ -55,5 +55,5 @@ func (v *VRouter) Update(cloudItem *cloudmodel.VRouter) {
 	v.Label = cloudItem.Label
 	v.VPCLcuuid = cloudItem.VPCLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VROUTER_EN, v))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, v))
 }

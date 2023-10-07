@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVIP(dbItem *mysql.VIP, seq int) {
@@ -31,12 +31,12 @@ func (b *DiffBaseDataSet) addVIP(dbItem *mysql.VIP, seq int) {
 		IP:     dbItem.IP,
 		VTapID: dbItem.VTapID,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VIP_EN, b.VIP[dbItem.Lcuuid]))
+	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, b.VIP[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVIP(lcuuid string) {
 	delete(b.VIP, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VIP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, lcuuid))
 }
 
 type VIP struct {
@@ -48,5 +48,5 @@ type VIP struct {
 func (p *VIP) Update(cloudItem *cloudmodel.VIP) {
 	p.IP = cloudItem.IP
 	p.VTapID = cloudItem.VTapID
-	log.Info(updateDiffBase(RESOURCE_TYPE_VIP_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, p))
 }
