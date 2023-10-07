@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type VM struct {
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	updater := &VM{
 		UpdaterBase[cloudmodel.VM, mysql.VM, *cache.VM]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVM(),
 			diffBaseData: wholeCache.VMs,
@@ -50,8 +51,8 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -81,8 +82,8 @@ func (m *VM) generateUpdateInfo(diffBase *cache.VM, cloudItem *cloudmodel.VM) (m
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				common.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVPC(dbItem *mysql.VPC, seq int) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addVPC(dbItem *mysql.VPC, seq int) {
 		CIDR:         dbItem.CIDR,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVPC(lcuuid string) {
 	delete(b.VPCs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VPC_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid))
 }
 
 type VPC struct {
@@ -57,5 +57,5 @@ func (v *VPC) Update(cloudItem *cloudmodel.VPC) {
 	v.TunnelID = cloudItem.TunnelID
 	v.CIDR = cloudItem.CIDR
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VPC_EN, v))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, v))
 }

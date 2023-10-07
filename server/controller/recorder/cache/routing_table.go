@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addRoutingTable(dbItem *mysql.RoutingTable, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addRoutingTable(dbItem *mysql.RoutingTable, seq int) {
 		Nexthop:     dbItem.Nexthop,
 		NexthopType: dbItem.NexthopType,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRoutingTable(lcuuid string) {
 	delete(b.RoutingTables, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
 }
 
 type RoutingTable struct {
@@ -51,5 +51,5 @@ func (r *RoutingTable) Update(cloudItem *cloudmodel.RoutingTable) {
 	r.Destination = cloudItem.Destination
 	r.Nexthop = cloudItem.Nexthop
 	r.NexthopType = cloudItem.NexthopType
-	log.Info(updateDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, r))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, r))
 }

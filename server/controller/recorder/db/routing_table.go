@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type RoutingTable struct {
@@ -28,7 +28,7 @@ type RoutingTable struct {
 func NewRoutingTable() *RoutingTable {
 	return &RoutingTable{
 		OperatorBase[mysql.RoutingTable]{
-			resourceTypeName: common.RESOURCE_TYPE_ROUTING_TABLE_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

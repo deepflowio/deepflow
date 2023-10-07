@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addSecurityGroup(dbItem *mysql.SecurityGroup, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addSecurityGroup(dbItem *mysql.SecurityGroup, seq int)
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroup(lcuuid string) {
 	delete(b.SecurityGroups, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
 }
 
 type SecurityGroup struct {
@@ -51,5 +51,5 @@ func (s *SecurityGroup) Update(cloudItem *cloudmodel.SecurityGroup) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
 	s.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, s))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, s))
 }

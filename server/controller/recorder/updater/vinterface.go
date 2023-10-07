@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -33,6 +33,7 @@ type VInterface struct {
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *cache.ToolDataSet) *VInterface {
 	updater := &VInterface{
 		UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *cache.VInterface]{
+			resourceType:      ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			cache:             wholeCache,
 			domainToolDataSet: domainToolDataSet,
 			dbOperator:        db.NewVInterface(),
@@ -60,8 +61,8 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 			}
 			if !exists {
 				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-					common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 				))
 				return nil, false
 			}
@@ -72,7 +73,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		log.Errorf(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
 			cloudItem.DeviceType, cloudItem.DeviceLcuuid,
-			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 		)
 		return nil, false
 	}
@@ -110,8 +111,8 @@ func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *c
 				}
 				if !exists {
 					log.Errorf(resourceAForResourceBNotFound(
-						common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-						common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 					))
 					return nil, false
 				}

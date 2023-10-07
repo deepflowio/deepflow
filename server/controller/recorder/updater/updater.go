@@ -48,6 +48,8 @@ type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constr
 }
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
+	resourceType string
+
 	cache             *cache.Cache                    // 基于 Domain 或者 SubDomain 范围构造
 	domainToolDataSet *cache.ToolDataSet              // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
 	dbOperator        db.Operator[MT]                 // 数据库操作对象
@@ -68,7 +70,11 @@ func (u *UpdaterBase[CT, MT, BT]) RegisterListener(listener listener.Listener[CT
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 	dbItemsToAdd := []*MT{}
+	logDebug := logDebugResourceTypeEnabled(u.resourceType)
 	for _, cloudItem := range u.cloudData {
+		if logDebug {
+			log.Infof(debugCloudItem(u.resourceType, cloudItem))
+		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
 			log.Infof("to add (cloud item: %#v)", cloudItem)

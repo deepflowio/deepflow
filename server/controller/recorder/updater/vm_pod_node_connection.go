@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type VMPodNodeConnection struct {
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
 	updater := &VMPodNodeConnection{
 		UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *cache.VMPodNodeConnection]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVMPodNodeConnection(),
 			diffBaseData: wholeCache.VMPodNodeConnections,
@@ -50,8 +51,8 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 	vmID, exists := c.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
-			common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
