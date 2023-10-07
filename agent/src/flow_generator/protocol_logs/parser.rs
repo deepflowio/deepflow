@@ -19,6 +19,7 @@ use std::mem::swap;
 use std::{
     cmp::min,
     collections::HashMap,
+    fmt,
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc, Mutex,
@@ -31,21 +32,23 @@ use std::{
 use arc_swap::access::Access;
 use log::{info, warn};
 use rand::prelude::{Rng, SeedableRng, SmallRng};
+use serde::Serialize;
 
-use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, LogMessageType,
-};
+use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData, LogMessageType};
 
 use crate::{
     common::{
         enums::EthernetType,
-        flow::{get_uniq_flow_id_in_one_minute, PacketDirection, SignalSource},
+        flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         meta_packet::ProtocolData,
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
+    flow_generator::{
+        error::{Error, Result},
+        FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
+    },
     metric::document::TapSide,
     rpc::get_timestamp,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -53,7 +56,7 @@ use crate::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use public::utils::string::get_string_from_chars;
 use public::{
-    queue::{DebugSender, Error, Receiver},
+    queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
 
@@ -66,12 +69,26 @@ const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
 const THROTTLE_BUCKET_BITS: u8 = 2;
 const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送方是有突发的，需要累积一定时间做采样
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct MetaAppProto {
-    base_info: AppProtoLogsBaseInfo,
-    direction: PacketDirection,
-    direction_score: u8,
-    l7_info: L7ProtocolInfo,
+    #[serde(flatten)]
+    pub base_info: AppProtoLogsBaseInfo,
+    #[serde(skip)]
+    pub direction: PacketDirection,
+    pub direction_score: u8,
+    #[serde(flatten)]
+    pub l7_info: L7ProtocolInfo,
+}
+
+impl fmt::Display for MetaAppProto {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} direction_score: {}\n",
+            self.base_info, self.direction_score
+        )?;
+        write!(f, "\t{:?}", self.l7_info)
+    }
 }
 
 impl MetaAppProto {
@@ -192,6 +209,71 @@ impl MetaAppProto {
             l7_info,
         })
     }
+
+    pub fn is_request(&self) -> bool {
+        self.base_info.head.msg_type == LogMessageType::Request
+    }
+
+    pub fn is_response(&self) -> bool {
+        self.base_info.head.msg_type == LogMessageType::Response
+    }
+
+    pub fn ebpf_flow_session_id(&self) -> u64 {
+        // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
+        // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
+
+        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
+        let proto = if self.base_info.head.proto == L7Protocol::Grpc {
+            if let L7ProtocolInfo::HttpInfo(_) = &self.l7_info {
+                L7Protocol::Http2
+            } else {
+                unreachable!()
+            }
+        } else {
+            self.base_info.head.proto
+        };
+
+        let flow_id_part =
+            (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
+        if let Some(session_id) = self.l7_info.session_id() {
+            flow_id_part | (proto as u64) << 24 | ((session_id as u64) & 0xffffff)
+        } else {
+            let mut cap_seq = self
+                .base_info
+                .syscall_cap_seq_0
+                .max(self.base_info.syscall_cap_seq_1);
+            if self.base_info.head.msg_type == LogMessageType::Request {
+                cap_seq += 1;
+            };
+            flow_id_part | ((proto as u64) << 24) | (cap_seq & 0xffffff)
+        }
+    }
+
+    pub fn session_merge(&mut self, log: Self) -> Result<()> {
+        if let Err(err) = self.protocol_merge(log.l7_info) {
+            /*
+                if can not merge, return log which can not merge to self.
+                the follow circumstance can not merge:
+                    when ebpf disorder, http1 can not match req/resp.
+            */
+            if let Error::L7ProtocolCanNotMerge(l7_info) = err {
+                return Err(Error::L7LogCanNotMerge(Self { l7_info, ..log }));
+            }
+            return Err(err);
+        };
+        self.base_info.merge(log.base_info);
+        Ok(())
+    }
+
+    fn protocol_merge(&mut self, log: L7ProtocolInfo) -> Result<()> {
+        self.l7_info.merge_log(log)
+    }
+
+    // 是否需要进一步聚合
+    // 目前仅http2 uprobe 需要聚合多个请求
+    pub fn need_protocol_merge(&self) -> bool {
+        self.l7_info.need_merge()
+    }
 }
 
 #[derive(Default)]
@@ -203,7 +285,6 @@ pub struct SessionAggrCounter {
     throttle_drop: AtomicU64,
 }
 
-// FIXME: counter not registered
 impl RefCountable for SessionAggrCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
@@ -291,7 +372,7 @@ struct SessionQueue {
     last_flush_time: Duration,
 
     window_size: usize,
-    time_window: Option<Vec<HashMap<u64, Box<AppProtoLogsData>>>>,
+    time_window: Option<Vec<HashMap<u64, Box<MetaAppProto>>>>,
 
     throttle: Throttle,
 
@@ -364,7 +445,7 @@ impl SessionQueue {
     //   - 收到响应，根据报文时间-RRT时间，找到对应的时间窗口，查找是否有匹配的请求
     //      - 若有， 则合并请求和响应(将响应的数据填入请求中，并修改请求的类型为会话)，释放当前响应，发送会话
     //      - 若没有, 则直接发送当前响应
-    fn aggregate_session_and_send(&mut self, item: Box<AppProtoLogsData>) {
+    fn aggregate_session_and_send(&mut self, item: Box<MetaAppProto>) {
         self.counter.receive.fetch_add(1, Ordering::Relaxed);
 
         let slot_time = if item.base_info.head.msg_type == LogMessageType::Response {
@@ -429,14 +510,14 @@ impl SessionQueue {
 
     fn on_request_log(
         &mut self,
-        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
-        mut item: Box<AppProtoLogsData>,
+        map: &mut HashMap<u64, Box<MetaAppProto>>,
+        mut item: Box<MetaAppProto>,
         key: u64,
     ) {
         if let Some(mut p) = map.remove(&key) {
             if item.need_protocol_merge() {
                 let _ = p.session_merge(*item);
-                if p.special_info.is_session_end() {
+                if p.l7_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(p);
                 } else {
@@ -447,7 +528,7 @@ impl SessionQueue {
                 // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
                 if p.is_response() && p.base_info.start_time > item.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(*p) {
+                    if let Err(Error::L7LogCanNotMerge(p)) = item.session_merge(*p) {
                         self.send(Box::new(p));
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -466,7 +547,7 @@ impl SessionQueue {
             }
         } else {
             if item.need_protocol_merge() {
-                let (req_end, resp_end) = item.special_info.is_req_resp_end();
+                let (req_end, resp_end) = item.l7_info.is_req_resp_end();
                 // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
                 if req_end || resp_end {
                     return;
@@ -486,8 +567,8 @@ impl SessionQueue {
 
     fn on_response_log(
         &mut self,
-        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
-        item: Box<AppProtoLogsData>,
+        map: &mut HashMap<u64, Box<MetaAppProto>>,
+        item: Box<MetaAppProto>,
         key: u64,
     ) {
         // response, 需要找到request并merge
@@ -495,7 +576,7 @@ impl SessionQueue {
             if item.need_protocol_merge() {
                 let _ = p.session_merge(*item);
 
-                if p.special_info.is_session_end() {
+                if p.l7_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(p);
                 } else {
@@ -504,7 +585,7 @@ impl SessionQueue {
             } else {
                 if p.is_request() && item.base_info.start_time > p.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    if let Err(L7LogCanNotMerge(item)) = p.session_merge(*item) {
+                    if let Err(Error::L7LogCanNotMerge(item)) = p.session_merge(*item) {
                         self.send(Box::new(item));
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -523,7 +604,7 @@ impl SessionQueue {
             }
         } else {
             if item.need_protocol_merge() {
-                let (req_end, resp_end) = item.special_info.is_req_resp_end();
+                let (req_end, resp_end) = item.l7_info.is_req_resp_end();
                 // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
                 // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
                 if req_end || resp_end {
@@ -554,7 +635,9 @@ impl SessionQueue {
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             for item in map.into_values() {
                 if batch.len() >= QUEUE_BATCH_SIZE {
-                    if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
+                    if let Err(queue::Error::Terminated(..)) =
+                        self.output_queue.send_all(&mut batch)
+                    {
                         warn!("output queue terminated");
                         batch.clear();
                         break 'outer;
@@ -564,18 +647,18 @@ impl SessionQueue {
             }
         }
         if !batch.is_empty() {
-            if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
+            if let Err(queue::Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                 warn!("output queue terminated");
             }
         }
         self.time_window.replace(time_window);
     }
 
-    fn calc_key(item: &AppProtoLogsData) -> u64 {
-        if let L7ProtocolInfo::MqttInfo(_) = item.special_info {
+    fn calc_key(item: &MetaAppProto) -> u64 {
+        if let L7ProtocolInfo::MqttInfo(_) = item.l7_info {
             return item.base_info.flow_id;
         }
-        let request_id = if let Some(id) = item.special_info.session_id() {
+        let request_id = if let Some(id) = item.l7_info.session_id() {
             id
         } else {
             0
@@ -584,11 +667,7 @@ impl SessionQueue {
         get_uniq_flow_id_in_one_minute(item.base_info.flow_id) << 32 | (request_id as u64)
     }
 
-    fn flush_window(
-        &mut self,
-        n: usize,
-        time_window: &mut Vec<HashMap<u64, Box<AppProtoLogsData>>>,
-    ) {
+    fn flush_window(&mut self, n: usize, time_window: &mut Vec<HashMap<u64, Box<MetaAppProto>>>) {
         let delete_num = min(n, self.window_size);
         for i in 0..delete_num {
             let map = time_window.get_mut(i).unwrap();
@@ -606,8 +685,8 @@ impl SessionQueue {
             Duration::from_secs(self.aggregate_start_time.as_secs() + n as u64 * SLOT_WIDTH);
     }
 
-    fn send(&mut self, item: Box<AppProtoLogsData>) {
-        if item.special_info.skip_send() {
+    fn send(&mut self, item: Box<MetaAppProto>) {
+        if item.l7_info.skip_send() {
             return;
         }
 
@@ -616,12 +695,13 @@ impl SessionQueue {
             return;
         }
 
-        if let Err(Error::Terminated(..)) = self.output_queue.send(BoxAppProtoLogsData(item)) {
+        if let Err(queue::Error::Terminated(..)) = self.output_queue.send(BoxAppProtoLogsData(item))
+        {
             warn!("output queue terminated");
         }
     }
 
-    fn send_all(&mut self, items: Vec<Box<AppProtoLogsData>>) {
+    fn send_all(&mut self, items: Vec<Box<MetaAppProto>>) {
         for item in items {
             self.send(item);
         }
@@ -694,21 +774,15 @@ impl SessionAggregator {
                                 {
                                     continue;
                                 }
-                                session_queue.aggregate_session_and_send(Box::new(
-                                    AppProtoLogsData {
-                                        base_info: (*app_proto).base_info.clone(),
-                                        special_info: (*app_proto).l7_info,
-                                        direction_score: (*app_proto).direction_score,
-                                    },
-                                ));
+                                session_queue.aggregate_session_and_send(app_proto);
                             }
                         }
-                        Err(Error::Timeout) => {
+                        Err(queue::Error::Timeout) => {
                             session_queue.flush_one_slot();
                             continue;
                         }
-                        Err(Error::Terminated(..)) => break,
-                        Err(Error::BatchTooLarge(_)) => unreachable!(),
+                        Err(queue::Error::Terminated(..)) => break,
+                        Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                     };
                 }
                 session_queue.clear();

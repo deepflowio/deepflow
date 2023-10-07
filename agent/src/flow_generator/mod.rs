@@ -33,9 +33,8 @@ pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
 pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
-pub use protocol_logs::L7ProtoRawDataType;
 pub use protocol_logs::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, HttpLog, KafkaLog,
+    AppProtoHead, AppProtoLogsBaseInfo, DnsLog, DubboLog, HttpLog, KafkaLog, L7ProtoRawDataType,
     LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog, TlsLog,
 };
 
