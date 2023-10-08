@@ -21,6 +21,7 @@ pub use libc::c_int;
 pub use libc::c_uchar; // u8
 pub use libc::c_uint; // u32
 pub use libc::c_ulonglong;
+use log::info;
 pub use std::ffi::{CStr, CString};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -550,4 +551,10 @@ extern "C" {
      */
     pub fn process_stack_trace_data_for_flame_graph(_data: *mut stack_profile_data);
     pub fn release_flame_graph_hash();
+}
+
+#[no_mangle]
+extern "C" fn rust_info_wrapper(msg: *const libc::c_char) {
+    let msg_str: &str = unsafe { std::ffi::CStr::from_ptr(msg).to_str().unwrap() };
+    info!("{}", msg_str);
 }
