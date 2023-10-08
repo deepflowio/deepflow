@@ -19,6 +19,7 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
+use std::env::set_var;
 use std::fmt::Write;
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -325,6 +326,9 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
+    set_var("RUST_LOG", "info");
+    env_logger::init();
+
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {

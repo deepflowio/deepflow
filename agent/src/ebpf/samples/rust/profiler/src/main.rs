@@ -18,6 +18,7 @@ use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
 use profiler::ebpf::*;
+use std::env::set_var;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
@@ -122,6 +123,9 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
+    set_var("RUST_LOG", "info");
+    env_logger::init();
+
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
@@ -147,7 +151,7 @@ fn main() {
             ::std::process::exit(1);
         }
 
-	// Used to test our DeepFlow products, written as 97 frequency, so that
+        // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
         if start_continuous_profiler(97, 10, 300, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
@@ -155,12 +159,10 @@ fn main() {
         }
 
         set_profiler_regex(
-            CString::new(
-                "^(socket_tracer|java|deepflow-.*)$".as_bytes(),
-            )
-            .unwrap()
-            .as_c_str()
-            .as_ptr(),
+            CString::new("^(socket_tracer|java|deepflow-.*)$".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
         );
 
         // CPUID will not be included in the aggregation of stack trace data.
