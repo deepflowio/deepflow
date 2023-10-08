@@ -55,7 +55,7 @@ impl From<&Flow> for MiniFlow {
                 (&flow.flow_metrics_peers[1]).into(),
             ],
             signal_source: flow.signal_source,
-            directions: Default::default(),
+            directions: flow.directions,
             is_active_service: flow.is_active_service,
 
             otel_service: flow.otel_service.clone(),

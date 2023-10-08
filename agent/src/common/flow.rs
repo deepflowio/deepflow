@@ -933,6 +933,8 @@ pub struct Flow {
     pub reversed: bool,
     pub tap_side: TapSide,
     #[serde(skip)]
+    pub directions: [Direction; 2],
+    #[serde(skip)]
     pub acl_gids: Vec<u16>,
     #[serde(skip)]
     pub otel_service: Option<String>,
@@ -1112,13 +1114,12 @@ impl Flow {
             return;
         }
         // 链路追踪统计位置
-        let [src_tap_side, dst_tap_side] =
-            get_direction(&*self, trident_type, cloud_gateway_traffic);
+        self.directions = get_direction(&*self, trident_type, cloud_gateway_traffic);
 
-        if src_tap_side != Direction::None && dst_tap_side == Direction::None {
-            self.tap_side = src_tap_side.into();
-        } else if src_tap_side == Direction::None && dst_tap_side != Direction::None {
-            self.tap_side = dst_tap_side.into();
+        if self.directions[0] != Direction::None && self.directions[1] == Direction::None {
+            self.tap_side = self.directions[0].into();
+        } else if self.directions[0] == Direction::None && self.directions[1] != Direction::None {
+            self.tap_side = self.directions[1].into();
         }
     }
 
@@ -1199,16 +1200,6 @@ pub fn get_direction(
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
 
     match flow.signal_source {
-        SignalSource::OTel => {
-            // The direction of otel data is obtained according to flow.tap_side.
-            return if flow.tap_side == TapSide::ClientApp {
-                [Direction::ClientAppToServer, Direction::None]
-            } else if flow.tap_side == TapSide::ServerApp {
-                [Direction::None, Direction::ServerAppToClient]
-            } else {
-                [Direction::None, Direction::None]
-            };
-        }
         SignalSource::EBPF => {
             // For eBPF data, the direction can be calculated directly through l2_end,
             // and its l2_end has been set in MetaPacket::from_ebpf().
@@ -1228,7 +1219,7 @@ pub fn get_direction(
             return [Direction::None, Direction::None];
         }
         _ => {
-            // Data from otel may not have mac_src and mac_dst
+            // workload and container collector need to collect loopback port flow
             if flow.flow_key.mac_src == flow.flow_key.mac_dst
                 && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
             {
@@ -1509,13 +1500,6 @@ pub fn get_direction(
     const FLOW_METRICS_PEER_DST: usize = 1;
 
     let flow_key = &flow.flow_key;
-
-    // Workload和容器采集器需采集loopback口流量
-    if flow_key.mac_src == flow_key.mac_dst
-        && (is_tt_workload(trident_type) || is_tt_pod(trident_type))
-    {
-        return [Direction::None, Direction::LocalToLocal];
-    }
 
     // 全景图统计
     let tunnel = &flow.tunnel;
