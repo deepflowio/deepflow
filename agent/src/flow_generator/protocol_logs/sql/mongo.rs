@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+use std::ffi::CStr;
+
+use bson::{self, Document};
 use serde::Serialize;
 
 use super::super::{AppProtoHead, LogMessageType};
-
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
 use crate::{
@@ -37,9 +39,6 @@ use crate::{
     },
     utils::bytes,
 };
-// 加载bson库
-use bson::{self, Document};
-use std::ffi::CStr;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MongoDBInfo {
@@ -173,7 +172,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
         }
 
         self.info.is_tls = param.is_tls();
-        return true;
+        return header.is_request();
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -209,12 +208,23 @@ impl L7ProtocolParserInterface for MongoDBLog {
 }
 
 const _OP_REPLY: u32 = 1;
-const _OP_MSG: u32 = 2013;
+const _DB_MSG: u32 = 1000;
 const _OP_UPDATE: u32 = 2001;
 const _OP_INSERT: u32 = 2002;
+const _RESERVED: u32 = 2003;
 const _OP_QUERY: u32 = 2004;
 const _OP_GET_MORE: u32 = 2005;
 const _OP_DELETE: u32 = 2006;
+const _OP_KILL_CURSORS: u32 = 2007;
+const _OP_COMMAND: u32 = 2010;
+const _OP_COMMANDREPLY: u32 = 2011;
+const _OP_COMPRESSED: u32 = 2012;
+const _OP_MSG: u32 = 2013;
+const _UNKNOWN: &str = "Unknown";
+
+const _HEADER_SIZE: usize = 16;
+
+const _EXCEPTION_OFFSET: usize = 20;
 
 impl MongoDBLog {
     // TODO: tracing
@@ -235,18 +245,33 @@ impl MongoDBLog {
             return Err(Error::MongoDBLogParseFailed);
         }
         info.op_code = header.op_code;
-        info.op_code_name = header.op_code_name;
+        info.op_code_name = header.op_code_name.clone();
+
+        if header.is_request() {
+            info.msg_type = LogMessageType::Request;
+            self.info.req_len = header.length;
+            info.request_id = header.request_id;
+            self.perf_stats
+                .as_mut()
+                .map(|p: &mut L7PerfStats| p.inc_req());
+        } else {
+            info.msg_type = LogMessageType::Response;
+            self.info.resp_len = header.length;
+            info.request_id = header.response_to;
+            info.response_id = header.request_id;
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
+        }
+
         // command decode
         match info.op_code {
-            _OP_MSG => {
+            _OP_MSG if payload.len() > _HEADER_SIZE => {
                 // OP_MSG
                 let mut msg_body = MongoOpMsg::default();
-                msg_body.decode(&payload[16..offset as usize + 16])?;
+                msg_body.decode(&payload[_HEADER_SIZE..])?;
                 match info.msg_type {
                     LogMessageType::Response => {
                         info.response = msg_body.sections.doc.to_string();
-                        info.exception =
-                            msg_body.sections.c_string.unwrap_or("unknown".to_string());
+                        info.exception = msg_body.sections.c_string.unwrap_or(_UNKNOWN.to_string());
                         info.response_code =
                             msg_body.sections.doc.get_f64("code").unwrap_or(0.0) as i32;
                         if info.response_code > 0 {
@@ -258,17 +283,17 @@ impl MongoDBLog {
                     }
                 }
             }
-            _OP_REPLY => {
+            _OP_REPLY if payload.len() > _HEADER_SIZE => {
                 // "OP_REPLY"
                 let mut msg_body = MongoOpReply::default();
-                msg_body.decode(&payload[16..])?;
+                msg_body.decode(&payload[_HEADER_SIZE..])?;
                 if !msg_body.reply_ok {
                     self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 }
                 info.response = msg_body.doc.to_string();
                 info.exception = msg_body.response_msg;
             }
-            _OP_UPDATE => {
+            _OP_UPDATE if payload.len() > 24 => {
                 // "OP_UPDATE"
                 info.exception = CStr::from_bytes_until_nul(&payload[20..])
                     .map_err(|_| Error::L7ProtocolUnknown)?
@@ -278,7 +303,7 @@ impl MongoDBLog {
                     .unwrap_or(Document::default());
                 info.request = update.to_string();
             }
-            _OP_INSERT => {
+            _OP_INSERT if payload.len() > 20 => {
                 // OP_INSERT
                 info.exception = CStr::from_bytes_until_nul(&payload[20..])
                     .map_err(|_| Error::L7ProtocolUnknown)?
@@ -288,7 +313,7 @@ impl MongoDBLog {
                     .unwrap_or(Document::default());
                 info.request = insert.to_string();
             }
-            _OP_QUERY => {
+            _OP_QUERY if payload.len() > 28 => {
                 // "OP_QUERY"
                 info.exception = CStr::from_bytes_until_nul(&payload[..20])
                     .map_err(|_| Error::L7ProtocolUnknown)?
@@ -299,7 +324,7 @@ impl MongoDBLog {
                     .unwrap_or(Document::default());
                 info.request = query.to_string();
             }
-            _OP_GET_MORE | _OP_DELETE => {
+            _OP_GET_MORE | _OP_DELETE if payload.len() > 20 => {
                 // OP_GET_MORE
                 info.request = CStr::from_bytes_until_nul(&payload[..20])
                     .map_err(|_| Error::L7ProtocolUnknown)?
@@ -309,20 +334,6 @@ impl MongoDBLog {
             _ => {
                 info.request = info.op_code_name.clone();
             }
-        }
-
-        if header.response_to > 0 {
-            // response_to is the request_id, when 0 means the request
-            info.msg_type = LogMessageType::Response;
-            self.info.resp_len = header.length;
-            info.request_id = header.response_to;
-            info.response_id = header.request_id;
-            self.perf_stats.as_mut().map(|p| p.inc_resp());
-        } else {
-            info.msg_type = LogMessageType::Request;
-            self.info.req_len = header.length;
-            info.request_id = header.request_id;
-            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
 
         Ok(false)
@@ -339,12 +350,21 @@ pub struct MongoDBHeader {
 }
 
 impl MongoDBHeader {
+    fn is_request(&self) -> bool {
+        match self.op_code {
+            _OP_QUERY | _OP_UPDATE | _OP_INSERT | _OP_DELETE => true,
+            _OP_REPLY => false,
+            // response_to is the request_id, when 0 means the request
+            _ => self.response_to == 0,
+        }
+    }
+
     fn decode(&mut self, payload: &[u8]) -> isize {
         if payload.len() < 16 {
             return -1;
         }
         self.length = bytes::read_u32_le(payload) & 0xffffff;
-        if self.length != payload.len() as u32 {
+        if self.length < payload.len() as u32 {
             return -1;
         }
         self.op_code = bytes::read_u32_le(&payload[12..16]);
@@ -359,19 +379,19 @@ impl MongoDBHeader {
 
     pub fn get_op_str(&self) -> &'static str {
         match self.op_code {
-            1 => "OP_REPLY",
-            1000 => "DB_MSG",
-            2001 => "OP_UPDATE", // 用于更新集合中的文档
-            2002 => "OP_INSERT", // 用于将一个或多个文档插入集合中。
-            2003 => "RESERVED",
-            2004 => "OP_QUERY",        // 用于在数据库中查询集合中的文档。
-            2005 => "OP_GET_MORE",     // 用于在数据库中查询集合中的文档。
-            2006 => "OP_DELETE",       // 用于从集合中删除一个或多个文档。
-            2007 => "OP_KILL_CURSORS", // 用于关闭数据库中的活动游标。这是确保在查询结束时回收数据库资源所必需的。
-            2010 => "OP_COMMAND",      // 表示命令请求的集群内部协议。已过时
-            2011 => "OP_COMMANDREPLY", // 群内部协议表示对OP_COMMAND的回复。已过时
-            2012 => "OP_COMPRESSED",
-            2013 => "OP_MSG", // 使用MongoDB 3.6中引入的格式发送消息
+            _OP_REPLY => "OP_REPLY",
+            _DB_MSG => "DB_MSG",
+            _OP_UPDATE => "OP_UPDATE", // 用于更新集合中的文档
+            _OP_INSERT => "OP_INSERT", // 用于将一个或多个文档插入集合中。
+            _RESERVED => "RESERVED",
+            _OP_QUERY => "OP_QUERY", // 用于在数据库中查询集合中的文档。
+            _OP_GET_MORE => "OP_GET_MORE", // 用于在数据库中查询集合中的文档。
+            _OP_DELETE => "OP_DELETE", // 用于从集合中删除一个或多个文档。
+            _OP_KILL_CURSORS => "OP_KILL_CURSORS", // 用于关闭数据库中的活动游标。这是确保在查询结束时回收数据库资源所必需的。
+            _OP_COMMAND => "OP_COMMAND",           // 表示命令请求的集群内部协议。已过时
+            _OP_COMMANDREPLY => "OP_COMMANDREPLY", // 群内部协议表示对OP_COMMAND的回复。已过时
+            _OP_COMPRESSED => "OP_COMPRESSED",
+            _OP_MSG => "OP_MSG", // 使用MongoDB 3.6中引入的格式发送消息
             _ => "OP_UNKNOWN",
         }
     }
@@ -396,6 +416,9 @@ pub struct MongoOpMsg {
 
 impl MongoOpMsg {
     fn decode(&mut self, payload: &[u8]) -> Result<bool> {
+        if payload.len() < 9 {
+            return Ok(false);
+        }
         // todo: decode flag
         let mut sections = Sections::default();
         //sections.kind = payload[4];
@@ -460,7 +483,7 @@ impl Sections {
             }
             _ => {
                 // Unknown
-                self.kind_name = "UNKNOWN".to_string();
+                self.kind_name = _UNKNOWN.to_string();
                 return Ok(false);
             }
         }
@@ -506,7 +529,7 @@ impl MongoOpReply {
             }
             _ => {
                 // Unknown is Undecoded
-                self.response_msg = "UNKNOWN".to_string();
+                self.response_msg = _UNKNOWN.to_string();
                 self.reply_ok = true;
             }
         }
