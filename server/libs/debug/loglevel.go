@@ -21,6 +21,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"strings"
 
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
@@ -45,20 +46,20 @@ func NewLogLevelControl() *LogLevelControl {
 	return logLevelProcess
 }
 
-func decodeLogLevel(arg *bytes.Buffer) (string, error) {
-	var level string
+func decodeBuffer(arg *bytes.Buffer) (string, error) {
+	var buf string
 	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&level); err != nil {
+	if err := decoder.Decode(&buf); err != nil {
 		log.Error(err)
-		return level, err
+		return buf, err
 	}
-	return level, nil
+	return buf, nil
 }
 
-func encodeLogLevel(level string) (*bytes.Buffer, error) {
+func encodeBuffer(buf string) (*bytes.Buffer, error) {
 	buffer := bytes.Buffer{}
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(level); err != nil {
+	if err := encoder.Encode(buf); err != nil {
 		log.Errorf("encoder.Encode: %s", err)
 		return nil, err
 	}
@@ -68,47 +69,66 @@ func encodeLogLevel(level string) (*bytes.Buffer, error) {
 func (l *LogLevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
 	switch operate {
 	case LOG_LEVEL_CMD_SHOW:
-		logLevel := getLogLevel()
-		enc, err := encodeLogLevel(logLevel)
+		buf, err := decodeBuffer(arg)
+		if err != nil {
+			SendToClient(conn, remote, 1, nil)
+			return
+		}
+		moduleLoglevel := strings.Split(buf, "|")
+		if len(moduleLoglevel) < 2 {
+			SendToClient(conn, remote, 1, nil)
+			return
+		}
+		module := moduleLoglevel[0]
+		logLevel := getLogLevel(module)
+
+		enc, err := encodeBuffer(logLevel)
 		if err != nil {
 			SendToClient(conn, remote, 1, nil)
 		} else {
 			SendToClient(conn, remote, 0, enc)
 		}
 	case LOG_LEVEL_CMD_SET:
-		logLevel, err := decodeLogLevel(arg)
+		buf, err := decodeBuffer(arg)
 		if err != nil {
 			SendToClient(conn, remote, 1, nil)
 		} else {
-			log.Infof("set logLevel to (%s)", logLevel)
-			if err := setLogLevel(logLevel); err != nil {
-				log.Warningf("set logLevel(%s) failed: %s", logLevel, err)
+			moduleLoglevel := strings.Split(buf, "|")
+			if len(moduleLoglevel) < 2 {
+				SendToClient(conn, remote, 1, nil)
+				return
+			}
+			module, logLevel := moduleLoglevel[0], moduleLoglevel[1]
+
+			log.Infof("set module(%s) logLevel to (%s)", module, logLevel)
+			if err := setLogLevel(module, logLevel); err != nil {
+				log.Warningf("set module(%s) logLevel(%s) failed: %s", module, logLevel, err)
 				SendToClient(conn, remote, 1, nil)
 			} else {
-				enc, _ := encodeLogLevel(logLevel)
+				enc, _ := encodeBuffer(logLevel)
 				SendToClient(conn, remote, 0, enc)
 			}
 		}
 	}
 }
 
-func getLogLevel() string {
-	return logging.GetLevel("").String()
+func getLogLevel(module string) string {
+	return logging.GetLevel(module).String()
 }
 
-func setLogLevel(level string) error {
+func setLogLevel(module, level string) error {
 	levelId, err := logging.LogLevel(level)
 	if err != nil {
 		return err
 	}
-	logging.SetLevel(levelId, "")
+	logging.SetLevel(levelId, module)
 	return nil
 }
 
-func sendCmd(operate int, logLevel string, out interface{}) bool {
+func sendCmd(operate int, module, logLevel string, out interface{}) bool {
 	buffer := bytes.Buffer{}
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(logLevel); err != nil {
+	if err := encoder.Encode(module + "|" + logLevel); err != nil {
 		fmt.Printf("%v: %s\n", err, logLevel)
 		return false
 	}
@@ -138,31 +158,40 @@ func RegisterLogLevelCommand() *cobra.Command {
 	}
 
 	show := &cobra.Command{
-		Use:   "show",
-		Short: "show current log Level",
+		Use:   "show [module]",
+		Short: "show current module log Level",
 		Run: func(cmd *cobra.Command, args []string) {
+			module := ""
+			if len(args) == 1 {
+				module = args[0]
+			}
 			var level string
-			if sendCmd(LOG_LEVEL_CMD_SHOW, "", &level) {
-				fmt.Printf("Current log level: %s\n", level)
+			if sendCmd(LOG_LEVEL_CMD_SHOW, module, "", &level) {
+				fmt.Printf("Current module(%s) log level: %s\n", module, level)
 			}
 		},
 	}
 
 	set := &cobra.Command{
-		Use:   "set {loglevel}",
-		Short: "set log level 'debug|info|warning|error'",
+		Use:   "set [module] {loglevel}",
+		Short: "set [module] log level 'debug|info|warning|error'",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				fmt.Println("please run with 'debug|info|warning|error'.")
-				return
+			module, logLevel := "", ""
+			if len(args) == 1 {
+				module = ""
+				logLevel = args[0]
+			} else if len(args) == 2 {
+				module = args[0]
+				logLevel = args[1]
 			}
-			if args[0] != "debug" && args[0] != "info" && args[0] != "warning" && args[0] != "error" {
-				fmt.Println("please run with 'debug|info|warning|error'.")
+
+			if logLevel != "debug" && logLevel != "info" && logLevel != "warning" && logLevel != "error" {
+				fmt.Println("please run with loglevel 'debug|info|warning|error'.")
 				return
 			}
 			var level string
-			if sendCmd(LOG_LEVEL_CMD_SET, args[0], &level) {
-				fmt.Printf("Set log level: %s\n", level)
+			if sendCmd(LOG_LEVEL_CMD_SET, module, logLevel, &level) {
+				fmt.Printf("module(%s) set log level: %s\n", module, level)
 			}
 		},
 	}
