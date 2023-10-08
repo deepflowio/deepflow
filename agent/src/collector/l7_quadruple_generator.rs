@@ -34,7 +34,7 @@ use super::{
     MetricsType,
 };
 
-use crate::common::flow::{get_direction, CloseType, L7Protocol, L7Stats, SignalSource};
+use crate::common::flow::{CloseType, L7Protocol, L7Stats, SignalSource};
 use crate::config::handler::{CollectorAccess, CollectorConfig};
 use crate::metric::meter::{AppAnomaly, AppLatency, AppMeter, AppTraffic};
 use crate::rpc::get_timestamp;
@@ -218,7 +218,6 @@ impl SubQuadGen {
 
     pub fn inject_app_meter(
         &mut self,
-        config: &CollectorConfig,
         l7_stats: &L7Stats,
         app_meter: &AppMeter,
         endpoint_hash: u32,
@@ -262,13 +261,7 @@ impl SubQuadGen {
 
             // If l7_stats.flow.is_some(), set the flow of all meter belonging to this flow
             if let Some(tagged_flow) = &l7_stats.flow {
-                let mut flow = MiniFlow::from(&tagged_flow.flow);
-                // TODO: Move direction into tagged_flow to avoid redundant `get_direction` call
-                flow.directions = get_direction(
-                    &tagged_flow.flow,
-                    config.trident_type,
-                    config.cloud_gateway_traffic,
-                );
+                let flow = MiniFlow::from(&tagged_flow.flow);
                 let (is_active_host0, is_active_host1) =
                     check_active(time_in_second.as_secs(), possible_host, &flow);
                 for meter in meters.drain(..) {
@@ -292,13 +285,7 @@ impl SubQuadGen {
             }
             // If l7_stats.flow.is_some(), set the flow of all meter belonging to this flow
             if let Some(tagged_flow) = &l7_stats.flow {
-                let mut flow = MiniFlow::from(&tagged_flow.flow);
-                // TODO: Move direction into tagged_flow to avoid redundant `get_direction` call
-                flow.directions = get_direction(
-                    &tagged_flow.flow,
-                    config.trident_type,
-                    config.cloud_gateway_traffic,
-                );
+                let flow = MiniFlow::from(&tagged_flow.flow);
                 let (is_active_host0, is_active_host1) =
                     check_active(time_in_second.as_secs(), possible_host, &flow);
                 let boxed_app_meter = Box::new(AppMeterWithFlow {
@@ -582,7 +569,6 @@ impl L7QuadrupleGenerator {
 
         if second_inject {
             self.second_quad_gen.as_mut().unwrap().inject_app_meter(
-                config,
                 &l7_stats,
                 &app_meter,
                 endpoint_hash,
@@ -593,7 +579,6 @@ impl L7QuadrupleGenerator {
 
         if minute_inject {
             self.minute_quad_gen.as_mut().unwrap().inject_app_meter(
-                config,
                 &l7_stats,
                 &app_meter,
                 endpoint_hash,
