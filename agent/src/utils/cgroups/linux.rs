@@ -219,6 +219,13 @@ impl Cgroups {
     }
 }
 
+// TODO: support for android
+#[cfg(target_os = "android")]
+pub fn is_kernel_available_for_cgroups() -> bool {
+    false
+}
+
+#[cfg(not(target_os = "android"))]
 pub fn is_kernel_available_for_cgroups() -> bool {
     const MIN_KERNEL_VERSION_SUPPORT_CGROUP: &str = "2.6.24"; // Support cgroups from Linux 2.6.24
     let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
