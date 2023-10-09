@@ -163,6 +163,7 @@ pub struct MetaPacket<'a> {
     pub netns_id: u32,
 
     pub thread_id: u32,
+    pub coroutine_id: u64,
     pub syscall_trace_id: u64,
     #[cfg(target_os = "linux")]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
@@ -929,6 +930,7 @@ impl<'a> MetaPacket<'a> {
         packet.cap_seq = data.cap_seq;
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
+        packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
