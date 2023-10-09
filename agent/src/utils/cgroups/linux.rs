@@ -230,6 +230,14 @@ pub fn is_kernel_available_for_cgroups() -> bool {
         .0
         .ge(MIN_KERNEL_VERSION_SUPPORT_CGROUP)
 }
+
+// TODO: support for arm architecture
+#[cfg(target_arch = "aarch64")]
+pub fn is_cgroup_procs_writable() -> bool {
+    false
+}
+
+#[cfg(not(target_arch = "aarch64"))]
 pub fn is_cgroup_procs_writable() -> bool {
     // The cgroup.procs file can only be written after Linux 3.0. Refer to:
     // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b
