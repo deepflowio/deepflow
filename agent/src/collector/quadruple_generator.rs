@@ -38,7 +38,7 @@ use super::{
 use crate::common::{
     endpoint::EPC_FROM_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
-    flow::{get_direction, CloseType, L7Protocol, SignalSource},
+    flow::{CloseType, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
 };
 use crate::config::handler::{CollectorAccess, CollectorConfig};
@@ -484,7 +484,6 @@ impl SubQuadGen {
 
     pub fn inject_flow(
         &mut self,
-        config: &CollectorConfig,
         tagged_flow: Arc<BatchedBox<TaggedFlow>>,
         flow_meter: &FlowMeter,
         id_maps: &[HashMap<u16, u16>; 2],
@@ -521,13 +520,7 @@ impl SubQuadGen {
             } else {
                 L7Protocol::Unknown
             };
-            let mut flow = MiniFlow::from(&tagged_flow.flow);
-            // TODO: Move direction into tagged_flow to avoid redundant `get_direction` call
-            flow.directions = get_direction(
-                &tagged_flow.flow,
-                config.trident_type,
-                config.cloud_gateway_traffic,
-            );
+            let flow = MiniFlow::from(&tagged_flow.flow);
             let acc_flow = FlowMeterWithFlow {
                 flow,
                 l7_protocol,
@@ -882,7 +875,6 @@ impl QuadrupleGenerator {
 
         if second_inject {
             self.second_quad_gen.as_mut().unwrap().inject_flow(
-                config,
                 tagged_flow.clone(),
                 &flow_meter,
                 &self.id_maps,
@@ -903,7 +895,6 @@ impl QuadrupleGenerator {
                 }
             }
             self.minute_quad_gen.as_mut().unwrap().inject_flow(
-                config,
                 tagged_flow,
                 &flow_meter,
                 &self.id_maps,
@@ -1194,8 +1185,6 @@ impl QuadrupleGenerator {
 mod test {
     use super::*;
 
-    use crate::config::handler::ModuleConfig;
-
     use public::{buffer::Allocator, debug::QueueDebugger, queue};
 
     fn new_acc_flow(tagged_flow: Arc<BatchedBox<TaggedFlow>>) -> FlowMeterWithFlow {
@@ -1248,9 +1237,7 @@ mod test {
         let flow_meter = FlowMeter::default();
         let id_maps = [HashMap::new(), HashMap::new()];
         let mut key = QuadrupleGenerator::get_key(&tagged_flow);
-        let config = ModuleConfig::default();
         quad_gen.inject_flow(
-            &config.collector,
             tagged_flow.clone(),
             &flow_meter,
             &id_maps,
@@ -1259,7 +1246,6 @@ mod test {
         );
 
         quad_gen.inject_flow(
-            &config.collector,
             tagged_flow.clone(),
             &flow_meter,
             &id_maps,

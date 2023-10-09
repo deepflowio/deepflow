@@ -645,10 +645,20 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 				f.Value = "'" + nodeType + "'"
 			}
 		}
+
+		if strings.HasPrefix(f.Args[0], "is_internet") {
+			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+		}
+
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:
 		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
+
+		if strings.HasPrefix(f.Args[0], "is_internet") {
+			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+		}
+
 		return f.getViewNode()
 	case TAG_FUNCTION_TO_STRING:
 		if common.IsValueInSliceString(f.Args[0], []string{"start_time", "end_time"}) {
