@@ -117,6 +117,8 @@ impl MetaAppProto {
             syscall_trace_id_response: 0,
             syscall_trace_id_thread_0: 0,
             syscall_trace_id_thread_1: 0,
+            syscall_coroutine_0: 0,
+            syscall_coroutine_1: 0,
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
             ebpf_type: meta_packet.ebpf_type,
@@ -132,10 +134,12 @@ impl MetaAppProto {
                 base_info.process_id_0 = meta_packet.process_id;
                 base_info.process_kname_0 = process_name;
                 base_info.netns_id_0 = meta_packet.netns_id;
+                base_info.syscall_coroutine_0 = meta_packet.coroutine_id;
             } else {
                 base_info.process_id_1 = meta_packet.process_id;
                 base_info.process_kname_1 = process_name;
                 base_info.netns_id_1 = meta_packet.netns_id;
+                base_info.syscall_cap_seq_1 = meta_packet.coroutine_id;
             }
         }
 
