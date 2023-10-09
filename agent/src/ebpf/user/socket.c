@@ -109,15 +109,33 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
+	
+	probes_set_symbol(tps, "ksys_write");
+	probes_set_symbol(tps, "ksys_read");
 
-	probes_set_enter_symbol(tps, "__sys_sendmsg");
-	probes_set_enter_symbol(tps, "__sys_sendmmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmmsg");
-	probes_set_enter_symbol(tps, "do_writev");
-	probes_set_enter_symbol(tps, "do_readv");
+	probes_set_symbol(tps, "__sys_sendto");
+	probes_set_symbol(tps, "__sys_recvfrom");
+	probes_set_symbol(tps, "__sys_sendmsg");
+
+
+	probes_set_symbol(tps, "__sys_sendmmsg");
+	probes_set_symbol(tps, "__sys_recvmsg");
+	probes_set_symbol(tps, "__sys_recvmmsg");
+	probes_set_symbol(tps, "do_writev");
+	probes_set_symbol(tps, "do_readv");
+
+	probes_set_enter_symbol(tps, "__sys_connect");
+	probes_set_enter_symbol(tps, "__close_fd");
+	probes_set_enter_symbol(tps, "__arm64_sys_getppid");
+
+
+	// __sys_socket, __arm64_sys_accept, __arm64_sys_accept4 
+	probes_set_exit_symbol(tps, "__sys_socket");
+	probes_set_exit_symbol(tps, "__arm64_sys_accept");
+	probes_set_exit_symbol(tps, "__arm64_sys_accept4");
+
 	tps->kprobes_nr = index;
-
+#if 0
 	/* tracepoints */
 	index = 0;
 
@@ -145,6 +163,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
+
 	// process execute
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
 
@@ -158,7 +177,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	tps->tps_nr = index;
-
+#endif
 	// 收集go可执行文件uprobe符号信息
 	collect_go_uprobe_syms_from_procfs(tps);
 
@@ -1090,8 +1109,21 @@ static int update_offset_map_default(struct bpf_tracer *t)
 	struct bpf_offset_param offset;
 	memset(&offset, 0, sizeof(offset));
 
+
+        //offset.ready = 1;
+        //offset.task__files_offset = 0x7c0;
+        //offset.sock__flags_offset = 0x220;
+        //offset.tcp_sock__copied_seq_offset = 0x604;
+        //offset.tcp_sock__write_seq_offset = 0x784;
+
+
 	offset.struct_files_struct_fdt_offset = 0x20;
-	offset.struct_files_private_data_offset = 0xc8;
+
+	// aosp_kernel-common-android12-5.10 on target kernel_kprobes_aarch64
+	offset.struct_files_private_data_offset = 0xd8;
+	//offset.struct_files_private_data_offset = 0xc8;
+
+
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x00;
 	offset.struct_file_dentry_offset = 0x18;
@@ -1104,7 +1136,11 @@ static int update_offset_map_default(struct bpf_tracer *t)
 	offset.struct_sock_dport_offset = 0xc;
 	offset.struct_sock_sport_offset = 0xe;
 	offset.struct_sock_skc_state_offset = 0x12;
-	offset.struct_sock_common_ipv6only_offset = 0x13;
+
+
+	// aosp_kernel-common-android12-5.10 on target kernel_kprobes_aarch64
+	offset.struct_sock_common_ipv6only_offset = 0x60;
+	//offset.struct_sock_common_ipv6only_offset = 0x13;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_error("update_offset_map_default failed.\n");
@@ -1495,19 +1531,10 @@ static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
  */
 static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 {
-	// jmp for tracepoints
 	__insert_output_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_DATA_SUBMIT_NAME_FOR_TP,
-				    PROG_DATA_SUBMIT_TP_IDX);
-	__insert_output_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_OUTPUT_DATA_NAME_FOR_TP,
-				    PROG_OUTPUT_DATA_TP_IDX);
-	__insert_output_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_IO_EVENT_NAME_FOR_TP,
-				    PROG_IO_EVENT_TP_IDX);
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_IO_EVENT_NAME_FOR_KP,
+				    PROG_IO_EVENT_KP_IDX);
 
 	// jmp for kprobe/uprobe
 	__insert_output_prog_to_map(tracer,

@@ -19,7 +19,6 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
-use std::env::set_var;
 use std::fmt::Write;
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -332,11 +331,8 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
-    set_var("RUST_LOG", "info");
-    env_logger::init();
-
-    let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
-    let log_file_c = log_file.as_c_str();
+    //let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
+    //let log_file_c = log_file.as_c_str();
     unsafe {
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
@@ -351,23 +347,23 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
+	enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
 
-        set_feature_regex(
-            FEATURE_UPROBE_OPENSSL,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
-        set_feature_regex(
-            FEATURE_UPROBE_GOLANG,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
+       // set_feature_regex(
+       //     FEATURE_UPROBE_OPENSSL,
+       //     CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+       // );
+       // set_feature_regex(
+       //     FEATURE_UPROBE_GOLANG,
+       //     CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+       // );
 
-        set_io_event_collect_mode(1);
+       // set_io_event_collect_mode(1);
 
-        set_io_event_minimal_duration(1000000);
+       // set_io_event_minimal_duration(1000000);
 
-        // enable go auto traceing,
-        set_go_tracing_timeout(120);
+       // // enable go auto traceing,
+       // set_go_tracing_timeout(120);
 
         /*
             let bypass_port = 443;
@@ -383,8 +379,8 @@ fn main() {
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
-        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-            println!("bpf_tracer_init() file:{:?} error", log_file);
+        if bpf_tracer_init(std::ptr::null(), true) != 0 {
+            println!("bpf_tracer_init() error");
             ::std::process::exit(1);
         }
         /*
@@ -412,7 +408,7 @@ fn main() {
         }
 
         // test data limit max
-        set_data_limit_max(10000);
+        //set_data_limit_max(10000);
 
         print!("socket_tracer_start() finish\n");
 
