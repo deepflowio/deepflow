@@ -259,6 +259,9 @@ var (
 		input:  "select session_length AS `会话长度` from l7_flow_log where `session_length`<=392037",
 		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037 LIMIT 10000",
 	}, {
+		input:  "SELECT node_type(is_internet_0) as `client_node_type` , icon_id(is_internet_0) as `client_icon_id`,  node_type(is_internet_1) as `server_node_type`, is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
+		output: "WITH if(l3_epc_id_0=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999))),0) AS `client_icon_id` SELECT if(l3_epc_id_0=-2,'internet','') AS `client_node_type`, `client_icon_id`, if(l3_epc_id_1=-2,'internet','') AS `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY `client_node_type`, `client_icon_id`, `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
+	}, {
 		index:  "count_1",
 		input:  "select Count(row) as a from l7_flow_log having a > 0 ",
 		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
