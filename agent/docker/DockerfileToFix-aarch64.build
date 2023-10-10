@@ -79,7 +79,8 @@ RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/and
 
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache
-RUN cargo install sccache
+RUN source /opt/rh/devtoolset-8/enable && \
+    cargo install sccache
 
 RUN rustup target install aarch64-linux-android
 CMD bash
