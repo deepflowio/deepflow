@@ -75,7 +75,9 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
 RUN curl https://mirrors.cloud.tencent.com/AndroidSDK/android-ndk-r26-linux.zip  --silent -o /opt/android-ndk-r26-linux.zip && \
     cd /opt/ && \
     unzip android-ndk-r26-linux.zip && \
-    rustup target install aarch64-linux-android
+    rm -rf android-ndk-r26-linux.zip
+
+RUN rustup target install aarch64-linux-android
 
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache
