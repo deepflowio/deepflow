@@ -77,11 +77,11 @@ RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/and
     unzip android-ndk-r26-linux.zip && \
     rm -rf android-ndk-r26-linux.zip
 
-RUN rustup target install aarch64-linux-android
-
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache
 RUN cargo install sccache
+
+RUN rustup target install aarch64-linux-android
 CMD bash
 
 #
