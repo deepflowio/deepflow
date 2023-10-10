@@ -438,7 +438,6 @@ impl DubboLog {
                     let segs: Vec<&str> = info.span_id.split("|").collect();
                     if segs.len() > 3 {
                         info.span_id = format!("{}-{}", segs[0], segs[1]);
-                        skip = true;
                     }
                 }
             }
