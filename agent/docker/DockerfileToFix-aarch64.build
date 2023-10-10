@@ -72,7 +72,7 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libjattach.a --silent -o /usr/lib64/libjattach.a && \
     chmod 755 /usr/lib64/libjattach.a
 
-RUN curl https://mirrors.cloud.tencent.com/AndroidSDK/android-ndk-r26-linux.zip -o /opt/android-ndk-r26-linux.zip && \
+RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/android-ndk-r26-linux.zip -o /opt/android-ndk-r26-linux.zip && \
     cd /opt/ && \
     unzip android-ndk-r26-linux.zip && \
     rm -rf android-ndk-r26-linux.zip
