@@ -72,6 +72,10 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libjattach.a --silent -o /usr/lib64/libjattach.a && \
     chmod 755 /usr/lib64/libjattach.a
 
+RUN curl https://mirrors.cloud.tencent.com/AndroidSDK/android-ndk-r26-linux.zip  --silent -o /opt/android-ndk-r26-linux.zip && \
+    cd /opt/ && \
+    unzip android-ndk-r26-linux.zip && \
+    rustup target install aarch64-linux-android
 
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache
