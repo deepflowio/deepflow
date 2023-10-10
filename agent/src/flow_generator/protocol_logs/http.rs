@@ -1019,6 +1019,23 @@ impl HttpLog {
         None
     }
 
+    // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|0
+    // sw3的value全部使用'｜'分隔，TRACEID后为SAMPLE字段取值范围仅有0或1
+    // 提取`TRACEID`展示为HTTP日志中的`TraceID`字段
+    // 提取`SEGMENTID-SPANID`展示为HTTP日志中的`SpanID`字段
+    fn decode_skywalking3_id(value: &str, id_type: u8) -> Option<String> {
+        let segs: Vec<&str> = value.split("|").collect();
+
+        if id_type == Self::TRACE_ID && segs.len() > 2 {
+            return Some(segs[7].to_string());
+        }
+        if id_type == Self::SPAN_ID && segs.len() > 4 {
+            return Some(format!("{}-{}", segs[0], segs[1]));
+        }
+
+        None
+    }
+
     // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
     // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
     // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
@@ -1069,6 +1086,7 @@ impl HttpLog {
                 Some(payload.to_owned())
             }
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
+            TraceType::Sw3 => Self::decode_skywalking3_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
             TraceType::NewRpcTraceContext => {
