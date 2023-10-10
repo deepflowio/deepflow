@@ -383,6 +383,10 @@ struct period_event_op {
 	struct list_head list;
 	char name[NAME_LEN];
 	bool is_valid;
+	/* The cycle time of event triggering (unit is microseconds) */
+	uint32_t times; 
+	/* The number of ticks the last time the event was triggered */
+	uint64_t pre_ticks; 
 	period_event_fun_t f;
 };
 
@@ -475,7 +479,9 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    void *handle, int freq);
 int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries);
 struct bpf_tracer *find_bpf_tracer(const char *name);
-int register_period_event_op(const char *name, period_event_fun_t f);
+int register_period_event_op(const char *name,
+			     period_event_fun_t f,
+			     uint32_t period_time);
 int set_period_event_invalid(const char *name);
 
 /**

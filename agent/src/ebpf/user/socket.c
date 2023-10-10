@@ -1889,12 +1889,14 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	if ((ret =
 	     register_period_event_op("check-map-exceeded",
-				      check_map_exceeded)))
+				      check_map_exceeded,
+				      CHECK_MAP_EXCEEDED_PERIOD)))
 		return ret;
 
 	if ((ret =
 	     register_period_event_op("check-kern-adapt",
-				      check_kern_adapt_and_state_update)))
+				      check_kern_adapt_and_state_update,
+				      CHECK_KERN_ADAPT_PERIOD)))
 		return ret;
 
 	if ((ret = sockopt_register(&socktrace_sockopts)) != ETR_OK)
