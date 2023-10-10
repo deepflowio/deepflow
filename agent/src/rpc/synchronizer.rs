@@ -21,7 +21,7 @@ use std::mem;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::process::{self, Command};
-use std::str::FromStr;
+use std::str::{self, FromStr};
 use std::sync::{
     self,
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
@@ -1480,15 +1480,25 @@ impl RuntimeEnvironment {
     fn new() -> RuntimeEnvironment {
         let mut sys = System::new();
         sys.refresh_system();
+        let os_name = if let Some(name) = sys.name() {
+            name
+        } else if let Some(name) = Self::android_os_name() {
+            name
+        } else {
+            "".to_owned()
+        };
+        let os_version = if let Some(v) = sys.os_version() {
+            v
+        } else if let Some(v) = Self::android_os_version() {
+            v
+        } else {
+            "".to_owned()
+        };
         RuntimeEnvironment {
             cpu_num: sys.cpus().len() as u32,
             memory_size: sys.total_memory(),
             arch: std::env::consts::ARCH.into(),
-            os: format!(
-                "{} {}",
-                sys.name().unwrap_or_default(),
-                sys.os_version().unwrap_or_default()
-            ),
+            os: format!("{} {}", os_name, os_version),
             kernel_version: sys
                 .kernel_version()
                 .unwrap_or_default()
@@ -1496,6 +1506,34 @@ impl RuntimeEnvironment {
                 .next()
                 .unwrap_or_default()
                 .into(),
+        }
+    }
+
+    fn android_os_name() -> Option<String> {
+        Self::android_system_info("ro.product.model")
+    }
+
+    fn android_os_version() -> Option<String> {
+        Self::android_system_info("ro.build.version.release")
+    }
+
+    fn android_system_info(name: &'static str) -> Option<String> {
+        let output = match Command::new("/system/bin/getprop").arg(name).output() {
+            Ok(output) => output,
+            Err(e) => {
+                warn!("Call getprop failed: {:?}", e);
+                return None;
+            }
+        };
+        let Ok(info_str) = str::from_utf8(&output.stdout) else {
+            warn!("getprop output is not valid utf8");
+            return None;
+        };
+        let info_str = info_str.trim();
+        if info_str.is_empty() {
+            None
+        } else {
+            Some(info_str.to_owned())
         }
     }
 }

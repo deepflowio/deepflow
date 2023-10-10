@@ -177,13 +177,14 @@ impl Cgroups {
     /// 更改资源限制
     pub fn apply(cgroup: Cgroup, max_cpus: u32, max_memory: u64) -> Result<(), Error> {
         let mut resources = Resources::default();
-        let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;
-        let cpu_resources = CpuResources {
-            quota: Some(cpu_quota as i64),
-            period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
-            ..Default::default()
-        };
-        resources.cpu = cpu_resources;
+
+        // let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;
+        // let cpu_resources = CpuResources {
+        //     quota: Some(cpu_quota as i64),
+        //     period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
+        //     ..Default::default()
+        // };
+        // resources.cpu = cpu_resources;
 
         let memory_resources = MemoryResources {
             memory_hard_limit: Some(max_memory as i64),
