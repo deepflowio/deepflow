@@ -124,14 +124,11 @@ func NetworkFlowSort(flows []*model.L7TracingSpan) []*model.L7TracingSpan {
 }
 
 func AppFlowSetService(flows []*model.L7TracingSpan) {
-	for i, flow0 := range flows {
-		if i+1 == len(flows) {
-			break
-		}
+	for _, flow0 := range flows {
 		if flow0.ParentID > 0 {
 			continue
 		}
-		for _, flow1 := range flows[i+1:] {
+		for _, flow1 := range flows {
 			if flow0.ParentSpanID == flow1.SpanID {
 				if flow0.AppService == flow1.AppService {
 					if flow0.Service != nil && flow1.Service == nil {
@@ -146,34 +143,11 @@ func AppFlowSetService(flows []*model.L7TracingSpan) {
 			}
 		}
 	}
-
-	for i := len(flows) - 1; i >= 0; i-- {
-		if i-1 < 0 {
-			break
-		}
-		if flows[i].ParentID > 0 {
-			continue
-		}
-		for j := i - 1; j >= 0; j-- {
-			if flows[i].ParentSpanID == flows[j].SpanID {
-				if flows[i].AppService == flows[j].AppService {
-					if flows[i].Service != nil && flows[j].Service == nil {
-						flows[j].Service = flows[i].Service
-						flows[i].Service.AppFlowOfDirectFlows = append(flows[i].Service.AppFlowOfDirectFlows, flows[j])
-					} else if flows[i].Service == nil && flows[j].Service != nil {
-						flows[i].Service = flows[j].Service
-						flows[j].Service.AppFlowOfDirectFlows = append(flows[j].Service.AppFlowOfDirectFlows, flows[i])
-					}
-				}
-				break
-			}
-		}
-	}
 }
 
 func AppFlowSort(flows []*model.L7TracingSpan) {
 	for _, flow0 := range flows {
-		// 1. 若存在parent_span_id，且存在flow的span_id等于该parent_span_id,则将该应用span的parent设置为该flow
+		// 1. 若存在parent_span_id，且系统span的span_id等于parent_span_id,则将该应用span的parent设置为该系统span
 		if flow0.ParentSyscallFlow != nil {
 			SetParent(flow0, flow0.ParentSyscallFlow, "app_flow mounted on syscall due to parent_span_id")
 			continue

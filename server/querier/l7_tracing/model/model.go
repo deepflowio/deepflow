@@ -21,18 +21,22 @@ import (
 )
 
 type L7Tracing struct {
-	ID           uint64 `json:"_id"`
-	Database     string `json:"database"`
-	Table        string `json:"table"`
-	MaxIteration int    `json:"max_iteration"`
-	TimeStart    int    `json:"time_start" binding:"required"`
-	TimeEnd      int    `json:"time_end" binding:"required"`
-	Debug        bool   `json:"debug"`
-	Context      context.Context
+	ID             string `json:"_id"`
+	TraceID        string `json:"trace_id"`
+	Database       string `json:"database"`
+	Table          string `json:"table"`
+	MaxIteration   int    `json:"max_iteration"`    // 使用Flowmeta信息搜索的次数，每次搜索可认为大约能够扩充一级调用关系
+	NetworkDelayUs int    `json:"network_delay_us"` // 使用Flowmeta进行流日志匹配的时间偏差容忍度，越大漏报率越低但误报率越高，一般设置为网络时延的最大可能值
+	NtpDelayUs     int    `json:"ntp_delay_us"`
+	HasAttributes  bool   `json:"has_attributes"`
+	TimeStart      int    `json:"time_start" binding:"required"`
+	TimeEnd        int    `json:"time_end" binding:"required"`
+	Debug          bool   `json:"debug"`
+	Context        context.Context
 }
 
 type L7TracingSpan struct {
-	OriginID               string         `json:"origin_id"`
+	OriginID               string         `json:"origin_id"` // uint64
 	IDs                    []string       `json:"_ids"`
 	RelatedIDs             []string       `json:"related_ids"`
 	StartTimeUs            int            `json:"start_time_us"`
@@ -47,8 +51,8 @@ type L7TracingSpan struct {
 	RequestType            string         `json:"request_type"`
 	RequestResource        string         `json:"request_resource"`
 	ResponseStatus         int            `json:"response_status"`
-	FlowID                 string         `json:"flow_id"`
-	RequestID              *uint64        `json:"request_id"`
+	FlowID                 string         `json:"flow_id"` // uint64
+	RequestID              *string        `json:"request_id"`
 	XRequestID0            string         `json:"x_request_id_0"`
 	XRequestID1            string         `json:"x_request_id_1"`
 	TraceID                string         `json:"trace_id"`
@@ -110,7 +114,7 @@ type L7TracingSpan struct {
 	HttpProxyClient        string         `json:"http_proxy_client"`
 	Protocol               int            `json:"protocol"`
 	Version                string         `json:"version"`
-	UID                    int            `json:"_uid"`
+	UID                    int            `json:"uid"`
 	ParentAppFlow          *L7TracingSpan `json:"parent_app_flow"`
 	ParentSyscallFlow      *L7TracingSpan `json:"parent_syscall_flow"`
 	Network                *TraceNetwork  `json:"network"`
@@ -126,9 +130,16 @@ type Debug struct {
 	Error     string `json:"error"`
 }
 
+type CurlDebug struct {
+	Url   string `json:"url"`
+	Time  string `json:"time"`
+	Error string `json:"error"`
+}
+
 type L7TracingDebug struct {
-	QuerierDebug []Debug `json:"querier_debug"`
-	FormatTime   string  `json:"format_time"`
+	QuerierDebug []Debug     `json:"querier_debug"`
+	CallDebug    []CurlDebug `json:"call_debug"`
+	FormatTime   string      `json:"format_time"`
 }
 
 type TraceService struct {
@@ -181,4 +192,38 @@ type NetworkMeta struct {
 	TraceID         string
 	Endpoint        string
 	SpanID          string
+}
+
+type L7NetworkMeta struct {
+	ID             string
+	Type           int
+	ReqTcpSeq      int
+	RespTcpSeq     int
+	StartTimeUs    int
+	EndTimeUs      int
+	SpanID         string
+	NetworkDelayUs int
+}
+
+type L7SyscallMeta struct {
+	ID                     string
+	VtapID                 int
+	SyscallTraceIDRequest  string
+	SyscallTraceIDResponse string
+	TapSide                string
+	StartTimeUs            int
+	EndTimeUs              int
+}
+
+type L7AppMeta struct {
+	ID           string
+	TapSide      string
+	SpanID       string
+	ParentSpanID string
+}
+
+type L7XRequestMeta struct {
+	ID          string
+	XRequestID0 string
+	XRequestID1 string
 }
