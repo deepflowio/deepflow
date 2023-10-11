@@ -280,6 +280,7 @@ querier:
     request-query-with-debug: true
     external-tag-cache-size: 1024
     external-tag-load-interval: 300
+    thanos-replica-labels: [] # remove duplicate replica labels when query data
     cache:
       enabled: true
       cache-item-size: 512000 # max size of cache item, unit: byte

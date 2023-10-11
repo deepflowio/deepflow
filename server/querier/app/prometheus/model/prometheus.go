@@ -23,15 +23,16 @@ import (
 )
 
 type PromQueryParams struct {
-	MetricsWithPrefix string
-	Promql            string
-	StartTime         string
-	EndTime           string
-	Step              string
-	Debug             bool
-	Slimit            string
-	Matchers          []string
-	Context           context.Context
+	MetricsWithPrefix   string
+	Promql              string
+	StartTime           string
+	EndTime             string
+	Step                string
+	Debug               bool
+	Slimit              string
+	ThanosReplicaLabels []string
+	Matchers            []string
+	Context             context.Context
 }
 
 type PromQueryData struct {
