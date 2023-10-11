@@ -40,8 +40,7 @@ char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint32_t *tracers_lock;
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
-volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
-uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
+volatile uint64_t prev_sys_boot_time_ns; // 上一次更新的系统启动时间，单位：纳秒
 
 struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 
@@ -70,16 +69,19 @@ static pthread_t cpus_kick_pthread;
  */
 static volatile int ready_flag_cpus[MAX_CPU_NR];
 
-static struct list_head extra_waiting_head;	// 额外事务处理的注册
-
-#define EVENT_PERIOD_TIME	1		// 事件处理的周期时间，单位：秒
-static struct list_head period_events_head;	// 周期性事件处理的注册
+/* Registration of additional transactions 额外事务处理的注册 */
+static struct list_head extra_waiting_head;
+/* Registration for periodic event handling 周期性事件处理的注册 */
+static struct list_head period_events_head;
 
 int sys_cpus_count;
 bool *cpu_online;		// 用于判断CPU是否是online
 
 // 所有tracer成功完成启动，会被应用设置为1
 static volatile uint64_t all_probes_ready;
+
+// Number of period timer ticks.
+static uint64_t period_event_ticks;
 
 static int tracepoint_attach(struct tracepoint *tp);
 static int perf_reader_setup(struct bpf_perf_reader *perf_reader);
@@ -1210,10 +1212,14 @@ static void ctrl_main(__unused void *arg)
  */
 static void period_events_process(void)
 {
+	period_event_ticks++;
 	struct period_event_op *peo;
 	list_for_each_entry(peo, &period_events_head, list) {
-		if (peo->is_valid)
-			peo->f();
+		if (peo->is_valid) {
+			if ((period_event_ticks % peo->times) == 0) {
+				peo->f();
+			}
+		}
 	}
 }
 
@@ -1228,15 +1234,28 @@ static struct period_event_op *find_period_event(const char *name)
 	return NULL;
 }
 
-int register_period_event_op(const char *name, period_event_fun_t f)
+/*
+ * Register for periodic execution events.
+ * @name event name
+ * @f Event execution callback interface
+ * @period_time The event execution cycle time, unit is milliseconds
+ * 
+ * @return
+ *    ETR_OK(0) on success, < 0 on error 
+ */
+int register_period_event_op(const char *name,
+			     period_event_fun_t f,
+			     uint32_t period_time)
 {
 	struct period_event_op *peo = malloc(sizeof(struct period_event_op));
 	if (!peo) {
 		ebpf_warning("malloc() failed, no memory.\n");
 		return -ENOMEM;
 	}
+
 	peo->f = f;
 	peo->is_valid = true;
+	peo->times = period_time;
 	snprintf(peo->name, sizeof(peo->name), "%s", name);
 	list_add_tail(&peo->list, &period_events_head);
 
@@ -1295,16 +1314,11 @@ static int cpus_kick_kern(void)
  */
 static int boot_time_update(void)
 {
-	boot_time_update_count++;
-	// 默认情况下1分钟更新一次系统启动时间
-	if (!((boot_time_update_count * EVENT_PERIOD_TIME) %
-	      BOOT_TIME_UPDATE_PERIOD)) {
-		prev_sys_boot_time_ns = sys_boot_time_ns;
-		uint64_t real_time, monotonic_time;
-		real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-		monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-		sys_boot_time_ns = real_time - monotonic_time;
-	}
+	prev_sys_boot_time_ns = sys_boot_time_ns;
+	uint64_t real_time, monotonic_time;
+	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+	monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	sys_boot_time_ns = real_time - monotonic_time;
 
 	return ETR_OK;
 }
@@ -1330,7 +1344,7 @@ static void period_process_main(__unused void *arg)
 
 	for (;;) {
 		period_events_process();
-		sleep(EVENT_PERIOD_TIME);
+		usleep(EVENT_PERIOD_TIME_US);
 	}
 }
 
@@ -1594,10 +1608,22 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		return ETR_INVAL;
 	}
 
-	if (register_period_event_op("kick_kern", cpus_kick_kern))
+	if (register_period_event_op("kick_kern", cpus_kick_kern,
+				     KICK_KERN_PERIOD))
 		return ETR_INVAL;
 
 	/*
+	 * Since the system time may be modified during system operation,
+	 * the system startup time (accuracy is nanoseconds) needs to be
+	 * updated periodically and adjusted accordingly as the system
+	 * time changes. Since the eBPF capture time is calculated by ad-
+	 * ding monotonic time (monotonic time, which refers to the time
+	 * lost after system startup) on the basis of system startup time
+	 * (sys_boot_time_ns), the system startup time must be periodica-
+	 * lly checked and adjusted to avoid system time changes. The ca-
+	 * pture time of eBPF data is significantly different from the
+	 * capture time of AF_PACKET data.
+	 *
 	 * 由于系统运行过程中会存在系统时间被改动而发生变化的情况，
 	 * 因此需要对系统启动时间(精度为纳秒)进行周期性的更新，是之
 	 * 随系统时间变化而相应进行调整。由于eBPF捕获时间的计算是在
@@ -1606,7 +1632,8 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	 * 检查调整，以免系统时间改变而使eBPF数据的捕获时间较之AF_PACKET
 	 * 捕获数据的时间发生较大差异。
 	 */
-	if (register_period_event_op("boot time update", boot_time_update))
+	if (register_period_event_op("boot time update", boot_time_update,
+				     SYS_TIME_UPDATE_PERIOD))
 		return ETR_INVAL;
 
 	err =
