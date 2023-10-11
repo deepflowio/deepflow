@@ -2044,6 +2044,7 @@ TRUNCATE TABLE ch_pod_ns;
 CREATE TABLE IF NOT EXISTS ch_pod_group (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    pod_group_type          INTEGER DEFAULT NULL,
     icon_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2718,3 +2719,4 @@ CREATE TABLE IF NOT EXISTS ch_view_change (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_view_change;
 INSERT INTO ch_view_change () VALUES ();
+
