@@ -1216,10 +1216,8 @@ static void period_events_process(void)
 	struct period_event_op *peo;
 	list_for_each_entry(peo, &period_events_head, list) {
 		if (peo->is_valid) {
-			if ((period_event_ticks - peo->pre_ticks) >=
-			    peo->times) {
+			if ((period_event_ticks % peo->times) == 0) {
 				peo->f();
-				peo->pre_ticks = period_event_ticks;
 			}
 		}
 	}
@@ -1258,7 +1256,6 @@ int register_period_event_op(const char *name,
 	peo->f = f;
 	peo->is_valid = true;
 	peo->times = period_time;
-	peo->pre_ticks = 0;
 	snprintf(peo->name, sizeof(peo->name), "%s", name);
 	list_add_tail(&peo->list, &period_events_head);
 

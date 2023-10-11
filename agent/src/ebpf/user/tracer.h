@@ -385,8 +385,6 @@ struct period_event_op {
 	bool is_valid;
 	/* The cycle time of event triggering (unit is microseconds) */
 	uint32_t times; 
-	/* The number of ticks the last time the event was triggered */
-	uint64_t pre_ticks; 
 	period_event_fun_t f;
 };
 
