@@ -169,4 +169,40 @@ enum {
 
 /* Profiler - maximum data push interval time (in nanosecond). */
 #define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */ 
+
+/*
+ * timer config
+ */
+
+/*
+ * timer ticks: ticks every 1 millisecond.
+ *
+ * unit: microseconds
+ */
+#define EVENT_PERIOD_TIME_US    1000
+
+/*
+ * The kernel uses bundled burst to send data to the user.
+ * The implementation method is that all CPUs trigger timeout checks and send
+ * the data resident in the eBPF buffer. This value is the periodic time, unit
+ * is microseconds.
+ */
+#define KICK_KERN_PERIOD 10 // 10 milliseconds
+
+/*
+ * System boot time update cycle time, unit is milliseconds.
+ */
+#define SYS_TIME_UPDATE_PERIOD 1000  // 1 seconds
+
+/*
+ * Check whether the eBPF Map exceeds the maximum value and use it to release
+ * stale data (unit is milliseconds).
+ */
+#define CHECK_MAP_EXCEEDED_PERIOD 1000 // 1 seconds
+
+/* 
+ * Used to check whether the kernel adaptation is successful, here is the
+ * check cycle time (unit is milliseconds).
+ */
+#define CHECK_KERN_ADAPT_PERIOD 1000 // 1 seconds
 #endif /* DF_EBPF_CONFIG_H */
