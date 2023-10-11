@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -47,6 +49,7 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 	if !ok {
 		return nil, false
 	}
+	appLabelSlice, ok := l.generateAPPLabelData()
 
 	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData()
 	if !ok {
@@ -58,14 +61,17 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 		labelID := prometheusMetricLabel.LabelID
 		labelNameValueData := metricLabelIDNameValueMap[labelID]
 		labelName := labelNameValueData["label_name"]
-		labelNameID := labelNameIDMap[labelName]
-		labelValue := labelNameValueData["label_value"]
-		labelValueID := valueNameIDMap[labelValue]
-		keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
-			LabelNameID:  labelNameID,
-			LabelValue:   labelValue,
-			LabelValueID: labelValueID,
+		if slices.Contains(appLabelSlice, labelName) {
+			labelNameID := labelNameIDMap[labelName]
+			labelValue := labelNameValueData["label_value"]
+			labelValueID := valueNameIDMap[labelValue]
+			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
+				LabelNameID:  labelNameID,
+				LabelValue:   labelValue,
+				LabelValueID: labelValueID,
+			}
 		}
+
 	}
 	return keyToItem, true
 }
@@ -99,6 +105,22 @@ func (l *ChAPPLabel) generateLabelIDNameValueData() (map[int]map[string]string, 
 		metricLabelIDNameValueMap[prometheusLabel.ID] = map[string]string{"label_name": prometheusLabel.Name, "label_value": prometheusLabel.Value}
 	}
 	return metricLabelIDNameValueMap, true
+}
+
+func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
+	appLabelSlice := []string{}
+	var prometheusAPPMetricAPPLabelLayouts []mysql.ChPrometheusMetricAPPLabelLayout
+	err := mysql.Db.Unscoped().Find(&prometheusAPPMetricAPPLabelLayouts).Error
+
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		return appLabelSlice, false
+	}
+
+	for _, prometheusAPPMetricAPPLabelLayout := range prometheusAPPMetricAPPLabelLayouts {
+		appLabelSlice = append(appLabelSlice, prometheusAPPMetricAPPLabelLayout.APPLabelName)
+	}
+	return appLabelSlice, true
 }
 
 func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, bool) {
