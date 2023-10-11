@@ -67,7 +67,10 @@ func (mi *metricLabel) GetMetricNameIDToLabelIDs() *hashmap.Map[int, mapset.Set[
 func (ml *metricLabel) Add(batch []*controller.PrometheusMetricLabel) {
 	for _, item := range batch {
 		for _, li := range item.GetLabelIds() {
-			ml.metricNameIDToLabelIDs.GetOrInsert(int(item.GetMetricNameId()), mapset.NewSet(int(li)))
+			ml.metricNameIDToLabelIDs.GetOrInsert(int(item.GetMetricNameId()), mapset.NewSet[int]())
+			if lids, ok := ml.metricNameIDToLabelIDs.Get(int(item.GetMetricNameId())); ok {
+				lids.Add(int(li))
+			}
 		}
 	}
 }
@@ -79,7 +82,10 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 	}
 	for _, item := range metricLabels {
 		if mni, ok := ml.metricNameCache.GetIDByName(item.MetricName); ok {
-			ml.metricNameIDToLabelIDs.GetOrInsert(mni, mapset.NewSet(item.LabelID))
+			ml.metricNameIDToLabelIDs.GetOrInsert(mni, mapset.NewSet[int]())
+			if lids, ok := ml.metricNameIDToLabelIDs.Get(mni); ok {
+				lids.Add(item.LabelID)
+			}
 		}
 	}
 	return nil
