@@ -33,6 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
+	recordercfg "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -239,6 +240,7 @@ func (m *Manager) run(ctx context.Context) {
 
 func (m *Manager) Start() {
 	cloudcfg.SetCloudGlobalConfig(m.cfg.TaskCfg.CloudCfg)
+	recordercfg.Set(&m.cfg.TaskCfg.RecorderCfg)
 
 	log.Info("manager started")
 	ctx := context.Context(context.Background())

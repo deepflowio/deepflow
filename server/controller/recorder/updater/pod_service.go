@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodService struct {
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
 	updater := &PodService{
 		UpdaterBase[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodService(),
 			diffBaseData: wholeCache.PodServices,
@@ -50,23 +51,23 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podNamespaceID, exists := s.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
-			common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 		))
 	}
 	podClusterID, exists := s.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -75,8 +76,8 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 		podIngressID, exists = s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
-				common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -110,8 +111,8 @@ func (s *PodService) generateUpdateInfo(diffBase *cache.PodService, cloudItem *c
 			podIngressID, exists = s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 			if !exists {
 				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
-					common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+					ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 				))
 				return nil, false
 			}

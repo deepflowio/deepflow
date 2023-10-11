@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type RDSInstance struct {
@@ -28,7 +28,7 @@ type RDSInstance struct {
 func NewRDSInstance() *RDSInstance {
 	operater := &RDSInstance{
 		OperatorBase[mysql.RDSInstance]{
-			resourceTypeName: common.RESOURCE_TYPE_RDS_INSTANCE_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

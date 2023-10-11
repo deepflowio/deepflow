@@ -186,17 +186,18 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
 
 	info := d.platformData.QueryNetnsIdInfo(uint32(s.VTAPID), s.NetnsID)
+	podGroupType := uint8(0)
 	if info != nil {
 		s.RegionID = uint16(info.RegionID)
 		s.AZID = uint16(info.AZID)
 		s.L3EpcID = info.EpcID
-
 		s.HostID = uint16(info.HostID)
 		s.PodID = info.PodID
 		s.PodNodeID = info.PodNodeID
 		s.PodNSID = uint16(info.PodNSID)
 		s.PodClusterID = uint16(info.PodClusterID)
 		s.PodGroupID = info.PodGroupID
+		podGroupType = info.PodGroupType
 		s.L3DeviceType = uint8(info.DeviceType)
 		s.L3DeviceID = info.DeviceID
 		s.SubnetID = uint16(info.SubnetID)
@@ -213,7 +214,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	}
 
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
-	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
+	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
 
@@ -286,6 +287,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 
 	}
 
+	podGroupType := uint8(0)
 	if event.IfNeedTagged {
 		s.Tagged = 1
 		resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
@@ -299,6 +301,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.PodNSID = uint16(resourceInfo.PodNSID)
 			s.PodClusterID = uint16(resourceInfo.PodClusterID)
 			s.PodGroupID = resourceInfo.PodGroupID
+			podGroupType = resourceInfo.PodGroupType
 			s.L3DeviceType = uint8(resourceInfo.L3DeviceType)
 			s.L3DeviceID = resourceInfo.L3DeviceID
 		}
@@ -317,6 +320,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		s.PodNSID = uint16(event.PodNSID)
 		s.PodClusterID = uint16(event.PodClusterID)
 		s.PodGroupID = event.PodGroupID
+		podGroupType = event.PodGroupType
 		s.L3DeviceType = uint8(event.L3DeviceType)
 		s.L3DeviceID = event.L3DeviceID
 
@@ -356,6 +360,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.PodNodeID,
 			s.L3DeviceID,
 			s.L3DeviceType,
+			podGroupType,
 			s.L3EpcID,
 		)
 

@@ -21,19 +21,18 @@ import (
 	"fmt"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var (
 	VMStateToString = map[int]string{
-		common.VM_STATE_RUNNING:   "running",
-		common.VM_STATE_STOPPED:   "stopped",
-		common.VM_STATE_EXCEPTION: "exception",
+		ctrlrcommon.VM_STATE_RUNNING:   "running",
+		ctrlrcommon.VM_STATE_STOPPED:   "stopped",
+		ctrlrcommon.VM_STATE_EXCEPTION: "exception",
 	}
 )
 
@@ -45,11 +44,11 @@ type VM struct {
 func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
 		EventManagerBase{
-			resourceType: RESOURCE_TYPE_VM_EN,
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_VM,
+		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 	}
 	return mng
 }
@@ -120,7 +119,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 		cloudItem.Lcuuid,
 		eType,
 		name,
-		common.VIF_DEVICE_TYPE_VM,
+		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 		id,
 		opts...,
 	)

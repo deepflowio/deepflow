@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type LBListener struct {
@@ -28,7 +28,7 @@ type LBListener struct {
 func NewLBListener() *LBListener {
 	operater := &LBListener{
 		OperatorBase[mysql.LBListener]{
-			resourceTypeName: common.RESOURCE_TYPE_LB_LISTENER_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			softDelete:       true,
 			allocateID:       false,
 		},

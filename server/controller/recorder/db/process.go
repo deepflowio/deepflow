@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type Process struct {
@@ -28,7 +28,7 @@ type Process struct {
 func NewProcess() *Process {
 	operator := &Process{
 		OperatorBase[mysql.Process]{
-			resourceTypeName: common.RESOURCE_TYPE_PROCESS_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

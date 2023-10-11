@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type Host struct {
@@ -28,7 +28,7 @@ type Host struct {
 func NewHost() *Host {
 	operater := &Host{
 		OperatorBase[mysql.Host]{
-			resourceTypeName: common.RESOURCE_TYPE_HOST_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

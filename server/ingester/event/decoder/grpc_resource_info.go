@@ -61,6 +61,7 @@ type ResourceInfo struct {
 	PodNodeID    uint32
 	PodNSID      uint32
 	PodGroupID   uint32
+	PodGroupType uint8 // no need to store
 	PodID        uint32
 	PodClusterID uint32
 	AZID         uint32
@@ -185,6 +186,7 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNod
 		PodNodeID:    podNodeID,
 		PodNSID:      intf.GetPodNsId(),
 		PodGroupID:   intf.GetPodGroupId(),
+		PodGroupType: uint8(intf.GetPodGroupType()),
 		PodID:        podID,
 		PodClusterID: intf.GetPodClusterId(),
 		AZID:         intf.GetAzId(),
@@ -196,6 +198,7 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNod
 	nodeInfo.PodID = 0
 	nodeInfo.PodNSID = 0
 	nodeInfo.PodGroupID = 0
+	nodeInfo.PodGroupType = 0
 	nodeInfo.PodClusterID = 0
 	podNodeInfos[podNodeID] = &nodeInfo
 
@@ -204,6 +207,7 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNod
 	hostInfo.PodID = 0
 	hostInfo.PodNSID = 0
 	hostInfo.PodGroupID = 0
+	nodeInfo.PodGroupType = 0
 	hostInfo.PodClusterID = 0
 	hostInfos[hostID] = &hostInfo
 

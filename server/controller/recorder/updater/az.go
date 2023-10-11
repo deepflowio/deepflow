@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,6 +31,7 @@ type AZ struct {
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	updater := &AZ{
 		UpdaterBase[cloudmodel.AZ, mysql.AZ, *cache.AZ]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewAZ(),
 			diffBaseData: wholeCache.AZs,

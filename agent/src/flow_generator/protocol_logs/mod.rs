@@ -216,6 +216,10 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(rename = "syscall_thread_1", skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_thread_1: u32,
     #[serde(skip_serializing_if = "value_is_default")]
+    pub syscall_coroutine_0: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub syscall_coroutine_1: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_0: u64,
     #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_1: u64,
@@ -306,6 +310,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
             syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
+            syscall_coroutine_0: f.syscall_coroutine_0,
+            syscall_coroutine_1: f.syscall_coroutine_1,
             gpid_0: f.gpid_0,
             gpid_1: f.gpid_1,
             netns_id_0: f.netns_id_0,

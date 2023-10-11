@@ -20,10 +20,9 @@ import (
 	"fmt"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -35,7 +34,7 @@ type WANIP struct {
 func NewWANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 	mng := &WANIP{
 		EventManagerBase{
-			resourceType: RESOURCE_TYPE_WAN_IP_EN,
+			resourceType: ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
@@ -61,34 +60,34 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 		if ok {
 			deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Errorf("device type for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("device type for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 			deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("device id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 			mac, ok = i.ToolDataSet.GetMacByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Errorf("mac for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("mac for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 			if err != nil {
-				log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
+				log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
 			deviceRelatedOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
 			if err != nil {
-				log.Errorf("releated options for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
+				log.Errorf("releated options for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
 			networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Errorf("network id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("network id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 			networkName, ok = i.ToolDataSet.GetNetworkNameByID(networkID)
 			if !ok {
-				log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("network name for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 		} else {
-			log.Errorf("%s lcuuid (id: %d) for %s not found", RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_WAN_IP_EN)
+			log.Errorf("%s lcuuid (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN)
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{
@@ -100,7 +99,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
-		if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+		if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
 			podNodeInfo, err := i.ToolDataSet.GetPodNodeInfoByID(deviceID)
 			if err != nil {
 				log.Error(err)
@@ -121,7 +120,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 					continue
 				}
 			}
-		} else if deviceType == common.VIF_DEVICE_TYPE_POD {
+		} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
 			podInfo, err := i.ToolDataSet.GetPodInfoByID(deviceID)
 			if err != nil {
 				log.Error(err)
@@ -175,40 +174,40 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 			if ok {
 				deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Errorf("device type for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("device type for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 				deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("device id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 				mac, ok = i.ToolDataSet.GetMacByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Errorf("mac for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("mac for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if err != nil {
-					log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
+					log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 					deviceName = getDeviceNameFromAllByID(deviceType, deviceID)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Errorf("network id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("network id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 				networkName, ok = i.ToolDataSet.GetNetworkNameByID(networkID)
 				if !ok {
-					log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("network name for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 
 			} else {
-				log.Errorf("%s lcuuid (id: %d) for %s not found", RESOURCE_TYPE_VINTERFACE_EN, vifID, RESOURCE_TYPE_WAN_IP_EN)
+				log.Errorf("%s lcuuid (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN)
 			}
 		} else {
-			log.Errorf("%s id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_WAN_IP_EN, lcuuid)
+			log.Errorf("%s id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid)
 		}
 
 		ip, ok := i.ToolDataSet.GetWANIPByLcuuid(lcuuid)
 		if !ok {
-			log.Errorf("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_WAN_IP_EN, lcuuid)
+			log.Errorf("%s (lcuuid: %s) ip not found", ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid)
 		}
 
 		i.createAndEnqueue(

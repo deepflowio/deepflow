@@ -99,6 +99,7 @@ LOOP:
 		// 当前没有未结束的刷新数据goroutine，启动刷新cache后结束
 		case <-r.canRefresh:
 			log.Infof("recorder (domain lcuuid: %s) cache refresh started", r.domainLcuuid)
+			r.cacheMng.SetLogLevel(logging.DEBUG)
 			r.cacheMng.Refresh()
 			log.Infof("recorder (domain lcuuid: %s) cache refresh completed", r.domainLcuuid)
 

@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type Pod struct {
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
 		UpdaterBase[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPod(),
 			diffBaseData: wholeCache.Pods,
@@ -50,32 +51,32 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
-			common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
-			common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
-			common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
@@ -84,8 +85,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 		podReplicaSetID, exists = p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
-				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -122,8 +123,8 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -139,8 +140,8 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 			podReplicaSetID, exists = p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
 			if !exists {
 				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
-					common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+					ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 				))
 				return nil, false
 			}
@@ -151,8 +152,8 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 		podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
-				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

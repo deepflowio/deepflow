@@ -17,10 +17,9 @@
 package event
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -33,11 +32,11 @@ type RDSInstance struct {
 func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInstance {
 	return &RDSInstance{
 		EventManagerBase{
-			resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN,
+			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+		ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE,
 	}
 }
 

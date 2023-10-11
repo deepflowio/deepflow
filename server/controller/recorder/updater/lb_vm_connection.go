@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type LBVMConnection struct {
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
 	updater := &LBVMConnection{
 		UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *cache.LBVMConnection]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLBVMConnection(),
 			diffBaseData: wholeCache.LBVMConnections,
@@ -50,16 +51,16 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 	vmID, exists := c.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
-			common.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	lbID, exists := c.cache.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
-			common.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

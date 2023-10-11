@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodCluster(dbItem *mysql.PodCluster, seq int) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addPodCluster(dbItem *mysql.PodCluster, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodCluster(lcuuid string) {
 	delete(b.PodClusters, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
 }
 
 type PodCluster struct {
@@ -56,5 +56,5 @@ func (p *PodCluster) Update(cloudItem *cloudmodel.PodCluster) {
 	p.ClusterName = cloudItem.ClusterName
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, p))
 }

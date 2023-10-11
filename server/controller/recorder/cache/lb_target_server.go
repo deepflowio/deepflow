@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addLBTargetServer(dbItem *mysql.LBTargetServer, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addLBTargetServer(dbItem *mysql.LBTargetServer, seq in
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBTargetServer(lcuuid string) {
 	delete(b.LBTargetServers, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid))
 }
 
 type LBTargetServer struct {
@@ -51,5 +51,5 @@ func (l *LBTargetServer) Update(cloudItem *cloudmodel.LBTargetServer) {
 	l.IP = cloudItem.IP
 	l.Port = cloudItem.Port
 	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, l))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, l))
 }

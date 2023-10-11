@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type NATVMConnection struct {
 func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMConnection) *NATVMConnection {
 	updater := &NATVMConnection{
 		UpdaterBase[cloudmodel.NATVMConnection, mysql.NATVMConnection, *cache.NATVMConnection]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNATVMConnection(),
 			diffBaseData: wholeCache.NATVMConnections,
@@ -50,16 +51,16 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 	vmID, exists := c.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
-			common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	natID, exists := c.cache.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
-			common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

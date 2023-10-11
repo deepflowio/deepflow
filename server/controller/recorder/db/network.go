@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type Network struct {
@@ -28,7 +28,7 @@ type Network struct {
 func NewNetwork() *Network {
 	operater := &Network{
 		OperatorBase[mysql.Network]{
-			resourceTypeName: common.RESOURCE_TYPE_NETWORK_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

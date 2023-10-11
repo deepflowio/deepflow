@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodCluster struct {
@@ -28,7 +28,7 @@ type PodCluster struct {
 func NewPodCluster() *PodCluster {
 	operater := &PodCluster{
 		OperatorBase[mysql.PodCluster]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_CLUSTER_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

@@ -26,13 +26,17 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 use thread::JoinHandle;
 
-use super::check_active;
-use super::{consts::*, MetricsType};
+use super::{
+    check_active,
+    consts::*,
+    round_to_minute,
+    types::{AppMeterWithFlow, MiniFlow},
+    MetricsType,
+};
 
-use crate::collector::round_to_minute;
 use crate::common::flow::{CloseType, L7Protocol, L7Stats, SignalSource};
 use crate::config::handler::{CollectorAccess, CollectorConfig};
-use crate::metric::meter::{AppAnomaly, AppLatency, AppMeter, AppMeterWithFlow, AppTraffic};
+use crate::metric::meter::{AppAnomaly, AppLatency, AppMeter, AppTraffic};
 use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
@@ -257,17 +261,19 @@ impl SubQuadGen {
 
             // If l7_stats.flow.is_some(), set the flow of all meter belonging to this flow
             if let Some(tagged_flow) = &l7_stats.flow {
+                let flow = MiniFlow::from(&tagged_flow.flow);
                 let (is_active_host0, is_active_host1) =
-                    check_active(time_in_second.as_secs(), possible_host, &tagged_flow.flow);
+                    check_active(time_in_second.as_secs(), possible_host, &flow);
                 for meter in meters.drain(..) {
                     let app_meter = Box::new(AppMeterWithFlow {
                         app_meter: meter.app_meter,
-                        flow: tagged_flow.clone(),
+                        flow: flow.clone(),
                         l7_protocol: meter.l7_protocol,
                         endpoint_hash,
                         endpoint: meter.endpoint.clone(),
                         is_active_host0,
                         is_active_host1,
+                        time_in_second: tagged_flow.flow.flow_stat_time,
                     });
                     stash.meters.push(app_meter);
                 }
@@ -279,16 +285,18 @@ impl SubQuadGen {
             }
             // If l7_stats.flow.is_some(), set the flow of all meter belonging to this flow
             if let Some(tagged_flow) = &l7_stats.flow {
+                let flow = MiniFlow::from(&tagged_flow.flow);
                 let (is_active_host0, is_active_host1) =
-                    check_active(time_in_second.as_secs(), possible_host, &tagged_flow.flow);
+                    check_active(time_in_second.as_secs(), possible_host, &flow);
                 let boxed_app_meter = Box::new(AppMeterWithFlow {
                     app_meter: *app_meter,
-                    flow: tagged_flow.clone(),
+                    flow,
                     l7_protocol: l7_stats.l7_protocol,
                     endpoint_hash,
                     endpoint: l7_stats.endpoint.clone(),
                     is_active_host0,
                     is_active_host1,
+                    time_in_second: tagged_flow.flow.flow_stat_time,
                 });
                 stash.meters.push(boxed_app_meter);
             } else {
@@ -535,9 +543,9 @@ impl L7QuadrupleGenerator {
 
     fn handle(
         &mut self,
+        config: &CollectorConfig,
         l7_stats: Option<BatchedBox<L7Stats>>,
         time_in_second: Duration,
-        config: &CollectorConfig,
     ) {
         let mut second_inject = false;
         let mut minute_inject = false;
@@ -646,7 +654,7 @@ impl L7QuadrupleGenerator {
                     if config.enabled {
                         for l7_stat in l7_recv_batch.drain(..) {
                             let time_in_second = l7_stat.time_in_second;
-                            self.handle(Some(l7_stat), time_in_second, &config);
+                            self.handle(&config, Some(l7_stat), time_in_second);
                         }
                     } else {
                         l7_recv_batch.clear();
@@ -660,9 +668,9 @@ impl L7QuadrupleGenerator {
                 }
                 Err(Error::Timeout) => {
                     self.handle(
+                        &config,
                         None,
                         get_timestamp(self.ntp_diff.load(Ordering::Relaxed)),
-                        &config,
                     );
                 }
                 Err(Error::Terminated(_, _)) => {

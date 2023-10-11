@@ -48,6 +48,10 @@ func GetClient() *Client {
 	return client
 }
 
+func GetConfig() *Config { // TODO use this function
+	return client.Config
+}
+
 type Client struct {
 	ResourceAPI       redis.UniversalClient
 	DimensionResource redis.UniversalClient

@@ -16,9 +16,7 @@
 
 package cache
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/common"
-)
+import "github.com/deepflowio/deepflow/server/controller/common"
 
 type EventToolDataSet struct {
 	hostIPToID   map[string]int
