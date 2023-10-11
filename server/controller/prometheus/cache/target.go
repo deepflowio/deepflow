@@ -135,7 +135,6 @@ func (t *targetIDToLabelNames) Load(id int) []string {
 type target struct {
 	keyToTargetID        *keyToTargetID
 	targetIDToLabelNames *targetIDToLabelNames
-	idToLabels           sync.Map
 }
 
 func newTarget() *target {
