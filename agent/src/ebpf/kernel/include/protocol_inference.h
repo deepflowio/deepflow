@@ -1600,6 +1600,35 @@ infer_mongo_message(const char *buf, size_t count,
 	return MSG_REQUEST;
 }
 
+static __inline enum message_type
+infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
+{
+	if (conn_info->prev_count == 5) {
+		return MSG_REQUEST;
+	}
+	if (count < 3) {
+		return MSG_UNKNOWN;
+	}
+	// Client Hello: 16 03 01
+	// Server Hello: 16 03 03
+	// Certificate:  16 03 03
+	// Client Key Exchange: 16 03 03
+	// Change Cipher Spec: 14 03 03
+	// Encrypted Alert: 15 03 03
+	char buffer[3];
+	bpf_probe_read(buffer, 3, buf);
+	if ((buffer[0] == 0x14 || buffer[0] == 0x15 || buffer[0] == 0x16) &&
+	    buffer[1] == 0x03 && (buffer[2] == 0x01 || buffer[2] == 0x03)) {
+		if(count == 5){
+			save_prev_data(buf, conn_info, 5);
+			return MSG_PRESTORE;
+		} else {
+			return MSG_REQUEST;
+		}
+	}
+	return MSG_UNKNOWN;
+}
+
 static __inline bool drop_msg_by_comm(void)
 {
 	char comm[TASK_COMM_LEN];
@@ -1649,6 +1678,7 @@ infer_protocol(struct ctx_info_s *ctx,
 	 * If extra->tls is true, the datas is obtained by the uprobe.
 	 * The obtained datas is unencrypted, not filtered.
 	 */
+	// FIXME: Loss of HTTPS TLS packets
 	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) &&
 	    extra->source == DATA_SOURCE_SYSCALL) {
 		return inferred_message;
@@ -1827,6 +1857,14 @@ infer_protocol(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_TLS:
+			if ((inferred_message.type =
+			     infer_tls_message(syscall_infer_buf, syscall_infer_len,
+					       conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_TLS;
+				return inferred_message;
+			}
+			break;
 		default:
 			break;
 		}
@@ -1897,6 +1935,14 @@ infer_protocol(struct ctx_info_s *ctx,
 		    infer_dns_message(infer_buf, count,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_TLS && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_tls_message(infer_buf, count,
+				      conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_TLS;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
 #else
