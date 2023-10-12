@@ -806,8 +806,14 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
-		return filter, errors.New(errorMessage)
+		if value == "" {
+			filter = "1=1"
+		} else {
+			filter = "1!=1"
+		}
+		debugMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		log.Debug(debugMessage)
+		return filter, nil
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
@@ -815,6 +821,10 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
+				if value == "" {
+					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+					return filter, nil
+				}
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, labelNameID, op, value)
 				} else {
@@ -846,8 +856,14 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
-		return filter, errors.New(errorMessage)
+		if value == "" {
+			filter = "1=1"
+		} else {
+			filter = "1!=1"
+		}
+		debugMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		log.Debug(debugMessage)
+		return filter, nil
 	}
 	prometheusSubqueryCache := GetPrometheusSubqueryCache()
 	// Determine whether the tag is app_label or target_label
@@ -862,6 +878,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					if time.Since(timeout) < time.Duration(config.Cfg.PrometheusIdSubqueryLruTimeout) {
 						return filter, nil
 					}
+				}
+				if value == "" {
+					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
+					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+					return filter, nil
 				}
 
 				// lru timeout
@@ -909,7 +931,6 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 		}
 		targetLabelFilter := TargetLabelFilter{OriginFilter: originFilter, TransFilter: transFilter}
 		e.TargetLabelFilters = append(e.TargetLabelFilters, targetLabelFilter)
-		// FIXME delete placeholders
 		filter = ""
 	}
 	return filter, nil
