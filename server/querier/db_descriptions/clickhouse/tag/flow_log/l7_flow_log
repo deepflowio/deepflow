@@ -90,6 +90,8 @@ syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response  , int            ,                       , Tracing Info      , 111
 syscall_thread_0          , syscall_thread_0          , syscall_thread_0           , int            ,                       , Tracing Info      , 111
 syscall_thread_1          , syscall_thread_1          , syscall_thread_1           , int            ,                       , Tracing Info      , 111
+syscall_coroutine_0       , syscall_coroutine_0       , syscall_coroutine_0        , int            ,                       , Tracing Info      , 111
+syscall_coroutine_1       , syscall_coroutine_1       , syscall_coroutine_1        , int            ,                       , Tracing Info      , 111
 syscall_cap_seq_0         , syscall_cap_seq_0         , syscall_cap_seq_0          , int            ,                       , Tracing Info      , 111
 syscall_cap_seq_1         , syscall_cap_seq_1         , syscall_cap_seq_1          , int            ,                       , Tracing Info      , 111
 
