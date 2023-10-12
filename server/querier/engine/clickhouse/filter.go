@@ -806,7 +806,7 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
+		if value == "''" {
 			filter = "1=1"
 		} else {
 			filter = "1!=1"
@@ -821,7 +821,7 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				if value == "" {
+				if value == "''" {
 					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
 					return filter, nil
 				}
@@ -856,7 +856,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
+		if value == "''" {
 			filter = "1=1"
 		} else {
 			filter = "1!=1"
@@ -879,7 +879,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 						return filter, nil
 					}
 				}
-				if value == "" {
+				if value == "''" {
 					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
