@@ -1088,11 +1088,6 @@ impl FlowMap {
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
-            direction_score: if meta_packet.socket_role > 0 {
-                ServiceTable::MAX_SCORE
-            } else {
-                0
-            },
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -1128,9 +1123,41 @@ impl FlowMap {
         #[cfg(target_os = "windows")]
         let local_epc_id = 0;
 
-        // 标签
+        // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        // direction rectify
+        if meta_packet.signal_source == SignalSource::EBPF {
+            let (src_l3_epc_id, dst_l3_epc_id) = if let Some(ep) = node.endpoint_data_cache.as_ref()
+            {
+                (
+                    ep.src_info().l3_epc_id as i16,
+                    ep.dst_info().l3_epc_id as i16,
+                )
+            } else {
+                (0, 0)
+            };
+            let flow_src_key = ServiceKey::new(
+                meta_packet.lookup_key.src_ip,
+                src_l3_epc_id,
+                meta_packet.lookup_key.src_port,
+            );
+            let flow_dst_key = ServiceKey::new(
+                meta_packet.lookup_key.dst_ip,
+                dst_l3_epc_id,
+                meta_packet.lookup_key.dst_port,
+            );
+            let (direction_score, need_reverse) = self.service_table.get_ebpf_tcp_score(
+                meta_packet.socket_role,
+                flow_src_key,
+                flow_dst_key,
+            );
+            if need_reverse {
+                node.tagged_flow.flow.reverse(true);
+            }
+            node.tagged_flow.flow.direction_score = direction_score;
+        }
+
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
             .flow
