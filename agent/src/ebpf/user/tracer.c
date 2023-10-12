@@ -1344,7 +1344,7 @@ static void period_process_main(__unused void *arg)
 
 	for (;;) {
 		period_events_process();
-		usleep(EVENT_PERIOD_TIME_US);
+		usleep(EVENT_TIMER_TICK_US);
 	}
 }
 
