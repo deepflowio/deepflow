@@ -1519,6 +1519,15 @@ infer_fastcgi_message(const char *buf, size_t count,
 		return MSG_PRESTORE;
 	}
 
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
+			return MSG_UNKNOWN;
+		if (header->type == FCGI_BEGIN_REQUEST || header->type == FCGI_PARAMS)
+			return MSG_REQUEST;
+		else
+			return MSG_RESPONSE;
+	}
+
 	if (fastcgi_header_common_check(header) && count > 8 &&
 	    __bpf_ntohs(header->content_length) != 0) {
 		if (header->type == FCGI_BEGIN_REQUEST) {
