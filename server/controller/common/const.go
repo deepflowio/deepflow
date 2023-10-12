@@ -84,6 +84,7 @@ const (
 	OS_UBUNTU  = 3
 	OS_SUSE    = 4
 	OS_WINDOWS = 5
+	OS_ANDROID = 6
 )
 
 const (
