@@ -220,11 +220,14 @@ const _OP_COMMAND: u32 = 2010;
 const _OP_COMMANDREPLY: u32 = 2011;
 const _OP_COMPRESSED: u32 = 2012;
 const _OP_MSG: u32 = 2013;
-const _UNKNOWN: &str = "Unknown";
+const _UNKNOWN: &str = "";
 
 const _HEADER_SIZE: usize = 16;
 
 const _EXCEPTION_OFFSET: usize = 20;
+const _COLLECTION_NAME_OFFSET: usize = 20;
+const _QUERY_DOC_OFFSET: usize = _COLLECTION_NAME_OFFSET + 8; // 8 is sizeof(Number to skip + Number to Reture)
+const _MSG_DOC_SECTION_OFFSET: usize = _HEADER_SIZE + 4; // 4 is sizeof(Message Flags)
 
 impl MongoDBLog {
     // TODO: tracing
@@ -264,16 +267,25 @@ impl MongoDBLog {
 
         // command decode
         match info.op_code {
-            _OP_MSG if payload.len() > _HEADER_SIZE => {
+            _OP_MSG if payload.len() > _MSG_DOC_SECTION_OFFSET => {
                 // OP_MSG
                 let mut msg_body = MongoOpMsg::default();
-                msg_body.decode(&payload[_HEADER_SIZE..])?;
+                // TODO: Message Flags
+                msg_body.decode(&payload[_MSG_DOC_SECTION_OFFSET..])?;
                 match info.msg_type {
                     LogMessageType::Response => {
-                        info.response = msg_body.sections.doc.to_string();
-                        info.exception = msg_body.sections.c_string.unwrap_or(_UNKNOWN.to_string());
-                        info.response_code =
-                            msg_body.sections.doc.get_f64("code").unwrap_or(0.0) as i32;
+                        // The data structure of doc is Bson, which is a normal response when there is no errmsg in it
+                        if msg_body.sections.doc.get_str("errmsg").is_err() {
+                            info.response = msg_body.sections.doc.to_string();
+                        } else {
+                            info.exception =
+                                msg_body.sections.doc.get_str("errmsg").unwrap().to_string();
+                        }
+                        if info.exception.len() == 0 {
+                            info.exception =
+                                msg_body.sections.c_string.unwrap_or(_UNKNOWN.to_string());
+                        }
+                        info.response_code = msg_body.sections.doc.get_i32("code").unwrap_or(0);
                         if info.response_code > 0 {
                             self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                         }
@@ -315,13 +327,16 @@ impl MongoDBLog {
             }
             _OP_QUERY if payload.len() > 28 => {
                 // "OP_QUERY"
-                info.exception = CStr::from_bytes_until_nul(&payload[..20])
-                    .map_err(|_| Error::L7ProtocolUnknown)?
-                    .to_string_lossy()
-                    .into_owned();
+                let collection_name =
+                    CStr::from_bytes_until_nul(&payload[_COLLECTION_NAME_OFFSET..])
+                        .map_err(|_| Error::L7ProtocolUnknown)?
+                        .to_string_lossy()
+                        .into_owned();
 
-                let query = Document::from_reader(&payload[28 + info.exception.len() + 1..])
-                    .unwrap_or(Document::default());
+                let query = Document::from_reader(
+                    &payload[_QUERY_DOC_OFFSET + collection_name.len() + 1..],
+                )
+                .unwrap_or(Document::default());
                 info.request = query.to_string();
             }
             _OP_GET_MORE | _OP_DELETE if payload.len() > 20 => {
@@ -415,18 +430,24 @@ pub struct MongoOpMsg {
 }
 
 impl MongoOpMsg {
+    const _KIND_OFFSET: usize = 0;
+    const _KIND_LEN: usize = 1;
+    const _DOC_LENGTH_OFFSET: usize = Self::_KIND_OFFSET + Self::_KIND_LEN;
+    const _DOC_LENGTH_LEN: usize = 4;
+
     fn decode(&mut self, payload: &[u8]) -> Result<bool> {
-        if payload.len() < 9 {
+        if payload.len() < Self::_DOC_LENGTH_OFFSET + Self::_DOC_LENGTH_LEN {
             return Ok(false);
         }
-        // todo: decode flag
         let mut sections = Sections::default();
         //sections.kind = payload[4];
-        let section_len = bytes::read_u32_le(&payload[5..9]);
-        if payload.len() < 4 + section_len as usize {
+        let section_len = bytes::read_u32_le(
+            &payload[Self::_DOC_LENGTH_OFFSET..Self::_DOC_LENGTH_OFFSET + Self::_DOC_LENGTH_LEN],
+        );
+        if payload.len() < Self::_DOC_LENGTH_LEN + section_len as usize {
             return Ok(false);
         }
-        let _ = sections.decode(&payload[4..]);
+        let _ = sections.decode(&payload);
         self.sections = sections;
         // todo: decode checksum
         Ok(true)
@@ -455,8 +476,9 @@ impl Sections {
             0 => {
                 // Body
                 self.kind_name = "BODY".to_string();
-                let lenght = bytes::read_u32_le(&payload[1..5]);
-                if lenght != payload.len() as u32 - 1 {
+                let length = bytes::read_u32_le(&payload[1..5]);
+                // TODO: When ChecksumPresent is 1, there will be checksum in the payload
+                if length != payload.len() as u32 - 1 && length != payload.len() as u32 - 5 {
                     return Ok(false);
                 }
                 self.doc = Document::from_reader(&payload[1..]).unwrap_or(Document::default());
@@ -567,3 +589,85 @@ pub struct MongoOpUpdate {
     zero: u32,
 }
 */
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use std::rc::Rc;
+    use std::{cell::RefCell, fs};
+
+    use super::*;
+
+    use crate::{
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        flow_generator::L7_RRT_CACHE_CAPACITY,
+        utils::test::Capture,
+    };
+
+    const FILE_DIR: &str = "resources/test/flow_generator/mongo";
+
+    fn run(name: &str) -> String {
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
+        let mut packets = capture.as_meta_packets();
+        if packets.is_empty() {
+            return "".to_string();
+        }
+
+        let mut output: String = String::new();
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        for packet in packets.iter_mut() {
+            packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            let payload = match packet.get_l4_payload() {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let mut mongo = MongoDBLog::default();
+            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+
+            let is_mongo = mongo.check_payload(payload, param);
+            let info = mongo.parse_payload(payload, param);
+            if let Ok(info) = info {
+                match info.unwrap_single() {
+                    L7ProtocolInfo::MongoDBInfo(i) => {
+                        output.push_str(&format!("{:?} is_mongo: {}\r\n", i, is_mongo));
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                output.push_str(&format!(
+                    "{:?} is_mongo: {}\r\n",
+                    MongoDBInfo::default(),
+                    is_mongo
+                ));
+            }
+        }
+        output
+    }
+
+    #[test]
+    fn check() {
+        let files = vec![("mongo.pcap", "mongo.result")];
+
+        for item in files.iter() {
+            let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
+            let output = run(item.0);
+
+            if output != expected {
+                let output_path = Path::new("actual.txt");
+                fs::write(&output_path, &output).unwrap();
+                assert!(
+                    output == expected,
+                    "output different from expected {}, written to {:?}",
+                    item.1,
+                    output_path
+                );
+            }
+        }
+    }
+}
