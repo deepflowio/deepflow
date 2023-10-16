@@ -48,7 +48,6 @@ use super::{
 
 use crate::{
     common::{
-        ebpf::EbpfType,
         endpoint::{
             EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
         },
@@ -1009,12 +1008,6 @@ impl FlowMap {
 
     fn init_flow(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let flow_config = config.flow;
-        match meta_packet.ebpf_type {
-            EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {}
-            _ => {
-                meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
-            }
-        }
 
         let mut tagged_flow = TaggedFlow::default();
         let lookup_key = &meta_packet.lookup_key;
@@ -1574,6 +1567,9 @@ impl FlowMap {
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = config.flow.flow_timeout.opening;
+        if let Some(meta_flow_log) = node.meta_flow_log.as_mut() {
+            let _ = meta_flow_log.parse_l3(meta_packet);
+        }
         node
     }
 
