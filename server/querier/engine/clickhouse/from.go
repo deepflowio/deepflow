@@ -32,7 +32,7 @@ func (t *Table) Format(m *view.Model) {
 }
 
 func GetVirtualTableFilter(db, table string) (view.Node, bool) {
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		filter := fmt.Sprintf("virtual_table_name='%s'", table)
 		return &view.Expr{Value: "(" + filter + ")"}, true
 	}
