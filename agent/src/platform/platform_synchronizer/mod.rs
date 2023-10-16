@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux_process;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux_socket;
 mod proc_scan_hook;
 #[cfg(target_os = "windows")]
@@ -26,20 +26,23 @@ mod windows;
 #[cfg(target_os = "windows")]
 mod windows_process;
 
+#[cfg(target_os = "android")]
+use std::os::android::fs::MetadataExt;
 #[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::{
     fs::{metadata, symlink_metadata},
-    os::linux::fs::MetadataExt,
     path::PathBuf,
 };
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux_process::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux_socket::*;
 use public::proto::common::TridentType;
 #[cfg(target_os = "windows")]
@@ -47,7 +50,7 @@ pub use windows_process::*;
 
 use crate::utils::environment::{is_tt_pod, is_tt_workload};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 // return the (now_sec - sym_change_time) second
 pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static str> {
     // linux default not record the file birth time, use the change time instead of the birth time.
@@ -61,7 +64,7 @@ pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static s
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn dir_inode(path: &str) -> std::io::Result<u64> {
     let m = metadata(path)?;
     Ok(m.st_ino())

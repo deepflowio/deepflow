@@ -38,8 +38,6 @@ use super::{
 use special_recv_engine::Libpcap;
 
 use crate::config::handler::{CollectorAccess, LogParserAccess};
-#[cfg(target_os = "linux")]
-use crate::platform::GenericPoller;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -61,7 +59,6 @@ use crate::{
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
-    netns::NsFile,
     packet::Packet,
     proto::trident::{Exception, IfMacSource, TapMode},
     queue::DebugSender,
@@ -108,7 +105,7 @@ pub(super) struct BaseDispatcher {
     pub(super) terminated: Arc<AtomicBool>,
     pub(super) stats: Arc<Collector>,
     #[cfg(target_os = "linux")]
-    pub(super) platform_poller: Arc<GenericPoller>,
+    pub(super) platform_poller: Arc<crate::platform::GenericPoller>,
 
     pub(super) policy_getter: PolicyGetter,
     pub(super) exception_handler: ExceptionHandler,
@@ -122,7 +119,8 @@ pub(super) struct BaseDispatcher {
     pub(super) packet_sequence_output_queue:
         DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
 
-    pub(super) netns: NsFile,
+    #[cfg(target_os = "linux")]
+    pub(super) netns: public::netns::NsFile,
 
     // dispatcher id for easy debugging
     pub log_id: String,
@@ -169,6 +167,7 @@ impl BaseDispatcher {
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
+            #[cfg(target_os = "linux")]
             netns: self.netns.clone(),
             npb_dedup_enabled: self.npb_dedup_enabled.clone(),
             log_id: self.log_id.clone(),
@@ -179,43 +178,6 @@ impl BaseDispatcher {
 
     pub fn terminate_handler(&mut self) {
         self.pipelines.lock().unwrap().clear();
-    }
-
-    pub(super) fn check_and_update_bpf(&mut self) {
-        if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
-            return;
-        }
-
-        #[cfg(target_os = "linux")]
-        let tap_interfaces = self.tap_interfaces.lock().unwrap();
-        #[cfg(target_os = "linux")]
-        if tap_interfaces.len() == 0 {
-            return;
-        }
-
-        let bpf_options = self.bpf_options.lock().unwrap();
-        #[cfg(target_os = "linux")]
-        if let Err(e) = self.engine.set_bpf(
-            bpf_options.get_bpf_instructions(
-                &tap_interfaces,
-                &self.tap_interface_whitelist,
-                self.options.lock().unwrap().snap_len,
-            ),
-            &CString::new(bpf_options.get_bpf_syntax()).unwrap(),
-        ) {
-            warn!(
-                "set_bpf failed with tap_interfaces count {}: {}",
-                tap_interfaces.len(),
-                e
-            );
-        }
-        #[cfg(target_os = "windows")]
-        if let Err(e) = self
-            .engine
-            .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
-        {
-            warn!("set_bpf failed: {}", e);
-        }
     }
 
     pub(super) fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
@@ -230,7 +192,7 @@ impl BaseDispatcher {
             }
             Ok(links) => links,
         };
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "android"))]
         let pcap_interfaces = match net::links_by_name_regex(&config.tap_interface_regex) {
             Err(e) => {
                 warn!("get interfaces by name regex failed: {}", e);
@@ -250,7 +212,7 @@ impl BaseDispatcher {
                 .iter()
                 .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
                 .collect();
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let src_ifaces: Vec<_> = pcap_interfaces
                 .iter()
                 .map(|src_iface| (src_iface.name.as_str(), src_iface.if_index as isize))
@@ -273,6 +235,63 @@ impl BaseDispatcher {
         };
 
         Ok(())
+    }
+
+    pub(super) unsafe fn recv<'a>(
+        engine: &'a mut RecvEngine,
+        leaky_bucket: &LeakyBucket,
+        exception_handler: &ExceptionHandler,
+        prev_timestamp: &mut Duration,
+        counter: &PacketCounter,
+        ntp_diff: &AtomicI64,
+    ) -> Option<(Packet<'a>, Duration)> {
+        let packet = engine.recv();
+        if packet.is_err() {
+            if let recv_engine::Error::Timeout = packet.unwrap_err() {
+                return None;
+            }
+            counter.err.fetch_add(1, Ordering::Relaxed);
+            // Sleep to avoid wasting cpu during consequential errors
+            thread::sleep(Duration::from_millis(1));
+            return None;
+        }
+        let packet = packet.unwrap();
+        // Receiving incomplete eth header under some environments, unlikely to happen
+        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        let mut timestamp = packet.timestamp;
+        let time_diff = ntp_diff.load(Ordering::Relaxed);
+        if time_diff >= 0 {
+            timestamp += Duration::from_nanos(time_diff as u64);
+        } else {
+            timestamp -= Duration::from_nanos(-time_diff as u64);
+        }
+        if timestamp > *prev_timestamp {
+            if timestamp - *prev_timestamp > Duration::from_secs(60) {
+                // Correct invalid timestamp under some environments. Root cause unclear.
+                // A large timestamp will lead to discarding of following packets, correct
+                // this by setting it to present time
+                let now = get_timestamp(time_diff);
+                if timestamp > now && timestamp - now > Duration::from_secs(60) {
+                    timestamp = now;
+                }
+            }
+            *prev_timestamp = timestamp;
+        }
+        while !leaky_bucket.acquire(1) {
+            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
+            exception_handler.set(Exception::RxPpsThresholdExceeded);
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        counter.rx_all.fetch_add(1, Ordering::Relaxed);
+        counter
+            .rx_all_bytes
+            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+
+        Some((packet, timestamp))
     }
 }
 
@@ -361,68 +380,23 @@ impl BaseDispatcher {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
     }
-}
 
-impl BaseDispatcher {
-    pub(super) unsafe fn recv<'a>(
-        engine: &'a mut RecvEngine,
-        leaky_bucket: &LeakyBucket,
-        exception_handler: &ExceptionHandler,
-        prev_timestamp: &mut Duration,
-        counter: &PacketCounter,
-        ntp_diff: &AtomicI64,
-    ) -> Option<(Packet<'a>, Duration)> {
-        let packet = engine.recv();
-        if packet.is_err() {
-            if let recv_engine::Error::Timeout = packet.unwrap_err() {
-                return None;
-            }
-            counter.err.fetch_add(1, Ordering::Relaxed);
-            // Sleep to avoid wasting cpu during consequential errors
-            thread::sleep(Duration::from_millis(1));
-            return None;
-        }
-        let packet = packet.unwrap();
-        // Receiving incomplete eth header under some environments, unlikely to happen
-        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
-            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-            return None;
-        }
-        let mut timestamp = packet.timestamp;
-        let time_diff = ntp_diff.load(Ordering::Relaxed);
-        if time_diff >= 0 {
-            timestamp += Duration::from_nanos(time_diff as u64);
-        } else {
-            timestamp -= Duration::from_nanos(-time_diff as u64);
-        }
-        if timestamp > *prev_timestamp {
-            if timestamp - *prev_timestamp > Duration::from_secs(60) {
-                // Correct invalid timestamp under some environments. Root cause unclear.
-                // A large timestamp will lead to discarding of following packets, correct
-                // this by setting it to present time
-                let now = get_timestamp(time_diff);
-                if timestamp > now && timestamp - now > Duration::from_secs(60) {
-                    timestamp = now;
-                }
-            }
-            *prev_timestamp = timestamp;
-        }
-        while !leaky_bucket.acquire(1) {
-            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            exception_handler.set(Exception::RxPpsThresholdExceeded);
-            thread::sleep(Duration::from_millis(1));
+    pub(super) fn check_and_update_bpf(&mut self) {
+        if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
+            return;
         }
 
-        counter.rx_all.fetch_add(1, Ordering::Relaxed);
-        counter
-            .rx_all_bytes
-            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
-
-        Some((packet, timestamp))
+        let bpf_options = self.bpf_options.lock().unwrap();
+        if let Err(e) = self
+            .engine
+            .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
+        {
+            warn!("set_bpf failed: {}", e);
+        }
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl BaseDispatcher {
     #[cfg(not(target_arch = "s390x"))]
     fn is_engine_dpdk(&self) -> bool {
@@ -526,6 +500,33 @@ impl BaseDispatcher {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
     }
+
+    pub(super) fn check_and_update_bpf(&mut self) {
+        if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
+            return;
+        }
+
+        let tap_interfaces = self.tap_interfaces.lock().unwrap();
+        if tap_interfaces.len() == 0 {
+            return;
+        }
+
+        let bpf_options = self.bpf_options.lock().unwrap();
+        if let Err(e) = self.engine.set_bpf(
+            bpf_options.get_bpf_instructions(
+                &tap_interfaces,
+                &self.tap_interface_whitelist,
+                self.options.lock().unwrap().snap_len,
+            ),
+            &CString::new(bpf_options.get_bpf_syntax()).unwrap(),
+        ) {
+            warn!(
+                "set_bpf failed with tap_interfaces count {}: {}",
+                tap_interfaces.len(),
+                e
+            );
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -628,7 +629,7 @@ pub struct BaseDispatcherListener {
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_bpf: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
-    pub platform_poller: Arc<GenericPoller>,
+    pub platform_poller: Arc<crate::platform::GenericPoller>,
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
@@ -638,7 +639,8 @@ pub struct BaseDispatcherListener {
     analyzer_ip: String,
     proxy_controller_port: u16,
     analyzer_port: u16,
-    pub netns: NsFile,
+    #[cfg(target_os = "linux")]
+    pub netns: public::netns::NsFile,
 
     // dispatcher id for easy debugging
     pub log_id: String,
@@ -701,7 +703,7 @@ impl BaseDispatcherListener {
 
         let mut bpf_options = self.bpf_options.lock().unwrap();
         bpf_options.capture_bpf = config.capture_bpf.clone();
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             bpf_options.bpf_syntax = bpf_builder.build_pcap_syntax();
         }
@@ -723,7 +725,7 @@ impl BaseDispatcherListener {
     }
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         self.on_afpacket_change(config);
         self.on_decap_type_change(config);
         self.on_bpf_change(config);
@@ -792,7 +794,7 @@ impl BaseDispatcherListener {
                 Ok(link) => interfaces = vec![link],
                 Err(e) => warn!("link_by_name failed: {:?}", e),
             }
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "android"))]
             match net::link_by_name(&self.src_interface) {
                 Ok(link) => interfaces = vec![link],
                 Err(e) => warn!("link_by_name failed: {:?}", e),
@@ -810,7 +812,7 @@ impl BaseDispatcherListener {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl BaseDispatcherListener {
     fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {

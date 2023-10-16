@@ -19,14 +19,14 @@ use std::{
     process::Command,
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
 #[cfg(target_os = "windows")]
 mod windows;
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux::*;
 
 fn exec_command(program: &str, args: &[&str]) -> Result<String> {

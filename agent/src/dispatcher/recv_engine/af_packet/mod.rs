@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 pub mod bpf;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod header;
 pub mod options;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod tpacket;
 
 pub use bpf::*;
 pub use options::{OptSocketType, OptTpacketVersion, Options};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use tpacket::Tpacket;
 
 /* example

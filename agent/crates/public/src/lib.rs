@@ -24,12 +24,14 @@ pub mod enums;
 pub mod error;
 pub mod l7_protocol;
 pub mod leaky_bucket;
-pub mod netns;
 pub mod packet;
 pub mod proto;
 pub mod pwd;
 pub mod queue;
 pub mod sender;
 pub mod utils;
+
+#[cfg(target_os = "linux")]
+pub mod netns;
 
 pub use leaky_bucket::LeakyBucket;

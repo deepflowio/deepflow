@@ -21,7 +21,7 @@ use std::ffi::CStr;
 use std::sync::{atomic::AtomicU64, Arc};
 use std::time::Duration;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use af_packet::{options::Options, tpacket::Tpacket};
 pub use public::error::{Error, Result};
 use public::packet;
@@ -36,7 +36,7 @@ pub const FRAME_SIZE_MIN: usize = 1 << 11; // analyzer
 pub const POLL_TIMEOUT: Duration = Duration::from_millis(100);
 
 pub enum RecvEngine {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     AfPacket(Tpacket),
     Dpdk(),
     Libpcap(Option<Libpcap>),
@@ -47,7 +47,7 @@ impl RecvEngine {
 
     pub fn init(&mut self) -> Result<()> {
         match self {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(_) => Ok(()),
             Self::Dpdk() => todo!(),
             Self::Libpcap(_) => Ok(()),
@@ -65,7 +65,7 @@ impl RecvEngine {
 
     pub unsafe fn recv(&mut self) -> Result<packet::Packet> {
         match self {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => match e.read() {
                 Some(p) => Ok(p),
                 None => Err(Error::Timeout),
@@ -81,7 +81,7 @@ impl RecvEngine {
     #[allow(unused_variables)]
     pub fn set_bpf(&mut self, ins: Vec<af_packet::RawInstruction>, syntax: &CStr) -> Result<()> {
         match self {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => e.set_bpf(ins).map_err(|e| e.into()),
             Self::Libpcap(w) => w
                 .as_mut()
@@ -93,7 +93,7 @@ impl RecvEngine {
 
     pub fn get_counter_handle(&self) -> Arc<dyn stats::RefCountable> {
         match self {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => Arc::new(e.get_counter_handle()),
             Self::Dpdk() => todo!(),
             Self::Libpcap(w) => match w {
@@ -104,7 +104,7 @@ impl RecvEngine {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl Default for RecvEngine {
     fn default() -> Self {
         Self::AfPacket(Tpacket::new(Options::default()).unwrap())

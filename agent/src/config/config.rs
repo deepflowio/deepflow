@@ -759,7 +759,7 @@ impl Default for YamlConfig {
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
             libpcap_enabled: true,

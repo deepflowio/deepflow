@@ -50,7 +50,6 @@ use crate::{
 use public::{
     buffer::{Allocator, BatchedBuffer},
     debug::QueueDebugger,
-    netns::NsFile,
     proto::trident::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
@@ -73,7 +72,8 @@ pub struct AnalyzerModeDispatcherListener {
 }
 
 impl AnalyzerModeDispatcherListener {
-    pub fn netns(&self) -> &NsFile {
+    #[cfg(target_os = "linux")]
+    pub fn netns(&self) -> &public::netns::NsFile {
         &self.base.netns
     }
 
@@ -297,7 +297,7 @@ impl AnalyzerModeDispatcher {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parse_config.load(),
                             collector: &collector_config.load(),
-                            #[cfg(target_os = "linux")]
+                            #[cfg(any(target_os = "linux", target_os = "android"))]
                             ebpf: None,
                         };
 

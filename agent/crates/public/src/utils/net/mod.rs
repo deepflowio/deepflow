@@ -24,20 +24,20 @@ use std::{
 use bitflags::bitflags;
 use serde::Serialize;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod arp;
 pub mod h2pack;
 
 mod error;
 pub use error::{Error, Result};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod ethtool;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use ethtool::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux::*;
 
 #[cfg(target_os = "windows")]
@@ -64,9 +64,10 @@ bitflags! {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use neli::consts::rtnl::{Iff, IffFlags};
-#[cfg(target_os = "linux")]
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl From<&IffFlags> for LinkFlags {
     fn from(flags: &IffFlags) -> Self {
         let mut fs = Self::default();
@@ -88,7 +89,7 @@ impl From<&IffFlags> for LinkFlags {
         fs
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl From<u32> for LinkFlags {
     fn from(flags: u32) -> Self {
         Self::from_bits_truncate(flags)
@@ -105,7 +106,7 @@ pub struct Link {
     pub device_name: String,
     pub name: String,
     pub flags: LinkFlags,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub if_type: Option<String>,
     pub peer_index: Option<u32>,
     pub link_netnsid: Option<u32>,

@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
+use std::path::Path;
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr, SocketAddrV4},
-    path::Path,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex, MutexGuard,
@@ -30,6 +31,7 @@ use std::{
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
+#[cfg(target_os = "linux")]
 use regex::Regex;
 use ring::digest;
 use tokio::runtime::Runtime;
@@ -39,24 +41,29 @@ use crate::{
     config::handler::{OsProcScanConfig, PlatformAccess},
     exception::ExceptionHandler,
     handler,
-    platform::{
-        kubernetes::{GenericPoller, Poller},
-        InterfaceEntry, LibvirtXmlExtractor,
-    },
     policy::{PolicyGetter, PolicySetter},
     rpc::Session,
     trident::AgentId,
     utils::{
-        command::{
-            get_all_vm_xml, get_brctl_show, get_hostname, get_ip_address, get_ovs_interfaces,
-            get_ovs_ports, get_vlan_config, get_vm_states,
-        },
+        command::{get_hostname, get_ip_address},
         lru::Lru,
     },
 };
+#[cfg(target_os = "linux")]
+use crate::{
+    platform::{
+        kubernetes::{GenericPoller, Poller},
+        InterfaceEntry, LibvirtXmlExtractor,
+    },
+    utils::command::{
+        get_all_vm_xml, get_brctl_show, get_ovs_interfaces, get_ovs_ports, get_vlan_config,
+        get_vm_states,
+    },
+};
 
+#[cfg(target_os = "linux")]
+use public::netns::{self, InterfaceInfo, NsFile};
 use public::{
-    netns::{self, InterfaceInfo, NsFile},
     proto::{
         common::TridentType,
         trident::{
@@ -81,9 +88,12 @@ pub(super) struct ProcessArgs {
     pub(super) session: Arc<Session>,
     pub(super) sniffer: Arc<sniffer_builder::Sniffer>,
     pub(super) timer: Arc<Condvar>,
+    #[cfg(target_os = "linux")]
     pub(super) xml_extractor: Arc<LibvirtXmlExtractor>,
+    #[cfg(target_os = "linux")]
     pub(super) kubernetes_poller: Arc<Mutex<Option<Arc<GenericPoller>>>>,
     pub(super) exception_handler: ExceptionHandler,
+    #[cfg(target_os = "linux")]
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
     pub(super) pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
@@ -119,12 +129,15 @@ pub struct PlatformSynchronizer {
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
+    #[cfg(target_os = "linux")]
     kubernetes_poller: Arc<Mutex<Option<Arc<GenericPoller>>>>,
     thread: Mutex<Option<JoinHandle<()>>>,
     session: Arc<Session>,
+    #[cfg(target_os = "linux")]
     xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
     exception_handler: ExceptionHandler,
+    #[cfg(target_os = "linux")]
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     override_os_hostname: Arc<Option<String>>,
     pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
@@ -137,12 +150,12 @@ impl PlatformSynchronizer {
         config: PlatformAccess,
         agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
-        xml_extractor: Arc<LibvirtXmlExtractor>,
+        #[cfg(target_os = "linux")] xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
-        extra_netns_regex: String,
+        #[cfg(target_os = "linux")] extra_netns_regex: String,
         override_os_hostname: Option<String>,
-        pid_netns_id_map: HashMap<u32, u32>,
     ) -> Self {
+        #[cfg(target_os = "linux")]
         let extra_netns_regex = if extra_netns_regex != "" {
             info!("platform monitoring extra netns: /{}/", extra_netns_regex);
             Some(Regex::new(&extra_netns_regex).unwrap())
@@ -163,24 +176,29 @@ impl PlatformSynchronizer {
                     .unwrap()
                     .as_secs(),
             )),
+            #[cfg(target_os = "linux")]
             kubernetes_poller: Default::default(),
             running: Arc::new(Mutex::new(false)),
             timer: Arc::new(Condvar::new()),
             thread: Mutex::new(None),
             session,
+            #[cfg(target_os = "linux")]
             xml_extractor,
             sniffer,
             exception_handler,
+            #[cfg(target_os = "linux")]
             extra_netns_regex: Arc::new(Mutex::new(extra_netns_regex)),
             override_os_hostname: Arc::new(override_os_hostname),
-            pid_netns_id_map: Arc::new(RwLock::new(pid_netns_id_map)),
+            pid_netns_id_map: Default::default(),
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub fn set_netns_regex(&self, regex: Option<Regex>) {
         *self.extra_netns_regex.lock().unwrap() = regex;
     }
 
+    #[cfg(target_os = "linux")]
     pub fn set_kubernetes_poller(&self, poller: Arc<GenericPoller>) {
         self.kubernetes_poller.lock().unwrap().replace(poller);
     }
@@ -233,12 +251,15 @@ impl PlatformSynchronizer {
             agent_id: self.agent_id.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
+            #[cfg(target_os = "linux")]
             kubernetes_poller: self.kubernetes_poller.clone(),
             timer: self.timer.clone(),
             session: self.session.clone(),
+            #[cfg(target_os = "linux")]
             xml_extractor: self.xml_extractor.clone(),
             sniffer: self.sniffer.clone(),
             exception_handler: self.exception_handler.clone(),
+            #[cfg(target_os = "linux")]
             extra_netns_regex: self.extra_netns_regex.clone(),
             override_os_hostname: self.override_os_hostname.clone(),
             pid_netns_id_map: self.pid_netns_id_map.clone(),
@@ -256,17 +277,17 @@ impl PlatformSynchronizer {
     fn query_platform(
         platform_args: &mut PlatformArgs,
         hash_args: &mut HashArgs,
-        self_interface_infos: &mut Vec<InterfaceInfo>,
-        self_xml_interfaces: &mut Vec<InterfaceEntry>,
+        #[cfg(target_os = "linux")] self_interface_infos: &mut Vec<InterfaceInfo>,
+        #[cfg(target_os = "linux")] self_xml_interfaces: &mut Vec<InterfaceEntry>,
         process_info: &mut Vec<ProcessData>,
         process_info_enabled: bool,
         platform_enabled: bool,
         proc_scan_conf: &OsProcScanConfig,
         process_args: &ProcessArgs,
-        self_kubernetes_version: &mut u64,
+        #[cfg(target_os = "linux")] self_kubernetes_version: &mut u64,
         self_last_ip_update_timestamp: &mut Duration,
-        netns: &Vec<NsFile>,
-        libvirt_xml_path: &Path,
+        #[cfg(target_os = "linux")] netns: &Vec<NsFile>,
+        #[cfg(target_os = "linux")] libvirt_xml_path: &Path,
     ) {
         let mut changed = 0;
 
@@ -289,6 +310,24 @@ impl PlatformSynchronizer {
 
         let mut raw_ip_netns = vec![];
         let mut raw_ip_addrs = vec![];
+        #[cfg(target_os = "android")]
+        {
+            let raw_host_ip_addr = get_ip_address()
+                .map_err(|err| debug!("get_ip_address error:{}", err))
+                .ok();
+            if let Some(ip_addr) = raw_host_ip_addr.as_ref() {
+                for line in ip_addr.lines() {
+                    // 忽略可能变化的行避免version频繁更新
+                    if line.contains("valid_lft") {
+                        continue;
+                    }
+                    hash_handle.update(line.as_bytes());
+                }
+            }
+            raw_ip_netns.push("default".to_owned());
+            raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
+        }
+        #[cfg(target_os = "linux")]
         for ns in netns {
             if let Err(e) = netns::open_named_and_setns(ns) {
                 warn!("setns to {:?} failed: {}", ns, e);
@@ -309,18 +348,26 @@ impl PlatformSynchronizer {
             raw_ip_netns.push(ns.to_string());
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
+        #[cfg(target_os = "linux")]
         if let Err(e) = netns::reset_netns() {
             warn!("restore net namespace failed: {}", e);
             return;
         }
 
+        #[cfg(target_os = "linux")]
         let mut raw_all_vm_xml = None;
+        #[cfg(target_os = "linux")]
         let mut raw_vm_states = None;
+        #[cfg(target_os = "linux")]
         let mut raw_ovs_interfaces = None;
+        #[cfg(target_os = "linux")]
         let mut raw_ovs_ports = None;
+        #[cfg(target_os = "linux")]
         let mut raw_brctl_show = None;
+        #[cfg(target_os = "linux")]
         let mut raw_vlan_config = None;
 
+        #[cfg(target_os = "linux")]
         if platform_enabled {
             raw_all_vm_xml = get_all_vm_xml(libvirt_xml_path)
                 .map_err(|err| debug!("get_all_vm_xml error:{}", err))
@@ -429,34 +476,42 @@ impl PlatformSynchronizer {
             }
         }
 
-        let kubernetes_poller = process_args.kubernetes_poller.lock().unwrap();
+        #[cfg(target_os = "linux")]
         let mut new_kubernetes_version = *self_kubernetes_version;
-        if let Some(poller) = kubernetes_poller.as_ref() {
-            new_kubernetes_version = poller.get_version();
-            if new_kubernetes_version != *self_kubernetes_version {
-                debug!("kubernetes info changed");
+        #[cfg(target_os = "linux")]
+        let kubernetes_poller = process_args.kubernetes_poller.lock().unwrap();
+        #[cfg(target_os = "linux")]
+        let mut xml_interface_hash = [0u8; SHA1_DIGEST_LEN];
+        #[cfg(target_os = "linux")]
+        let xml_interfaces = process_args.xml_extractor.get_entries();
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(poller) = kubernetes_poller.as_ref() {
+                new_kubernetes_version = poller.get_version();
+                if new_kubernetes_version != *self_kubernetes_version {
+                    debug!("kubernetes info changed");
+                    changed += 1;
+                }
+            }
+
+            if let Some(xml_interfaces) = xml_interfaces.as_ref() {
+                xml_interfaces.iter().for_each(|interface| {
+                    let mut xml_info_handle =
+                        digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY);
+                    xml_info_handle.update(interface.name.as_bytes());
+                    xml_info_handle.update(u64::from(interface.mac).to_string().as_bytes());
+                    xml_info_handle.update(interface.domain_name.as_bytes());
+
+                    let digest = xml_info_handle.finish();
+                    for (i, &b) in digest.as_ref().into_iter().enumerate() {
+                        xml_interface_hash[i] ^= b;
+                    }
+                });
+            }
+            if xml_interface_hash != hash_args.xml_interfaces_hash {
+                debug!("xml interfaces info changed");
                 changed += 1;
             }
-        }
-
-        let xml_interfaces = process_args.xml_extractor.get_entries();
-        let mut xml_interface_hash = [0u8; SHA1_DIGEST_LEN];
-        if let Some(xml_interfaces) = xml_interfaces.as_ref() {
-            xml_interfaces.iter().for_each(|interface| {
-                let mut xml_info_handle = digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY);
-                xml_info_handle.update(interface.name.as_bytes());
-                xml_info_handle.update(u64::from(interface.mac).to_string().as_bytes());
-                xml_info_handle.update(interface.domain_name.as_bytes());
-
-                let digest = xml_info_handle.finish();
-                for (i, &b) in digest.as_ref().into_iter().enumerate() {
-                    xml_interface_hash[i] ^= b;
-                }
-            });
-        }
-        if xml_interface_hash != hash_args.xml_interfaces_hash {
-            debug!("xml interfaces info changed");
-            changed += 1;
         }
 
         if changed > 0 {
@@ -464,6 +519,7 @@ impl PlatformSynchronizer {
                 hash_args.raw_info_hash.copy_from_slice(raw_info_hash);
                 platform_args.raw_hostname = raw_hostname;
 
+                #[cfg(target_os = "linux")]
                 if platform_enabled {
                     platform_args.raw_all_vm_xml = raw_all_vm_xml;
                     platform_args.raw_vm_states = raw_vm_states;
@@ -487,11 +543,13 @@ impl PlatformSynchronizer {
                 }
             }
 
+            #[cfg(target_os = "linux")]
             if new_kubernetes_version != *self_kubernetes_version {
                 *self_interface_infos = kubernetes_poller.as_ref().unwrap().get_interface_info();
                 *self_kubernetes_version = new_kubernetes_version;
             }
 
+            #[cfg(target_os = "linux")]
             if xml_interface_hash != hash_args.xml_interfaces_hash {
                 if let Some(xml_interfaces) = xml_interfaces {
                     *self_xml_interfaces = xml_interfaces;
@@ -511,8 +569,8 @@ impl PlatformSynchronizer {
     fn push_platform_message(
         platform_args: &PlatformArgs,
         process_args: &ProcessArgs,
-        self_interface_infos: &Vec<InterfaceInfo>,
-        self_xml_interfaces: &Vec<InterfaceEntry>,
+        #[cfg(target_os = "linux")] self_interface_infos: &Vec<InterfaceInfo>,
+        #[cfg(target_os = "linux")] self_xml_interfaces: &Vec<InterfaceEntry>,
         proc_data: &Vec<ProcessData>,
         vtap_id: u16,
         version: u64,
@@ -567,6 +625,7 @@ impl PlatformSynchronizer {
                 .collect();
         }
 
+        #[cfg(target_os = "linux")]
         let interfaces: Vec<trident::InterfaceInfo> = self_interface_infos
             .iter()
             .map(|interface_info| trident::InterfaceInfo {
@@ -608,7 +667,9 @@ impl PlatformSynchronizer {
             lldp_info: lldp_infos,
             raw_ip_netns: platform_args.raw_ip_netns.clone(),
             raw_ip_addrs: platform_args.raw_ip_addrs.clone(),
+            #[cfg(target_os = "linux")]
             interfaces,
+            ..Default::default()
         };
 
         let process_data = GenesisProcessData {
@@ -634,6 +695,7 @@ impl PlatformSynchronizer {
 
     fn process(args: ProcessArgs) {
         let mut last_version = 0;
+        #[cfg(target_os = "linux")]
         let mut kubernetes_version = 0;
         let mut last_ip_update_timestamp = Duration::default();
         let init_version = args.version.load(Ordering::Relaxed);
@@ -641,27 +703,34 @@ impl PlatformSynchronizer {
         let mut hash_args = HashArgs::default();
         let mut platform_args = PlatformArgs::default();
 
-        let mut interface_infos = vec![];
-        let mut xml_interfaces = vec![];
         let mut process_data = vec![];
 
+        #[cfg(target_os = "linux")]
+        let mut interface_infos = vec![];
+        #[cfg(target_os = "linux")]
+        let mut xml_interfaces = vec![];
+
+        #[cfg(target_os = "linux")]
         let mut netns = vec![];
 
         loop {
-            let mut new_netns = vec![NsFile::Root];
-            if let Some(re) = &*args.extra_netns_regex.lock().unwrap() {
-                let mut extra_ns = netns::find_ns_files_by_regex(&re);
-                extra_ns.sort_unstable();
-                new_netns.extend(extra_ns);
-            }
-            if netns.is_empty() {
-                netns = new_netns;
-            } else if netns != new_netns {
-                info!(
-                    "query net namespaces changed from {:?} to {:?}",
-                    netns, new_netns
-                );
-                netns = new_netns;
+            #[cfg(target_os = "linux")]
+            {
+                let mut new_netns = vec![NsFile::Root];
+                if let Some(re) = &*args.extra_netns_regex.lock().unwrap() {
+                    let mut extra_ns = netns::find_ns_files_by_regex(&re);
+                    extra_ns.sort_unstable();
+                    new_netns.extend(extra_ns);
+                }
+                if netns.is_empty() {
+                    netns = new_netns;
+                } else if netns != new_netns {
+                    info!(
+                        "query net namespaces changed from {:?} to {:?}",
+                        netns, new_netns
+                    );
+                    netns = new_netns;
+                }
             }
 
             let config_guard = args.config.load();
@@ -674,21 +743,27 @@ impl PlatformSynchronizer {
             let ctrl_ip = args.agent_id.read().ip.to_string();
             let poll_interval = config_guard.sync_interval;
             let kubernetes_cluster_id = config_guard.kubernetes_cluster_id.clone();
+            #[cfg(target_os = "linux")]
             let libvirt_xml_path = config_guard.libvirt_xml_path.clone();
 
             Self::query_platform(
                 &mut platform_args,
                 &mut hash_args,
+                #[cfg(target_os = "linux")]
                 &mut interface_infos,
+                #[cfg(target_os = "linux")]
                 &mut xml_interfaces,
                 &mut process_data,
                 process_info_enabled,
                 platform_enabled,
                 proc_scan_conf,
                 &args,
+                #[cfg(target_os = "linux")]
                 &mut kubernetes_version,
                 &mut last_ip_update_timestamp,
+                #[cfg(target_os = "linux")]
                 &netns,
+                #[cfg(target_os = "linux")]
                 libvirt_xml_path.as_path(),
             );
 
@@ -756,7 +831,9 @@ impl PlatformSynchronizer {
             match Self::push_platform_message(
                 &platform_args,
                 &args,
+                #[cfg(target_os = "linux")]
                 &interface_infos,
+                #[cfg(target_os = "linux")]
                 &xml_interfaces,
                 &process_data,
                 cur_vtap_id,
