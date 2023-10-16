@@ -63,9 +63,13 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Use:   "otlp",
 		Short: "otlp exporter debug commands",
 	}
+	profileCmd := &cobra.Command{
+		Use:   "profile",
+		Short: "profile debug commands",
+	}
 
 	root.AddCommand(ingesterCmd)
-	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd, otlpCmd)
+	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd, otlpCmd, profileCmd)
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
@@ -101,6 +105,8 @@ func RegisterIngesterCommand(root *cobra.Command) {
 
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"stats", "show otlp exporter stats"}, nil))
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
+
+	profileCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROFILE, debug.CmdHelper{"platformData [filter]", "show profile platform data statistics"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }
