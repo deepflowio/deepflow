@@ -26,7 +26,7 @@ use super::error::{Error, Result};
 // ioctl ethtool request
 #[cfg(target_env = "gnu")]
 const SIOCETHTOOL: u64 = 0x8946;
-#[cfg(target_env = "musl")]
+#[cfg(any(target_env = "musl", target_env = ""))]
 const SIOCETHTOOL: i32 = 0x8946;
 
 // ethtool stats related constants.

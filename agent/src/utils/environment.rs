@@ -25,16 +25,14 @@ use std::{
 };
 #[cfg(target_os = "windows")]
 use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::{fs, io::Read, os::unix::fs::MetadataExt};
 
 use bytesize::ByteSize;
-#[cfg(target_os = "linux")]
-use elf::{file::FileHeader, gabi::ET_CORE};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use log::info;
 use log::{error, warn};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
 #[cfg(target_os = "windows")]
@@ -51,7 +49,7 @@ use public::proto::{common::TridentType, trident::Exception};
 #[cfg(target_os = "windows")]
 use super::process::get_memory_rss;
 use super::process::get_process_num_by_name;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use public::utils::net::get_link_enabled_features;
 use public::utils::net::{
     addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
@@ -72,9 +70,9 @@ const BYTES_PER_MEGABYTE: u64 = 1024 * 1024;
 const MIN_MEMORY_LIMIT_MEGABYTE: u64 = 128; // uint: Megabyte
 const MAX_MEMORY_LIMIT_MEGABYTE: u64 = 100000; // uint: Megabyte
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 const CORE_FILE_CONFIG: &str = "/proc/sys/kernel/core_pattern";
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 const CORE_FILE_LIMIT: usize = 3;
 const DNS_HOST_IPV4: IpAddr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
 const DNS_HOST_IPV6: IpAddr = IpAddr::V6(Ipv6Addr::new(0x240c, 0, 0, 0, 0, 0, 0, 0x6666));
@@ -99,7 +97,7 @@ pub fn kernel_check() {
         return;
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         use nix::sys::utsname::uname;
         const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
@@ -130,7 +128,7 @@ pub fn tap_interface_check(tap_interfaces: &[String]) {
         return error!("static-config: tap-interfaces is none in analyzer-mode");
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     for name in tap_interfaces {
         let features = match get_link_enabled_features(name) {
             Ok(f) => f,
@@ -148,7 +146,7 @@ pub fn tap_interface_check(tap_interfaces: &[String]) {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn free_memory_check(_required: u64, _exception_handler: &ExceptionHandler) -> Result<()> {
     return Ok(()); // fixme: The way to obtain free memory is different in earlier versions of Linux, which requires adaptation
 }
@@ -257,7 +255,7 @@ pub fn controller_ip_check(ips: &[String]) {
     process::exit(-1);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn core_file_check() {
     let core_path = fs::read(CORE_FILE_CONFIG);
     if core_path.is_err() {
@@ -329,12 +327,12 @@ pub fn core_file_check() {
         let elf_data = &mut elf_data[..n.unwrap()];
 
         // Check whether the file is a core file
-        let elf_header = FileHeader::parse(&mut elf_data.as_bytes());
+        let elf_header = elf::file::FileHeader::parse(&mut elf_data.as_bytes());
         if elf_header.is_err() {
             continue;
         }
         let elf_header = elf_header.unwrap();
-        if elf_header.elftype.0 != ET_CORE {
+        if elf_header.elftype.0 != elf::gabi::ET_CORE {
             continue;
         }
 
@@ -494,7 +492,7 @@ pub fn running_in_only_watch_k8s_mode() -> bool {
     running_in_container() && env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some()
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn get_executable_path() -> Result<PathBuf, io::Error> {
     let possible_paths = vec![
         "/proc/self/exe".to_owned(),

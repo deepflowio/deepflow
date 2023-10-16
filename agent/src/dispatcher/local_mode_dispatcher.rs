@@ -45,7 +45,6 @@ use crate::{
     utils::bytes::read_u16_be,
 };
 use public::{
-    netns::NsFile,
     proto::{common::TridentType, trident::IfMacSource},
     utils::net::{Link, MacAddr},
 };
@@ -83,7 +82,7 @@ impl LocalModeDispatcher {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parse_config.load(),
                 collector: &base.collector_config.load(),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 ebpf: None,
             };
 
@@ -115,7 +114,7 @@ impl LocalModeDispatcher {
             }
             #[cfg(target_os = "windows")]
             let (mut packet, mut timestamp) = recved.unwrap();
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let (packet, mut timestamp) = recved.unwrap();
 
             let pipeline = {
@@ -165,7 +164,7 @@ impl LocalModeDispatcher {
 
             let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let decap_length = match BaseDispatcher::decap_tunnel(
                 packet.data,
                 &base.tap_type_handler,
@@ -279,7 +278,7 @@ impl LocalModeDispatcher {
         #[cfg(target_os = "linux")]
         return LocalModeDispatcherListener::new(self.base.listener(), self.extractor.clone());
 
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "android"))]
         return LocalModeDispatcherListener::new(self.base.listener());
     }
 }
@@ -311,7 +310,8 @@ impl LocalModeDispatcherListener {
         }
     }
 
-    pub fn netns(&self) -> &NsFile {
+    #[cfg(target_os = "linux")]
+    pub fn netns(&self) -> &public::netns::NsFile {
         &self.base.netns
     }
 
@@ -371,6 +371,7 @@ impl LocalModeDispatcherListener {
             &interfaces,
             if_mac_source,
             trident_type,
+            #[cfg(target_os = "linux")]
             &self.base.options.lock().unwrap().tap_mac_script,
         );
         self.base.on_vm_change(&keys, &macs);
@@ -383,15 +384,15 @@ impl LocalModeDispatcherListener {
         if_mac_source: IfMacSource,
         trident_type: TridentType,
         #[cfg(target_os = "linux")] tap_mac_script: &str,
-        #[cfg(target_os = "windows")] _: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
 
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "android"))]
         let index_to_mac_map = Self::get_if_index_to_inner_mac_map();
         #[cfg(target_os = "linux")]
         let index_to_mac_map =
             Self::get_if_index_to_inner_mac_map(&self.base.platform_poller, &self.base.netns);
+
         #[cfg(target_os = "linux")]
         let name_to_mac_map = self.get_if_name_to_mac_map(tap_mac_script);
 
@@ -427,15 +428,17 @@ impl LocalModeDispatcherListener {
                 IfMacSource::IfLibvirtXml => {
                     *name_to_mac_map.get(&iface.name).unwrap_or(&iface.mac_addr)
                 }
-                #[cfg(target_os = "windows")]
+                #[cfg(any(target_os = "windows", target_os = "android"))]
                 IfMacSource::IfLibvirtXml => MacAddr::ZERO,
             });
         }
         macs
     }
-    #[cfg(target_os = "linux")]
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn get_if_name_to_mac_map(&self, tap_mac_script: &str) -> HashMap<String, MacAddr> {
         let mut result = HashMap::new();
+        #[cfg(target_os = "linux")]
         if let Some(entries) = self.extractor.get_entries() {
             debug!("Xml Mac:");
             for entry in entries {
@@ -477,7 +480,7 @@ impl LocalModeDispatcherListener {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "android"))]
 impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
@@ -503,7 +506,10 @@ impl LocalModeDispatcherListener {
 
 #[cfg(target_os = "linux")]
 impl LocalModeDispatcherListener {
-    fn get_if_index_to_inner_mac_map(poller: &GenericPoller, ns: &NsFile) -> HashMap<u32, MacAddr> {
+    fn get_if_index_to_inner_mac_map(
+        poller: &GenericPoller,
+        ns: &public::netns::NsFile,
+    ) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
         match poller.get_interface_info_in(ns) {

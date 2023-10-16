@@ -34,17 +34,9 @@ use std::{
     },
 };
 
-#[cfg(target_os = "linux")]
-use libc::c_int;
 use log::{debug, error, info, warn};
 use packet_dedup::*;
-#[cfg(target_os = "linux")]
-use pcap_sys::bpf_insn;
-#[cfg(target_os = "linux")]
-use pcap_sys::{bpf_program, pcap_compile_nopcap};
 use public::debug::QueueDebugger;
-#[cfg(target_os = "linux")]
-use public::enums::LinuxSllPacketType::Outgoing;
 use special_recv_engine::Libpcap;
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
@@ -53,17 +45,17 @@ use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
 pub use recv_engine::RecvEngine;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use self::base_dispatcher::TapInterfaceWhitelist;
 use crate::config::handler::CollectorAccess;
 #[cfg(target_os = "linux")]
-use crate::platform::GenericPoller;
+use crate::platform::LibvirtXmlExtractor;
 use crate::utils::environment::get_mac_by_name;
 use crate::{
     common::{
@@ -76,15 +68,14 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
-    platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
     utils::stats::{self, Collector},
 };
+
 #[cfg(target_os = "linux")]
-use public::netns;
+use public::netns::NsFile;
 use public::{
     buffer::BatchedBox,
-    netns::NsFile,
     proto::{
         common::TridentType,
         trident::{IfMacSource, TapMode},
@@ -239,6 +230,7 @@ impl FlowAclListener for DispatcherListener {
 }
 
 impl DispatcherListener {
+    #[cfg(target_os = "linux")]
     pub(super) fn netns(&self) -> &NsFile {
         match self {
             Self::Local(a) => a.netns(),
@@ -299,7 +291,7 @@ pub struct DpdkRingPortConf {
 
 pub struct BpfOptions {
     pub capture_bpf: String,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub bpf_syntax: Vec<BpfSyntax>,
     pub bpf_syntax_str: String,
 }
@@ -308,7 +300,7 @@ impl Default for BpfOptions {
     fn default() -> Self {
         Self {
             capture_bpf: "".to_string(),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             bpf_syntax: Vec::new(),
             bpf_syntax_str: "".to_string(),
         }
@@ -318,11 +310,11 @@ impl Default for BpfOptions {
 impl BpfOptions {
     // When using the default BPF filtering rules, it can support collecting traffic
     // from up to 950 network ports simultaneously.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     const MAX_TAP_INTERFACES: usize = 950;
 
     // When tap_interfaces.len() exceeds 950, set bpf will report an error.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn skip_tap_interface(
         &self,
         tap_interfaces: &Vec<Link>,
@@ -397,16 +389,16 @@ impl BpfOptions {
         return bpf_syntax;
     }
 
-    #[cfg(target_os = "linux")]
-    fn to_pcap_bpf_prog(&self) -> Option<bpf_program> {
-        let mut prog: bpf_program = bpf_program {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    fn to_pcap_bpf_prog(&self) -> Option<pcap_sys::bpf_program> {
+        let mut prog = pcap_sys::bpf_program {
             bf_len: 0,
             bf_insns: std::ptr::null_mut(),
         };
         unsafe {
             #[cfg(target_arch = "x86_64")]
-            let ret = pcap_compile_nopcap(
-                0xffff as c_int,
+            let ret = pcap_sys::pcap_compile_nopcap(
+                0xffff as libc::c_int,
                 1,
                 &mut prog,
                 self.capture_bpf.as_ptr() as *const i8,
@@ -414,8 +406,8 @@ impl BpfOptions {
                 0xffffffff,
             );
             #[cfg(target_arch = "aarch64")]
-            let ret = pcap_compile_nopcap(
-                0xffff as c_int,
+            let ret = pcap_sys::pcap_compile_nopcap(
+                0xffff as libc::c_int,
                 1,
                 &mut prog,
                 self.capture_bpf.as_ptr() as *const u8,
@@ -430,7 +422,7 @@ impl BpfOptions {
         return Some(prog);
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn get_bpf_instructions(
         &self,
         tap_interfaces: &Vec<Link>,
@@ -461,7 +453,7 @@ impl BpfOptions {
                         } else if pcap_ins[bf_len - 2].code & OP_CLS_RETURN == OP_CLS_RETURN {
                             // RetConstant 65535
                             // RetConstant 0
-                            pcap_ins[bf_len - 2] = bpf_insn {
+                            pcap_ins[bf_len - 2] = pcap_sys::bpf_insn {
                                 code: OP_CLS_JUMP | OP_JUMP_EQUAL,
                                 jt: 1,
                                 jf: 1,
@@ -514,7 +506,7 @@ impl BpfOptions {
 #[derive(Default)]
 pub struct Options {
     pub packet_blocks: usize,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
     pub tap_mode: TapMode,
@@ -636,6 +628,7 @@ pub struct DispatcherBuilder {
     mirror_traffic_pcp: Option<u16>,
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
+    #[cfg(target_os = "linux")]
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: Option<DebugSender<BatchedBox<L7Stats>>>,
@@ -648,10 +641,11 @@ pub struct DispatcherBuilder {
     collector_config: Option<CollectorAccess>,
     policy_getter: Option<PolicyGetter>,
     #[cfg(target_os = "linux")]
-    platform_poller: Option<Arc<GenericPoller>>,
+    platform_poller: Option<Arc<crate::platform::GenericPoller>>,
     exception_handler: Option<ExceptionHandler>,
     ntp_diff: Option<Arc<AtomicI64>>,
     pcap_interfaces: Option<Vec<Link>>,
+    #[cfg(target_os = "linux")]
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
@@ -719,6 +713,7 @@ impl DispatcherBuilder {
         self
     }
 
+    #[cfg(target_os = "linux")]
     pub fn libvirt_xml_extractor(mut self, v: Arc<LibvirtXmlExtractor>) -> Self {
         self.libvirt_xml_extractor = Some(v);
         self
@@ -788,6 +783,7 @@ impl DispatcherBuilder {
         self
     }
 
+    #[cfg(target_os = "linux")]
     pub fn netns(mut self, v: NsFile) -> Self {
         self.netns = Some(v);
         self
@@ -814,10 +810,11 @@ impl DispatcherBuilder {
     }
 
     pub fn build(mut self) -> Result<Dispatcher> {
+        #[cfg(target_os = "linux")]
         let netns = self.netns.unwrap_or_default();
         // set ns before creating af packet socket
         #[cfg(target_os = "linux")]
-        let _ = netns::open_named_and_setns(&netns)?;
+        let _ = public::netns::open_named_and_setns(&netns)?;
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -858,7 +855,9 @@ impl DispatcherBuilder {
                 let mut lid = vec![id.to_string()];
                 if &src_interface != "" {
                     lid.push(src_interface.clone());
-                } else if netns != NsFile::Root {
+                }
+                #[cfg(target_os = "linux")]
+                if &src_interface == "" && netns != NsFile::Root {
                     lid.push(netns.to_string());
                 }
                 format!("({})", lid.join(", "))
@@ -951,6 +950,7 @@ impl DispatcherBuilder {
                 .packet_sequence_output_queue
                 .take()
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
+            #[cfg(target_os = "linux")]
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
             pause: Arc::new(AtomicBool::new(true)),
@@ -1006,7 +1006,7 @@ impl DispatcherBuilder {
                         .bpf_syntax
                         .push(BpfSyntax::JumpIf(JumpIf {
                             cond: JumpTest::JumpNotEqual,
-                            val: Outgoing as u32,
+                            val: public::enums::LinuxSllPacketType::Outgoing as u32,
                             skip_true: 1,
                             ..Default::default()
                         }));
@@ -1047,7 +1047,7 @@ impl DispatcherBuilder {
         };
         dispatcher.init();
         #[cfg(target_os = "linux")]
-        let _ = netns::reset_netns()?;
+        let _ = public::netns::reset_netns()?;
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
             terminated,
@@ -1079,7 +1079,7 @@ impl DispatcherBuilder {
                     .iter()
                     .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
                     .collect();
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 let src_ifaces = pcap_interfaces
                     .as_ref()
                     .unwrap()
@@ -1099,7 +1099,7 @@ impl DispatcherBuilder {
                 .map_err(|e| error::Error::Libpcap(e.to_string()))?;
                 Ok(RecvEngine::Libpcap(Some(libpcap)))
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             TapMode::Mirror if options.dpdk_conf.enabled => {
                 #[cfg(target_arch = "s390x")]
                 return Err(Error::ConfigInvalid(
@@ -1110,7 +1110,7 @@ impl DispatcherBuilder {
                     Ok(RecvEngine::Dpdk())
                 }
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
                 let afp = af_packet::Options {
                     frame_size: if options.tap_mode == TapMode::Analyzer {
@@ -1137,7 +1137,7 @@ impl DispatcherBuilder {
 
 #[cfg(target_os = "linux")]
 impl DispatcherBuilder {
-    pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
+    pub fn platform_poller(mut self, v: Arc<crate::platform::GenericPoller>) -> Self {
         self.platform_poller = Some(v);
         self
     }

@@ -15,7 +15,7 @@
  */
 
 pub mod c_ffi;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod shared_obj;
 pub mod wasm;
 
