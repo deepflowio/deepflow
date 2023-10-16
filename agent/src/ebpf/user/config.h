@@ -41,7 +41,7 @@
 #define PROG_DATA_SUBMIT_NAME_FOR_TP   "bpf_prog_tp__data_submit"
 #define PROG_OUTPUT_DATA_NAME_FOR_KP	"bpf_prog_kp__output_data"
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"bpf_prog_tp__output_data"
-#define PROG_IO_EVENT_NAME_FOR_TP	"bpf_prog_tp__io_event"
+#define PROG_IO_EVENT_NAME_FOR_KP	"bpf_prog_kp__io_event"
 
 // perf profiler
 #define MAP_PERF_PROFILER_BUF_A_NAME	"__profiler_output_a"
@@ -51,13 +51,13 @@
 enum {
 	PROG_DATA_SUBMIT_TP_IDX,
 	PROG_OUTPUT_DATA_TP_IDX,
-	PROG_IO_EVENT_TP_IDX,
 	PROG_TP_NUM
 };
 
 enum {
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
+	PROG_IO_EVENT_KP_IDX,
 	PROG_KP_NUM
 };
 
@@ -98,7 +98,7 @@ enum {
 #define SK_TRACER_NAME			"socket-trace"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
-#define DATADUMP_FILE_PATH_PREFIX	"/var/log"
+#define DATADUMP_FILE_PATH_PREFIX	"/data"
 
 // trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
 // Maximum proportion of trace map reclamation (refers to the proportion of

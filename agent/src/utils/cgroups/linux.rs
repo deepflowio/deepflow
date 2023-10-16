@@ -177,13 +177,14 @@ impl Cgroups {
     /// 更改资源限制
     pub fn apply(cgroup: Cgroup, max_cpus: u32, max_memory: u64) -> Result<(), Error> {
         let mut resources = Resources::default();
-        let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;
-        let cpu_resources = CpuResources {
-            quota: Some(cpu_quota as i64),
-            period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
-            ..Default::default()
-        };
-        resources.cpu = cpu_resources;
+
+        // let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;
+        // let cpu_resources = CpuResources {
+        //     quota: Some(cpu_quota as i64),
+        //     period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
+        //     ..Default::default()
+        // };
+        // resources.cpu = cpu_resources;
 
         let memory_resources = MemoryResources {
             memory_hard_limit: Some(max_memory as i64),
@@ -219,6 +220,13 @@ impl Cgroups {
     }
 }
 
+// TODO: support for android
+#[cfg(target_os = "android")]
+pub fn is_kernel_available_for_cgroups() -> bool {
+    false
+}
+
+#[cfg(not(target_os = "android"))]
 pub fn is_kernel_available_for_cgroups() -> bool {
     const MIN_KERNEL_VERSION_SUPPORT_CGROUP: &str = "2.6.24"; // Support cgroups from Linux 2.6.24
     let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
@@ -230,6 +238,14 @@ pub fn is_kernel_available_for_cgroups() -> bool {
         .0
         .ge(MIN_KERNEL_VERSION_SUPPORT_CGROUP)
 }
+
+// TODO: support for android
+#[cfg(target_os = "android")]
+pub fn is_cgroup_procs_writable() -> bool {
+    false
+}
+
+#[cfg(not(target_os = "android"))]
 pub fn is_cgroup_procs_writable() -> bool {
     // The cgroup.procs file can only be written after Linux 3.0. Refer to:
     // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b

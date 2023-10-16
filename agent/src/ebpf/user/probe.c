@@ -156,7 +156,9 @@ int program__detach_probe(struct ebpf_link *link,
 	if (link->detach(link))
 		ebpf_info("<%s> detach ev_name:%s, error\n", __func__, ev_name);
 
-	int ret;
+	int ret = 0;
+
+#if 0
 	bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 	if (is_kprobe) {
 		ret = bpf_detach_kprobe(ev_name);
@@ -167,6 +169,7 @@ int program__detach_probe(struct ebpf_link *link,
 	if (ret < 0)
 		ebpf_info("<%s> bpf_detach_probe ev_name:%s error.\n", __func__,
 			  ev_name);
+#endif
 
 	free(link);
 	return ret;
@@ -189,9 +192,9 @@ int program__attach_kprobe(void *prog,
 			   char *ev_name, void **ret_link)
 {
 	int maxactive = 0;
-	if (retprobe) {
-		maxactive = KRETPROBE_MAXACTIVE_MAX;
-	}
+	//if (retprobe) {
+	//	maxactive = KRETPROBE_MAXACTIVE_MAX;
+	//}
 	return program__attach_probe((const struct ebpf_prog *)prog,
 				     retprobe, (const char *)ev_name, func_name,
 				     "kprobe", 0, pid, maxactive, ret_link);
