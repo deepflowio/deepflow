@@ -171,6 +171,7 @@ type PlatformInfoTable struct {
 	podNameInfos       map[string][]*PodInfo
 	vtapIdInfos        map[uint32]*VtapInfo
 	containerInfos     map[string][]*PodInfo
+	containerHitCount  map[string]*uint64
 	containerMissCount map[string]*uint64
 
 	peerConnections map[int32][]int32
@@ -412,6 +413,7 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		vtapIdInfos:        make(map[uint32]*VtapInfo),
 		containerInfos:     make(map[string][]*PodInfo),
 		containerMissCount: make(map[string]*uint64),
+		containerHitCount:  make(map[string]*uint64),
 		peerConnections:    make(map[int32][]int32),
 		ctlIP:              nodeIP,
 		counter:            &Counter{},
@@ -858,8 +860,17 @@ func (t *PlatformInfoTable) String() string {
 		fmt.Fprintf(sb, "  %-15d  %d\n", epcID, *missCount)
 	}
 
+	if len(t.containerHitCount) > 0 {
+		sb.WriteString("\n9 *containerID         hitcount  (使用containerID匹配pod信息成功的统计)\n")
+		sb.WriteString("--------------------------------\n")
+	}
+
+	for containerID, hitCount := range t.containerHitCount {
+		fmt.Fprintf(sb, "  %-20s  %d\n", containerID, *hitCount)
+	}
+
 	if len(t.containerMissCount) > 0 {
-		sb.WriteString("\n9 *containerID         miss  (使用containerID无法匹配到pod信息的统计)\n")
+		sb.WriteString("\n10 *containerID         miss  (使用containerID无法匹配到pod信息的统计)\n")
 		sb.WriteString("--------------------------------\n")
 	}
 
@@ -958,6 +969,8 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 
 	t.epcIDBaseInfos = newEpcIDBaseInfos
 	t.epcIDBaseMissCount = make(map[int32]*uint64)
+	t.containerHitCount = make(map[string]*uint64)
+	t.containerMissCount = make(map[string]*uint64)
 
 	t.netnsIdInfos = newNetnsIdInfos
 	t.epcIDPodInfos = newEpcIDPodInfos
@@ -1020,6 +1033,9 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 
 		t.epcIDBaseInfos = masterTable.epcIDBaseInfos
 		t.epcIDBaseMissCount = make(map[int32]*uint64)
+
+		t.containerHitCount = make(map[string]*uint64)
+		t.containerMissCount = make(map[string]*uint64)
 
 		t.versionPlatformData = newVersion
 		t.otherRegionCount = 0
@@ -1496,9 +1512,16 @@ func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint32, containerID str
 		atomic.AddInt64(&t.counter.ContainerTotalCount, 1)
 		// assume containerid will not repeat in one cluster
 		if containerInfos, ok := t.containerInfos[containerID]; ok {
-			atomic.AddInt64(&t.counter.ContainerHitCount, int64(len(containerInfos)))
 			for _, podInfo := range containerInfos {
 				if podInfo.PodClusterId == podClusterId {
+					hitCount, ok := t.containerHitCount[containerID]
+					if !ok {
+						hitCount = new(uint64)
+						t.containerHitCount[containerID] = hitCount
+					}
+					atomic.AddUint64(hitCount, 1)
+					atomic.AddInt64(&t.counter.ContainerHitCount, 1)
+
 					return podInfo
 				}
 			}
@@ -1510,7 +1533,7 @@ func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint32, containerID str
 				t.containerMissCount[containerID] = missCount
 			}
 			atomic.AddUint64(missCount, 1)
-			atomic.AddInt64(&t.counter.ContainerMissCount, int64(len(containerInfos)))
+			atomic.AddInt64(&t.counter.ContainerMissCount, 1)
 		}
 	}
 	return nil
