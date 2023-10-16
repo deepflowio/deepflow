@@ -270,7 +270,7 @@ impl SubQuadGen {
                         flow: flow.clone(),
                         l7_protocol: meter.l7_protocol,
                         endpoint_hash,
-                        endpoint: meter.endpoint.clone(),
+                        endpoint: meter.endpoint,
                         is_active_host0,
                         is_active_host1,
                         time_in_second: tagged_flow.flow.flow_stat_time,
@@ -549,8 +549,8 @@ impl L7QuadrupleGenerator {
     ) {
         let mut second_inject = false;
         let mut minute_inject = false;
-        if let Some(s) = self.second_quad_gen.as_mut() {
-            if config.vtap_flow_1s_enabled {
+        if config.vtap_flow_1s_enabled {
+            if let Some(s) = self.second_quad_gen.as_mut() {
                 second_inject = s.move_window(time_in_second);
             }
         }
@@ -565,7 +565,11 @@ impl L7QuadrupleGenerator {
 
         let endpoint_hash = hash_endpoint(&l7_stats.endpoint) as u32;
 
-        let app_meter = Self::generate_app_meter(&l7_stats, config.l7_metrics_enabled);
+        let app_meter = if config.l7_metrics_enabled {
+            Self::generate_app_meter(&l7_stats)
+        } else {
+            AppMeter::default()
+        };
 
         if second_inject {
             self.second_quad_gen.as_mut().unwrap().inject_app_meter(
@@ -588,12 +592,7 @@ impl L7QuadrupleGenerator {
         }
     }
 
-    fn generate_app_meter(l7_stats: &L7Stats, l7_metrics_enabled: bool) -> AppMeter {
-        let mut app_meter = AppMeter::default();
-
-        if !l7_metrics_enabled {
-            return app_meter;
-        }
+    fn generate_app_meter(l7_stats: &L7Stats) -> AppMeter {
         let (close_type, direction_score) = if let Some(tagged_flow) = &l7_stats.flow {
             (
                 tagged_flow.flow.close_type,
@@ -609,7 +608,7 @@ impl L7QuadrupleGenerator {
                 SignalSource::Packet | SignalSource::EBPF | SignalSource::XFlow,
             ) => {
                 // only L7Protocol is Unknown or Other and SignalSource != Otel will execute the following logic
-                app_meter = AppMeter {
+                AppMeter {
                     traffic: AppTraffic {
                         request: (close_type != CloseType::ForcedReport) as u32,
                         response: (close_type != CloseType::ForcedReport) as u32,
@@ -618,28 +617,24 @@ impl L7QuadrupleGenerator {
                     ..Default::default()
                 }
             }
-            (_, _) => {
-                app_meter = AppMeter {
-                    traffic: AppTraffic {
-                        request: stats.request_count,
-                        response: stats.response_count,
-                        direction_score: direction_score,
-                    },
-                    latency: AppLatency {
-                        rrt_max: stats.rrt_max,
-                        rrt_sum: stats.rrt_sum as u64,
-                        rrt_count: stats.rrt_count,
-                    },
-                    anomaly: AppAnomaly {
-                        client_error: stats.err_client_count,
-                        server_error: stats.err_server_count,
-                        timeout: stats.err_timeout,
-                    },
-                };
-            }
+            (_, _) => AppMeter {
+                traffic: AppTraffic {
+                    request: stats.request_count,
+                    response: stats.response_count,
+                    direction_score: direction_score,
+                },
+                latency: AppLatency {
+                    rrt_max: stats.rrt_max,
+                    rrt_sum: stats.rrt_sum as u64,
+                    rrt_count: stats.rrt_count,
+                },
+                anomaly: AppAnomaly {
+                    client_error: stats.err_client_count,
+                    server_error: stats.err_server_count,
+                    timeout: stats.err_timeout,
+                },
+            },
         }
-
-        app_meter
     }
 
     fn handler_routine(&mut self) {

@@ -90,6 +90,8 @@ syscall_trace_id_request  , Req Syscall TraceID           ,
 syscall_trace_id_response , Resp Syscall TraceID          ,
 syscall_thread_0          , Req Syscall Thread            ,
 syscall_thread_1          , Resp Syscall Thread           ,
+syscall_coroutine_0       , Req Syscall Coroutine         ,
+syscall_coroutine_1       , Resp Syscall Coroutine        ,
 syscall_cap_seq_0         , Req Syscall CapSeq            ,
 syscall_cap_seq_1         , Resp Syscall CapSeq           ,
 
