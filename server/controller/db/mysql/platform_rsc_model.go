@@ -68,8 +68,8 @@ type SoftDeleteBase struct {
 }
 
 type Process struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	VTapID         uint32    `gorm:"column:vtap_id;type:int;not null;default:0" mapstructure:"VTAP_ID"`
 	PID            uint64    `gorm:"column:pid;type:int;not null;default:0" mapstructure:"PID"`
@@ -85,8 +85,8 @@ type Process struct {
 }
 
 type Domain struct {
-	Base         `gorm:"embedded"`
-	OperatedTime `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" mapstructure:"SYNCED_AT"`
 	Name         string     `gorm:"column:name;type:varchar(64)" mapstructure:"NAME"`
 	IconID       int        `gorm:"column:icon_id;type:int" mapstructure:"ICON_ID"`
@@ -103,8 +103,8 @@ type Domain struct {
 // TODO 最终可以与cloud模块命名统一，Domain -> DomainLcuuid
 
 type SubDomain struct {
-	Base         `gorm:"embedded"`
-	OperatedTime `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" mapstructure:"SYNCED_AT"`
 	Domain       string     `gorm:"column:domain;type:char(64);default:''" mapstructure:"DOMAIN"`
 	Name         string     `gorm:"column:name;type:varchar(64);default:''" mapstructure:"NAME"`
@@ -118,8 +118,8 @@ type SubDomain struct {
 }
 
 type Region struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string  `gorm:"column:name;type:varchar(64);default:''" mapstructure:"NAME"`
 	CreateMethod   int     `gorm:"column:create_method;type:int;default:0" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string  `gorm:"column:label;type:varchar(64);default:''" mapstructure:"LABEL"`
@@ -128,8 +128,8 @@ type Region struct {
 }
 
 type AZ struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(64);default:''" mapstructure:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" mapstructure:"LABEL"`
@@ -142,8 +142,8 @@ func (AZ) TableName() string {
 }
 
 type Host struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Type           int       `gorm:"column:type;type:int" mapstructure:"TYPE"`   // 1.Server 3.Gateway 4.DFI
 	State          int       `gorm:"column:state;type:int" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
@@ -168,8 +168,8 @@ func (Host) TableName() string {
 }
 
 type VM struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
@@ -190,7 +190,7 @@ func (VM) TableName() string {
 }
 
 type VMPodNodeConnection struct {
-	Base      `gorm:"embedded"`
+	Base      `gorm:"embedded" mapstructure:",squash"`
 	VMID      int    `gorm:"column:vm_id;type:int;default:null" mapstructure:"VM_ID"`
 	PodNodeID int    `gorm:"column:pod_node_id;type:int;default:null" mapstructure:"POD_NODE_ID"`
 	Domain    string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
@@ -202,7 +202,7 @@ func (VMPodNodeConnection) TableName() string {
 }
 
 type VMSecurityGroup struct {
-	Base            `gorm:"embedded"`
+	Base            `gorm:"embedded" mapstructure:",squash"`
 	SecurityGroupID int `gorm:"column:sg_id;type:int;not null" mapstructure:"SG_ID"`
 	VMID            int `gorm:"column:vm_id;type:int;not null" mapstructure:"VM_ID"`
 	Priority        int `gorm:"column:priority;type:int;not null" mapstructure:"PRIORITY"`
@@ -213,7 +213,7 @@ func (VMSecurityGroup) TableName() string {
 }
 
 type Contact struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string    `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	CreateMethod int       `gorm:"column:create_method;type:int;default:0" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Mobile       string    `gorm:"column:mobile;type:char(13);default:''" mapstructure:"MOBILE"`
@@ -229,7 +229,7 @@ type Contact struct {
 }
 
 type VPCContact struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	CreateMethod int `gorm:"column:create_method;type:int;default:0" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	VPCID        int `gorm:"column:epc_id;type:int;default:0" mapstructure:"VPC_ID"`
 	ContactID    int `gorm:"column:contact_id;type:int;default:0" mapstructure:"CONTACT_ID"`
@@ -240,8 +240,8 @@ func (VPCContact) TableName() string {
 }
 
 type VPC struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" mapstructure:"LABEL"`
@@ -260,8 +260,8 @@ func (VPC) TableName() string {
 }
 
 type Network struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	State          int    `gorm:"column:state;type:int;not null" mapstructure:"STATE"`        // 0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.Destroyed
 	NetType        int    `gorm:"column:net_type;type:int;default:4" mapstructure:"NET_TYPE"` // 1.CTRL 2.SERVICE 3.WAN 4.LAN
 	Name           string `gorm:"column:name;type:varchar(256);not null" mapstructure:"NAME"`
@@ -287,7 +287,7 @@ func (Network) TableName() string {
 }
 
 type Subnet struct {
-	Base      `gorm:"embedded"`
+	Base      `gorm:"embedded" mapstructure:",squash"`
 	Prefix    string `gorm:"column:prefix;type:char(64);default:''" mapstructure:"PREFIX"`
 	Netmask   string `gorm:"column:netmask;type:char(64);default:''" mapstructure:"NETMASK"`
 	NetworkID int    `gorm:"column:vl2id;type:int;default:null" mapstructure:"VL2ID"`
@@ -302,8 +302,8 @@ func (Subnet) TableName() string {
 }
 
 type VRouter struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.To run 7.Running 8.To stop 9.Stopped
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
@@ -320,7 +320,7 @@ func (VRouter) TableName() string {
 }
 
 type RoutingTable struct {
-	Base        `gorm:"embedded"`
+	Base        `gorm:"embedded" mapstructure:",squash"`
 	VRouterID   int    `gorm:"column:vnet_id;type:int;default:null" mapstructure:"VNET_ID"`
 	Destination string `gorm:"column:destination;type:text;default:''" mapstructure:"DESTINATION"`
 	NexthopType string `gorm:"column:nexthop_type;type:text;default:''" mapstructure:"NEXTHOP_TYPE"`
@@ -328,8 +328,8 @@ type RoutingTable struct {
 }
 
 type DHCPPort struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" mapstructure:"REGION"`
@@ -342,7 +342,7 @@ func (DHCPPort) TableName() string {
 }
 
 type VInterface struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string    `gorm:"column:name;type:char(64);default:''" mapstructure:"NAME"`
 	Index        int       `gorm:"column:ifindex;type:int;not null" mapstructure:"IFINDEX"`
 	State        int       `gorm:"column:state;type:int;not null" mapstructure:"STATE"`                  // 1. Attached 2.Detached 3.Exception
@@ -369,7 +369,7 @@ func (VInterface) TableName() string {
 }
 
 type LANIP struct { // TODO 添加region字段
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	IP           string    `gorm:"column:ip;type:char(64);default:''" mapstructure:"IP"`
 	Netmask      string    `gorm:"column:netmask;type:char(64);default:''" mapstructure:"NETMASK"`
 	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" mapstructure:"GATEWAY"`
@@ -390,7 +390,7 @@ func (LANIP) TableName() string {
 }
 
 type WANIP struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	IP           string    `gorm:"column:ip;type:char(64);default:''" mapstructure:"IP"`
 	Alias        string    `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	Netmask      int       `gorm:"column:netmask;type:int;default:null" mapstructure:"NETMASK"`
@@ -411,7 +411,7 @@ func (WANIP) TableName() string {
 }
 
 type FloatingIP struct {
-	Base      `gorm:"embedded"`
+	Base      `gorm:"embedded" mapstructure:",squash"`
 	Domain    string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
 	Region    string `gorm:"column:region;type:char(64);default:''" mapstructure:"REGION"`
 	VPCID     int    `gorm:"column:epc_id;type:int;default:0" mapstructure:"VPC_ID"`
@@ -425,8 +425,8 @@ func (FloatingIP) TableName() string {
 }
 
 type SecurityGroup struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:varchar(64);default:''" mapstructure:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
@@ -437,7 +437,7 @@ type SecurityGroup struct {
 }
 
 type SecurityGroupRule struct {
-	Base            `gorm:"embedded"`
+	Base            `gorm:"embedded" mapstructure:",squash"`
 	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" mapstructure:"SG_ID"`
 	Direction       int    `gorm:"column:direction;type:tinyint(1);not null;default:0" mapstructure:"DIRECTION"` // 0.Unknow 1.Ingress 2.Egress
 	Protocol        string `gorm:"column:protocol;type:char(64);default:''" mapstructure:"PROTOCOL"`
@@ -451,8 +451,8 @@ type SecurityGroupRule struct {
 }
 
 type NATGateway struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:''" mapstructure:"FLOATING_IPS"` // separated by ,
@@ -468,7 +468,7 @@ func (NATGateway) TableName() string {
 }
 
 type NATRule struct {
-	Base           `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
 	NATGatewayID   int    `gorm:"column:nat_id;type:int;default:0" mapstructure:"NAT_ID"`
 	Type           string `gorm:"column:type;type:char(16);default:''" mapstructure:"TYPE"`
 	Protocol       string `gorm:"column:protocol;type:char(64);default:''" mapstructure:"PROTOCOL"`
@@ -485,7 +485,7 @@ func (NATRule) TableName() string {
 }
 
 type NATVMConnection struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	NATGatewayID int    `gorm:"column:nat_id;type:int;default:null" mapstructure:"NAT_ID"`
 	VMID         int    `gorm:"column:vm_id;type:int;default:null" mapstructure:"VM_ID"`
 	Domain       string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
@@ -496,8 +496,8 @@ func (NATVMConnection) TableName() string {
 }
 
 type LB struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	Model          int    `gorm:"column:model;type:int;default:0" mapstructure:"MODEL"` // 1.Internal 2.External
@@ -514,8 +514,8 @@ func (LB) TableName() string {
 }
 
 type LBListener struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	LBID           int    `gorm:"column:lb_id;type:int;default:0" mapstructure:"LB_ID"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	IPs            string `gorm:"column:ips;type:text;default:''" mapstructure:"IPS"`           // separated by ,
@@ -531,7 +531,7 @@ func (LBListener) TableName() string {
 }
 
 type LBTargetServer struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	LBID         int    `gorm:"column:lb_id;type:int;default:0" mapstructure:"LB_ID"`
 	LBListenerID int    `gorm:"column:lb_listener_id;type:int;default:0" mapstructure:"LB_LISTENER_ID"`
 	VPCID        int    `gorm:"column:epc_id;type:int;default:0" mapstructure:"EPC_ID"`
@@ -548,7 +548,7 @@ func (LBTargetServer) TableName() string {
 }
 
 type LBVMConnection struct {
-	Base   `gorm:"embedded"`
+	Base   `gorm:"embedded" mapstructure:",squash"`
 	LBID   int    `gorm:"column:lb_id;type:int;default:null" mapstructure:"LB_ID"`
 	VMID   int    `gorm:"column:vm_id;type:int;default:null" mapstructure:"VM_ID"`
 	Domain string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
@@ -559,8 +559,8 @@ func (LBVMConnection) TableName() string {
 }
 
 type PeerConnection struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" mapstructure:"LOCAL_EPC_ID"`
@@ -572,8 +572,8 @@ type PeerConnection struct {
 }
 
 type CEN struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
@@ -586,8 +586,8 @@ func (CEN) TableName() string {
 }
 
 type RDSInstance struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	State          int    `gorm:"column:state;type:tinyint(1);not null;default:0" mapstructure:"STATE"` // 0. Unknown 1. Running 2. Recovering
@@ -607,8 +607,8 @@ func (RDSInstance) TableName() string {
 }
 
 type RedisInstance struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" mapstructure:"LABEL"`
 	State          int    `gorm:"column:state;type:tinyint(1);not null;default:0" mapstructure:"STATE"` // 0. Unknown 1. Running 2. Recovering
@@ -623,7 +623,7 @@ type RedisInstance struct {
 }
 
 type VIP struct {
-	Base   `gorm:"embedded"`
+	Base   `gorm:"embedded" mapstructure:",squash"`
 	IP     string `gorm:"column:ip;type:char(64);default:''" mapstructure:"IP"`
 	Domain string `gorm:"column:domain;type:char(64);not null" mapstructure:"DOMAIN"`
 	VTapID uint32 `gorm:"column:vtap_id;type:int;not null;default:0" mapstructure:"VTAP_ID"`
@@ -634,8 +634,8 @@ func (VIP) TableName() string {
 }
 
 type PodCluster struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	ClusterName    string `gorm:"column:cluster_name;type:varchar(256);default:''" mapstructure:"CLUSTER_NAME"`
 	Version        string `gorm:"column:version;type:varchar(256);default:''" mapstructure:"VERSION"`
@@ -647,8 +647,8 @@ type PodCluster struct {
 }
 
 type PodNamespace struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" mapstructure:"CLOUD_TAGS"` // separated by ,
@@ -660,8 +660,8 @@ type PodNamespace struct {
 }
 
 type PodNode struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" mapstructure:"TYPE"`               // 1: Master 2: Node
@@ -679,8 +679,8 @@ type PodNode struct {
 }
 
 type PodIngress struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:null" mapstructure:"POD_NAMESPACE_ID"`
@@ -692,7 +692,7 @@ type PodIngress struct {
 }
 
 type PodIngressRule struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" mapstructure:"PROTOCOL"`
 	Host         string `gorm:"column:host;type:text;default:''" mapstructure:"HOST"`
@@ -701,7 +701,7 @@ type PodIngressRule struct {
 }
 
 type PodIngressRuleBackend struct {
-	Base             `gorm:"embedded"`
+	Base             `gorm:"embedded" mapstructure:",squash"`
 	Path             string `gorm:"column:path;type:text;default:''" mapstructure:"PATH"`
 	Port             int    `gorm:"column:port;type:int;default:null" mapstructure:"PORT"`
 	PodServiceID     int    `gorm:"column:pod_service_id;type:int;default:null" mapstructure:"POD_SERVICE_ID"`
@@ -711,8 +711,8 @@ type PodIngressRuleBackend struct {
 }
 
 type PodService struct {
-	Base             `gorm:"embedded"`
-	SoftDeleteBase   `gorm:"embedded"`
+	Base             `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase   `gorm:"embedded" mapstructure:",squash"`
 	Name             string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Label            string `gorm:"column:label;type:text;default:''" mapstructure:"LABEL"`           // separated by ,
 	Annotation       string `gorm:"column:annotation;type:text;default:''" mapstructure:"ANNOTATION"` // separated by ,
@@ -731,7 +731,7 @@ type PodService struct {
 }
 
 type PodServicePort struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" mapstructure:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" mapstructure:"PORT"`
@@ -742,8 +742,8 @@ type PodServicePort struct {
 }
 
 type PodGroup struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" mapstructure:"TYPE"` // 1: Deployment 2: StatefulSet 3: ReplicationController
@@ -758,7 +758,7 @@ type PodGroup struct {
 }
 
 type PodGroupPort struct {
-	Base         `gorm:"embedded"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" mapstructure:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" mapstructure:"PORT"`
@@ -768,8 +768,8 @@ type PodGroupPort struct {
 }
 
 type PodReplicaSet struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	Label          string `gorm:"column:label;type:text;default:''" mapstructure:"LABEL"` // separated by ,
@@ -788,8 +788,8 @@ func (PodReplicaSet) TableName() string {
 }
 
 type PrometheusTarget struct {
-	Base           `gorm:"embedded"`
-	SoftDeleteBase `gorm:"embedded"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Instance       string `gorm:"column:instance;type:varchar(255);default:''" mapstructure:"INSTANCE"`
 	Job            string `gorm:"column:job;type:varchar(255);default:''" mapstructure:"JOB"`
 	ScrapeURL      string `gorm:"column:scrape_url;type:varchar(2083);default:''" mapstructure:"SCRAPE_URL"`
@@ -805,8 +805,8 @@ func (PrometheusTarget) TableName() string {
 }
 
 type Pod struct {
-	Base            `gorm:"embedded"`
-	SoftDeleteBase  `gorm:"embedded"`
+	Base            `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase  `gorm:"embedded" mapstructure:",squash"`
 	Name            string `gorm:"column:name;type:varchar(256);default:''" mapstructure:"NAME"`
 	Alias           string `gorm:"column:alias;type:char(64);default:''" mapstructure:"ALIAS"`
 	State           int    `gorm:"column:state;type:int;not null" mapstructure:"STATE"`                    // 0.Exception 1.Running

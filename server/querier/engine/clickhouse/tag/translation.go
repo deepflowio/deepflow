@@ -883,7 +883,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[podGroupTypeSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))",
-				"",
+				podGroupIDSuffix+"!=0",
 				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s)",
 				"",
 			),

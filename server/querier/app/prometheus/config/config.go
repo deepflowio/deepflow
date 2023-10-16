@@ -25,6 +25,7 @@ type Prometheus struct {
 	RequestQueryWithDebug   bool            `default:"false" yaml:"request-query-with-debug"`
 	ExternalTagCacheSize    int             `default:"1024" yaml:"external-tag-cache-size"`
 	ExternalTagLoadInterval int             `default:"300" yaml:"external-tag-load-interval"`
+	ThanosReplicaLabels     []string        `yaml:"thanos-replica-labels"`
 	Cache                   PrometheusCache `yaml:"cache"`
 }
 
