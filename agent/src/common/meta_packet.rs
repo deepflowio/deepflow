@@ -169,6 +169,7 @@ pub struct MetaPacket<'a> {
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+    pub socket_role: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,
@@ -932,6 +933,7 @@ impl<'a> MetaPacket<'a> {
         packet.thread_id = data.thread_id;
         packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
+        packet.socket_role = data.socket_role;
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
             data.process_kname.as_ptr() as *const u8,
