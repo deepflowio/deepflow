@@ -1082,6 +1082,11 @@ impl FlowMap {
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
+            direction_score: if meta_packet.socket_role > 0 {
+                ServiceTable::MAX_SCORE
+            } else {
+                0
+            },
             ..Default::default()
         };
         tagged_flow.flow = flow;

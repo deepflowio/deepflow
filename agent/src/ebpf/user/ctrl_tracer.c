@@ -223,7 +223,7 @@ static inline int msg_send(int clt_fd,
 		res = sendn(clt_fd, data, data_len, MSG_NOSIGNAL);
 		if (data_len != res) {
 			fprintf(stderr,
-				"[%s] scoket msg body send error -- %d/%d sent\n",
+				"[%s] socket msg body send error -- %d/%d sent\n",
 				__func__, res, data_len);
 			return -1;
 		}
@@ -329,7 +329,7 @@ static int sockopt_send(enum sockopt_type type, sockoptid_t cmd, const void *in,
 	clt_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	res = connect(clt_fd, (struct sockaddr *)&clt_addr, sizeof(clt_addr));
 	if (-1 == res) {
-		fprintf(stderr, "[%s] scoket msg connection error: %s\n",
+		fprintf(stderr, "[%s] socket msg connection error: %s\n",
 			__func__, strerror(errno));
 		free(msg);
 		return -1;
