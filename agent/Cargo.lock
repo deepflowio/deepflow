@@ -860,6 +860,7 @@ dependencies = [
  "flexi_logger",
  "futures",
  "grpc",
+ "hex",
  "hostname",
  "http",
  "humantime-serde",
