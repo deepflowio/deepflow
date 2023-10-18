@@ -884,14 +884,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))",
 				podGroupIDSuffix+"!=0",
-				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s)",
+				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s) AND "+podGroupIDSuffix+"!=0",
 				"",
 			),
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))",
 				"",
-				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
+				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
 			),
 		}
 	}
