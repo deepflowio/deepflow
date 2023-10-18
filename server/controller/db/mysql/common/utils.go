@@ -20,86 +20,21 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
-	l "log"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/op/go-logging"
-	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm/schema"
 
-	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
 )
 
 var log = logging.MustGetLogger("db.mysql.common")
 
-var SQL_FILE_DIR = "/etc/mysql"
-
-func GetConnectionWithoutDatabase(cfg MySqlConfig) *gorm.DB {
-	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
-	return GetGormDB(dsn)
-}
-
-func GetConnectionWithDatabase(cfg MySqlConfig) *gorm.DB {
-	// set multiStatements=true in dsn only when migrating MySQL
-	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut*2, true)
-	return GetGormDB(dsn)
-}
-
-func GetDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bool) string {
-	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=%ds",
-		cfg.UserName,
-		cfg.UserPassword,
-		cfg.Host,
-		cfg.Port,
-		database,
-		timeout,
-	)
-	if multiStatements {
-		dsn += "&multiStatements=true"
-	}
-	return dsn
-}
-
-func GetGormDB(dsn string) *gorm.DB {
-	Db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN:                       dsn,   // DSN data source name
-		DefaultStringSize:         256,   // string 类型字段的默认长度
-		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
-		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
-		DontSupportRenameColumn:   true,  // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
-		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
-	}), &gorm.Config{
-		NamingStrategy: schema.NamingStrategy{SingularTable: true}, // 设置全局表名禁用复数
-		Logger: logger.New(
-			l.New(os.Stdout, "\r\n", l.LstdFlags), // io writer
-			logger.Config{
-				SlowThreshold:             0,            // 慢SQL阈值,为0时不打印
-				LogLevel:                  logger.Error, // Log level
-				IgnoreRecordNotFoundError: false,        // 忽略ErrRecordNotFound（记录未找到）错误
-				Colorful:                  true,         // 是否彩色打印
-			}), // 配置log
-	})
-	if err != nil {
-		log.Errorf("Mysql Connection failed with error: %v", err.Error())
-		return nil
-	}
-
-	sqlDB, _ := Db.DB()
-	// 限制最大空闲连接数、最大连接数和连接的生命周期
-	sqlDB.SetMaxIdleConns(50)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	return Db
-}
+const SQL_FILE_DIR = "/etc/mysql"
 
 func DropDatabase(db *gorm.DB, database string) error {
 	log.Infof("drop database %s", database)
@@ -169,6 +104,10 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 		if err != nil {
 			return err
 		}
+		err = executeScript(db, nv)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -190,6 +129,15 @@ func executeIssu(db *gorm.DB, nextVersion string) error {
 	}
 	log.Infof("execute db issu (version: %s) success", nextVersion)
 	return nil
+}
+
+func executeScript(db *gorm.DB, nextVersion string) error {
+	var err error
+	switch nextVersion {
+	case script.SCRIPT_UPDATE_CLOUD_TAG:
+		err = script.ScriptUpdateCloudTags(db)
+	}
+	return err
 }
 
 func getAscSortedNextVersions(files []fs.FileInfo, curVersion string) []string {

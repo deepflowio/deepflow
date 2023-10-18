@@ -22,6 +22,7 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
@@ -38,7 +39,7 @@ var log = logging.MustGetLogger("db.migrator.mysql")
 //
 //	and upgrade based the result.
 func MigrateMySQL(cfg MySqlConfig) bool {
-	db := GetConnectionWithoutDatabase(cfg)
+	db := mysql.GetConnectionWithoutDatabase(cfg)
 	if db == nil {
 		return false
 	}
@@ -48,7 +49,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 		return false
 	}
 
-	db = GetConnectionWithDatabase(cfg)
+	db = mysql.GetConnectionWithDatabase(cfg)
 	if db == nil {
 		return false
 	}
@@ -107,7 +108,7 @@ func UpgradeIfDBVersionNotLatest(db *gorm.DB, cfg MySqlConfig) bool {
 func RecreateDatabaseAndInitTables(db *gorm.DB, cfg MySqlConfig) bool {
 	log.Info("recreate database and init tables")
 	DropDatabase(db, cfg.Database)
-	db = GetConnectionWithoutDatabase(cfg)
+	db = mysql.GetConnectionWithoutDatabase(cfg)
 	if db == nil {
 		return false
 	}
@@ -117,7 +118,7 @@ func RecreateDatabaseAndInitTables(db *gorm.DB, cfg MySqlConfig) bool {
 		return false
 	}
 
-	db = GetConnectionWithDatabase(cfg)
+	db = mysql.GetConnectionWithDatabase(cfg)
 	if db == nil {
 		return false
 	}

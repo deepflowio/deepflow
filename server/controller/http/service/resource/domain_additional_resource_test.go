@@ -19,6 +19,7 @@ package resource
 import (
 	"testing"
 
+	"github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -29,7 +30,7 @@ func Test_convertTagsToString(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    string
+		want    map[string]string
 		wantErr bool
 	}{
 		{
@@ -39,7 +40,7 @@ func Test_convertTagsToString(t *testing.T) {
 					{Key: "key-1", Value: "value-1"},
 				},
 			},
-			want:    "key-1:value-1",
+			want:    map[string]string{"key-1": "value-1"},
 			wantErr: false,
 		},
 		{
@@ -50,7 +51,7 @@ func Test_convertTagsToString(t *testing.T) {
 					{Key: "key-2", Value: "value-2"},
 				},
 			},
-			want:    "key-1:value-1, key-2:value-2",
+			want:    map[string]string{"key-1": "value-1", "key-2": "value-2"},
 			wantErr: false,
 		},
 		{
@@ -77,18 +78,18 @@ func Test_convertTagsToString(t *testing.T) {
 			args: args{
 				tags: []model.AdditionalResourceTag{},
 			},
-			want:    "",
+			want:    map[string]string{},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := convertTagsToString(tt.args.tags)
+			got, err := convertTagsToMap(tt.args.tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("convertTagsToString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
+			if common.DiffMap(got, tt.want) {
 				t.Errorf("convertTagsToString() = %v, want %v", got, tt.want)
 			}
 		})
