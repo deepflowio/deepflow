@@ -63,8 +63,8 @@ type OperatedTime struct {
 }
 
 type SoftDeleteBase struct {
-	OperatedTime
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" mapstructure:"DELETED_AT"`
+	OperatedTime `mapstructure:",squash"`
+	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" mapstructure:"DELETED_AT"`
 }
 
 type Process struct {
