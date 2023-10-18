@@ -17,5 +17,6 @@
 package config
 
 type Config struct {
-	RedisRefreshInterval int `default:"3600" yaml:"redis_refresh_interval"`
+	RedisRefreshInterval int      `default:"3600" yaml:"redis_refresh_interval"`
+	AdditionalDomains    []string `yaml:"additional_domains"`
 }

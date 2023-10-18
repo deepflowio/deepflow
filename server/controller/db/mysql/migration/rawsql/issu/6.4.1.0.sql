@@ -11,7 +11,6 @@ BEGIN
 
     IF pod_group_type_column = '' THEN
         ALTER TABLE `ch_pod_group` ADD COLUMN `pod_group_type` INTEGER DEFAULT NULL AFTER `name`;
-        ALTER TABLE `vinterface` ADD COLUMN `vmac` CHAR(32) DEFAULT '' AFTER `mac`;
     END IF;
     UPDATE db_version SET version='6.4.1.0';
 END;
