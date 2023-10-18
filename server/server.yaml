@@ -52,6 +52,8 @@ controller:
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600
+    # additional domains
+    additional_domains:
 
   # deepflow web service config
   df-web-service:

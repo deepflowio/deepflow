@@ -85,6 +85,11 @@ struct datadump_msg {
 	char comm[16];
 };
 
+struct cpdbg_msg {
+	bool enable;		// Whether to enable the datadump ?
+	int timeout;
+};
+
 int sockopt_ctl(void *arg);
 int ctrl_init(void);
 int sockopt_register(struct tracer_sockopts *sockopts);

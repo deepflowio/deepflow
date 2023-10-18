@@ -56,12 +56,13 @@ func GetNameSpace() string {
 }
 
 var osDict = map[string]int{
-	"centos":  OS_CENTOS,
-	"red hat": OS_REDHAT,
-	"redhat":  OS_REDHAT,
-	"ubuntu":  OS_UBUNTU,
-	"suse":    OS_SUSE,
-	"windows": OS_WINDOWS,
+	"centos":     OS_CENTOS,
+	"red hat":    OS_REDHAT,
+	"redhat":     OS_REDHAT,
+	"ubuntu":     OS_UBUNTU,
+	"suse":       OS_SUSE,
+	"windows":    OS_WINDOWS,
+	"cuttlefish": OS_ANDROID,
 }
 
 var archDict = map[string]int{
