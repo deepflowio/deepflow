@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/pyroscope-io/pyroscope/pkg/scrape/model"
+	"github.com/prometheus/common/model"
 )
 
 const (
