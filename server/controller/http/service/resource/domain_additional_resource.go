@@ -389,7 +389,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) subdomain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			podNS.CloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -412,7 +412,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			chost.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			chost.CloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -430,7 +430,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			podNS.CloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -974,28 +974,23 @@ func getPodNamespaceInSubdomainFromDB(domainUUIDs []string) (map[string]map[stri
 	return subdomainUUIDToPodNSNameToInfo, nil
 }
 
-func convertTagsToString(tags []model.AdditionalResourceTag) (string, error) {
+func convertTagsToMap(tags []model.AdditionalResourceTag) (map[string]string, error) {
 	// If tag is not set then return null value as delete.
+	ret := map[string]string{}
 	if len(tags) == 0 {
-		return "", nil
+		return ret, nil
 	}
 
-	var str string
-	for i, tag := range tags {
+	for _, tag := range tags {
 		if err := isTagValid(tag.Key, true); err != nil {
-			return "", err
+			return ret, err
 		}
 		if err := isTagValid(tag.Value, false); err != nil {
-			return "", err
+			return ret, err
 		}
-
-		if i == 0 {
-			str = fmt.Sprintf("%s:%s", tag.Key, tag.Value)
-			continue
-		}
-		str = fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
+		ret[tag.Key] = tag.Value
 	}
-	return str, nil
+	return ret, nil
 }
 
 func isTagValid(str string, isKey bool) error {

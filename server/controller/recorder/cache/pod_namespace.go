@@ -43,10 +43,10 @@ func (b *DiffBaseDataSet) deletePodNamespace(lcuuid string) {
 
 type PodNamespace struct {
 	DiffBase
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-	CloudTags       string `json:"cloud_tags"`
+	RegionLcuuid    string            `json:"region_lcuuid"`
+	AZLcuuid        string            `json:"az_lcuuid"`
+	SubDomainLcuuid string            `json:"sub_domain_lcuuid"`
+	CloudTags       map[string]string `json:"cloud_tags"`
 }
 
 func (p *PodNamespace) Update(cloudItem *cloudmodel.PodNamespace) {

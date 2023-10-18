@@ -50,15 +50,15 @@ func (b *DiffBaseDataSet) deleteVM(lcuuid string) {
 
 type VM struct {
 	DiffBase
-	Name         string `json:"name"`
-	Label        string `json:"label"`
-	State        int    `json:"state"`
-	HType        int    `json:"htype"`
-	LaunchServer string `json:"launch_server"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid"`
-	AZLcuuid     string `json:"az_lcuuid"`
-	CloudTags    string `json:"cloud_tags"`
+	Name         string            `json:"name"`
+	Label        string            `json:"label"`
+	State        int               `json:"state"`
+	HType        int               `json:"htype"`
+	LaunchServer string            `json:"launch_server"`
+	VPCLcuuid    string            `json:"vpc_lcuuid"`
+	RegionLcuuid string            `json:"region_lcuuid"`
+	AZLcuuid     string            `json:"az_lcuuid"`
+	CloudTags    map[string]string `json:"cloud_tags"`
 }
 
 func (v *VM) Update(cloudItem *cloudmodel.VM) {

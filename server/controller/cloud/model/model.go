@@ -47,17 +47,17 @@ type Host struct {
 }
 
 type VM struct {
-	Lcuuid       string    `json:"lcuuid" binding:"required"`
-	Name         string    `json:"name" binding:"required"`
-	Label        string    `json:"label"`
-	HType        int       `json:"htype" binding:"required"`
-	State        int       `json:"state" binding:"required"`
-	LaunchServer string    `json:"launch_server" binding:"required"`
-	CloudTags    string    `json:"cloud_tags"`
-	CreatedAt    time.Time `json:"created_at"`
-	VPCLcuuid    string    `json:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string    `json:"az_lcuuid" binding:"required"`
-	RegionLcuuid string    `json:"region_lcuuid" binding:"required"`
+	Lcuuid       string            `json:"lcuuid" binding:"required"`
+	Name         string            `json:"name" binding:"required"`
+	Label        string            `json:"label"`
+	HType        int               `json:"htype" binding:"required"`
+	State        int               `json:"state" binding:"required"`
+	LaunchServer string            `json:"launch_server" binding:"required"`
+	CreatedAt    time.Time         `json:"created_at"`
+	VPCLcuuid    string            `json:"vpc_lcuuid" binding:"required"`
+	AZLcuuid     string            `json:"az_lcuuid" binding:"required"`
+	RegionLcuuid string            `json:"region_lcuuid" binding:"required"`
+	CloudTags    map[string]string `json:"cloud_tags"`
 }
 
 type VMPodNodeConnection struct {
@@ -353,13 +353,13 @@ type PodNode struct {
 }
 
 type PodNamespace struct {
-	Lcuuid           string `json:"lcuuid" binding:"required"`
-	Name             string `json:"name" binding:"required"`
-	CloudTags        string `json:"cloud_tags"`
-	PodClusterLcuuid string `json:"pod_cluster_lcuuid" binding:"required"`
-	AZLcuuid         string `json:"az_lcuuid" binding:"required"`
-	RegionLcuuid     string `json:"region_lcuuid" binding:"required"`
-	SubDomainLcuuid  string `json:"sub_domain_lcuuid" binding:"required"`
+	Lcuuid           string            `json:"lcuuid" binding:"required"`
+	Name             string            `json:"name" binding:"required"`
+	PodClusterLcuuid string            `json:"pod_cluster_lcuuid" binding:"required"`
+	AZLcuuid         string            `json:"az_lcuuid" binding:"required"`
+	RegionLcuuid     string            `json:"region_lcuuid" binding:"required"`
+	SubDomainLcuuid  string            `json:"sub_domain_lcuuid" binding:"required"`
+	CloudTags        map[string]string `json:"cloud_tags"`
 }
 
 type PodService struct {
@@ -597,7 +597,7 @@ type AdditionalResource struct {
 	SubDomainResources    map[string]*AdditionalSubdomainResource
 }
 
-type UUIDToCloudTags map[string]string
+type UUIDToCloudTags map[string]map[string]string
 
 type AdditionalSubdomainResource struct {
 	PodNamespaceCloudTags UUIDToCloudTags
