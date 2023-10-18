@@ -139,7 +139,7 @@ impl MetaAppProto {
                 base_info.process_id_1 = meta_packet.process_id;
                 base_info.process_kname_1 = process_name;
                 base_info.netns_id_1 = meta_packet.netns_id;
-                base_info.syscall_cap_seq_1 = meta_packet.coroutine_id;
+                base_info.syscall_coroutine_1 = meta_packet.coroutine_id;
             }
         }
 
