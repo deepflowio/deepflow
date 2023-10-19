@@ -806,8 +806,8 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
-			filter = "1=1"
+		if value == "''" {
+			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
@@ -821,8 +821,8 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				if value == "" {
-					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+				if value == "''" {
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					return filter, nil
 				}
 				if strings.Contains(op, "match") {
@@ -852,12 +852,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
+		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
-			filter = "1=1"
+		if value == "''" {
+			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
@@ -879,8 +879,8 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 						return filter, nil
 					}
 				}
-				if value == "" {
-					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+				if value == "''" {
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
 					return filter, nil
