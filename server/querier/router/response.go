@@ -22,7 +22,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/service"
 )
 
 type Response struct {
@@ -68,7 +67,7 @@ func InternalErrorResponse(c *gin.Context, data interface{}, debug interface{}, 
 func JsonResponse(c *gin.Context, data interface{}, debug interface{}, err error) {
 	if err != nil {
 		switch t := err.(type) {
-		case *service.ServiceError:
+		case *common.ServiceError:
 			switch t.Status {
 			case common.RESOURCE_NOT_FOUND, common.INVALID_POST_DATA, common.RESOURCE_NUM_EXCEEDED,
 				common.SELECTED_RESOURCES_NUM_EXCEEDED:
