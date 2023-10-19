@@ -393,7 +393,6 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 
 		clib_mem_free((void *)msg);
 		msg_kv->msg_ptr = 0;
-		(*(u64 *) ctx)++;
 	}
 
 	int ret = VEC_OK;
@@ -435,9 +434,8 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	last_push_time = curr_time;
 	push_count++;
 
-	u64 elems_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
-						    (void *)&elems_count);
+						    NULL);
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
@@ -453,12 +451,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 
 	vec_free(trace_msg_kvps);
 
-	if (elems_count != h->hash_elems_count) {
-		ebpf_warning("elems_count %lu hash_elems_count %lu "
-			     "hit_hash_count %lu\n", elems_count,
-			     h->hash_elems_count, h->hit_hash_count);
-	}
-
 	h->hit_hash_count = 0;
 	h->hash_elems_count = 0;
 
@@ -466,9 +458,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 		msg_clear_hash = false;
 		stack_trace_msg_hash_free(h);
 	}
-
-	ebpf_debug("release_stack_trace_msg hashmap clear %lu "
-		   "elems.\n", elems_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
