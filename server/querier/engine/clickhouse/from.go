@@ -17,9 +17,9 @@
 package clickhouse
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -43,7 +43,7 @@ func GetMetricIDFilter(db, table string) (view.Node, error) {
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return nil, errors.New(errorMessage)
+		return nil, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	filter := fmt.Sprintf("metric_id=%d", metricID)
 	return &view.Expr{Value: "(" + filter + ")"}, nil
