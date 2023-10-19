@@ -15,11 +15,9 @@
  */
 
 mod dubbo;
-mod protobuf_rpc;
 mod sofa_rpc;
 
 pub use dubbo::{DubboHeader, DubboInfo, DubboLog};
-pub use protobuf_rpc::{get_protobuf_rpc_parser, ProtobufRpcInfo, ProtobufRpcWrapLog};
 pub use sofa_rpc::{
     decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, SofaRpcInfo, SofaRpcLog,
     SOFA_NEW_RPC_TRACE_CTX_KEY,

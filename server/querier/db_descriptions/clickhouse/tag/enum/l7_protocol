@@ -7,7 +7,6 @@
 23      , HTTP2_TLS       ,
 40      , Dubbo           ,
 41      , gRPC            ,
-42      , ProtobufRPC     ,
 43      , SOFARPC         ,
 44      , FastCGI         ,
 60      , MySQL           ,
