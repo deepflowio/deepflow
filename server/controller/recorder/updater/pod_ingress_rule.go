@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodIngressRule struct {
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
 	updater := &PodIngressRule{
 		UpdaterBase[cloudmodel.PodIngressRule, mysql.PodIngressRule, *cache.PodIngressRule]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodIngressRule(),
 			diffBaseData: wholeCache.PodIngressRules,
@@ -50,8 +51,8 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
-			common.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

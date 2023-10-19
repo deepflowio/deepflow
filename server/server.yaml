@@ -52,6 +52,8 @@ controller:
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600
+    # additional domains
+    additional_domains:
 
   # deepflow web service config
   df-web-service:
@@ -170,7 +172,13 @@ controller:
         resource_max_id_0: 64000
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
-
+        # local debug log
+        log_debug: 
+          enabled: false
+          detail_enabled: false
+          resource_type:
+          #  - all
+          #  - vpc
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
@@ -274,6 +282,7 @@ querier:
     request-query-with-debug: true
     external-tag-cache-size: 1024
     external-tag-load-interval: 300
+    thanos-replica-labels: [] # remove duplicate replica labels when query data
     cache:
       enabled: true
       cache-item-size: 512000 # max size of cache item, unit: byte

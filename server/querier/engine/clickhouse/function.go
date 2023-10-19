@@ -79,6 +79,10 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 }
 
 func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
+	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
+		return GetTopKTrans(name, args, alias, db, table, ctx)
+	}
+
 	var levelFlag int
 	field := args[0]
 	field = strings.Trim(field, "`")
@@ -113,6 +117,77 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	}
 	return &AggFunction{
 		Metrics: metricStruct,
+		Name:    name,
+		Args:    args,
+		Alias:   alias,
+	}, levelFlag, unit, nil
+}
+
+func GetTopKTrans(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
+	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
+	if !ok {
+		return nil, 0, "", nil
+	}
+
+	var fields []string
+	if name == view.FUNCTION_TOPK {
+		fields = args[:len(args)-1]
+	} else if name == view.FUNCTION_ANY {
+		fields = args
+	}
+
+	levelFlag := view.MODEL_METRICS_LEVEL_FLAG_UNLAY
+
+	fieldsLen := len(fields)
+	dbFields := make([]string, fieldsLen)
+	conditions := make([]string, 0, fieldsLen)
+
+	var metricStruct *metrics.Metrics
+	for i, field := range fields {
+		var condition string
+
+		field = strings.Trim(field, "`")
+		metricStruct, ok = metrics.GetAggMetrics(field, db, table, ctx)
+		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
+			return nil, 0, "", nil
+		}
+
+		condition = metricStruct.Condition
+		tag, ok := tag.GetTag(field, db, table, "default")
+		if ok {
+			dbFields[i] = tag.TagTranslator
+			if condition == "" {
+				condition = tag.NotNullFilter
+			}
+		} else {
+			dbFields[i] = metricStruct.DBField
+		}
+		if condition != "" {
+			conditions = append(conditions, condition)
+		}
+
+		// 判断算子是否支持单层
+		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db == "flow_metrics" {
+			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
+			if !common.IsValueInSliceString(name, unlayFuns) {
+				levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+			}
+		}
+	}
+
+	metricStructCopy := *metricStruct
+	if fieldsLen > 1 {
+		metricStructCopy.DBField = "(" + strings.Join(dbFields, ", ") + ")"
+		metricStructCopy.Condition = "(" + strings.Join(conditions, " AND ") + ")"
+	} else {
+		metricStructCopy.DBField = strings.Join(dbFields, ", ")
+		metricStructCopy.Condition = strings.Join(conditions, " AND ")
+	}
+
+	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
+
+	return &AggFunction{
+		Metrics: &metricStructCopy,
 		Name:    name,
 		Args:    args,
 		Alias:   alias,
@@ -570,10 +645,20 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 				f.Value = "'" + nodeType + "'"
 			}
 		}
+
+		if strings.HasPrefix(f.Args[0], "is_internet") {
+			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+		}
+
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:
 		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
+
+		if strings.HasPrefix(f.Args[0], "is_internet") {
+			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+		}
+
 		return f.getViewNode()
 	case TAG_FUNCTION_TO_STRING:
 		if common.IsValueInSliceString(f.Args[0], []string{"start_time", "end_time"}) {

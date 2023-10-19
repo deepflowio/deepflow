@@ -131,7 +131,10 @@ memcpy_s_inline(void *__restrict__ dest, rsize_t dmax,
 	 * n == 0 isn't really "bad", so check first in the
 	 * "wall-of-shame" department...
 	 */
-	bad = (dest == 0) + (src == 0) + (n > dmax) + (dest == src) + (n == 0);
+	if (n > dmax)
+		n = dmax;
+
+	bad = (dest == 0) + (src == 0) + (dest == src) + (n == 0);
 	if (PREDICT_FALSE(bad != 0)) {
 		/* Not actually trying to copy anything is OK */
 		if (n == 0)
@@ -140,8 +143,6 @@ memcpy_s_inline(void *__restrict__ dest, rsize_t dmax,
 			ebpf_error("dest NULL");
 		if (src == NULL)
 			ebpf_error("src NULL");
-		if (n > dmax)
-			ebpf_error("n > dmax");
 		if (dest == src)
 			ebpf_error("dest == src");
 		return -1;

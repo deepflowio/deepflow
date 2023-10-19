@@ -219,10 +219,6 @@ func isTargetRequestEqual(l, r *trident.TargetRequest) bool {
 }
 
 func addTargetRequest(req *trident.PrometheusLabelRequest, target *trident.TargetRequest) {
-	if target.GetJob() == "" && target.GetInstance() == "" {
-		return
-	}
-
 	for _, r := range req.RequestTargets {
 		if isTargetRequestEqual(r, target) {
 			return

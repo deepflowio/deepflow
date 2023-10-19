@@ -28,7 +28,7 @@ use npb_handler::{NpbHandler, NpbMode};
 use npb_pcap_policy::{NpbTunnelType, PolicyData};
 use public::{enums::HeaderType, packet, queue::DebugSender, utils::net::MacAddr};
 
-use crate::collector::acc_flow::U16Set;
+use crate::collector::types::U16Set;
 use crate::common::meta_packet::{MetaPacket, RawPacket};
 
 pub struct IpInfo {

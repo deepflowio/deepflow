@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type NATRule struct {
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
 	updater := &NATRule{
 		UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *cache.NATRule]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNATRule(),
 			diffBaseData: wholeCache.NATRules,
@@ -53,8 +54,8 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 		natGatewayID, exists = r.cache.ToolDataSet.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
-				common.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}
@@ -64,8 +65,8 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 		vinterfaceID, exists = r.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-				common.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

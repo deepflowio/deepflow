@@ -1,34 +1,36 @@
-name: automation_test
+name: automation test
 
 on:
   workflow_dispatch:
     inputs:
       DEEPFLOW_SERVER_IMAGE_TAG:
         description: 'server image tag'
-        required: false
+        required: true
         default: 'latest'
       DEEPFLOW_AGENT_IMAGE_TAG:
         description: 'agent image tag'
-        required: false
+        required: true
         default: 'latest'
-      PYTEST_XDIST_WORKER_NUMBER:
+      WORKER_NUMBER:
         description: 'Worker number, recommend 3-6'
-        required: true
+        required: false
         default: '3'
-      PYTEST_DF_ENV_NUMBER:
+      DF_ENV_NUMBER:
         description: 'Deepflow env number, recommend 1-3'
-        required: true
+        required: false
         default: '1'
       TEST_CASE:
-        description: 'case name'
+        description: |
+          case name, support: 
+          [basic, querier, cloud_k8s, cloud_workloadv, upgrade]
         required: false
-        default: 'all'
-      BRANCH:
-        description: 'df-test branch '
+        default: 'basic'
+      DF_TEST_BRANCH:
+        description: 'df-test branch'
         required: false
         default: 'master'
-      DF_ENVS_FIXED:
-        description: 'Does test case need server, 1 means no server required'
+      DEBUG:
+        description: 'reserve case environment at end of the use case, 1 means reserve'
         required: false
         default: '0'
 
@@ -37,6 +39,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 200
     steps:
+    - name: Check Server And Agent Image
+      run: |
+        server_tag="${{ github.event.inputs.DEEPFLOW_SERVER_IMAGE_TAG }}"
+        server=$(skopeo inspect docker://registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:${server_tag} 2>&1 | grep "Error parsing image name" || :)
+        if [ -n "$server" ]; then
+          echo "Get Server Image Failed: "
+          echo "$server"
+          exit 1
+        fi
+        agent_tag="${{ github.event.inputs.DEEPFLOW_AGENT_IMAGE_TAG }}"
+        agent=$(skopeo inspect docker://registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-agent:${agent_tag} 2>&1 | grep "Error parsing image name" || :)
+        if [ -n "$agent" ]; then
+          echo "Get Agent Image Failed: "
+          echo "$agent"
+          exit 1
+        fi
+        exit 0
+
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -54,15 +74,20 @@ jobs:
     - name: set environment vars
       run: |
         echo "LC_ALL=en_US.utf8" >> $GITHUB_ENV
-        echo "PYTEST_XDIST_WORKER_NUMBER=${{ github.event.inputs.PYTEST_XDIST_WORKER_NUMBER }}" >> $GITHUB_ENV
-        echo "PYTEST_DF_ENV_NUMBER=${{ github.event.inputs.PYTEST_DF_ENV_NUMBER }}" >> $GITHUB_ENV
+        echo "WORKER_NUMBER=${{ github.event.inputs.WORKER_NUMBER }}" >> $GITHUB_ENV
+        echo "DF_ENV_NUMBER=${{ github.event.inputs.DF_ENV_NUMBER }}" >> $GITHUB_ENV
         echo "TEST_CASE=${{ github.event.inputs.TEST_CASE }}" >> $GITHUB_ENV
         echo "DEEPFLOW_SERVER_IMAGE_TAG=${{ github.event.inputs.DEEPFLOW_SERVER_IMAGE_TAG }}" >> $GITHUB_ENV
         echo "DEEPFLOW_AGENT_IMAGE_TAG=${{ github.event.inputs.DEEPFLOW_AGENT_IMAGE_TAG }}" >> $GITHUB_ENV
-        echo "NO_REPORT=${{ github.event.inputs.BRANCH }}" >> $GITHUB_ENV
-        echo "DF_ENVS_FIXED=${{ github.event.inputs.DF_ENVS_FIXED }}" >> $GITHUB_ENV
+        echo "DF_TEST_BRANCH=${{ github.event.inputs.DF_TEST_BRANCH }}" >> $GITHUB_ENV
+        echo "DEBUG=${{ github.event.inputs.DEBUG }}" >> $GITHUB_ENV
+        echo "AUTOMATION_TEST_TOKEN=${{ secrets.AUTOMATION_TEST_TOKEN }}" >> $GITHUB_ENV
+        echo "AUTOMATION_TEST_PUBLIC_URL=${{ secrets.AUTOMATION_TEST_PUBLIC_URL }}" >> $GITHUB_ENV
+
     # - name: Setup Debug Session
     #   uses: csexton/debugger-action@master
     - name: run client
-      run: python3 automation_test/ws_client.py
+      run: |
+        export PYTHONUNBUFFERED=1
+        python3 automation_test/ws_client.py
   

@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type VMSecurityGroup struct {
 func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecurityGroup) *VMSecurityGroup {
 	updater := &VMSecurityGroup{
 		UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *cache.VMSecurityGroup]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVMSecurityGroup(),
 			diffBaseData: wholeCache.VMSecurityGroups,
@@ -50,16 +51,16 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 	securityGroupID, exists := v.cache.ToolDataSet.GetSecurityGroupIDByLcuuid(cloudItem.SecurityGroupLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
-			common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	vmID, exists := v.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
-			common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

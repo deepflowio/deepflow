@@ -589,10 +589,9 @@ mod test {
     fn test_fastcgi() {
         let (info, perf) = check_and_parse("fastcgi.pcap");
         assert_eq!(info.method.as_str(), "GET");
-        println!("{:?}", info);
 
         let f = FastCGIInfo {
-            version: 0,
+            version: 1,
             request_id: 1,
             msg_type: LogMessageType::Request,
             method: "GET".into(),

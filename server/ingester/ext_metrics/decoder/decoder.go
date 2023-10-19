@@ -194,7 +194,7 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 			d.counter.ErrorCount++
 			return
 		}
-		if err := pbStats.Unmarshal(bytes); err != nil {
+		if err := pbStats.Unmarshal(bytes); err != nil || pbStats.Name == "" {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("deepflow stats parse failed, err msg: %s", err)
 			}
@@ -307,6 +307,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 		t.AZID = uint16(info.AZID)
 		t.HostID = uint16(info.HostID)
 		t.PodGroupID = info.PodGroupID
+		podGroupType := uint8(info.PodGroupType)
 		t.PodNSID = uint16(info.PodNSID)
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
@@ -323,7 +324,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 			t.ServiceID = d.platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 	}
 }
 

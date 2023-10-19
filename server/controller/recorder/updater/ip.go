@@ -18,9 +18,8 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type IP struct {
@@ -77,12 +76,12 @@ func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []clo
 		vt, exists := i.cache.ToolDataSet.GetVInterfaceTypeByLcuuid(cloudItem.VInterfaceLcuuid)
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
-				rcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
 				"cloud ip", cloudItem.Lcuuid,
 			))
 			continue
 		}
-		if vt == common.VIF_TYPE_WAN {
+		if vt == ctrlrcommon.VIF_TYPE_WAN {
 			wanCloudData = append(wanCloudData, cloudItem)
 		} else {
 			lanCloudData = append(lanCloudData, cloudItem)

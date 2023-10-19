@@ -132,7 +132,7 @@ pub struct MetaPacket<'a> {
 
     tcp_options_flag: u8,
 
-    pub tcp_data: MetaPacketTcpHeader,
+    pub protocol_data: ProtocolData,
     pub tap_port: TapPort, // packet与xflow复用
     pub signal_source: SignalSource,
     pub payload_len: u16,
@@ -163,11 +163,13 @@ pub struct MetaPacket<'a> {
     pub netns_id: u32,
 
     pub thread_id: u32,
+    pub coroutine_id: u64,
     pub syscall_trace_id: u64,
     #[cfg(target_os = "linux")]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+    pub socket_role: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,
@@ -208,19 +210,31 @@ impl<'a> MetaPacket<'a> {
     }
 
     pub fn is_syn(&self) -> bool {
-        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            return tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN;
+        }
+        false
     }
 
     pub fn is_syn_ack(&self) -> bool {
-        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN_ACK && self.payload_len == 0
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            return tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN_ACK && self.payload_len == 0;
+        }
+        false
     }
 
     pub fn is_ack(&self) -> bool {
-        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::ACK && self.payload_len == 0
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            return tcp_data.flags & TcpFlags::MASK == TcpFlags::ACK && self.payload_len == 0;
+        }
+        false
     }
 
     pub fn is_psh_ack(&self) -> bool {
-        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            return tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1;
+        }
+        false
     }
 
     pub fn has_valid_payload(&self) -> bool {
@@ -246,7 +260,11 @@ impl<'a> MetaPacket<'a> {
     fn update_tcp_opt(&mut self, packet: &[u8]) {
         let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size as usize;
         let payload_offset = (offset + self.l4_opt_size as usize).min(packet.len());
-
+        let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &mut self.protocol_data {
+            tcp_data
+        } else {
+            unreachable!()
+        };
         while offset + 1 < payload_offset {
             // 如果不足2B，EOL和NOP都可以忽略
             let assume_length = packet[offset + 1].max(2) as usize;
@@ -260,7 +278,7 @@ impl<'a> MetaPacket<'a> {
                     let tcp_opt_mss_offset = offset + 2;
                     self.tcp_options_flag |= TCP_OPT_FLAG_MSS;
                     offset += TCP_OPT_MSS_LEN;
-                    self.tcp_data.mss = u16::from_be_bytes(
+                    tcp_data.mss = u16::from_be_bytes(
                         *<&[u8; 2]>::try_from(&packet[tcp_opt_mss_offset..tcp_opt_mss_offset + 2])
                             .unwrap(),
                     );
@@ -272,12 +290,12 @@ impl<'a> MetaPacket<'a> {
                     let tcp_opt_win_scale_offset = offset + 2;
                     self.tcp_options_flag |= TCP_OPT_FLAG_WIN_SCALE;
                     offset += TCP_OPT_WIN_SCALE_LEN;
-                    self.tcp_data.win_scale = packet[tcp_opt_win_scale_offset];
+                    tcp_data.win_scale = packet[tcp_opt_win_scale_offset];
                 }
                 TcpOptionNumbers::SACK_PERMITTED => {
                     self.tcp_options_flag |= TCP_OPT_FLAG_SACK_PERMIT;
                     offset += 2;
-                    self.tcp_data.sack_permitted = true;
+                    tcp_data.sack_permitted = true;
                 }
                 TcpOptionNumbers::SACK => {
                     if offset + assume_length > payload_offset {
@@ -294,7 +312,7 @@ impl<'a> MetaPacket<'a> {
                     sack.extend_from_slice(
                         &packet[tcp_opt_sack_offset..tcp_opt_sack_offset + sack_size],
                     );
-                    self.tcp_data.sack.replace(sack);
+                    tcp_data.sack.replace(sack);
                 }
                 TcpOptionNumber(TCP_OPT_ADDRESS_HUAWEI) | TcpOptionNumber(TCP_OPT_ADDRESS_IPVS) => {
                     if assume_length == TCP_TOA_LEN {
@@ -646,6 +664,10 @@ impl<'a> MetaPacket<'a> {
                 if size_checker < 0 {
                     return Ok(());
                 }
+                let icmp_type_index = FIELD_OFFSET_ICMP_TYPE_CODE + self.l2_l3_opt_size as usize;
+                let mut icmp_data = IcmpData::default();
+                icmp_data.icmp_type = packet[icmp_type_index];
+
                 match IcmpType::new(
                     packet[FIELD_OFFSET_ICMP_TYPE_CODE + self.l2_l3_opt_size as usize],
                 ) {
@@ -660,8 +682,16 @@ impl<'a> MetaPacket<'a> {
                             return Ok(());
                         }
                     }
+                    IcmpTypes::EchoRequest => {
+                        icmp_data.echo_id_seq = read_u32_be(&packet[icmp_type_index + 4..]);
+                    }
+                    IcmpTypes::EchoReply => {
+                        icmp_data.echo_id_seq = read_u32_be(&packet[icmp_type_index + 4..]);
+                        self.lookup_key.direction = PacketDirection::ServerToClient;
+                    }
                     _ => (),
                 }
+                self.protocol_data = ProtocolData::IcmpData(icmp_data);
                 self.payload_len =
                     (self.packet_len as usize - (packet.len() - size_checker as usize)) as u16;
                 self.header_type = HeaderType::Ipv4Icmp;
@@ -758,30 +788,47 @@ impl<'a> MetaPacket<'a> {
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 self.payload_len = self.l4_payload_len as u16;
                 self.header_type = header_type;
-                self.tcp_data.data_offset = data_offset;
-                self.tcp_data.win_size =
-                    read_u16_be(&packet[win_off + self.l2_l3_opt_size as usize..]);
-                self.tcp_data.flags =
-                    TcpFlags::from_bits_truncate(packet[flag_off + self.l2_l3_opt_size as usize]);
-                self.tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size as usize..]);
-                self.tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size as usize..]);
+                if let ProtocolData::TcpHeader(tcp_data) = &mut self.protocol_data {
+                    tcp_data.data_offset = data_offset;
+                    tcp_data.win_size =
+                        read_u16_be(&packet[win_off + self.l2_l3_opt_size as usize..]);
+                    tcp_data.flags = TcpFlags::from_bits_truncate(
+                        packet[flag_off + self.l2_l3_opt_size as usize],
+                    );
+                    tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size as usize..]);
+                    tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size as usize..]);
+                    tcp_data.data_offset = data_offset;
+                }
                 if data_offset > 5 {
                     self.update_tcp_opt(packet);
                 }
             }
             IpProtocol::ICMPV6 => {
+                let mut icmp_data = IcmpData::default();
                 if size_checker > 0 {
-                    // ICMPV6_TYPE_OFFSET使用ipv6的头长，实际ipv6比ipv4多的已经加在l3optSize中，这里再去掉
-                    self.nd_reply_or_arp_request = Icmpv6Type::new(
-                        packet[ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size as usize
-                            - IPV6_HEADER_ADJUST],
-                    ) == Icmpv6Types::NeighborAdvert;
+                    let icmpv6_type_index = ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size as usize;
+                    icmp_data.icmp_type = packet[icmpv6_type_index];
+
+                    match Icmpv6Type::new(packet[icmpv6_type_index]) {
+                        Icmpv6Types::NeighborAdvert => {
+                            self.nd_reply_or_arp_request = true;
+                        }
+                        Icmpv6Types::EchoRequest => {
+                            icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
+                        }
+                        Icmpv6Types::EchoReply => {
+                            icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
+                            self.lookup_key.direction = PacketDirection::ServerToClient;
+                        }
+                        _ => {}
+                    }
                     // 忽略link-local address并只考虑ND reply, i.e. neighbour advertisement
                     if let IpAddr::V6(ip) = self.lookup_key.src_ip {
                         self.nd_reply_or_arp_request =
                             self.nd_reply_or_arp_request && !is_unicast_link_local(&ip);
                     }
                 }
+                self.protocol_data = ProtocolData::IcmpData(icmp_data);
                 self.payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 return Ok(());
@@ -884,7 +931,9 @@ impl<'a> MetaPacket<'a> {
         packet.cap_seq = data.cap_seq;
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
+        packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
+        packet.socket_role = data.socket_role;
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
             data.process_kname.as_ptr() as *const u8,
@@ -898,7 +947,9 @@ impl<'a> MetaPacket<'a> {
             PACKET_KNAME_MAX_PADDING,
         );
         packet.socket_id = data.socket_id;
-        packet.tcp_data.seq = data.tcp_seq as u32;
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
+            tcp_data.seq = data.tcp_seq as u32;
+        }
         packet.ebpf_type = EbpfType::try_from(data.source)?;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
 
@@ -996,8 +1047,10 @@ impl<'a> fmt::Display for MetaPacket<'a> {
         if let Some(t) = &self.tunnel {
             write!(f, "\t\ttunnel: {}\n", t)?;
         }
-        if self.lookup_key.proto == IpProtocol::TCP {
-            write!(f, "\t\ttcp: {:?}\n", self.tcp_data)?;
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            if self.lookup_key.proto == IpProtocol::TCP {
+                write!(f, "\t\ttcp: {:?}\n", tcp_data)?;
+            }
         }
         if let Some(r) = &self.raw {
             if r.len() > 0 {
@@ -1024,6 +1077,24 @@ pub struct MetaPacketTcpHeader {
     pub win_scale: u8,
     pub sack_permitted: bool,
     pub sack: Option<Vec<u8>>, // sack value
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct IcmpData {
+    pub icmp_type: u8,
+    pub echo_id_seq: u32,
+}
+
+#[derive(Clone, Debug)]
+pub enum ProtocolData {
+    TcpHeader(MetaPacketTcpHeader),
+    IcmpData(IcmpData),
+}
+
+impl Default for ProtocolData {
+    fn default() -> Self {
+        Self::TcpHeader(MetaPacketTcpHeader::default())
+    }
 }
 
 #[cfg(test)]

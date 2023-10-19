@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type LANIP struct {
@@ -28,7 +28,7 @@ type LANIP struct {
 func NewLANIP() *LANIP {
 	return &LANIP{
 		OperatorBase[mysql.LANIP]{
-			resourceTypeName: common.RESOURCE_TYPE_LAN_IP_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

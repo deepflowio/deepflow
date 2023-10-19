@@ -18,9 +18,10 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +32,7 @@ type CEN struct {
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
 		UpdaterBase[cloudmodel.CEN, mysql.CEN, *cache.CEN]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewCEN(),
 			diffBaseData: wholeCache.CENs,
@@ -52,8 +54,8 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
-				common.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
 			))
 			continue
 		}
@@ -63,7 +65,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Domain: c.cache.DomainLcuuid,
-		VPCIDs: common.IntSliceToString(vpcIDs),
+		VPCIDs: rcommon.IntSliceToString(vpcIDs),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -74,20 +76,20 @@ func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN)
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
 	}
-	if !common.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
+	if !rcommon.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
 		vpcIDs := []int{}
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 			if !exists {
 				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
-					common.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
+					ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
 				))
 				continue
 			}
 			vpcIDs = append(vpcIDs, vpcID)
 		}
-		updateInfo["epc_ids"] = common.IntSliceToString(vpcIDs)
+		updateInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
 	}
 
 	if len(updateInfo) > 0 {

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-pub(crate) mod acc_flow;
 mod collector;
 mod consts;
 pub(crate) mod flow_aggr;
 pub(crate) mod l7_quadruple_generator;
 pub(crate) mod quadruple_generator;
+pub(crate) mod types;
 
 use std::net::IpAddr;
 use std::thread::JoinHandle;
@@ -29,15 +29,10 @@ pub use collector::{Collector, L7Collector};
 
 use bitflags::bitflags;
 
-use crate::{
-    common::{
-        endpoint::EPC_FROM_INTERNET,
-        flow::{Flow, FlowMetricsPeer},
-    },
-    utils::possible_host::PossibleHost,
-};
+use crate::{common::endpoint::EPC_FROM_INTERNET, utils::possible_host::PossibleHost};
 
 use self::l7_quadruple_generator::L7QuadrupleGeneratorThread;
+use self::types::{MiniFlow, PeerInfo};
 use self::{flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread};
 
 const SECONDS_IN_MINUTE: u64 = 60;
@@ -53,27 +48,17 @@ pub fn round_to_minute(t: Duration) -> Duration {
     Duration::from_secs(t.as_secs() / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE)
 }
 
-pub fn check_active(now: u64, possible_host: &mut PossibleHost, flow: &Flow) -> (bool, bool) {
+pub fn check_active(now: u64, possible_host: &mut PossibleHost, flow: &MiniFlow) -> (bool, bool) {
     (
-        check_active_host(
-            now,
-            possible_host,
-            &flow.flow_metrics_peers[0],
-            &flow.flow_key.ip_src,
-        ),
-        check_active_host(
-            now,
-            possible_host,
-            &flow.flow_metrics_peers[1],
-            &flow.flow_key.ip_dst,
-        ),
+        check_active_host(now, possible_host, &flow.peers[0], &flow.flow_key.ip_src),
+        check_active_host(now, possible_host, &flow.peers[1], &flow.flow_key.ip_dst),
     )
 }
 
 pub fn check_active_host(
     now: u64,
     possible_host: &mut PossibleHost,
-    flow_metric: &FlowMetricsPeer,
+    flow_metric: &PeerInfo,
     ip: &IpAddr,
 ) -> bool {
     if flow_metric.is_active_host || flow_metric.l3_epc_id == EPC_FROM_INTERNET {
@@ -83,7 +68,7 @@ pub fn check_active_host(
     if flow_metric.is_device {
         return true;
     }
-    if flow_metric.total_packet_count > 0 {
+    if flow_metric.has_packets {
         // 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
         possible_host.add(now, ip, flow_metric.l3_epc_id);
         true

@@ -18,7 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -31,6 +31,7 @@ type VPC struct {
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	updater := &VPC{
 		UpdaterBase[cloudmodel.VPC, mysql.VPC, *cache.VPC]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVPC(),
 			diffBaseData: wholeCache.VPCs,
@@ -51,7 +52,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) 
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
 		UID:          cloudItem.Label,
-		CreateMethod: common.CREATE_METHOD_LEARN,
+		CreateMethod: ctrlrcommon.CREATE_METHOD_LEARN,
 		Domain:       v.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		CIDR:         cloudItem.CIDR,

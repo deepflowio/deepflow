@@ -197,14 +197,9 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 	if start.Local().Unix()%int64(step.Seconds()) > int64(p.lookbackDelta.Seconds()) {
 		start = time.Unix(start.Local().Unix()-start.Local().Unix()%int64(step.Seconds()), 0)
 	}
-	if end.Local().Unix()%int64(step.Seconds()) > int64(p.lookbackDelta.Seconds()) {
-		end = time.Unix(end.Local().Unix()-end.Local().Unix()%int64(step.Seconds())+int64(step.Seconds()), 0)
-	}
 	if int(step.Seconds())%86400 == 0 {
 		year_start, month_start, day_start := start.Date()
-		year_end, month_end, day_end := end.Date()
 		start = time.Date(year_start, month_start, day_start, 0, 0, 0, 0, start.Location())
-		end = time.Date(year_end, month_end, day_end, 0, 0, 0, 0, end.Location())
 	}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {

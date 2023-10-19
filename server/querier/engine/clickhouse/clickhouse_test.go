@@ -55,7 +55,7 @@ var (
 		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l4_flow_log` ORDER BY `sum_log_count` desc LIMIT 1",
 	}, {
 		input:  "select Uniq(ip_0) as uniq_ip_0 from l4_flow_log limit 1",
-		output: "SELECT uniqIf([toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `uniq_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT uniqIf([toString(ip4_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `uniq_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Max(byte) as max_byte, Sum(log_count) as sum_log_count from l4_flow_log having Sum(byte)>=0 limit 1",
 		output: "SELECT MAX(byte_tx+byte_rx) AS `max_byte`, SUM(1) AS `sum_log_count` FROM flow_log.`l4_flow_log` HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 1",
@@ -259,6 +259,12 @@ var (
 		input:  "select session_length AS `会话长度` from l7_flow_log where `session_length`<=392037",
 		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037 LIMIT 10000",
 	}, {
+		input:  "SELECT node_type(is_internet_0) as `client_node_type` , icon_id(is_internet_0) as `client_icon_id`,  node_type(is_internet_1) as `server_node_type`, is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
+		output: "WITH if(l3_epc_id_0=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999))),0) AS `client_icon_id` SELECT if(l3_epc_id_0=-2,'internet','') AS `client_node_type`, `client_icon_id`, if(l3_epc_id_1=-2,'internet','') AS `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY `client_node_type`, `client_icon_id`, `server_node_type`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
+	}, {
+		input:  "select Enum(pod_group_type_0) ,pod_group_type_0 from l7_flow_log where Enum(pod_group_type_0)!='Deployment' limit 10",
+		output: "WITH dictGetOrDefault(flow_tag.int_enum_map, 'name', ('pod_group_type',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) AS `Enum(pod_group_type_0)` SELECT `Enum(pod_group_type_0)`, dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))) AS `pod_group_type_0` FROM flow_log.`l7_flow_log` PREWHERE (not(toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name = 'Deployment' and tag_name='pod_group_type') AND pod_group_id_0!=0)) LIMIT 10",
+	}, {
 		index:  "count_1",
 		input:  "select Count(row) as a from l7_flow_log having a > 0 ",
 		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
@@ -291,6 +297,30 @@ var (
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod, pod_cluster_id, service_id) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(1)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+	}, {
+		input:  "SELECT is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
+		output: "SELECT if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
+	}, {
+		index:  "TopK_1",
+		input:  "select TopK(ip_0, 10) as top_10_ip_0 from l4_flow_log limit 1",
+		output: "SELECT topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `top_10_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+	}, {
+		index:  "TopK_2",
+		input:  "select TopK(ip_0, pod_0, 10) as top_10_ip_pod_0 from l4_flow_log limit 1",
+		output: "SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `top_10_ip_pod_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+	}, {
+		index:  "Any_1",
+		input:  "select Any(ip_0) as any_ip_0 from l4_flow_log limit 1",
+		output: "SELECT topKIf(1)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `any_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+	}, {
+		index:  "Any_2",
+		input:  "select Any(ip_0, pod_0) as any_ip_pod_0 from l4_flow_log limit 1",
+		output: "SELECT topKIf(1)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `any_ip_pod_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+	}, {
+		index:  "layered_0",
+		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
+		output: "SELECT region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `region_0` LIMIT 1",
+		db:     "flow_metrics",
 	}}
 )
 

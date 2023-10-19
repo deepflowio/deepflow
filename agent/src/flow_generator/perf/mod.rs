@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+pub(crate) mod icmp;
 mod stats;
 pub mod tcp;
 pub(crate) mod udp;
@@ -59,7 +60,7 @@ use crate::{
     config::{handler::LogParserConfig, FlowConfig},
 };
 
-use {tcp::TcpPerf, udp::UdpPerf};
+use {icmp::IcmpPerf, tcp::TcpPerf, udp::UdpPerf};
 
 pub use stats::FlowPerfCounter;
 pub use stats::PerfStats;
@@ -88,6 +89,7 @@ pub trait L7FlowPerf {
 pub enum L4FlowPerfTable {
     Tcp(Box<TcpPerf>),
     Udp(UdpPerf),
+    Icmp(IcmpPerf),
 }
 
 impl L4FlowPerf for L4FlowPerfTable {
@@ -95,6 +97,7 @@ impl L4FlowPerf for L4FlowPerfTable {
         match self {
             Self::Tcp(p) => p.parse(packet, direction),
             Self::Udp(p) => p.parse(packet, direction),
+            Self::Icmp(p) => p.parse(packet, direction),
         }
     }
 
@@ -102,6 +105,7 @@ impl L4FlowPerf for L4FlowPerfTable {
         match self {
             Self::Tcp(p) => p.data_updated(),
             Self::Udp(p) => p.data_updated(),
+            Self::Icmp(p) => p.data_updated(),
         }
     }
 
@@ -109,6 +113,7 @@ impl L4FlowPerf for L4FlowPerfTable {
         match self {
             Self::Tcp(p) => p.copy_and_reset_data(flow_reversed),
             Self::Udp(p) => p.copy_and_reset_data(flow_reversed),
+            Self::Icmp(p) => p.copy_and_reset_data(flow_reversed),
         }
     }
 }
@@ -153,7 +158,7 @@ impl L7ProtocolChecker {
             iter: match l4_protocol {
                 L4Protocol::Tcp => self.tcp.iter(),
                 L4Protocol::Udp => self.udp.iter(),
-                L4Protocol::Unknown => [].iter(),
+                _ => [].iter(),
             },
             port,
         }
@@ -483,6 +488,7 @@ impl FlowLog {
                         .unwrap_or_else(|| Box::new(TcpPerf::new(counter))),
                 )),
                 L4Protocol::Udp => Some(L4FlowPerfTable::Udp(UdpPerf::new())),
+                L4Protocol::Icmp => Some(L4FlowPerfTable::Icmp(IcmpPerf::new())),
                 _ => None,
             }
         } else {
@@ -550,6 +556,13 @@ impl FlowLog {
             );
         }
         Ok(L7ParseResult::None)
+    }
+
+    pub fn parse_l3(&mut self, packet: &mut MetaPacket) -> Result<()> {
+        if let Some(l4) = self.l4.as_mut() {
+            l4.parse(packet, false)?;
+        }
+        Ok(())
     }
 
     pub fn copy_and_reset_l4_perf_data(&mut self, flow_reversed: bool, flow: &mut Flow) {

@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addLB(dbItem *mysql.LB, seq int) {
@@ -33,12 +33,12 @@ func (b *DiffBaseDataSet) addLB(dbItem *mysql.LB, seq int) {
 		VIP:          dbItem.VIP,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLB(lcuuid string) {
 	delete(b.LBs, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid))
 }
 
 type LB struct {
@@ -56,5 +56,5 @@ func (l *LB) Update(cloudItem *cloudmodel.LB) {
 	l.VIP = cloudItem.VIP
 	l.VPCLcuuid = cloudItem.VPCLcuuid
 	l.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_LB_EN, l))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, l))
 }

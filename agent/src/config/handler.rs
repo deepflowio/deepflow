@@ -1957,12 +1957,33 @@ impl ConfigHandler {
                 }
             }
 
-            fn quadruple_generator_callback(_: &ConfigHandler, components: &mut AgentComponents) {
-                for collector in components.collectors.iter().as_ref() {
-                    collector.quadruple_generator.update_config();
-                }
+            if candidate_config.collector.l7_metrics_enabled
+                != new_config.collector.l7_metrics_enabled
+            {
+                info!(
+                    "quadruple generator update l7_metrics_enabled to {}",
+                    new_config.collector.l7_metrics_enabled
+                );
+                candidate_config.collector.l7_metrics_enabled =
+                    new_config.collector.l7_metrics_enabled;
             }
-            callbacks.push(quadruple_generator_callback);
+            if candidate_config.collector.vtap_flow_1s_enabled
+                != new_config.collector.vtap_flow_1s_enabled
+            {
+                info!(
+                    "quadruple generator update vtap_flow_1s_enabled to {}",
+                    new_config.collector.vtap_flow_1s_enabled
+                );
+                candidate_config.collector.vtap_flow_1s_enabled =
+                    new_config.collector.vtap_flow_1s_enabled;
+            }
+            if candidate_config.collector.enabled != new_config.collector.enabled {
+                info!(
+                    "quadruple generator update collector_enabled to {}",
+                    new_config.collector.enabled
+                );
+                candidate_config.collector.enabled = new_config.collector.enabled;
+            }
 
             info!(
                 "collector config change from {:#?} to {:#?}",

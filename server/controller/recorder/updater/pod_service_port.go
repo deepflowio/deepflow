@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type PodServicePort struct {
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
 	updater := &PodServicePort{
 		UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *cache.PodServicePort]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodServicePort(),
 			diffBaseData: wholeCache.PodServicePorts,
@@ -50,8 +51,8 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
-			common.RESOURCE_TYPE_POD_SERVICE_PORT_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

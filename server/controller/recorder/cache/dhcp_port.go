@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataSet *ToolDataSet) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataS
 		AZLcuuid:     dbItem.AZ,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteDHCPPort(lcuuid string) {
 	delete(b.DHCPPorts, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
 }
 
 type DHCPPort struct {
@@ -55,5 +55,5 @@ func (d *DHCPPort) Update(cloudItem *cloudmodel.DHCPPort) {
 	d.RegionLcuuid = cloudItem.RegionLcuuid
 	d.AZLcuuid = cloudItem.AZLcuuid
 	d.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, d))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, d))
 }

@@ -143,6 +143,12 @@ static void print_cp_tracer_status(struct bpf_tracer *t);
  */
 static atomic64_t process_lost_count;
 
+/* Continuous Profiler debug lock */
+static pthread_mutex_t cpdbg_mutex;
+static bool cpdbg_enable;
+static uint32_t cpdbg_start_time;
+static uint32_t cpdbg_timeout;
+
 static u64 get_process_lost_count(void)
 {
 	return atomic64_read(&process_lost_count);
@@ -322,19 +328,60 @@ static int init_stack_trace_msg_hash(stack_trace_msg_hash_t * h,
 					 nbuckets, hash_memory_size);
 }
 
+static inline bool is_cpdbg_timeout(void)
+{
+	uint32_t passed_sec;
+	passed_sec = get_sys_uptime() - cpdbg_start_time;
+	if (passed_sec > cpdbg_timeout) {
+		cpdbg_start_time = 0;
+		cpdbg_enable = false;
+		ebpf_info("\n\ncpdbg is finished, use time: %us.\n\n",
+			  cpdbg_timeout);
+		cpdbg_timeout = 0;
+		return true;
+	}
+
+	return false;
+}
+
+static void print_cp_data(stack_trace_msg_t * msg)
+{
+	char *cid;
+	if (strlen((char *)msg->container_id) == 0)
+		cid = "null";
+	else
+		cid = (char *)msg->container_id;
+
+	ebpf_info
+	    ("netns_id %lu container_id %s process_name %s pid %u stime %lu "
+	     "u_stack_id %lu k_statck_id %lu cpu %u count %u comm %s tiemstamp"
+	     " %lu datalen %u data %s\n",
+	     msg->netns_id, cid,
+	     msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
+	     msg->k_stack_id, msg->cpu, msg->count, msg->comm, msg->time_stamp,
+	     msg->data_len, msg->data);
+}
+
+static void cpdbg_process(stack_trace_msg_t * msg)
+{
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (unlikely(cpdbg_enable)) {
+		if (!is_cpdbg_timeout())
+			print_cp_data(msg);
+
+	}
+	pthread_mutex_unlock(&cpdbg_mutex);
+}
+
 static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 {
 	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *) kv;
 	if (msg_kv->msg_ptr != 0) {
 		stack_trace_msg_t *msg = (stack_trace_msg_t *) msg_kv->msg_ptr;
-#ifdef CP_DEBUG
-		ebpf_debug
-		    ("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
-		     "%lu cpu %u count %u comm %s datalen %u data %s\n",
-		     msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
-		     msg->k_stack_id, msg->cpu, msg->count, msg->comm,
-		     msg->data_len, msg->data);
-#endif
+
+		/* continuous profiler debug */
+		cpdbg_process(msg);
+
 		tracer_callback_t fun = profiler_tracer->process_fn;
 		/*
 		 * Execute callback function to hand over the data to the
@@ -346,7 +393,6 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 
 		clib_mem_free((void *)msg);
 		msg_kv->msg_ptr = 0;
-		(*(u64 *) ctx)++;
 	}
 
 	int ret = VEC_OK;
@@ -388,9 +434,8 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	last_push_time = curr_time;
 	push_count++;
 
-	u64 elems_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
-						    (void *)&elems_count);
+						    NULL);
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
@@ -406,12 +451,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 
 	vec_free(trace_msg_kvps);
 
-	if (elems_count != h->hash_elems_count) {
-		ebpf_warning("elems_count %lu hash_elems_count %lu "
-			     "hit_hash_count %lu\n", elems_count,
-			     h->hash_elems_count, h->hit_hash_count);
-	}
-
 	h->hit_hash_count = 0;
 	h->hash_elems_count = 0;
 
@@ -419,9 +458,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 		msg_clear_hash = false;
 		stack_trace_msg_hash_free(h);
 	}
-
-	ebpf_debug("release_stack_trace_msg hashmap clear %lu "
-		   "elems.\n", elems_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -523,7 +559,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-						    stack_str_hash, matched, info_p);
+						    stack_str_hash, matched,
+						    info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -557,8 +594,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				    ("stack_trace_msg_hash_add_del() failed.\n");
 				clib_mem_free(msg);
 			} else {
-				__sync_fetch_and_add(&msg_hash->
-						     hash_elems_count, 1);
+				__sync_fetch_and_add
+				    (&msg_hash->hash_elems_count, 1);
 			}
 		}
 
@@ -936,6 +973,48 @@ static bool check_kallsyms_addr_is_zero(void)
 	return (count == check_num);
 }
 
+static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
+			     void **out, size_t * outsize)
+{
+	return 0;
+}
+
+static int cpdbg_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
+{
+	struct cpdbg_msg *msg = (struct cpdbg_msg *)conf;
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (msg->enable) {
+		cpdbg_start_time = get_sys_uptime();
+		cpdbg_timeout = msg->timeout;
+	}
+
+	if (cpdbg_enable && !msg->enable) {
+		cpdbg_timeout = 0;
+		cpdbg_start_time = 0;
+	}
+
+	cpdbg_enable = msg->enable;
+	if (cpdbg_enable) {
+		ebpf_info("cpdbg enable timeout %ds\n", cpdbg_timeout);
+	} else {
+		ebpf_info("cpdbg disable");
+	}
+
+	pthread_mutex_unlock(&cpdbg_mutex);
+
+	return 0;
+}
+
+static struct tracer_sockopts cpdbg_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.set_opt_min = SOCKOPT_SET_CPDBG_ADD,
+	.set_opt_max = SOCKOPT_SET_CPDBG_OFF,
+	.set = cpdbg_sockopt_set,
+	.get_opt_min = SOCKOPT_GET_CPDBG_SHOW,
+	.get_opt_max = SOCKOPT_GET_CPDBG_SHOW,
+	.get = cpdbg_sockopt_get,
+};
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
@@ -970,6 +1049,11 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 	}
 
 	atomic64_init(&process_lost_count);
+
+	/*
+	 * Initialize cpdbg
+	 */
+	pthread_mutex_init(&cpdbg_mutex, NULL);
 
 	profiler_stop = 0;
 	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
@@ -1047,6 +1131,9 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 			     relase_profiler, create_profiler,
 			     (void *)callback, freq);
 	if (tracer == NULL)
+		return (-1);
+
+	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
 		return (-1);
 
 	tracer->state = TRACER_RUNNING;
@@ -1202,7 +1289,7 @@ int stop_continuous_profiler(void)
 	return (0);
 }
 
-void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val)
 {
 	return;
 }

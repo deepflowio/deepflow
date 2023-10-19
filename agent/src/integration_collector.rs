@@ -56,7 +56,7 @@ use crate::{
     config::PrometheusExtraConfig,
     exception::ExceptionHandler,
     flow_generator::protocol_logs::L7ResponseStatus,
-    metric::document::TapSide,
+    metric::document::{Direction, TapSide},
     policy::PolicyGetter,
 };
 
@@ -374,9 +374,15 @@ fn fill_l7_stats(
     if flow.tap_side == TapSide::ClientApp {
         l2_end_0 = true;
         ip0 = ip;
+        flow.directions = [Direction::ClientAppToServer, Direction::None];
+    } else if flow.tap_side == TapSide::ServerApp {
+        l2_end_1 = true;
+        ip1 = ip;
+        flow.directions = [Direction::None, Direction::ServerAppToClient];
     } else {
         l2_end_1 = true;
         ip1 = ip;
+        flow.directions = [Direction::None, Direction::None];
     }
     for attr in &span.attributes {
         match attr.key.as_str() {

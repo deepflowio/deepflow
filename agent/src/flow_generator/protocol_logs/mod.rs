@@ -36,9 +36,8 @@ pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
-    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
-    DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,
-    SOFA_NEW_RPC_TRACE_CTX_KEY,
+    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, DubboHeader, DubboInfo,
+    DubboLog, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
     decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog,
@@ -216,6 +215,10 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(rename = "syscall_thread_1", skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_thread_1: u32,
     #[serde(skip_serializing_if = "value_is_default")]
+    pub syscall_coroutine_0: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub syscall_coroutine_1: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_0: u64,
     #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_1: u64,
@@ -306,6 +309,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
             syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
+            syscall_coroutine_0: f.syscall_coroutine_0,
+            syscall_coroutine_1: f.syscall_coroutine_1,
             gpid_0: f.gpid_0,
             gpid_1: f.gpid_1,
             netns_id_0: f.netns_id_0,

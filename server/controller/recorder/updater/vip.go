@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,6 +31,7 @@ type VIP struct {
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	updater := &VIP{
 		UpdaterBase[cloudmodel.VIP, mysql.VIP, *cache.VIP]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVIP(),
 			diffBaseData: wholeCache.VIP,

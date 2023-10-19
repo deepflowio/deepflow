@@ -18,8 +18,13 @@ package updater
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/op/go-logging"
+	"golang.org/x/exp/slices"
+
+	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 var log = logging.MustGetLogger("recorder.updater")
@@ -30,4 +35,32 @@ func resourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string
 
 func ipIsInvalid(resource, lcuuid, ip string) string {
 	return fmt.Sprintf("%s (lcuuid: %s) ip: %s is invalid", resource, lcuuid, ip)
+}
+
+func debugCloudItem[CT constraint.CloudModel](resourceType string, cloudItem CT) string {
+	if config.Get().LogDebug.DetailEnabled {
+		return fmt.Sprintf("debug %s: %#v", resourceType, cloudItem)
+	}
+	return fmt.Sprintf("debug %s: %s", resourceType, getCloudItemLcuuid(cloudItem))
+}
+
+func logDebugResourceTypeEnabled(resourceType string) bool {
+	if config.Get().LogDebug.Enabled {
+		if slices.Contains(config.Get().LogDebug.ResourceTypes, resourceType) || slices.Contains(config.Get().LogDebug.ResourceTypes, "all") {
+			return true
+		}
+	}
+	return false
+}
+
+func logDebugEnabled() bool {
+	return config.Get().LogDebug.Enabled
+}
+
+func getCloudItemLcuuid[CT constraint.CloudModel](cloudItem CT) string {
+	value := reflect.ValueOf(cloudItem).FieldByName("Lcuuid")
+	if value.IsValid() {
+		return value.String()
+	}
+	return ""
 }

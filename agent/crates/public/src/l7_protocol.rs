@@ -35,7 +35,6 @@ pub enum L7Protocol {
     // RPC
     Dubbo = 40,
     Grpc = 41,
-    ProtobufRPC = 42,
     SofaRPC = 43,
 
     FastCGI = 44,
@@ -69,7 +68,6 @@ impl From<String> for L7Protocol {
             "https" => Self::Http1TLS,
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
-            "protobufrpc" => Self::ProtobufRPC,
             "fastcgi" => Self::FastCGI,
             "custom" => Self::Custom,
             "sofarpc" => Self::SofaRPC,
@@ -85,13 +83,6 @@ impl From<String> for L7Protocol {
     }
 }
 
-// the actually rpc protocol when l7 protocol is ProtobufRPC
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
-#[repr(u64)]
-pub enum ProtobufRpcProtocol {
-    Krpc = 1,
-}
-
 #[derive(Serialize, Debug, Clone, PartialEq, Hash, Eq)]
 pub enum CustomProtocol {
     Wasm(u8, String),
@@ -101,7 +92,6 @@ pub enum CustomProtocol {
 #[derive(Clone, Debug, PartialEq)]
 pub enum L7ProtocolEnum {
     L7Protocol(L7Protocol),
-    ProtobufRpc(ProtobufRpcProtocol),
     Custom(CustomProtocol),
 }
 
@@ -115,7 +105,6 @@ impl L7ProtocolEnum {
     pub fn get_l7_protocol(&self) -> L7Protocol {
         match self {
             L7ProtocolEnum::L7Protocol(p) => *p,
-            L7ProtocolEnum::ProtobufRpc(_) => L7Protocol::ProtobufRPC,
             L7ProtocolEnum::Custom(_) => L7Protocol::Custom,
         }
     }

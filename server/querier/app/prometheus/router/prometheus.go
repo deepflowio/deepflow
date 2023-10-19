@@ -46,6 +46,7 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		args.Slimit = c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
 		args.Debug, _ = strconv.ParseBool(debug)
+
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
@@ -73,7 +74,6 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
-		//pp.Println(result)
 		c.JSON(200, result)
 	})
 }
@@ -92,9 +92,8 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 			c.JSON(500, err)
 			return
 		}
-		//pp.Println(req)
+
 		resp, err := svc.PromRemoteReadService(&req, c.Request.Context())
-		//pp.Println(resp)
 		if err != nil {
 			c.JSON(500, err)
 			return

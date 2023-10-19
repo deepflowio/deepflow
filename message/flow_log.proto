@@ -263,6 +263,8 @@ message AppProtoLogsBaseInfo {
     uint32 gpid_1 = 36;
     uint32 netns_id_0 = 37;
     uint32 netns_id_1 = 38;
+    uint64 syscall_coroutine_0 = 39;
+    uint64 syscall_coroutine_1 = 40;
 }
 
 message AppProtoHead {

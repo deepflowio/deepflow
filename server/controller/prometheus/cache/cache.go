@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
@@ -67,7 +68,7 @@ func GetSingleton() *Cache {
 			MetricAndAPPLabelLayout: new(metricAndAPPLabelLayout),
 			Target:                  t,
 			Label:                   l,
-			MetricLabel:             newMetricLabel(l),
+			MetricLabel:             newMetricLabel(mn, l),
 			MetricTarget:            newMetricTarget(mn, t),
 		}
 	})
@@ -216,47 +217,34 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	}
 	getLabel := func() {
 		temp := map[string]interface{}{
-			"keys":      make(map[string]interface{}),
-			"id_to_key": make(map[int]string),
+			"key_to_id": make(map[string]interface{}),
+			"id_to_key": make(map[int]interface{}),
 		}
-		tempCache.Label.idToKey.Range(func(key, value any) bool {
-			temp["id_to_key"].(map[int]string)[key.(int)] = marshal(value)
+		tempCache.Label.keyToID.Range(func(key, value any) bool {
+			temp["key_to_id"].(map[string]interface{})[marshal(key)] = value
 			return true
 		})
-		for item := range tempCache.Label.keys.Iterator().C {
-			temp["keys"].(map[string]interface{})[marshal(item)] = struct{}{}
-		}
-		if len(temp["keys"].(map[string]interface{})) > 0 ||
-			len(temp["id_to_key"].(map[int]string)) > 0 {
+		tempCache.Label.idToKey.Range(func(key, value any) bool {
+			temp["id_to_key"].(map[int]interface{})[key.(int)] = value
+			return true
+		})
+
+		if len(temp["key_to_id"].(map[string]interface{})) > 0 ||
+			len(temp["id_to_key"].(map[int]interface{})) > 0 {
 			content["label"] = temp
 		}
 	}
 	getMetricLabel := func() {
 		temp := map[string]interface{}{
-			"label_cache": map[string]interface{}{
-				"keys":      make(map[string]interface{}),
-				"id_to_key": make(map[int]string),
-			},
-			"metric_name_to_label_ids": make(map[string][]int),
-			"metric_label_detail_keys": make(map[string]interface{}),
+			"metric_name_id_to_label_ids": make(map[int][]int),
 		}
-		for item := range tempCache.MetricLabel.labelCache.keys.Iterator().C {
-			temp["label_cache"].(map[string]interface{})["keys"].(map[string]interface{})[marshal(item)] = struct{}{}
-		}
-		tempCache.MetricLabel.labelCache.idToKey.Range(func(key, value any) bool {
-			temp["label_cache"].(map[string]interface{})["id_to_key"].(map[int]string)[key.(int)] = marshal(value)
+
+		tempCache.MetricLabel.metricNameIDToLabelIDs.Range(func(i int, s mapset.Set[int]) bool {
+			temp["metric_name_id_to_label_ids"].(map[int][]int)[i] = s.ToSlice()
 			return true
 		})
-		for k, v := range tempCache.MetricLabel.metricNameToLabelIDs {
-			temp["metric_name_to_label_ids"].(map[string][]int)[k] = v
-		}
-		for item := range tempCache.MetricLabel.metricLabelDetailKeys.Iterator().C {
-			temp["metric_label_detail_keys"].(map[string]interface{})[marshal(item)] = struct{}{}
-		}
-		if len(temp["label_cache"].(map[string]interface{})["keys"].(map[string]interface{})) > 0 ||
-			len(temp["label_cache"].(map[string]interface{})["id_to_key"].(map[int]string)) > 0 ||
-			len(temp["metric_name_to_label_ids"].(map[string][]int)) > 0 ||
-			len(temp["metric_label_detail_keys"].(map[string]interface{})) > 0 {
+
+		if len(temp["metric_name_id_to_label_ids"].(map[int][]int)) > 0 {
 			content["metric_label"] = temp
 		}
 	}
@@ -277,7 +265,7 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			for item := range value.Iterator().C {
 				keys[marshal(item)] = struct{}{}
 			}
-			temp["target_id_to_label_names"].(map[string]interface{})[key] = keys
+			temp["metric_name_to_target_ids"].(map[string]interface{})[key] = keys
 		}
 		if len(temp["metric_target_keys"].(map[string]interface{})) > 0 ||
 			len(temp["metric_name_to_target_ids"].(map[string]interface{})) > 0 ||

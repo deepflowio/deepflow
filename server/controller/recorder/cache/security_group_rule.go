@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addSecurityGroupRule(dbItem *mysql.SecurityGroupRule, seq int) {
@@ -34,12 +34,12 @@ func (b *DiffBaseDataSet) addSecurityGroupRule(dbItem *mysql.SecurityGroupRule, 
 		Remote:          dbItem.Remote,
 		RemotePortRange: dbItem.RemotePortRange,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroupRule(lcuuid string) {
 	delete(b.SecurityGroupRules, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, lcuuid))
 }
 
 type SecurityGroupRule struct {
@@ -57,5 +57,5 @@ func (s *SecurityGroupRule) Update(cloudItem *cloudmodel.SecurityGroupRule) {
 	s.Local = cloudItem.Local
 	s.Remote = cloudItem.Remote
 	s.RemotePortRange = cloudItem.RemotePortRange
-	log.Info(updateDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, s))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, s))
 }

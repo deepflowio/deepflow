@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type FloatingIP struct {
@@ -28,7 +28,7 @@ type FloatingIP struct {
 func NewFloatingIP() *FloatingIP {
 	return &FloatingIP{
 		OperatorBase[mysql.FloatingIP]{
-			resourceTypeName: common.RESOURCE_TYPE_FLOATING_IP_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},

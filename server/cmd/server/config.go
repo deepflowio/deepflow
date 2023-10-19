@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/pyroscope-io/client/pyroscope"
+	"github.com/grafana/pyroscope-go"
 	yaml "gopkg.in/yaml.v2"
 )
 

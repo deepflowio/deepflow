@@ -192,7 +192,14 @@ enum {
 	SOCKOPT_SET_DATADUMP_ON,
 	SOCKOPT_SET_DATADUMP_OFF,
 	/* get */
-	SOCKOPT_GET_DATADUMP_SHOW
+	SOCKOPT_GET_DATADUMP_SHOW,
+
+	/* set */
+	SOCKOPT_SET_CPDBG_ADD = 700,
+	SOCKOPT_SET_CPDBG_ON,
+	SOCKOPT_SET_CPDBG_OFF,
+	/* get */
+	SOCKOPT_GET_CPDBG_SHOW
 };
 
 struct mem_block_head {
@@ -383,6 +390,8 @@ struct period_event_op {
 	struct list_head list;
 	char name[NAME_LEN];
 	bool is_valid;
+	/* The cycle time of event triggering (unit is microseconds) */
+	uint32_t times; 
 	period_event_fun_t f;
 };
 
@@ -475,7 +484,9 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    void *handle, int freq);
 int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries);
 struct bpf_tracer *find_bpf_tracer(const char *name);
-int register_period_event_op(const char *name, period_event_fun_t f);
+int register_period_event_op(const char *name,
+			     period_event_fun_t f,
+			     uint32_t period_time);
 int set_period_event_invalid(const char *name);
 
 /**

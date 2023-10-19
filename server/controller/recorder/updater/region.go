@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,6 +31,7 @@ type Region struct {
 func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 	updater := &Region{
 		UpdaterBase[cloudmodel.Region, mysql.Region, *cache.Region]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRegion(),
 			diffBaseData: wholeCache.Regions,
