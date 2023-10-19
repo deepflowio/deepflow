@@ -159,7 +159,7 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return "", "", errors.New(errorMessage)
+		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
