@@ -15,7 +15,7 @@
  */
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
 use serde::Serialize;
 use wasm::WasmLog;
 
