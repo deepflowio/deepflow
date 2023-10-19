@@ -69,9 +69,11 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libjattach.a --silent -o /usr/lib64/libjattach.a && \
     chmod 755 /usr/lib64/libjattach.a
 
-RUN curl https://mirrors.cloud.tencent.com/AndroidSDK/android-ndk-r26-linux.zip --silent -o /opt/android-ndk-r26-linux.zip && \
+RUN curl https://dl.google.com/android/repository/android-ndk-r26b-linux.zip --silent -o /opt/android-ndk-r26-linux.zip && \
     cd /opt/ && unzip android-ndk-r26-linux.zip && \
-    rm -f /opt/android-ndk-r26-linux.zip && rustup target install aarch64-linux-android
+    rm -f /opt/android-ndk-r26-linux.zip && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64-linux-android/libpcap.a --silent -o /opt/android-ndk-r26/toolchains/llvm/prebuilt/linux-x86_64/lib/libpcap.a && \
+    rustup target install aarch64-linux-android
 
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存
