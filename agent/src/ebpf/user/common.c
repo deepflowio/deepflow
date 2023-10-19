@@ -528,8 +528,12 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	//#1 SMP Debian 4.19.289-2 (2023-08-08)
 	if (strstr(sys_info.version, "Debian")) {
 		int num;
-		if (sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
+		if (
+			(sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
+			   major, minor, patch, &num) != 4) && 
+			(sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
 			   major, minor, patch, &num) != 4)
+		)
 			return ETR_INVAL;
 	}
 
