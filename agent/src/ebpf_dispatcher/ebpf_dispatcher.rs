@@ -351,7 +351,9 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
-            profile.container_id = data.container_id.to_vec();
+            profile.container_id = CStr::from_ptr(data.container_id.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned();
 
             if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
                 warn!("ebpf profile send error: {:?}", e);
