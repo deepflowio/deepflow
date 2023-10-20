@@ -62,6 +62,10 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 			log.Debug("accepter or requester vpc info is nil")
 			continue
 		}
+		if pData.Status.Code != types.VpcPeeringConnectionStateReasonCodeActive {
+			log.Infof("peer connections (%s) status (%s) invalid", peerConnectionName, pData.Status.Code)
+			continue
+		}
 		peerConnections = append(peerConnections, model.PeerConnection{
 			Lcuuid:             common.GetUUID(peerConnectionID, uuid.Nil),
 			Name:               peerConnectionName,
