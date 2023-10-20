@@ -164,7 +164,7 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			platformData:    d.platformData,
 			IP:              make([]byte, len(profile.Ip)),
 			netNsID:         profile.NetnsId,
-			containerID:     string(profile.ContainerId),
+			containerID:     profile.ContainerId,
 			compressionAlgo: d.compressionAlgo,
 			observer:        &observer{},
 			Counter:         d.counter,
