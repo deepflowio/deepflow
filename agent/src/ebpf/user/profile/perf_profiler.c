@@ -353,6 +353,13 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	else
 		cid = (char *)msg->container_id;
 
+	/*
+	 * TODO(@jiping)
+	 * We didn't use the 'ebpf_info()' interface here to send data to the
+	 * Rust log. The reason is that after 'ebpf_info()' -> 'rust_info_wrapper()',
+	 * we noticed some instability, and occasional segmentation faults occurred.
+	 * This is something that needs to be resolved in the future. 
+	 */
 	fprintf(stdout,
 		"\n-------------------------------\n"
 		"netns_id %lu container_id %s process_name %s pid %u stime %lu "
