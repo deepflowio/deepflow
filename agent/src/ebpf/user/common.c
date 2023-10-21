@@ -968,8 +968,6 @@ int exec_command(const char *cmd, const char *args)
 			     cmd_buf, strerror(errno));
 	} else {
 		if (WIFEXITED(rc)) {
-			ebpf_info("'%s' normal termination, exit status %d\n",
-				  cmd_buf, WEXITSTATUS(rc));
 			return WEXITSTATUS(rc);
 		} else if (WIFSIGNALED(rc)) {
 			ebpf_info

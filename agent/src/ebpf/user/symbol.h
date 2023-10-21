@@ -62,6 +62,8 @@ struct symbolizer_proc_info {
 	bool verified;
 	/* To mark whether it is a Java process? */
 	bool is_java;
+	/* Have a new perf map file ? */
+	bool new_java_syms_file;
 	/* Unknown symbols was found, and it is currently mainly used to
 	 * obtain the match of the Java process.*/
 	bool unknown_syms_found;

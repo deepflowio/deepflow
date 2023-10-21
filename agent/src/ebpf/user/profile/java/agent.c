@@ -35,12 +35,10 @@
 #include <jvmticmlr.h>
 
 #include "../../config.h"
+#include "config.h"
 
 #define STRING_BUFFER_SIZE 2000
 #define BIG_STRING_BUFFER_SIZE 20000
-
-#define PERF_MAP_FILE_FMT "/tmp/perf-%d.map"
-#define PERF_MAP_LOG_FILE_FMT "/tmp/perf-%d.log"
 
 static pthread_mutex_t g_lock;
 

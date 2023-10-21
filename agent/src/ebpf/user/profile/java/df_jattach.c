@@ -18,10 +18,12 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
+#include <dirent.h>
 
 #include "../../config.h"
 #include "../../common.h"
 #include "../../log.h"
+#include "config.h"
 #include "df_jattach.h"
 
 #define jattach_log(fmt, ...)				\
@@ -67,7 +69,7 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	int ret;
 	char copy_target_path[MAX_PATH_LENGTH];
 	int len = snprintf(copy_target_path, sizeof(copy_target_path),
-			   "/proc/%d/root/tmp", target_pid);
+			   TARGET_NS_STORAGE_PATH, target_pid);
 	if (access(copy_target_path, F_OK)) {
 		if (mkdir(copy_target_path, 0777) != 0) {
 			jattach_log(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
@@ -166,18 +168,18 @@ static void select_sitable_agent_lib(pid_t pid, bool is_same_mntns)
 	df_enter_ns(pid, "mnt", &mnt_self_fd);
 
 	agent_lib_so_path[0] = '\0';
-	if (test_dl_open(AGENT_LIB_SRC_PATH)) {
+	if (test_dl_open(AGENT_LIB_TARGET_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
-			 AGENT_LIB_SRC_PATH);
+			 AGENT_LIB_TARGET_PATH);
 		jattach_log(JAVA_LOG_TAG
 			    "Func %s target PID %d test %s, success.\n",
-			    __func__, pid, AGENT_LIB_SRC_PATH);
+			    __func__, pid, AGENT_LIB_TARGET_PATH);
 		goto found;
 	}
 
-	if (test_dl_open(AGENT_MUSL_LIB_SRC_PATH)) {
+	if (test_dl_open(AGENT_MUSL_LIB_TARGET_PATH)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
-			 AGENT_MUSL_LIB_SRC_PATH);
+			 AGENT_MUSL_LIB_TARGET_PATH);
 		jattach_log(JAVA_LOG_TAG
 			    "Func %s target PID %d test %s, success.\n",
 			    __func__, pid, AGENT_MUSL_LIB_SRC_PATH);
@@ -189,10 +191,10 @@ static void select_sitable_agent_lib(pid_t pid, bool is_same_mntns)
 found:
 
 	if (!is_same_mntns) {
-		if (strcmp(agent_lib_so_path, AGENT_LIB_SRC_PATH) == 0) {
-			clear_target_ns_tmp_file(AGENT_MUSL_LIB_SRC_PATH);
+		if (strcmp(agent_lib_so_path, AGENT_LIB_TARGET_PATH) == 0) {
+			clear_target_ns_tmp_file(AGENT_MUSL_LIB_TARGET_PATH);
 		} else {
-			clear_target_ns_tmp_file(AGENT_LIB_SRC_PATH);
+			clear_target_ns_tmp_file(AGENT_LIB_TARGET_PATH);
 		}
 	}
 
@@ -250,14 +252,52 @@ static bool is_same_mntns(int target_pid)
 	return __is_same_ns(target_pid, "mnt");
 }
 
+void clear_local_perf_files(int pid)
+{
+	char local_path[MAX_PATH_LENGTH];
+	snprintf(local_path, sizeof(local_path),
+		 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+	clear_target_ns_tmp_file(local_path);
+
+	snprintf(local_path, sizeof(local_path),
+		 DF_AGENT_LOCAL_PATH_FMT ".log", pid);
+	clear_target_ns_tmp_file(local_path);
+}
+
+static void __unused clear_old_target_perf_files(int pid)
+{
+	/* if pid == target_ns_pid, run in same namespace */
+	int target_ns_pid = get_nspid(pid);
+	if (target_ns_pid < 0) {
+		return;
+	}
+
+	char path[MAX_PATH_LENGTH];
+	snprintf(path, sizeof(path),
+		 "/proc/%d/root/tmp/perf-%d.map", pid, target_ns_pid);
+	clear_target_ns_tmp_file(path);
+
+	snprintf(path, sizeof(path),
+		 "/proc/%d/root/tmp/perf-%d.log", pid, target_ns_pid);
+	clear_target_ns_tmp_file(path);
+
+	snprintf(path, sizeof(path),
+		 "/proc/%d/root/deepflow/perf-%d.map", pid, target_ns_pid);
+	clear_target_ns_tmp_file(path);
+
+	snprintf(path, sizeof(path),
+		 "/proc/%d/root/deepflow/perf-%d.log", pid, target_ns_pid);
+	clear_target_ns_tmp_file(path);
+}
+
 void clear_target_ns(int pid, int target_ns_pid)
 {
 	/*
 	 * Delete files:
-	 *  /tmp/perf-<pid>.map
-	 *  /tmp/perf-<pid>.log
-	 *  /tmp/df_java_agent.so
-	 *  /tmp/df_java_agent_musl.so
+	 *  path/df_perf-<pid>.map
+	 *  path/df_perf-<pid>.log
+	 *  path/df_java_agent.so
+	 *  path/df_java_agent_musl.so
 	 */
 
 	if (is_same_mntns(pid))
@@ -265,17 +305,21 @@ void clear_target_ns(int pid, int target_ns_pid)
 
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path),
-		 "/proc/%d/root/tmp/perf-%d.map", pid, target_ns_pid);
+		 DF_AGENT_MAP_PATH_FMT, pid, target_ns_pid);
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path),
-		 "/proc/%d/root/tmp/perf-%d.log", pid, target_ns_pid);
+		 DF_AGENT_LOG_PATH_FMT, pid, target_ns_pid);
+	clear_target_ns_tmp_file(target_path);
+
+	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
+		 AGENT_MUSL_LIB_TARGET_PATH);
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_MUSL_LIB_SRC_PATH);
+		 AGENT_LIB_TARGET_PATH);
 	clear_target_ns_tmp_file(target_path);
-	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_LIB_SRC_PATH);
-	clear_target_ns_tmp_file(target_path);
+
+	snprintf(target_path, sizeof(target_path), TARGET_NS_STORAGE_PATH, pid);
+	rmdir(target_path);
 }
 
 void clear_target_ns_so(int pid, int target_ns_pid)
@@ -289,10 +333,10 @@ void clear_target_ns_so(int pid, int target_ns_pid)
 
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_MUSL_LIB_SRC_PATH);
+		 AGENT_MUSL_LIB_TARGET_PATH);
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_LIB_SRC_PATH);
+		 AGENT_LIB_TARGET_PATH);
 	clear_target_ns_tmp_file(target_path);
 }
 
@@ -329,31 +373,31 @@ static inline void switch_to_root_ns(int root_fd)
 	df_exit_ns(root_fd);
 }
 
-void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
+int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 {
-	if (is_same_mntns(pid))
-		return;
-
-	char target_path[128];
-	char src_path[128];
-	snprintf(src_path, sizeof(src_path), "/proc/%d/root/tmp/perf-%d.%s",
+	char target_path[PERF_PATH_SZ];
+	char src_path[PERF_PATH_SZ];
+	snprintf(src_path, sizeof(src_path), DF_AGENT_PATH_FMT ".%s",
 		 pid, ns_pid, file_type);
-	snprintf(target_path, sizeof(target_path), "/tmp/perf-%d.%s", pid,
-		 file_type);
+	snprintf(target_path, sizeof(target_path),
+		 DF_AGENT_LOCAL_PATH_FMT ".%s", pid, file_type);
 
-	if (access(src_path, F_OK) != 0) {
-		return;
+	if (access(src_path, F_OK)) {
+		return -1;
 	}
 
 	if (access(target_path, F_OK) == 0) {
-		if (unlink(target_path) != 0)
-			return;
+		if (unlink(target_path) != 0) {
+			return -1;
+		}
 	}
 
 	if (copy_file(src_path, target_path)) {
 		jattach_log("Copy '%s' to '%s' failed.\n", src_path,
 			    target_path);
 	}
+
+	return 0;
 }
 
 int java_attach(pid_t pid)
@@ -368,22 +412,31 @@ int java_attach(pid_t pid)
 		return -1;
 	}
 
+	/* if pid == target_ns_pid, run in same namespace */
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
 		return -1;
 	}
 
+	/*
+	 * If the agent is installed directly on the node or host,
+	 * be careful to delete the df-perf-pid.map and
+	 * df-perf-pid.log on them.
+	 */
 	bool is_same_mnt = is_same_mntns(pid);
 	if (is_same_mnt) {
-		char path[128];
-		snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.map",
+		char path[PERF_PATH_SZ];
+		snprintf(path, sizeof(path), DF_AGENT_MAP_PATH_FMT,
 			 pid, target_ns_pid);
 		clear_target_ns_tmp_file(path);
-		snprintf(path, sizeof(path), "/proc/%d/root/tmp/perf-%d.log",
+		snprintf(path, sizeof(path), DF_AGENT_LOG_PATH_FMT,
 			 pid, target_ns_pid);
 		clear_target_ns_tmp_file(path);
-
 	} else {
+		/*
+		 * Delete the files on the target file system if they
+		 * are not on the same mount point.
+		 */
 		clear_target_ns(pid, target_ns_pid);
 	}
 
@@ -477,6 +530,33 @@ failed:
 }
 
 #ifdef JAVA_AGENT_ATTACH_TOOL
+static void clean_old_java_perf_files(void)
+{
+	struct dirent *entry = NULL;
+	DIR *fddir = NULL;
+
+	fddir = opendir("/proc/");
+	if (fddir == NULL) {
+		jattach_log("Failed to open '/proc/'\n");
+		return;
+	}
+
+	pid_t pid;
+	while ((entry = readdir(fddir)) != NULL) {
+		pid = atoi(entry->d_name);
+		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
+			char comm[16];
+			memset(comm, 0, sizeof(comm));
+			get_process_starttime_and_comm(pid, comm, sizeof(comm));
+			if (strcmp(comm, "java") == 0) {
+				clear_old_target_perf_files(pid);
+			}
+		}
+	}
+
+	closedir(fddir);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2) {
@@ -485,6 +565,12 @@ int main(int argc, char **argv)
 	}
 
 	log_to_stdout = true;
+
+	if (strcmp(argv[1], "clean") == 0) {
+		clean_old_java_perf_files();
+		return 0;
+	}
+
 	int pid = atoi(argv[1]);
 	return java_attach(pid);
 }

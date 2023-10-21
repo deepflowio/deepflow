@@ -179,7 +179,7 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(65));
+        thread::sleep(Duration::from_secs(150));
         stop_continuous_profiler();
         print!(
             "====== capture count {}, sum {}\n",

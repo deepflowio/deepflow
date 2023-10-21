@@ -34,6 +34,13 @@ void gen_java_symbols_file(int pid)
 	char args[32];
 	snprintf(args, sizeof(args), "%d", pid);
 	exec_command(DF_JAVA_ATTACH_CMD, args);
+	if (copy_file_from_target_ns(pid, target_ns_pid, "map") ||
+	    copy_file_from_target_ns(pid, target_ns_pid, "log"))
+		ebpf_warning("Copy pid %d files failed\n", pid);
+	clear_target_ns(pid, target_ns_pid);
+}
 
-	clear_target_ns_so(pid, target_ns_pid);
+void clean_local_java_symbols_files(int pid)
+{
+	clear_local_perf_files(pid);
 }

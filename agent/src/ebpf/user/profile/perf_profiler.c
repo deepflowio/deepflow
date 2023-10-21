@@ -40,6 +40,7 @@
 #include "stringifier.h"
 #include "../table.h"
 #include <regex.h>
+#include "java/config.h"
 #include "java/df_jattach.h"
 
 #include "../perf_profiler_bpf_common.c"
@@ -352,14 +353,17 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	else
 		cid = (char *)msg->container_id;
 
-	ebpf_info
-	    ("netns_id %lu container_id %s process_name %s pid %u stime %lu "
-	     "u_stack_id %lu k_statck_id %lu cpu %u count %u comm %s tiemstamp"
-	     " %lu datalen %u data %s\n",
-	     msg->netns_id, cid,
-	     msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
-	     msg->k_stack_id, msg->cpu, msg->count, msg->comm, msg->time_stamp,
-	     msg->data_len, msg->data);
+	fprintf(stdout,
+		"\n-------------------------------\n"
+		"netns_id %lu container_id %s process_name %s pid %u stime %lu "
+		"u_stack_id %u k_statck_id %u cpu %u count %u comm %s tiemstamp"
+		" %lu datalen %u data %s\n",
+		msg->netns_id, cid,
+		msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
+		msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+		msg->time_stamp, msg->data_len, msg->data);
+
+	fflush(stdout);
 }
 
 static void cpdbg_process(stack_trace_msg_t * msg)
@@ -820,6 +824,10 @@ static int create_profiler(struct bpf_tracer *tracer)
 		free_perf_buffer_reader(reader_a);
 		return ETR_NORESOURCE;
 	}
+
+	/* clear old perf files */
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
 
 	/* syms_cache_hash maps from pid to BCC symbol cache.
 	 * Use of void* is inherited from the BCC library. */
