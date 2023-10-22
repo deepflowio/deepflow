@@ -24,4 +24,5 @@ int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);
 void clear_target_ns(int pid, int target_ns_pid);
 void clear_target_ns_so(int pid, int target_ns_pid);
 void clear_local_perf_files(int pid);
+bool is_same_mntns(int target_pid);
 #endif /* DF_JATTACH_H */

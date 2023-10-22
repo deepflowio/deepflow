@@ -21,6 +21,7 @@
 
 #include "../common.h"
 #include "../log.h"
+#include "java/config.h"
 #include "java/df_jattach.h"
 #include "attach.h"
 
@@ -33,14 +34,25 @@ void gen_java_symbols_file(int pid)
 		return;
 	}
 
-	char args[32];
-	snprintf(args, sizeof(args), "%d %d", pid,
-		 g_java_syms_write_bytes_max);
+	char args[PERF_PATH_SZ * 2];
+	if (!is_same_mntns(pid)) {
+		snprintf(args, sizeof(args), "%d %d,%s,%s", pid,
+			 g_java_syms_write_bytes_max,
+			 PERF_MAP_FILE_FMT, PERF_MAP_LOG_FILE_FMT);
+	} else {
+		snprintf(args, sizeof(args), "%d %d,%s,%s", pid,
+			 g_java_syms_write_bytes_max,
+			 DF_AGENT_LOCAL_PATH_FMT ".map",
+			 DF_AGENT_LOCAL_PATH_FMT ".log");
+	}
+
 	exec_command(DF_JAVA_ATTACH_CMD, args);
-	if (copy_file_from_target_ns(pid, target_ns_pid, "map") ||
-	    copy_file_from_target_ns(pid, target_ns_pid, "log"))
-		ebpf_warning("Copy pid %d files failed\n", pid);
-	clear_target_ns(pid, target_ns_pid);
+	if (!is_same_mntns(pid)) {
+		if (copy_file_from_target_ns(pid, target_ns_pid, "map") ||
+		    copy_file_from_target_ns(pid, target_ns_pid, "log"))
+			ebpf_warning("Copy pid %d files failed\n", pid);
+		clear_target_ns(pid, target_ns_pid);
+	}
 }
 
 void clean_local_java_symbols_files(int pid)

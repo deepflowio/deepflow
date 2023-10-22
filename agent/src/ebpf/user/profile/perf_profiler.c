@@ -1036,6 +1036,8 @@ static struct tracer_sockopts cpdbg_sockopts = {
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * @java_syms_space_limit The maximum space occupied by the Java symbol files
+ *                        in the target POD. 
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
@@ -1045,7 +1047,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
-
+ 
 	// REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 	if (check_kernel_version(4, 9) != 0) {
 		ebpf_warning

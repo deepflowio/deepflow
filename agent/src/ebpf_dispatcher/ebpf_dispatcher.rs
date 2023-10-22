@@ -539,7 +539,8 @@ impl EbpfCollector {
             let on_cpu_profile_config = &config.ebpf.on_cpu_profile;
             if !on_cpu_profile_config.disabled {
                 if start_continuous_profiler(
-                    on_cpu_profile_config.frequency as i32, 10,
+                    on_cpu_profile_config.frequency as i32,
+                    10,
                     Self::ebpf_on_cpu_callback,
                 ) != 0
                 {

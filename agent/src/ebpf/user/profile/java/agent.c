@@ -40,7 +40,18 @@
 #define STRING_BUFFER_SIZE 2000
 #define BIG_STRING_BUFFER_SIZE 20000
 
+/*
+ * HotSpot JVM does not support agent unloading. However, you
+ * may "attach" the same library multiple times with different
+ * arguments. The library will not be loaded again, but
+ * Agent_OnAttach will still be called multiple times with
+ * different arguments.
+ */
+
 pthread_mutex_t g_df_lock;
+
+char perf_map_file_path[128];
+char perf_log_file_path[128];
 
 FILE *perf_map_file_ptr = NULL;
 FILE *perf_map_log_file_ptr = NULL;
@@ -89,12 +100,45 @@ jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 
 jint open_perf_map_file(pid_t pid)
 {
-	return df_open_file(pid, PERF_MAP_FILE_FMT, &perf_map_file_ptr);
+	return df_open_file(pid, perf_map_file_path, &perf_map_file_ptr);
 }
 
 jint open_perf_map_log_file(pid_t pid)
 {
-	return df_open_file(pid, PERF_MAP_LOG_FILE_FMT, &perf_map_log_file_ptr);
+	return df_open_file(pid, perf_log_file_path, &perf_map_log_file_ptr);
+}
+
+jint df_agent_config(char *opts)
+{
+	g_perf_map_file_size = 0;
+
+	char buf[300];
+	char *start;
+	start = buf;
+	snprintf(buf, sizeof(buf), "%s", opts);
+
+	/* g_perf_map_file_size_limit */
+	char *p = strchr(start, ',');
+	if (p == NULL)
+		return JNI_ERR;
+	*p = '\0';
+	g_perf_map_file_size_limit = atoi(start);
+
+	/* perf_map_file_path[] */
+	start = ++p;
+	p = strchr(start, ',');
+	if (p == NULL)
+		return JNI_ERR;
+	*p = '\0';
+	snprintf(perf_map_file_path, sizeof(perf_map_file_path), "%s", start);
+
+	/* perf_log_file_path[] */
+	start = ++p;
+	if (start == NULL)
+		return JNI_ERR;
+	snprintf(perf_log_file_path, sizeof(perf_log_file_path), "%s", start);
+
+	return JNI_OK;
 }
 
 jint close_files(void)
@@ -362,10 +406,12 @@ Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 {
 	jvmtiEnv *jvmti;
 	pthread_mutex_init(&g_df_lock, NULL);
+	_(df_agent_config(options));
 	_(open_perf_map_log_file(getpid()));
-	df_log("- JVMTI agent write perf files max size %s bytes.", options);
-	g_perf_map_file_size_limit = atoi(options);
-	g_perf_map_file_size = 0;
+	df_log("- JVMTI g_perf_map_file_size_limit: %d, "
+	       "perf_map_file_path: %s perf_log_file_path: %s",
+	       g_perf_map_file_size_limit,
+	       perf_map_file_path, perf_log_file_path);
 	_(open_perf_map_file(getpid()));
 	_(get_jvmti_env(vm, &jvmti));
 	_(enable_capabilities(jvmti));

@@ -71,6 +71,15 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	int len = snprintf(copy_target_path, sizeof(copy_target_path),
 			   TARGET_NS_STORAGE_PATH, target_pid);
 	if (access(copy_target_path, F_OK)) {
+		/*
+		 * The purpose of umask(0); is to set the current process's file
+		 * creation mask (umask) to 0, which means that no permission
+		 * bits will be cleared when creating a file or directory. Files
+		 * and directories will have the permission bits specified at the
+		 * time of creation.
+		 */
+		umask(0);
+
 		if (mkdir(copy_target_path, 0777) != 0) {
 			jattach_log(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
 				    __func__, copy_target_path);
@@ -168,21 +177,34 @@ static void select_sitable_agent_lib(pid_t pid, bool is_same_mntns)
 	df_enter_ns(pid, "mnt", &mnt_self_fd);
 
 	agent_lib_so_path[0] = '\0';
-	if (test_dl_open(AGENT_LIB_TARGET_PATH)) {
-		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
+	char test_path[PERF_PATH_SZ];
+	if (!is_same_mntns)
+		snprintf(test_path, sizeof(test_path), "%s",
 			 AGENT_LIB_TARGET_PATH);
+	else
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_LIB_SRC_PATH);
+
+	if (test_dl_open(test_path)) {
+		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
 		jattach_log(JAVA_LOG_TAG
 			    "Func %s target PID %d test %s, success.\n",
-			    __func__, pid, AGENT_LIB_TARGET_PATH);
+			    __func__, pid, test_path);
 		goto found;
 	}
 
-	if (test_dl_open(AGENT_MUSL_LIB_TARGET_PATH)) {
-		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s",
+	if (!is_same_mntns)
+		snprintf(test_path, sizeof(test_path), "%s",
 			 AGENT_MUSL_LIB_TARGET_PATH);
+	else
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_MUSL_LIB_SRC_PATH);
+
+	if (test_dl_open(test_path)) {
+		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
 		jattach_log(JAVA_LOG_TAG
 			    "Func %s target PID %d test %s, success.\n",
-			    __func__, pid, AGENT_MUSL_LIB_SRC_PATH);
+			    __func__, pid, test_path);
 		goto found;
 	}
 
@@ -202,12 +224,11 @@ found:
 	df_exit_ns(mnt_self_fd);
 }
 
-static int attach(pid_t pid, int limit)
+static int attach(pid_t pid, char *opts)
 {
-	char bytes_limit[11];
-	snprintf(bytes_limit, sizeof(bytes_limit), "%d", limit);
-	char *argv[] = { "load", agent_lib_so_path, "true", bytes_limit};
+	char *argv[] = { "load", agent_lib_so_path, "true", opts };
 	int argc = sizeof(argv) / sizeof(argv[0]);
+	printf("argc %d opts %s\n", argc, argv[3]);
 	int ret = jattach(pid, argc, (char **)argv);
 	jattach_log(JAVA_LOG_TAG
 		    "jattach pid %d argv: \"load %s true\" return %d\n", pid,
@@ -249,7 +270,7 @@ static bool __unused is_same_netns(int target_pid)
 	return __is_same_ns(target_pid, "net");
 }
 
-static bool is_same_mntns(int target_pid)
+bool is_same_mntns(int target_pid)
 {
 	return __is_same_ns(target_pid, "mnt");
 }
@@ -402,7 +423,7 @@ int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 	return 0;
 }
 
-int java_attach(pid_t pid, int space_limit)
+int java_attach(pid_t pid, char *opts)
 {
 #ifdef NS_FILES_COPY_TEST
 	int net_fd, ipc_fd, mnt_fd;
@@ -422,17 +443,17 @@ int java_attach(pid_t pid, int space_limit)
 
 	/*
 	 * If the agent is installed directly on the node or host,
-	 * be careful to delete the df-perf-pid.map and
-	 * df-perf-pid.log on them.
+	 * be careful to delete the perf-pid.map and
+	 * perf-pid.log on them.
 	 */
 	bool is_same_mnt = is_same_mntns(pid);
 	if (is_same_mnt) {
 		char path[PERF_PATH_SZ];
-		snprintf(path, sizeof(path), DF_AGENT_MAP_PATH_FMT,
-			 pid, target_ns_pid);
+		snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map",
+			 pid);
 		clear_target_ns_tmp_file(path);
-		snprintf(path, sizeof(path), DF_AGENT_LOG_PATH_FMT,
-			 pid, target_ns_pid);
+		snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".log",
+			 pid);
 		clear_target_ns_tmp_file(path);
 	} else {
 		/*
@@ -489,7 +510,7 @@ int java_attach(pid_t pid, int space_limit)
 		goto failed;
 #endif
 
-	ret = attach(pid, space_limit);
+	ret = attach(pid, opts);
 
 #ifdef NS_FILES_COPY_TEST
 	/*
@@ -567,13 +588,12 @@ int main(int argc, char **argv)
 	}
 
 	if (argc != 3) {
-		fprintf(stderr, "Usage: %s <pid> <space-limit>\n", argv[0]);
+		fprintf(stderr, "Usage: %s <pid> <opts>\n", argv[0]);
 		return -1;
 	}
 
 	log_to_stdout = true;
 	int pid = atoi(argv[1]);
-	int space_limit = atoi(argv[2]);
-	return java_attach(pid, space_limit);
+	return java_attach(pid, argv[2]);
 }
 #endif /* JAVA_AGENT_ATTACH_TEST */
