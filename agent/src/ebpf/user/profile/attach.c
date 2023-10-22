@@ -24,6 +24,8 @@
 #include "java/df_jattach.h"
 #include "attach.h"
 
+extern int g_java_syms_write_bytes_max;
+
 void gen_java_symbols_file(int pid)
 {
 	int target_ns_pid = get_nspid(pid);
@@ -32,7 +34,8 @@ void gen_java_symbols_file(int pid)
 	}
 
 	char args[32];
-	snprintf(args, sizeof(args), "%d", pid);
+	snprintf(args, sizeof(args), "%d %d", pid,
+		 g_java_syms_write_bytes_max);
 	exec_command(DF_JAVA_ATTACH_CMD, args);
 	if (copy_file_from_target_ns(pid, target_ns_pid, "map") ||
 	    copy_file_from_target_ns(pid, target_ns_pid, "log"))

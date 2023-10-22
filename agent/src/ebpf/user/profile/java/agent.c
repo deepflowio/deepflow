@@ -40,10 +40,13 @@
 #define STRING_BUFFER_SIZE 2000
 #define BIG_STRING_BUFFER_SIZE 20000
 
-static pthread_mutex_t g_lock;
+pthread_mutex_t g_df_lock;
 
-static FILE *perf_map_file_ptr = NULL;
-static FILE *perf_map_log_file_ptr = NULL;
+FILE *perf_map_file_ptr = NULL;
+FILE *perf_map_log_file_ptr = NULL;
+
+int g_perf_map_file_size_limit;
+int g_perf_map_file_size;
 
 #define _(e)                                                                \
 	if (e != JNI_OK) {                                                  \
@@ -52,7 +55,7 @@ static FILE *perf_map_log_file_ptr = NULL;
 		return e;                                                   \
 	}
 
-static void df_log(const char *format, ...)
+void df_log(const char *format, ...)
 {
 	if (perf_map_log_file_ptr) {
 		va_list ap;
@@ -64,7 +67,7 @@ static void df_log(const char *format, ...)
 	}
 }
 
-static jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
+jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 {
 	FILE *file_ptr;
 	char filename[50];	// Assuming the filename won't exceed 50 characters
@@ -84,17 +87,17 @@ static jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 	return JNI_OK;
 }
 
-static jint open_perf_map_file(pid_t pid)
+jint open_perf_map_file(pid_t pid)
 {
 	return df_open_file(pid, PERF_MAP_FILE_FMT, &perf_map_file_ptr);
 }
 
-static jint open_perf_map_log_file(pid_t pid)
+jint open_perf_map_log_file(pid_t pid)
 {
 	return df_open_file(pid, PERF_MAP_LOG_FILE_FMT, &perf_map_log_file_ptr);
 }
 
-static jint close_files(void)
+jint close_files(void)
 {
 	if (perf_map_file_ptr)
 		fclose(perf_map_file_ptr);
@@ -129,8 +132,8 @@ jint get_jvmti_env(JavaVM * jvm, jvmtiEnv ** jvmti)
 	return JNI_OK;
 }
 
-static void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
-			  const char *help_msg_or_null)
+void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
+		   const char *help_msg_or_null)
 {
 	if (err_num == JVMTI_ERROR_NONE) {
 		return;		// No need to log if there's no error
@@ -150,7 +153,7 @@ static void jvmti_err_log(jvmtiEnv * jvmti, const jvmtiError err_num,
 	df_log("[error][%d] %s: %s.", err_num, err_name_str, help_message);
 }
 
-static jint enable_capabilities(jvmtiEnv * jvmti)
+jint enable_capabilities(jvmtiEnv * jvmti)
 {
 	jvmtiCapabilities capabilities;
 	memset(&capabilities, 0, sizeof(jvmtiCapabilities));
@@ -169,25 +172,34 @@ static jint enable_capabilities(jvmtiEnv * jvmti)
 	return JNI_OK;
 }
 
-static void deallocate(jvmtiEnv * jvmti, void *string)
+void deallocate(jvmtiEnv * jvmti, void *string)
 {
 	if (string != NULL)
 		(*jvmti)->Deallocate(jvmti, (unsigned char *)string);
 }
 
-static void write_symbol(const void *code_addr, unsigned int code_size,
-			 const char *entry)
+void df_write_symbol(const void *code_addr, unsigned int code_size,
+		     const char *entry)
 {
-	pthread_mutex_lock(&g_lock);
-	fprintf(perf_map_file_ptr, "%lx %x %s\n", (unsigned long)code_addr,
-		code_size, entry);
+	char symbol_str[1024];
+	int bytes_all = 0;
+	pthread_mutex_lock(&g_df_lock);
+	snprintf(symbol_str, sizeof(symbol_str), "%lx %x %s\n",
+		 (unsigned long)code_addr, code_size, entry);
+	bytes_all = g_perf_map_file_size + strlen(symbol_str);
+	if (bytes_all >= g_perf_map_file_size_limit) {
+		pthread_mutex_unlock(&g_df_lock);
+		return;
+	}
+	fprintf(perf_map_file_ptr, "%s", symbol_str);
 	fflush(perf_map_file_ptr);
-	pthread_mutex_unlock(&g_lock);
+	g_perf_map_file_size = bytes_all;
+	pthread_mutex_unlock(&g_df_lock);
 }
 
-static void generate_single_entry(jvmtiEnv * jvmti,
-				  jmethodID method, const void *code_addr,
-				  jint code_size)
+void generate_single_entry(jvmtiEnv * jvmti,
+			   jmethodID method, const void *code_addr,
+			   jint code_size)
 {
 	jclass class;
 	char *method_name = NULL;
@@ -223,10 +235,10 @@ static void generate_single_entry(jvmtiEnv * jvmti,
 	deallocate(jvmti, (unsigned char *)method_name);
 	deallocate(jvmti, (unsigned char *)msig);
 
-	write_symbol(code_addr, (unsigned int)code_size, output);
+	df_write_symbol(code_addr, (unsigned int)code_size, output);
 }
 
-static void JNICALL
+void JNICALL
 cbCompiledMethodLoad(jvmtiEnv * jvmti,
 		     jmethodID method,
 		     jint code_size,
@@ -237,22 +249,22 @@ cbCompiledMethodLoad(jvmtiEnv * jvmti,
 	generate_single_entry(jvmti, method, code_addr, code_size);
 }
 
-static void JNICALL
+void JNICALL
 cbDynamicCodeGenerated(jvmtiEnv * jvmti,
 		       const char *name, const void *address, jint length)
 {
 
-	write_symbol(address, (unsigned int)length, name);
+	df_write_symbol(address, (unsigned int)length, name);
 }
 
-static void JNICALL
+void JNICALL
 cbCompiledMethodUnload(jvmtiEnv * jvmti, jmethodID method, const void *address)
 {
 
-	write_symbol(address, 0, "");
+	df_write_symbol(address, 0, "");
 }
 
-static jvmtiError set_callback_funs(jvmtiEnv * jvmti)
+jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 {
 	jvmtiEventCallbacks callbacks;
 
@@ -272,7 +284,7 @@ static jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 	return JNI_OK;
 }
 
-static jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
+jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 {
 	jvmtiError error;
 
@@ -309,7 +321,7 @@ static jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 	return JNI_OK;
 }
 
-static jint replay_callbacks(jvmtiEnv * jvmti)
+jint replay_callbacks(jvmtiEnv * jvmti)
 {
 	jvmtiError error;
 	jvmtiPhase phase;
@@ -349,8 +361,11 @@ JNIEXPORT jint JNICALL
 Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 {
 	jvmtiEnv *jvmti;
-	pthread_mutex_init(&g_lock, NULL);
+	pthread_mutex_init(&g_df_lock, NULL);
 	_(open_perf_map_log_file(getpid()));
+	df_log("- JVMTI agent write perf files max size %s bytes.", options);
+	g_perf_map_file_size_limit = atoi(options);
+	g_perf_map_file_size = 0;
 	_(open_perf_map_file(getpid()));
 	_(get_jvmti_env(vm, &jvmti));
 	_(enable_capabilities(jvmti));
@@ -359,7 +374,7 @@ Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 	_(replay_callbacks(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_DISABLE));
 
-	df_log("JVMTI symbolization agent startup sequence complete.");
+	df_log("- JVMTI symbolization agent startup sequence complete.");
 
 	close_files();
 	return 0;

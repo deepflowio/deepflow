@@ -465,11 +465,16 @@ extern "C" {
     /*
      * start continuous profiler
      * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+     * @java_syms_space_limit The maximum space occupied by the Java symbol files
+     *   in the target POD. Its valid range is [2, 10], which means it falls within
+     *   the interval of 2Mi to 10Mi. If the configuration value is outside this
+     *   range, the default value of 10(10Mi), will be used.
      * @callback Profile data processing callback interface
      * @returns 0 on success, < 0 on error
      */
     pub fn start_continuous_profiler(
         freq: c_int,
+        java_syms_space_limit: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
     ) -> c_int;
 

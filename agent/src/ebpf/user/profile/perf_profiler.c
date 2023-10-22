@@ -65,6 +65,9 @@
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
 
+/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
+int g_java_syms_write_bytes_max;
+
 extern int major, minor;
 extern char linux_release[128];
 extern __thread uword thread_index;
@@ -1036,7 +1039,8 @@ static struct tracer_sockopts cpdbg_sockopts = {
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq, int java_syms_space_limit,
+			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
@@ -1062,6 +1066,12 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 			     "r.\n3 Restart the pod.");
 		return (-1);
 	}
+
+	int java_space_bytes = java_syms_space_limit * 1024 *1024;
+	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
+	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
+		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
+	g_java_syms_write_bytes_max = java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
 
 	atomic64_init(&process_lost_count);
 

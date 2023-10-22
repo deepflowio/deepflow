@@ -490,9 +490,8 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		if (p->is_java) {
 			/* Delete target ns Java files */
 			int pid = (int)kv->k.pid;
-			int target_ns_pid = get_nspid(pid);
-			if (target_ns_pid > 0) {
-				clear_target_ns(pid, target_ns_pid);
+			if (pid > 0) {
+				clean_local_java_symbols_files(pid);
 			}
 		}
 

@@ -202,9 +202,11 @@ found:
 	df_exit_ns(mnt_self_fd);
 }
 
-static int attach(pid_t pid)
+static int attach(pid_t pid, int limit)
 {
-	char *argv[] = { "load", agent_lib_so_path, "true" };
+	char bytes_limit[11];
+	snprintf(bytes_limit, sizeof(bytes_limit), "%d", limit);
+	char *argv[] = { "load", agent_lib_so_path, "true", bytes_limit};
 	int argc = sizeof(argv) / sizeof(argv[0]);
 	int ret = jattach(pid, argc, (char **)argv);
 	jattach_log(JAVA_LOG_TAG
@@ -400,7 +402,7 @@ int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 	return 0;
 }
 
-int java_attach(pid_t pid)
+int java_attach(pid_t pid, int space_limit)
 {
 #ifdef NS_FILES_COPY_TEST
 	int net_fd, ipc_fd, mnt_fd;
@@ -487,7 +489,7 @@ int java_attach(pid_t pid)
 		goto failed;
 #endif
 
-	ret = attach(pid);
+	ret = attach(pid, space_limit);
 
 #ifdef NS_FILES_COPY_TEST
 	/*
@@ -559,19 +561,19 @@ static void clean_old_java_perf_files(void)
 
 int main(int argc, char **argv)
 {
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <pid>\n", argv[0]);
-		return -1;
-	}
-
-	log_to_stdout = true;
-
 	if (strcmp(argv[1], "clean") == 0) {
 		clean_old_java_perf_files();
 		return 0;
 	}
 
+	if (argc != 3) {
+		fprintf(stderr, "Usage: %s <pid> <space-limit>\n", argv[0]);
+		return -1;
+	}
+
+	log_to_stdout = true;
 	int pid = atoi(argv[1]);
-	return java_attach(pid);
+	int space_limit = atoi(argv[2]);
+	return java_attach(pid, space_limit);
 }
 #endif /* JAVA_AGENT_ATTACH_TEST */
