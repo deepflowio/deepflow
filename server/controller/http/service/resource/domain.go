@@ -43,8 +43,14 @@ import (
 
 var log = logging.MustGetLogger("service.resource")
 
-var DOMAIN_PASSWORD_KEYS = []string{
-	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password", "token",
+var DOMAIN_PASSWORD_KEYS = map[string]bool{
+	"admin_password":      false,
+	"secret_key":          false,
+	"client_secret":       false,
+	"password":            false,
+	"boss_secret_key":     false,
+	"manage_one_password": false,
+	"token":               false,
 }
 
 func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (string, string) {
@@ -167,7 +173,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 
 		domainResp.Config = make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &domainResp.Config)
-		for _, key := range DOMAIN_PASSWORD_KEYS {
+		for key := range DOMAIN_PASSWORD_KEYS {
 			if _, ok := domainResp.Config[key]; ok {
 				domainResp.Config[key] = common.DEFAULT_ENCRYPTION_PASSWORD
 			}
@@ -204,7 +210,7 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 	info := domainCreate
 	info.Config = map[string]interface{}{}
 	for k, v := range domainCreate.Config {
-		if common.Contains(DOMAIN_PASSWORD_KEYS, k) {
+		if _, ok := DOMAIN_PASSWORD_KEYS[k]; ok {
 			info.Config[k] = "******"
 		} else {
 			info.Config[k] = v
@@ -288,7 +294,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 	domain.ControllerIP = controllerIP
 
 	// encrypt password/access_key
-	for _, key := range DOMAIN_PASSWORD_KEYS {
+	for key := range DOMAIN_PASSWORD_KEYS {
 		if _, ok := domainCreate.Config[key]; ok && cfg != nil {
 			serverIP, grpcServerPort := getGrpcServerAndPort(domain.ControllerIP, cfg)
 			encryptKey, err := common.GetEncryptKey(
@@ -410,7 +416,7 @@ func UpdateDomain(
 		}
 
 		// transfer password/access_key
-		for _, key := range DOMAIN_PASSWORD_KEYS {
+		for key := range DOMAIN_PASSWORD_KEYS {
 			if _, ok := configUpdate[key]; ok && cfg != nil {
 				if configUpdate[key] == common.DEFAULT_ENCRYPTION_PASSWORD {
 					configUpdate[key] = config[key]

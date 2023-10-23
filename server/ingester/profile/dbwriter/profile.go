@@ -381,6 +381,7 @@ func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platf
 
 func (p *InProcessProfile) fillPodInfo(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
 	if containerID == "" {
+		log.Debugf("%s-%s uploaded empty containerID by vtapID: %d", p.AppService, p.ProfileEventType, vtapID)
 		return
 	}
 	podInfo := platformData.QueryPodContainerInfo(vtapID, containerID)

@@ -290,7 +290,10 @@ impl FlowMap {
                 stats_collector.register_countable(
                     "allocator",
                     Countable::Ref(allocator.counter()),
-                    vec![StatsOption::Tag("type", "TaggedFlow".to_owned())],
+                    vec![
+                        StatsOption::Tag("type", "TaggedFlow".to_owned()),
+                        StatsOption::Tag("id", format!("{}", id)),
+                    ],
                 );
                 allocator
             },
@@ -300,7 +303,10 @@ impl FlowMap {
                 stats_collector.register_countable(
                     "allocator",
                     Countable::Ref(allocator.counter()),
-                    vec![StatsOption::Tag("type", "L7Stats".to_owned())],
+                    vec![
+                        StatsOption::Tag("type", "L7Stats".to_owned()),
+                        StatsOption::Tag("id", format!("{}", id)),
+                    ],
                 );
                 allocator
             },

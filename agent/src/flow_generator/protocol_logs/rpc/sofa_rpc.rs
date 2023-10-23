@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+mod hessian;
 
 use nom::InputTakeAtPosition;
 use public::{
@@ -36,6 +37,8 @@ use crate::{
     },
 };
 
+use self::hessian::{FieldEnum, HessianObjIterator};
+
 const REQ_HDR_LEN: usize = 22;
 const RESP_HDR_LEN: usize = 20;
 
@@ -48,9 +51,15 @@ const CMD_CODE_HEARTBEAT: u16 = 0;
 const CMD_CODE_REQ: u16 = 1;
 const CMD_CODE_RESP: u16 = 2;
 
-const SERVICE_KEY: &'static str = "sofa_head_target_service";
-const METHOD_KEY: &'static str = "sofa_head_method_name";
-const TRACE_ID_KEY: &'static str = "rpc_trace_context.sofaTraceId";
+const CODE_C_HESSIAN: u8 = 1;
+
+const HDR_SERVICE_KEY: &'static str = "sofa_head_target_service";
+const SERVICE_KEY: &'static str = "targetServiceUniqueName";
+const HDR_METHOD_KEY: &'static str = "sofa_head_method_name";
+const METHOD_KEY: &'static str = "methodName";
+const HDR_TRACE_ID_KEY: &'static str = "rpc_trace_context.sofaTraceId";
+const TRACE_ID_KEY: &'static str = "sofaTraceId";
+
 pub const SOFA_NEW_RPC_TRACE_CTX_KEY: &'static str = "new_rpc_trace_context";
 
 struct Hdr {
@@ -58,6 +67,7 @@ struct Hdr {
     typ: u8,
     cmd_code: u16,
     req_id: u32,
+    code_c: u8,
     class_len: u16,
     resp_code: u16,
     hdr_len: u16,
@@ -93,11 +103,12 @@ impl TryFrom<&[u8]> for Hdr {
         * +-----------------------------------------------------------------------------------------------+
     */
     fn try_from(payload: &[u8]) -> Result<Self, Self::Error> {
-        if payload.len() < 2 {
+        if payload.len() < 10 {
             return Err(Error::L7ProtocolUnknown);
         }
         let proto = payload[0];
         let typ = payload[1];
+        let code_c = payload[9];
         match typ {
             TYPE_REQ => {
                 if payload.len() < REQ_HDR_LEN {
@@ -115,6 +126,7 @@ impl TryFrom<&[u8]> for Hdr {
                     typ,
                     cmd_code,
                     req_id,
+                    code_c,
                     resp_code: 0,
                     class_len,
                     hdr_len,
@@ -138,6 +150,7 @@ impl TryFrom<&[u8]> for Hdr {
                     typ,
                     cmd_code,
                     req_id,
+                    code_c,
                     resp_code,
                     class_len,
                     hdr_len,
@@ -383,7 +396,9 @@ impl SofaRpcLog {
                 }
                 payload
             } else {
-                &payload[..hdr_len]
+                let hdr_payload = &payload[..hdr_len];
+                payload = &payload[hdr_len..];
+                hdr_payload
             };
 
             let sofa_hdr = SofaHdr::from(hdr_payload);
@@ -391,14 +406,40 @@ impl SofaRpcLog {
             info.method = sofa_hdr.method;
             info.trace_id = sofa_hdr.trace_id;
 
-            if check && (info.target_serv.is_empty() || info.method.is_empty()) {
-                return Err(Error::L7ProtocolUnknown);
-            }
-
             if !sofa_hdr.new_rpc_trace_context.is_empty() {
                 info.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
+        // parse req hessian2 obj
+        if hdr.code_c == CODE_C_HESSIAN && payload.len() != 0 && hdr.typ == TYPE_REQ {
+            if let Some(h) = HessianObjIterator::new(payload) {
+                for (k, v) in h {
+                    let FieldEnum::String(val) = v else {
+                        continue;
+                    };
+                    match k {
+                        METHOD_KEY if info.method.is_empty() => info.method = val.to_string(),
+                        SERVICE_KEY if info.target_serv.is_empty() => {
+                            info.target_serv = val.to_string()
+                        }
+                        TRACE_ID_KEY if info.trace_id.is_empty() => info.trace_id = val.to_string(),
+                        _ => {
+                            if !info.trace_id.is_empty()
+                                && !info.target_serv.is_empty()
+                                && !info.method.is_empty()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if check && (info.target_serv.is_empty() || info.method.is_empty()) {
+            return Err(Error::L7ProtocolUnknown);
+        }
+
         if check {
             Ok(false)
         } else {
@@ -466,9 +507,9 @@ impl From<&[u8]> for SofaHdr {
                 return ret;
             };
             match key_str {
-                SERVICE_KEY => ret.service = String::from_utf8_lossy(val).to_string(),
-                METHOD_KEY => ret.method = String::from_utf8_lossy(val).to_string(),
-                TRACE_ID_KEY => ret.trace_id = String::from_utf8_lossy(val).to_string(),
+                HDR_SERVICE_KEY => ret.service = String::from_utf8_lossy(val).to_string(),
+                HDR_METHOD_KEY => ret.method = String::from_utf8_lossy(val).to_string(),
+                HDR_TRACE_ID_KEY => ret.trace_id = String::from_utf8_lossy(val).to_string(),
                 SOFA_NEW_RPC_TRACE_CTX_KEY => {
                     ret.new_rpc_trace_context = String::from_utf8_lossy(val).to_string()
                 }

@@ -32,8 +32,8 @@ use crate::{
     },
     flow_generator::{
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            L7ResponseStatus,
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+            value_is_default, L7ResponseStatus,
         },
         Error, Result,
     },
@@ -60,14 +60,16 @@ pub struct MongoDBInfo {
     pub op_code: u32,
     #[serde(skip)]
     pub op_code_name: String,
-    #[serde(skip)]
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub request: String,
     #[serde(skip)]
     pub response: String,
-    #[serde(skip)]
+    #[serde(rename = "response_code", skip_serializing_if = "value_is_default")]
     pub response_code: i32,
     #[serde(skip)]
     pub exception: String,
+    #[serde(rename = "response_status")]
+    pub status: L7ResponseStatus,
 
     rrt: u64,
 }
@@ -100,27 +102,21 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
 // 协议文档: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
 impl MongoDBInfo {
     fn merge(&mut self, other: Self) {
-        if self.response_id == 0 {
-            self.request_id = other.request_id;
-            self.request = other.request;
-        }
-        //self.request_id = other.request_id;
-
-        if self.response_id == 0 {
-            self.response_id = other.response_id;
-            self.response = other.response;
-        }
-
         match other.msg_type {
             LogMessageType::Request => {
                 self.req_len = other.req_len;
                 self.op_code_name = other.op_code_name;
                 self.op_code = other.op_code;
+                self.request = other.request;
+                self.request_id = other.request_id;
             }
             LogMessageType::Response => {
                 self.response_code = other.response_code;
                 self.resp_len = other.resp_len;
                 self.exception = other.exception;
+                self.status = other.status;
+                self.response_id = other.response_id;
+                self.response = other.response;
             }
             _ => {}
         }
@@ -141,9 +137,13 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
                 result: f.response.to_string(),
                 exception: f.exception.to_string(),
                 code: std::option::Option::<i32>::from(f.response_code),
-                status: L7ResponseStatus::Ok,
+                status: f.status,
                 ..Default::default()
             },
+            ext_info: Some(ExtendedInfo {
+                request_id: Option::<u32>::from(f.request_id),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         return log;
@@ -280,6 +280,8 @@ impl MongoDBLog {
                         } else {
                             info.exception =
                                 msg_body.sections.doc.get_str("errmsg").unwrap().to_string();
+                            // TODO: Distinguish error types
+                            info.status = L7ResponseStatus::ClientError;
                         }
                         if info.exception.len() == 0 {
                             info.exception =
@@ -287,7 +289,7 @@ impl MongoDBLog {
                         }
                         info.response_code = msg_body.sections.doc.get_i32("code").unwrap_or(0);
                         if info.response_code > 0 {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
                         }
                     }
                     _ => {
@@ -346,9 +348,7 @@ impl MongoDBLog {
                     .to_string_lossy()
                     .into_owned();
             }
-            _ => {
-                info.request = info.op_code_name.clone();
-            }
+            _ => {}
         }
 
         Ok(false)

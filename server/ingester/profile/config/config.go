@@ -28,11 +28,12 @@ import (
 var log = logging.MustGetLogger("profile.config")
 
 type Config struct {
-	Base              *config.Config
-	CKWriterConfig    config.CKWriterConfig `yaml:"profile-ck-writer"`
-	ProfileTTL        int                   `yaml:"profile-ttl-hour"`
-	DecoderQueueCount int                   `yaml:"profile-decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"profile-decoder-queue-size"`
+	Base                 *config.Config
+	CKWriterConfig       config.CKWriterConfig `yaml:"profile-ck-writer"`
+	ProfileTTL           int                   `yaml:"profile-ttl-hour"`
+	DecoderQueueCount    int                   `yaml:"profile-decoder-queue-count"`
+	DecoderQueueSize     int                   `yaml:"profile-decoder-queue-size"`
+	CompressionAlgorithm *string               `yaml:"profile-compression-algorithm"`
 }
 
 type ProfileConfig struct {
@@ -56,6 +57,13 @@ func (c *Config) Validate() error {
 
 	if c.DecoderQueueSize == 0 {
 		c.DecoderQueueSize = DefaultDecoderQueueSize
+	}
+
+	if c.CompressionAlgorithm == nil {
+		// when not configure `profile-compression-algorithm`, default value is `zstd`
+		// when configure profile-compression-algorithm with '', will not use compression algo
+		c.CompressionAlgorithm = new(string)
+		*c.CompressionAlgorithm = "zstd"
 	}
 
 	return nil

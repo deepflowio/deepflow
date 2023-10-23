@@ -735,7 +735,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				whereFilter = equalFilter
 			}
 		case "pod_service_id", "pod_service_id_0", "pod_service_id_1", "natgw_id", "natgw_id_0", "natgw_id_1", "natgw", "natgw_0", "natgw_1",
-			"lb_id", "lb_id_0", "lb_id_1", "lb", "lb_0", "lb_1", "lb_listener_id", "lb_listener_id_0", "lb_listener_id_1", "lb_listener", "lb_listener_0", "lb_listener_1":
+			"lb_id", "lb_id_0", "lb_id_1", "lb", "lb_0", "lb_1", "lb_listener_id", "lb_listener_id_0", "lb_listener_id_1", "lb_listener", "lb_listener_0", "lb_listener_1", "pod_group_type", "pod_group_type_0", "pod_group_type_1":
 			switch strings.ToLower(op) {
 			case "not match":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
@@ -802,12 +802,12 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
+		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
-			filter = "1=1"
+		if value == "''" {
+			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
@@ -821,8 +821,8 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				if value == "" {
-					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+				if value == "''" {
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					return filter, nil
 				}
 				if strings.Contains(op, "match") {
@@ -852,12 +852,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
+		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
-		if value == "" {
-			filter = "1=1"
+		if value == "''" {
+			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
@@ -879,8 +879,8 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 						return filter, nil
 					}
 				}
-				if value == "" {
-					filter = fmt.Sprintf("app_label_value_id_%d = 0", appLabel.appLabelColumnIndex)
+				if value == "''" {
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
 					return filter, nil
@@ -1022,7 +1022,12 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						if strings.Contains(tagName, "pod_group_type") {
+							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
+							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") OR " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						}
 					} else {
 						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName)
 					}
@@ -1035,12 +1040,33 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						if strings.Contains(tagName, "pod_group_type") {
+							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						}
 					} else {
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+						if strings.Contains(tagName, "pod_group_type") {
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
+						} else {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+						}
 					}
 				} else {
 					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
+				}
+			case "not match":
+				if strings.Contains(tagName, "pod_group_type") {
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName) + ")"
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, f.Value, enumFileName)
+				}
+			case "not in":
+				if strings.Contains(tagName, "pod_group_type") {
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value, enumFileName) + ")"
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
 				}
 			default:
 				if strings.Contains(opName, "match") {
