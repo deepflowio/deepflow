@@ -52,10 +52,27 @@ static u64 add_symcache_count;
 static u64 free_symcache_count;
 
 /*
+ * To allow Java to run for an extended period and gather more symbol
+ * information, we delay symbol retrieval when encountering unknown symbols.
+ * The default value is 'JAVA_SYMS_TABLE_UPDATE_PERIOD'.
+ */
+static volatile u64 java_syms_fetch_delay; // In seconds.
+   
+/*
  * When a process exits, save the symbol cache pids
  * to be deleted.
  */
 static struct symbol_cache_del_pids cache_del_pids;
+
+void set_java_syms_fetch_delay(int delay_secs)
+{
+	java_syms_fetch_delay = delay_secs;
+}
+
+u64 get_java_syms_fetch_delay(void)
+{
+	return java_syms_fetch_delay;
+}
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf)
@@ -813,7 +830,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if (p->is_java && p->unknown_syms_found
 			    && p->update_syms_table_time == 0) {
 				p->update_syms_table_time =
-				    curr_time + JAVA_SYMS_TABLE_UPDATE_PERIOD;
+				    curr_time + get_java_syms_fetch_delay();
 			}
 
 			if (p->update_syms_table_time > 0

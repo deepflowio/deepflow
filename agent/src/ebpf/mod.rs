@@ -469,12 +469,17 @@ extern "C" {
      *   in the target POD. Its valid range is [2, 10], which means it falls within
      *   the interval of 2Mi to 10Mi. If the configuration value is outside this
      *   range, the default value of 10(10Mi), will be used.
+     * @java_update_delay To allow Java to run for an extended period and gather
+     *   more symbol information, we delay symbol retrieval when encountering unknown
+     *   symbols.
+     *   The recommended range for values is [60, 86400], default valuse is 300.
      * @callback Profile data processing callback interface
      * @returns 0 on success, < 0 on error
      */
     pub fn start_continuous_profiler(
         freq: c_int,
         java_syms_space_limit: c_int,
+        java_update_delay: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
     ) -> c_int;
 

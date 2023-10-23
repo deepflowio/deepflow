@@ -183,6 +183,8 @@ int create_and_init_symbolizer_caches(void);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);
 void exec_symbol_cache_update(void);
+void set_java_syms_fetch_delay(int delay_secs);
+u64 get_java_syms_fetch_delay(void);
 #endif
 void update_symbol_cache(pid_t pid);
 #endif /* _BPF_SYMBOL_H_ */

@@ -1046,10 +1046,16 @@ static struct tracer_sockopts cpdbg_sockopts = {
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
  * @java_syms_space_limit The maximum space occupied by the Java symbol files
  *                        in the target POD. 
+ * @java_update_delay To allow Java to run for an extended period and gather
+ *                    more symbol information, we delay symbol retrieval when
+ *                    encountering unknown symbols. The default value is
+ *                    'JAVA_SYMS_TABLE_UPDATE_PERIOD' (300 seconds).
+ *                    This represents the delay in seconds.
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
 int start_continuous_profiler(int freq, int java_syms_space_limit,
+			      int java_update_delay,
 			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
@@ -1082,6 +1088,12 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
 		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
 	g_java_syms_write_bytes_max = java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
+	ebpf_info("set java_syms_write_bytes_max : %d\n", g_java_syms_write_bytes_max);
+
+	if (java_update_delay <= 0)
+		java_update_delay = JAVA_SYMS_TABLE_UPDATE_PERIOD;
+	set_java_syms_fetch_delay(java_update_delay);
+	ebpf_info("set java_update_delay : %lu\n", java_update_delay);
 
 	atomic64_init(&process_lost_count);
 
