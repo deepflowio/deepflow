@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/server/libs/stats"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("trisolaris/statsd")
@@ -118,17 +118,17 @@ func AddGPIDSendCounter(count uint64) {
 func Start() {
 	for apiType, name := range ApiTypeToName {
 		grpcCounters[apiType] = NewGrpcCounter()
-		err := stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", grpcCounters[apiType], stats.OptionStatTags{"grpc_type": name})
+		err := stats.RegisterCountableWithModulePrefix("controller_", "trisolaris", grpcCounters[apiType], stats.OptionStatTags{"grpc_type": name})
 		if err != nil {
 			log.Error(err)
 		}
 	}
 
-	err := stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", gpidCounter, stats.OptionStatTags{"grpc_type": "GPIDCount"})
+	err := stats.RegisterCountableWithModulePrefix("controller_", "trisolaris", gpidCounter, stats.OptionStatTags{"grpc_type": "GPIDCount"})
 	if err != nil {
 		log.Error(err)
 	}
-	err = stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", GetPrometheusLabelIDsCounterSingleton(), stats.OptionStatTags{"grpc_type": "GetPrometheusLabelIDsDetail"})
+	err = stats.RegisterCountableWithModulePrefix("controller_", "trisolaris", GetPrometheusLabelIDsCounterSingleton(), stats.OptionStatTags{"grpc_type": "GetPrometheusLabelIDsDetail"})
 	if err != nil {
 		log.Error(err)
 	}

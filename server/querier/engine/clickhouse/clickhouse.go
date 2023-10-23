@@ -744,6 +744,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
+			} else if e.DB == "deepflow_system" {
+				// deepflow_system 只有 deepflow_system 表，使用 virtual_table_name 做过滤区分
+				table = "deepflow_system"
 			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
 				whereStmt := Where{}
 				metricIDFilter, err := GetMetricIDFilter(e.DB, e.Table)

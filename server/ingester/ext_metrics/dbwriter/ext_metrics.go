@@ -55,18 +55,14 @@ func (m *ExtMetrics) DatabaseName() string {
 
 func (m *ExtMetrics) TableName() string {
 	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
-		return m.VTableName
+		return DEEPFLOW_SYSTEM_TABLE
 	} else {
 		return EXT_METRICS_TABLE
 	}
 }
 
 func (m *ExtMetrics) VirtualTableName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
-		return ""
-	} else {
-		return m.VTableName
-	}
+	return m.VTableName
 }
 
 // Note: The order of Write() must be consistent with the order of append() in Columns.
@@ -74,9 +70,9 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(m.Timestamp)
 	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
 		m.UniversalTag.WriteBlock(block)
-		block.Write(m.VTableName)
 	}
 	block.Write(
+		m.VTableName,
 		m.TagNames,
 		m.TagValues,
 		m.MetricsFloatNames,
@@ -91,12 +87,9 @@ func (m *ExtMetrics) Columns() []*ckdb.Column {
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
 	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
 		columns = zerodoc.GenUniversalTagColumns(columns)
-
-		// FIXME: Currently there is no virtual_table_name column in the deepflow_system database,
-		// but it will be unified in the future.
-		columns = append(columns, ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名k"))
 	}
 	columns = append(columns,
+		ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名"),
 		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("额外的tag"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayLowCardinalityString).SetComment("额外的tag对应的值"),
 		ckdb.NewColumn("metrics_float_names", ckdb.ArrayLowCardinalityString).SetComment("额外的float类型metrics"),
@@ -115,19 +108,12 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	engine := ckdb.MergeTree
 
 	// order key
-	orderKeys := []string{}
+	orderKeys := []string{"virtual_table_name", timeKey}
 	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
-		// FIXME: Currently there is no virtual_table_name column in the deepflow_system database,
-		// but it will be unified in the future.
-		orderKeys = append(orderKeys, "virtual_table_name")
-		orderKeys = append(orderKeys, timeKey)
-
 		// order key in universal tags
 		orderKeys = append(orderKeys, "l3_epc_id")
 		orderKeys = append(orderKeys, "ip4")
 		orderKeys = append(orderKeys, "ip6")
-	} else {
-		orderKeys = append(orderKeys, timeKey)
 	}
 
 	return &ckdb.Table{
