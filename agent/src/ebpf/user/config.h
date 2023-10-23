@@ -208,12 +208,12 @@ enum {
 
 /*
  * The maximum space occupied by the Java symbol files in the target POD.
- * Its valid range is [2, 10], which means it falls within the interval
- * of 2Mi to 10Mi. If the configuration value is outside this range, the
+ * Its valid range is [2, 100], which means it falls within the interval
+ * of 2Mi to 100Mi. If the configuration value is outside this range, the
  * default value of 10(10Mi), will be used.
  */
 #define JAVA_POD_WRITE_FILES_SPACE_MIN 2097152 // 2Mi
-#define JAVA_POD_WRITE_FILES_SPACE_MAX 10485760 // 10Mi
+#define JAVA_POD_WRITE_FILES_SPACE_MAX 104857600 // 100Mi
 #define JAVA_POD_WRITE_FILES_SPACE_DEF 10485760 // 10Mi
 /*
  * The `df_java_agent_musl.so` and `df_java_agent.so` files will also be
