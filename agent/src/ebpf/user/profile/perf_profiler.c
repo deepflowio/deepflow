@@ -30,6 +30,7 @@
 #include "../types.h"
 #include "../vec.h"
 #include "../tracer.h"
+#include "../socket.h"
 #include "attach.h"
 #include "perf_profiler.h"
 #include "../elf.h"
@@ -759,9 +760,16 @@ static void cp_reader_work(void *arg)
 
 		/* 
 		 * Waiting for the regular expression to be configured
-		 * and start working. 
+		 * and start working. Ensure the socket tracer is in
+		 * the 'running' state to prevent starting the profiler
+		 * before the socket tracer has completed its attach
+		 * operation. The profiler's processing depends on probe
+		 * interfaces provided by the socket tracer, such as process
+		 * exit events. We want to ensure that everything is ready
+		 * before the profiler performs address translation.
 		 */
-		if (unlikely(!regex_existed)) {
+		if (unlikely(!regex_existed ||
+			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			exec_symbol_cache_update();
 			sleep(1);
 			continue;
