@@ -27,6 +27,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         protocol_logs::{
@@ -164,6 +165,8 @@ impl TryFrom<&[u8]> for Hdr {
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct SofaRpcInfo {
+    is_tls: bool,
+
     proto: u8,
     req_id: u32,
     msg_type: LogMessageType,
@@ -221,7 +224,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
     }
 
     fn is_tls(&self) -> bool {
-        false
+        self.is_tls
     }
 
     fn get_endpoint(&self) -> Option<String> {
@@ -235,6 +238,11 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
 
 impl From<SofaRpcInfo> for L7ProtocolSendLog {
     fn from(s: SofaRpcInfo) -> Self {
+        let flags = if s.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         Self {
             req_len: Some(s.req_len),
             resp_len: Some(s.resp_len),
@@ -260,6 +268,7 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
                 request_id: Some(s.req_id),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         }
     }
@@ -293,6 +302,7 @@ impl L7ProtocolParserInterface for SofaRpcLog {
                     return Ok(L7ParseResult::None);
                 }
                 self.cal_perf(param, &mut info);
+                info.is_tls = param.is_tls();
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
                 } else {

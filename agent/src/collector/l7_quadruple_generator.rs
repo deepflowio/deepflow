@@ -240,13 +240,9 @@ impl SubQuadGen {
                 // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
                 // so the L7Protocol of the same flow may be different. The principles are as follows:
                 // 1. Unknown l7_protocol can be overwritten by any protocol.
-                // 2. Other l7_protocol can be overwritten by other non-unknown l7_protocol
                 if l7_stats.l7_protocol == meter.l7_protocol {
                     meter.app_meter.sequential_merge(app_meter);
-                } else if meter.l7_protocol == L7Protocol::Unknown
-                    || (meter.l7_protocol == L7Protocol::Other
-                        && l7_stats.l7_protocol != L7Protocol::Unknown)
-                {
+                } else if meter.l7_protocol == L7Protocol::Unknown {
                     meter.l7_protocol = l7_stats.l7_protocol;
                     meter.app_meter = *app_meter;
                 }
@@ -604,7 +600,7 @@ impl L7QuadrupleGenerator {
         let stats = &l7_stats.stats;
         match (l7_stats.l7_protocol, l7_stats.signal_source) {
             (
-                L7Protocol::Unknown | L7Protocol::Other,
+                L7Protocol::Unknown,
                 SignalSource::Packet | SignalSource::EBPF | SignalSource::XFlow,
             ) => {
                 // only L7Protocol is Unknown or Other and SignalSource != Otel will execute the following logic
