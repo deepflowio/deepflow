@@ -184,6 +184,7 @@ pub struct SK_BPF_DATA {
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
     // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
+    pub is_tls: bool,
 
     /* trace info */
     pub tcp_seq: u64, // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
@@ -270,7 +271,7 @@ impl fmt::Display for SK_BPF_DATA {
             write!(
                 f,
                 "Timestamp: {} Socket: {} CapSeq: {} Process: {}:{} Thread: {} MsgType: {} Direction: {} \n \
-                \t{}_{} -> {}_{} Seq: {} Trace-ID: {} L7: {} Data {:?}",
+                \t{}_{} -> {}_{} Seq: {} Trace-ID: {} L7: {} TLS: {:?} Data {:?}",
                 self.timestamp,
                 self.socket_id,
                 self.cap_seq,
@@ -286,6 +287,7 @@ impl fmt::Display for SK_BPF_DATA {
                 self.tcp_seq,
                 self.syscall_trace_id_call,
                 self.l7_protocol_hint,
+                self.is_tls,
                 data_bytes
             )
         }

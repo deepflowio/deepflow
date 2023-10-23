@@ -22,6 +22,7 @@ use std::time::Duration;
 #[cfg(target_os = "linux")]
 use std::{error::Error, net::Ipv6Addr, ptr};
 
+use bitflags::bitflags;
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
     icmpv6::{Icmpv6Type, Icmpv6Types},
@@ -99,6 +100,14 @@ impl<'a> From<BatchedBuffer<u8>> for RawPacket<'a> {
     }
 }
 
+bitflags! {
+    #[derive(Default)]
+    pub struct EbpfFlags: u32 {
+        const NONE = 0;
+        const TLS = 1;
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
@@ -158,6 +167,7 @@ pub struct MetaPacket<'a> {
     //  流结束标识, 目前只有 go http2 uprobe 用到
     pub is_request_end: bool,
     pub is_response_end: bool,
+    pub ebpf_flags: EbpfFlags,
 
     pub process_id: u32,
     pub netns_id: u32,
@@ -184,11 +194,9 @@ impl<'a> MetaPacket<'a> {
             self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
         }
     }
+
     pub fn is_tls(&self) -> bool {
-        match self.l7_protocol_from_ebpf {
-            L7Protocol::Http1TLS | L7Protocol::Http2TLS => true,
-            _ => false,
-        }
+        self.ebpf_flags.contains(EbpfFlags::TLS)
     }
 
     pub fn empty() -> MetaPacket<'a> {
@@ -952,6 +960,11 @@ impl<'a> MetaPacket<'a> {
         }
         packet.ebpf_type = EbpfType::try_from(data.source)?;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
+        packet.ebpf_flags = if data.is_tls {
+            EbpfFlags::TLS
+        } else {
+            EbpfFlags::NONE
+        };
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
         if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {

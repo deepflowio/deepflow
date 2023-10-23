@@ -359,7 +359,7 @@ fn fill_l7_stats(
         )
     };
     let mut l4_protocol = L4Protocol::Tcp;
-    let mut l7_protocol = L7Protocol::Other;
+    let mut l7_protocol = L7Protocol::Unknown;
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
     let (mut l2_end_0, mut l2_end_1) = (false, false);
@@ -460,8 +460,6 @@ fn fill_l7_stats(
     if is_http2 {
         if l7_protocol == L7Protocol::Http1 {
             l7_protocol = L7Protocol::Http2;
-        } else if l7_protocol == L7Protocol::Http1TLS {
-            l7_protocol = L7Protocol::Http2TLS;
         }
     }
 

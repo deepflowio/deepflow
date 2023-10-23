@@ -493,9 +493,7 @@ impl FlowPerfStats {
             self.l4_protocol = other.l4_protocol;
         }
 
-        if self.l7_protocol == L7Protocol::Unknown
-            || (self.l7_protocol == L7Protocol::Other && other.l7_protocol != L7Protocol::Unknown)
-        {
+        if self.l7_protocol == L7Protocol::Unknown && other.l7_protocol != L7Protocol::Unknown {
             self.l7_protocol = other.l7_protocol;
         }
 

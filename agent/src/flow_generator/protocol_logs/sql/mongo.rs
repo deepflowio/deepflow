@@ -29,6 +29,7 @@ use crate::{
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         protocol_logs::{
@@ -125,6 +126,11 @@ impl MongoDBInfo {
 
 impl From<MongoDBInfo> for L7ProtocolSendLog {
     fn from(f: MongoDBInfo) -> Self {
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         let log = L7ProtocolSendLog {
             req_len: std::option::Option::<u32>::from(f.req_len),
             req: L7Request {
@@ -144,6 +150,7 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
                 request_id: Option::<u32>::from(f.request_id),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         };
         return log;
@@ -177,7 +184,6 @@ impl L7ProtocolParserInterface for MongoDBLog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = MongoDBInfo::default();
-        self.info.is_tls = param.is_tls();
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -187,6 +193,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        info.is_tls = param.is_tls();
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
         } else {

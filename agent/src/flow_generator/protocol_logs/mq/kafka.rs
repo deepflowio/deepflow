@@ -21,6 +21,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{KafkaInfoCache, L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         error::{Error, Result},
@@ -189,6 +190,11 @@ impl KafkaInfo {
 impl From<KafkaInfo> for L7ProtocolSendLog {
     fn from(f: KafkaInfo) -> Self {
         let command_str = f.get_command();
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         let log = L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
@@ -205,6 +211,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
                 request_id: Some(f.correlation_id),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         };
         return log;
@@ -237,6 +244,7 @@ impl L7ProtocolParserInterface for KafkaLog {
         };
         let mut info = KafkaInfo::default();
         Self::parse(self, payload, param.l4_protocol, param.direction, &mut info)?;
+        info.is_tls = param.is_tls();
 
         // handle kafka status code
         {

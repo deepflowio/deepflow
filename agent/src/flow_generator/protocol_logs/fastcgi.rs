@@ -22,6 +22,7 @@ use serde::Serialize;
 use crate::common::flow::{L7PerfStats, PacketDirection};
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam};
+use crate::common::meta_packet::EbpfFlags;
 use crate::config::handler::L7LogDynamicConfig;
 use crate::flow_generator::protocol_logs::value_is_default;
 use crate::flow_generator::{Error, Result};
@@ -93,6 +94,9 @@ pub struct FastCGIInfo {
     rrt: u64,
 
     #[serde(skip)]
+    is_tls: bool,
+
+    #[serde(skip)]
     seq_off: u32,
 }
 
@@ -125,7 +129,7 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
     }
 
     fn is_tls(&self) -> bool {
-        false
+        self.is_tls
     }
 
     fn tcp_seq_offset(&self) -> u32 {
@@ -234,6 +238,11 @@ impl FastCGIInfo {
 
 impl From<FastCGIInfo> for L7ProtocolSendLog {
     fn from(f: FastCGIInfo) -> Self {
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         Self {
             req: L7Request {
                 req_type: f.method,
@@ -266,6 +275,7 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
                 request_id: Some(f.request_id),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         }
     }
@@ -483,6 +493,7 @@ impl L7ProtocolParserInterface for FastCGILog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        info.is_tls = param.is_tls();
         Ok(L7ParseResult::Single(L7ProtocolInfo::FastCGIInfo(info)))
     }
 

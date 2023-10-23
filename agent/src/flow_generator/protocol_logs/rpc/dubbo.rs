@@ -24,6 +24,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
@@ -177,7 +178,11 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 _ => f.serial_id.to_string(),
             },
         };
-
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
@@ -214,6 +219,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 }),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         }
     }
@@ -252,6 +258,7 @@ impl L7ProtocolParserInterface for DubboLog {
         };
         let mut info = DubboInfo::default();
         self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
+        info.is_tls = param.is_tls();
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
