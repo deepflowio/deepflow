@@ -588,27 +588,30 @@ func (p *PlatformDataOP) generatePodIPS() {
 	pods := p.metaData.GetDBDataCache().GetPods()
 	podIPs := make([]*trident.PodIp, 0, len(pods))
 	for _, pod := range pods {
-		vifs, ok := rawData.podIDToVifs[pod.ID]
-		if ok == false {
-			continue
+		podNodeIP := ""
+		if podNode := rawData.GetPodNode(pod.PodNodeID); podNode != nil {
+			podNodeIP = podNode.IP
 		}
-		vifs.Each(func(vif interface{}) bool {
-			podVif := vif.(*models.VInterface)
-			ips, ok := rawData.vInterfaceIDToIP[podVif.ID]
-			if ok == false || len(ips) == 0 {
-				return false
-			}
-			data := &trident.PodIp{
-				PodId:        proto.Uint32(uint32(pod.ID)),
-				PodName:      proto.String(pod.Name),
-				EpcId:        proto.Uint32(uint32(pod.VPCID)),
-				Ip:           proto.String(ips[0].GetIp()),
-				PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
-				ContainerIds: strings.Split(pod.ContainerIDs, ", "),
-			}
-			podIPs = append(podIPs, data)
-			return true
-		})
+		data := &trident.PodIp{
+			PodId:        proto.Uint32(uint32(pod.ID)),
+			PodName:      proto.String(pod.Name),
+			EpcId:        proto.Uint32(uint32(pod.VPCID)),
+			PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
+			ContainerIds: strings.Split(pod.ContainerIDs, ", "),
+			PodNodeIp:    proto.String(podNodeIP),
+		}
+		if vifs, ok := rawData.podIDToVifs[pod.ID]; ok == true {
+			vifs.Each(func(vif interface{}) bool {
+				podVif := vif.(*models.VInterface)
+				ips, ok := rawData.vInterfaceIDToIP[podVif.ID]
+				if ok == false || len(ips) == 0 {
+					return false
+				}
+				data.Ip = proto.String(ips[0].GetIp())
+				return true
+			})
+		}
+		podIPs = append(podIPs, data)
 	}
 	p.updatePodIPs(podIPs)
 }
