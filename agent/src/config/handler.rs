@@ -62,10 +62,7 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::{
-        environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
-        logger::RemoteLogConfig,
-    },
+    utils::environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
@@ -1198,8 +1195,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 pub struct ConfigHandler {
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
-    pub logger_handle: LoggerHandle,
-    pub remote_log_config: RemoteLogConfig,
+    pub logger_handle: Option<LoggerHandle>,
     // need update
     pub static_config: Config,
     pub candidate_config: ModuleConfig,
@@ -1207,13 +1203,7 @@ pub struct ConfigHandler {
 }
 
 impl ConfigHandler {
-    pub fn new(
-        config: Config,
-        ctrl_ip: IpAddr,
-        ctrl_mac: MacAddr,
-        logger_handle: LoggerHandle,
-        remote_log_config: RemoteLogConfig,
-    ) -> Self {
+    pub fn new(config: Config, ctrl_ip: IpAddr, ctrl_mac: MacAddr) -> Self {
         let candidate_config =
             ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
@@ -1224,9 +1214,12 @@ impl ConfigHandler {
             ctrl_mac,
             candidate_config,
             current_config,
-            logger_handle,
-            remote_log_config,
+            logger_handle: None,
         }
+    }
+
+    pub fn set_logger_handle(&mut self, handle: LoggerHandle) {
+        self.logger_handle.replace(handle);
     }
 
     pub fn collector(&self) -> CollectorAccess {
@@ -1703,54 +1696,60 @@ impl ConfigHandler {
                 } else {
                     info!("Disable rsyslog");
                 }
-                self.remote_log_config
-                    .set_enabled(new_config.log.rsyslog_enabled);
             }
             if candidate_config.log.log_level != new_config.log.log_level {
-                match self
-                    .logger_handle
-                    .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
-                {
-                    Ok(_) => {
-                        candidate_config.log.log_level = new_config.log.log_level;
-                        info!("log level set to {}", new_config.log.log_level);
-                    }
-                    Err(e) => warn!("failed to set log_level: {}", e),
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h
+                        .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
+                    {
+                        Ok(_) => {
+                            candidate_config.log.log_level = new_config.log.log_level;
+                            info!("log level set to {}", new_config.log.log_level);
+                        }
+                        Err(e) => warn!("failed to set log_level: {}", e),
+                    },
+                    None => warn!("logger_handle not set"),
                 }
             }
             if candidate_config.log.host != new_config.log.host {
-                self.remote_log_config
-                    .set_hostname(new_config.log.host.clone());
+                info!(
+                    "remote log hostname {} -> {}",
+                    candidate_config.log.host, new_config.log.host
+                )
             }
             if candidate_config.log.log_threshold != new_config.log.log_threshold {
-                info!("LogThreshold set to {}", new_config.log.log_threshold);
-                self.remote_log_config
-                    .set_threshold(new_config.log.log_threshold);
+                info!(
+                    "remote log threshold {} -> {}",
+                    candidate_config.log.log_threshold, new_config.log.log_threshold
+                )
             }
             if candidate_config.log.log_retention != new_config.log.log_retention {
-                match self.logger_handle.flw_config() {
-                    Err(FlexiLoggerError::NoFileLogger) => {
-                        info!("no file logger, skipped log_retention change")
-                    }
-                    _ => match self.logger_handle.reset_flw(
-                        &FileLogWriter::builder(
-                            FileSpec::try_from(&static_config.log_file).unwrap(),
-                        )
-                        .rotate(
-                            Criterion::Age(Age::Day),
-                            Naming::Timestamps,
-                            Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
-                        )
-                        .create_symlink(&static_config.log_file)
-                        .append(),
-                    ) {
-                        Ok(_) => {
-                            info!("log_retention set to {}", new_config.log.log_retention);
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h.flw_config() {
+                        Err(FlexiLoggerError::NoFileLogger) => {
+                            info!("no file logger, skipped log_retention change")
                         }
-                        Err(e) => {
-                            warn!("failed to set log_retention: {}", e);
-                        }
+                        _ => match h.reset_flw(
+                            &FileLogWriter::builder(
+                                FileSpec::try_from(&static_config.log_file).unwrap(),
+                            )
+                            .rotate(
+                                Criterion::Age(Age::Day),
+                                Naming::Timestamps,
+                                Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
+                            )
+                            .create_symlink(&static_config.log_file)
+                            .append(),
+                        ) {
+                            Ok(_) => {
+                                info!("log_retention set to {}", new_config.log.log_retention);
+                            }
+                            Err(e) => {
+                                warn!("failed to set log_retention: {}", e);
+                            }
+                        },
                     },
+                    None => warn!("logger_handle not set"),
                 }
             }
             if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip
@@ -1759,10 +1758,6 @@ impl ConfigHandler {
                 info!(
                     "Rsyslog client connect to {} {}",
                     &new_config.log.analyzer_ip, new_config.log.analyzer_port
-                );
-                self.remote_log_config.set_remotes(
-                    &vec![new_config.log.analyzer_ip.clone()],
-                    new_config.log.analyzer_port,
                 );
             }
             candidate_config.log = new_config.log;
