@@ -265,14 +265,14 @@ static inline bool __is_same_ns(int target_pid, const char *tag)
 	return false;
 }
 
-static bool __unused is_same_netns(int target_pid)
+static bool __unused is_same_netns(int pid)
 {
-	return __is_same_ns(target_pid, "net");
+	return __is_same_ns(pid, "net");
 }
 
-bool is_same_mntns(int target_pid)
+bool is_same_mntns(int pid)
 {
-	return __is_same_ns(target_pid, "mnt");
+	return __is_same_ns(pid, "mnt");
 }
 
 void clear_local_perf_files(int pid)
@@ -287,8 +287,11 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-static void __unused clear_old_target_perf_files(int pid)
+void __unused clear_old_target_perf_files(int pid)
 {
+	if (is_same_mntns(pid))
+                return;
+
 	/* if pid == target_ns_pid, run in same namespace */
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
@@ -297,20 +300,13 @@ static void __unused clear_old_target_perf_files(int pid)
 
 	char path[MAX_PATH_LENGTH];
 	snprintf(path, sizeof(path),
-		 "/proc/%d/root/tmp/perf-%d.map", pid, target_ns_pid);
-	clear_target_ns_tmp_file(path);
-
-	snprintf(path, sizeof(path),
 		 "/proc/%d/root/tmp/perf-%d.log", pid, target_ns_pid);
-	clear_target_ns_tmp_file(path);
-
-	snprintf(path, sizeof(path),
-		 "/proc/%d/root/deepflow/perf-%d.map", pid, target_ns_pid);
-	clear_target_ns_tmp_file(path);
-
-	snprintf(path, sizeof(path),
-		 "/proc/%d/root/deepflow/perf-%d.log", pid, target_ns_pid);
-	clear_target_ns_tmp_file(path);
+	if (access(path, F_OK) == 0) {
+		clear_target_ns_tmp_file(path);
+		snprintf(path, sizeof(path),
+			 "/proc/%d/root/tmp/perf-%d.map", pid, target_ns_pid);
+		clear_target_ns_tmp_file(path);
+	}
 }
 
 void clear_target_ns(int pid, int target_ns_pid)
