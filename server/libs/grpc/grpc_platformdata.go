@@ -102,6 +102,7 @@ type PodInfo struct {
 	EpcId        int32
 	PodClusterId uint32
 	ContainerIds []string
+	PodNodeIp    string
 }
 
 type VtapInfo struct {
@@ -1547,7 +1548,8 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 			EpcId:        epcId,
 			Ip:           podIp.GetIp(),
 			PodClusterId: podIp.GetPodClusterId(),
-			ContainerIds: containerIds}
+			ContainerIds: containerIds,
+			PodNodeIp:    podIp.GetPodNodeIp()}
 		if podInfos, ok := podNameInfos[podName]; ok {
 			podNameInfos[podName] = append(podInfos, podInfo)
 		} else {
