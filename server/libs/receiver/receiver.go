@@ -61,11 +61,12 @@ const (
 var log = logging.MustGetLogger("receiver")
 
 type RecvBuffer struct {
-	Begin  int // 开始位置
-	End    int
-	Buffer []byte
-	IP     net.IP // 保存消息的发送方IP
-	VtapID uint16
+	Begin      int // 开始位置
+	End        int
+	Buffer     []byte
+	IP         net.IP // 保存消息的发送方IP
+	VtapID     uint16
+	SocketType ServerType
 }
 
 // 实现空接口，仅用于队列调试打印
@@ -121,10 +122,11 @@ func minPowerOfTwo(v int) int {
 	return v
 }
 
-func AcquireRecvBuffer(length int) (*RecvBuffer, bool) {
+func AcquireRecvBuffer(length int, socketType ServerType) (*RecvBuffer, bool) {
 	isNew := false
 	index := getBufferPoolIndex(length)
 	buf := recvBufferPools[index].Get().(*RecvBuffer)
+	buf.SocketType = socketType
 	if len(buf.Buffer) < length {
 		length = minPowerOfTwo(length)
 		buf.Buffer = make([]byte, length)
@@ -667,7 +669,7 @@ func (r *Receiver) ProcessUDPServer() {
 	flowHeader := &datatype.FlowHeader{}
 	r.setUDPTimeout()
 	for !r.exit {
-		recvBuffer, _ := AcquireRecvBuffer(RECV_BUFSIZE_2K)
+		recvBuffer, _ := AcquireRecvBuffer(RECV_BUFSIZE_2K, UDP)
 		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer.Buffer)
 		if err != nil || size < datatype.MESSAGE_HEADER_LEN {
 			ReleaseRecvBuffer(recvBuffer)
@@ -885,7 +887,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client(%s) wrong frame size(%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
 			return
 		}
-		recvBuffer, isNew := AcquireRecvBuffer(dataLen)
+		recvBuffer, isNew := AcquireRecvBuffer(dataLen, TCP)
 		if isNew {
 			r.counter.NewBufferCount++
 		}
