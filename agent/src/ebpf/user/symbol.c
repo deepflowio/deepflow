@@ -54,7 +54,7 @@ static u64 free_symcache_count;
 /*
  * To allow Java to run for an extended period and gather more symbol
  * information, we delay symbol retrieval when encountering unknown symbols.
- * The default value is 'JAVA_SYMS_TABLE_UPDATE_PERIOD'.
+ * The default value is 'JAVA_SYMS_UPDATE_DELAY_DEF'.
  */
 static volatile u64 java_syms_fetch_delay; // In seconds.
    

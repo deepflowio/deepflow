@@ -541,7 +541,7 @@ impl EbpfCollector {
                 if start_continuous_profiler(
                     on_cpu_profile_config.frequency as i32,
                     10,
-                    300,
+                    60,
                     Self::ebpf_on_cpu_callback,
                 ) != 0
                 {

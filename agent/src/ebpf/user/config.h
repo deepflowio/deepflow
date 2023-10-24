@@ -165,7 +165,9 @@ enum {
  * date the Java symbol table. This is done The purpose is to avoid freque-
  * nt updates of the java symbol table.
  */
-#define JAVA_SYMS_TABLE_UPDATE_PERIOD 300 // 300 seconds
+#define JAVA_SYMS_UPDATE_DELAY_DEF 60 // 60 seconds
+#define JAVA_SYMS_UPDATE_DELAY_MIN 5 // 5 seconds
+#define JAVA_SYMS_UPDATE_DELAY_MAX 3600 // 3600 seconds
 
 /* Profiler - maximum data push interval time (in nanosecond). */
 #define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */ 
