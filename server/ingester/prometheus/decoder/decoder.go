@@ -536,6 +536,10 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.PodID = podInfo.PodId
 			t.L3EpcID = podInfo.EpcId
 			ip = net.ParseIP(podInfo.Ip)
+			// maybe Pod is hostnetwork mode or can't get pod IP, then get pod node IP instead
+			if ip == nil {
+				ip = net.ParseIP(podInfo.PodNodeIp)
+			}
 			hasMatched = true
 		}
 	}
