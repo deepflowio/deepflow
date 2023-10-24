@@ -46,9 +46,9 @@ var L7_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"error":              NewReplaceMetrics(DB_FIELD_ERROR, ""),
 	"client_error":       NewReplaceMetrics(DB_FIELD_CLIENT_ERROR, ""),
 	"server_error":       NewReplaceMetrics(DB_FIELD_SERVER_ERROR, ""),
-	"error_ratio":        NewReplaceMetrics(DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
-	"client_error_ratio": NewReplaceMetrics(DB_FIELD_CLIENT_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
-	"server_error_ratio": NewReplaceMetrics(DB_FIELD_SERVER_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
+	"error_ratio":        NewReplaceMetrics(DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE+">0"),
+	"client_error_ratio": NewReplaceMetrics(DB_FIELD_CLIENT_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_CLIENT_ERROR+"/"+DB_FIELD_RESPONSE+">0"),
+	"server_error_ratio": NewReplaceMetrics(DB_FIELD_SERVER_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_SERVER_ERROR+"/"+DB_FIELD_RESPONSE+">0"),
 	"session_length":     NewReplaceMetrics(DB_FIELD_SESSION_LENGTH, "").SetIsAgg(false),
 }
 

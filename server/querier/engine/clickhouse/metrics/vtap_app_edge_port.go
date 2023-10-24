@@ -19,11 +19,11 @@ package metrics
 var VTAP_APP_EDGE_PORT_METRICS = map[string]*Metrics{}
 
 var VTAP_APP_EDGE_PORT_METRICS_REPLACE = map[string]*Metrics{
-	"rrt": NewReplaceMetrics("rrt_sum/rrt_count", "rrt_count>0"),
+	"rrt": NewReplaceMetrics("rrt_sum/rrt_count", "rrt_sum/rrt_count>0"),
 
-	"error_ratio":        NewReplaceMetrics("error/response", "response>0"),
-	"client_error_ratio": NewReplaceMetrics("client_error/response", "response>0"),
-	"server_error_ratio": NewReplaceMetrics("server_error/response", "response>0"),
+	"error_ratio":        NewReplaceMetrics("error/response", "error/response>0"),
+	"client_error_ratio": NewReplaceMetrics("client_error/response", "client_error/response>0"),
+	"server_error_ratio": NewReplaceMetrics("server_error/response", "server_error/response>0"),
 }
 
 func GetVtapAppEdgePortMetrics() map[string]*Metrics {
