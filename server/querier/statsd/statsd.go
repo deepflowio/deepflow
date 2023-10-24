@@ -23,7 +23,7 @@ import (
 )
 
 func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
-	return stats.RegisterCountableWithModulePrefix("querier.", module, countable, opts...)
+	return stats.RegisterCountableWithModulePrefix("querier_", module, countable, opts...)
 }
 
 type ClickhouseCounter struct {
