@@ -329,16 +329,17 @@ func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platf
 	var info *grpc.Info
 	if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 		// ebpf profile will submit netns from agent
-		// 1. try to find platform info by netnsid
-		if p.NetnsID != 0 {
-			info = platformData.QueryNetnsIdInfo(vtapID, p.NetnsID)
-		}
-		// 2. if find nothing, try to find platform info by containerid
-		if info == nil {
+		// 1. try to find platform info by containerid
+		if containerID != "" {
 			p.fillPodInfo(vtapID, containerID, platformData)
 			if p.PodID != 0 {
 				info = platformData.QueryEpcIDPodInfo(p.L3EpcID, p.PodID)
 			}
+		}
+
+		// 2. if find nothing, try to find platform info by netnsid
+		if info == nil && p.NetnsID != 0 {
+			info = platformData.QueryNetnsIdInfo(vtapID, p.NetnsID)
 		}
 	}
 
@@ -387,8 +388,11 @@ func (p *InProcessProfile) fillPodInfo(vtapID uint32, containerID string, platfo
 	podInfo := platformData.QueryPodContainerInfo(vtapID, containerID)
 	if podInfo != nil {
 		p.PodID = podInfo.PodId
-		// when using containerID to get pod, it means pod maybe `hostNetwork` and PodIP equals NodeIP
 		ip := net.ParseIP(podInfo.Ip)
+		// ip is nil means pod maybe `hostNetwork` and PodIP equals NodeIP
+		if ip == nil {
+			ip = net.ParseIP(podInfo.PodNodeIp)
+		}
 		if ip != nil {
 			if ip4 := ip.To4(); ip4 != nil {
 				p.IsIPv4 = true
