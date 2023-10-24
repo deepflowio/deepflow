@@ -68,7 +68,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.cancel = mCancel
 	e.metricName = newMetricName(cfg.ResourceMaxID1)
 	e.labelName = newLabelName(cfg.ResourceMaxID0)
-	e.labelValue = newLabelValue(cfg.ResourceMaxID1)
+	e.labelValue = newLabelValue()
 	e.label = newLabel()
 	e.LabelLayout = newLabelLayout(cfg)
 	e.metricLabel = newMetricLabel(e.metricName, e.label)
@@ -131,18 +131,23 @@ func (e *Encoder) refresh() error {
 
 func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	resp := new(controller.SyncPrometheusResponse)
-	egRunAhead := &errgroup.Group{}
-	AppendErrGroup(egRunAhead, e.encodeLabel, resp, req.GetLabels())
-	AppendErrGroup(egRunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
-	AppendErrGroup(egRunAhead, e.encodeTarget, resp, req.GetTargets())
-	err := egRunAhead.Wait()
+	eg1RunAhead := &errgroup.Group{}
+	AppendErrGroup(eg1RunAhead, e.encodeMetricName, resp, req.GetMetricNames())
+	AppendErrGroup(eg1RunAhead, e.encodeLabelName, resp, req.GetLabelNames())
+	AppendErrGroup(eg1RunAhead, e.encodeLabelValue, resp, req.GetLabelValues())
+	err := eg1RunAhead.Wait()
+	if err != nil {
+		return resp, err
+	}
+	eg2RunAhead := &errgroup.Group{}
+	AppendErrGroup(eg2RunAhead, e.encodeLabel, resp, req.GetLabels())
+	AppendErrGroup(eg2RunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
+	AppendErrGroup(eg2RunAhead, e.encodeTarget, resp, req.GetTargets())
+	err = eg2RunAhead.Wait()
 	if err != nil {
 		return resp, err
 	}
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, e.encodeMetricName, resp, req.GetMetricNames())
-	AppendErrGroup(eg, e.encodeLabelName, resp, req.GetLabelNames())
-	AppendErrGroup(eg, e.encodeLabelValue, resp, req.GetLabelValues())
 	AppendErrGroup(eg, e.encodeMetricLabel, resp, req.GetMetricLabels())
 	AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
 	err = eg.Wait()

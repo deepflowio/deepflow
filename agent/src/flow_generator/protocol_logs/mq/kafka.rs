@@ -22,17 +22,20 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{KafkaInfoCache, L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
+    config::handler::TraceType,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            consts::KAFKA_REQ_HEADER_LEN,
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+            consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
+            decode_base64_to_string,
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
 };
 
+const KAFKA_PRODUCE: u16 = 0;
 const KAFKA_FETCH: u16 = 1;
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -43,6 +46,8 @@ pub struct KafkaInfo {
 
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub correlation_id: u32,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub trace_id: String,
 
     // request
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
@@ -53,6 +58,9 @@ pub struct KafkaInfo {
     pub api_key: u16,
     #[serde(skip)]
     pub client_id: String,
+    // Extract only from KAFKA_PRODUCE and KAFKA_FETCH
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
+    pub topic_name: String,
 
     // reponse
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
@@ -100,8 +108,11 @@ impl KafkaInfo {
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
-        if other.status_code != None {
+        if other.status_code.is_some() {
             self.status_code = other.status_code;
+        }
+        if other.topic_name.len() > 0 {
+            self.topic_name = other.topic_name;
         }
     }
 
@@ -194,8 +205,10 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             resp_len: f.resp_msg_size,
             req: L7Request {
                 req_type: String::from(command_str),
+                resource: f.topic_name,
                 ..Default::default()
             },
+            version: Some(f.api_version.to_string()),
             resp: L7Response {
                 status: f.status,
                 code: f.status_code,
@@ -203,6 +216,24 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             },
             ext_info: Some(ExtendedInfo {
                 request_id: Some(f.correlation_id),
+                x_request_id_0: if f.msg_type == LogMessageType::Request {
+                    Some(f.correlation_id.to_string())
+                } else {
+                    None
+                },
+                x_request_id_1: if f.msg_type == LogMessageType::Response {
+                    Some(f.correlation_id.to_string())
+                } else {
+                    None
+                },
+                ..Default::default()
+            }),
+            trace_info: Some(TraceInfo {
+                trace_id: if f.trace_id.is_empty() {
+                    None
+                } else {
+                    Some(f.trace_id)
+                },
                 ..Default::default()
             }),
             ..Default::default()
@@ -306,6 +337,86 @@ impl L7ProtocolParserInterface for KafkaLog {
 
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
+    const MAX_TRACE_ID: usize = 255;
+
+    fn get_topics_name_offset(api_key: u16, api_version: u16) -> Option<usize> {
+        match api_key {
+            KAFKA_PRODUCE => {
+                if api_version <= 2 {
+                    // Offset for API version <= 2
+                    Some(24)
+                } else if api_version <= 9 {
+                    // Offset for API version <= 9
+                    Some(26)
+                } else {
+                    // Invalid API version
+                    None
+                }
+            }
+            KAFKA_FETCH => {
+                if api_version <= 2 {
+                    // Offset for API version <= 2
+                    Some(30)
+                } else if api_version == 3 {
+                    // Offset for API version == 3
+                    Some(34)
+                } else if api_version <= 6 {
+                    // Offset for API version <= 6
+                    Some(35)
+                } else if api_version <= 12 {
+                    // Offset for API version <= 12
+                    Some(43)
+                } else {
+                    // Invalid API version
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn check_char_boundary(payload: &str, start: usize, end: usize) -> bool {
+        let mut invalid = false;
+        for index in start..end {
+            if !payload.is_char_boundary(index) {
+                invalid = true;
+                break;
+            }
+        }
+        return invalid;
+    }
+
+    // Example: 'sw8  1-{trace-id}-{other}'
+    fn decode_sw8_trace_id(payload: &str, info: &mut KafkaInfo) {
+        let tag = TraceType::Sw8.to_string();
+        let mut start = 0;
+        let mut trace_id = "";
+        while start < payload.len() {
+            if !payload.is_char_boundary(start) {
+                break;
+            }
+            let index = payload[start..].find(tag.as_str());
+            if index.is_none() {
+                break;
+            }
+            let index = index.unwrap();
+
+            let start_index = payload[start + index..].find("1-");
+            if let Some(current_index) = start_index {
+                let trace_id_index = start + index + current_index + 2;
+                let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
+                trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
+                break;
+            }
+            start += index + tag.len();
+        }
+
+        if trace_id.len() > 0 {
+            if let Some(end_index) = trace_id.find("-") {
+                info.trace_id = decode_base64_to_string(&trace_id[..end_index]);
+            }
+        }
+    }
 
     // 协议识别的时候严格检查避免误识别，日志解析的时候不用严格检查因为可能有长度截断
     // ================================================================================
@@ -328,10 +439,26 @@ impl KafkaLog {
         info.api_version = read_u16_be(&payload[6..]);
         info.correlation_id = read_u32_be(&payload[8..]);
         info.client_id = String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
-
         if !info.client_id.is_ascii() {
             return Err(Error::KafkaLogParseFailed);
         }
+        // topic
+        if let Some(mut topic_offset) = Self::get_topics_name_offset(info.api_key, info.api_version)
+        {
+            topic_offset += client_id_len;
+            if topic_offset + 2 < payload.len() {
+                let topic_name_len = read_u16_be(&payload[topic_offset..]) as usize;
+                if topic_name_len <= payload[topic_offset + 2..].len() {
+                    info.topic_name = String::from_utf8_lossy(
+                        &payload[topic_offset + 2..topic_offset + 2 + topic_name_len],
+                    )
+                    .into_owned();
+                }
+            }
+        }
+        // sw8
+        let payload = String::from_utf8_lossy(&payload[14..14 + client_id_len]);
+        Self::decode_sw8_trace_id(&payload, info);
         Ok(())
     }
 
@@ -352,15 +479,19 @@ impl KafkaLog {
         if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
-        if payload.len() < KAFKA_REQ_HEADER_LEN {
-            return Err(Error::KafkaLogParseFailed);
-        }
+
         match direction {
             PacketDirection::ClientToServer => {
+                if payload.len() < KAFKA_REQ_HEADER_LEN {
+                    return Err(Error::KafkaLogParseFailed);
+                }
                 self.request(payload, false, info)?;
                 self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
+                if payload.len() < KAFKA_RESP_HEADER_LEN {
+                    return Err(Error::KafkaLogParseFailed);
+                }
                 self.response(payload, info)?;
                 self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
@@ -459,7 +590,10 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("kafka.pcap", "kafka.result")];
+        let files = vec![
+            ("kafka.pcap", "kafka.result"),
+            ("produce.pcap", "produce.result"),
+        ];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
@@ -537,5 +671,21 @@ mod tests {
             }
         }
         kafka.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn trace_id() {
+        let payload = "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf".as_bytes();
+        let payload = String::from_utf8_lossy(payload);
+
+        let mut info = KafkaInfo::default();
+
+        KafkaLog::decode_sw8_trace_id(&payload, &mut info);
+
+        assert_eq!(
+            info.trace_id, "abcdefghi",
+            "parse trace id {} unexcepted",
+            info.trace_id
+        );
     }
 }
