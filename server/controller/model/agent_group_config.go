@@ -163,10 +163,12 @@ type EbpfKprobePortlist struct {
 }
 
 type OnCpuProfile struct {
-	Disabled  *bool   `yaml:"disabled,omitempty"`
-	Frequency *int    `yaml:"frequency,omitempty"`
-	Cpu       *int    `yaml:"cpu,omitempty"`
-	Regex     *string `yaml:"regex,omitempty"`
+	Disabled                           *bool   `yaml:"disabled,omitempty"`
+	Frequency                          *int    `yaml:"frequency,omitempty"`
+	Cpu                                *int    `yaml:"cpu,omitempty"`
+	Regex                              *string `yaml:"regex,omitempty"`
+	JavaSymbolFileMaxSpaceLimit        *int    `yaml:"java-symbol-file-max-space-limit,omitempty"`
+	JavaSymbolFileRefreshDeferInterval *string `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 }
 
 type EbpfConfig struct {
