@@ -50,6 +50,7 @@ struct symbol_cache_del_pids {
 };
 
 struct symbolizer_proc_info {
+	int pid;
 	/* The process creation time since
 	 * system boot, (in milliseconds) */
 	u64 stime;
@@ -62,6 +63,8 @@ struct symbolizer_proc_info {
 	bool verified;
 	/* To mark whether it is a Java process? */
 	bool is_java;
+	/* Determine if the Java symbol file generation has been added to tasks list. */
+	bool add_task_list;
 	/* Have a new perf map file ? */
 	bool new_java_syms_file;
 	/* Unknown symbols was found, and it is currently mainly used to
@@ -73,6 +76,8 @@ struct symbolizer_proc_info {
 	char comm[TASK_COMM_LEN];
 	/* container id */
 	char container_id[CONTAINER_ID_SIZE];
+	/* reference counting */
+	u64 use;
 };
 
 struct symbolizer_cache_kvp {
