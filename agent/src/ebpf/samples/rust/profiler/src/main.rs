@@ -149,7 +149,7 @@ fn main() {
 
 	// Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
-        if start_continuous_profiler(97, continuous_profiler_callback) != 0 {
+        if start_continuous_profiler(97, 10, 300, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
@@ -177,7 +177,7 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(65));
+        thread::sleep(Duration::from_secs(150));
         stop_continuous_profiler();
         print!(
             "====== capture count {}, sum {}\n",
