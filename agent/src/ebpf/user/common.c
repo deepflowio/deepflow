@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdbool.h>
 #include <linux/limits.h>	/* ulimit */
@@ -35,6 +36,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/utsname.h>
+#include <pthread.h>
 #include "config.h"
 #include "types.h"
 #include "clib.h"
@@ -529,12 +531,11 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	//#1 SMP Debian 4.19.289-2 (2023-08-08)
 	if (strstr(sys_info.version, "Debian")) {
 		int num;
-		if (
-			(sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
-			   major, minor, patch, &num) != 4) && 
-			(sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
-			   major, minor, patch, &num) != 4)
-		)
+		if ((sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
+			    major, minor, patch, &num) != 4) &&
+		    (sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
+			    major, minor, patch, &num) != 4)
+		    )
 			return ETR_INVAL;
 	}
 
@@ -1039,4 +1040,34 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 	fclose(fp);
 
 	return fetch_container_id_from_str(buff, id, copy_bytes);
+}
+
+int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg)
+{
+	int ret;
+	ret = pthread_create(t, NULL, fn, arg);
+	if (ret) {
+		ebpf_warning("worker name %s is error:%s\n",
+			     name, strerror(errno));
+		return ETR_INVAL;
+	}
+
+	/* set thread name */
+	pthread_setname_np(*t, name);
+
+	/*
+	 * Separating threads is to automatically release
+	 * resources after pthread_exit(), without being
+	 * blocked or stuck.
+	 */
+	ret = pthread_detach(*t);
+	if (ret != 0) {
+		ebpf_warning("Error detaching thread, error:%s\n",
+			     strerror(errno));
+		return ETR_INVAL;
+	} else {
+		ebpf_info("thread %s, detached successful.", name);
+	}
+
+	return ETR_OK;
 }
