@@ -26,6 +26,7 @@ import (
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
@@ -58,7 +59,10 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 				switch t := tErr.(type) {
 				case *common.ServiceError:
 					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{Status: _STATUS_SUCCESS, Data: &model.PromQueryData{ResultType: parser.ValueTypeVector}})
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
 						return
 					}
 				}
@@ -90,7 +94,10 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 				switch t := tErr.(type) {
 				case *common.ServiceError:
 					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{Status: _STATUS_SUCCESS, Data: &model.PromQueryData{ResultType: parser.ValueTypeVector}})
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
 						return
 					}
 				}
@@ -123,7 +130,10 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 				switch t := tErr.(type) {
 				case *common.ServiceError:
 					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{Status: _STATUS_SUCCESS, Data: &model.PromQueryData{ResultType: parser.ValueTypeVector}})
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
 						return
 					}
 				}
@@ -174,7 +184,10 @@ func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 				switch t := tErr.(type) {
 				case *common.ServiceError:
 					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{Status: _STATUS_SUCCESS, Data: &model.PromQueryData{ResultType: parser.ValueTypeVector}})
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
 						return
 					}
 				}
