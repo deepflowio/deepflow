@@ -925,10 +925,6 @@ int create_and_init_symbolizer_caches(void)
 				continue;
 			}
 
-			if (p->is_java) {
-				clear_old_target_perf_files(pid);
-			}
-
 			sym.v.proc_info_p = pointer_to_uword(p);
 			sym.v.cache = 0;
 			if (symbol_caches_hash_add_del
