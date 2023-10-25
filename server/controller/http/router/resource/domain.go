@@ -44,7 +44,7 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.GET("/v2/domains/", getDomains)
 	e.POST("/v1/domains/", createDomain(d.cfg))
 	e.PATCH("/v1/domains/:lcuuid/", updateDomain(d.cfg))
-	e.DELETE("/v1/domains/:lcuuid/", deleteDomain)
+	e.DELETE("/v1/domains/:name-or-uuid/", deleteDomainByNameOrUUID)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
 	e.GET("/v2/sub-domains/", getSubDomains)
@@ -124,11 +124,9 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	})
 }
 
-func deleteDomain(c *gin.Context) {
-	var err error
-
-	lcuuid := c.Param("lcuuid")
-	data, err := resource.DeleteDomain(lcuuid)
+func deleteDomainByNameOrUUID(c *gin.Context) {
+	nameOrUUID := c.Param("name-or-uuid")
+	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID)
 	common.JsonResponse(c, data, err)
 }
 
