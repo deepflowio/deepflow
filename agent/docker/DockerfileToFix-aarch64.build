@@ -10,9 +10,9 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 
 # Install base dependencies
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq
-RUN yum install gcc gcc-c++ curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem -y && \
+RUN yum install gcc gcc-c++ curl devtoolset-11-gcc devtoolset-11-gdb devtoolset-11-gcc-c++ devtoolset-11-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem -y && \
     curl https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
-    source /opt/rh/devtoolset-8/enable && \
+    source /opt/rh/devtoolset-11/enable && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-devel-1.2.2-el7.aarch64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-filesystem-1.2.2-el7.aarch64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-gcc-1.2.2-el7.aarch64.rpm --silent -O && \

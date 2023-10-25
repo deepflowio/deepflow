@@ -181,6 +181,9 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	if db == "ext_metrics" {
 		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
 		chClient.DB = "flow_tag"
+	} else if db == "deepflow_system" {
+		sql = "SELECT table FROM flow_tag.deepflow_system_custom_field GROUP BY table"
+		chClient.DB = "flow_tag"
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}

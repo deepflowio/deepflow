@@ -1,8 +1,9 @@
-FROM ghcr.io/deepflowio/rust-build:1.24 as builder
+FROM ghcr.io/deepflowio/rust-build:1.25 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 ARG GITHUB_REF_NAME
-RUN source /opt/rh/devtoolset-8/enable && cp docker/rust-proxy-config /usr/local/cargo/config && RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release && \
+RUN cp docker/rust-proxy-config /usr/local/cargo/config && \
+    cargo build --release && \
     cargo build --release --bin deepflow-agent-ctl && \
     ls -alh target/release
 FROM scratch

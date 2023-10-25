@@ -16,9 +16,9 @@
 
 use std::net::IpAddr;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::af_packet::bpf::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::common::{
     enums::EthernetType, ETH_TYPE_LEN, ETH_TYPE_OFFSET, GRE4_PROTO_OFFSET, GRE6_PROTO_OFFSET,
     GRE_PROTO_LEN, IPV4_ADDR_LEN, IPV4_DST_OFFSET, IPV4_FLAGS_FRAG_OFFSET_LEN, IPV4_FLAGS_OFFSET,
@@ -28,20 +28,20 @@ use crate::common::{
     VLAN_HEADER_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
 };
 use crate::common::{enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use public::enums::LinuxSllPacketType::Outgoing;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 type JumpModifier = fn(jumpIf: JumpIf, index: usize, total: usize) -> JumpIf;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Default)]
 struct BpfBuilder {
     ins: Vec<BpfSyntax>,
     modifiers: Vec<Option<JumpModifier>>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl BpfBuilder {
     fn appends(&mut self, syntaxs: &mut Vec<BpfSyntax>) -> &mut Self {
         for syntax in syntaxs {
@@ -90,7 +90,7 @@ pub(crate) struct Builder {
     pub analyzer_source_ip: IpAddr,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl Builder {
     fn drop_modifier(mut jump_if: JumpIf, index: usize, total: usize) -> JumpIf {
         let remain = total - (index + 1);
@@ -804,7 +804,7 @@ impl Builder {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg(test)]
 mod tests {
     use super::*;

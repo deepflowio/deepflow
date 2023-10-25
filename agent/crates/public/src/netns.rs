@@ -25,6 +25,7 @@ use std::{
     hash::{Hash, Hasher},
     io::{Cursor, Write},
     mem,
+    net::IpAddr,
     os::unix::{fs::MetadataExt, io::AsRawFd},
     path::{Path, PathBuf},
 };
@@ -33,6 +34,7 @@ use log::{debug, trace, warn};
 use neli::{
     attr::Attribute,
     consts::{genl::*, nl::*, rtnl::*, socket::*},
+    err::{NlError, SerError},
     genl::Genlmsghdr,
     nl::{NlPayload, Nlmsghdr},
     rtnl::{Rtattr, Rtgenmsg},
@@ -43,11 +45,91 @@ use neli::{
 use nix::sched::{setns, CloneFlags};
 use num_enum::IntoPrimitive;
 use regex::Regex;
+use thiserror::Error;
 
-use super::{Error, InterfaceInfo, Result};
-use crate::utils::net::{
-    addr_list, link_by_name, link_list, links_by_name_regex, Addr, Link, IF_TYPE_IPVLAN,
+use super::utils::net::{
+    self, addr_list, link_by_name, link_list, links_by_name_regex, Addr, Link, MacAddr,
+    IF_TYPE_IPVLAN,
 };
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("neli error: {0}")]
+    NeliError(String),
+    #[error("net error: {0}")]
+    NetError(#[from] net::Error),
+    #[error("netns not found")]
+    NotFound,
+    #[error("syscall error: {0}")]
+    Syscall(#[from] nix::Error),
+}
+
+impl<T: Debug, P: Debug> From<NlError<T, P>> for Error {
+    fn from(e: NlError<T, P>) -> Self {
+        Self::NeliError(format!("{}", e))
+    }
+}
+
+impl From<SerError> for Error {
+    fn from(e: SerError) -> Self {
+        Self::NeliError(format!("{}", e))
+    }
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Default, Clone)]
+pub struct InterfaceInfo {
+    pub tap_ns: NsFile,
+    pub tap_idx: u32,
+    pub mac: MacAddr,
+    pub ips: Vec<IpAddr>,
+    pub name: String,
+    pub device_id: String,
+    pub ns_inode: u64,
+}
+
+impl fmt::Display for InterfaceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ips_str = self
+            .ips
+            .iter()
+            .map(|ip| ip.to_string())
+            .collect::<Vec<String>>()
+            .as_slice()
+            .join(",");
+        write!(
+            f,
+            "{}: {}: {} [{}] device {} ino {}",
+            self.tap_idx, self.name, self.mac, ips_str, self.device_id, self.ns_inode
+        )
+    }
+}
+
+impl PartialEq for InterfaceInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.tap_idx.eq(&other.tap_idx) && self.mac.eq(&other.mac)
+    }
+}
+
+impl Eq for InterfaceInfo {}
+
+impl PartialOrd for InterfaceInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for InterfaceInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self.tap_idx.cmp(&other.tap_idx), self.mac.cmp(&other.mac)) {
+            (Ordering::Equal, mac) => mac,
+            (tap, _) => tap,
+        }
+    }
+}
 
 #[derive(IntoPrimitive)]
 #[repr(u16)]

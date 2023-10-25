@@ -78,7 +78,7 @@ use crate::{
     utils::stats::{self, Countable, StatsOption},
     wasm_error,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     config::handler::EbpfConfig,
     plugin::{
@@ -105,7 +105,7 @@ pub struct Config<'a> {
     pub flow: &'a FlowConfig,
     pub log_parser: &'a LogParserConfig,
     pub collector: &'a CollectorConfig,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf: Option<&'a EbpfConfig>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
 }
 
@@ -156,9 +156,9 @@ pub struct FlowMap {
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
@@ -214,7 +214,7 @@ impl FlowMap {
             },
         });
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let so_plugin_counter_map = if config.so_plugins.is_empty() {
             None
         } else {
@@ -353,13 +353,13 @@ impl FlowMap {
                     Some(Rc::new(RefCell::new(vm)))
                 }
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin: if config.so_plugins.is_empty() {
                 None
             } else {
                 Some(Rc::new(config.so_plugins.clone()))
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin_counter_map,
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
@@ -557,7 +557,7 @@ impl FlowMap {
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
         if !self.inject_flush_ticker(config, meta_packet.lookup_key.timestamp.into()) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
                 _ => 0,
@@ -1088,11 +1088,6 @@ impl FlowMap {
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
-            direction_score: if meta_packet.socket_role > 0 {
-                ServiceTable::MAX_SCORE
-            } else {
-                0
-            },
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -1120,7 +1115,7 @@ impl FlowMap {
         node.endpoint_data_cache = Default::default();
         node.packet_sequence_block = None; // Enterprise Edition Feature: packet-sequence
         node.residual_request = 0;
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let local_epc_id = match config.ebpf.as_ref() {
             Some(c) => c.epc_id as i32,
             _ => 0,
@@ -1128,9 +1123,41 @@ impl FlowMap {
         #[cfg(target_os = "windows")]
         let local_epc_id = 0;
 
-        // 标签
+        // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        // direction rectify
+        if meta_packet.signal_source == SignalSource::EBPF {
+            let (src_l3_epc_id, dst_l3_epc_id) = if let Some(ep) = node.endpoint_data_cache.as_ref()
+            {
+                (
+                    ep.src_info().l3_epc_id as i16,
+                    ep.dst_info().l3_epc_id as i16,
+                )
+            } else {
+                (0, 0)
+            };
+            let flow_src_key = ServiceKey::new(
+                meta_packet.lookup_key.src_ip,
+                src_l3_epc_id,
+                meta_packet.lookup_key.src_port,
+            );
+            let flow_dst_key = ServiceKey::new(
+                meta_packet.lookup_key.dst_ip,
+                dst_l3_epc_id,
+                meta_packet.lookup_key.dst_port,
+            );
+            let (direction_score, need_reverse) = self.service_table.get_ebpf_tcp_score(
+                meta_packet.socket_role,
+                flow_src_key,
+                flow_dst_key,
+            );
+            if need_reverse {
+                node.tagged_flow.flow.reverse(true);
+            }
+            node.tagged_flow.flow.direction_score = direction_score;
+        }
+
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
             .flow
@@ -1207,9 +1234,9 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 self.so_plugin.as_ref().map(|s| s.clone()),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 self.so_plugin_counter_map.as_ref().map(|p| p.clone()),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
@@ -1245,7 +1272,7 @@ impl FlowMap {
 
         if !node.policy_in_tick[meta_packet.lookup_key.direction as usize] {
             node.policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
                 _ => 0,
@@ -1371,7 +1398,7 @@ impl FlowMap {
         }
         // 这里需要查询策略，建立ARP表
         if meta_packet.is_ndp_response() {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
                 _ => 0,
@@ -1445,7 +1472,7 @@ impl FlowMap {
         let log_parser_config = &config.log_parser;
 
         if let Some(log) = node.meta_flow_log.as_mut() {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
                 _ => 0,
@@ -2392,7 +2419,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2430,7 +2457,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2474,7 +2501,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet1 = _new_meta_packet();
@@ -2503,7 +2530,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2565,7 +2592,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let npb_action = NpbAction::new(
@@ -2623,7 +2650,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2667,7 +2694,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2703,7 +2730,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
@@ -2768,7 +2795,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
 
@@ -2836,7 +2863,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         // SYN
@@ -2924,7 +2951,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
 
@@ -2968,7 +2995,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet_0 = _new_meta_packet();
@@ -2995,7 +3022,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         let mut packet_0 = _new_meta_packet();
@@ -3023,7 +3050,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
 
@@ -3066,7 +3093,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
 

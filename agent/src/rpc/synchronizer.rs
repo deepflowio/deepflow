@@ -63,10 +63,6 @@ use crate::utils::{
     },
     stats,
 };
-#[cfg(target_os = "linux")]
-use public::netns::{addr_list_in_netns, NsFile};
-#[cfg(target_os = "windows")]
-use public::utils::net::addr_list;
 use public::{
     proto::{
         common::TridentType,
@@ -575,9 +571,9 @@ impl Synchronizer {
             host: Some(status.hostname.clone()),
             host_ips: {
                 #[cfg(target_os = "linux")]
-                let addrs = addr_list_in_netns(&NsFile::Root);
-                #[cfg(target_os = "windows")]
-                let addrs = addr_list();
+                let addrs = public::netns::addr_list_in_netns(&public::netns::NsFile::Root);
+                #[cfg(any(target_os = "windows", target_os = "android"))]
+                let addrs = public::utils::net::addr_list();
 
                 addrs.map_or(vec![], |xs| {
                     xs.into_iter()

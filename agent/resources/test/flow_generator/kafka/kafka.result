@@ -1,2 +1,2 @@
-KafkaInfo { msg_type: Request, is_tls: false, correlation_id: 2, req_msg_size: Some(49), api_version: 3, api_key: 18, client_id: "adminclient-1", resp_msg_size: None, status: Ok, status_code: None, rrt: 0 } is_kafka: true
-KafkaInfo { msg_type: Response, is_tls: false, correlation_id: 2, req_msg_size: None, api_version: 0, api_key: 0, client_id: "", resp_msg_size: Some(435), status: Ok, status_code: None, rrt: 4941 } is_kafka: false
+KafkaInfo { msg_type: Request, is_tls: false, correlation_id: 2, trace_id: "", req_msg_size: Some(49), api_version: 3, api_key: 18, client_id: "adminclient-1", topic_name: "", resp_msg_size: None, status: Ok, status_code: None, rrt: 0 } is_kafka: true
+KafkaInfo { msg_type: Response, is_tls: false, correlation_id: 2, trace_id: "", req_msg_size: None, api_version: 0, api_key: 0, client_id: "", topic_name: "", resp_msg_size: Some(435), status: Ok, status_code: None, rrt: 4941 } is_kafka: false

@@ -74,14 +74,6 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 
 func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
 	queueCount := config.DecoderQueueCount
-	if msgType == datatype.MESSAGE_TYPE_DFSTATS {
-		// FIXME: At present, there are hundreds of tables in the deepflow_system database,
-		// and the amount of data is not large. Adjust the queue size to reduce memory consumption.
-		// In the future, it is necessary to merge the data tables in deepflow_system with
-		// reference to the ext_metrics database.
-		queueCount = 1
-	}
-
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
 		config.DecoderQueueSize,

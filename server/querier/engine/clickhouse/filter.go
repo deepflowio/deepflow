@@ -802,7 +802,7 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
+		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {

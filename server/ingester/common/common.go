@@ -36,7 +36,7 @@ import (
 var log = logging.MustGetLogger("common")
 
 const (
-	MODULE_INGESTER             = "ingester."
+	MODULE_INGESTER             = "ingester_"
 	QUEUE_STATS_MODULE_INGESTER = queue.OptionModule(MODULE_INGESTER)
 )
 
