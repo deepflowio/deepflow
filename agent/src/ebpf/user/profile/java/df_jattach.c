@@ -287,28 +287,6 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-void __unused clear_old_target_perf_files(int pid)
-{
-	if (is_same_mntns(pid))
-                return;
-
-	/* if pid == target_ns_pid, run in same namespace */
-	int target_ns_pid = get_nspid(pid);
-	if (target_ns_pid < 0) {
-		return;
-	}
-
-	char path[MAX_PATH_LENGTH];
-	snprintf(path, sizeof(path),
-		 "/proc/%d/root/tmp/perf-%d.log", pid, target_ns_pid);
-	if (access(path, F_OK) == 0) {
-		clear_target_ns_tmp_file(path);
-		snprintf(path, sizeof(path),
-			 "/proc/%d/root/tmp/perf-%d.map", pid, target_ns_pid);
-		clear_target_ns_tmp_file(path);
-	}
-}
-
 void clear_target_ns(int pid, int target_ns_pid)
 {
 	/*
@@ -549,40 +527,8 @@ failed:
 }
 
 #ifdef JAVA_AGENT_ATTACH_TOOL
-static void clean_old_java_perf_files(void)
-{
-	struct dirent *entry = NULL;
-	DIR *fddir = NULL;
-
-	fddir = opendir("/proc/");
-	if (fddir == NULL) {
-		jattach_log("Failed to open '/proc/'\n");
-		return;
-	}
-
-	pid_t pid;
-	while ((entry = readdir(fddir)) != NULL) {
-		pid = atoi(entry->d_name);
-		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
-			char comm[16];
-			memset(comm, 0, sizeof(comm));
-			get_process_starttime_and_comm(pid, comm, sizeof(comm));
-			if (strcmp(comm, "java") == 0) {
-				clear_old_target_perf_files(pid);
-			}
-		}
-	}
-
-	closedir(fddir);
-}
-
 int main(int argc, char **argv)
 {
-	if (strcmp(argv[1], "clean") == 0) {
-		clean_old_java_perf_files();
-		return 0;
-	}
-
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s <pid> <opts>\n", argv[0]);
 		return -1;
