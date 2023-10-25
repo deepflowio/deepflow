@@ -42,6 +42,7 @@
 #include "common.h"
 #include "log.h"
 #include "string.h"
+#include "profile/java/config.h"
 
 #define MAXLINE 1024
 
@@ -946,7 +947,7 @@ int exec_command(const char *cmd, const char *args)
 {
 	FILE *fp;
 	int rc = 0;
-	char cmd_buf[64];
+	char cmd_buf[PERF_PATH_SZ * 2];
 	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
 	fp = popen(cmd_buf, "r");
 	if (NULL == fp) {
@@ -968,8 +969,6 @@ int exec_command(const char *cmd, const char *args)
 			     cmd_buf, strerror(errno));
 	} else {
 		if (WIFEXITED(rc)) {
-			ebpf_info("'%s' normal termination, exit status %d\n",
-				  cmd_buf, WEXITSTATUS(rc));
 			return WEXITSTATUS(rc);
 		} else if (WIFSIGNALED(rc)) {
 			ebpf_info
