@@ -326,4 +326,5 @@ int running_socket_tracer(tracer_callback_t handle,
 int register_event_handle(uint32_t type, void (*fn)(void *));
 int socket_tracer_stop(void);
 int socket_tracer_start(void);
+enum tracer_state get_socket_tracer_state(void);
 #endif /* DF_USER_SOCKET_H */

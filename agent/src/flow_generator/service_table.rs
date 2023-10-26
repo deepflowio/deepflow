@@ -468,6 +468,49 @@ impl ServiceTable {
 
         (flow_src_score, flow_dst_score)
     }
+
+    pub fn get_ebpf_tcp_score(
+        &mut self,
+        socket_role: u8,
+        flow_src_key: ServiceKey,
+        flow_dst_key: ServiceKey,
+    ) -> (u8, bool) {
+        let mut score = Self::MIN_SCORE;
+        let mut need_reverse = false;
+        match (flow_src_key, flow_dst_key) {
+            (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                // socket_role: 0:unkonwn 1:client(connect) 2:server(accept)
+                // if socket_role > 0, indicating that socket was established by connect
+                // or accept, then the score of flow_dst_key should be the MAX_SCORE
+                if socket_role > 0 {
+                    self.ipv4.put(flow_dst_key, Self::MAX_SCORE);
+                    self.ipv4.pop(&flow_src_key);
+                    score = Self::MAX_SCORE;
+                } else if let Some(s) = self.ipv4.get(&flow_dst_key) {
+                    score = *s;
+                } else if let Some(s) = self.ipv4.get(&flow_src_key) {
+                    // if get score from flow_src_key, it indicate that the packet maybe disorder, the flow should be reversed
+                    score = *s;
+                    need_reverse = score == Self::MAX_SCORE;
+                }
+            }
+            (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                if socket_role > 0 {
+                    self.ipv6.put(flow_dst_key, Self::MAX_SCORE);
+                    self.ipv6.pop(&flow_src_key);
+                    score = Self::MAX_SCORE;
+                } else if let Some(s) = self.ipv6.get(&flow_dst_key) {
+                    score = *s;
+                } else if let Some(s) = self.ipv6.get(&flow_src_key) {
+                    // if get score from flow_src_key, it indicate that the packet maybe disorder, the flow should be reversed
+                    score = *s;
+                    need_reverse = score == Self::MAX_SCORE;
+                }
+            }
+            _ => unimplemented!(),
+        }
+        (score, need_reverse)
+    }
 }
 
 #[cfg(test)]

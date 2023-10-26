@@ -11,7 +11,7 @@ RUN --mount=target=/tmp-mount \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
-    apt-get update && apt-get install \
+    apt-get update && apt-get upgrade -y && apt-get install \
     --no-install-suggests  --no-install-recommends -y \
     tzdata \
     iproute2 \

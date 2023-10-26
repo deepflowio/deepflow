@@ -7,7 +7,6 @@
 src/proto/*.rs
 src/proto/integration/*.rs
 
-.cargo
 src/ebpf/data
 src/ebpf/.data_done
 src/ebpf/libtrace.a

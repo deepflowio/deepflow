@@ -496,6 +496,7 @@ message PodIp {
     optional string ip = 4;
     optional uint32 pod_cluster_id = 5;
     repeated string container_ids = 6;
+    optional string pod_node_ip = 7;
 }
 
 message VtapIp {

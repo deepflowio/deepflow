@@ -296,6 +296,9 @@ pub struct OnCpuProfile {
     pub frequency: u16,
     pub cpu: u16,
     pub regex: String,
+    pub java_symbol_file_max_space_limit: u8,
+    #[serde(with = "humantime_serde")]
+    pub java_symbol_file_refresh_defer_interval: Duration,
 }
 
 impl Default for OnCpuProfile {
@@ -305,6 +308,8 @@ impl Default for OnCpuProfile {
             frequency: 99,
             cpu: 0,
             regex: "^deepflow-.*".to_string(),
+            java_symbol_file_max_space_limit: 10,
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
         }
     }
 }
@@ -639,6 +644,25 @@ impl YamlConfig {
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 524288;
         }
+        if c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit < 2
+            || c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit > 100
+        {
+            c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit = 10
+        }
+        if c.ebpf
+            .on_cpu_profile
+            .java_symbol_file_refresh_defer_interval
+            < Duration::from_secs(5)
+            || c.ebpf
+                .on_cpu_profile
+                .java_symbol_file_refresh_defer_interval
+                > Duration::from_secs(3600)
+        {
+            c.ebpf
+                .on_cpu_profile
+                .java_symbol_file_refresh_defer_interval = Duration::from_secs(60)
+        }
+
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
             c.guard_interval = Duration::from_secs(10);
@@ -759,7 +783,7 @@ impl Default for YamlConfig {
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
             libpcap_enabled: true,

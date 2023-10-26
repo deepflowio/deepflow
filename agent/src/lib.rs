@@ -21,9 +21,9 @@ pub mod common;
 mod config;
 pub mod debug;
 pub mod dispatcher;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod ebpf;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod ebpf_dispatcher;
 mod error;
 mod exception;
