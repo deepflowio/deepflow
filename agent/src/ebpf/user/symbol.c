@@ -864,6 +864,9 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				gen_java_symbols_file(pid);
 				p->new_java_syms_file = true;
 			}
+		} else {
+			/* Ensure that newly launched JAVA processes are detected. */
+			return NULL;
 		}
 
 		if (kv.v.cache)
