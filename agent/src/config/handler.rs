@@ -15,7 +15,7 @@
  */
 
 use std::cmp::{max, min};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
@@ -47,7 +47,10 @@ use super::{
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 use super::{
-    config::{Config, KubernetesResourceConfig, PcapConfig, PortConfig, YamlConfig},
+    config::{
+        Config, HttpEndpointExtraction, KubernetesResourceConfig, MatchRule, PcapConfig,
+        PortConfig, YamlConfig,
+    },
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
 use crate::plugin::c_ffi::SoPluginFunc;
@@ -488,11 +491,78 @@ impl fmt::Debug for FlowConfig {
 }
 
 #[derive(Clone, PartialEq, Eq)]
+struct TrieNode {
+    children: HashMap<char, Box<TrieNode>>,
+    keep_segments: Option<usize>,
+}
+
+impl TrieNode {
+    fn new() -> Self {
+        TrieNode {
+            children: HashMap::new(),
+            keep_segments: None,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct HttpEndpointTrie {
+    root: TrieNode,
+}
+
+impl HttpEndpointTrie {
+    pub fn new() -> Self {
+        Self {
+            root: TrieNode::new(),
+        }
+    }
+
+    pub fn insert(&mut self, rule: &MatchRule) {
+        let mut node = &mut self.root;
+        for ch in rule.prefix.chars() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(TrieNode::new()));
+        }
+        node.keep_segments = Some(rule.keep_segments);
+    }
+
+    pub fn find_matching_rule(&self, input: &str) -> usize {
+        const DEFAULT_KEEP_SEGMENTS: usize = 2;
+        let mut node = &self.root;
+        let mut keep_segments = DEFAULT_KEEP_SEGMENTS;
+        for c in input.chars() {
+            if let Some(child) = node.children.get(&c) {
+                keep_segments = child.keep_segments.unwrap_or(keep_segments);
+                node = child.as_ref();
+            } else {
+                break;
+            }
+        }
+        keep_segments
+    }
+}
+
+impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
+    fn from(v: &HttpEndpointExtraction) -> Self {
+        let mut t = Self::new();
+        v.match_rules
+            .iter()
+            .filter(|r| r.keep_segments > 0)
+            .for_each(|r| t.insert(r));
+        t
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
+    pub http_endpoint_disabled: bool,
+    pub http_endpoint_trie: HttpEndpointTrie,
 }
 
 impl Default for LogParserConfig {
@@ -502,6 +572,8 @@ impl Default for LogParserConfig {
             l7_log_session_aggr_timeout: Duration::ZERO,
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
+            http_endpoint_disabled: false,
+            http_endpoint_trie: HttpEndpointTrie::new(),
         }
     }
 }
@@ -1106,6 +1178,17 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     tap_sides
                 },
+                http_endpoint_disabled: conf
+                    .yaml_config
+                    .l7_protocol_advanced_features
+                    .http_endpoint_extraction
+                    .disabled,
+                http_endpoint_trie: HttpEndpointTrie::from(
+                    &conf
+                        .yaml_config
+                        .l7_protocol_advanced_features
+                        .http_endpoint_extraction,
+                ),
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
@@ -2460,5 +2543,64 @@ impl YamlConfig {
         } else {
             (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_trie() {
+        let trie = HttpEndpointTrie::new();
+        assert!(trie.root.children.is_empty());
+        assert_eq!(trie.root.keep_segments, None);
+    }
+
+    #[test]
+    fn test_insert_trie_node() {
+        let mut trie = HttpEndpointTrie::new();
+        let rule1 = MatchRule {
+            prefix: "/a".to_string(),
+            keep_segments: 1,
+        };
+        let rule2 = MatchRule {
+            prefix: "/a/b/c/d".to_string(),
+            keep_segments: 3,
+        };
+        let rule3 = MatchRule {
+            prefix: "/d/e/f".to_string(),
+            keep_segments: 3,
+        };
+        trie.insert(&rule1);
+        assert_eq!(trie.root.children.len(), 1);
+        trie.insert(&rule2);
+        assert_eq!(trie.root.children.len(), 1);
+        trie.insert(&rule3);
+        assert_eq!(trie.root.children.get(&'/').unwrap().children.len(), 2);
+    }
+
+    #[test]
+    fn test_find_matching_rule() {
+        let mut trie = HttpEndpointTrie::new();
+        let rule1 = MatchRule {
+            prefix: "/a/b/c".to_string(),
+            keep_segments: 1,
+        };
+        let rule2 = MatchRule {
+            prefix: "/a/b/c/d".to_string(),
+            keep_segments: 3,
+        };
+        let rule3 = MatchRule {
+            prefix: "/d/e/f".to_string(),
+            keep_segments: 3,
+        };
+        trie.insert(&rule1);
+        trie.insert(&rule2);
+        trie.insert(&rule3);
+        assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
+        assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
+        assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 2);
     }
 }

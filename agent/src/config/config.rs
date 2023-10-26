@@ -387,6 +387,26 @@ pub struct KubernetesResourceConfig {
     pub disabled: bool,
 }
 
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct MatchRule {
+    pub prefix: String,
+    pub keep_segments: usize,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct HttpEndpointExtraction {
+    pub disabled: bool,
+    pub match_rules: Vec<MatchRule>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct L7ProtocolAdvancedFeatures {
+    pub http_endpoint_extraction: HttpEndpointExtraction,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -498,6 +518,7 @@ pub struct YamlConfig {
     pub ntp_max_interval: Duration,
     #[serde(with = "humantime_serde")]
     pub ntp_min_interval: Duration,
+    pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
 }
 
 impl YamlConfig {
@@ -871,6 +892,7 @@ impl Default for YamlConfig {
             external_metric_integration_disabled: false,
             ntp_max_interval: Duration::from_secs(300),
             ntp_min_interval: Duration::from_secs(10),
+            l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
         }
     }
 }

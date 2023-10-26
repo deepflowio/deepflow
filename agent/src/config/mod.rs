@@ -18,11 +18,13 @@ mod config;
 pub mod handler;
 
 pub use config::{
-    Config, ConfigError, FlowGeneratorConfig, KubernetesPollerType, KubernetesResourceConfig,
-    OsProcRegexp, PcapConfig, PrometheusExtraConfig, RuntimeConfig, TripleMapConfig,
-    UprobeProcRegExp, XflowGeneratorConfig, YamlConfig, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
-    OS_PROC_REGEXP_MATCH_ACTION_DROP, OS_PROC_REGEXP_MATCH_TYPE_CMD,
-    OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_TAG,
+    Config, ConfigError, FlowGeneratorConfig, HttpEndpointExtraction, KubernetesPollerType,
+    KubernetesResourceConfig, MatchRule, OsProcRegexp, PcapConfig, PrometheusExtraConfig,
+    RuntimeConfig, TripleMapConfig, UprobeProcRegExp, XflowGeneratorConfig, YamlConfig,
+    OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
+    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
-pub use handler::{DispatcherConfig, FlowAccess, FlowConfig, ModuleConfig, NpbConfig};
+pub use handler::{
+    DispatcherConfig, FlowAccess, FlowConfig, HttpEndpointTrie, ModuleConfig, NpbConfig,
+};

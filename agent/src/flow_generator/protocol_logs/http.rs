@@ -26,20 +26,18 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
-use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
 use crate::plugin::CustomInfo;
 use crate::{
     common::{
         ebpf::EbpfType,
         enums::IpProtocol,
-        flow::L7Protocol,
         flow::PacketDirection,
+        flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::{L7LogDynamicConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     utils::bytes::{read_u32_be, read_u32_le},
@@ -103,8 +101,8 @@ pub struct HttpInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
+    endpoint: Option<String>,
     // set by wasm plugin
-    custom_endpoint: Option<String>,
     custom_result: Option<String>,
     custom_exception: Option<String>,
 
@@ -128,7 +126,7 @@ impl HttpInfo {
         }
 
         if !custom.req.endpoint.is_empty() {
-            self.custom_endpoint = Some(custom.req.endpoint)
+            self.endpoint = Some(custom.req.endpoint)
         }
 
         //req write
@@ -211,7 +209,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
                 Some(self.path.clone())
             }
         } else {
-            None
+            self.endpoint.clone()
         }
     }
 }
@@ -357,7 +355,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.method,
                 f.path.clone(),
                 f.host,
-                f.custom_endpoint.unwrap_or_default(),
+                f.endpoint.unwrap_or_default(),
             )
         };
         let flags = if f.is_tls {
@@ -488,6 +486,14 @@ impl L7ProtocolParserInterface for HttpLog {
                 _ => self.parse_http_v2(payload, param, &mut info)?,
             },
             _ => unreachable!(),
+        }
+        match self.proto {
+            L7Protocol::Http1 | L7Protocol::Http2 => {
+                if !config.http_endpoint_disabled {
+                    info.endpoint = Some(handle_endpoint(config, &info.path));
+                }
+            }
+            _ => {}
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
@@ -1291,11 +1297,28 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
     V1HeaderIterator(payload)
 }
 
+pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
+    let keep_segments = config.http_endpoint_trie.find_matching_rule(path);
+    let output = path.split('?').next().unwrap();
+    let cleaned_output = output
+        .split('/')
+        .filter(|&s| !s.is_empty() && s != ".")
+        .collect::<Vec<&str>>();
+    format!(
+        "/{}",
+        cleaned_output[..keep_segments.min(cleaned_output.len())].join("/")
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
-    use crate::common::MetaPacket;
-    use crate::config::handler::LogParserConfig;
+    use crate::common::{
+        l7_protocol_log::{EbpfParam, L7PerfCache},
+        MetaPacket,
+    };
+    use crate::config::{
+        handler::LogParserConfig, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
+    };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
 
@@ -1643,5 +1666,81 @@ mod tests {
             }
         }
         http.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn test_handle_endpoint() {
+        let mut config = LogParserConfig::default();
+        let path = String::from("");
+        let expected_output = "/"; // take "/" for an empty string
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123");
+        let expected_output = "/api/v1"; // the default value is 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1"; // without parameters
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("///././/api/v1//.//./users/123?query=456");
+        let expected_output = "/api/v1"; // appear continuous "/" or appear "."
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "/api".to_string(),
+                keep_segments: 1,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api"; // prefixes match, take 1 segment
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/app/v1/users/123?query=456");
+        let expected_output = "/app/v1"; // prefixes do not match, default is 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![
+                MatchRule {
+                    prefix: "/api".to_string(),
+                    keep_segments: 1,
+                },
+                MatchRule {
+                    prefix: "/api/v1/users".to_string(),
+                    keep_segments: 4,
+                },
+            ],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users/123"; // longest prefix match: /api/v1/users, take 4 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users"; // the longest prefix matches: /api/v1/users, but there are only 3 segments in path
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/123?query=456");
+        let expected_output = "/api"; // longest prefix match: /api, take 1 segment
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "".to_string(),
+                keep_segments: 3,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users"; // the default value is changed to 3 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "/api/v1".to_string(),
+                keep_segments: 0,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1"; // prefixes match, but the keep_segments is 0, use the default value 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
     }
 }
