@@ -32,9 +32,7 @@ use std::time::Duration;
 use anyhow::Result;
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
-use flexi_logger::{
-    colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
-};
+use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
 use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
@@ -60,8 +58,8 @@ use crate::{
         proc_event::BoxedProcEvents,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
-        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
-        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
+        FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::PcapConfig,
     config::{
@@ -96,7 +94,7 @@ use crate::{
             trident_process_check,
         },
         guard::Guard,
-        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
+        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
     },
@@ -119,7 +117,6 @@ use public::{
     packet::MiniPacket,
     proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
-    sender::SendMessageType,
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
@@ -253,24 +250,33 @@ impl Trident {
             }
         };
 
+        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
+        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac);
+
+        let config = &config_handler.static_config;
         let hostname = match config.override_os_hostname.as_ref() {
             Some(name) => name.to_owned(),
             None => get_hostname().unwrap_or_default(),
         };
 
         let ntp_diff = Arc::new(AtomicI64::new(0));
+        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
+        let exception_handler = ExceptionHandler::default();
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
             .to_str()
             .unwrap()
             .to_owned();
-        let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
-            &hostname,
-            &config.controller_ips,
-            DEFAULT_INGESTER_PORT,
+        let remote_log_writer = RemoteLogWriter::new(
             base_name,
-            vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
+            hostname.clone(),
+            config_handler.log(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
             ntp_diff.clone(),
         );
 
@@ -323,9 +329,10 @@ impl Trident {
             logger
         };
         let logger_handle = logger.start()?;
+        config_handler.set_logger_handle(logger_handle);
 
+        let config = &config_handler.static_config;
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -346,11 +353,12 @@ impl Trident {
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
                 state_thread,
-                config,
+                ctrl_ip,
+                ctrl_mac,
+                config_handler,
                 version_info,
-                logger_handle,
-                remote_log_config,
                 stats_collector,
+                exception_handler,
                 config_path,
                 sidecar_mode,
                 ntp_diff,
@@ -368,11 +376,12 @@ impl Trident {
 
     fn run(
         state: TridentState,
-        mut config: Config,
+        ctrl_ip: IpAddr,
+        ctrl_mac: MacAddr,
+        mut config_handler: ConfigHandler,
         version_info: &'static VersionInfo,
-        logger_handle: LoggerHandle,
-        remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
+        exception_handler: ExceptionHandler,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
         ntp_diff: Arc<AtomicI64>,
@@ -380,15 +389,14 @@ impl Trident {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Environment variables: {:?}", get_env());
 
-        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
-
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
         if running_in_container() {
             info!(
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
         }
+
+        let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
 
         #[cfg(target_os = "linux")]
         let agent_id = if sidecar_mode {
@@ -420,47 +428,54 @@ impl Trident {
 
         info!(
             "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
-            agent_id, config.agent_mode, ctrl_ip, ctrl_mac
+            agent_id, config_handler.static_config.agent_mode, ctrl_ip, ctrl_mac
         );
 
-        let exception_handler = ExceptionHandler::default();
         let session = Arc::new(Session::new(
-            config.controller_port,
-            config.controller_tls_port,
+            config_handler.static_config.controller_port,
+            config_handler.static_config.controller_tls_port,
             DEFAULT_TIMEOUT,
-            config.controller_cert_file_prefix.clone(),
-            config.controller_ips.clone(),
+            config_handler
+                .static_config
+                .controller_cert_file_prefix
+                .clone(),
+            config_handler.static_config.controller_ips.clone(),
             exception_handler.clone(),
             &stats_collector,
         ));
 
         let runtime = Arc::new(
             Builder::new_multi_thread()
-                .worker_threads(config.async_worker_thread_number.into())
+                .worker_threads(
+                    config_handler
+                        .static_config
+                        .async_worker_thread_number
+                        .into(),
+                )
                 .enable_all()
                 .build()
                 .unwrap(),
         );
 
-        if matches!(config.agent_mode, RunningMode::Managed)
-            && running_in_container()
-            && config.kubernetes_cluster_id.is_empty()
+        if matches!(
+            config_handler.static_config.agent_mode,
+            RunningMode::Managed
+        ) && running_in_container()
+            && config_handler
+                .static_config
+                .kubernetes_cluster_id
+                .is_empty()
         {
-            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
+            config_handler.static_config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
                 &runtime,
                 &session,
-                config.kubernetes_cluster_name.as_ref(),
+                config_handler
+                    .static_config
+                    .kubernetes_cluster_name
+                    .as_ref(),
             );
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
-
-        let mut config_handler = ConfigHandler::new(
-            config,
-            ctrl_ip,
-            ctrl_mac,
-            logger_handle,
-            remote_log_config.clone(),
-        );
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
         let agent_id_tx = Arc::new(agent_id_tx);
@@ -725,7 +740,6 @@ impl Trident {
                         &session,
                         &synchronizer,
                         exception_handler.clone(),
-                        remote_log_config.clone(),
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
@@ -1170,7 +1184,6 @@ pub struct AgentComponents {
     pub policy_setter: PolicySetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
-    pub remote_log_config: RemoteLogConfig,
 
     max_memory: u64,
     tap_mode: TapMode,
@@ -1435,7 +1448,6 @@ impl AgentComponents {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
-        remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
@@ -2371,10 +2383,6 @@ impl AgentComponents {
             Default::default(),
         );
 
-        remote_log_config.set_enabled(candidate_config.log.rsyslog_enabled);
-        remote_log_config.set_threshold(candidate_config.log.log_threshold);
-        remote_log_config.set_hostname(candidate_config.log.host.clone());
-
         let sender_config = config_handler.sender().load();
         let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
             sender_config.bandwidth_probe_interval.as_secs(),
@@ -2436,7 +2444,6 @@ impl AgentComponents {
             policy_setter,
             npb_bandwidth_watcher,
             npb_arp_table,
-            remote_log_config,
             runtime,
         })
     }
@@ -2661,7 +2668,6 @@ impl Components {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
-        remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
@@ -2683,7 +2689,6 @@ impl Components {
             session,
             synchronizer,
             exception_handler,
-            remote_log_config,
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
             platform_synchronizer,
