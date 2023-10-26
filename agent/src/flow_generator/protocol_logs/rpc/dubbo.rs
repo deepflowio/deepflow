@@ -371,9 +371,10 @@ impl DubboLog {
 
         match trace_type {
             TraceType::Sw3 => {
+                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
                 if info.trace_id.len() > 2 {
                     let segs: Vec<&str> = info.trace_id.split("|").collect();
-                    if segs.len() > 8 {
+                    if segs.len() > 7 {
                         info.trace_id = segs[7].to_string();
                     }
                 }
@@ -432,8 +433,7 @@ impl DubboLog {
 
         match trace_type {
             TraceType::Sw3 => {
-                // Format:
-                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|1
+                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
                 if info.span_id.len() > 2 {
                     let segs: Vec<&str> = info.span_id.split("|").collect();
                     if segs.len() > 3 {
