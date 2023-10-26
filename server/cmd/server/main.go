@@ -35,9 +35,9 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ingester"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/querier/querier"
+	pyroscope "github.com/grafana/pyroscope-go"
 
 	logging "github.com/op/go-logging"
-	"github.com/pyroscope-io/client/pyroscope"
 	yaml "gopkg.in/yaml.v2"
 )
 
