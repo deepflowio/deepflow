@@ -28,6 +28,7 @@ func (b *DiffBaseDataSet) addPodNode(dbItem *mysql.PodNode, seq int) {
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
+		Type:            dbItem.Type,
 		State:           dbItem.State,
 		VCPUNum:         dbItem.VCPUNum,
 		MemTotal:        dbItem.MemTotal,
@@ -45,6 +46,7 @@ func (b *DiffBaseDataSet) deletePodNode(lcuuid string) {
 
 type PodNode struct {
 	DiffBase
+	Type            int    `json:"type"`
 	State           int    `json:"state"`
 	VCPUNum         int    `json:"vcpu_num"`
 	MemTotal        int    `json:"mem_total"`
@@ -54,6 +56,7 @@ type PodNode struct {
 }
 
 func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
+	p.Type = cloudItem.Type
 	p.State = cloudItem.State
 	p.VCPUNum = cloudItem.VCPUNum
 	p.MemTotal = cloudItem.MemTotal
