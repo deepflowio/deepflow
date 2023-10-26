@@ -978,6 +978,24 @@ vtap_group_id: g-xxxxxx
     #"DNS": "53"
     #"TLS": "1-65535"
 
+  ## L7 Protocol Advanced Features
+  #l7-protocol-advanced-features:
+
+    ## Extract the configuration of http endpoint
+    #http-endpoint-extraction:
+      ## Disable the switch to extract http endpoint
+      ## Default: false
+      #disabled: false
+
+      ## Extract endpoint according to the following rules
+      #match-rules:
+      ## Find a longest prefix that can match according to the principle of "longest prefix matching"
+      #- prefix: ""
+
+        ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
+        ## Default: 2
+        #keep-segments: 2
+
   ########################
   ## L4 Packet Sequence ##
   ########################

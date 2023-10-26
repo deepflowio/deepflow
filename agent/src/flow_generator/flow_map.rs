@@ -1416,6 +1416,11 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         new_endpoint: Option<String>,
     ) {
+        // endpoint as long as it can be parsed in the request packet
+        if meta_packet.lookup_key.direction == PacketDirection::ServerToClient {
+            return;
+        }
+
         let flow_id = &node.tagged_flow.flow.flow_id;
         // The original endpoint is inconsistent with new_endpoint
         if let (Some(flow_perf_stats), Some(last_endpoint), Some(new_endpoint)) = (
@@ -1434,7 +1439,7 @@ impl FlowMap {
                     .unwrap()
                     .copy_and_reset_l7_perf_data(l7_timeout_count as u32);
 
-                // FIXME:Because the endpoint changes, the index of the first packet of the current endpoint
+                // FIXME: Because the endpoint changes, the index of the first packet of the current endpoint
                 // will also be counted into the index of the previous endpoint, so there will be a slight error
                 flow_perf_stats.l7.sequential_merge(&l7_perf_stats); // It needs to fill l7 back in flow because flow also needs to present l7 metrics
 
@@ -1444,7 +1449,7 @@ impl FlowMap {
                     flow: None,
                     stats: l7_perf_stats,
                     endpoint: Some(last_endpoint.clone()),
-                    flow_id: node.tagged_flow.flow.flow_id,
+                    flow_id: *flow_id,
                     time_in_second: node.tagged_flow.flow.flow_stat_time.into(),
                     signal_source: node.tagged_flow.flow.signal_source,
                     l7_protocol,
@@ -1454,8 +1459,8 @@ impl FlowMap {
                     .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
         }
-        // endpoint as long as it can be parsed in the request packet
-        if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
+        // FIXME: the endpoint may be None after parsed
+        if new_endpoint.is_some() {
             node.tagged_flow.flow.last_endpoint = new_endpoint;
         }
     }
