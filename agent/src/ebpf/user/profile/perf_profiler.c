@@ -30,6 +30,7 @@
 #include "../types.h"
 #include "../vec.h"
 #include "../tracer.h"
+#include "../socket.h"
 #include "attach.h"
 #include "perf_profiler.h"
 #include "../elf.h"
@@ -40,6 +41,7 @@
 #include "stringifier.h"
 #include "../table.h"
 #include <regex.h>
+#include "java/config.h"
 #include "java/df_jattach.h"
 
 #include "../perf_profiler_bpf_common.c"
@@ -63,6 +65,9 @@
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+
+/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
+int g_java_syms_write_bytes_max;
 
 extern int major, minor;
 extern char linux_release[128];
@@ -142,6 +147,12 @@ static void print_cp_tracer_status(struct bpf_tracer *t);
  * is used to count the number of lost processes during the parsing process.
  */
 static atomic64_t process_lost_count;
+
+/* Continuous Profiler debug lock */
+static pthread_mutex_t cpdbg_mutex;
+static bool cpdbg_enable;
+static uint32_t cpdbg_start_time;
+static uint32_t cpdbg_timeout;
 
 static u64 get_process_lost_count(void)
 {
@@ -322,19 +333,70 @@ static int init_stack_trace_msg_hash(stack_trace_msg_hash_t * h,
 					 nbuckets, hash_memory_size);
 }
 
+static inline bool is_cpdbg_timeout(void)
+{
+	uint32_t passed_sec;
+	passed_sec = get_sys_uptime() - cpdbg_start_time;
+	if (passed_sec > cpdbg_timeout) {
+		cpdbg_start_time = 0;
+		cpdbg_enable = false;
+		ebpf_info("\n\ncpdbg is finished, use time: %us.\n\n",
+			  cpdbg_timeout);
+		cpdbg_timeout = 0;
+		return true;
+	}
+
+	return false;
+}
+
+static void print_cp_data(stack_trace_msg_t * msg)
+{
+	char *cid;
+	if (strlen((char *)msg->container_id) == 0)
+		cid = "null";
+	else
+		cid = (char *)msg->container_id;
+
+	/*
+	 * TODO(@jiping)
+	 * We didn't use the 'ebpf_info()' interface here to send data to the
+	 * Rust log. The reason is that after 'ebpf_info()' -> 'rust_info_wrapper()',
+	 * we noticed some instability, and occasional segmentation faults occurred.
+	 * This is something that needs to be resolved in the future. 
+	 */
+	fprintf(stdout,
+		"\n-------------------------------\n"
+		"netns_id %lu container_id %s process_name %s pid %u stime %lu "
+		"u_stack_id %u k_statck_id %u cpu %u count %u comm %s tiemstamp"
+		" %lu datalen %u data %s\n",
+		msg->netns_id, cid,
+		msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
+		msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+		msg->time_stamp, msg->data_len, msg->data);
+
+	fflush(stdout);
+}
+
+static void cpdbg_process(stack_trace_msg_t * msg)
+{
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (unlikely(cpdbg_enable)) {
+		if (!is_cpdbg_timeout())
+			print_cp_data(msg);
+
+	}
+	pthread_mutex_unlock(&cpdbg_mutex);
+}
+
 static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 {
 	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *) kv;
 	if (msg_kv->msg_ptr != 0) {
 		stack_trace_msg_t *msg = (stack_trace_msg_t *) msg_kv->msg_ptr;
-#ifdef CP_DEBUG
-		ebpf_debug
-		    ("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
-		     "%lu cpu %u count %u comm %s datalen %u data %s\n",
-		     msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
-		     msg->k_stack_id, msg->cpu, msg->count, msg->comm,
-		     msg->data_len, msg->data);
-#endif
+
+		/* continuous profiler debug */
+		cpdbg_process(msg);
+
 		tracer_callback_t fun = profiler_tracer->process_fn;
 		/*
 		 * Execute callback function to hand over the data to the
@@ -346,7 +408,6 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 
 		clib_mem_free((void *)msg);
 		msg_kv->msg_ptr = 0;
-		(*(u64 *) ctx)++;
 	}
 
 	int ret = VEC_OK;
@@ -388,9 +449,8 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	last_push_time = curr_time;
 	push_count++;
 
-	u64 elems_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
-						    (void *)&elems_count);
+						    NULL);
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
@@ -406,12 +466,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 
 	vec_free(trace_msg_kvps);
 
-	if (elems_count != h->hash_elems_count) {
-		ebpf_warning("elems_count %lu hash_elems_count %lu "
-			     "hit_hash_count %lu\n", elems_count,
-			     h->hash_elems_count, h->hit_hash_count);
-	}
-
 	h->hit_hash_count = 0;
 	h->hash_elems_count = 0;
 
@@ -419,9 +473,6 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 		msg_clear_hash = false;
 		stack_trace_msg_hash_free(h);
 	}
-
-	ebpf_debug("release_stack_trace_msg hashmap clear %lu "
-		   "elems.\n", elems_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -523,7 +574,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-						    stack_str_hash, matched, info_p);
+						    stack_str_hash, matched,
+						    info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -557,8 +609,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				    ("stack_trace_msg_hash_add_del() failed.\n");
 				clib_mem_free(msg);
 			} else {
-				__sync_fetch_and_add(&msg_hash->
-						     hash_elems_count, 1);
+				__sync_fetch_and_add
+				    (&msg_hash->hash_elems_count, 1);
 			}
 		}
 
@@ -708,9 +760,16 @@ static void cp_reader_work(void *arg)
 
 		/* 
 		 * Waiting for the regular expression to be configured
-		 * and start working. 
+		 * and start working. Ensure the socket tracer is in
+		 * the 'running' state to prevent starting the profiler
+		 * before the socket tracer has completed its attach
+		 * operation. The profiler's processing depends on probe
+		 * interfaces provided by the socket tracer, such as process
+		 * exit events. We want to ensure that everything is ready
+		 * before the profiler performs address translation.
 		 */
-		if (unlikely(!regex_existed)) {
+		if (unlikely(!regex_existed ||
+			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			exec_symbol_cache_update();
 			sleep(1);
 			continue;
@@ -783,6 +842,10 @@ static int create_profiler(struct bpf_tracer *tracer)
 		free_perf_buffer_reader(reader_a);
 		return ETR_NORESOURCE;
 	}
+
+	/* clear old perf files */
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
 
 	/* syms_cache_hash maps from pid to BCC symbol cache.
 	 * Use of void* is inherited from the BCC library. */
@@ -936,18 +999,69 @@ static bool check_kallsyms_addr_is_zero(void)
 	return (count == check_num);
 }
 
+static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
+			     void **out, size_t * outsize)
+{
+	return 0;
+}
+
+static int cpdbg_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
+{
+	struct cpdbg_msg *msg = (struct cpdbg_msg *)conf;
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (msg->enable) {
+		cpdbg_start_time = get_sys_uptime();
+		cpdbg_timeout = msg->timeout;
+	}
+
+	if (cpdbg_enable && !msg->enable) {
+		cpdbg_timeout = 0;
+		cpdbg_start_time = 0;
+	}
+
+	cpdbg_enable = msg->enable;
+	if (cpdbg_enable) {
+		ebpf_info("cpdbg enable timeout %ds\n", cpdbg_timeout);
+	} else {
+		ebpf_info("cpdbg disable");
+	}
+
+	pthread_mutex_unlock(&cpdbg_mutex);
+
+	return 0;
+}
+
+static struct tracer_sockopts cpdbg_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.set_opt_min = SOCKOPT_SET_CPDBG_ADD,
+	.set_opt_max = SOCKOPT_SET_CPDBG_OFF,
+	.set = cpdbg_sockopt_set,
+	.get_opt_min = SOCKOPT_GET_CPDBG_SHOW,
+	.get_opt_max = SOCKOPT_GET_CPDBG_SHOW,
+	.get = cpdbg_sockopt_get,
+};
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * @java_syms_space_limit The maximum space occupied by the Java symbol files
+ *                        in the target POD. 
+ * @java_syms_update_delay To allow Java to run for an extended period and gather
+ *                    more symbol information, we delay symbol retrieval when
+ *                    encountering unknown symbols. The default value is
+ *                    'JAVA_SYMS_UPDATE_DELAY_DEF'.
+ *                    This represents the delay in seconds.
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq, int java_syms_space_limit,
+			      int java_syms_update_delay,
+			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
-
+ 
 	// REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 	if (check_kernel_version(4, 9) != 0) {
 		ebpf_warning
@@ -969,7 +1083,25 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 		return (-1);
 	}
 
+	int java_space_bytes = java_syms_space_limit * 1024 *1024;
+	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
+	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
+		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
+	g_java_syms_write_bytes_max = java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
+	ebpf_info("set java_syms_write_bytes_max : %d\n", g_java_syms_write_bytes_max);
+
+	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
+	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
+		java_syms_update_delay = JAVA_SYMS_UPDATE_DELAY_DEF;
+	set_java_syms_fetch_delay(java_syms_update_delay);
+	ebpf_info("set java_syms_update_delay : %lu\n", java_syms_update_delay);
+
 	atomic64_init(&process_lost_count);
+
+	/*
+	 * Initialize cpdbg
+	 */
+	pthread_mutex_init(&cpdbg_mutex, NULL);
 
 	profiler_stop = 0;
 	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
@@ -1047,6 +1179,9 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 			     relase_profiler, create_profiler,
 			     (void *)callback, freq);
 	if (tracer == NULL)
+		return (-1);
+
+	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
 		return (-1);
 
 	tracer->state = TRACER_RUNNING;
@@ -1202,7 +1337,7 @@ int stop_continuous_profiler(void)
 	return (0);
 }
 
-void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val)
 {
 	return;
 }

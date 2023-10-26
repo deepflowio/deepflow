@@ -19,4 +19,5 @@
 
 #define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
 void gen_java_symbols_file(int pid);
+void clean_local_java_symbols_files(int pid);
 #endif /* ATTACH_H */

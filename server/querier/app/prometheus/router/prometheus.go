@@ -24,13 +24,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/snappy"
+	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/promql"
+	"github.com/prometheus/prometheus/promql/parser"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service"
+	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
 const _STATUS_FAIL = "fail"
+const _STATUS_SUCCESS = "success"
 
 // PromQL Query API
 func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
@@ -46,8 +51,22 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		args.Slimit = c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
 		args.Debug, _ = strconv.ParseBool(debug)
+
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
+			if tErr := getInnerError(err); tErr != nil {
+				// only for `RESOURCE_NOT_FOUND` error, it means query non-existence metrics, it should return 200 with empty result
+				switch t := tErr.(type) {
+				case *common.ServiceError:
+					if t.Status == common.RESOURCE_NOT_FOUND {
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
+						return
+					}
+				}
+			}
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
@@ -70,10 +89,22 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 
 		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
+			if tErr := getInnerError(err); tErr != nil {
+				// only for `RESOURCE_NOT_FOUND` error, it means query non-existence metrics, it should return 200 with empty result
+				switch t := tErr.(type) {
+				case *common.ServiceError:
+					if t.Status == common.RESOURCE_NOT_FOUND {
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
+						return
+					}
+				}
+			}
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
-		//pp.Println(result)
 		c.JSON(200, result)
 	})
 }
@@ -92,10 +123,21 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 			c.JSON(500, err)
 			return
 		}
-		//pp.Println(req)
+
 		resp, err := svc.PromRemoteReadService(&req, c.Request.Context())
-		//pp.Println(resp)
 		if err != nil {
+			if tErr := getInnerError(err); tErr != nil {
+				switch t := tErr.(type) {
+				case *common.ServiceError:
+					if t.Status == common.RESOURCE_NOT_FOUND {
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
+						return
+					}
+				}
+			}
 			c.JSON(500, err)
 			return
 		}
@@ -138,6 +180,18 @@ func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 		ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
 		result, err := svc.PromSeriesQueryService(&args, ctx)
 		if err != nil {
+			if tErr := getInnerError(err); tErr != nil {
+				switch t := tErr.(type) {
+				case *common.ServiceError:
+					if t.Status == common.RESOURCE_NOT_FOUND {
+						c.JSON(200, &model.PromQueryResponse{
+							Status: _STATUS_SUCCESS,
+							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+						})
+						return
+					}
+				}
+			}
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
@@ -188,7 +242,7 @@ func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
 		filters, ok := c.GetQueryMap("filter")
 		if !ok {
 			// return query itself
-			c.JSON(200, &model.PromQueryWrapper{OptStatus: "success", Data: []map[string]interface{}{{"query": query}}})
+			c.JSON(200, &model.PromQueryWrapper{OptStatus: _STATUS_SUCCESS, Data: []map[string]interface{}{{"query": query}}})
 			return
 		}
 		result, err := svc.PromQLParseFilter(query, filters)
@@ -198,4 +252,14 @@ func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
 		}
 		c.JSON(200, result)
 	})
+}
+
+func getInnerError(err error) error {
+	for {
+		innerError := errors.Unwrap(err)
+		if innerError == nil {
+			return err
+		}
+		err = innerError
+	}
 }

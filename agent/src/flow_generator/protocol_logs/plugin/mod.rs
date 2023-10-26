@@ -15,7 +15,7 @@
  */
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
 use serde::Serialize;
 use wasm::WasmLog;
 
@@ -27,12 +27,12 @@ use crate::{
     flow_generator::Result,
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use self::shared_obj::{get_so_parser, SoLog};
 use self::{custom_wrap::CustomWrapLog, wasm::get_wasm_parser};
 
 pub mod custom_wrap;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod shared_obj;
 pub mod wasm;
 
@@ -40,7 +40,7 @@ pub mod wasm;
 #[enum_dispatch(L7ProtocolParserInterface)]
 pub enum CustomLog {
     WasmLog(WasmLog),
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     SoLog(SoLog),
 }
 
@@ -48,7 +48,7 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
     L7ProtocolParser::Custom(CustomWrapLog {
         parser: Some(match proto {
             CustomProtocol::Wasm(p, s) => CustomLog::WasmLog(get_wasm_parser(p, s)),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             CustomProtocol::So(p, s) => CustomLog::SoLog(get_so_parser(p, s)),
             #[cfg(target_os = "windows")]
             CustomProtocol::So(_, _) => todo!(),
@@ -56,7 +56,7 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
     })
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[inline(always)]
 fn all_plugin_log_parser() -> [CustomLog; 2] {
     [

@@ -19,7 +19,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::{error::Error, net::Ipv6Addr, ptr};
 
 use pnet::packet::{
@@ -29,7 +29,7 @@ use pnet::packet::{
 };
 
 use super::ebpf::EbpfType;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::enums::TapType;
 use super::{
     consts::*,
@@ -42,7 +42,7 @@ use super::{
 };
 
 use crate::error;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
@@ -165,10 +165,11 @@ pub struct MetaPacket<'a> {
     pub thread_id: u32,
     pub coroutine_id: u64,
     pub syscall_trace_id: u64,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+    pub socket_role: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,
@@ -866,7 +867,7 @@ impl<'a> MetaPacket<'a> {
         self.l4_payload_len as usize
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut (*data);
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
@@ -932,6 +933,7 @@ impl<'a> MetaPacket<'a> {
         packet.thread_id = data.thread_id;
         packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
+        packet.socket_role = data.socket_role;
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
             data.process_kname.as_ptr() as *const u8,
@@ -1008,7 +1010,7 @@ impl<'a> MetaPacket<'a> {
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {

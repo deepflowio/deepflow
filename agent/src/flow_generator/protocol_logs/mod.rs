@@ -36,9 +36,8 @@ pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
-    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
-    DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,
-    SOFA_NEW_RPC_TRACE_CTX_KEY,
+    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, DubboHeader, DubboInfo,
+    DubboLog, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
     decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog,

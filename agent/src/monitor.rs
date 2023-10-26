@@ -395,7 +395,7 @@ impl Monitor {
                 debug!("adding new monitor interface list: {:?}", monitor_list);
             }
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             for link in links {
                 if let Some(broker) = link_map_guard.get(&link.name) {
                     broker.update(NetMetricArg {

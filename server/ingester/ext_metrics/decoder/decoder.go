@@ -194,7 +194,7 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 			d.counter.ErrorCount++
 			return
 		}
-		if err := pbStats.Unmarshal(bytes); err != nil {
+		if err := pbStats.Unmarshal(bytes); err != nil || pbStats.Name == "" {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("deepflow stats parse failed, err msg: %s", err)
 			}

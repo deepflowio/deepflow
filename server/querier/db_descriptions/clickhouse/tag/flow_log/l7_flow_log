@@ -21,6 +21,7 @@ pod_ns                    , pod_ns_0                  , pod_ns_1                
 pod_node                  , pod_node_0                , pod_node_1                 , resource       ,                       , Universal Tag     , 111
 pod_ingress               , pod_ingress_0             , pod_ingress_1              , resource       ,                       , Universal Tag     , 111
 pod_service               , pod_service_0             , pod_service_1              , resource       ,                       , Universal Tag     , 111
+pod_group_type            , pod_group_type_0          , pod_group_type_1           , int_enum       , pod_group_type        , Universal Tag     , 111
 pod_group                 , pod_group_0               , pod_group_1                , resource       ,                       , Universal Tag     , 111
 pod                       , pod_0                     , pod_1                      , resource       ,                       , Universal Tag     , 111
 service                   , service_0                 , service_1                  , resource       ,                       , Universal Tag     , 111
@@ -89,6 +90,8 @@ syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response  , int            ,                       , Tracing Info      , 111
 syscall_thread_0          , syscall_thread_0          , syscall_thread_0           , int            ,                       , Tracing Info      , 111
 syscall_thread_1          , syscall_thread_1          , syscall_thread_1           , int            ,                       , Tracing Info      , 111
+syscall_coroutine_0       , syscall_coroutine_0       , syscall_coroutine_0        , int            ,                       , Tracing Info      , 111
+syscall_coroutine_1       , syscall_coroutine_1       , syscall_coroutine_1        , int            ,                       , Tracing Info      , 111
 syscall_cap_seq_0         , syscall_cap_seq_0         , syscall_cap_seq_0          , int            ,                       , Tracing Info      , 111
 syscall_cap_seq_1         , syscall_cap_seq_1         , syscall_cap_seq_1          , int            ,                       , Tracing Info      , 111
 

@@ -17,7 +17,9 @@
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
 
-use public::{error, netns};
+use public::error;
+#[cfg(target_os = "linux")]
+use public::netns;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -35,6 +37,7 @@ pub enum Error {
     Libpcap(String), // Enterprise Edition Feature: windows-dispatcher
     #[error("flavor dispatcher is empty")]
     DispatcherFlavorEmpty, // Enterprise Edition Feature: windows-dispatcher
+    #[cfg(target_os = "linux")]
     #[error("netns failure: {0}")]
     NetNs(String), // Enterprise Edition Feature: network-namespace
 }
@@ -45,6 +48,7 @@ impl<T: TryFromPrimitive> From<TryFromPrimitiveError<T>> for Error {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl From<netns::Error> for Error {
     fn from(e: netns::Error) -> Self {
         Error::NetNs(e.to_string())

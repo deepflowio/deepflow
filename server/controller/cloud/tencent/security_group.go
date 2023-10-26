@@ -153,6 +153,9 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			if cidrBlock, ok := rule.rule.CheckGet("CidrBlock"); ok && cidrBlock.MustString() != "" {
 				addressSet.Add(cidrBlock.MustString())
 			}
+			if cidrBlockV6, ok := rule.rule.CheckGet("Ipv6CidrBlock"); ok && cidrBlockV6.MustString() != "" {
+				addressSet.Add(cidrBlockV6.MustString())
+			}
 
 			if rSGID, ok := rule.rule.CheckGet("SecurityGroupId"); ok && rSGID.MustString() != "" {
 				etherType = common.SECURITY_GROUP_IP_TYPE_UNKNOWN

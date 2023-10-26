@@ -18,6 +18,5 @@ pub mod common;
 pub mod flow_log;
 pub mod integration;
 pub mod metric;
-pub mod protobuf_rpc;
 pub mod stats;
 pub mod trident;

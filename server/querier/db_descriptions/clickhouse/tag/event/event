@@ -20,6 +20,7 @@ pod_cluster                , pod_cluster               , pod_cluster            
 pod_ns                     , pod_ns                    , pod_ns                    , resource       ,                       , Universal Tag   , 111
 pod_node                   , pod_node                  , pod_node                  , resource       ,                       , Universal Tag   , 111
 pod_service                , pod_service               , pod_service               , resource       ,                       , Universal Tag   , 111
+pod_group_type             , pod_group_type            , pod_group_type            , int_enum       , pod_group_type        , Universal Tag   , 111
 pod_group                  , pod_group                 , pod_group                 , resource       ,                       , Universal Tag   , 111
 pod                        , pod                       , pod                       , resource       ,                       , Universal Tag   , 111
 service                    , service                   , service                   , resource       ,                       , Universal Tag   , 111

@@ -76,10 +76,27 @@ static void socktrace_help(void)
 	fprintf(stderr, "Usage:\n" "    %s tracer show\n", DF_BPF_NAME);
 }
 
+static void cpdbg_help(void)
+{
+	fprintf(stderr,
+		"Continuous profiler debug: profiler data output to agent log\n");
+	fprintf(stderr, "Usage:\n" "    %s cpdbg {on|off} [OPTIONS]\n",
+		DF_BPF_NAME);
+	fprintf(stderr, "Options:\n");
+	fprintf(stderr,
+		"    '-t, --timeout':      set profiler debug timout. Unit: second\n");
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s cpdbg on --timeout 60\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s cpdbg off\n", DF_BPF_NAME);
+}
+
 static void datadump_help(void)
 {
-	fprintf(stderr, "Usage:\n" "    %s datadump {on|off} [OPTIONS]\n", DF_BPF_NAME);
-	fprintf(stderr, "    %s datadump set pid PID comm COMM proto PROTO_NUM\n", DF_BPF_NAME);
+	fprintf(stderr, "Usage:\n" "    %s datadump {on|off} [OPTIONS]\n",
+		DF_BPF_NAME);
+	fprintf(stderr,
+		"    %s datadump set pid PID comm COMM proto PROTO_NUM\n",
+		DF_BPF_NAME);
 	fprintf(stderr, "PROTO_NUM:\n");
 	fprintf(stderr, "    0:   PROTO_ALL\n");
 	fprintf(stderr, "    1:   PROTO_ORTHER\n");
@@ -98,16 +115,20 @@ static void datadump_help(void)
 	fprintf(stderr, "PID:\n");
 	fprintf(stderr, "    0:   all process/thread\n");
 	fprintf(stderr, "COMM:\n");
-	fprintf(stderr, "    '':  The process name or thread name is not restricted.\n");
+	fprintf(stderr,
+		"    '':  The process name or thread name is not restricted.\n");
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "    '-O, --only-stdout':  dump to stdout only.\n");
-	fprintf(stderr, "    '-t, --timeout':      set datadump timout. Unit: second\n");
+	fprintf(stderr,
+		"    '-t, --timeout':      set datadump timout. Unit: second\n");
 	fprintf(stderr, "For example:\n");
 	fprintf(stderr, "    %s datadump set pid 4567 comm curl proto 0\n",
 		DF_BPF_NAME);
-	fprintf(stderr, "    %s datadump set pid 4567 comm '' proto 20\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump set pid 4567 comm '' proto 20\n",
+		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump on --timeout 60\n", DF_BPF_NAME);
-	fprintf(stderr, "    %s datadump on --only-stdout --timeout 60\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump on --only-stdout --timeout 60\n",
+		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump off\n", DF_BPF_NAME);
 }
 
@@ -202,7 +223,7 @@ static inline int msg_send(int clt_fd,
 		res = sendn(clt_fd, data, data_len, MSG_NOSIGNAL);
 		if (data_len != res) {
 			fprintf(stderr,
-				"[%s] scoket msg body send error -- %d/%d sent\n",
+				"[%s] socket msg body send error -- %d/%d sent\n",
 				__func__, res, data_len);
 			return -1;
 		}
@@ -308,7 +329,7 @@ static int sockopt_send(enum sockopt_type type, sockoptid_t cmd, const void *in,
 	clt_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	res = connect(clt_fd, (struct sockaddr *)&clt_addr, sizeof(clt_addr));
 	if (-1 == res) {
-		fprintf(stderr, "[%s] scoket msg connection error: %s\n",
+		fprintf(stderr, "[%s] socket msg connection error: %s\n",
 			__func__, strerror(errno));
 		free(msg);
 		return -1;
@@ -446,12 +467,10 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		       sk_trace_params->kern_trace_map_used);
 		printf("datadump_enable:\t%s\n",
 		       sk_trace_params->datadump_enable ? "true" : "false");
-		printf("datadump_pid:\t%d\n",
-		       sk_trace_params->datadump_pid);
+		printf("datadump_pid:\t%d\n", sk_trace_params->datadump_pid);
 		printf("datadump_proto:\t%d\n",
 		       sk_trace_params->datadump_proto);
-		printf("datadump_comm:\t%s\n",
-		       sk_trace_params->datadump_comm);
+		printf("datadump_comm:\t%s\n", sk_trace_params->datadump_comm);
 		printf("datadump_file_path:\t%s\n\n",
 		       sk_trace_params->datadump_file_path);
 
@@ -496,7 +515,8 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 				if (conf->cmd == DF_BPF_CMD_ON) {
 					msg.enable = true;
 					if (msg.timeout == 0) {
-						printf("Miss --timeout setting.\n");
+						printf
+						    ("Miss --timeout setting.\n");
 						return ETR_NOTSUPP;
 					}
 					printf("Set datadump on, timeout %ds ",
@@ -562,6 +582,54 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	return ETR_OK;
 }
 
+static int cpdbg_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			struct df_bpf_conf *conf)
+{
+	switch (conf->cmd) {
+	case DF_BPF_CMD_ON:
+	case DF_BPF_CMD_OFF:
+		{
+			struct cpdbg_msg msg;
+			msg.timeout = conf->timeout;
+			if (conf->cmd == DF_BPF_CMD_ON
+			    || conf->cmd == DF_BPF_CMD_OFF) {
+				if (conf->argc != 0) {
+					obj->help();
+					return ETR_NOTSUPP;
+				}
+				if (conf->cmd == DF_BPF_CMD_ON) {
+					msg.enable = true;
+					if (msg.timeout == 0) {
+						printf
+						    ("Miss --timeout setting.\n");
+						return ETR_NOTSUPP;
+					}
+					printf("Set cpdbg on, timeout %ds ",
+					       msg.timeout);
+				} else {
+					msg.enable = false;
+					printf("Set cpdbg off ");
+				}
+			} else {
+				obj->help();
+				return ETR_NOTSUPP;
+			}
+
+			if (df_bpf_setsockopt(SOCKOPT_SET_CPDBG_ADD, &msg,
+					      sizeof(msg)) == 0) {
+				printf("Success.\n");
+			} else {
+				printf("Failed.\n");
+			}
+
+			break;
+		}
+	default:
+		return ETR_NOTSUPP;
+	}
+	return ETR_OK;
+}
+
 static int tracer_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			 struct df_bpf_conf *conf)
 {
@@ -613,13 +681,19 @@ struct df_bpf_obj datadump_obj = {
 	.do_cmd = datadump_do_cmd,
 };
 
+struct df_bpf_obj cpdbg_obj = {
+	.name = "cpdbg",
+	.help = cpdbg_help,
+	.do_cmd = cpdbg_do_cmd,
+};
+
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
 		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace datadump }\n"
+		"    OBJECT  := { tracer socktrace datadump cpdbg }\n"
 		"    COMMAND := { show list set }\n"
 		"Options:\n"
 		"    -v, --verbose\n"
@@ -634,6 +708,8 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 		return &socktrace_obj;
 	} else if (strcmp(name, "datadump") == 0) {
 		return &datadump_obj;
+	} else if (strcmp(name, "cpdbg") == 0) {
+		return &cpdbg_obj;
 	}
 
 	return NULL;

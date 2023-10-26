@@ -52,6 +52,8 @@ controller:
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600
+    # additional domains
+    additional_domains:
 
   # deepflow web service config
   df-web-service:
@@ -280,6 +282,7 @@ querier:
     request-query-with-debug: true
     external-tag-cache-size: 1024
     external-tag-load-interval: 300
+    thanos-replica-labels: [] # remove duplicate replica labels when query data
     cache:
       enabled: true
       cache-item-size: 512000 # max size of cache item, unit: byte
@@ -440,6 +443,9 @@ ingester:
 
   ## profile process database data retention time(unit: hour)
   #profile-ttl-hour: 72
+
+  ## profile compression algorithm, default is zstd, empty string for not compress
+  #profile-compression-algorithm: "zstd"
 
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300

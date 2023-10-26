@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/profile/decoder"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	libqueue "github.com/deepflowio/deepflow/server/libs/queue"
@@ -71,6 +72,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 			if err != nil {
 				return nil, err
 			}
+			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROFILE, platformDatas[i])
 		}
 		profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, i, config)
 		if err != nil {
@@ -79,6 +81,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
+			*config.CompressionAlgorithm,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			profileWriter,

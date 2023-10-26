@@ -57,6 +57,7 @@ static volatile uint64_t probes_act;
 
 extern int sys_cpus_count;
 extern bool *cpu_online;
+extern uint32_t attach_failed_count;
 
 static int infer_socktrace_fd;
 static uint32_t conf_max_socket_entries;
@@ -967,7 +968,7 @@ static int check_kern_adapt_and_state_update(void)
 	if (t == NULL)
 		return -1;
 
-	if (is_adapt_success(t)) {
+	if (is_adapt_success(t) && attach_failed_count == 0) {
 		ebpf_info("[eBPF Kernel Adapt] Linux %s adapt success. "
 			  "Set the status to TRACER_RUNNING\n", linux_release);
 		t->state = TRACER_RUNNING;
@@ -1889,12 +1890,14 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	if ((ret =
 	     register_period_event_op("check-map-exceeded",
-				      check_map_exceeded)))
+				      check_map_exceeded,
+				      CHECK_MAP_EXCEEDED_PERIOD)))
 		return ret;
 
 	if ((ret =
 	     register_period_event_op("check-kern-adapt",
-				      check_kern_adapt_and_state_update)))
+				      check_kern_adapt_and_state_update,
+				      CHECK_KERN_ADAPT_PERIOD)))
 		return ret;
 
 	if ((ret = sockopt_register(&socktrace_sockopts)) != ETR_OK)
@@ -1966,6 +1969,15 @@ int socket_tracer_start(void)
 	add_probes_act(ACT_ATTACH);
 
 	return 0;
+}
+
+enum tracer_state __unused get_socket_tracer_state(void)
+{
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
+	if (t == NULL) 
+		return TRACER_STOP_ERR;
+
+	return t->state;
 }
 
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,

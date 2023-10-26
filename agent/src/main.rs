@@ -20,7 +20,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::{ArgAction, Parser};
 use log::error;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use signal_hook::{consts::TERM_SIGNALS, iterator::Signals};
 
 use ::deepflow_agent::*;

@@ -958,7 +958,7 @@ mod tests {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
             collector: &module_config.collector,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: None,
         };
         for mut pkt in packets {

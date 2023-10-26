@@ -84,27 +84,29 @@ var eBPFEventType = map[pb.ProfileEventType]string{
 }
 
 type Decoder struct {
-	index         int
-	msgType       datatype.MessageType
-	platformData  *grpc.PlatformInfoTable
-	inQueue       queue.QueueReader
-	profileWriter *dbwriter.ProfileWriter
+	index           int
+	msgType         datatype.MessageType
+	platformData    *grpc.PlatformInfoTable
+	inQueue         queue.QueueReader
+	profileWriter   *dbwriter.ProfileWriter
+	compressionAlgo string
 
 	counter *Counter
 	utils.Closable
 }
 
-func NewDecoder(index int, msgType datatype.MessageType,
+func NewDecoder(index int, msgType datatype.MessageType, compressionAlgo string,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	profileWriter *dbwriter.ProfileWriter) *Decoder {
 	return &Decoder{
-		index:         index,
-		msgType:       msgType,
-		platformData:  platformData,
-		inQueue:       inQueue,
-		profileWriter: profileWriter,
-		counter:       &Counter{},
+		index:           index,
+		msgType:         msgType,
+		platformData:    platformData,
+		inQueue:         inQueue,
+		profileWriter:   profileWriter,
+		compressionAlgo: compressionAlgo,
+		counter:         &Counter{},
 	}
 }
 
@@ -156,15 +158,16 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 		}
 
 		parser := &Parser{
-			vtapID:       vtapID,
-			inTimestamp:  time.Now(),
-			callBack:     d.profileWriter.Write,
-			platformData: d.platformData,
-			IP:           make([]byte, len(profile.Ip)),
-			netNsID:      profile.NetnsId,
-			containerID:  string(profile.ContainerId),
-			observer:     &observer{},
-			Counter:      d.counter,
+			vtapID:          vtapID,
+			inTimestamp:     time.Now(),
+			callBack:        d.profileWriter.Write,
+			platformData:    d.platformData,
+			IP:              make([]byte, len(profile.Ip)),
+			netNsID:         profile.NetnsId,
+			containerID:     profile.ContainerId,
+			compressionAlgo: d.compressionAlgo,
+			observer:        &observer{},
+			Counter:         d.counter,
 		}
 		copy(parser.IP, profile.Ip[:len(profile.Ip)])
 

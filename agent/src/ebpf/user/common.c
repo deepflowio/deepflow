@@ -42,6 +42,9 @@
 #include "common.h"
 #include "log.h"
 #include "string.h"
+#include "profile/java/config.h"
+
+#define MAXLINE 1024
 
 static u64 g_sys_btime_msecs;
 
@@ -164,7 +167,6 @@ uint32_t get_sys_uptime(void)
 static void exec_clear_residual_probes(const char *events_file,
 				       const char *type_name)
 {
-#define MAXLINE 1024
 	struct probe_elem {
 		struct list_head list;
 		char event[MAXLINE];
@@ -522,6 +524,19 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	uname(&sys_info);
 	if (sscanf(sys_info.release, "%u.%u.%u", major, minor, patch) != 3)
 		return ETR_INVAL;
+
+	// Get the real version of Debian
+	//#1 SMP Debian 4.19.289-2 (2023-08-08)
+	if (strstr(sys_info.version, "Debian")) {
+		int num;
+		if (
+			(sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
+			   major, minor, patch, &num) != 4) && 
+			(sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
+			   major, minor, patch, &num) != 4)
+		)
+			return ETR_INVAL;
+	}
 
 	return ETR_OK;
 }
@@ -932,7 +947,7 @@ int exec_command(const char *cmd, const char *args)
 {
 	FILE *fp;
 	int rc = 0;
-	char cmd_buf[64];
+	char cmd_buf[PERF_PATH_SZ * 2];
 	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
 	fp = popen(cmd_buf, "r");
 	if (NULL == fp) {
@@ -954,8 +969,6 @@ int exec_command(const char *cmd, const char *args)
 			     cmd_buf, strerror(errno));
 	} else {
 		if (WIFEXITED(rc)) {
-			ebpf_info("'%s' normal termination, exit status %d\n",
-				  cmd_buf, WEXITSTATUS(rc));
 			return WEXITSTATUS(rc);
 		} else if (WIFSIGNALED(rc)) {
 			ebpf_info
@@ -970,50 +983,60 @@ int exec_command(const char *cmd, const char *args)
 	return -1;
 }
 
+int fetch_container_id_from_str(char *buff, char *id, int copy_bytes)
+{
+	static const int cid_len = 64;
+	char *p;
+
+	if ((p = strstr(buff, ".scope")))
+		*p = '\0';
+	else
+		p = buff + strlen(buff);
+
+	if (strlen(buff) < cid_len)
+		return -1;
+
+	p -= cid_len;
+
+	if (strchr(p, '.') || strchr(p, '-') || strchr(p, '/'))
+		return -1;
+
+	if (strlen(p) != cid_len)
+		return -1;
+
+	memset(id, 0, copy_bytes);
+	memcpy_s_inline((void *)id, copy_bytes, (void *)p, cid_len);
+
+	return 0;
+}
+
 int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 {
-	static const int scope_len = 5;
-	static const int cid_len = 64;
-	char file[PATH_MAX], buff[4096];
-	int fd;
+	char file[PATH_MAX], buff[MAXLINE];
 	memset(buff, 0, sizeof(buff));
 	snprintf(file, sizeof(file), "/proc/%d/cgroup", pid);
 	if (access(file, F_OK))
 		return -1;
 
-	fd = open(file, O_RDONLY);
-	if (fd <= 2)
-		return -1;
-
-	read(fd, buff, sizeof(buff));
-	close(fd);
-
-	char *p;
-	if ((p = strchr(buff, '\n')) == NULL)
-		return -1;
-
-	*p = '\0';
-	if (strlen(buff) < (scope_len + 1 + cid_len)) {
+	FILE *fp;
+	char *lf;
+	if ((fp = fopen(file, "r")) == NULL) {
 		return -1;
 	}
 
-	if ((p = strstr(buff, ".scope"))) {
-		*p = '\0';
-		p = strstr(buff, "containerd-");
-		if (p == NULL)
-			return -1;
-		p += strlen("containerd-");
-		goto done;
+	while ((fgets(buff, sizeof(buff), fp)) != NULL) {
+		if ((lf = strchr(buff, '\n')))
+			*lf = '\0';
+		// includes "pids" | "cpuset" | "devices" | "memory" | "cpu"
+		if (strstr(buff, "pids") || strstr(buff, "cpuset")
+		    || strstr(buff, "devices") || strstr(buff, "memory")
+		    || strstr(buff, "cpu")) {
+			break;
+		}
 
-	} else if ((p = strstr(buff, "/docker/"))) {
-		p += strlen("/docker/");
-		goto done;
 	}
 
-	return -1;
-done:
-	if (strlen(p) != cid_len)
-		return -1;
-	memcpy_s_inline((void *)id, copy_bytes, (void *)p, cid_len);
-	return 0;
+	fclose(fp);
+
+	return fetch_container_id_from_str(buff, id, copy_bytes);
 }

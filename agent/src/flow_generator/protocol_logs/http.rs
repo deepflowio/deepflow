@@ -1483,9 +1483,9 @@ mod tests {
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
             wasm_vm: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin_counter_map: None,
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
@@ -34,19 +32,17 @@ use std::time::Duration;
 use anyhow::Result;
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
-#[cfg(target_os = "linux")]
-use flexi_logger::Duplicate;
-use flexi_logger::{
-    colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
-};
-use log::{debug, error, info, warn};
-#[cfg(target_os = "linux")]
-use regex::Regex;
+use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
+use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 
 #[cfg(target_os = "linux")]
-use crate::platform::prometheus::targets::TargetsWatcher;
+use crate::platform::{
+    kubernetes::{GenericPoller, Poller, SidecarPoller},
+    prometheus::targets::TargetsWatcher,
+    ApiWatcher, LibvirtXmlExtractor,
+};
 use crate::{
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
@@ -59,10 +55,11 @@ use crate::{
     common::{
         enums::TapType,
         flow::L7Stats,
+        proc_event::BoxedProcEvents,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
-        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
-        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
+        FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::PcapConfig,
     config::{
@@ -97,40 +94,29 @@ use crate::{
             trident_process_check,
         },
         guard::Guard,
-        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
+        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
     },
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     ebpf_dispatcher::EbpfCollector,
-    platform::{
-        kubernetes::{GenericPoller, Poller, SidecarPoller},
-        ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer,
-    },
-    utils::{
-        environment::{core_file_check, is_tt_pod, running_in_only_watch_k8s_mode},
-        lru::Lru,
-    },
+    platform::SocketSynchronizer,
+    utils::{environment::core_file_check, lru::Lru},
 };
 
 use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
-use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
-use public::netns::{self, link_by_name_in_netns, links_by_name_regex_in_netns};
-#[cfg(target_os = "windows")]
-use public::utils::net::{link_by_name, links_by_name_regex};
+use public::netns;
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
-    netns::NsFile,
     packet::MiniPacket,
     proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
-    sender::SendMessageType,
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
@@ -264,24 +250,33 @@ impl Trident {
             }
         };
 
+        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
+        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac);
+
+        let config = &config_handler.static_config;
         let hostname = match config.override_os_hostname.as_ref() {
             Some(name) => name.to_owned(),
             None => get_hostname().unwrap_or_default(),
         };
 
         let ntp_diff = Arc::new(AtomicI64::new(0));
+        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
+        let exception_handler = ExceptionHandler::default();
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
             .to_str()
             .unwrap()
             .to_owned();
-        let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
-            &hostname,
-            &config.controller_ips,
-            DEFAULT_INGESTER_PORT,
+        let remote_log_writer = RemoteLogWriter::new(
             base_name,
-            vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
+            hostname.clone(),
+            config_handler.log(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
             ntp_diff.clone(),
         );
 
@@ -327,16 +322,17 @@ impl Trident {
             ])))
         };
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let logger = if nix::unistd::getppid().as_raw() != 1 {
-            logger.duplicate_to_stderr(Duplicate::All)
+            logger.duplicate_to_stderr(flexi_logger::Duplicate::All)
         } else {
             logger
         };
         let logger_handle = logger.start()?;
+        config_handler.set_logger_handle(logger_handle);
 
+        let config = &config_handler.static_config;
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -357,11 +353,12 @@ impl Trident {
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
                 state_thread,
-                config,
+                ctrl_ip,
+                ctrl_mac,
+                config_handler,
                 version_info,
-                logger_handle,
-                remote_log_config,
                 stats_collector,
+                exception_handler,
                 config_path,
                 sidecar_mode,
                 ntp_diff,
@@ -379,11 +376,12 @@ impl Trident {
 
     fn run(
         state: TridentState,
-        mut config: Config,
+        ctrl_ip: IpAddr,
+        ctrl_mac: MacAddr,
+        mut config_handler: ConfigHandler,
         version_info: &'static VersionInfo,
-        logger_handle: LoggerHandle,
-        remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
+        exception_handler: ExceptionHandler,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
         ntp_diff: Arc<AtomicI64>,
@@ -391,15 +389,14 @@ impl Trident {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Environment variables: {:?}", get_env());
 
-        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
-
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
         if running_in_container() {
             info!(
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
         }
+
+        let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
 
         #[cfg(target_os = "linux")]
         let agent_id = if sidecar_mode {
@@ -409,7 +406,7 @@ impl Trident {
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
-            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+            if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
                 warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                 warn!("setns error: {}", e);
                 thread::sleep(Duration::from_secs(1));
@@ -423,7 +420,7 @@ impl Trident {
             };
             AgentId { ip, mac }
         };
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "android"))]
         let agent_id = AgentId {
             ip: ctrl_ip.clone(),
             mac: ctrl_mac,
@@ -431,47 +428,54 @@ impl Trident {
 
         info!(
             "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
-            agent_id, config.agent_mode, ctrl_ip, ctrl_mac
+            agent_id, config_handler.static_config.agent_mode, ctrl_ip, ctrl_mac
         );
 
-        let exception_handler = ExceptionHandler::default();
         let session = Arc::new(Session::new(
-            config.controller_port,
-            config.controller_tls_port,
+            config_handler.static_config.controller_port,
+            config_handler.static_config.controller_tls_port,
             DEFAULT_TIMEOUT,
-            config.controller_cert_file_prefix.clone(),
-            config.controller_ips.clone(),
+            config_handler
+                .static_config
+                .controller_cert_file_prefix
+                .clone(),
+            config_handler.static_config.controller_ips.clone(),
             exception_handler.clone(),
             &stats_collector,
         ));
 
         let runtime = Arc::new(
             Builder::new_multi_thread()
-                .worker_threads(config.async_worker_thread_number.into())
+                .worker_threads(
+                    config_handler
+                        .static_config
+                        .async_worker_thread_number
+                        .into(),
+                )
                 .enable_all()
                 .build()
                 .unwrap(),
         );
 
-        if matches!(config.agent_mode, RunningMode::Managed)
-            && running_in_container()
-            && config.kubernetes_cluster_id.is_empty()
+        if matches!(
+            config_handler.static_config.agent_mode,
+            RunningMode::Managed
+        ) && running_in_container()
+            && config_handler
+                .static_config
+                .kubernetes_cluster_id
+                .is_empty()
         {
-            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
+            config_handler.static_config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
                 &runtime,
                 &session,
-                config.kubernetes_cluster_name.as_ref(),
+                config_handler
+                    .static_config
+                    .kubernetes_cluster_name
+                    .as_ref(),
             );
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
-
-        let mut config_handler = ConfigHandler::new(
-            config,
-            ctrl_ip,
-            ctrl_mac,
-            logger_handle,
-            remote_log_config.clone(),
-        );
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
         let agent_id_tx = Arc::new(agent_id_tx);
@@ -557,7 +561,7 @@ impl Trident {
         monitor.start();
 
         #[cfg(target_os = "linux")]
-        let (libvirt_xml_extractor, platform_synchronizer, sidecar_poller) = {
+        let (libvirt_xml_extractor, platform_synchronizer, sidecar_poller, api_watcher) = {
             let ext = Arc::new(LibvirtXmlExtractor::new());
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
@@ -572,7 +576,6 @@ impl Trident {
                     .extra_netns_regex
                     .clone(),
                 config_handler.static_config.override_os_hostname.clone(),
-                HashMap::new(),
             ));
             ext.start();
             let poller = if sidecar_mode {
@@ -585,9 +588,17 @@ impl Trident {
             } else {
                 None
             };
-            (ext, syn, poller)
+            let watcher = Arc::new(ApiWatcher::new(
+                runtime.clone(),
+                config_handler.platform(),
+                synchronizer.agent_id.clone(),
+                session.clone(),
+                exception_handler.clone(),
+                stats_collector.clone(),
+            ));
+            (ext, syn, poller, watcher)
         };
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "android"))]
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
@@ -602,16 +613,6 @@ impl Trident {
         ) {
             platform_synchronizer.start();
         }
-
-        #[cfg(target_os = "linux")]
-        let api_watcher = Arc::new(ApiWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            synchronizer.agent_id.clone(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
@@ -642,9 +643,10 @@ impl Trident {
                         domain_name_listener.stop();
                         platform_synchronizer.stop();
                         #[cfg(target_os = "linux")]
-                        api_watcher.stop();
-                        #[cfg(target_os = "linux")]
-                        libvirt_xml_extractor.stop();
+                        {
+                            api_watcher.stop();
+                            libvirt_xml_extractor.stop();
+                        }
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
                                 info!("stop cgroups controller failed, {:?}", e);
@@ -738,7 +740,6 @@ impl Trident {
                         &session,
                         &synchronizer,
                         exception_handler.clone(),
-                        remote_log_config.clone(),
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
@@ -844,9 +845,12 @@ impl Trident {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn get_listener_links(conf: &DispatcherConfig, netns: &NsFile) -> Vec<Link> {
-    let interfaces = match links_by_name_regex_in_netns(&conf.tap_interface_regex, netns) {
+fn get_listener_links(
+    conf: &DispatcherConfig,
+    #[cfg(target_os = "linux")] netns: &netns::NsFile,
+) -> Vec<Link> {
+    #[cfg(target_os = "linux")]
+    match netns::links_by_name_regex_in_netns(&conf.tap_interface_regex, netns) {
         Err(e) => {
             warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
             vec![]
@@ -858,16 +862,13 @@ fn get_listener_links(conf: &DispatcherConfig, netns: &NsFile) -> Vec<Link> {
                     conf.tap_interface_regex, netns,
                 );
             }
+            debug!("tap interfaces in namespace {:?}: {:?}", netns, links);
             links
         }
-    };
-    debug!("tap interfaces in namespace {:?}: {:?}", netns, interfaces);
-    interfaces
-}
+    }
 
-#[cfg(not(target_os = "linux"))]
-fn get_listener_links(conf: &DispatcherConfig, _: &NsFile) -> Vec<Link> {
-    let interfaces = match links_by_name_regex(&conf.tap_interface_regex) {
+    #[cfg(any(target_os = "windows", target_os = "android"))]
+    match public::utils::net::links_by_name_regex(&conf.tap_interface_regex) {
         Err(e) => {
             warn!("get interfaces by name regex failed: {}", e);
             vec![]
@@ -879,11 +880,10 @@ fn get_listener_links(conf: &DispatcherConfig, _: &NsFile) -> Vec<Link> {
                     conf.tap_interface_regex
                 );
             }
+            debug!("tap interfaces: {:?}", links);
             links
         }
-    };
-    debug!("tap interfaces: {:?}", interfaces);
-    interfaces
+    }
 }
 
 fn dispatcher_listener_callback(
@@ -898,7 +898,11 @@ fn dispatcher_listener_callback(
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
             for listener in components.dispatcher_listeners.iter() {
-                let interfaces = get_listener_links(conf, listener.netns());
+                let interfaces = get_listener_links(
+                    conf,
+                    #[cfg(target_os = "linux")]
+                    listener.netns(),
+                );
                 listener.on_tap_interface_change(
                     &interfaces,
                     if_mac_source,
@@ -1063,7 +1067,7 @@ impl DomainNameListener {
                                 AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
-                                if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                                if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}", e);
                                     thread::sleep(Duration::from_secs(1));
@@ -1077,7 +1081,7 @@ impl DomainNameListener {
                                 };
                                 AgentId { ip, mac }
                             };
-                            #[cfg(target_os = "windows")]
+                            #[cfg(any(target_os = "windows", target_os = "android"))]
                             let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
 
                             session.reset_server_ip(ips.clone());
@@ -1154,12 +1158,12 @@ pub struct AgentComponents {
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
     #[cfg(target_os = "linux")]
     pub kubernetes_poller: Arc<GenericPoller>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
     pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
@@ -1180,7 +1184,6 @@ pub struct AgentComponents {
     pub policy_setter: PolicySetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
-    pub remote_log_config: RemoteLogConfig,
 
     max_memory: u64,
     tap_mode: TapMode,
@@ -1445,7 +1448,6 @@ impl AgentComponents {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
-        remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
@@ -1473,7 +1475,7 @@ impl AgentComponents {
             let regex = &candidate_config.dispatcher.extra_netns_regex;
             let regex = if regex != "" {
                 info!("platform monitoring extra netns: /{}/", regex);
-                Some(Regex::new(regex).unwrap())
+                Some(regex::Regex::new(regex).unwrap())
             } else {
                 info!("platform monitoring no extra netns");
                 None
@@ -1493,7 +1495,7 @@ impl AgentComponents {
 
         info!("Start check process...");
         trident_process_check(process_threshold);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if !yaml_config.check_core_file_disabled {
             info!("Start check core file...");
             core_file_check();
@@ -1583,7 +1585,7 @@ impl AgentComponents {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
             yaml_config.toa_sender_queue_size,
             "1-socket-sync-toa-info-queue",
@@ -1595,7 +1597,7 @@ impl AgentComponents {
             "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let socket_synchronizer = SocketSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
@@ -1740,7 +1742,7 @@ impl AgentComponents {
             analyzer_port: candidate_config.dispatcher.analyzer_port,
         };
         let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let bpf_syntax = bpf_builder.build_pcap_syntax();
 
         // Enterprise Edition Feature: packet-sequence
@@ -1771,7 +1773,7 @@ impl AgentComponents {
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions {
             capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             bpf_syntax,
             bpf_syntax_str,
         }));
@@ -1787,14 +1789,22 @@ impl AgentComponents {
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
-            src_interfaces_and_namespaces.push((src_if.clone(), NsFile::Root));
+            src_interfaces_and_namespaces.push((
+                src_if.clone(),
+                #[cfg(target_os = "linux")]
+                netns::NsFile::Root,
+            ));
         }
         if src_interfaces_and_namespaces.is_empty() {
-            src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
+            src_interfaces_and_namespaces.push((
+                "".into(),
+                #[cfg(target_os = "linux")]
+                netns::NsFile::Root,
+            ));
         }
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
-            let re = Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
+            let re = regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
             let mut nss = netns::find_ns_files_by_regex(&re);
             nss.sort_unstable();
             for ns in nss {
@@ -1824,7 +1834,11 @@ impl AgentComponents {
             false,
         );
 
-        for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
+        for (i, entry) in src_interfaces_and_namespaces.into_iter().enumerate() {
+            let src_interface = entry.0;
+            #[cfg(target_os = "linux")]
+            let netns = entry.1;
+
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
@@ -1930,22 +1944,25 @@ impl AgentComponents {
             ]));
             handler_builders.push(handler_builder.clone());
 
-            let tap_interfaces =
-                get_listener_links(&config_handler.candidate_config.dispatcher, &netns);
+            let tap_interfaces = get_listener_links(
+                &config_handler.candidate_config.dispatcher,
+                #[cfg(target_os = "linux")]
+                &netns,
+            );
 
             let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
                 tap_interfaces.clone()
             } else {
                 #[cfg(target_os = "linux")]
-                match link_by_name_in_netns(&src_interface, &netns) {
+                match netns::link_by_name_in_netns(&src_interface, &netns) {
                     Ok(link) => vec![link],
                     Err(e) => {
                         warn!("link_by_name: {}, error: {}", src_interface, e);
                         vec![]
                     }
                 }
-                #[cfg(target_os = "windows")]
-                match link_by_name(&src_interface) {
+                #[cfg(any(target_os = "windows", target_os = "android"))]
+                match public::utils::net::link_by_name(&src_interface) {
                     Ok(link) => vec![link],
                     Err(e) => {
                         warn!("link_by_name: {}, error: {}", src_interface, e);
@@ -1960,7 +1977,7 @@ impl AgentComponents {
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
                 .options(Arc::new(Mutex::new(dispatcher::Options {
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
                     af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
                     packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     tap_mode: candidate_config.tap_mode,
@@ -1998,7 +2015,6 @@ impl AgentComponents {
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface.clone())
-                .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type)
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
@@ -2008,6 +2024,7 @@ impl AgentComponents {
                 );
             #[cfg(target_os = "linux")]
             let dispatcher_builder = dispatcher_builder
+                .netns(netns)
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .platform_poller(kubernetes_poller.clone());
             let dispatcher = match dispatcher_builder.build() {
@@ -2106,10 +2123,9 @@ impl AgentComponents {
         );
 
         let ebpf_dispatcher_id = dispatchers.len();
-        #[cfg(target_os = "linux")]
-        #[allow(unused)]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut ebpf_collector = None;
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
             && candidate_config.tap_mode != TapMode::Analyzer
         {
@@ -2217,7 +2233,7 @@ impl AgentComponents {
                     ebpf_collector = Some(collector);
                 }
                 Err(e) => {
-                    error!("ebpf collector error: {:?}", e);
+                    log::error!("ebpf collector error: {:?}", e);
                 }
             };
         }
@@ -2367,10 +2383,6 @@ impl AgentComponents {
             Default::default(),
         );
 
-        remote_log_config.set_enabled(candidate_config.log.rsyslog_enabled);
-        remote_log_config.set_threshold(candidate_config.log.log_threshold);
-        remote_log_config.set_hostname(candidate_config.log.host.clone());
-
         let sender_config = config_handler.sender().load();
         let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
             sender_config.bandwidth_probe_interval.as_secs(),
@@ -2402,13 +2414,13 @@ impl AgentComponents {
             platform_synchronizer,
             #[cfg(target_os = "linux")]
             kubernetes_poller,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             socket_synchronizer,
             #[cfg(target_os = "linux")]
             prometheus_targets_watcher,
             debugger,
             session_aggrs,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
@@ -2432,7 +2444,6 @@ impl AgentComponents {
             policy_setter,
             npb_bandwidth_watcher,
             npb_arp_table,
-            remote_log_config,
             runtime,
         })
     }
@@ -2443,15 +2454,17 @@ impl AgentComponents {
         }
         info!("Staring agent components.");
         self.stats_collector.start();
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        self.socket_synchronizer.start();
         #[cfg(target_os = "linux")]
         {
-            if is_tt_pod(self.config.trident_type) {
+            if crate::utils::environment::is_tt_pod(self.config.trident_type) {
                 self.kubernetes_poller.start();
             }
             if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
                 self.prometheus_targets_watcher.start();
             }
-            self.socket_synchronizer.start();
         }
         self.debugger.start();
         self.metrics_uniform_sender.start();
@@ -2498,7 +2511,7 @@ impl AgentComponents {
             collector.start();
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
         }
@@ -2538,10 +2551,11 @@ impl AgentComponents {
             d.stop();
         }
 
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        self.socket_synchronizer.stop();
         #[cfg(target_os = "linux")]
         {
             self.kubernetes_poller.stop();
-            self.socket_synchronizer.stop();
             self.prometheus_targets_watcher.stop();
         }
 
@@ -2570,7 +2584,7 @@ impl AgentComponents {
         }
 
         self.debugger.stop();
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Some(h) = self.ebpf_collector.as_mut().and_then(|t| t.notify_stop()) {
             join_handles.push(h);
         }
@@ -2654,7 +2668,6 @@ impl Components {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
-        remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
@@ -2665,7 +2678,7 @@ impl Components {
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
-        if running_in_only_watch_k8s_mode() {
+        if crate::utils::environment::running_in_only_watch_k8s_mode() {
             let components = WatcherComponents::new(config_handler, agent_mode, runtime)?;
             return Ok(Components::Watcher(components));
         }
@@ -2676,7 +2689,6 @@ impl Components {
             session,
             synchronizer,
             exception_handler,
-            remote_log_config,
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
             platform_synchronizer,

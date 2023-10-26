@@ -15,126 +15,135 @@
  */
 
 use std::env;
-use std::io::Result;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::io;
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
-    Arc, Mutex, RwLock, Weak,
+    atomic::{AtomicI64, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    Arc, Weak,
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use chrono::{DateTime, Local};
-use dns_lookup::lookup_host;
+use arc_swap::access::Access;
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
-use log::{error, info};
+
+use public::{
+    queue,
+    sender::{SendMessageType, Sendable},
+};
 
 use super::stats;
+use crate::{
+    config::handler::{LogAccess, LogConfig, SenderAccess},
+    exception::ExceptionHandler,
+    sender::uniform_sender::UniformSenderThread,
+};
 
-#[derive(Clone)]
-pub struct RemoteLogConfig {
-    enabled: Arc<AtomicBool>,
-    threshold: Arc<AtomicU32>,
-    hostname: Arc<Mutex<String>>,
-    remotes: Arc<RwLock<Vec<String>>>,
-    remote_port: Arc<AtomicU16>,
-    remote_addrs: Arc<RwLock<Vec<SocketAddr>>>,
-    last_domain_name_lookup: Arc<AtomicU64>,
+macro_rules! write_message {
+    ($self:expr, $config:expr, $now:expr, $($arg:tt)*) => {{
+        use std::io::Write;
+        let mut buffer = Vec::new();
+        let dt = chrono::DateTime::<chrono::Local>::from(*$now).to_rfc3339();
+        let hostname = if $config.host == "" {
+            &$self.default_host
+        } else {
+            &$config.host
+        };
+        write!(&mut buffer, "{} {} {}[{}]: ", dt, hostname, $self.tag, process::id()).and_then(|_| {
+            write!(&mut buffer, $($arg)*).and_then(|_| {
+                if buffer[buffer.len() - 1] != '\n' as u8 {
+                    buffer.push('\n' as u8);
+                }
+                $self.sender.send(LogBuffer(buffer)).map_err(|e| match e {
+                    public::queue::Error::Terminated(..) => {
+                        std::io::Error::new(std::io::ErrorKind::BrokenPipe, "queue terminated")
+                    }
+                    public::queue::Error::Timeout | public::queue::Error::BatchTooLarge(_) => unreachable!(),
+                })
+            })
+        })
+    }};
 }
 
-impl RemoteLogConfig {
-    pub fn set_enabled(&self, enabled: bool) {
-        self.enabled.store(enabled, Ordering::Relaxed);
+#[derive(Debug)]
+pub struct LogBuffer(Vec<u8>);
+
+impl Sendable for LogBuffer {
+    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let len = self.0.len();
+        buf.append(&mut self.0);
+        Ok(len)
     }
 
-    pub fn set_threshold(&self, threshold: u32) {
-        self.threshold.store(threshold, Ordering::Relaxed);
-    }
-
-    pub fn set_hostname(&self, hostname: String) {
-        *self.hostname.lock().unwrap() = hostname;
-    }
-
-    pub fn set_remotes<S: AsRef<str>>(&self, addrs: &[S], port: u16) {
-        let remotes = addrs.iter().map(|addr| addr.as_ref().to_string()).collect();
-        *self.remotes.write().unwrap() = remotes;
-        self.remote_port.store(port, Ordering::Relaxed);
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Syslog
     }
 }
 
 pub struct RemoteLogWriter {
-    socket: UdpSocket,
-
-    remotes: Arc<RwLock<Vec<String>>>,
-    remote_port: Arc<AtomicU16>,
-    enabled: Arc<AtomicBool>,
-    threshold: Arc<AtomicU32>,
-    hostname: Arc<Mutex<String>>,
-    remote_addrs: Arc<RwLock<Vec<SocketAddr>>>,
-    last_domain_name_lookup: Arc<AtomicU64>,
     ntp_diff: Arc<AtomicI64>,
 
+    default_host: String,
     tag: String,
-    header: Vec<u8>,
 
     hourly_count: AtomicU32,
     last_hour: AtomicU8,
+
+    config: LogAccess,
+
+    sender: queue::Sender<LogBuffer>,
+    uniform_sender: UniformSenderThread<LogBuffer>,
 }
 
 impl RemoteLogWriter {
-    const DOMAIN_LOOKUP_INTERVAL: u64 = 180; // Seconds
-    pub fn new<S1: AsRef<str>, S2: AsRef<str>>(
-        hostname: S1,
-        addrs: &[S2],
-        port: u16,
+    const INNER_QUEUE_SIZE: usize = 65536;
+
+    pub fn new(
+        default_host: String,
         tag: String,
-        header: Vec<u8>,
+        log_config: LogAccess,
+        sender_config: SenderAccess,
+        stats_collector: Arc<stats::Collector>,
+        exception_handler: ExceptionHandler,
         ntp_diff: Arc<AtomicI64>,
-    ) -> (Self, RemoteLogConfig) {
-        let enabled: Arc<AtomicBool> = Default::default();
-        let threshold: Arc<AtomicU32> = Default::default();
-        let hostname = Arc::new(Mutex::new(hostname.as_ref().to_owned()));
-        let remotes = Arc::new(RwLock::new(
-            addrs.iter().map(|addr| addr.as_ref().to_string()).collect(),
-        ));
-        let remote_addrs = Arc::new(RwLock::new(vec![]));
-        let last_domain_name_lookup = Arc::new(AtomicU64::new(0));
-        let remote_port = Arc::new(AtomicU16::new(port));
-        (
-            Self {
-                remotes: remotes.clone(),
-                remote_port: remote_port.clone(),
-                socket: UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).unwrap(),
-                enabled: enabled.clone(),
-                threshold: threshold.clone(),
-                hostname: hostname.clone(),
-                tag: if &tag == "" {
-                    env::args().next().unwrap()
-                } else {
-                    tag
-                },
-                header,
-                remote_addrs: remote_addrs.clone(),
-                last_domain_name_lookup: last_domain_name_lookup.clone(),
-                hourly_count: Default::default(),
-                last_hour: Default::default(),
-                ntp_diff,
+    ) -> Self {
+        let module = "remote_logger";
+        let (sender, receiver, counter) = queue::bounded(Self::INNER_QUEUE_SIZE);
+        stats_collector.register_countable(
+            "queue",
+            stats::Countable::Owned(Box::new(counter)),
+            vec![
+                stats::StatsOption::Tag("module", module.to_owned()),
+                stats::StatsOption::Tag("index", "0".to_owned()),
+            ],
+        );
+        let mut uniform_sender = UniformSenderThread::new(
+            module,
+            Arc::new(receiver),
+            sender_config,
+            stats_collector,
+            exception_handler,
+            true,
+        );
+        uniform_sender.start();
+        Self {
+            ntp_diff,
+            default_host,
+            tag: if &tag == "" {
+                env::args().next().unwrap()
+            } else {
+                tag
             },
-            RemoteLogConfig {
-                enabled,
-                threshold,
-                hostname,
-                remotes,
-                remote_port,
-                remote_addrs,
-                last_domain_name_lookup,
-            },
-        )
+            hourly_count: Default::default(),
+            last_hour: Default::default(),
+            config: log_config,
+            sender,
+            uniform_sender,
+        }
     }
 
-    fn over_threshold(&self, now: &SystemTime) -> bool {
+    fn over_threshold(&self, config: &LogConfig, now: &SystemTime) -> bool {
         // TODO: variables accessed in single thread don't need to be atomic
-        let threshold = self.threshold.load(Ordering::Relaxed);
+        let threshold = config.log_threshold;
         if threshold == 0 {
             return false;
         }
@@ -142,12 +151,12 @@ impl RemoteLogWriter {
         let mut hourly_count = self.hourly_count.load(Ordering::Relaxed);
         if self.last_hour.swap(this_hour, Ordering::Relaxed) != this_hour {
             if hourly_count > threshold {
-                let _ = self.write_message(
+                let _ = write_message!(
+                    &self,
+                    config,
                     now,
-                    format!(
-                        "[WARN] Log threshold exceeded, lost {} logs.",
-                        hourly_count - threshold
-                    ),
+                    "[WARN] Log threshold exceeded, lost {} logs.",
+                    hourly_count - threshold
                 );
             }
             hourly_count = 0;
@@ -159,94 +168,26 @@ impl RemoteLogWriter {
             return true;
         }
         if hourly_count == threshold {
-            let _ = self.write_message(
+            let _ = write_message!(
+                &self,
+                config,
                 now,
-                format!(
-                    "[WARN] Log threshold is exceeding, current config is {}.",
-                    threshold
-                ),
+                "[WARN] Log threshold is exceeding, current config is {}.",
+                threshold
             );
             return true;
         }
         false
     }
-
-    fn domain_name_lookup(&self, now: SystemTime) {
-        let now = now
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        if self
-            .last_domain_name_lookup
-            .fetch_update(Ordering::Acquire, Ordering::Relaxed, |x| {
-                if now < x + Self::DOMAIN_LOOKUP_INTERVAL {
-                    None
-                } else {
-                    Some(now)
-                }
-            })
-            .is_err()
-        {
-            return;
-        }
-
-        let remotes = self.remotes.read().unwrap().clone();
-        let port = self.remote_port.load(Ordering::Relaxed);
-        let mut remote_addrs = vec![];
-        for addr in &remotes {
-            if let Ok(ip) = addr.parse::<IpAddr>() {
-                remote_addrs.push(SocketAddr::new(ip, port))
-            } else {
-                if let Ok(mut host_ips) = lookup_host(addr.as_ref()) {
-                    host_ips.sort();
-                    remote_addrs.push(SocketAddr::new(host_ips[0], port))
-                } else {
-                    error!("Invalid remote address {}, please check the configuration and domain name server.", addr);
-                }
-            }
-        }
-        let last_remote_addrs = self.remote_addrs.read().unwrap().clone();
-        if last_remote_addrs != remote_addrs {
-            info!(
-                "Logger remote update from {:?} to {:?} by {:?}",
-                last_remote_addrs, remote_addrs, remotes
-            );
-            *self.remote_addrs.write().unwrap() = remote_addrs;
-        }
-    }
-
-    fn write_message(&self, now: &SystemTime, message: String) -> Result<()> {
-        // TODO: avoid buffer allocation
-        let mut buffer = self.header.clone();
-        let time_str = DateTime::<Local>::from(*now).to_rfc3339();
-        buffer.extend_from_slice(time_str.as_bytes());
-        buffer.push(' ' as u8);
-        buffer.extend_from_slice(self.hostname.lock().unwrap().as_bytes());
-        buffer.push(' ' as u8);
-        buffer.extend_from_slice(self.tag.as_bytes());
-        buffer.extend_from_slice(format!("[{}]", process::id()).as_bytes());
-        buffer.push(':' as u8);
-        buffer.push(' ' as u8);
-        buffer.extend_from_slice(&message.into_bytes());
-        if buffer[buffer.len() - 1] != '\n' as u8 {
-            buffer.push('\n' as u8);
-        }
-        let mut result = Ok(());
-        for remote in self.remote_addrs.read().unwrap().iter() {
-            match self.socket.send_to(buffer.as_slice(), remote) {
-                Err(e) => result = Err(e),
-                _ => (),
-            }
-        }
-        result
-    }
 }
 
 impl LogWriter for RemoteLogWriter {
-    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
-        if !self.enabled.load(Ordering::Relaxed) {
+    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> io::Result<()> {
+        let config = self.config.load();
+        if !config.rsyslog_enabled {
             return Ok(());
         }
+
         let now: SystemTime = (*now.now()).into();
         let diff = self.ntp_diff.load(Ordering::Relaxed);
         let now = if diff > 0 {
@@ -256,22 +197,34 @@ impl LogWriter for RemoteLogWriter {
                 .unwrap()
         };
 
-        if self.over_threshold(&now) {
+        if self.over_threshold(&config, &now) {
             return Ok(());
         }
-        self.domain_name_lookup(now);
 
         if let Some((file, line)) = record.file().zip(record.line()) {
-            self.write_message(
+            write_message!(
+                &self,
+                &config,
                 &now,
-                format!("[{}] {}:{} {}", record.level(), file, line, record.args()),
+                "[{}] {}:{} {}",
+                record.level(),
+                file,
+                line,
+                record.args(),
             )
         } else {
-            self.write_message(&now, format!("[{}] {}", record.level(), record.args()))
+            write_message!(
+                &self,
+                &config,
+                &now,
+                "[{}] {}",
+                record.level(),
+                record.args(),
+            )
         }
     }
 
-    fn flush(&self) -> Result<()> {
+    fn flush(&self) -> io::Result<()> {
         Ok(())
     }
 }
@@ -293,7 +246,7 @@ impl LogLevelWriter {
 }
 
 impl LogWriter for LogLevelWriter {
-    fn write(&self, _: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
+    fn write(&self, _: &mut DeferredNow, record: &Record<'_>) -> io::Result<()> {
         match record.level() {
             Level::Error => &self.0.error,
             Level::Warn => &self.0.warning,
@@ -303,7 +256,7 @@ impl LogWriter for LogLevelWriter {
         Ok(())
     }
 
-    fn flush(&self) -> Result<()> {
+    fn flush(&self) -> io::Result<()> {
         Ok(())
     }
 }
@@ -343,13 +296,13 @@ impl LogWriterAdapter {
 }
 
 impl LogWriter for LogWriterAdapter {
-    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
+    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> io::Result<()> {
         self.0
             .iter()
             .fold(Ok(()), |r, w| r.or(w.write(now, record)))
     }
 
-    fn flush(&self) -> Result<()> {
+    fn flush(&self) -> io::Result<()> {
         self.0.iter().fold(Ok(()), |r, w| r.or(w.flush()))
     }
 }

@@ -81,6 +81,8 @@ type L7Base struct {
 	SyscallTraceIDResponse uint64
 	SyscallThread0         uint32
 	SyscallThread1         uint32
+	SyscallCoroutine0      uint64
+	SyscallCoroutine1      uint64
 	SyscallCapSeq0         uint32
 	SyscallCapSeq1         uint32
 }
@@ -130,6 +132,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
 		ckdb.NewColumn("syscall_thread_0", ckdb.UInt32).SetComment("Syscall线程-请求"),
 		ckdb.NewColumn("syscall_thread_1", ckdb.UInt32).SetComment("Syscall线程-响应"),
+		ckdb.NewColumn("syscall_coroutine_0", ckdb.UInt64).SetComment("Request Syscall Coroutine"),
+		ckdb.NewColumn("syscall_coroutine_1", ckdb.UInt64).SetComment("Response Syscall Coroutine"),
 		ckdb.NewColumn("syscall_cap_seq_0", ckdb.UInt32).SetComment("Syscall序列号-请求"),
 		ckdb.NewColumn("syscall_cap_seq_1", ckdb.UInt32).SetComment("Syscall序列号-响应"),
 	)
@@ -177,6 +181,8 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 		f.SyscallTraceIDResponse,
 		f.SyscallThread0,
 		f.SyscallThread1,
+		f.SyscallCoroutine0,
+		f.SyscallCoroutine1,
 		f.SyscallCapSeq0,
 		f.SyscallCapSeq1)
 }
@@ -256,9 +262,9 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_result", ckdb.String).SetComment("响应结果, DNS解析地址"),
 
 		ckdb.NewColumn("http_proxy_client", ckdb.String).SetComment("HTTP代理客户端"),
-		ckdb.NewColumn("x_request_id_0", ckdb.String).SetComment("XRequestID0"),
-		ckdb.NewColumn("x_request_id_1", ckdb.String).SetComment("XRequestID1"),
-		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
+		ckdb.NewColumn("x_request_id_0", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID0"),
+		ckdb.NewColumn("x_request_id_1", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID1"),
+		ckdb.NewColumn("trace_id", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
@@ -427,7 +433,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 			}
 			h.RequestId = &h.requestId
 		}
-	case datatype.L7_PROTOCOL_PROTOBUF_RPC, datatype.L7_PROTOCOL_SOFARPC:
+	case datatype.L7_PROTOCOL_SOFARPC:
 		// assume protobuf and sofa rpc Always have request_id and maybe equal to 0
 		h.RequestId = &h.requestId
 	}
@@ -538,6 +544,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
 	b.SyscallThread0 = l.SyscallTraceIdThread_0
 	b.SyscallThread1 = l.SyscallTraceIdThread_1
+	b.SyscallCoroutine0 = l.SyscallCoroutine_0
+	b.SyscallCoroutine1 = l.SyscallCoroutine_1
 	b.SyscallCapSeq0 = l.SyscallCapSeq_0
 	b.SyscallCapSeq1 = l.SyscallCapSeq_1
 

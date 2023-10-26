@@ -10,7 +10,7 @@ git clone --recursive https://github.com/deepflowio/deepflow.git
 cd deepflow 
 docker run --privileged --rm -it -v \
     $(pwd):/deepflow -v ~/.cargo:/usr/local/cargo hub.deepflow.yunshan.net/public/rust-build bash -c \
-    "source /opt/rh/devtoolset-8/enable && cd /deepflow/agent && cargo build"
+    "cd /deepflow/agent && cargo build"
 
 # binary file directory: ./agent/target/debug/deepflow-agent
 ```
