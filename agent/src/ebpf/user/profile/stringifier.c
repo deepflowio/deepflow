@@ -56,6 +56,7 @@
 #include "../table.h"
 #include "../bihash_8_8.h"
 #include "../bihash_16_8.h"
+#include "attach.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 
@@ -87,11 +88,11 @@ int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 {
 	memset(h, 0, sizeof(*h));
 	u32 nbuckets = STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM;
-	u64 hash_memory_size = STRINGIFIER_STACK_STR_HASH_MEM_SZ; // 1G bytes
+	u64 hash_memory_size = STRINGIFIER_STACK_STR_HASH_MEM_SZ;	// 1G bytes
 	h->private =
-		clib_mem_alloc_aligned("hash_ext_data",
-				       sizeof(struct stack_str_hash_ext_data),
-				       0, NULL);
+	    clib_mem_alloc_aligned("hash_ext_data",
+				   sizeof(struct stack_str_hash_ext_data),
+				   0, NULL);
 	if (h->private == NULL)
 		return ETR_NOMEM;
 
@@ -102,7 +103,7 @@ int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 	return stack_str_hash_init(h, (char *)name, nbuckets, hash_memory_size);
 }
 
-void release_stack_str_hash(stack_str_hash_t *h)
+void release_stack_str_hash(stack_str_hash_t * h)
 {
 	if (h->private) {
 		struct stack_str_hash_ext_data *ext = h->private;
@@ -201,6 +202,20 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 
 	int ret = symcache_resolve(pid, resolver, address, &sym);
 	if (ret == 0) {
+		if (info_p && pid > 0) {
+			struct symbolizer_proc_info *p = info_p;
+			if (p->new_java_syms_file) {
+				/*
+				 * TODO @jiping
+				 * If you delete the local file perf-PID.map immediately,
+				 * it will leave many symbolic links in /tmp/perf-PID.map.
+				 * We need a better method to delete these map files. Currently,
+				 * they are first saved in the local directory '/tmp'.
+				 */
+				//clean_local_java_symbols_files(pid);
+				p->new_java_syms_file = false;
+			}
+		}
 		ptr = symbol_name_fetch(pid, &sym);
 		if (ptr) {
 			char *p = ptr;
@@ -225,13 +240,12 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 		 * [/lib64/xxx.so]
 		 */
 		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "[%s]",
-			 sym.module);
+		snprintf(format_str, sizeof(format_str), "[%s]", sym.module);
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
 		if (info_p) {
 			struct symbolizer_proc_info *p = info_p;
-			if (p->is_java) {
+			if (p->is_java && strstr(format_str, "perf-")) {
 				p->unknown_syms_found = true;
 			}
 		}
@@ -269,10 +283,9 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      pid_t pid,
 				      int stack_id,
-				      stack_str_hash_t *h,
+				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val,
-				      void *info_p)
+				      int *ret_val, void *info_p)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -347,14 +360,12 @@ failed:
 	return NULL;
 }
 
-static char *
-folded_stack_trace_string(struct bpf_tracer *t,
-			  int stack_id,
-			  pid_t pid,
-			  const char *stack_map_name,
-			  stack_str_hash_t *h,
-			  bool new_cache,
-			  void *info_p)
+static char *folded_stack_trace_string(struct bpf_tracer *t,
+				       int stack_id,
+				       pid_t pid,
+				       const char *stack_map_name,
+				       stack_str_hash_t * h,
+				       bool new_cache, void *info_p)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -429,13 +440,11 @@ static inline char *alloc_stack_trace_str(int len)
 	return trace_str;
 }
 
-char *
-resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
-				struct stack_trace_key_t *v,
-				const char *stack_map_name,
-				stack_str_hash_t *h,
-				bool new_cache,
-				void *info_p)
+char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
+				      struct stack_trace_key_t *v,
+				      const char *stack_map_name,
+				      stack_str_hash_t * h,
+				      bool new_cache, void *info_p)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -460,18 +469,14 @@ resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h,
-							new_cache,
-							info_p);
+							h, new_cache, info_p);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
 							stack_map_name,
-							h,
-							new_cache,
-							info_p);
+							h, new_cache, info_p);
 	}
 
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */

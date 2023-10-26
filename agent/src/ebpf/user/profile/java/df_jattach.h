@@ -17,18 +17,12 @@
 #ifndef DF_JATTACH_H
 #define DF_JATTACH_H
 
-#define AGENT_LIB_NAME "df_java_agent.so"
-#define AGENT_LIB_SRC_PATH "/tmp/" AGENT_LIB_NAME
-
-#define AGENT_MUSL_LIB_NAME "df_java_agent_musl.so"
-#define AGENT_MUSL_LIB_SRC_PATH "/tmp/" AGENT_MUSL_LIB_NAME
-
-#define JAVA_LOG_TAG "[JAVA]"
-
 typedef uint64_t(*agent_test_t) (void);
 
 void clear_target_ns_tmp_file(const char *target_path);
-void copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);
+int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);
 void clear_target_ns(int pid, int target_ns_pid);
 void clear_target_ns_so(int pid, int target_ns_pid);
+void clear_local_perf_files(int pid);
+bool is_same_mntns(int target_pid);
 #endif /* DF_JATTACH_H */
