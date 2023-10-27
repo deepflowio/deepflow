@@ -36,6 +36,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
@@ -223,5 +224,8 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 		time.Sleep(1 * time.Second)
 		os.Exit(1)
 	}
+	wg := utils.GetWaitGroupInCtx(ctx)
+	wg.Add(1)
+	defer wg.Done()
 	wait.UntilWithContext(ctx, le.Run, 0)
 }
