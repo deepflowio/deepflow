@@ -94,7 +94,7 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
-			relatedOK := slices.Contains[string]([]string{"pod_service"}, resourceNoSuffix)
+			relatedOK := slices.Contains[[]string, string]([]string{"pod_service"}, resourceNoSuffix)
 			if relatedOK {
 				return
 			}
