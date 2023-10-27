@@ -236,6 +236,9 @@ impl HttpInfo {
                 if self.referer.is_some() {
                     self.referer = other.referer;
                 }
+                if self.endpoint.is_none() {
+                    self.endpoint = other.endpoint;
+                }
                 // 下面用于判断是否结束
                 // ================
                 // determine whether request is end
@@ -478,6 +481,12 @@ impl L7ProtocolParserInterface for HttpLog {
                 EbpfType::GoHttp2Uprobe => {
                     self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
                     if param.parse_log {
+                        if self.proto == L7Protocol::Http2
+                            && !config.http_endpoint_disabled
+                            && info.path.len() > 0
+                        {
+                            info.endpoint = Some(handle_endpoint(config, &info.path));
+                        }
                         return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
                     } else {
                         return Ok(L7ParseResult::None);
@@ -489,7 +498,7 @@ impl L7ProtocolParserInterface for HttpLog {
         }
         match self.proto {
             L7Protocol::Http1 | L7Protocol::Http2 => {
-                if !config.http_endpoint_disabled {
+                if !config.http_endpoint_disabled && info.path.len() > 0 {
                     info.endpoint = Some(handle_endpoint(config, &info.path));
                 }
             }
