@@ -278,4 +278,7 @@ int exec_command(const char *cmd, const char *args);
 u64 current_sys_time_secs(void);
 int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
 int fetch_container_id(pid_t pid, char *id, int copy_bytes);
+#ifndef AARCH64_MUSL
+int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
+#endif /* AARCH64_MUSL */
 #endif /* DF_COMMON_H */

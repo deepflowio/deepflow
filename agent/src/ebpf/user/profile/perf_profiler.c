@@ -31,7 +31,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "attach.h"
+#include "java/gen_syms_file.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -68,6 +68,9 @@
 
 /* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
 int g_java_syms_write_bytes_max;
+
+/* Used for handling updates to JAVA symbol files */
+static pthread_t java_syms_update_thread;
 
 extern int major, minor;
 extern char linux_release[128];
@@ -746,6 +749,11 @@ release_iter:
 	push_and_release_stack_trace_msg(&g_msg_hash, false);
 }
 
+static void java_syms_update_work(void *arg)
+{
+	java_syms_update_main(arg);
+}
+
 static void cp_reader_work(void *arg)
 {
 	thread_index = THREAD_PROFILER_READER_IDX;
@@ -854,6 +862,15 @@ static int create_profiler(struct bpf_tracer *tracer)
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
 
+	ret = create_work_thread("java_update",
+				 &java_syms_update_thread,
+				 (void *)java_syms_update_work,
+				 (void *)tracer);
+
+	if (ret) {
+		goto error;
+	}
+
 	/*
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
@@ -862,11 +879,14 @@ static int create_profiler(struct bpf_tracer *tracer)
 					(void *)&cp_reader_work);
 
 	if (ret) {
-		relase_profiler(tracer);
-		return ETR_INVAL;
+		goto error;
 	}
 
 	return ETR_OK;
+
+error:
+	relase_profiler(tracer);
+	return ETR_INVAL;
 }
 
 int stop_continuous_profiler(void)
@@ -1061,7 +1081,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
- 
+
 	// REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 	if (check_kernel_version(4, 9) != 0) {
 		ebpf_warning
@@ -1083,12 +1103,14 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 		return (-1);
 	}
 
-	int java_space_bytes = java_syms_space_limit * 1024 *1024;
+	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
 	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
 		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
-	g_java_syms_write_bytes_max = java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
-	ebpf_info("set java_syms_write_bytes_max : %d\n", g_java_syms_write_bytes_max);
+	g_java_syms_write_bytes_max =
+	    java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
+	ebpf_info("set java_syms_write_bytes_max : %d\n",
+		  g_java_syms_write_bytes_max);
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
 	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -1321,13 +1343,10 @@ int set_profiler_cpu_aggregation(int flag)
 #include "../tracer.h"
 #include "perf_profiler.h"
 
-/*
- * start continuous profiler
- * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @callback Profile data processing callback interface
- * @returns 0 on success, < 0 on error
- */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq,
+			      int java_syms_space_limit,
+			      int java_syms_update_delay,
+			      tracer_callback_t callback)
 {
 	return (-1);
 }

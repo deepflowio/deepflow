@@ -94,7 +94,7 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
-			relatedOK := slices.Contains[string]([]string{"pod_service"}, resourceNoSuffix)
+			relatedOK := slices.Contains[[]string, string]([]string{"pod_service"}, resourceNoSuffix)
 			if relatedOK {
 				return
 			}
@@ -633,32 +633,36 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
 		case "_id":
-			idValue := strings.TrimLeft(t.Value, "(")
-			idValue = strings.TrimRight(idValue, ")")
-			idSlice := strings.Split(idValue, ",")
-			whereFilters := []string{}
-			for _, valueStr := range idSlice {
-				valueStr = strings.Trim(t.Value, "'")
-				valueInt, err := strconv.ParseUint(valueStr, 10, 64)
-				if err != nil {
-					log.Error(err)
-					return nil, err
+			// When there is a time range in the conditions, there is no need to add redundant time filtering
+			if w.time.TimeStart > 0 && w.time.TimeEnd > 0 {
+				whereFilter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			} else {
+				idValue := strings.TrimLeft(t.Value, "(")
+				idValue = strings.TrimRight(idValue, ")")
+				idSlice := strings.Split(idValue, ",")
+				whereFilters := []string{}
+				for _, valueStr := range idSlice {
+					valueStr = strings.Trim(t.Value, "'")
+					valueInt, err := strconv.ParseUint(valueStr, 10, 64)
+					if err != nil {
+						log.Error(err)
+						return nil, err
+					}
+					idFilter := fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
+					whereFilters = append(whereFilters, "("+idFilter+")")
 				}
-				idFilter := fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
-				whereFilters = append(whereFilters, "("+idFilter+")")
-			}
-			if len(whereFilters) != 0 {
-				equalFilter := "(" + strings.Join(whereFilters, " OR ") + ")"
-				switch strings.ToLower(op) {
-				case "not in":
-					whereFilter = "not(" + equalFilter + ")"
-				case "!=":
-					whereFilter = "not(" + equalFilter + ")"
-				default:
-					whereFilter = equalFilter
+				if len(whereFilters) != 0 {
+					equalFilter := "(" + strings.Join(whereFilters, " OR ") + ")"
+					switch strings.ToLower(op) {
+					case "not in":
+						whereFilter = "not(" + equalFilter + ")"
+					case "!=":
+						whereFilter = "not(" + equalFilter + ")"
+					default:
+						whereFilter = equalFilter
+					}
 				}
 			}
-
 		case "ip", "ip_0", "ip_1", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip_0", "tunnel_rx_ip_1", "nat_real_ip", "nat_real_ip_0", "nat_real_ip_1":
 			equalFilter := ""
 			ipValues := strings.TrimLeft(t.Value, "(")
