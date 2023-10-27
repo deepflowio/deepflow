@@ -41,9 +41,9 @@ use super::{
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
-    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, QUEUE_BATCH_SIZE,
-    SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
-    THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_UNIT,
+    FLOW_METRICS_PEER_SRC, QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY,
+    SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK,
+    TIME_UNIT,
 };
 
 use crate::{
@@ -1751,29 +1751,6 @@ impl FlowMap {
                 l7_stats.l7_protocol = l7_protocol;
             }
         }
-        // Unknown application only counts metrics, and the judgment condition needs to consider
-        // the flow's duration, so the value is assigned when the flow is finished
-        //
-        // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
-        // 1. TCP protocol
-        // 2. l4_metrics_enabled = true
-        // 3. l7_metrics_enabled = true
-        // 4. The application protocol cannot be identified
-        // 5. The flow ends or the flow lasts more than 60 seconds
-        // 6. The L7PerfStats is valuable
-        if flow.flow_key.proto == IpProtocol::TCP
-            && flow.flow_perf_stats.is_some()
-            && Self::l7_metrics_enabled(config)
-        {
-            let stats = flow.flow_perf_stats.as_mut().unwrap();
-            if stats.l7_protocol == L7Protocol::Unknown
-                && (flow.close_type != CloseType::ForcedReport
-                    || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
-                && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
-            {
-                stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
-            }
-        }
 
         self.stats_counter
             .concurrent
@@ -1846,29 +1823,7 @@ impl FlowMap {
                     l7_stats.l7_protocol = l7_protocol;
                 }
             }
-            // Unknown application only counts metrics, and the judgment condition needs to consider
-            // the flow's duration, so the value is assigned when the flow is finished
-            //
-            // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
-            // 1. TCP protocol
-            // 2. l4_metrics_enabled = true
-            // 3. l7_metrics_enabled = true
-            // 4. The application protocol cannot be identified
-            // 5. The flow ends or the flow lasts more than 60 seconds
-            // 6. The L7PerfStats is valuable
-            if flow.flow_key.proto == IpProtocol::TCP
-                && flow.flow_perf_stats.is_some()
-                && Self::l7_metrics_enabled(config)
-            {
-                let stats = flow.flow_perf_stats.as_mut().unwrap();
-                if stats.l7_protocol == L7Protocol::Unknown
-                    && (flow.close_type != CloseType::ForcedReport
-                        || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
-                    && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
-                {
-                    stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
-                }
-            }
+
             let tagged_flow = Arc::new(
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),

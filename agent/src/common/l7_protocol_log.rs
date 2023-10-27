@@ -37,7 +37,7 @@ use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
     DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
-    SofaRpcLog,
+    SofaRpcLog, TlsLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
 use crate::plugin::wasm::WasmVm;
@@ -86,8 +86,8 @@ macro_rules! impl_protocol_parser {
                 match self {
                     Self::Http(p) => {
                         match p.protocol() {
-                            L7Protocol::Http1|L7Protocol::Http1TLS => return "HTTP",
-                            L7Protocol::Http2|L7Protocol::Http2TLS => return "HTTP2",
+                            L7Protocol::Http1 => return "HTTP",
+                            L7Protocol::Http2 => return "HTTP2",
                             _ => unreachable!()
                         }
                     },
@@ -118,8 +118,8 @@ macro_rules! impl_protocol_parser {
         pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser> {
             match p {
                 L7ProtocolEnum::L7Protocol(p) => match p {
-                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
-                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
+                    L7Protocol::Http1 => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
+                    L7Protocol::Http2 => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
                     L7Protocol::Grpc => Some(L7ProtocolParser::Http(HttpLog::new_v2(true))),
 
                     // in check_payload, need to get the default Custom by L7Protocol.
@@ -170,6 +170,7 @@ impl_protocol_parser! {
         Dubbo(DubboLog),
         FastCGI(FastCGILog),
         MQTT(MqttLog),
+        Tls(TlsLog),
         // add protocol below
     }
 }
@@ -411,15 +412,8 @@ impl ParseParam<'_> {
             buf_size: 0,
         };
         if packet.ebpf_type != EbpfType::None {
-            let is_tls = match packet.ebpf_type {
-                EbpfType::TlsUprobe => true,
-                _ => match packet.l7_protocol_from_ebpf {
-                    L7Protocol::Http1TLS | L7Protocol::Http2TLS => true,
-                    _ => false,
-                },
-            };
             param.ebpf_param = Some(EbpfParam {
-                is_tls,
+                is_tls: packet.is_tls(),
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
                 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -539,14 +533,8 @@ impl From<&Vec<String>> for L7ProtocolBitmap {
             if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
                 let protocol = p.protocol();
                 match protocol {
-                    L7Protocol::Http1 => {
-                        bitmap.set_enabled(L7Protocol::Http1);
-                        bitmap.set_enabled(L7Protocol::Http1TLS);
-                    }
-                    L7Protocol::Http2 => {
-                        bitmap.set_enabled(L7Protocol::Http2);
-                        bitmap.set_enabled(L7Protocol::Http2TLS);
-                    }
+                    L7Protocol::Http1 => bitmap.set_enabled(L7Protocol::Http1),
+                    L7Protocol::Http2 => bitmap.set_enabled(L7Protocol::Http2),
                     _ => {
                         bitmap.set_enabled(protocol);
                     }

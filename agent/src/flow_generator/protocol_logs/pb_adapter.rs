@@ -78,6 +78,7 @@ pub struct L7ProtocolSendLog {
     pub version: Option<String>,
     pub trace_info: Option<TraceInfo>,
     pub ext_info: Option<ExtendedInfo>,
+    pub flags: u32,
 }
 
 impl L7ProtocolSendLog {
@@ -168,5 +169,6 @@ impl L7ProtocolSendLog {
             }
             log.ext_info = Some(ext_info);
         }
+        log.flags = self.flags;
     }
 }

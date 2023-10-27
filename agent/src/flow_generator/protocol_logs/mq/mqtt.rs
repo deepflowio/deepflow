@@ -32,6 +32,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         error::{Error, Result},
@@ -46,6 +47,8 @@ use public::proto::flow_log::MqttTopic;
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
     msg_type: LogMessageType,
+    #[serde(skip)]
+    is_tls: bool,
 
     #[serde(rename = "request_domain", skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
@@ -93,7 +96,7 @@ impl L7ProtocolInfoInterface for MqttInfo {
     }
 
     fn is_tls(&self) -> bool {
-        false
+        self.is_tls
     }
 }
 
@@ -120,6 +123,7 @@ impl Default for MqttInfo {
             status: L7ResponseStatus::Ok,
             msg_type: LogMessageType::Other,
             rrt: 0,
+            is_tls: false,
         }
     }
 }
@@ -160,6 +164,11 @@ impl From<MqttInfo> for L7ProtocolSendLog {
     fn from(f: MqttInfo) -> Self {
         let version = Some(String::from(f.get_version_str()));
         let mut topic_str = String::new();
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         match f.pkt_type {
             PacketKind::Publish { .. } => {
                 if let Some(t) = f.publish_topic {
@@ -193,6 +202,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
                 code: f.code,
                 ..Default::default()
             },
+            flags,
             ..Default::default()
         }
     }
@@ -231,6 +241,7 @@ impl L7ProtocolParserInterface for MqttLog {
                 });
 
                 info.msg_type = self.msg_type;
+                info.is_tls = param.is_tls();
 
                 match param.direction {
                     PacketDirection::ClientToServer => {

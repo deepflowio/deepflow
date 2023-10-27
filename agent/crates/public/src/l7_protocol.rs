@@ -24,13 +24,10 @@ pub const DEFAULT_DNS_PORT: u16 = 53;
 pub enum L7Protocol {
     #[num_enum(default)]
     Unknown = 0,
-    Other = 1,
 
     // HTTP
     Http1 = 20,
     Http2 = 21,
-    Http1TLS = 22,
-    Http2TLS = 23,
 
     // RPC
     Dubbo = 40,
@@ -53,19 +50,19 @@ pub enum L7Protocol {
 
     // INFRA
     DNS = 120,
+    Tls = 121,
 
     Custom = 127,
 
     Max = 255,
 }
 
-// Translate the string value of l7_protocol into a L7Protocol enumeration value
+// Translate the string value of l7_protocol into a L7Protocol enumeration value used by OTEL.
 impl From<String> for L7Protocol {
     fn from(l7_protocol_str: String) -> Self {
         let l7_protocol_str = l7_protocol_str.to_lowercase();
         match l7_protocol_str.as_str() {
-            "http" => Self::Http1,
-            "https" => Self::Http1TLS,
+            "http" | "https" => Self::Http1,
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
             "fastcgi" => Self::FastCGI,
@@ -78,7 +75,7 @@ impl From<String> for L7Protocol {
             "kafka" => Self::Kafka,
             "mqtt" => Self::MQTT,
             "dns" => Self::DNS,
-            _ => Self::Other,
+            _ => Self::Unknown,
         }
     }
 }

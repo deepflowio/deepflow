@@ -37,6 +37,7 @@ use crate::{
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::error::{Error, Result},
@@ -176,7 +177,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: self.get_l7_protocol_with_tls(),
+            proto: self.proto,
             msg_type: self.msg_type,
             rrt: self.rrt,
         })
@@ -305,28 +306,6 @@ impl HttpInfo {
         (self.is_req_end, self.is_resp_end)
     }
 
-    pub fn get_l7_protocol_with_tls(&self) -> L7Protocol {
-        match self.proto {
-            L7Protocol::Http1 => {
-                if self.is_tls {
-                    L7Protocol::Http1TLS
-                } else {
-                    L7Protocol::Http1
-                }
-            }
-            L7Protocol::Http2 => {
-                if self.is_tls {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
-            }
-
-            L7Protocol::Grpc => L7Protocol::Grpc,
-            _ => unreachable!(),
-        }
-    }
-
     fn is_grpc(&self) -> bool {
         self.proto == L7Protocol::Grpc
     }
@@ -381,6 +360,11 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.custom_endpoint.unwrap_or_default(),
             )
         };
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
 
         L7ProtocolSendLog {
             req_len: f.req_content_length,
@@ -420,6 +404,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 },
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         }
     }
@@ -512,24 +497,7 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        match self.proto {
-            L7Protocol::Http1 => {
-                if self.is_tls {
-                    L7Protocol::Http1TLS
-                } else {
-                    L7Protocol::Http1
-                }
-            }
-            L7Protocol::Http2 => {
-                if self.is_tls {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
-            }
-            L7Protocol::Grpc => L7Protocol::Grpc,
-            _ => unreachable!(),
-        }
+        self.proto
     }
 
     fn parsable_on_udp(&self) -> bool {

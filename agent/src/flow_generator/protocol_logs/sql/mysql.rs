@@ -31,6 +31,7 @@ use crate::{
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         error::{Error, Result},
@@ -191,6 +192,11 @@ impl MysqlInfo {
 
 impl From<MysqlInfo> for L7ProtocolSendLog {
     fn from(f: MysqlInfo) -> Self {
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         let log = L7ProtocolSendLog {
             version: if f.protocol_version == 0 {
                 None
@@ -234,7 +240,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             } else {
                 None
             },
-
+            flags,
             ..Default::default()
         };
         return log;
