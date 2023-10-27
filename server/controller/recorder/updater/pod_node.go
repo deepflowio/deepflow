@@ -85,6 +85,9 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.Pod
 
 func (n *PodNode) generateUpdateInfo(diffBase *cache.PodNode, cloudItem *cloudmodel.PodNode) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
+	if diffBase.Type != cloudItem.Type {
+		updateInfo["type"] = cloudItem.Type
+	}
 	if diffBase.State != cloudItem.State {
 		updateInfo["state"] = cloudItem.State
 	}

@@ -92,6 +92,10 @@ impl Header {
     fn encode(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self.frame_size.to_be_bytes().as_slice());
         buffer.push(self.msg_type.into());
+        // syslog header is 5 bytes
+        if matches!(self.msg_type, SendMessageType::Syslog) {
+            return;
+        }
         buffer.extend_from_slice(self.version.to_le_bytes().as_slice());
         buffer.extend_from_slice(self.sequence.to_le_bytes().as_slice());
         buffer.extend_from_slice(self.vtap_id.to_le_bytes().as_slice());

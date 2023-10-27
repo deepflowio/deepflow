@@ -14,10 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef ATTACH_H
-#define ATTACH_H
+#ifndef GEN_SYMS_FILE_H
+#define GEN_SYMS_FILE_H
 
 #define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
+
+struct java_syms_update_task {
+	struct list_head list;
+	struct symbolizer_proc_info *p;
+};
+
 void gen_java_symbols_file(int pid);
 void clean_local_java_symbols_files(int pid);
-#endif /* ATTACH_H */
+void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
+void java_syms_update_main(void *arg);
+#endif /* GEN_SYMS_FILE_H */

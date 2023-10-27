@@ -46,7 +46,7 @@
 #endif
 #include "libGoReSym.h"
 #include "profile/java/df_jattach.h"
-#include "profile/attach.h"
+#include "profile/java/gen_syms_file.h"
 
 static u64 add_symcache_count;
 static u64 free_symcache_count;
@@ -56,8 +56,8 @@ static u64 free_symcache_count;
  * information, we delay symbol retrieval when encountering unknown symbols.
  * The default value is 'JAVA_SYMS_UPDATE_DELAY_DEF'.
  */
-static volatile u64 java_syms_fetch_delay; // In seconds.
-   
+static volatile u64 java_syms_fetch_delay;	// In seconds.
+
 /*
  * When a process exits, save the symbol cache pids
  * to be deleted.
@@ -512,8 +512,11 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 			}
 		}
 
-		clib_mem_free((void *)p);
-		kv->v.proc_info_p = 0;
+		/* Ensure that all tasks are completed before releasing. */
+		if (AO_SUB_F(&p->use, 1) == 0) {
+			clib_mem_free((void *)p);
+			kv->v.proc_info_p = 0;
+		}
 	}
 }
 
@@ -657,6 +660,8 @@ static struct bcc_symbol_option lazy_opt = {
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 {
 	memset(p, 0, sizeof(*p));
+	p->pid = pid;
+	p->add_task_list = false;
 	p->unknown_syms_found = false;
 	p->new_java_syms_file = false;
 	p->netns_id = get_netns_id_from_pid(pid);
@@ -683,6 +688,8 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	} else {
 		p->verified = false;
 	}
+
+	p->use = 1;
 
 	return ETR_OK;
 }
@@ -837,33 +844,46 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			    && curr_time >= p->update_syms_table_time) {
 				/* Update java symbols table, will be executed during
 				 * the next Java symbolication */
-				gen_java_symbols_file(pid);
-				p->new_java_syms_file = true;
 
-				if (kv.v.cache) {
-					bcc_free_symcache((void *)kv.v.cache,
-							  kv.k.pid);
-					kv.v.cache =
-					    pointer_to_uword(bcc_symcache_new
-							     ((int)kv.k.pid,
-							      &lazy_opt));
-					if (symbol_caches_hash_add_del
-					    (h, (symbol_caches_hash_kv *) & kv,
-					     1 /* is_add */ )) {
-						ebpf_warning
-						    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-						     (int)kv.k.pid);
+				/* Has the symbol file for Java been generated ? */
+				if (AO_GET(&p->new_java_syms_file)) {
+					if (kv.v.cache) {
+						bcc_free_symcache((void *)kv.v.
+								  cache,
+								  kv.k.pid);
+						kv.v.cache =
+						    pointer_to_uword
+						    (bcc_symcache_new
+						     ((int)kv.k.pid,
+						      &lazy_opt));
+						if (symbol_caches_hash_add_del
+						    (h,
+						     (symbol_caches_hash_kv *) &
+						     kv, 1 /* is_add */ )) {
+							ebpf_warning
+							    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+							     (int)kv.k.pid);
+						}
+					}
+
+					p->unknown_syms_found = false;
+					p->update_syms_table_time = 0;
+					p->new_java_syms_file = false;
+					p->add_task_list = false;
+				} else {
+					if (!p->add_task_list) {
+						add_java_syms_update_task(p);
+						p->add_task_list = true;
 					}
 				}
-
-				p->unknown_syms_found = false;
-				p->update_syms_table_time = 0;
 			}
 
 			if (p->is_java && (void *)kv.v.cache == NULL) {
 				gen_java_symbols_file(pid);
-				p->new_java_syms_file = true;
 			}
+		} else {
+			/* Ensure that newly launched JAVA processes are detected. */
+			return NULL;
 		}
 
 		if (kv.v.cache)

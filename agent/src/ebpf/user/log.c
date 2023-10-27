@@ -72,37 +72,44 @@ static void error_exit(int code)
 	os_exit(code);
 }
 
-extern void rust_info_wrapper(char *msg);
-
-__attribute__((weak)) void rust_info_wrapper(char *msg)
-{
-	printf("%s\n", msg);
-}
-
 static char *dispatch_message(char *msg, uint16_t len)
 {
-	if (!msg || len < 1)
+	if (!msg)
 		return msg;
 
-	if (msg[len - 1] == '\n')
-		msg[len - 1] = 0;
-	rust_info_wrapper(msg);
+	if (log_to_stdout)
+		os_puts(log_stream, msg, len, true);
+	else
+		os_puts(log_stream, msg, len, false);
+
 	return msg;
 }
 
 void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 		 uint32_t line_number, char *fmt, ...)
 {
-	char msg[MSG_SZ] = {};
+	char msg[MSG_SZ];
 	uint16_t len = 0;
 	uint16_t max = MSG_SZ;
 	va_list va;
+	time_t timep;
+	struct tm *p;
+	time(&timep);
+	p = localtime(&timep);
 
 	if (function_name) {
 		if (how_to_die & ERROR_WARNING) {
-			len += snprintf(msg + len, max - len, "[eBPF] WARNING: func %s()", function_name);
+			len += snprintf(msg + len, max - len,
+					"%d-%02d-%02d %02d:%02d:%02d \033[33;1m[eBPF] ",
+					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+					p->tm_hour, p->tm_min, p->tm_sec);
+			len += snprintf(msg + len, max - len, "WARNING: func %s()", function_name);
 		} else {
-			len += snprintf(msg + len, max - len, "[eBPF] ERROR: func %s()", function_name);
+			len += snprintf(msg + len, max - len,
+					"%d-%02d-%02d %02d:%02d:%02d \033[41;37m[eBPF] ",
+					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+					p->tm_hour, p->tm_min, p->tm_sec);
+			len += snprintf(msg + len, max - len, "ERROR: func %s()", function_name);
 		}
 		if (line_number > 0)
 			len +=
@@ -118,6 +125,7 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 	len += vsnprintf(msg + len, max - len, fmt, va);
 	va_end(va);
 
+	len += snprintf(msg + len, max - len, "\033[0m");
 	dispatch_message(msg, len);
 	if (how_to_die & ERROR_ABORT)
 		debugger();
@@ -128,12 +136,19 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 
 void _ebpf_info(char *fmt, ...)
 {
-	char msg[MSG_SZ] = {};
+	char msg[MSG_SZ];
 	uint16_t len = 0;
 	uint16_t max = MSG_SZ;
+	time_t timep;
+	struct tm *p;
+	time(&timep);
+	p = localtime(&timep);
 	va_list va;
 
-	len += snprintf(msg + len, max - len, "[eBPF] INFO ");
+	len += snprintf(msg + len, max - len,
+			"%d-%02d-%02d %02d:%02d:%02d [eBPF] INFO ",
+			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+			p->tm_hour, p->tm_min, p->tm_sec);
 
 	va_start(va, fmt);
 	len += vsnprintf(msg + len, max - len, fmt, va);
