@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type SecurityGroup struct {
 func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroup) *SecurityGroup {
 	updater := &SecurityGroup{
 		UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *cache.SecurityGroup]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSecurityGroup(),
 			diffBaseData: wholeCache.SecurityGroups,
@@ -58,8 +59,8 @@ func (g *SecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroup)
 		vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				common.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.Lcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.Lcuuid,
 			))
 			return nil, false
 		}

@@ -20,8 +20,8 @@ import (
 	"time"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDataSet) {
@@ -55,12 +55,12 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		AZLcuuid:            dbItem.AZ,
 		SubDomainLcuuid:     dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePod(lcuuid string) {
 	delete(b.Pods, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid))
 }
 
 type Pod struct {
@@ -95,5 +95,5 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.VPCLcuuid = cloudItem.VPCLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, p))
 }

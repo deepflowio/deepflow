@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type RDSInstance struct {
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
 		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRDSInstance(),
 			diffBaseData: wholeCache.RDSInstances,
@@ -50,8 +51,8 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-			common.RESOURCE_TYPE_RDS_INSTANCE_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type Region struct {
@@ -28,7 +28,7 @@ type Region struct {
 func NewRegion() *Region {
 	operater := &Region{
 		OperatorBase[mysql.Region]{
-			resourceTypeName: common.RESOURCE_TYPE_REGION_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

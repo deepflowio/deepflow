@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type VPC struct {
@@ -28,7 +28,7 @@ type VPC struct {
 func NewVPC() *VPC {
 	operater := &VPC{
 		OperatorBase[mysql.VPC]{
-			resourceTypeName: common.RESOURCE_TYPE_VPC_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

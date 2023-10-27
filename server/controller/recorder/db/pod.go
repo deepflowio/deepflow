@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type Pod struct {
@@ -28,7 +28,7 @@ type Pod struct {
 func NewPod() *Pod {
 	operater := &Pod{
 		OperatorBase[mysql.Pod]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

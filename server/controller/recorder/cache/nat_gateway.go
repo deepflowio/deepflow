@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addNATGateway(dbItem *mysql.NATGateway, seq int) {
@@ -32,12 +32,12 @@ func (b *DiffBaseDataSet) addNATGateway(dbItem *mysql.NATGateway, seq int) {
 		FloatingIPs:  dbItem.FloatingIPs,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATGateway(lcuuid string) {
 	delete(b.NATGateways, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
 }
 
 type NATGateway struct {
@@ -51,5 +51,5 @@ func (n *NATGateway) Update(cloudItem *cloudmodel.NATGateway) {
 	n.Name = cloudItem.Name
 	n.FloatingIPs = cloudItem.FloatingIPs
 	n.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, n))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, n))
 }

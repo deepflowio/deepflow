@@ -18,7 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -31,6 +31,7 @@ type Host struct {
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	updater := &Host{
 		UpdaterBase[cloudmodel.Host, mysql.Host, *cache.Host]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewHost(),
 			diffBaseData: wholeCache.Hosts,
@@ -57,7 +58,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 		ExtraInfo:  cloudItem.ExtraInfo,
 		UserName:   "root",
 		UserPasswd: "deepflow",
-		State:      common.HOST_STATE_COMPLETE,
+		State:      ctrlrcommon.HOST_STATE_COMPLETE,
 		AZ:         cloudItem.AZLcuuid,
 		Region:     cloudItem.RegionLcuuid,
 		Domain:     h.cache.DomainLcuuid,

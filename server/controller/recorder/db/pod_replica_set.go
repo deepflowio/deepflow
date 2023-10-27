@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodReplicaSet struct {
@@ -28,7 +28,7 @@ type PodReplicaSet struct {
 func NewPodReplicaSet() *PodReplicaSet {
 	operater := &PodReplicaSet{
 		OperatorBase[mysql.PodReplicaSet]{
-			resourceTypeName: common.RESOURCE_TYPE_POD_REPLICA_SET_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

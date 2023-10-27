@@ -91,7 +91,7 @@ OBJS := user/elf.o \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
 	user/profile/java/df_jattach.o \
-	user/profile/attach.o
+	user/profile/java/gen_syms_file.o
 
 JAVA_TOOL := deepflow-jattach
 JAVA_AGENT_GNU_SO := df_java_agent.so
@@ -178,7 +178,7 @@ tools: $(LIBTRACE)
 
 $(JAVA_TOOL): $(JAVA_AGENT_SO)
 	$(call msg,TOOLS,$@)
-	$(Q)$(CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl
+	$(Q)$(CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 

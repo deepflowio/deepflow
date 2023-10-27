@@ -18,9 +18,9 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
@@ -31,6 +31,7 @@ type LBListener struct {
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
 	updater := &LBListener{
 		UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *cache.LBListener]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLBListener(),
 			diffBaseData: wholeCache.LBListeners,
@@ -50,8 +51,8 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
-			common.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.Lcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}

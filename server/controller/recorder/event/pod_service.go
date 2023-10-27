@@ -18,10 +18,9 @@ package event
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -34,11 +33,11 @@ type PodService struct {
 func NewPodService(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
 	mng := &PodService{
 		EventManagerBase{
-			resourceType: RESOURCE_TYPE_POD_SERVICE_EN,
+			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_POD_SERVICE,
+		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE,
 	}
 	return mng
 }

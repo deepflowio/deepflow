@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type DHCPPort struct {
@@ -28,7 +28,7 @@ type DHCPPort struct {
 func NewDHCPPort() *DHCPPort {
 	operater := &DHCPPort{
 		OperatorBase[mysql.DHCPPort]{
-			resourceTypeName: common.RESOURCE_TYPE_DHCP_PORT_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			softDelete:       true,
 			allocateID:       true,
 		},

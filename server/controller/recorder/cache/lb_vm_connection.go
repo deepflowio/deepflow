@@ -17,8 +17,8 @@
 package cache
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addLBVMConnection(dbItem *mysql.LBVMConnection, seq int) {
@@ -28,12 +28,12 @@ func (b *DiffBaseDataSet) addLBVMConnection(dbItem *mysql.LBVMConnection, seq in
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBVMConnection(lcuuid string) {
 	delete(b.LBVMConnections, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid))
 }
 
 type LBVMConnection struct {

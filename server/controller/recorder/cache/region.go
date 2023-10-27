@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addRegion(dbItem *mysql.Region, seq int) {
@@ -31,12 +31,12 @@ func (b *DiffBaseDataSet) addRegion(dbItem *mysql.Region, seq int) {
 		Name:  dbItem.Name,
 		Label: dbItem.Label,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRegion(lcuuid string) {
 	delete(b.Regions, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_REGION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid))
 }
 
 type Region struct {
@@ -48,5 +48,5 @@ type Region struct {
 func (r *Region) Update(cloudItem *cloudmodel.Region) {
 	r.Name = cloudItem.Name
 	r.Label = cloudItem.Label
-	log.Info(updateDiffBase(RESOURCE_TYPE_REGION_EN, r))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, r))
 }

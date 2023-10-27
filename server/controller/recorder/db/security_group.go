@@ -17,8 +17,8 @@
 package db
 
 import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type SecurityGroup struct {
@@ -28,7 +28,7 @@ type SecurityGroup struct {
 func NewSecurityGroup() *SecurityGroup {
 	operater := &SecurityGroup{
 		OperatorBase[mysql.SecurityGroup]{
-			resourceTypeName: common.RESOURCE_TYPE_SECURITY_GROUP_EN,
+			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			softDelete:       true,
 			allocateID:       false,
 		},

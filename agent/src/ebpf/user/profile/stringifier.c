@@ -56,7 +56,7 @@
 #include "../table.h"
 #include "../bihash_8_8.h"
 #include "../bihash_16_8.h"
-#include "attach.h"
+#include "java/gen_syms_file.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 

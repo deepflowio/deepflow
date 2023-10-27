@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,6 +31,7 @@ type Process struct {
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
 	updater := &Process{
 		UpdaterBase[cloudmodel.Process, mysql.Process, *cache.Process]{
+			resourceType: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewProcess(),
 			diffBaseData: wholeCache.Process,
