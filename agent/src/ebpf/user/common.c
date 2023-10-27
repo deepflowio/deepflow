@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdbool.h>
@@ -1042,7 +1041,7 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 	return fetch_container_id_from_str(buff, id, copy_bytes);
 }
 
-#ifndef AARCH64_MUSL
+#if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg)
 {
 	int ret;
@@ -1072,4 +1071,4 @@ int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg)
 
 	return ETR_OK;
 }
-#endif
+#endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
