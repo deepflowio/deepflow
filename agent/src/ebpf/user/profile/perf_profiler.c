@@ -1343,13 +1343,10 @@ int set_profiler_cpu_aggregation(int flag)
 #include "../tracer.h"
 #include "perf_profiler.h"
 
-/*
- * start continuous profiler
- * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @callback Profile data processing callback interface
- * @returns 0 on success, < 0 on error
- */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq,
+			      int java_syms_space_limit,
+			      int java_syms_update_delay,
+			      tracer_callback_t callback)
 {
 	return (-1);
 }
