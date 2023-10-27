@@ -645,6 +645,7 @@ pub enum TraceType {
     XB3,
     XB3Span,
     Uber,
+    Sw3,
     Sw6,
     Sw8,
     TraceParent,
@@ -657,6 +658,7 @@ pub enum TraceType {
 const TRACE_TYPE_XB3: &str = "x-b3-traceid";
 const TRACE_TYPE_XB3SPAN: &str = "x-b3-spanid";
 const TRACE_TYPE_UBER: &str = "uber-trace-id";
+const TRACE_TYPE_SW3: &str = "sw3";
 const TRACE_TYPE_SW6: &str = "sw6";
 const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
@@ -676,6 +678,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
+            TRACE_TYPE_SW3 => TraceType::Sw3,
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
@@ -706,6 +709,7 @@ impl TraceType {
             TraceType::XB3 => context.to_ascii_lowercase() == TRACE_TYPE_XB3,
             TraceType::XB3Span => context.to_ascii_lowercase() == TRACE_TYPE_XB3SPAN,
             TraceType::Uber => context.to_ascii_lowercase() == TRACE_TYPE_UBER,
+            TraceType::Sw3 => context.to_ascii_lowercase() == TRACE_TYPE_SW3,
             TraceType::Sw6 => context.to_ascii_lowercase() == TRACE_TYPE_SW6,
             TraceType::Sw8 => context.to_ascii_lowercase() == TRACE_TYPE_SW8,
             TraceType::TraceParent => context.to_ascii_lowercase() == TRACE_TYPE_TRACE_PARENT,
@@ -723,6 +727,7 @@ impl TraceType {
             &TraceType::XB3 => TRACE_TYPE_XB3.into(),
             &TraceType::XB3Span => TRACE_TYPE_XB3SPAN.into(),
             &TraceType::Uber => TRACE_TYPE_UBER.into(),
+            &TraceType::Sw3 => TRACE_TYPE_SW3.into(),
             &TraceType::Sw6 => TRACE_TYPE_SW6.into(),
             &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
             &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
@@ -738,6 +743,7 @@ impl TraceType {
             TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
             TraceType::XB3Span => TRACE_TYPE_XB3SPAN.to_string(),
             TraceType::Uber => TRACE_TYPE_UBER.to_string(),
+            TraceType::Sw3 => TRACE_TYPE_SW3.to_string(),
             TraceType::Sw6 => TRACE_TYPE_SW6.to_string(),
             TraceType::Sw8 => TRACE_TYPE_SW8.to_string(),
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.to_string(),

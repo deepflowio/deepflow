@@ -331,6 +331,7 @@ impl DubboLog {
     // 注意 dubbo trace id 解析是区分大小写的
     fn decode_trace_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
+            TraceType::Sw3 => TraceType::Sw3.to_string(),
             TraceType::Sw8 => TraceType::Sw8.to_string(),
             TraceType::Customize(tag) => tag.to_string(),
             _ => return,
@@ -369,6 +370,15 @@ impl DubboLog {
         }
 
         match trace_type {
+            TraceType::Sw3 => {
+                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
+                if info.trace_id.len() > 2 {
+                    let segs: Vec<&str> = info.trace_id.split("|").collect();
+                    if segs.len() > 7 {
+                        info.trace_id = segs[7].to_string();
+                    }
+                }
+            }
             TraceType::Sw8 => {
                 if info.trace_id.len() > 2 {
                     if let Some(index) = info.trace_id[2..].find("-") {
@@ -384,6 +394,7 @@ impl DubboLog {
     fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
             TraceType::Customize(tag) => tag.to_string(),
+            TraceType::Sw3 => TraceType::Sw3.to_string(),
             TraceType::Sw8 => TraceType::Sw8.to_string(),
             _ => return,
         };
@@ -421,6 +432,15 @@ impl DubboLog {
         }
 
         match trace_type {
+            TraceType::Sw3 => {
+                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
+                if info.span_id.len() > 2 {
+                    let segs: Vec<&str> = info.span_id.split("|").collect();
+                    if segs.len() > 3 {
+                        info.span_id = format!("{}-{}", segs[0], segs[1]);
+                    }
+                }
+            }
             TraceType::Sw8 => {
                 // Format:
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
