@@ -2366,6 +2366,7 @@ impl AgentComponents {
             policy_getter,
             synchronizer.ntp_diff(),
             candidate_config.yaml_config.prometheus_extra_config.clone(),
+            candidate_config.log_parser.clone(),
             candidate_config
                 .yaml_config
                 .external_profile_integration_disabled,
