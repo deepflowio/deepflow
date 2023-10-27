@@ -15,8 +15,6 @@
  */
 
 use std::cmp::{max, min};
-#[cfg(target_os = "linux")]
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -32,22 +30,18 @@ use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
     Naming,
 };
-#[cfg(target_os = "linux")]
-use libc::{c_int, setpriority, PRIO_PROCESS};
 use log::{error, info, warn, Level};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
     sched::{sched_setaffinity, CpuSet},
     unistd::Pid,
 };
-#[cfg(target_os = "linux")]
-use regex::Regex;
 use sysinfo::SystemExt;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
@@ -57,7 +51,7 @@ use super::{
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
 use crate::plugin::c_ffi::SoPluginFunc;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::plugin::shared_obj::load_plugin;
 use crate::rpc::Session;
 use crate::{
@@ -68,28 +62,25 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::{
-        environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
-        logger::RemoteLogConfig,
-    },
+    utils::environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::{kubernetes::Poller, ApiWatcher, ProcRegRewrite},
-    utils::environment::{get_ctrl_ip_and_mac, is_tt_pod, is_tt_workload},
+    platform::ProcRegRewrite,
+    utils::environment::{get_ctrl_ip_and_mac, is_tt_workload},
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    platform::{kubernetes::Poller, ApiWatcher},
+    utils::environment::is_tt_pod,
 };
 
 use public::bitmap::Bitmap;
 use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
-};
-#[cfg(target_os = "linux")]
-use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{self, NsFile},
 };
 
 use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
@@ -128,7 +119,7 @@ pub type DebugAccess = Access<DebugConfig>;
 
 pub type SynchronizerAccess = Access<SynchronizerConfig>;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub type EbpfAccess = Access<EbpfConfig>;
 
 pub type MetricServerAccess = Access<MetricServerConfig>;
@@ -258,7 +249,7 @@ impl Default for NpbConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OsProcScanConfig {
     pub os_proc_root: String,
@@ -325,7 +316,7 @@ pub struct DispatcherConfig {
     pub capture_bpf: String,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub af_packet_version: OptTpacketVersion,
     pub tap_mode: TapMode,
     pub region_id: u32,
@@ -578,7 +569,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置
@@ -595,11 +586,11 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
-    pub l7_protocol_ports: HashMap<String, String>,
+    pub l7_protocol_ports: std::collections::HashMap<String, String>,
     pub ebpf: EbpfYamlConfig,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl fmt::Debug for EbpfConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EbpfConfig")
@@ -634,7 +625,7 @@ impl fmt::Debug for EbpfConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl EbpfConfig {
     pub fn l7_log_enabled(&self) -> bool {
         // disabled when metrics collection is turned off
@@ -858,7 +849,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf: EbpfConfig,
     pub trident_type: TridentType,
     pub metric_server: MetricServerConfig,
@@ -952,7 +943,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 af_packet_blocks: conf
                     .yaml_config
                     .get_af_packet_blocks(conf.tap_mode, conf.max_memory),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 af_packet_version: conf.capture_socket_type.into(),
                 tap_mode: conf.tap_mode,
                 region_id: conf.region_id,
@@ -1048,7 +1039,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 os_proc_scan_conf: OsProcScanConfig {
                     os_proc_root: conf.yaml_config.os_proc_root.clone(),
                     os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
@@ -1131,7 +1122,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.analyzer_port,
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: EbpfConfig {
                 collector_enabled: conf.collector_enabled,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
@@ -1156,7 +1147,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
                     // use host mac
-                    if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                    #[cfg(target_os = "linux")]
+                    if let Err(e) =
+                        public::netns::open_named_and_setns(&public::netns::NsFile::Root)
+                    {
                         warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                         warn!("setns error: {}", e);
                         thread::sleep(Duration::from_secs(1));
@@ -1164,7 +1158,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     let (_, ctrl_mac) =
                         get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
-                    if let Err(e) = netns::reset_netns() {
+                    #[cfg(target_os = "linux")]
+                    if let Err(e) = public::netns::reset_netns() {
                         warn!("reset setns error: {}", e);
                         thread::sleep(Duration::from_secs(1));
                         process::exit(-1);
@@ -1200,8 +1195,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 pub struct ConfigHandler {
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
-    pub logger_handle: LoggerHandle,
-    pub remote_log_config: RemoteLogConfig,
+    pub logger_handle: Option<LoggerHandle>,
     // need update
     pub static_config: Config,
     pub candidate_config: ModuleConfig,
@@ -1209,13 +1203,7 @@ pub struct ConfigHandler {
 }
 
 impl ConfigHandler {
-    pub fn new(
-        config: Config,
-        ctrl_ip: IpAddr,
-        ctrl_mac: MacAddr,
-        logger_handle: LoggerHandle,
-        remote_log_config: RemoteLogConfig,
-    ) -> Self {
+    pub fn new(config: Config, ctrl_ip: IpAddr, ctrl_mac: MacAddr) -> Self {
         let candidate_config =
             ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
@@ -1226,9 +1214,12 @@ impl ConfigHandler {
             ctrl_mac,
             candidate_config,
             current_config,
-            logger_handle,
-            remote_log_config,
+            logger_handle: None,
         }
+    }
+
+    pub fn set_logger_handle(&mut self, handle: LoggerHandle) {
+        self.logger_handle.replace(handle);
     }
 
     pub fn collector(&self) -> CollectorAccess {
@@ -1317,7 +1308,7 @@ impl ConfigHandler {
         )
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -1405,7 +1396,7 @@ impl ConfigHandler {
             );
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if yaml_config.process_scheduling_priority
             != new_config.yaml_config.process_scheduling_priority
         {
@@ -1415,10 +1406,10 @@ impl ConfigHandler {
             );
             let pid = process::id();
             unsafe {
-                if setpriority(
-                    PRIO_PROCESS,
+                if libc::setpriority(
+                    libc::PRIO_PROCESS,
                     pid,
-                    new_config.yaml_config.process_scheduling_priority as c_int,
+                    new_config.yaml_config.process_scheduling_priority as libc::c_int,
                 ) != 0
                 {
                     warn!(
@@ -1429,7 +1420,7 @@ impl ConfigHandler {
             }
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
             info!(
                 "CPU Affinity set to {}.",
@@ -1519,14 +1510,14 @@ impl ConfigHandler {
                 );
                 if let Some(c) = components.as_ref() {
                     let old_regex = if candidate_config.dispatcher.extra_netns_regex != "" {
-                        Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
+                        regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
                     } else {
                         None
                     };
 
                     let regex = new_config.dispatcher.extra_netns_regex.as_ref();
                     let regex = if regex != "" {
-                        match Regex::new(regex) {
+                        match regex::Regex::new(regex) {
                             Ok(re) => {
                                 info!("platform monitoring extra netns: /{}/", regex);
                                 Some(re)
@@ -1541,12 +1532,14 @@ impl ConfigHandler {
                         None
                     };
 
-                    let old_netns = old_regex.map(|re| netns::find_ns_files_by_regex(&re));
-                    let new_netns = regex.as_ref().map(|re| netns::find_ns_files_by_regex(&re));
+                    let old_netns = old_regex.map(|re| public::netns::find_ns_files_by_regex(&re));
+                    let new_netns = regex
+                        .as_ref()
+                        .map(|re| public::netns::find_ns_files_by_regex(&re));
                     if old_netns != new_netns {
                         info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
                         thread::sleep(Duration::from_secs(1));
-                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                        process::exit(public::consts::NORMAL_EXIT_WITH_RESTART);
                     }
 
                     c.platform_synchronizer.set_netns_regex(regex.clone());
@@ -1703,54 +1696,60 @@ impl ConfigHandler {
                 } else {
                     info!("Disable rsyslog");
                 }
-                self.remote_log_config
-                    .set_enabled(new_config.log.rsyslog_enabled);
             }
             if candidate_config.log.log_level != new_config.log.log_level {
-                match self
-                    .logger_handle
-                    .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
-                {
-                    Ok(_) => {
-                        candidate_config.log.log_level = new_config.log.log_level;
-                        info!("log level set to {}", new_config.log.log_level);
-                    }
-                    Err(e) => warn!("failed to set log_level: {}", e),
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h
+                        .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
+                    {
+                        Ok(_) => {
+                            candidate_config.log.log_level = new_config.log.log_level;
+                            info!("log level set to {}", new_config.log.log_level);
+                        }
+                        Err(e) => warn!("failed to set log_level: {}", e),
+                    },
+                    None => warn!("logger_handle not set"),
                 }
             }
             if candidate_config.log.host != new_config.log.host {
-                self.remote_log_config
-                    .set_hostname(new_config.log.host.clone());
+                info!(
+                    "remote log hostname {} -> {}",
+                    candidate_config.log.host, new_config.log.host
+                )
             }
             if candidate_config.log.log_threshold != new_config.log.log_threshold {
-                info!("LogThreshold set to {}", new_config.log.log_threshold);
-                self.remote_log_config
-                    .set_threshold(new_config.log.log_threshold);
+                info!(
+                    "remote log threshold {} -> {}",
+                    candidate_config.log.log_threshold, new_config.log.log_threshold
+                )
             }
             if candidate_config.log.log_retention != new_config.log.log_retention {
-                match self.logger_handle.flw_config() {
-                    Err(FlexiLoggerError::NoFileLogger) => {
-                        info!("no file logger, skipped log_retention change")
-                    }
-                    _ => match self.logger_handle.reset_flw(
-                        &FileLogWriter::builder(
-                            FileSpec::try_from(&static_config.log_file).unwrap(),
-                        )
-                        .rotate(
-                            Criterion::Age(Age::Day),
-                            Naming::Timestamps,
-                            Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
-                        )
-                        .create_symlink(&static_config.log_file)
-                        .append(),
-                    ) {
-                        Ok(_) => {
-                            info!("log_retention set to {}", new_config.log.log_retention);
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h.flw_config() {
+                        Err(FlexiLoggerError::NoFileLogger) => {
+                            info!("no file logger, skipped log_retention change")
                         }
-                        Err(e) => {
-                            warn!("failed to set log_retention: {}", e);
-                        }
+                        _ => match h.reset_flw(
+                            &FileLogWriter::builder(
+                                FileSpec::try_from(&static_config.log_file).unwrap(),
+                            )
+                            .rotate(
+                                Criterion::Age(Age::Day),
+                                Naming::Timestamps,
+                                Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
+                            )
+                            .create_symlink(&static_config.log_file)
+                            .append(),
+                        ) {
+                            Ok(_) => {
+                                info!("log_retention set to {}", new_config.log.log_retention);
+                            }
+                            Err(e) => {
+                                warn!("failed to set log_retention: {}", e);
+                            }
+                        },
                     },
+                    None => warn!("logger_handle not set"),
                 }
             }
             if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip
@@ -1759,10 +1758,6 @@ impl ConfigHandler {
                 info!(
                     "Rsyslog client connect to {} {}",
                     &new_config.log.analyzer_ip, new_config.log.analyzer_port
-                );
-                self.remote_log_config.set_remotes(
-                    &vec![new_config.log.analyzer_ip.clone()],
-                    new_config.log.analyzer_port,
                 );
             }
             candidate_config.log = new_config.log;
@@ -2231,7 +2226,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer;
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if candidate_config.ebpf != new_config.ebpf
             && candidate_config.tap_mode != TapMode::Analyzer
         {
@@ -2401,7 +2396,7 @@ impl ModuleConfig {
         let mut wasm = vec![];
         #[cfg(target_os = "windows")]
         let so = vec![];
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut so = vec![];
         rt.block_on(async {
             for i in self.yaml_config.wasm_plugins.iter() {
@@ -2418,7 +2413,7 @@ impl ModuleConfig {
             }
         });
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         rt.block_on(async {
             for i in self.yaml_config.so_plugins.iter() {
                 match session

@@ -22,10 +22,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("timeout")]
     Timeout,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error("afpacket error")]
     AfPacketError(#[from] af_packet::Error),
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error("create raw socket error")]
     CreateRawSocketError(#[from] std::io::Error),
     #[error("libpcap error {0}")]

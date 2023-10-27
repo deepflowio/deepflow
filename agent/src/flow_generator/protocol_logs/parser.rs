@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::mem::swap;
 use std::{
     cmp::min,
@@ -50,7 +50,7 @@ use crate::{
     rpc::get_timestamp,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use public::utils::string::get_string_from_chars;
 use public::{
     queue::{DebugSender, Error, Receiver},
@@ -126,7 +126,7 @@ impl MetaAppProto {
             netns_id_1: 0,
         };
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if meta_packet.signal_source == SignalSource::EBPF {
             let is_src = meta_packet.lookup_key.l2_end_0;
             let process_name = get_string_from_chars(&meta_packet.process_kname);
@@ -168,7 +168,7 @@ impl MetaAppProto {
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
             base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
         } else {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             if meta_packet.signal_source == SignalSource::EBPF {
                 swap(&mut base_info.process_id_0, &mut base_info.process_id_1);
                 swap(

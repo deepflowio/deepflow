@@ -1136,7 +1136,7 @@ impl QuadrupleGenerator {
                             );
                         }
 
-                        #[cfg(target_os = "linux")]
+                        #[cfg(any(target_os = "linux", target_os = "android"))]
                         if let Some(toa) = tagged_flow.get_toa_info() {
                             if self.proc_sync_enable {
                                 if let Err(_) = self.toa_info_output.send(Box::new(toa)) {

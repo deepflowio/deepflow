@@ -41,7 +41,7 @@ use crate::flow_generator::protocol_logs::{
 };
 use crate::flow_generator::{LogMessageType, Result};
 use crate::plugin::wasm::WasmVm;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 
 use public::enums::IpProtocol;
@@ -354,9 +354,9 @@ pub struct ParseParam<'a> {
 
     // plugins
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub so_func: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
@@ -399,9 +399,9 @@ impl ParseParam<'_> {
             l7_perf_cache: cache,
 
             wasm_vm: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin_counter_map: None,
 
             stats_counter: None,
@@ -416,7 +416,7 @@ impl ParseParam<'_> {
                 is_tls: packet.is_tls(),
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 process_kname: String::from_utf8_lossy(&packet.process_kname[..]).to_string(),
                 #[cfg(target_os = "windows")]
                 process_kname: "".into(),
@@ -439,7 +439,7 @@ impl<'a> ParseParam<'a> {
         self.wasm_vm = Some(vm);
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn set_so_func(&mut self, so_func: Rc<Vec<SoPluginFunc>>) {
         self.so_func = Some(so_func);
     }
@@ -447,10 +447,12 @@ impl<'a> ParseParam<'a> {
     pub fn set_counter(
         &mut self,
         stat: Arc<FlowMapCounter>,
-        #[cfg(target_os = "linux")] so_counter: Option<Rc<SoPluginCounterMap>>,
+        #[cfg(any(target_os = "linux", target_os = "android"))] so_counter: Option<
+            Rc<SoPluginCounterMap>,
+        >,
     ) {
         self.stats_counter = Some(stat);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             self.so_plugin_counter_map = so_counter;
         }

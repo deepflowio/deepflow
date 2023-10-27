@@ -178,7 +178,7 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 					case []interface{}:
 						newValue := value.([]interface{})
 						for i := range newValue {
-							indexOK := slices.Contains[int](groupIndexs, i)
+							indexOK := slices.Contains[[]int, int](groupIndexs, i)
 							if indexOK {
 								continue
 							}

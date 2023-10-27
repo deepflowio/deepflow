@@ -46,16 +46,33 @@
 #endif
 #include "libGoReSym.h"
 #include "profile/java/df_jattach.h"
-#include "profile/attach.h"
+#include "profile/java/gen_syms_file.h"
 
 static u64 add_symcache_count;
 static u64 free_symcache_count;
+
+/*
+ * To allow Java to run for an extended period and gather more symbol
+ * information, we delay symbol retrieval when encountering unknown symbols.
+ * The default value is 'JAVA_SYMS_UPDATE_DELAY_DEF'.
+ */
+static volatile u64 java_syms_fetch_delay;	// In seconds.
 
 /*
  * When a process exits, save the symbol cache pids
  * to be deleted.
  */
 static struct symbol_cache_del_pids cache_del_pids;
+
+void set_java_syms_fetch_delay(int delay_secs)
+{
+	java_syms_fetch_delay = delay_secs;
+}
+
+u64 get_java_syms_fetch_delay(void)
+{
+	return java_syms_fetch_delay;
+}
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf)
@@ -490,14 +507,16 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		if (p->is_java) {
 			/* Delete target ns Java files */
 			int pid = (int)kv->k.pid;
-			int target_ns_pid = get_nspid(pid);
-			if (target_ns_pid > 0) {
-				clear_target_ns(pid, target_ns_pid);
+			if (pid > 0) {
+				clean_local_java_symbols_files(pid);
 			}
 		}
 
-		clib_mem_free((void *)p);
-		kv->v.proc_info_p = 0;
+		/* Ensure that all tasks are completed before releasing. */
+		if (AO_SUB_F(&p->use, 1) == 0) {
+			clib_mem_free((void *)p);
+			kv->v.proc_info_p = 0;
+		}
 	}
 }
 
@@ -631,29 +650,6 @@ u64 get_pid_stime(pid_t pid)
 	return 0;
 }
 
-static void java_proc_info_config(struct symbolizer_proc_info *p, int pid)
-{
-	if (strcmp(p->comm, "java") == 0)
-		p->is_java = true;
-	else
-		p->is_java = false;
-
-	if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
-	    PROC_INFO_VERIFY_TIME) {
-		p->verified = true;
-		/*
-		 * Ensure the Java program runs stably for a period
-		 * of time before obtaining the Java address and
-		 * symbol mapping table.
-		 */
-		if (p->is_java)
-			gen_java_symbols_file(pid);
-
-	} else {
-		p->verified = false;
-	}
-}
-
 static struct bcc_symbol_option lazy_opt = {
 	.use_debug_file = false,
 	.check_debug_file_crc = false,
@@ -664,7 +660,10 @@ static struct bcc_symbol_option lazy_opt = {
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 {
 	memset(p, 0, sizeof(*p));
+	p->pid = pid;
+	p->add_task_list = false;
 	p->unknown_syms_found = false;
+	p->new_java_syms_file = false;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -677,6 +676,20 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->comm[sizeof(p->comm) - 1] = '\0';
 	if (p->stime == 0)
 		return ETR_INVAL;
+
+	if (strcmp(p->comm, "java") == 0)
+		p->is_java = true;
+	else
+		p->is_java = false;
+
+	if ((current_sys_time_secs() - (p->stime / 1000ULL)) >=
+	    PROC_INFO_VERIFY_TIME) {
+		p->verified = true;
+	} else {
+		p->verified = false;
+	}
+
+	p->use = 1;
 
 	return ETR_OK;
 }
@@ -717,7 +730,6 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			return;
 		}
 
-		java_proc_info_config(p, pid);
 		kv.v.proc_info_p = pointer_to_uword(p);
 		kv.v.cache = 0;
 		if (symbol_caches_hash_add_del
@@ -732,46 +744,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		u64 curr_time = current_sys_time_secs();
-		if (p->verified) {
-			/*
-			 * If an unknown frame appears during the process of symbolizing
-			 * the address of the Java process, we need to re-obtain the sy-
-			 * mbols table of the Java process after a delay.
-			 */
-			if (p->is_java && p->unknown_syms_found
-			    && p->update_syms_table_time == 0) {
-				p->update_syms_table_time =
-				    curr_time + JAVA_SYMS_TABLE_UPDATE_PERIOD;
-			}
-
-			if (p->update_syms_table_time > 0
-			    && curr_time >= p->update_syms_table_time) {
-				/* Update java symbols table, will be executed during
-				 * the next Java symbolication */
-				gen_java_symbols_file(pid);
-				if (kv.v.cache) {
-					bcc_free_symcache((void *)kv.v.cache,
-							  kv.k.pid);
-					kv.v.cache =
-					    pointer_to_uword(bcc_symcache_new
-							     ((int)kv.k.pid,
-							      &lazy_opt));
-					if (symbol_caches_hash_add_del
-					    (h, (symbol_caches_hash_kv *) & kv,
-					     1 /* is_add */ )) {
-						ebpf_warning
-						    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-						     (int)kv.k.pid);
-					}
-				}
-
-				p->unknown_syms_found = false;
-				p->update_syms_table_time = 0;
-				ebpf_info
-				    ("Update java symbols table, (Pid %d)\n",
-				     (int)kv.k.pid);
-			}
-		} else {
+		if (!p->verified) {
 			if (((curr_time - (p->stime / 1000ULL)) <
 			     PROC_INFO_VERIFY_TIME)) {
 				goto fetch_proc_info;
@@ -806,15 +779,6 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 				p->is_java = true;
 			else
 				p->is_java = false;
-
-			/*
-			 * We obtain the symbol table in the Java program after it has been
-			 * running for a while, rather than during the program's startup p-
-			 * rocess, to avoid situations where the symbol table cannot be re-
-			 * trieved.
-			 */
-			if (p->is_java)
-				gen_java_symbols_file(pid);
 
 			p->verified = true;
 		}
@@ -852,17 +816,78 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 		return k_resolver;
 
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_proc_info *p;
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
-		if (kv.v.cache)
-			return (void *)kv.v.cache;
-
 		if (!new_cache)
 			return NULL;
+
+		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		u64 curr_time = current_sys_time_secs();
+		if (p->verified) {
+			/*
+			 * If an unknown frame appears during the process of symbolizing
+			 * the address of the Java process, we need to re-obtain the sy-
+			 * mbols table of the Java process after a delay.
+			 */
+			if (p->is_java && p->unknown_syms_found
+			    && p->update_syms_table_time == 0) {
+				p->update_syms_table_time =
+				    curr_time + get_java_syms_fetch_delay();
+			}
+
+			if (p->update_syms_table_time > 0
+			    && curr_time >= p->update_syms_table_time) {
+				/* Update java symbols table, will be executed during
+				 * the next Java symbolication */
+
+				/* Has the symbol file for Java been generated ? */
+				if (AO_GET(&p->new_java_syms_file)) {
+					if (kv.v.cache) {
+						bcc_free_symcache((void *)kv.v.
+								  cache,
+								  kv.k.pid);
+						kv.v.cache =
+						    pointer_to_uword
+						    (bcc_symcache_new
+						     ((int)kv.k.pid,
+						      &lazy_opt));
+						if (symbol_caches_hash_add_del
+						    (h,
+						     (symbol_caches_hash_kv *) &
+						     kv, 1 /* is_add */ )) {
+							ebpf_warning
+							    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+							     (int)kv.k.pid);
+						}
+					}
+
+					p->unknown_syms_found = false;
+					p->update_syms_table_time = 0;
+					p->new_java_syms_file = false;
+					p->add_task_list = false;
+				} else {
+					if (!p->add_task_list) {
+						add_java_syms_update_task(p);
+						p->add_task_list = true;
+					}
+				}
+			}
+
+			if (p->is_java && (void *)kv.v.cache == NULL) {
+				gen_java_symbols_file(pid);
+			}
+		} else {
+			/* Ensure that newly launched JAVA processes are detected. */
+			return NULL;
+		}
+
+		if (kv.v.cache)
+			return (void *)kv.v.cache;
 
 		kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
 		if (kv.v.cache > 0)
@@ -891,7 +916,7 @@ int create_and_init_symbolizer_caches(void)
 
 	fddir = opendir("/proc/");
 	if (fddir == NULL) {
-		ebpf_warning("Failed to open %s.\n");
+		ebpf_warning("Failed to open '/proc'\n");
 		return ETR_PROC_FAIL;
 	}
 
@@ -920,7 +945,6 @@ int create_and_init_symbolizer_caches(void)
 				continue;
 			}
 
-			java_proc_info_config(p, pid);
 			sym.v.proc_info_p = pointer_to_uword(p);
 			sym.v.cache = 0;
 			if (symbol_caches_hash_add_del

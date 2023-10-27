@@ -80,6 +80,12 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 				metricsName := fmt.Sprintf("%s__%s__%s", db, TABLE_NAME_SAMPLES, tableName)
 				resp = append(resp, metricsName)
 			}
+		} else if db == DB_NAME_DEEPFLOW_SYSTEM {
+			deepflowSystem, _ := metrics.GetExtMetrics(DB_NAME_DEEPFLOW_SYSTEM, "", where, args.Context)
+			for _, v := range deepflowSystem {
+				metricName := fmt.Sprintf("%s__%s__%s", db, strings.ReplaceAll(v.Table, ".", "_"), strings.TrimPrefix(v.DisplayName, "metrics."))
+				resp = append(resp, metricName)
+			}
 		} else {
 			for _, table := range tables {
 				tableMetrics, _ := metrics.GetMetricsByDBTable(db, table, where, args.Context)

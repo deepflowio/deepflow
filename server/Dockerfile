@@ -2,7 +2,9 @@ FROM alpine:latest as deepflow-server
 
 MAINTAINER songzhen@yunshan.net
 
-RUN apk add tzdata
+RUN apk update && \
+    apk upgrade && \
+    apk add tzdata
 
 COPY ./server.yaml /etc/
 RUN mkdir /etc/mysql

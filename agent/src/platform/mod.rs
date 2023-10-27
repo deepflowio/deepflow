@@ -16,6 +16,7 @@
 
 #[cfg(target_os = "linux")]
 pub mod kubernetes;
+#[cfg(target_os = "linux")]
 mod libvirt_xml_extractor;
 mod platform_synchronizer;
 #[cfg(target_os = "linux")]
@@ -23,17 +24,17 @@ pub mod prometheus;
 
 #[cfg(target_os = "linux")]
 pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
+#[cfg(target_os = "linux")]
 pub use libvirt_xml_extractor::LibvirtXmlExtractor;
 pub use platform_synchronizer::ProcRegRewrite;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use platform_synchronizer::SocketSynchronizer;
 pub use platform_synchronizer::{process_info_enabled, PlatformSynchronizer};
-use public::utils::net::MacAddr;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceEntry {
     pub name: String,
-    pub mac: MacAddr,
+    pub mac: public::utils::net::MacAddr,
     pub domain_uuid: String,
     pub domain_name: String,
 }

@@ -30,7 +30,8 @@
 #include "../types.h"
 #include "../vec.h"
 #include "../tracer.h"
-#include "attach.h"
+#include "../socket.h"
+#include "java/gen_syms_file.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -40,6 +41,7 @@
 #include "stringifier.h"
 #include "../table.h"
 #include <regex.h>
+#include "java/config.h"
 #include "java/df_jattach.h"
 
 #include "../perf_profiler_bpf_common.c"
@@ -63,6 +65,12 @@
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+
+/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
+int g_java_syms_write_bytes_max;
+
+/* Used for handling updates to JAVA symbol files */
+static pthread_t java_syms_update_thread;
 
 extern int major, minor;
 extern char linux_release[128];
@@ -352,14 +360,24 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	else
 		cid = (char *)msg->container_id;
 
-	ebpf_info
-	    ("netns_id %lu container_id %s process_name %s pid %u stime %lu "
-	     "u_stack_id %lu k_statck_id %lu cpu %u count %u comm %s tiemstamp"
-	     " %lu datalen %u data %s\n",
-	     msg->netns_id, cid,
-	     msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
-	     msg->k_stack_id, msg->cpu, msg->count, msg->comm, msg->time_stamp,
-	     msg->data_len, msg->data);
+	/*
+	 * TODO(@jiping)
+	 * We didn't use the 'ebpf_info()' interface here to send data to the
+	 * Rust log. The reason is that after 'ebpf_info()' -> 'rust_info_wrapper()',
+	 * we noticed some instability, and occasional segmentation faults occurred.
+	 * This is something that needs to be resolved in the future. 
+	 */
+	fprintf(stdout,
+		"\n-------------------------------\n"
+		"netns_id %lu container_id %s process_name %s pid %u stime %lu "
+		"u_stack_id %u k_statck_id %u cpu %u count %u comm %s tiemstamp"
+		" %lu datalen %u data %s\n",
+		msg->netns_id, cid,
+		msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
+		msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+		msg->time_stamp, msg->data_len, msg->data);
+
+	fflush(stdout);
 }
 
 static void cpdbg_process(stack_trace_msg_t * msg)
@@ -731,6 +749,11 @@ release_iter:
 	push_and_release_stack_trace_msg(&g_msg_hash, false);
 }
 
+static void java_syms_update_work(void *arg)
+{
+	java_syms_update_main(arg);
+}
+
 static void cp_reader_work(void *arg)
 {
 	thread_index = THREAD_PROFILER_READER_IDX;
@@ -745,9 +768,16 @@ static void cp_reader_work(void *arg)
 
 		/* 
 		 * Waiting for the regular expression to be configured
-		 * and start working. 
+		 * and start working. Ensure the socket tracer is in
+		 * the 'running' state to prevent starting the profiler
+		 * before the socket tracer has completed its attach
+		 * operation. The profiler's processing depends on probe
+		 * interfaces provided by the socket tracer, such as process
+		 * exit events. We want to ensure that everything is ready
+		 * before the profiler performs address translation.
 		 */
-		if (unlikely(!regex_existed)) {
+		if (unlikely(!regex_existed ||
+			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			exec_symbol_cache_update();
 			sleep(1);
 			continue;
@@ -821,12 +851,25 @@ static int create_profiler(struct bpf_tracer *tracer)
 		return ETR_NORESOURCE;
 	}
 
+	/* clear old perf files */
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
+
 	/* syms_cache_hash maps from pid to BCC symbol cache.
 	 * Use of void* is inherited from the BCC library. */
 	create_and_init_symbolizer_caches();
 
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
+
+	ret = create_work_thread("java_update",
+				 &java_syms_update_thread,
+				 (void *)java_syms_update_work,
+				 (void *)tracer);
+
+	if (ret) {
+		goto error;
+	}
 
 	/*
 	 * Start a new thread to execute the data
@@ -836,11 +879,14 @@ static int create_profiler(struct bpf_tracer *tracer)
 					(void *)&cp_reader_work);
 
 	if (ret) {
-		relase_profiler(tracer);
-		return ETR_INVAL;
+		goto error;
 	}
 
 	return ETR_OK;
+
+error:
+	relase_profiler(tracer);
+	return ETR_INVAL;
 }
 
 int stop_continuous_profiler(void)
@@ -1018,10 +1064,19 @@ static struct tracer_sockopts cpdbg_sockopts = {
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * @java_syms_space_limit The maximum space occupied by the Java symbol files
+ *                        in the target POD. 
+ * @java_syms_update_delay To allow Java to run for an extended period and gather
+ *                    more symbol information, we delay symbol retrieval when
+ *                    encountering unknown symbols. The default value is
+ *                    'JAVA_SYMS_UPDATE_DELAY_DEF'.
+ *                    This represents the delay in seconds.
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq, int java_syms_space_limit,
+			      int java_syms_update_delay,
+			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
@@ -1047,6 +1102,21 @@ int start_continuous_profiler(int freq, tracer_callback_t callback)
 			     "r.\n3 Restart the pod.");
 		return (-1);
 	}
+
+	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
+	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
+	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
+		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
+	g_java_syms_write_bytes_max =
+	    java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
+	ebpf_info("set java_syms_write_bytes_max : %d\n",
+		  g_java_syms_write_bytes_max);
+
+	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
+	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
+		java_syms_update_delay = JAVA_SYMS_UPDATE_DELAY_DEF;
+	set_java_syms_fetch_delay(java_syms_update_delay);
+	ebpf_info("set java_syms_update_delay : %lu\n", java_syms_update_delay);
 
 	atomic64_init(&process_lost_count);
 
@@ -1273,13 +1343,10 @@ int set_profiler_cpu_aggregation(int flag)
 #include "../tracer.h"
 #include "perf_profiler.h"
 
-/*
- * start continuous profiler
- * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @callback Profile data processing callback interface
- * @returns 0 on success, < 0 on error
- */
-int start_continuous_profiler(int freq, tracer_callback_t callback)
+int start_continuous_profiler(int freq,
+			      int java_syms_space_limit,
+			      int java_syms_update_delay,
+			      tracer_callback_t callback)
 {
 	return (-1);
 }

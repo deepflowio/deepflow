@@ -262,9 +262,9 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_result", ckdb.String).SetComment("响应结果, DNS解析地址"),
 
 		ckdb.NewColumn("http_proxy_client", ckdb.String).SetComment("HTTP代理客户端"),
-		ckdb.NewColumn("x_request_id_0", ckdb.String).SetComment("XRequestID0"),
-		ckdb.NewColumn("x_request_id_1", ckdb.String).SetComment("XRequestID1"),
-		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
+		ckdb.NewColumn("x_request_id_0", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID0"),
+		ckdb.NewColumn("x_request_id_1", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID1"),
+		ckdb.NewColumn("trace_id", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),

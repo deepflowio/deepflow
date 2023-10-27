@@ -61,7 +61,7 @@ func (s *StatSource) String() string {
 
 var (
 	processName       string
-	processNameJoiner string = "."
+	processNameJoiner string = "_"
 	hostname          string
 	lock              sync.Mutex
 	preHooks          []func()

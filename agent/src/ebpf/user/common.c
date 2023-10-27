@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdbool.h>
 #include <linux/limits.h>	/* ulimit */
@@ -35,6 +36,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/utsname.h>
+#include <pthread.h>
 #include "config.h"
 #include "types.h"
 #include "clib.h"
@@ -42,6 +44,7 @@
 #include "common.h"
 #include "log.h"
 #include "string.h"
+#include "profile/java/config.h"
 
 #define MAXLINE 1024
 
@@ -528,12 +531,11 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	//#1 SMP Debian 4.19.289-2 (2023-08-08)
 	if (strstr(sys_info.version, "Debian")) {
 		int num;
-		if (
-			(sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
-			   major, minor, patch, &num) != 4) && 
-			(sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
-			   major, minor, patch, &num) != 4)
-		)
+		if ((sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
+			    major, minor, patch, &num) != 4) &&
+		    (sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
+			    major, minor, patch, &num) != 4)
+		    )
 			return ETR_INVAL;
 	}
 
@@ -946,7 +948,7 @@ int exec_command(const char *cmd, const char *args)
 {
 	FILE *fp;
 	int rc = 0;
-	char cmd_buf[64];
+	char cmd_buf[PERF_PATH_SZ * 2];
 	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
 	fp = popen(cmd_buf, "r");
 	if (NULL == fp) {
@@ -968,8 +970,6 @@ int exec_command(const char *cmd, const char *args)
 			     cmd_buf, strerror(errno));
 	} else {
 		if (WIFEXITED(rc)) {
-			ebpf_info("'%s' normal termination, exit status %d\n",
-				  cmd_buf, WEXITSTATUS(rc));
 			return WEXITSTATUS(rc);
 		} else if (WIFSIGNALED(rc)) {
 			ebpf_info
@@ -1041,3 +1041,35 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 
 	return fetch_container_id_from_str(buff, id, copy_bytes);
 }
+
+#ifndef AARCH64_MUSL
+int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg)
+{
+	int ret;
+	ret = pthread_create(t, NULL, fn, arg);
+	if (ret) {
+		ebpf_warning("worker name %s is error:%s\n",
+			     name, strerror(errno));
+		return ETR_INVAL;
+	}
+
+	/* set thread name */
+	pthread_setname_np(*t, name);
+
+	/*
+	 * Separating threads is to automatically release
+	 * resources after pthread_exit(), without being
+	 * blocked or stuck.
+	 */
+	ret = pthread_detach(*t);
+	if (ret != 0) {
+		ebpf_warning("Error detaching thread, error:%s\n",
+			     strerror(errno));
+		return ETR_INVAL;
+	} else {
+		ebpf_info("thread %s, detached successful.", name);
+	}
+
+	return ETR_OK;
+}
+#endif

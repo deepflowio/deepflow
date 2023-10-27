@@ -46,7 +46,7 @@ use crate::{
     config::handler::DebugAccess,
     policy::PolicySetter,
     rpc::{Session, StaticConfig, Status},
-    trident::{AgentId, RunningMode},
+    trident::AgentId,
     utils::command::get_hostname,
 };
 use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
@@ -92,7 +92,7 @@ impl Debugger {
         let conf = self.config.clone();
         let override_os_hostname = self.override_os_hostname.clone();
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let thread = thread::Builder::new()
             .name("debugger".to_owned())
             .spawn(move || {
@@ -120,6 +120,7 @@ impl Debugger {
                 let sock_clone = sock.clone();
                 let running_clone = running.clone();
                 let serialize_conf = config::standard();
+                #[cfg(target_os = "linux")]
                 let agent_mode = conf.load().agent_mode;
                 let beacon_port = conf.load().controller_port;
                 thread::Builder::new()
@@ -181,6 +182,7 @@ impl Debugger {
                                 &buf,
                                 &debuggers,
                                 serialize_conf,
+                                #[cfg(target_os = "linux")]
                                 agent_mode,
                             )
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
@@ -249,7 +251,6 @@ impl Debugger {
                 let sock_v6_clone = sock_v6.clone();
                 let running_clone = running.clone();
                 let serialize_conf = config::standard();
-                let agent_mode = conf.load().agent_mode;
                 let beacon_port = conf.load().controller_port;
                 thread::Builder::new()
                     .name("debugger-beacon".to_owned())
@@ -325,7 +326,6 @@ impl Debugger {
                                     &buf_v4,
                                     &debuggers,
                                     serialize_conf,
-                                    agent_mode,
                                 )
                                 .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                             }
@@ -360,7 +360,6 @@ impl Debugger {
                                     &buf_v6,
                                     &debuggers,
                                     serialize_conf,
-                                    agent_mode,
                                 )
                                 .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                             }
@@ -391,8 +390,7 @@ impl Debugger {
         mut payload: &[u8],
         debuggers: &ModuleDebuggers,
         serialize_conf: Configuration,
-        #[cfg(target_os = "linux")] agent_mode: RunningMode,
-        #[cfg(target_os = "windows")] _: RunningMode,
+        #[cfg(target_os = "linux")] agent_mode: crate::trident::RunningMode,
     ) -> Result<()> {
         let m = *payload.first().unwrap();
         let module = Module::try_from(m).unwrap_or_default();
@@ -400,7 +398,7 @@ impl Debugger {
         match module {
             #[cfg(target_os = "linux")]
             Module::Platform => {
-                if matches!(agent_mode, RunningMode::Standalone) {
+                if matches!(agent_mode, crate::trident::RunningMode::Standalone) {
                     let msg = PlatformMessage::Fin;
                     send_to(conn.0, conn.1, msg, serialize_conf)?;
                 }
