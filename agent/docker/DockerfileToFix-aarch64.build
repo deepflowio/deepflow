@@ -37,7 +37,6 @@ RUN yum install gcc gcc-c++ curl unzip devtoolset-8-gcc devtoolset-8-gdb devtool
     rpm -ivh musl-clang-*.rpm --force --nodeps && rm -rf musl-clang-*.rpm && \
     yum clean all
 
-
 # musl static library and header files
 RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl/libbcc_bpf.a --silent -O && \
