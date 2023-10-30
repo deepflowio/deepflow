@@ -273,6 +273,10 @@ impl L7ProtocolParserInterface for TlsLog {
             return false;
         }
 
+        if payload.len() < TlsHeader::HEADER_LEN {
+            return false;
+        }
+
         let tls_header = TlsHeader::new(payload);
         tls_header.is_handshake() && tls_header.is_client_hello()
     }
