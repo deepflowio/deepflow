@@ -193,6 +193,15 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 }
 
 func (e *OtlpExporter) grpcExport(ctx context.Context, i int, req ptraceotlp.ExportRequest) error {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warningf("otlp grpc export error: %s", r)
+			if j, err := req.MarshalJSON(); err == nil {
+				log.Infof("otlp request: %s", string(j))
+			}
+		}
+	}()
+
 	now := time.Now()
 
 	if e.grpcExporters[i] == nil {
