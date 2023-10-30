@@ -870,6 +870,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "kube-derive 0.74.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "l7",
  "libc",
  "log 0.4.18",
  "lru",
@@ -1938,6 +1939,10 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "l7"
+version = "0.1.0"
 
 [[package]]
 name = "lazy_static"

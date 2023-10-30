@@ -1,0 +1,5 @@
+TlsInfo { handshake_protocol: "Client hello", version: "0x301", request_resource: "Client hello", status: Ok, response_result: "", msg_type: Request, rrt: 0 } is_tls: true
+TlsInfo { handshake_protocol: "", version: "", request_resource: "", status: Ok, response_result: "Server hello|Certificate|Server key|Hello done", msg_type: Response, rrt: 6667 } is_tls: false
+TlsInfo { handshake_protocol: "Client key", version: "0x303", request_resource: "Client key|Change Cipher Spec|Encrypted Handshake Message", status: Ok, response_result: "", msg_type: Request, rrt: 0 } is_tls: false
+TlsInfo { handshake_protocol: "", version: "", request_resource: "", status: Ok, response_result: "Change Cipher Spec|Encrypted Handshake Message", msg_type: Response, rrt: 1570 } is_tls: false
+TlsInfo { handshake_protocol: "", version: "0x303", request_resource: "Application Data", status: Ok, response_result: "", msg_type: Request, rrt: 0 } is_tls: false

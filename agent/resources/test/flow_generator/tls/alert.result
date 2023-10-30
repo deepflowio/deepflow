@@ -1,0 +1,1 @@
+TlsInfo { handshake_protocol: "", version: "0x303", request_resource: "Encrypted Alert", status: Ok, response_result: "", msg_type: Request, rrt: 0 } is_tls: false
