@@ -178,7 +178,7 @@ tools: $(LIBTRACE)
 
 $(JAVA_TOOL): $(JAVA_AGENT_SO)
 	$(call msg,TOOLS,$@)
-	$(Q)$(CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 

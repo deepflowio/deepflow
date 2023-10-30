@@ -22,6 +22,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "types.h"
 #include "clib.h"
 #include "log.h"
@@ -278,7 +279,7 @@ int exec_command(const char *cmd, const char *args);
 u64 current_sys_time_secs(void);
 int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
 int fetch_container_id(pid_t pid, char *id, int copy_bytes);
-#ifndef AARCH64_MUSL
+#if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
-#endif /* AARCH64_MUSL */
+#endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
 #endif /* DF_COMMON_H */
