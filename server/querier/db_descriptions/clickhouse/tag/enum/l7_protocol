@@ -9,6 +9,7 @@
 44      , FastCGI         ,
 60      , MySQL           ,
 61      , PostgreSQL      ,
+62      , Oracle          ,
 80      , Redis           ,
 81      , MongoDB         ,
 100     , Kafka           ,
