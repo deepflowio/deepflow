@@ -62,7 +62,6 @@
 
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
-static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *u_sym_prefix = "";
 
@@ -241,6 +240,17 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 		 */
 		char format_str[4096];
 		snprintf(format_str, sizeof(format_str), "[%s]", sym.module);
+
+		/*
+		 * Remove Java symbol file generation operation to prevent Java
+		 * symbol-generated samples in flame graphs because these samples
+		 * are rare and concentrated in the initial phase and can be safely
+		 * ignored.
+		 */
+		if (strstr(format_str, "df_java_agent")) {
+			return NULL;
+		}
+
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
 		if (info_p) {
@@ -323,6 +333,8 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
+		} else {
+			goto failed;
 		}
 	}
 
@@ -479,6 +491,10 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							h, new_cache, info_p);
 	}
 
+	if (k_trace_str == NULL || u_trace_str == NULL) {
+		return NULL;
+	}
+
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	if (v->kernstack >= 0 && v->userstack >= 0) {
 		if (k_trace_str) {
@@ -533,29 +549,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		snprintf(trace_str, len, "%s",
 			 u_trace_str ? u_trace_str : u_err_tag);
 	} else {
-		/* 
-		 * The kernel can indicate the invalidity of a stack ID in two
-		 * different ways:
-		 *
-		 * -EFAULT: Stack trace is unavailable
-		 * For example, if the stack trace is only available in user space
-		 * and the kstack_id is invalid, this error code (-EFAULT) is used.
-		 *
-		 * -EEXIST: Hash bucket collision in the stack trace table
-		 *
-		 * If there is a hash table collision for one or both stack IDs, we
-		 * may reach this branch. However, we should not reach this point when
-		 * both stack IDs are set to "invalid" with the error code -EFAULT.
-		 */
-
-		len += strlen(lost_tag);
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			return NULL;
-		}
-
-		snprintf(trace_str, len, "%s", lost_tag);
+		return NULL;
 	}
 
 	return trace_str;
