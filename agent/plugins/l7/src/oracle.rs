@@ -14,16 +14,24 @@
  * limitations under the License.
  */
 
-mod mongo;
-mod mysql;
-mod oracle;
-mod postgre_convert;
-mod postgresql;
-mod redis;
-mod sql_check;
+#[derive(Default, PartialEq, Debug)]
+pub struct OracleParser {
+    pub sql: String,
+    pub data_id: u8,
+    pub call_id: u8,
 
-pub use mongo::{MongoDBInfo, MongoDBLog};
-pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
-pub use oracle::{OracleInfo, OracleLog};
-pub use postgresql::{PostgreInfo, PostgresqlLog};
-pub use redis::{decode, RedisInfo, RedisLog};
+    // response
+    pub ret_code: u16,
+    pub affected_rows: Option<u32>,
+    pub error_message: String,
+}
+
+impl OracleParser {
+    pub fn check_payload(&mut self, _: &[u8]) -> bool {
+        false
+    }
+
+    pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+        unreachable!();
+    }
+}

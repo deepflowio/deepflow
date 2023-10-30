@@ -159,6 +159,7 @@ const (
 	L7_PROTOCOL_FASTCGI    L7Protocol = 44
 	L7_PROTOCOL_MYSQL      L7Protocol = 60
 	L7_PROTOCOL_POSTGRE    L7Protocol = 61
+	L7_PROTOCOL_ORACLE     L7Protocol = 62
 	L7_PROTOCOL_REDIS      L7Protocol = 80
 	L7_PROTOCOL_MONGODB    L7Protocol = 81
 	L7_PROTOCOL_KAFKA      L7Protocol = 100
@@ -626,6 +627,8 @@ func (p L7Protocol) String() string {
 		formatted = "MySQL"
 	case L7_PROTOCOL_POSTGRE:
 		formatted = "PostgreSQL"
+	case L7_PROTOCOL_ORACLE:
+		formatted = "Oracle"
 	case L7_PROTOCOL_REDIS:
 		formatted = "Redis"
 	case L7_PROTOCOL_MONGODB:

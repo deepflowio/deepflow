@@ -41,8 +41,8 @@ pub use rpc::{
     DubboLog, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
-    decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog,
-    RedisInfo, RedisLog,
+    decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, OracleInfo, OracleLog,
+    PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 pub use tls::{TlsInfo, TlsLog};
 
