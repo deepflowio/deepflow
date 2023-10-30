@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-use std::fmt::Display;
-
 use serde::Serialize;
 
 use super::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
@@ -29,151 +27,9 @@ use crate::{
         meta_packet::EbpfFlags,
     },
     flow_generator::error::{Error, Result},
-    utils::bytes::{read_u16_be, read_u32_be},
 };
+use l7::tls::TlsHeader;
 use public::l7_protocol::L7Protocol;
-
-struct HandshakeHeader {
-    raw: u32,
-}
-
-impl Display for HandshakeHeader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.handshake_type() {
-            Self::HANDSHAKE_TYPE_CLIENT_HELLO => write!(f, "Client hello"),
-            Self::HANDSHAKE_TYPE_SERVER_HELLO => write!(f, "Server hello"),
-            Self::HANDSHAKE_TYPE_NEW_SESSION_TICKET => write!(f, "New session ticket"),
-            Self::HANDSHAKE_TYPE_CERTIFICATE => write!(f, "Certificate"),
-            Self::HANDSHAKE_TYPE_SERVER_KEY => write!(f, "Server key"),
-            Self::HANDSHAKE_TYPE_CERTIFICATE_REQUEST => write!(f, "Certificate request"),
-            Self::HANDSHAKE_TYPE_SERVER_HELLO_DONE => write!(f, "Hello done"),
-            Self::HANDSHAKE_TYPE_CLIENT_KEY => write!(f, "Client key"),
-            _ => write!(f, "Unsupport({})", self.handshake_type()),
-        }
-    }
-}
-
-impl HandshakeHeader {
-    const HEADER_LEN: usize = 4;
-
-    const HANDSHAKE_TYPE_CLIENT_HELLO: u8 = 1;
-    const HANDSHAKE_TYPE_SERVER_HELLO: u8 = 2;
-    const HANDSHAKE_TYPE_NEW_SESSION_TICKET: u8 = 4;
-    const HANDSHAKE_TYPE_CERTIFICATE: u8 = 11;
-    const HANDSHAKE_TYPE_SERVER_KEY: u8 = 12;
-    const HANDSHAKE_TYPE_CERTIFICATE_REQUEST: u8 = 13;
-    const HANDSHAKE_TYPE_SERVER_HELLO_DONE: u8 = 14;
-    const HANDSHAKE_TYPE_CLIENT_KEY: u8 = 16;
-
-    fn new(payload: &[u8]) -> Self {
-        assert!(payload.len() >= Self::HEADER_LEN);
-        Self {
-            raw: read_u32_be(payload),
-        }
-    }
-
-    fn handshake_type(&self) -> u8 {
-        (self.raw >> 24) as u8
-    }
-
-    fn length(&self) -> usize {
-        (self.raw & 0xffffff) as usize
-    }
-
-    fn is_client_hello(&self) -> bool {
-        self.handshake_type() == Self::HANDSHAKE_TYPE_CLIENT_HELLO
-    }
-
-    fn next(&self) -> usize {
-        Self::HEADER_LEN + self.length()
-    }
-}
-
-struct TlsHeader {
-    content_type: u8,
-    version: u16,
-    length: u16,
-    handshake_headers: Vec<HandshakeHeader>,
-    last: bool,
-}
-
-impl Display for TlsHeader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.content_type {
-            Self::CONTENT_TYPE_HANDSHAKE => {
-                write!(
-                    f,
-                    "{}",
-                    self.handshake_headers
-                        .iter()
-                        .map(|h| h.to_string())
-                        .collect::<Vec<String>>()
-                        .join("|")
-                )
-            }
-            Self::CONTENT_TYPE_CHANGE_CIPHER_SPEC => write!(f, "Change cipher spec"),
-            _ => write!(f, "Unsupport content type {}", self.content_type),
-        }
-    }
-}
-
-impl TlsHeader {
-    const HEADER_LEN: usize = 5;
-    const CONTEXT_TYPE_OFFSET: usize = 0;
-    const VERSION_OFFSET: usize = 1;
-    const LENGTH_OFFSET: usize = 3;
-
-    const CONTENT_TYPE_CHANGE_CIPHER_SPEC: u8 = 20;
-    const CONTENT_TYPE_HANDSHAKE: u8 = 22;
-
-    fn new(payload: &[u8]) -> Self {
-        assert!(payload.len() >= Self::HEADER_LEN);
-
-        let mut handshake_headers = vec![];
-        let mut offset = Self::HEADER_LEN;
-        let last = payload[Self::CONTEXT_TYPE_OFFSET] == Self::CONTENT_TYPE_CHANGE_CIPHER_SPEC;
-        let length = read_u16_be(&payload[Self::LENGTH_OFFSET..]) as usize + Self::HEADER_LEN;
-        if payload[Self::CONTEXT_TYPE_OFFSET] == Self::CONTENT_TYPE_HANDSHAKE {
-            while offset + HandshakeHeader::HEADER_LEN <= payload.len().min(length) {
-                let header = HandshakeHeader::new(&payload[offset..]);
-                offset += header.next();
-                handshake_headers.push(header);
-            }
-        }
-
-        Self {
-            content_type: payload[Self::CONTEXT_TYPE_OFFSET],
-            version: read_u16_be(&payload[Self::VERSION_OFFSET..]),
-            length: read_u16_be(&payload[Self::LENGTH_OFFSET..]),
-            handshake_headers,
-            last,
-        }
-    }
-
-    fn is_unsupport_content_type(&self) -> bool {
-        self.content_type != Self::CONTENT_TYPE_HANDSHAKE
-            && self.content_type != Self::CONTENT_TYPE_CHANGE_CIPHER_SPEC
-    }
-
-    fn is_handshake(&self) -> bool {
-        self.content_type == Self::CONTENT_TYPE_HANDSHAKE
-    }
-
-    fn is_client_hello(&self) -> bool {
-        self.handshake_headers
-            .iter()
-            .find(|&h| h.is_client_hello())
-            .is_some()
-    }
-
-    fn is_last(&self) -> bool {
-        self.last
-    }
-
-    fn next(&self) -> usize {
-        Self::HEADER_LEN + self.length as usize
-    }
-}
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct TlsInfo {
@@ -321,7 +177,7 @@ impl TlsLog {
             if header.is_unsupport_content_type() {
                 return Err(Error::TlsLogParseFailed(format!(
                     "Content type unsupport {}",
-                    header.content_type
+                    header.content_type()
                 )));
             }
             offset += header.next();
@@ -334,7 +190,7 @@ impl TlsLog {
         match param.direction {
             PacketDirection::ClientToServer => {
                 if tls_headers.len() > 0 {
-                    info.version = format!("0x{:x}", tls_headers[0].version);
+                    info.version = format!("0x{:x}", tls_headers[0].version());
                     if tls_headers[0].handshake_headers.len() > 0 {
                         info.handshake_protocol = tls_headers[0].handshake_headers[0].to_string();
                     }
@@ -427,7 +283,11 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("tls.pcap", "tls.result")];
+        let files = vec![
+            ("tls.pcap", "tls.result"),
+            ("application.pcap", "application.result"),
+            ("alert.pcap", "alert.result"),
+        ];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();

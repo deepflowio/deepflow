@@ -39,6 +39,7 @@ humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
 ipnetwork = "0.18.0"
+l7 = { path = "plugins/l7" }
 libc = "0.2.103"
 log = "0.4"
 lru = "0.9.0"
