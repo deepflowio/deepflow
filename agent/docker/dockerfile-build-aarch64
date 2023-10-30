@@ -1,5 +1,5 @@
 # TODO : aarch64 env rust-build update
-FROM ghcr.io/deepflowio/rust-build:1.25-arm64 as builder
+FROM ghcr.io/deepflowio/rust-build:1.26-arm64 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 ARG GITHUB_REF_NAME
