@@ -222,16 +222,6 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             },
             ext_info: Some(ExtendedInfo {
                 request_id: Some(f.correlation_id),
-                x_request_id_0: if f.msg_type == LogMessageType::Request {
-                    Some(f.correlation_id.to_string())
-                } else {
-                    None
-                },
-                x_request_id_1: if f.msg_type == LogMessageType::Response {
-                    Some(f.correlation_id.to_string())
-                } else {
-                    None
-                },
                 ..Default::default()
             }),
             trace_info: Some(TraceInfo {
@@ -394,6 +384,38 @@ impl KafkaLog {
         return invalid;
     }
 
+    // traceparent: 00-TRACEID-SPANID-01
+    fn decode_traceparent_trace_id(payload: &str, info: &mut KafkaInfo) {
+        let tag = TraceType::TraceParent.to_string();
+        let mut start = 0;
+        let mut trace_id = "";
+        while start < payload.len() {
+            if !payload.is_char_boundary(start) {
+                break;
+            }
+            let index = payload[start..].find(tag.as_str());
+            if index.is_none() {
+                break;
+            }
+            let index = index.unwrap();
+
+            let start_index = payload[start + index..].find("00-");
+            if let Some(current_index) = start_index {
+                let trace_id_index = start + index + current_index + 3;
+                let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
+                trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
+                break;
+            }
+            start += index + tag.len();
+        }
+
+        if trace_id.len() > 0 {
+            if let Some(end_index) = trace_id.find("-") {
+                info.trace_id = decode_base64_to_string(&trace_id[..end_index]);
+            }
+        }
+    }
+
     // Example: 'sw8  1-{trace-id}-{other}'
     fn decode_sw8_trace_id(payload: &str, info: &mut KafkaInfo) {
         let tag = TraceType::Sw8.to_string();
@@ -467,6 +489,7 @@ impl KafkaLog {
         // sw8
         let payload = String::from_utf8_lossy(&payload[14..14 + client_id_len]);
         Self::decode_sw8_trace_id(&payload, info);
+        Self::decode_traceparent_trace_id(&payload, info);
         Ok(())
     }
 
@@ -683,15 +706,22 @@ mod tests {
 
     #[test]
     fn trace_id() {
-        let payload = "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf".as_bytes();
+        let payload =
+            "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf traceparent: 00-123456789-01".as_bytes();
         let payload = String::from_utf8_lossy(payload);
 
         let mut info = KafkaInfo::default();
 
         KafkaLog::decode_sw8_trace_id(&payload, &mut info);
-
         assert_eq!(
             info.trace_id, "abcdefghi",
+            "parse trace id {} unexcepted",
+            info.trace_id
+        );
+
+        KafkaLog::decode_traceparent_trace_id(&payload, &mut info);
+        assert_eq!(
+            info.trace_id, "123456789",
             "parse trace id {} unexcepted",
             info.trace_id
         );
