@@ -278,7 +278,7 @@ vtap_group_id: g-xxxxxx
 #npb_socket_type: RAW_UDP
 
 ## Inner Additional Header
-## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header)
+## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header), 2 (QinQ)
 ## Note: Whether to add an extra 802.1Q header to NPB traffic, when this value is
 ##   set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
 ##   the value is the lower 12 bits of TunnelID in the VXLAN header.
