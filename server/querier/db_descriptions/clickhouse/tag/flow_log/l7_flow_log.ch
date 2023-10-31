@@ -61,6 +61,7 @@ resp_tcp_seq              , 响应 TCP Seq 号          ,
 
 l7_protocol               , 应用协议                 , 
 l7_protocol_str           , 应用协议                 , 字符串形式。
+is_tls                    , TLS                      ,
 version                   , 协议版本                 ,
 type                      , 日志类型                 ,
 request_type              , 请求类型                 ,

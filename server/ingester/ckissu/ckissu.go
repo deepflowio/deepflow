@@ -957,6 +957,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		ColumnNames: []string{"syscall_coroutine_0", "syscall_coroutine_1"},
 		ColumnType:  ckdb.UInt64,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"is_tls"},
+		ColumnType:  ckdb.UInt8,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {

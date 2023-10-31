@@ -1,6 +1,5 @@
 # Value , DisplayName     , Description
 0       , N/A             ,
-1       , Others          ,
 20      , HTTP            ,
 21      , HTTP2           ,
 40      , Dubbo           ,
