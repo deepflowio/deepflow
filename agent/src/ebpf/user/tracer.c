@@ -52,6 +52,8 @@ struct kprobe_port_bitmap bypass_port_bitmap;
 
 uint64_t adapt_kern_uid;	// Indicates the identifier of the adaptation kernel
 
+uint32_t attach_failed_count; // attach failure statistics
+
 /*
  * tracers
  */
@@ -697,6 +699,7 @@ static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
 	if (ret != 0) {
 		ebpf_warning
 		    ("program__attach_kprobe failed, ev_name:%s.\n", ev_name);
+		__sync_fetch_and_add(&attach_failed_count, 1);
 	}
 
 	return link;
@@ -812,6 +815,7 @@ static int tracepoint_attach(struct tracepoint *tp)
 	if (bl == NULL) {
 		ebpf_warning("program__attach_tracepoint() failed, name:%s.\n",
 			     tp->name);
+		__sync_fetch_and_add(&attach_failed_count, 1);
 		return ETR_INVAL;
 	}
 

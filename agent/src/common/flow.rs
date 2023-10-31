@@ -27,7 +27,7 @@ use std::{
 use log::{error, warn};
 use serde::{Serialize, Serializer};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
 use super::{
     decapsulate::TunnelType,
@@ -493,9 +493,7 @@ impl FlowPerfStats {
             self.l4_protocol = other.l4_protocol;
         }
 
-        if self.l7_protocol == L7Protocol::Unknown
-            || (self.l7_protocol == L7Protocol::Other && other.l7_protocol != L7Protocol::Unknown)
-        {
+        if self.l7_protocol == L7Protocol::Unknown && other.l7_protocol != L7Protocol::Unknown {
             self.l7_protocol = other.l7_protocol;
         }
 
@@ -874,7 +872,7 @@ impl Display for PacketDirection {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
         match msg_type {

@@ -24,18 +24,14 @@ pub const DEFAULT_DNS_PORT: u16 = 53;
 pub enum L7Protocol {
     #[num_enum(default)]
     Unknown = 0,
-    Other = 1,
 
     // HTTP
     Http1 = 20,
     Http2 = 21,
-    Http1TLS = 22,
-    Http2TLS = 23,
 
     // RPC
     Dubbo = 40,
     Grpc = 41,
-    ProtobufRPC = 42,
     SofaRPC = 43,
 
     FastCGI = 44,
@@ -54,22 +50,21 @@ pub enum L7Protocol {
 
     // INFRA
     DNS = 120,
+    Tls = 121,
 
     Custom = 127,
 
     Max = 255,
 }
 
-// Translate the string value of l7_protocol into a L7Protocol enumeration value
+// Translate the string value of l7_protocol into a L7Protocol enumeration value used by OTEL.
 impl From<String> for L7Protocol {
     fn from(l7_protocol_str: String) -> Self {
         let l7_protocol_str = l7_protocol_str.to_lowercase();
         match l7_protocol_str.as_str() {
-            "http" => Self::Http1,
-            "https" => Self::Http1TLS,
+            "http" | "https" => Self::Http1,
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
-            "protobufrpc" => Self::ProtobufRPC,
             "fastcgi" => Self::FastCGI,
             "custom" => Self::Custom,
             "sofarpc" => Self::SofaRPC,
@@ -80,16 +75,9 @@ impl From<String> for L7Protocol {
             "kafka" => Self::Kafka,
             "mqtt" => Self::MQTT,
             "dns" => Self::DNS,
-            _ => Self::Other,
+            _ => Self::Unknown,
         }
     }
-}
-
-// the actually rpc protocol when l7 protocol is ProtobufRPC
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
-#[repr(u64)]
-pub enum ProtobufRpcProtocol {
-    Krpc = 1,
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Hash, Eq)]
@@ -101,7 +89,6 @@ pub enum CustomProtocol {
 #[derive(Clone, Debug, PartialEq)]
 pub enum L7ProtocolEnum {
     L7Protocol(L7Protocol),
-    ProtobufRpc(ProtobufRpcProtocol),
     Custom(CustomProtocol),
 }
 
@@ -115,7 +102,6 @@ impl L7ProtocolEnum {
     pub fn get_l7_protocol(&self) -> L7Protocol {
         match self {
             L7ProtocolEnum::L7Protocol(p) => *p,
-            L7ProtocolEnum::ProtobufRpc(_) => L7Protocol::ProtobufRPC,
             L7ProtocolEnum::Custom(_) => L7Protocol::Custom,
         }
     }

@@ -31,6 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
+const vTapPortNameLength = 256
+
 type ChVTapPort struct {
 	UpdaterBase[mysql.ChVTapPort, VtapPortKey]
 }
@@ -147,6 +149,9 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					log.Debugf("duplicate name: %s (id: %d)", data.TapName, data.ID)
 				}
 			}
+			if len(vTapPort.Name) > vTapPortNameLength {
+				vTapPort.Name = vTapPort.Name[:vTapPortNameLength]
+			}
 			if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.DeviceID != 0 && data.DeviceType != 0 {
 				log.Debugf("device id: %d, device type: %d ", vTapPort.DeviceID, vTapPort.DeviceType)
 				vTapPort.DeviceID = data.DeviceID
@@ -195,6 +200,9 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 						log.Debugf("duplicate name: %s (id: %d)", data.TapName, data.ID)
 					}
 				}
+				if len(vTapPort.Name) > vTapPortNameLength {
+					vTapPort.Name = vTapPort.Name[:vTapPortNameLength]
+				}
 				if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.DeviceID != 0 && data.DeviceType != 0 {
 					log.Debugf("device id: %d, device type: %d ", vTapPort.DeviceID, vTapPort.DeviceType)
 					vTapPort.DeviceID = data.DeviceID
@@ -240,6 +248,9 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				}
 			} else if !common.Contains(nameSlice, "lo") {
 				vTapPort.Name = strings.Join([]string{"lo", vTapPort.Name}, ", ")
+			}
+			if len(vTapPort.Name) > vTapPortNameLength {
+				vTapPort.Name = vTapPort.Name[:vTapPortNameLength]
 			}
 			if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && deviceInfo.DeviceID != 0 && deviceInfo.DeviceType != 0 {
 				log.Debugf("device id: %d, device type: %d ", vTapPort.DeviceID, vTapPort.DeviceType)

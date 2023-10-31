@@ -592,10 +592,25 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 
 		// merge and serialize all tags as map key
 		var deepflowNativeTagString, promTagJson string
+		var filterTagMap map[string]string
 		// merge prometheus tags
 		if tagIndex > -1 {
 			promTagJson = values[tagIndex].(string)
-			deepflowNativeTagString = promTagJson
+			tagMap := make(map[string]string)
+			json.Unmarshal([]byte(promTagJson), &tagMap)
+			filterTagMap = make(map[string]string, len(tagMap))
+			for k, v := range tagMap {
+				if k == "" || v == "" {
+					continue
+				}
+				// ignore replica labels if passed
+				if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(k, config.Cfg.Prometheus.ThanosReplicaLabels) {
+					continue
+				}
+				filterTagMap[k] = v
+			}
+			promFilterTagJson, _ := json.Marshal(filterTagMap)
+			deepflowNativeTagString = string(promFilterTagJson)
 		}
 
 		// merge deepflow autotagging tags
@@ -622,14 +637,9 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 
 			// tag label pair
 			var pairs []prompb.Label
-			if tagIndex > -1 {
-				tagMap := make(map[string]string)
-				json.Unmarshal([]byte(promTagJson), &tagMap)
-				pairs = make([]prompb.Label, 0, 1+len(tagMap)+len(allDeepFlowNativeTags))
-				for k, v := range tagMap {
-					if k == "" || v == "" {
-						continue
-					}
+			if tagIndex > -1 && filterTagMap != nil {
+				pairs = make([]prompb.Label, 0, 1+len(filterTagMap)+len(allDeepFlowNativeTags))
+				for k, v := range filterTagMap {
 					if prefix == prefixTag {
 						// prometheus tag for deepflow metrics
 						pairs = append(pairs, prompb.Label{

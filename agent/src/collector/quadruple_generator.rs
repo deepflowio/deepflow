@@ -1020,7 +1020,7 @@ impl QuadrupleGenerator {
         };
         match (stats.l7_protocol, tagged_flow.flow.signal_source) {
             (
-                L7Protocol::Unknown | L7Protocol::Other,
+                L7Protocol::Unknown,
                 SignalSource::Packet | SignalSource::EBPF | SignalSource::XFlow,
             ) => {}
             (_, _) => {
@@ -1081,7 +1081,7 @@ impl QuadrupleGenerator {
                 .flow_perf_stats
                 .as_ref()
                 .map(|s| s.l7_protocol)
-                .unwrap_or(L7Protocol::Other)) as u8;
+                .unwrap_or(L7Protocol::Unknown)) as u8;
         }
     }
 
@@ -1136,7 +1136,7 @@ impl QuadrupleGenerator {
                             );
                         }
 
-                        #[cfg(target_os = "linux")]
+                        #[cfg(any(target_os = "linux", target_os = "android"))]
                         if let Some(toa) = tagged_flow.get_toa_info() {
                             if self.proc_sync_enable {
                                 if let Err(_) = self.toa_info_output.send(Box::new(toa)) {

@@ -288,7 +288,7 @@ impl NpbBuilder {
             self.mtu,
             self.pseudo_tunnel_header.clone(),
             underlay_vlan_header_size,
-            self.overlay_vlan_mode != VlanMode::None,
+            self.overlay_vlan_mode,
             self.bps_limit.clone(),
             counter,
             self.sender.clone(),

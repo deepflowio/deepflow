@@ -26,19 +26,18 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
-use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
 use crate::plugin::CustomInfo;
 use crate::{
     common::{
         ebpf::EbpfType,
         enums::IpProtocol,
-        flow::L7Protocol,
         flow::PacketDirection,
+        flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
-    config::handler::{L7LogDynamicConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     utils::bytes::{read_u32_be, read_u32_le},
@@ -102,8 +101,8 @@ pub struct HttpInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
+    endpoint: Option<String>,
     // set by wasm plugin
-    custom_endpoint: Option<String>,
     custom_result: Option<String>,
     custom_exception: Option<String>,
 
@@ -127,7 +126,7 @@ impl HttpInfo {
         }
 
         if !custom.req.endpoint.is_empty() {
-            self.custom_endpoint = Some(custom.req.endpoint)
+            self.endpoint = Some(custom.req.endpoint)
         }
 
         //req write
@@ -176,7 +175,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: self.get_l7_protocol_with_tls(),
+            proto: self.proto,
             msg_type: self.msg_type,
             rrt: self.rrt,
         })
@@ -210,7 +209,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
                 Some(self.path.clone())
             }
         } else {
-            None
+            self.endpoint.clone()
         }
     }
 }
@@ -236,6 +235,9 @@ impl HttpInfo {
                 }
                 if self.referer.is_some() {
                     self.referer = other.referer;
+                }
+                if self.endpoint.is_none() {
+                    self.endpoint = other.endpoint;
                 }
                 // 下面用于判断是否结束
                 // ================
@@ -305,28 +307,6 @@ impl HttpInfo {
         (self.is_req_end, self.is_resp_end)
     }
 
-    pub fn get_l7_protocol_with_tls(&self) -> L7Protocol {
-        match self.proto {
-            L7Protocol::Http1 => {
-                if self.is_tls {
-                    L7Protocol::Http1TLS
-                } else {
-                    L7Protocol::Http1
-                }
-            }
-            L7Protocol::Http2 => {
-                if self.is_tls {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
-            }
-
-            L7Protocol::Grpc => L7Protocol::Grpc,
-            _ => unreachable!(),
-        }
-    }
-
     fn is_grpc(&self) -> bool {
         self.proto == L7Protocol::Grpc
     }
@@ -378,8 +358,13 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.method,
                 f.path.clone(),
                 f.host,
-                f.custom_endpoint.unwrap_or_default(),
+                f.endpoint.unwrap_or_default(),
             )
+        };
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
         };
 
         L7ProtocolSendLog {
@@ -420,6 +405,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 },
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         }
     }
@@ -495,6 +481,12 @@ impl L7ProtocolParserInterface for HttpLog {
                 EbpfType::GoHttp2Uprobe => {
                     self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
                     if param.parse_log {
+                        if self.proto == L7Protocol::Http2
+                            && !config.http_endpoint_disabled
+                            && info.path.len() > 0
+                        {
+                            info.endpoint = Some(handle_endpoint(config, &info.path));
+                        }
                         return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
                     } else {
                         return Ok(L7ParseResult::None);
@@ -504,6 +496,14 @@ impl L7ProtocolParserInterface for HttpLog {
             },
             _ => unreachable!(),
         }
+        match self.proto {
+            L7Protocol::Http1 | L7Protocol::Http2 => {
+                if !config.http_endpoint_disabled && info.path.len() > 0 {
+                    info.endpoint = Some(handle_endpoint(config, &info.path));
+                }
+            }
+            _ => {}
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
         } else {
@@ -512,24 +512,7 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        match self.proto {
-            L7Protocol::Http1 => {
-                if self.is_tls {
-                    L7Protocol::Http1TLS
-                } else {
-                    L7Protocol::Http1
-                }
-            }
-            L7Protocol::Http2 => {
-                if self.is_tls {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
-            }
-            L7Protocol::Grpc => L7Protocol::Grpc,
-            _ => unreachable!(),
-        }
+        self.proto
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -1019,6 +1002,24 @@ impl HttpLog {
         None
     }
 
+    // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
+    // sw3的value全部使用'｜'分隔，TRACEID后为SAMPLE字段取值范围仅有0或1,可能不存在
+    // 提取`TRACEID`展示为HTTP日志中的`TraceID`字段
+    // 提取`SEGMENTID-SPANID`展示为HTTP日志中的`SpanID`字段
+    fn decode_skywalking3_id(value: &str, id_type: u8) -> Option<String> {
+        let segs: Vec<&str> = value.split("|").collect();
+        if segs.len() > 7 {
+            if id_type == Self::TRACE_ID {
+                return Some(segs[7].to_string());
+            }
+            if id_type == Self::SPAN_ID {
+                return Some(format!("{}-{}", segs[0], segs[1]));
+            }
+        }
+
+        None
+    }
+
     // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
     // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
     // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
@@ -1069,6 +1070,7 @@ impl HttpLog {
                 Some(payload.to_owned())
             }
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
+            TraceType::Sw3 => Self::decode_skywalking3_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
             TraceType::NewRpcTraceContext => {
@@ -1304,11 +1306,28 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
     V1HeaderIterator(payload)
 }
 
+pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
+    let keep_segments = config.http_endpoint_trie.find_matching_rule(path);
+    let output = path.split('?').next().unwrap();
+    let cleaned_output = output
+        .split('/')
+        .filter(|&s| !s.is_empty() && s != ".")
+        .collect::<Vec<&str>>();
+    format!(
+        "/{}",
+        cleaned_output[..keep_segments.min(cleaned_output.len())].join("/")
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
-    use crate::common::MetaPacket;
-    use crate::config::handler::LogParserConfig;
+    use crate::common::{
+        l7_protocol_log::{EbpfParam, L7PerfCache},
+        MetaPacket,
+    };
+    use crate::config::{
+        handler::LogParserConfig, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
+    };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
 
@@ -1464,9 +1483,9 @@ mod tests {
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
             wasm_vm: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin_counter_map: None,
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
@@ -1656,5 +1675,81 @@ mod tests {
             }
         }
         http.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn test_handle_endpoint() {
+        let mut config = LogParserConfig::default();
+        let path = String::from("");
+        let expected_output = "/"; // take "/" for an empty string
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123");
+        let expected_output = "/api/v1"; // the default value is 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1"; // without parameters
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("///././/api/v1//.//./users/123?query=456");
+        let expected_output = "/api/v1"; // appear continuous "/" or appear "."
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "/api".to_string(),
+                keep_segments: 1,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api"; // prefixes match, take 1 segment
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/app/v1/users/123?query=456");
+        let expected_output = "/app/v1"; // prefixes do not match, default is 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![
+                MatchRule {
+                    prefix: "/api".to_string(),
+                    keep_segments: 1,
+                },
+                MatchRule {
+                    prefix: "/api/v1/users".to_string(),
+                    keep_segments: 4,
+                },
+            ],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users/123"; // longest prefix match: /api/v1/users, take 4 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users"; // the longest prefix matches: /api/v1/users, but there are only 3 segments in path
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("/api/v1/123?query=456");
+        let expected_output = "/api"; // longest prefix match: /api, take 1 segment
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "".to_string(),
+                keep_segments: 3,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1/users"; // the default value is changed to 3 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
+            disabled: false,
+            match_rules: vec![MatchRule {
+                prefix: "/api/v1".to_string(),
+                keep_segments: 0,
+            }],
+        });
+        config.http_endpoint_trie = trie;
+        let path = String::from("/api/v1/users/123?query=456");
+        let expected_output = "/api/v1"; // prefixes match, but the keep_segments is 0, use the default value 2 segments
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
     }
 }

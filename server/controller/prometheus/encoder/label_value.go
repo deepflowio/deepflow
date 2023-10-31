@@ -31,11 +31,10 @@ type labelValue struct {
 	strToID      sync.Map
 }
 
-func newLabelValue(max int) *labelValue {
-	lv := &labelValue{
+func newLabelValue() *labelValue {
+	return &labelValue{
 		resourceType: "label_value",
 	}
-	return lv
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {

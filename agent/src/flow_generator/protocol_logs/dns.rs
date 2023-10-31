@@ -24,6 +24,7 @@ use crate::{
         enums::IpProtocol,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     flow_generator::error::{Error, Result},
@@ -120,6 +121,11 @@ impl DnsInfo {
 impl From<DnsInfo> for L7ProtocolSendLog {
     fn from(f: DnsInfo) -> Self {
         let req_type = String::from(f.get_domain_str());
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         let log = L7ProtocolSendLog {
             req: L7Request {
                 req_type,
@@ -136,6 +142,7 @@ impl From<DnsInfo> for L7ProtocolSendLog {
                 request_id: Some(f.trans_id as u32),
                 ..Default::default()
             }),
+            flags,
             ..Default::default()
         };
 
@@ -167,6 +174,7 @@ impl L7ProtocolParserInterface for DnsLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        info.is_tls = param.is_tls();
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::DnsInfo(info)))
         } else {

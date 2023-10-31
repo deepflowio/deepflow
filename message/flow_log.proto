@@ -214,6 +214,12 @@ message AppProtoLogsData {
 
     uint32 row_effect = 16;
     uint32 direction_score = 17;
+    // Flags Bimmap:
+    // 32                                  1     0
+    // +-----------------------------------+-----+
+    // | Reserve                           | TLS |
+    // +-----------------------------------+-----+
+    uint32 flags = 18;
 }
 
 message AppProtoLogsBaseInfo {

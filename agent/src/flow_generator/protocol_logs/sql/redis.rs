@@ -27,6 +27,7 @@ use crate::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        meta_packet::EbpfFlags,
     },
     flow_generator::{
         error::{Error, Result},
@@ -140,6 +141,11 @@ impl fmt::Display for RedisInfo {
 
 impl From<RedisInfo> for L7ProtocolSendLog {
     fn from(f: RedisInfo) -> Self {
+        let flags = if f.is_tls {
+            EbpfFlags::TLS.bits()
+        } else {
+            EbpfFlags::NONE.bits()
+        };
         let log = L7ProtocolSendLog {
             req: L7Request {
                 req_type: String::from_utf8_lossy(f.request_type.as_slice()).to_string(),
@@ -151,6 +157,7 @@ impl From<RedisInfo> for L7ProtocolSendLog {
                 exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
                 ..Default::default()
             },
+            flags,
             ..Default::default()
         };
         return log;

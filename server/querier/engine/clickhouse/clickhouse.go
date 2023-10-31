@@ -710,6 +710,8 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// 生成where的statement
 	whereStmt := Where{time: e.Model.Time}
 	// 解析ast树并生成view.Node结构
+	// Time-first parsing
+	e.parseTimeWhere(node.Expr, &whereStmt)
 	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
 	expr, err = e.TransPrometheusTargetIDFilter(expr)
 	filter := view.Filters{Expr: expr}
@@ -744,6 +746,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
+			} else if e.DB == "deepflow_system" {
+				// deepflow_system 只有 deepflow_system 表，使用 virtual_table_name 做过滤区分
+				table = "deepflow_system"
 			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
 				whereStmt := Where{}
 				metricIDFilter, err := GetMetricIDFilter(e.DB, e.Table)
@@ -1301,6 +1306,58 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 
 	}
 	return nil, errors.New(fmt.Sprintf("parse where error: %s(%T)", sqlparser.String(node), node))
+}
+
+func (e *CHEngine) parseTimeWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
+	switch node := node.(type) {
+	case *sqlparser.AndExpr:
+		left, err := e.parseTimeWhere(node.Left, w)
+		if err != nil {
+			return left, err
+		}
+		right, err := e.parseTimeWhere(node.Right, w)
+		if err != nil {
+			return right, err
+		}
+		op := view.Operator{Type: view.AND}
+		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
+	case *sqlparser.OrExpr:
+		left, err := e.parseTimeWhere(node.Left, w)
+		if err != nil {
+			return left, err
+		}
+		right, err := e.parseTimeWhere(node.Right, w)
+		if err != nil {
+			return right, err
+		}
+		op := view.Operator{Type: view.OR}
+		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
+	case *sqlparser.NotExpr:
+		expr, err := e.parseTimeWhere(node.Expr, w)
+		if err != nil {
+			return expr, err
+		}
+		op := view.Operator{Type: view.NOT}
+		return &view.UnaryExpr{Op: &op, Expr: expr}, nil
+	case *sqlparser.ComparisonExpr:
+		var comparExpr sqlparser.Expr
+		switch expr := node.Left.(type) {
+		case *sqlparser.ParenExpr: // 括号
+			comparExpr = expr.Expr
+		default:
+			comparExpr = expr
+		}
+		switch comparExpr.(type) {
+		case *sqlparser.ColName, *sqlparser.SQLVal:
+			whereTag := chCommon.ParseAlias(node.Left)
+			if whereTag == "time" {
+				whereValue := sqlparser.String(node.Right)
+				stmt := GetWhere(whereTag, whereValue)
+				return stmt.Trans(node, w, e)
+			}
+		}
+	}
+	return nil, nil
 }
 
 // 翻译单元,翻译结果写入view.Model

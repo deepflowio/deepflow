@@ -14,26 +14,18 @@
  * limitations under the License.
  */
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <dlfcn.h>
+#ifndef GEN_SYMS_FILE_H
+#define GEN_SYMS_FILE_H
 
-#include "../common.h"
-#include "../log.h"
-#include "java/df_jattach.h"
-#include "attach.h"
+#define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
 
-void gen_java_symbols_file(int pid)
-{
-	int target_ns_pid = get_nspid(pid);
-	if (target_ns_pid < 0) {
-		return;
-	}
+struct java_syms_update_task {
+	struct list_head list;
+	struct symbolizer_proc_info *p;
+};
 
-	char args[32];
-	snprintf(args, sizeof(args), "%d", pid);
-	exec_command(DF_JAVA_ATTACH_CMD, args);
-
-	clear_target_ns_so(pid, target_ns_pid);
-}
+void gen_java_symbols_file(int pid);
+void clean_local_java_symbols_files(int pid);
+void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
+void java_syms_update_main(void *arg);
+#endif /* GEN_SYMS_FILE_H */

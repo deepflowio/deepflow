@@ -278,7 +278,7 @@ vtap_group_id: g-xxxxxx
 #npb_socket_type: RAW_UDP
 
 ## Inner Additional Header
-## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header)
+## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header), 2 (QinQ)
 ## Note: Whether to add an extra 802.1Q header to NPB traffic, when this value is
 ##   set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
 ##   the value is the lower 12 bits of TunnelID in the VXLAN header.
@@ -942,11 +942,9 @@ vtap_group_id: g-xxxxxx
 
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
-  ##   ProtobufRPC is disabled by default, note that ebpf-kprobe-whitelist must be configured to enable it.
   #l7-protocol-enabled:
   #- HTTP ## for both HTTP and HTTP_TLS
   #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
-  #- ProtobufRPC ## for krpc ..
   #- SofaRPC
   #- FastCGI
   #- Dubbo
@@ -957,6 +955,7 @@ vtap_group_id: g-xxxxxx
   #- Kafka
   #- MQTT
   #- DNS
+  #- TLS
   #- Custom ## custom protocol from plugin
 
   ## Application Protocol Port Numbers
@@ -967,7 +966,6 @@ vtap_group_id: g-xxxxxx
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
     #"Custom": "1-65535" # plugins
-    #"ProtobufRPC": "1-65535"
     #"SofaRPC": "1-65535"
     #"FastCGI": "1-65535"
     #"Dubbo": "1-65535"
@@ -978,6 +976,25 @@ vtap_group_id: g-xxxxxx
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
     #"DNS": "53"
+    #"TLS": "1-65535"
+
+  ## L7 Protocol Advanced Features
+  #l7-protocol-advanced-features:
+
+    ## Extract the configuration of http endpoint
+    #http-endpoint-extraction:
+      ## Disable the switch to extract http endpoint
+      ## Default: false
+      #disabled: false
+
+      ## Extract endpoint according to the following rules
+      #match-rules:
+      ## Find a longest prefix that can match according to the principle of "longest prefix matching"
+      #- prefix: ""
+
+        ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
+        ## Default: 2
+        #keep-segments: 2
 
   ########################
   ## L4 Packet Sequence ##
@@ -1156,6 +1173,25 @@ vtap_group_id: g-xxxxxx
       ## Sampling process name
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
+
+      ## The maximum limit space in the root directory of each Java process. deepflow-agent will
+      ## automatically create a `/deepflow/` directory to temporarily store the symbol files of the
+      ## Java process. The space occupied by the files written by deepflow-agent will not exceed this
+      ## configured value. All files are stored temporarily and are immediately cleared once the Java
+      ## symbol files are obtained.
+      ## Default: 10. Range: [2, 100]
+      ## Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
+      ## this range, the default value of 10(10Mi), will be used.
+      #java-symbol-file-max-space-limit: 10
+
+
+      ## When deepflow-agent finds that an unresolved function name appears in the function call stack
+      ## of a Java process, it will trigger the regeneration of the symbol file of the process.
+      ## Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
+      ## Java processes, the regeneration will be deferred for a period of time.
+      ## Default: 60s. Range: [5, 3600]s
+      ## The unit of measurement used is seconds.
+      #java-symbol-file-refresh-defer-interval: 60s
 
   ######################################
   ## Agent Running in Standalone Mode ##

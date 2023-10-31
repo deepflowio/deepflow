@@ -15,9 +15,7 @@
  */
 
 use std::cmp::{max, min};
-#[cfg(target_os = "linux")]
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
@@ -32,32 +30,31 @@ use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
     Naming,
 };
-#[cfg(target_os = "linux")]
-use libc::{c_int, setpriority, PRIO_PROCESS};
 use log::{error, info, warn, Level};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
     sched::{sched_setaffinity, CpuSet},
     unistd::Pid,
 };
-#[cfg(target_os = "linux")]
-use regex::Regex;
 use sysinfo::SystemExt;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 use super::{
-    config::{Config, KubernetesResourceConfig, PcapConfig, PortConfig, YamlConfig},
+    config::{
+        Config, HttpEndpointExtraction, KubernetesResourceConfig, MatchRule, PcapConfig,
+        PortConfig, YamlConfig,
+    },
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
 use crate::plugin::c_ffi::SoPluginFunc;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::plugin::shared_obj::load_plugin;
 use crate::rpc::Session;
 use crate::{
@@ -68,28 +65,25 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::{
-        environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
-        logger::RemoteLogConfig,
-    },
+    utils::environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::{kubernetes::Poller, ApiWatcher, ProcRegRewrite},
-    utils::environment::{get_ctrl_ip_and_mac, is_tt_pod, is_tt_workload},
+    platform::ProcRegRewrite,
+    utils::environment::{get_ctrl_ip_and_mac, is_tt_workload},
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    platform::{kubernetes::Poller, ApiWatcher},
+    utils::environment::is_tt_pod,
 };
 
 use public::bitmap::Bitmap;
 use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
-};
-#[cfg(target_os = "linux")]
-use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{self, NsFile},
 };
 
 use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
@@ -128,7 +122,7 @@ pub type DebugAccess = Access<DebugConfig>;
 
 pub type SynchronizerAccess = Access<SynchronizerConfig>;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub type EbpfAccess = Access<EbpfConfig>;
 
 pub type MetricServerAccess = Access<MetricServerConfig>;
@@ -258,7 +252,7 @@ impl Default for NpbConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OsProcScanConfig {
     pub os_proc_root: String,
@@ -325,7 +319,7 @@ pub struct DispatcherConfig {
     pub capture_bpf: String,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub af_packet_version: OptTpacketVersion,
     pub tap_mode: TapMode,
     pub region_id: u32,
@@ -341,8 +335,6 @@ pub struct LogConfig {
     pub log_retention: u32,
     pub rsyslog_enabled: bool,
     pub host: String,
-    pub analyzer_ip: String,
-    pub analyzer_port: u16,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -497,11 +489,78 @@ impl fmt::Debug for FlowConfig {
 }
 
 #[derive(Clone, PartialEq, Eq)]
+struct TrieNode {
+    children: HashMap<char, Box<TrieNode>>,
+    keep_segments: Option<usize>,
+}
+
+impl TrieNode {
+    fn new() -> Self {
+        TrieNode {
+            children: HashMap::new(),
+            keep_segments: None,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct HttpEndpointTrie {
+    root: TrieNode,
+}
+
+impl HttpEndpointTrie {
+    pub fn new() -> Self {
+        Self {
+            root: TrieNode::new(),
+        }
+    }
+
+    pub fn insert(&mut self, rule: &MatchRule) {
+        let mut node = &mut self.root;
+        for ch in rule.prefix.chars() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(TrieNode::new()));
+        }
+        node.keep_segments = Some(rule.keep_segments);
+    }
+
+    pub fn find_matching_rule(&self, input: &str) -> usize {
+        const DEFAULT_KEEP_SEGMENTS: usize = 2;
+        let mut node = &self.root;
+        let mut keep_segments = DEFAULT_KEEP_SEGMENTS;
+        for c in input.chars() {
+            if let Some(child) = node.children.get(&c) {
+                keep_segments = child.keep_segments.unwrap_or(keep_segments);
+                node = child.as_ref();
+            } else {
+                break;
+            }
+        }
+        keep_segments
+    }
+}
+
+impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
+    fn from(v: &HttpEndpointExtraction) -> Self {
+        let mut t = Self::new();
+        v.match_rules
+            .iter()
+            .filter(|r| r.keep_segments > 0)
+            .for_each(|r| t.insert(r));
+        t
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
+    pub http_endpoint_disabled: bool,
+    pub http_endpoint_trie: HttpEndpointTrie,
 }
 
 impl Default for LogParserConfig {
@@ -511,6 +570,8 @@ impl Default for LogParserConfig {
             l7_log_session_aggr_timeout: Duration::ZERO,
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
+            http_endpoint_disabled: false,
+            http_endpoint_trie: HttpEndpointTrie::new(),
         }
     }
 }
@@ -578,7 +639,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置
@@ -595,11 +656,11 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
-    pub l7_protocol_ports: HashMap<String, String>,
+    pub l7_protocol_ports: std::collections::HashMap<String, String>,
     pub ebpf: EbpfYamlConfig,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl fmt::Debug for EbpfConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EbpfConfig")
@@ -634,7 +695,7 @@ impl fmt::Debug for EbpfConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl EbpfConfig {
     pub fn l7_log_enabled(&self) -> bool {
         // disabled when metrics collection is turned off
@@ -654,6 +715,7 @@ pub enum TraceType {
     XB3,
     XB3Span,
     Uber,
+    Sw3,
     Sw6,
     Sw8,
     TraceParent,
@@ -666,6 +728,7 @@ pub enum TraceType {
 const TRACE_TYPE_XB3: &str = "x-b3-traceid";
 const TRACE_TYPE_XB3SPAN: &str = "x-b3-spanid";
 const TRACE_TYPE_UBER: &str = "uber-trace-id";
+const TRACE_TYPE_SW3: &str = "sw3";
 const TRACE_TYPE_SW6: &str = "sw6";
 const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
@@ -685,6 +748,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
+            TRACE_TYPE_SW3 => TraceType::Sw3,
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
@@ -715,6 +779,7 @@ impl TraceType {
             TraceType::XB3 => context.to_ascii_lowercase() == TRACE_TYPE_XB3,
             TraceType::XB3Span => context.to_ascii_lowercase() == TRACE_TYPE_XB3SPAN,
             TraceType::Uber => context.to_ascii_lowercase() == TRACE_TYPE_UBER,
+            TraceType::Sw3 => context.to_ascii_lowercase() == TRACE_TYPE_SW3,
             TraceType::Sw6 => context.to_ascii_lowercase() == TRACE_TYPE_SW6,
             TraceType::Sw8 => context.to_ascii_lowercase() == TRACE_TYPE_SW8,
             TraceType::TraceParent => context.to_ascii_lowercase() == TRACE_TYPE_TRACE_PARENT,
@@ -732,6 +797,7 @@ impl TraceType {
             &TraceType::XB3 => TRACE_TYPE_XB3.into(),
             &TraceType::XB3Span => TRACE_TYPE_XB3SPAN.into(),
             &TraceType::Uber => TRACE_TYPE_UBER.into(),
+            &TraceType::Sw3 => TRACE_TYPE_SW3.into(),
             &TraceType::Sw6 => TRACE_TYPE_SW6.into(),
             &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
             &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
@@ -747,6 +813,7 @@ impl TraceType {
             TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
             TraceType::XB3Span => TRACE_TYPE_XB3SPAN.to_string(),
             TraceType::Uber => TRACE_TYPE_UBER.to_string(),
+            TraceType::Sw3 => TRACE_TYPE_SW3.to_string(),
             TraceType::Sw6 => TRACE_TYPE_SW6.to_string(),
             TraceType::Sw8 => TRACE_TYPE_SW8.to_string(),
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.to_string(),
@@ -858,7 +925,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf: EbpfConfig,
     pub trident_type: TridentType,
     pub metric_server: MetricServerConfig,
@@ -952,7 +1019,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 af_packet_blocks: conf
                     .yaml_config
                     .get_af_packet_blocks(conf.tap_mode, conf.max_memory),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 af_packet_version: conf.capture_socket_type.into(),
                 tap_mode: conf.tap_mode,
                 region_id: conf.region_id,
@@ -1048,7 +1115,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 os_proc_scan_conf: OsProcScanConfig {
                     os_proc_root: conf.yaml_config.os_proc_root.clone(),
                     os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
@@ -1109,6 +1176,17 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     tap_sides
                 },
+                http_endpoint_disabled: conf
+                    .yaml_config
+                    .l7_protocol_advanced_features
+                    .http_endpoint_extraction
+                    .disabled,
+                http_endpoint_trie: HttpEndpointTrie::from(
+                    &conf
+                        .yaml_config
+                        .l7_protocol_advanced_features
+                        .http_endpoint_extraction,
+                ),
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
@@ -1126,12 +1204,19 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_level: conf.log_level,
                 log_threshold: conf.log_threshold,
                 log_retention: conf.log_retention,
-                rsyslog_enabled: conf.rsyslog_enabled,
+                rsyslog_enabled: {
+                    if dest_ip == Ipv4Addr::UNSPECIFIED.to_string()
+                        || dest_ip == Ipv6Addr::UNSPECIFIED.to_string()
+                    {
+                        info!("analyzer_ip not set, remote log disabled");
+                        false
+                    } else {
+                        conf.rsyslog_enabled
+                    }
+                },
                 host: conf.host.clone(),
-                analyzer_ip: dest_ip.clone(),
-                analyzer_port: conf.analyzer_port,
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: EbpfConfig {
                 collector_enabled: conf.collector_enabled,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
@@ -1156,7 +1241,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
                     // use host mac
-                    if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                    #[cfg(target_os = "linux")]
+                    if let Err(e) =
+                        public::netns::open_named_and_setns(&public::netns::NsFile::Root)
+                    {
                         warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                         warn!("setns error: {}", e);
                         thread::sleep(Duration::from_secs(1));
@@ -1164,7 +1252,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     let (_, ctrl_mac) =
                         get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
-                    if let Err(e) = netns::reset_netns() {
+                    #[cfg(target_os = "linux")]
+                    if let Err(e) = public::netns::reset_netns() {
                         warn!("reset setns error: {}", e);
                         thread::sleep(Duration::from_secs(1));
                         process::exit(-1);
@@ -1200,8 +1289,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 pub struct ConfigHandler {
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
-    pub logger_handle: LoggerHandle,
-    pub remote_log_config: RemoteLogConfig,
+    pub logger_handle: Option<LoggerHandle>,
     // need update
     pub static_config: Config,
     pub candidate_config: ModuleConfig,
@@ -1209,13 +1297,7 @@ pub struct ConfigHandler {
 }
 
 impl ConfigHandler {
-    pub fn new(
-        config: Config,
-        ctrl_ip: IpAddr,
-        ctrl_mac: MacAddr,
-        logger_handle: LoggerHandle,
-        remote_log_config: RemoteLogConfig,
-    ) -> Self {
+    pub fn new(config: Config, ctrl_ip: IpAddr, ctrl_mac: MacAddr) -> Self {
         let candidate_config =
             ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
@@ -1226,9 +1308,12 @@ impl ConfigHandler {
             ctrl_mac,
             candidate_config,
             current_config,
-            logger_handle,
-            remote_log_config,
+            logger_handle: None,
         }
+    }
+
+    pub fn set_logger_handle(&mut self, handle: LoggerHandle) {
+        self.logger_handle.replace(handle);
     }
 
     pub fn collector(&self) -> CollectorAccess {
@@ -1317,7 +1402,7 @@ impl ConfigHandler {
         )
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -1405,7 +1490,7 @@ impl ConfigHandler {
             );
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if yaml_config.process_scheduling_priority
             != new_config.yaml_config.process_scheduling_priority
         {
@@ -1415,10 +1500,10 @@ impl ConfigHandler {
             );
             let pid = process::id();
             unsafe {
-                if setpriority(
-                    PRIO_PROCESS,
+                if libc::setpriority(
+                    libc::PRIO_PROCESS,
                     pid,
-                    new_config.yaml_config.process_scheduling_priority as c_int,
+                    new_config.yaml_config.process_scheduling_priority as libc::c_int,
                 ) != 0
                 {
                     warn!(
@@ -1429,7 +1514,7 @@ impl ConfigHandler {
             }
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
             info!(
                 "CPU Affinity set to {}.",
@@ -1519,14 +1604,14 @@ impl ConfigHandler {
                 );
                 if let Some(c) = components.as_ref() {
                     let old_regex = if candidate_config.dispatcher.extra_netns_regex != "" {
-                        Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
+                        regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
                     } else {
                         None
                     };
 
                     let regex = new_config.dispatcher.extra_netns_regex.as_ref();
                     let regex = if regex != "" {
-                        match Regex::new(regex) {
+                        match regex::Regex::new(regex) {
                             Ok(re) => {
                                 info!("platform monitoring extra netns: /{}/", regex);
                                 Some(re)
@@ -1541,12 +1626,14 @@ impl ConfigHandler {
                         None
                     };
 
-                    let old_netns = old_regex.map(|re| netns::find_ns_files_by_regex(&re));
-                    let new_netns = regex.as_ref().map(|re| netns::find_ns_files_by_regex(&re));
+                    let old_netns = old_regex.map(|re| public::netns::find_ns_files_by_regex(&re));
+                    let new_netns = regex
+                        .as_ref()
+                        .map(|re| public::netns::find_ns_files_by_regex(&re));
                     if old_netns != new_netns {
                         info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
                         thread::sleep(Duration::from_secs(1));
-                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                        process::exit(public::consts::NORMAL_EXIT_WITH_RESTART);
                     }
 
                     c.platform_synchronizer.set_netns_regex(regex.clone());
@@ -1703,67 +1790,61 @@ impl ConfigHandler {
                 } else {
                     info!("Disable rsyslog");
                 }
-                self.remote_log_config
-                    .set_enabled(new_config.log.rsyslog_enabled);
             }
             if candidate_config.log.log_level != new_config.log.log_level {
-                match self
-                    .logger_handle
-                    .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
-                {
-                    Ok(_) => {
-                        candidate_config.log.log_level = new_config.log.log_level;
-                        info!("log level set to {}", new_config.log.log_level);
-                    }
-                    Err(e) => warn!("failed to set log_level: {}", e),
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h
+                        .parse_and_push_temp_spec(new_config.log.log_level.as_str().to_lowercase())
+                    {
+                        Ok(_) => {
+                            candidate_config.log.log_level = new_config.log.log_level;
+                            info!("log level set to {}", new_config.log.log_level);
+                        }
+                        Err(e) => warn!("failed to set log_level: {}", e),
+                    },
+                    None => warn!("logger_handle not set"),
                 }
             }
             if candidate_config.log.host != new_config.log.host {
-                self.remote_log_config
-                    .set_hostname(new_config.log.host.clone());
+                info!(
+                    "remote log hostname {} -> {}",
+                    candidate_config.log.host, new_config.log.host
+                )
             }
             if candidate_config.log.log_threshold != new_config.log.log_threshold {
-                info!("LogThreshold set to {}", new_config.log.log_threshold);
-                self.remote_log_config
-                    .set_threshold(new_config.log.log_threshold);
+                info!(
+                    "remote log threshold {} -> {}",
+                    candidate_config.log.log_threshold, new_config.log.log_threshold
+                )
             }
             if candidate_config.log.log_retention != new_config.log.log_retention {
-                match self.logger_handle.flw_config() {
-                    Err(FlexiLoggerError::NoFileLogger) => {
-                        info!("no file logger, skipped log_retention change")
-                    }
-                    _ => match self.logger_handle.reset_flw(
-                        &FileLogWriter::builder(
-                            FileSpec::try_from(&static_config.log_file).unwrap(),
-                        )
-                        .rotate(
-                            Criterion::Age(Age::Day),
-                            Naming::Timestamps,
-                            Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
-                        )
-                        .create_symlink(&static_config.log_file)
-                        .append(),
-                    ) {
-                        Ok(_) => {
-                            info!("log_retention set to {}", new_config.log.log_retention);
+                match self.logger_handle.as_mut() {
+                    Some(h) => match h.flw_config() {
+                        Err(FlexiLoggerError::NoFileLogger) => {
+                            info!("no file logger, skipped log_retention change")
                         }
-                        Err(e) => {
-                            warn!("failed to set log_retention: {}", e);
-                        }
+                        _ => match h.reset_flw(
+                            &FileLogWriter::builder(
+                                FileSpec::try_from(&static_config.log_file).unwrap(),
+                            )
+                            .rotate(
+                                Criterion::Age(Age::Day),
+                                Naming::Timestamps,
+                                Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
+                            )
+                            .create_symlink(&static_config.log_file)
+                            .append(),
+                        ) {
+                            Ok(_) => {
+                                info!("log_retention set to {}", new_config.log.log_retention);
+                            }
+                            Err(e) => {
+                                warn!("failed to set log_retention: {}", e);
+                            }
+                        },
                     },
+                    None => warn!("logger_handle not set"),
                 }
-            }
-            if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip
-                || candidate_config.log.analyzer_port != new_config.log.analyzer_port
-            {
-                info!(
-                    "Rsyslog client connect to {} {}",
-                    &new_config.log.analyzer_ip, new_config.log.analyzer_port
-                );
-                self.remote_log_config.set_remotes(
-                    &vec![new_config.log.analyzer_ip.clone()],
-                    new_config.log.analyzer_port,
-                );
             }
             candidate_config.log = new_config.log;
         }
@@ -2231,7 +2312,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer;
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if candidate_config.ebpf != new_config.ebpf
             && candidate_config.tap_mode != TapMode::Analyzer
         {
@@ -2401,7 +2482,7 @@ impl ModuleConfig {
         let mut wasm = vec![];
         #[cfg(target_os = "windows")]
         let so = vec![];
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut so = vec![];
         rt.block_on(async {
             for i in self.yaml_config.wasm_plugins.iter() {
@@ -2418,7 +2499,7 @@ impl ModuleConfig {
             }
         });
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         rt.block_on(async {
             for i in self.yaml_config.so_plugins.iter() {
                 match session
@@ -2459,5 +2540,64 @@ impl YamlConfig {
         } else {
             (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_trie() {
+        let trie = HttpEndpointTrie::new();
+        assert!(trie.root.children.is_empty());
+        assert_eq!(trie.root.keep_segments, None);
+    }
+
+    #[test]
+    fn test_insert_trie_node() {
+        let mut trie = HttpEndpointTrie::new();
+        let rule1 = MatchRule {
+            prefix: "/a".to_string(),
+            keep_segments: 1,
+        };
+        let rule2 = MatchRule {
+            prefix: "/a/b/c/d".to_string(),
+            keep_segments: 3,
+        };
+        let rule3 = MatchRule {
+            prefix: "/d/e/f".to_string(),
+            keep_segments: 3,
+        };
+        trie.insert(&rule1);
+        assert_eq!(trie.root.children.len(), 1);
+        trie.insert(&rule2);
+        assert_eq!(trie.root.children.len(), 1);
+        trie.insert(&rule3);
+        assert_eq!(trie.root.children.get(&'/').unwrap().children.len(), 2);
+    }
+
+    #[test]
+    fn test_find_matching_rule() {
+        let mut trie = HttpEndpointTrie::new();
+        let rule1 = MatchRule {
+            prefix: "/a/b/c".to_string(),
+            keep_segments: 1,
+        };
+        let rule2 = MatchRule {
+            prefix: "/a/b/c/d".to_string(),
+            keep_segments: 3,
+        };
+        let rule3 = MatchRule {
+            prefix: "/d/e/f".to_string(),
+            keep_segments: 3,
+        };
+        trie.insert(&rule1);
+        trie.insert(&rule2);
+        trie.insert(&rule3);
+        assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
+        assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
+        assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 2);
     }
 }

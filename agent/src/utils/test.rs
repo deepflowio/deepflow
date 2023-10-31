@@ -28,7 +28,7 @@ impl Capture {
         let parse_len = parse_len.unwrap_or(1500);
         let mut packets = vec![];
         let mut capture = pcap::Capture::from_file(path).unwrap();
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         while let Ok(packet) = capture.next() {
             packets.push((
                 packet.header.clone(),

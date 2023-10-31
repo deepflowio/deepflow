@@ -17,9 +17,9 @@
 package clickhouse
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -32,7 +32,7 @@ func (t *Table) Format(m *view.Model) {
 }
 
 func GetVirtualTableFilter(db, table string) (view.Node, bool) {
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		filter := fmt.Sprintf("virtual_table_name='%s'", table)
 		return &view.Expr{Value: "(" + filter + ")"}, true
 	}
@@ -43,7 +43,7 @@ func GetMetricIDFilter(db, table string) (view.Node, error) {
 	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
-		return nil, errors.New(errorMessage)
+		return nil, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
 	filter := fmt.Sprintf("metric_id=%d", metricID)
 	return &view.Expr{Value: "(" + filter + ")"}, nil

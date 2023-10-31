@@ -69,7 +69,11 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		nodeIP := nodeIPs[0]
 		labels := metaData.Get("labels").MustMap()
 		nodeType := common.POD_NODE_TYPE_NODE
-		if _, ok := labels["node-role.kubernetes.io/master"]; ok {
+		// support k8s version less than 1.20
+		_, masterOK := labels["node-role.kubernetes.io/master"]
+		// support k8s version equal or great than 1.20
+		_, controlPlaneOK := labels["node-role.kubernetes.io/control-plane"]
+		if masterOK || controlPlaneOK {
 			nodeType = common.POD_NODE_TYPE_MASTER
 		}
 		statusConditions := nData.Get("status").Get("conditions")

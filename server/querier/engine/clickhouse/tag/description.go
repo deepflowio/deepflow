@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"regexp"
 	"strconv"
 	"strings"
@@ -701,6 +702,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				"auto_service":  AutoServiceMap,
 			}
 			for resourceKey, resourceType := range autoMap[tag] {
+				if slices.Contains(PodGroupTypeSlice, resourceKey) {
+					continue
+				}
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
 				if resourceKey == "service" {

@@ -46,16 +46,15 @@ use tokio::{
     time,
 };
 
-use crate::common::TaggedFlow;
 use crate::{
     common::{
         flow::{Flow, FlowPerfStats, L7PerfStats, L7Stats, SignalSource},
         lookup_key::LookupKey,
-        Timestamp,
+        TaggedFlow, Timestamp,
     },
-    config::PrometheusExtraConfig,
+    config::{handler::LogParserConfig, PrometheusExtraConfig},
     exception::ExceptionHandler,
-    flow_generator::protocol_logs::L7ResponseStatus,
+    flow_generator::protocol_logs::{http::handle_endpoint, L7ResponseStatus},
     metric::document::{Direction, TapSide},
     policy::PolicyGetter,
 };
@@ -249,6 +248,7 @@ fn decode_otel_trace_data(
     policy_getter: Arc<PolicyGetter>,
     time_diff: i64,
     flow_id: Arc<AtomicU64>,
+    log_parser_config: Arc<LogParserConfig>,
 ) -> Result<(Vec<u8>, Vec<BatchedBox<L7Stats>>), GenericError> {
     let mut l7_stats: Vec<BatchedBox<L7Stats>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
@@ -323,6 +323,7 @@ fn decode_otel_trace_data(
                     otel_service.clone(),
                     otel_instance.clone(),
                     time_diff,
+                    log_parser_config.clone(),
                 );
                 l7_stats.push(allocator.allocate_one_with(stats));
                 id += 1;
@@ -344,6 +345,7 @@ fn fill_l7_stats(
     otel_service: Option<String>,
     otel_instance: Option<String>,
     time_diff: i64,
+    log_parser_config: Arc<LogParserConfig>,
 ) -> L7Stats {
     let (mut ip0, mut ip1, eth_type) = if ip.is_ipv4() {
         (
@@ -359,7 +361,7 @@ fn fill_l7_stats(
         )
     };
     let mut l4_protocol = L4Protocol::Tcp;
-    let mut l7_protocol = L7Protocol::Other;
+    let mut l7_protocol = L7Protocol::Unknown;
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
     let (mut l2_end_0, mut l2_end_1) = (false, false);
@@ -368,7 +370,6 @@ fn fill_l7_stats(
     flow.signal_source = SignalSource::OTel;
     flow.otel_service = otel_service;
     flow.otel_instance = otel_instance;
-    flow.last_endpoint = Some(span.name.clone());
     flow.eth_type = eth_type;
     flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
     if flow.tap_side == TapSide::ClientApp {
@@ -456,12 +457,18 @@ fn fill_l7_stats(
             _ => {}
         }
     }
+    match l7_protocol {
+        L7Protocol::Http1 | L7Protocol::Http2 => {
+            flow.last_endpoint = Some(handle_endpoint(log_parser_config.as_ref(), &span.name))
+        }
+        _ => {
+            flow.last_endpoint = Some(span.name.clone());
+        }
+    }
 
     if is_http2 {
         if l7_protocol == L7Protocol::Http1 {
             l7_protocol = L7Protocol::Http2;
-        } else if l7_protocol == L7Protocol::Http1TLS {
-            l7_protocol = L7Protocol::Http2TLS;
         }
     }
 
@@ -593,6 +600,7 @@ async fn handler(
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
     prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    log_parser_config: Arc<LogParserConfig>,
     flow_id: Arc<AtomicU64>,
     external_profile_integration_disabled: bool,
     external_trace_integration_disabled: bool,
@@ -627,6 +635,7 @@ async fn handler(
                 policy_getter,
                 time_diff,
                 flow_id.clone(),
+                log_parser_config.clone(),
             )
             .map_err(|e| {
                 debug!("decode otel trace data error: {}", e);
@@ -881,6 +890,7 @@ pub struct MetricServer {
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
     prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    log_parser_config: Arc<LogParserConfig>,
     external_profile_integration_disabled: bool,
     external_trace_integration_disabled: bool,
     external_metric_integration_disabled: bool,
@@ -902,6 +912,7 @@ impl MetricServer {
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
         prometheus_extra_config: PrometheusExtraConfig,
+        log_parser_config: LogParserConfig,
         external_profile_integration_disabled: bool,
         external_trace_integration_disabled: bool,
         external_metric_integration_disabled: bool,
@@ -926,6 +937,7 @@ impl MetricServer {
                 policy_getter: Arc::new(policy_getter),
                 time_diff,
                 prometheus_extra_config: Arc::new(prometheus_extra_config),
+                log_parser_config: Arc::new(log_parser_config),
                 otel_l7_stats_sender,
                 external_profile_integration_disabled,
                 external_trace_integration_disabled,
@@ -971,6 +983,7 @@ impl MetricServer {
         let policy_getter = self.policy_getter.clone();
         let time_diff = self.time_diff.clone();
         let prometheus_extra_config = self.prometheus_extra_config.clone();
+        let log_parser_config = self.log_parser_config.clone();
         let external_profile_integration_disabled = self.external_profile_integration_disabled;
         let external_trace_integration_disabled = self.external_trace_integration_disabled;
         let external_metric_integration_disabled = self.external_metric_integration_disabled;
@@ -1035,6 +1048,7 @@ impl MetricServer {
                     let policy_getter = policy_getter.clone();
                     let time_diff = time_diff.clone();
                     let prometheus_extra_config = prometheus_extra_config.clone();
+                    let log_parser_config = log_parser_config.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
@@ -1050,6 +1064,7 @@ impl MetricServer {
                         let policy_getter = policy_getter.clone();
                         let time_diff = time_diff.clone();
                         let prometheus_extra_config = prometheus_extra_config.clone();
+                        let log_parser_config = log_parser_config.clone();
                         let flow_id = Arc::new(AtomicU64::new(0));
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
@@ -1069,6 +1084,7 @@ impl MetricServer {
                                     policy_getter.clone(),
                                     time_diff.clone(),
                                     prometheus_extra_config.clone(),
+                                    log_parser_config.clone(),
                                     flow_id.clone(),
                                     external_profile_integration_disabled,
                                     external_trace_integration_disabled,

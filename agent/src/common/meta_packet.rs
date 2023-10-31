@@ -19,9 +19,10 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::{error::Error, net::Ipv6Addr, ptr};
 
+use bitflags::bitflags;
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
     icmpv6::{Icmpv6Type, Icmpv6Types},
@@ -29,7 +30,7 @@ use pnet::packet::{
 };
 
 use super::ebpf::EbpfType;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::enums::TapType;
 use super::{
     consts::*,
@@ -42,7 +43,7 @@ use super::{
 };
 
 use crate::error;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
@@ -96,6 +97,14 @@ impl<'a> From<&'a [u8]> for RawPacket<'a> {
 impl<'a> From<BatchedBuffer<u8>> for RawPacket<'a> {
     fn from(b: BatchedBuffer<u8>) -> Self {
         Self::Owned(b)
+    }
+}
+
+bitflags! {
+    #[derive(Default)]
+    pub struct EbpfFlags: u32 {
+        const NONE = 0;
+        const TLS = 1;
     }
 }
 
@@ -158,6 +167,7 @@ pub struct MetaPacket<'a> {
     //  流结束标识, 目前只有 go http2 uprobe 用到
     pub is_request_end: bool,
     pub is_response_end: bool,
+    pub ebpf_flags: EbpfFlags,
 
     pub process_id: u32,
     pub netns_id: u32,
@@ -165,10 +175,11 @@ pub struct MetaPacket<'a> {
     pub thread_id: u32,
     pub coroutine_id: u64,
     pub syscall_trace_id: u64,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+    pub socket_role: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,
@@ -183,11 +194,9 @@ impl<'a> MetaPacket<'a> {
             self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
         }
     }
+
     pub fn is_tls(&self) -> bool {
-        match self.l7_protocol_from_ebpf {
-            L7Protocol::Http1TLS | L7Protocol::Http2TLS => true,
-            _ => false,
-        }
+        self.ebpf_flags.contains(EbpfFlags::TLS)
     }
 
     pub fn empty() -> MetaPacket<'a> {
@@ -866,7 +875,7 @@ impl<'a> MetaPacket<'a> {
         self.l4_payload_len as usize
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut (*data);
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
@@ -932,6 +941,7 @@ impl<'a> MetaPacket<'a> {
         packet.thread_id = data.thread_id;
         packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
+        packet.socket_role = data.socket_role;
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
             data.process_kname.as_ptr() as *const u8,
@@ -950,6 +960,11 @@ impl<'a> MetaPacket<'a> {
         }
         packet.ebpf_type = EbpfType::try_from(data.source)?;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
+        packet.ebpf_flags = if data.is_tls {
+            EbpfFlags::TLS
+        } else {
+            EbpfFlags::NONE
+        };
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
         if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {
@@ -1008,7 +1023,7 @@ impl<'a> MetaPacket<'a> {
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {

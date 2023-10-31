@@ -21,9 +21,9 @@ pub mod common;
 mod config;
 pub mod debug;
 pub mod dispatcher;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod ebpf;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod ebpf_dispatcher;
 mod error;
 mod exception;
@@ -110,12 +110,10 @@ mod tests {
             ("         |      ", crate::flow_generator::perf::tcp::PerfData),
             ("         -- ", crate::flow_generator::perf::udp::UdpPerf),
             ("         +> ", crate::flow_generator::protocol_logs::sql::PostgresqlLog),
-            ("         +> ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
             ("         +> ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),
             ("     -> ", crate::common::l7_protocol_log::L7ProtocolParser),
             ("         +- ", crate::flow_generator::protocol_logs::http::HttpLog),
             ("         +- ", crate::flow_generator::protocol_logs::dns::DnsLog),
-            ("         +- ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
             ("         +- ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),
             ("         +- ", crate::flow_generator::protocol_logs::sql::MysqlLog),
             ("         +- ", crate::flow_generator::protocol_logs::mq::KafkaLog),

@@ -90,6 +90,8 @@ syscall_trace_id_request  , 请求 Syscall TraceID     ,
 syscall_trace_id_response , 响应 Syscall TraceID     ,
 syscall_thread_0          , 请求 Syscall 线程        ,
 syscall_thread_1          , 响应 Syscall 线程        ,
+syscall_coroutine_0       , 请求 Syscall 协程        ,
+syscall_coroutine_1       , 响应 Syscall 协程        ,
 syscall_cap_seq_0         , 请求 Syscall 序号        ,
 syscall_cap_seq_1         , 响应 Syscall 序号        ,
 

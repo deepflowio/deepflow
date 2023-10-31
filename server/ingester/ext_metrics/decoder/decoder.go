@@ -141,6 +141,13 @@ func (d *Decoder) initMetricsTable() {
 		m.Timestamp = uint32(time.Now().Unix())
 		d.extMetricsWriter.Write(m)
 	}
+	if d.msgType == datatype.MESSAGE_TYPE_DFSTATS && d.extMetricsWriter != nil {
+		// send empty df stats, trigger the creation of deepflow_system.deepflow_system table
+		m := dbwriter.AcquireExtMetrics()
+		m.Timestamp = uint32(time.Now().Unix())
+		m.MsgType = datatype.MESSAGE_TYPE_DFSTATS
+		d.extMetricsWriter.Write(m)
+	}
 }
 
 func (d *Decoder) handleTelegraf(vtapID uint16, decoder *codec.SimpleDecoder) {
@@ -194,7 +201,7 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 			d.counter.ErrorCount++
 			return
 		}
-		if err := pbStats.Unmarshal(bytes); err != nil {
+		if err := pbStats.Unmarshal(bytes); err != nil || pbStats.Name == "" {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("deepflow stats parse failed, err msg: %s", err)
 			}

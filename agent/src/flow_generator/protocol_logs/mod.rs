@@ -24,6 +24,7 @@ pub mod pb_adapter;
 pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
+pub(crate) mod tls;
 pub use self::http::{
     check_http_method, get_http_request_info, get_http_request_version, get_http_resp_info,
     is_http_v1_payload, parse_v1_headers, HttpInfo, HttpLog, Httpv2Headers,
@@ -36,14 +37,14 @@ pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
-    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
-    DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,
-    SOFA_NEW_RPC_TRACE_CTX_KEY,
+    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, DubboHeader, DubboInfo,
+    DubboLog, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
     decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog,
     RedisInfo, RedisLog,
 };
+pub use tls::{TlsInfo, TlsLog};
 
 use std::{
     fmt,
@@ -411,12 +412,8 @@ impl AppProtoLogsData {
 
         // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
         let proto = if self.base_info.head.proto == L7Protocol::Grpc {
-            if let L7ProtocolInfo::HttpInfo(http) = &self.special_info {
-                if http.is_tls() {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
+            if let L7ProtocolInfo::HttpInfo(_) = &self.special_info {
+                L7Protocol::Http2
             } else {
                 unreachable!()
             }

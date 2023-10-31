@@ -236,7 +236,7 @@ impl Collector {
             let equals = s == &source;
             if !closed && equals {
                 warn!(
-                    "Possible memory leak! countable {} is not correctly closed.",
+                    "Found duplicated counter source {}, please check if the old one is correctly closed.",
                     source
                 );
             }

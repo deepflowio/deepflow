@@ -32,12 +32,14 @@ flate2 = "1.0.23"
 flexi_logger = { version = "0.23.3", features = ["use_chrono_for_offset"] }
 futures = "~0.3"
 grpc = { path = "plugins/grpc" }
+hex = "0.4.3"
 hostname = "0.3.1"
 http = "0.2.5"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
 ipnetwork = "0.18.0"
+l7 = { path = "plugins/l7" }
 libc = "0.2.103"
 log = "0.4"
 lru = "0.9.0"
@@ -79,8 +81,13 @@ envmnt = "0.10.4"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 cgroups-rs = "0.2.9"
+nix = "0.23"
+pcap = "0.9.1"
+procfs = { git = "https://github.com/deepflowio/procfs/" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
 k8s-openapi = { version = "^0.15", features = ["v1_19", "schemars"] }
 kube = { version = "0.74", default-features = false, features = [
     "client",
@@ -89,10 +96,7 @@ kube = { version = "0.74", default-features = false, features = [
     "rustls-tls",
 ] }
 kube-derive = "0.74"
-nix = "0.23"
 openshift-openapi = { version = "0.3.1", features = ["v4_6"] }
-pcap = "0.9.1"
-procfs = { git = "https://github.com/deepflowio/procfs/" }
 schemars = "0.8"
 
 [patch.crates-io]
