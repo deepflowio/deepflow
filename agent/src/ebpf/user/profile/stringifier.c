@@ -479,6 +479,14 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							h, new_cache, info_p);
 	}
 
+	/* 
+	 * Handling exceptions (e.g., memory allocation failure) by returning
+	 * a null value.
+	 */
+	if (k_trace_str == NULL || u_trace_str == NULL) {
+		return NULL;
+	}
+
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	if (v->kernstack >= 0 && v->userstack >= 0) {
 		if (k_trace_str) {
