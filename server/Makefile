@@ -27,33 +27,33 @@ vendor/${MESSAGE}/common/common.pb.go: vendor/${MESSAGE}/common.proto
 	cd vendor/${MESSAGE} && go generate common/stub.go
 
 vendor/${MESSAGE}/common.proto: vendor
-	cp -r ../message/common.proto vendor/${MESSAGE}/
-	cp -r ../message/common vendor/${MESSAGE}/
+	cp -rf ../message/common.proto vendor/${MESSAGE}/
+	cp -rf ../message/common vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/trident/trident.pb.go: vendor/${MESSAGE}/trident.proto
 	cd vendor/${MESSAGE} && go generate trident/stub.go
 
 vendor/${MESSAGE}/trident.proto: vendor
-	cp -r ../message/trident.proto vendor/${MESSAGE}/
-	cp -r ../message/trident vendor/${MESSAGE}/
+	cp -rf ../message/trident.proto vendor/${MESSAGE}/
+	cp -rf ../message/trident vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/controller/controller.pb.go: vendor/${MESSAGE}/controller.proto
 	cd vendor/${MESSAGE} && go generate controller/stub.go
 
 vendor/${MESSAGE}/controller.proto: vendor
-	cp -r ../message/controller.proto vendor/${MESSAGE}/
-	cp -r ../message/controller vendor/${MESSAGE}/
+	cp -rf ../message/controller.proto vendor/${MESSAGE}/
+	cp -rf ../message/controller vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/alarm_event/alarm_event.pb.go: vendor/${MESSAGE}/alarm_event.proto
 	cd vendor/${MESSAGE} && go generate alarm_event/stub.go
 
 vendor/${MESSAGE}/alarm_event.proto: vendor
-	cp -r ../message/alarm_event.proto vendor/${MESSAGE}/
-	cp -r ../message/alarm_event vendor/${MESSAGE}/
+	cp -rf ../message/alarm_event.proto vendor/${MESSAGE}/
+	cp -rf ../message/alarm_event vendor/${MESSAGE}/
 
 
 libs/datatype/pb/flow_log.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/
+	cp -rf $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/datatype/pb/flow_log.proto
 
@@ -61,7 +61,7 @@ libs/datatype/pb/flow_log.pb.go: libs/datatype/pb/flow_log.proto
 	cd libs/datatype/pb && go generate ./...
 
 libs/zerodoc/pb/metric.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/metric.proto libs/zerodoc/pb
+	cp -rf $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/metric.proto libs/zerodoc/pb
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/zerodoc/pb/metric.proto
 
@@ -69,10 +69,10 @@ libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
 
 vendor/${MESSAGE}/stats.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/stats.proto vendor/${MESSAGE}/
+	cp -rf $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/stats.proto vendor/${MESSAGE}/
 
 libs/stats/pb/stats.pb.go: vendor/${MESSAGE}/stats.proto
-	cp vendor/${MESSAGE}/stats.proto libs/stats/pb/stats.proto
+	cp -f vendor/${MESSAGE}/stats.proto libs/stats/pb/stats.proto
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/stats/pb/stats.proto
 	cd libs/stats/pb && go generate ./...

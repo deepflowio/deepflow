@@ -198,6 +198,7 @@ func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
 			log.Errorf("proto log decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
+		// fmt.Println("l7 log:", protoLog)
 		d.sendProto(protoLog)
 	}
 }

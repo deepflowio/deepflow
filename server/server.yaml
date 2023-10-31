@@ -295,7 +295,7 @@ querier:
 
 ingester:
   ## whether Ingester store metrics/flow_log... to database
-  #storage-disabled: false
+  storage-disabled: true
 
   #ckdb:
   #  # use internal or external ckdb
@@ -358,7 +358,7 @@ ingester:
   # stats-interval: 10
 
   ## The listening port used by Ingester to receive data
-  #listen-port: 20033
+  listen-port: 30033
 
   ## 遥测数据写入配置
   #metrics-ck-writer:

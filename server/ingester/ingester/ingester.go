@@ -166,6 +166,12 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		flowLog.Start()
 		closers = append(closers, flowLog)
 
+		// 写遥测数据
+		flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager)
+		checkError(err)
+		flowMetrics.Start()
+		closers = append(closers, flowMetrics)
+
 		if !cfg.StorageDisabled {
 			// 写ext_metrics数据
 			extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver, platformDataManager)
@@ -217,6 +223,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		}
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
+	fmt.Println("receiver start...")
 	receiver.Start()
 	closers = append(closers, receiver)
 

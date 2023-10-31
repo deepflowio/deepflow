@@ -28,7 +28,7 @@ import (
 	"syscall"
 
 	"github.com/deepflowio/deepflow/server/common"
-	"github.com/deepflowio/deepflow/server/controller/controller"
+	// "github.com/deepflowio/deepflow/server/controller/controller"
 	"github.com/deepflowio/deepflow/server/controller/report"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/profiler"
@@ -36,7 +36,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"github.com/deepflowio/deepflow/server/querier/querier"
+	// "github.com/deepflowio/deepflow/server/querier/querier"
 
 	logging "github.com/op/go-logging"
 )
@@ -106,9 +106,9 @@ func main() {
 
 	shared := common.NewControllerIngesterShared()
 
-	go controller.Start(ctx, *configPath, cfg.LogFile, shared)
+	// go controller.Start(ctx, *configPath, cfg.LogFile, shared)
 
-	go querier.Start(*configPath, cfg.LogFile)
+	// go querier.Start(*configPath, cfg.LogFile)
 	closers := ingester.Start(*configPath, shared)
 
 	common.NewMonitor()

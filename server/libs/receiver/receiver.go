@@ -430,6 +430,7 @@ func NewReceiver(
 
 // 注册处理函数，收到msgType的数据，放到outQueues中
 func (r *Receiver) RegistHandler(msgType datatype.MessageType, outQueues queue.MultiQueueWriter, nQueues int) error {
+	fmt.Println("---------------handler registered for message type:", msgType)
 	queueUDPCaches := make([]QueueCache, nQueues)
 	queueTCPCaches := make([]QueueCache, nQueues)
 	for i := 0; i < nQueues; i++ {
@@ -725,6 +726,7 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, sequence, metricsTimestamp, UDP)
 
+		// fmt.Println("receive udp message0, put to queue, type:", baseHeader.Type)
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
 		if r.handlers[baseHeader.Type] == nil {
 			atomic.AddUint64(&r.counter.Unregistered, 1)
@@ -737,6 +739,7 @@ func (r *Receiver) ProcessUDPServer() {
 			}
 			recvBuffer.IP = remoteAddr.IP
 			recvBuffer.VtapID = vtapID
+			fmt.Println("receive udp message, put to queue")
 			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
@@ -744,20 +747,24 @@ func (r *Receiver) ProcessUDPServer() {
 
 func (r *Receiver) ProcessTCPServer() {
 	defer r.TCPListener.Close()
+	fmt.Println("tcp server started!")
 	for !r.exit {
 		conn, err := r.TCPListener.Accept()
 		if err != nil {
+			fmt.Printf("Accept error.%s \n", err.Error())
 			log.Errorf("Accept error.%s ", err.Error())
 			time.Sleep(3 * time.Second)
 			continue
 		}
 		if tcpConn, ok := conn.(*net.TCPConn); ok {
 			if err := tcpConn.SetReadBuffer(r.TCPReadBuffer); err != nil {
+				fmt.Println("tcp server receive conn error")
 				log.Warningf("TCP client(%s) set read buffer failed, err: %s", conn.RemoteAddr().String(), err)
 			} else {
 				log.Infof("TCP client(%s) connect success, set read buffer %d.", conn.RemoteAddr().String(), r.TCPReadBuffer)
 			}
 		} else {
+			fmt.Println("tcp server receive conn success")
 			log.Infof("TCP client(%s) connect success.", conn.RemoteAddr().String())
 		}
 		go r.handleTCPConnection(conn)
@@ -819,6 +826,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 	defer r.flushPutTCPQueues()
 	ip := parseRemoteIP(conn)
+	fmt.Println("handle tcp connection")
 
 	baseHeader := &datatype.BaseHeader{}
 	baseHeaderBuffer := make([]byte, datatype.MESSAGE_HEADER_LEN)
@@ -905,11 +913,14 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, sequence, metricsTimestamp, TCP)
 		atomic.AddUint64(&r.counter.RxPackets, 1)
 
+		fmt.Println("receive tcp message", baseHeader.Type, len(r.handlers))
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
 		if r.handlers[baseHeader.Type] == nil {
+			fmt.Println("receive tcp message0")
 			atomic.AddUint64(&r.counter.Unregistered, 1)
 			ReleaseRecvBuffer(recvBuffer)
 		} else {
+			fmt.Println("receive tcp message1")
 			recvBuffer.Begin = 0
 			recvBuffer.End = int(baseHeader.FrameSize) - headerLen
 			recvBuffer.IP = ip
@@ -922,6 +933,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 func (r *Receiver) Start() {
 	var err error
 	if r.serverType == UDP || r.serverType == BOTH {
+		fmt.Printf("Listen udp port: %s\n", r.UDPAddress)
 		if r.UDPConn, err = net.ListenUDP("udp", r.UDPAddress); err != nil {
 			log.Errorf("UDP listen at %s failed: %s", r.UDPAddress, err)
 			os.Exit(-1)
@@ -930,6 +942,7 @@ func (r *Receiver) Start() {
 		go r.ProcessUDPServer()
 	}
 	if r.serverType == TCP || r.serverType == BOTH {
+		fmt.Printf("Listen tcp port: %s\n", r.TCPAddress)
 		if r.TCPListener, err = net.Listen("tcp", r.TCPAddress); err != nil {
 			log.Errorf("TCP listen at %s failed: %s", r.TCPAddress, err)
 			os.Exit(-1)

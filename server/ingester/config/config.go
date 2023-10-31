@@ -398,10 +398,10 @@ func Load(path string) *Config {
 		sleepAndExit()
 	}
 
-	if err = config.Base.Validate(); err != nil {
-		log.Error(err)
-		sleepAndExit()
-	}
+	// if err = config.Base.Validate(); err != nil {
+	// 	log.Error(err)
+	// 	sleepAndExit()
+	// }
 	config.Base.LogFile = config.LogFile
 	config.Base.LogLevel = config.LogLevel
 	return &config.Base

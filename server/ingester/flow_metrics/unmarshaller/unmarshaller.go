@@ -227,6 +227,7 @@ func (u *Unmarshaller) QueueProcess() {
 						log.Warningf("Decode failed, bytes len=%d err=%s", len([]byte(bytes)), err)
 						break
 					}
+					fmt.Printf("receive doc: %s\n", doc.String())
 					u.isGoodDocument(int64(doc.Timestamp))
 
 					// 秒级数据是否写入
@@ -252,7 +253,7 @@ func (u *Unmarshaller) QueueProcess() {
 					}
 					u.tableCounter[tableID]++
 
-					u.putStoreQueue(doc)
+					// u.putStoreQueue(doc)
 				}
 				receiver.ReleaseRecvBuffer(recvBytes)
 

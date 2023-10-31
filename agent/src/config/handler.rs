@@ -132,6 +132,7 @@ pub type PortAccess = Access<PortConfig>;
 #[derive(Clone, PartialEq, Eq)]
 pub struct CollectorConfig {
     pub enabled: bool,
+    pub running_mode: RunningMode,
     pub inactive_server_port_enabled: bool,
     pub inactive_ip_enabled: bool,
     pub vtap_flow_1s_enabled: bool,
@@ -1062,6 +1063,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
+                running_mode: static_config.agent_mode,
                 inactive_server_port_enabled: conf.inactive_server_port_enabled,
                 inactive_ip_enabled: conf.inactive_ip_enabled,
                 vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled,
