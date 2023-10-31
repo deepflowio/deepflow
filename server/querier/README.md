@@ -275,7 +275,7 @@ clickhouse指标量及算子特殊处理：
   - IgnoreZero为true，0值无意义
 
   ```
-  SELECT AVGArray(arrayFilter(x -> x>0, _rtt_sum)) AS avg_rtt
+  SELECT AVGArray(arrayFilter(x -> x>=0, _rtt_sum)) AS avg_rtt
   FROM
   (
       WITH if(rtt_count > 0, rtt_sum / rtt_count, 0)
@@ -304,17 +304,18 @@ clickhouse指标量及算子特殊处理：
 
 
 - Tag类
-  - 仅支持Uniq及UniqExact算子
-  - 内层使用uniqIf()
-  - 外层使用Sum
-  - 在不分层的情况下直接使用uniqIf
+  - 仅支持 Uniq、UniqExact、TopK、Any 算子
+  - 对应 clickhouse 的 uniq、uniqExact、topK
+  - Any 翻译为了 topK(1)，而非直接对应 clickhouse 的 any
+  - 分层翻译时逻辑同 Delay时延类
+  - 在不分层的情况下直接使用对应算子
 
   ```
-  SELECT SUM(_uniq_ip_0) AS uniq_ip_0
+  SELECT uniqArray(`_grouparray_[toString(ip4_0),toString(is_ipv4),toString(ip6_0)]`) AS `Uniq(客户端 IP 地址个数)`
   FROM
   (
-    SELECT uniqIf([toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS _uniq_ip_0
-    FROM l4_flow_log
+    SELECT  groupArrayIf([toString(ip4_0),toString(is_ipv4),toString(ip6_0)],NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `_grouparray_[toString(ip4_0),toString(is_ipv4),toString(ip6_0)]`
+    FROM flow_metrics.`vtap_flow_edge_port.1m` 
   )
   ```
 
@@ -351,3 +352,8 @@ clickhouse指标量及算子特殊处理：
   - select自动分组的node_type或icon_id时，group需有自动分组名称，不能只有自动分组ID
 - HAVING中放带聚合函数的指标量过滤
 - WHERE中放不带聚合函数的指标量过滤
+- 翻译为除法的指标在聚合函数中会携带 >= 0 条件，有以下几种情况
+  - delay 类型的指标  
+  - 拆层时 percentage, quotient 类型的指标  
+  - 不拆层时 flow_metrics 数据库的 percentage 指标
+  - flow_log 数据库中 l4_flow_log 和 l7_flow_log 中翻译为除法的指标
