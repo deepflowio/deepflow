@@ -335,8 +335,6 @@ pub struct LogConfig {
     pub log_retention: u32,
     pub rsyslog_enabled: bool,
     pub host: String,
-    pub analyzer_ip: String,
-    pub analyzer_port: u16,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -1206,10 +1204,17 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_level: conf.log_level,
                 log_threshold: conf.log_threshold,
                 log_retention: conf.log_retention,
-                rsyslog_enabled: conf.rsyslog_enabled,
+                rsyslog_enabled: {
+                    if dest_ip == Ipv4Addr::UNSPECIFIED.to_string()
+                        || dest_ip == Ipv6Addr::UNSPECIFIED.to_string()
+                    {
+                        info!("analyzer_ip not set, remote log disabled");
+                        false
+                    } else {
+                        conf.rsyslog_enabled
+                    }
+                },
                 host: conf.host.clone(),
-                analyzer_ip: dest_ip.clone(),
-                analyzer_port: conf.analyzer_port,
             },
             #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: EbpfConfig {
@@ -1840,14 +1845,6 @@ impl ConfigHandler {
                     },
                     None => warn!("logger_handle not set"),
                 }
-            }
-            if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip
-                || candidate_config.log.analyzer_port != new_config.log.analyzer_port
-            {
-                info!(
-                    "Rsyslog client connect to {} {}",
-                    &new_config.log.analyzer_ip, new_config.log.analyzer_port
-                );
             }
             candidate_config.log = new_config.log;
         }
