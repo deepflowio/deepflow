@@ -61,6 +61,7 @@ resp_tcp_seq              , resp_tcp_seq              , resp_tcp_seq            
 
 l7_protocol               , l7_protocol               , l7_protocol                , int_enum       , l7_protocol           , Application Layer , 111
 l7_protocol_str           , l7_protocol_str           , l7_protocol_str            , string         ,                       , Application Layer , 111
+is_tls                    , is_tls                    , is_tls                     , int_enum       , bool                  , Application Layer , 111
 version                   , version                   , version                    , string         ,                       , Application Layer , 111
 type                      , type                      , type                       , int_enum       , l7_log_type           , Application Layer , 111
 request_type              , request_type              , request_type               , string         ,                       , Application Layer , 111

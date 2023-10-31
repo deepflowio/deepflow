@@ -197,6 +197,7 @@ type L7FlowLog struct {
 	L7ProtocolStr string
 	Version       string
 	Type          uint8
+	IsTLS         uint8
 
 	RequestType     string
 	RequestDomain   string
@@ -249,6 +250,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("l7_protocol_str", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
+		ckdb.NewColumn("is_tls", ckdb.UInt8),
 
 		ckdb.NewColumn("request_type", ckdb.LowCardinalityString).SetComment("请求类型, HTTP请求方法、SQL命令类型、NoSQL命令类型、MQ命令类型、DNS查询类型"),
 		ckdb.NewColumn("request_domain", ckdb.String).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
@@ -294,12 +296,14 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.L7ProtocolStr,
 		h.Version,
 		h.Type,
+		h.IsTLS,
+
 		h.RequestType,
 		h.RequestDomain,
 		h.RequestResource,
 		h.Endpoint,
-
 		h.RequestId,
+
 		h.ResponseStatus,
 		h.ResponseCode,
 		h.ResponseException,
@@ -348,6 +352,7 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	} else {
 		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 	}
+	h.IsTLS = uint8(l.Flags & 0x1)
 
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
