@@ -170,7 +170,7 @@ pub struct MetaPacket<'a> {
     pub ebpf_flags: EbpfFlags,
 
     pub process_id: u32,
-    pub netns_id: u32,
+    pub pod_id: u32,
 
     pub thread_id: u32,
     pub coroutine_id: u64,

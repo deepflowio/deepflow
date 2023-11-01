@@ -319,7 +319,7 @@ pub struct Tagger {
     pub otel_instance: Option<String>,
     pub endpoint: Option<String>,
     pub signal_source: SignalSource,
-    pub netns_id: u32,
+    pub pod_id: u32,
 }
 
 impl Default for Tagger {
@@ -354,7 +354,7 @@ impl Default for Tagger {
             otel_instance: None,
             endpoint: None,
             signal_source: SignalSource::default(),
-            netns_id: 0,
+            pod_id: 0,
         }
     }
 }
@@ -411,8 +411,8 @@ impl From<Tagger> for metric::MiniTag {
                 app_service: t.otel_service.unwrap_or_default(),
                 app_instance: t.otel_instance.unwrap_or_default(),
                 endpoint: t.endpoint.unwrap_or_default(),
-                netns_id: t.netns_id,
-                pod_id: 0,
+                netns_id: 0, // TODO
+                pod_id: t.pod_id,
             }),
         }
     }

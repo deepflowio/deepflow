@@ -122,8 +122,8 @@ impl MetaAppProto {
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
             ebpf_type: meta_packet.ebpf_type,
-            netns_id_0: 0,
-            netns_id_1: 0,
+            pod_id_0: 0,
+            pod_id_1: 0,
         };
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -133,13 +133,13 @@ impl MetaAppProto {
             if is_src {
                 base_info.process_id_0 = meta_packet.process_id;
                 base_info.process_kname_0 = process_name;
-                base_info.netns_id_0 = meta_packet.netns_id;
                 base_info.syscall_coroutine_0 = meta_packet.coroutine_id;
+                base_info.pod_id_0 = meta_packet.pod_id;
             } else {
                 base_info.process_id_1 = meta_packet.process_id;
                 base_info.process_kname_1 = process_name;
-                base_info.netns_id_1 = meta_packet.netns_id;
                 base_info.syscall_coroutine_1 = meta_packet.coroutine_id;
+                base_info.pod_id_1 = meta_packet.pod_id;
             }
         }
 

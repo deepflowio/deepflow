@@ -941,7 +941,7 @@ pub struct Flow {
     #[serde(skip)]
     pub last_endpoint: Option<String>,
     pub direction_score: u8,
-    pub netns_id: u32,
+    pub pod_id: u32,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {

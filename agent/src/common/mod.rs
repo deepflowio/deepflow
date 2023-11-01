@@ -58,7 +58,7 @@ use num_enum::IntoPrimitive;
 use crate::common::policy::Acl;
 use public::proto::common::TridentType;
 
-use policy::{Cidr, IpGroupData, PeerConnection};
+use policy::{Cidr, Container, IpGroupData, PeerConnection};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct XflowKey {
@@ -101,5 +101,6 @@ pub trait FlowAclListener: Send + Sync {
         cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
     ) -> Result<(), String>;
+    fn containers_change(&mut self, _: &Vec<Arc<Container>>) {}
     fn id(&self) -> usize;
 }

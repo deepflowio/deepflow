@@ -49,7 +49,7 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::endpoint::EPC_FROM_INTERNET;
 use crate::common::policy::Acl;
-use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
+use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::RuntimeConfig;
@@ -265,7 +265,6 @@ impl Status {
                         warn!("{:?}: {}", item, result.unwrap_err());
                     }
                 }
-
                 self.update_platform_data(version, interfaces, peers, cidrs);
             } else {
                 error!("Invalid platform data.");
@@ -632,6 +631,14 @@ impl Synchronizer {
         }
     }
 
+    fn parse_containers(resp: &tp::SyncResponse) -> Vec<Arc<Container>> {
+        let mut containers = vec![];
+        for item in &resp.containers {
+            containers.push(Arc::new(Container::from(item)));
+        }
+        return containers;
+    }
+
     fn parse_segment(
         tap_mode: tp::TapMode,
         resp: &tp::SyncResponse,
@@ -737,6 +744,10 @@ impl Synchronizer {
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
+        let containers = Self::parse_containers(&resp);
+        for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+            listener.containers_change(&containers);
+        }
         let (_, macs, gateway_vmac_addrs) = Self::parse_segment(runtime_config.tap_mode, &resp);
 
         let mut status_guard = status.write();

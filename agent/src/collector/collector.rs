@@ -906,7 +906,7 @@ fn get_single_tagger(
         otel_service: flow.otel_service.clone(),
         otel_instance: flow.otel_instance.clone(),
         endpoint,
-        netns_id: flow.netns_id,
+        pod_id: flow.pod_id,
         ..Default::default()
     }
 }
@@ -1027,7 +1027,7 @@ fn get_edge_tagger(
         otel_service: flow.otel_service.clone(),
         otel_instance: flow.otel_instance.clone(),
         endpoint,
-        netns_id: flow.netns_id,
+        pod_id: flow.pod_id,
         ..Default::default()
     }
 }
