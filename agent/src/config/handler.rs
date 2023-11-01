@@ -1156,19 +1156,25 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
                     // use host mac
-                    if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
-                        warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
-                        warn!("setns error: {}", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(-1);
+                    if running_in_container() {
+                        if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                            warn!(
+                                "agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'."
+                            );
+                            warn!("setns error: {}", e);
+                            thread::sleep(Duration::from_secs(1));
+                            process::exit(-1);
+                        }
                     }
                     let (_, ctrl_mac) =
                         get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
-                    if let Err(e) = netns::reset_netns() {
-                        warn!("reset setns error: {}", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(-1);
-                    };
+                    if running_in_container() {
+                        if let Err(e) = netns::reset_netns() {
+                            warn!("reset setns error: {}", e);
+                            thread::sleep(Duration::from_secs(1));
+                            process::exit(-1);
+                        };
+                    }
                     ctrl_mac
                 } else {
                     MacAddr::ZERO
