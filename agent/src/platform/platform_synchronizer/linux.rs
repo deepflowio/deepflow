@@ -51,6 +51,7 @@ use crate::{
             get_all_vm_xml, get_brctl_show, get_hostname, get_ip_address, get_ovs_interfaces,
             get_ovs_ports, get_vlan_config, get_vm_states,
         },
+        environment::running_in_container,
         lru::Lru,
     },
 };
@@ -290,9 +291,11 @@ impl PlatformSynchronizer {
         let mut raw_ip_netns = vec![];
         let mut raw_ip_addrs = vec![];
         for ns in netns {
-            if let Err(e) = netns::open_named_and_setns(ns) {
-                warn!("setns to {:?} failed: {}", ns, e);
-                continue;
+            if running_in_container() {
+                if let Err(e) = netns::open_named_and_setns(ns) {
+                    warn!("setns to {:?} failed: {}", ns, e);
+                    continue;
+                }
             }
             let raw_host_ip_addr = get_ip_address()
                 .map_err(|err| debug!("get_ip_address error:{}", err))
@@ -309,9 +312,11 @@ impl PlatformSynchronizer {
             raw_ip_netns.push(ns.to_string());
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
-        if let Err(e) = netns::reset_netns() {
-            warn!("restore net namespace failed: {}", e);
-            return;
+        if running_in_container() {
+            if let Err(e) = netns::reset_netns() {
+                warn!("restore net namespace failed: {}", e);
+                return;
+            }
         }
 
         let mut raw_all_vm_xml = None;

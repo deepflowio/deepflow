@@ -36,7 +36,12 @@ impl PasswordInfo {
                 continue;
             }
             let Ok(uid) = fields[2].parse::<u32>() else {
-                error!("read pwd file {:?} fail, line `{}` can not parse, uid {} is not integer", file.as_ref().as_os_str(), line, fields[2]);
+                error!(
+                    "read pwd file {:?} fail, line `{}` can not parse, uid {} is not integer",
+                    file.as_ref().as_os_str(),
+                    line,
+                    fields[2]
+                );
                 continue;
             };
             v.push((uid, fields[0].to_string()));
