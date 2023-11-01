@@ -28,7 +28,7 @@ use crate::common::decapsulate::TunnelInfo;
 use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::{IfType, PlatformData};
-use crate::common::policy::{Cidr, CidrType, PeerConnection};
+use crate::common::policy::{Cidr, CidrType, Container, PeerConnection};
 use public::utils::net::is_unicast_link_local;
 
 const BROADCAST_MAC: u64 = 0xffffffffffff;
@@ -90,6 +90,8 @@ pub struct Labeler {
     epc_cidr_masklen_table: RwLock<AHashMap<i32, (u8, u8)>>,
     epc_cidr_table: RwLock<AHashMap<EpcNetIpKey, Arc<Cidr>>>,
     tunnel_cidr_table: RwLock<AHashMap<u32, Vec<Arc<Cidr>>>>,
+    // Container
+    container_table: RwLock<AHashMap<String, u32>>,
 }
 
 impl Default for Labeler {
@@ -104,6 +106,7 @@ impl Default for Labeler {
             epc_cidr_masklen_table: RwLock::new(AHashMap::new()),
             epc_cidr_table: RwLock::new(AHashMap::new()),
             tunnel_cidr_table: RwLock::new(AHashMap::new()),
+            container_table: RwLock::new(AHashMap::new()),
         }
     }
 }
@@ -311,6 +314,22 @@ impl Labeler {
         *self.tunnel_cidr_table.write().unwrap() = tunnel_table;
         *self.epc_cidr_masklen_table.write().unwrap() = masklen_table;
         *self.epc_cidr_table.write().unwrap() = epc_table;
+    }
+
+    pub fn update_container(&mut self, containers: &Vec<Arc<Container>>) {
+        let mut table = AHashMap::new();
+        for item in containers {
+            table.insert(item.container_id.clone(), item.pod_id);
+        }
+        *self.container_table.write().unwrap() = table;
+    }
+
+    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+        if let Some(pod_id) = self.container_table.read().unwrap().get(container_id) {
+            return *pod_id;
+        }
+
+        0
     }
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记

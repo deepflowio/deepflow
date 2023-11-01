@@ -987,6 +987,21 @@ impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Container {
+    pub pod_id: u32,
+    pub container_id: String,
+}
+
+impl From<&trident::Container> for Container {
+    fn from(value: &trident::Container) -> Self {
+        Self {
+            pod_id: value.pod_id(),
+            container_id: value.container_id().to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

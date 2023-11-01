@@ -132,7 +132,7 @@ impl fmt::Display for EventType {
 
 pub struct ProcEvent {
     pub pid: u32,
-    pub netns_id: u32,
+    pub pod_id: u32,
     thread_id: u32,
     coroutine_id: u64, // optional
     process_kname: Vec<u8>,
@@ -184,7 +184,7 @@ impl ProcEvent {
             end_time,
             event_type,
             event_data,
-            netns_id: 0,
+            pod_id: 0,
         };
 
         Ok(BoxedProcEvents(Box::new(proc_event)))
@@ -213,7 +213,7 @@ impl Sendable for BoxedProcEvents {
             process_kname: self.0.process_kname,
             end_time: self.0.end_time,
             event_type: self.0.event_type.into(),
-            netns_id: self.0.netns_id,
+            pod_id: self.0.pod_id,
             ..Default::default()
         };
         match self.0.event_data {

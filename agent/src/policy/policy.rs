@@ -37,7 +37,7 @@ use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{
-    gpid_key, Acl, Cidr, GpidEntry, GpidProtocol, IpGroupData, PeerConnection,
+    gpid_key, Acl, Cidr, Container, GpidEntry, GpidProtocol, IpGroupData, PeerConnection,
 };
 use crate::common::MetaPacket;
 use crate::common::TapPort;
@@ -383,6 +383,10 @@ impl Policy {
         (endpoints, entry)
     }
 
+    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+        self.labeler.lookup_pod_id(container_id)
+    }
+
     pub fn update_interfaces(
         &mut self,
         trident_type: TridentType,
@@ -410,6 +414,10 @@ impl Policy {
     pub fn update_cidr(&mut self, cidrs: &Vec<Arc<Cidr>>) {
         self.table.update_cidr(cidrs);
         self.labeler.update_cidr_table(cidrs);
+    }
+
+    pub fn update_container(&mut self, cidrs: &Vec<Arc<Container>>) {
+        self.labeler.update_container(cidrs);
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
@@ -540,6 +548,10 @@ impl PolicyGetter {
     pub fn lookup_epc_by_epc(&mut self, src: IpAddr, dst: IpAddr, l3_epc_id_src: i32) -> i32 {
         self.policy().lookup_epc_by_epc(src, dst, l3_epc_id_src)
     }
+
+    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+        self.policy().lookup_pod_id(container_id)
+    }
 }
 
 impl From<*mut Policy> for PolicyGetter {
@@ -589,6 +601,10 @@ impl FlowAclListener for PolicySetter {
         Ok(())
     }
 
+    fn containers_change(&mut self, containers: &Vec<Arc<Container>>) {
+        self.update_container(containers);
+    }
+
     fn id(&self) -> usize {
         u16::from(FlowAclListenerId::Policy) as usize
     }
@@ -625,6 +641,10 @@ impl PolicySetter {
 
     pub fn update_cidr(&mut self, cidrs: &Vec<Arc<Cidr>>) {
         self.policy().update_cidr(cidrs);
+    }
+
+    pub fn update_container(&mut self, containers: &Vec<Arc<Container>>) {
+        self.policy().update_container(containers);
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {

@@ -2220,7 +2220,6 @@ impl AgentComponents {
                 profile_sender.clone(),
                 &queue_debugger,
                 stats_collector.clone(),
-                platform_synchronizer.clone(),
             ) {
                 Ok(collector) => {
                     synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));

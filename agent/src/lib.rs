@@ -55,7 +55,9 @@ pub use {
         l7_protocol_log::LogCache as _LogCache,
         lookup_key::LookupKey as _LookupKey,
         platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
-        policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
+        policy::{
+            Acl as _Acl, Cidr as _Cidr, Container as _Container, IpGroupData as _IpGroupData,
+        },
         port_range::PortRange as _PortRange,
         Timestamp as _Timestamp,
     },
