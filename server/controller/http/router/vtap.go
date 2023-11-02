@@ -31,16 +31,19 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-type Vtap struct{}
+type Vtap struct {
+	cfg *config.ControllerConfig
+}
 
-func NewVtap() *Vtap {
-	return new(Vtap)
+func NewVtap(cfg *config.ControllerConfig) *Vtap {
+	return &Vtap{cfg: cfg}
 }
 
 func (v *Vtap) RegisterTo(e *gin.Engine) {
@@ -53,7 +56,7 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/vtaps/batch/", batchUpdateVtap)
 	e.DELETE("/v1/vtaps/batch/", batchDeleteVtap)
 
-	e.POST("/v1/rebalance-vtap/", rebalanceVtap)
+	e.POST("/v1/rebalance-vtap/", rebalanceVtap(v.cfg))
 
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
@@ -221,27 +224,29 @@ func batchDeleteVtap(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func rebalanceVtap(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["check"] = false
-	if value, ok := c.GetQuery("check"); ok {
-		args["check"] = (strings.ToLower(value) == "true")
-	}
-	if value, ok := c.GetQuery("type"); ok {
-		args["type"] = value
-		if args["type"] != "controller" && args["type"] != "analyzer" {
-			BadRequestResponse(
-				c, httpcommon.INVALID_PARAMETERS,
-				fmt.Sprintf("type (%s) is not supported", args["type"]),
-			)
+func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["check"] = false
+		if value, ok := c.GetQuery("check"); ok {
+			args["check"] = (strings.ToLower(value) == "true")
+		}
+		if value, ok := c.GetQuery("type"); ok {
+			args["type"] = value
+			if args["type"] != "controller" && args["type"] != "analyzer" {
+				BadRequestResponse(
+					c, httpcommon.INVALID_PARAMETERS,
+					fmt.Sprintf("type (%s) is not supported", args["type"]),
+				)
+				return
+			}
+		} else {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "must specify type")
 			return
 		}
-	} else {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "must specify type")
-		return
-	}
-	data, err := service.VTapRebalance(args)
-	JsonResponse(c, data, err)
+		data, err := service.VTapRebalance(args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
+		JsonResponse(c, data, err)
+	})
 }
 
 func batchUpdateVtapTapMode(c *gin.Context) {

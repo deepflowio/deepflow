@@ -132,6 +132,13 @@ controller:
     # vtap rebalance config, interval uint:s
     auto_rebalance_vtap: true
     rebalance_check_interval: 300
+    ingester-load-balancing-strategy:
+      # options: by-ingested-data, by-agent-count
+      algorithm: by-ingested-data 
+      # use the data in data-duration as the basis for balancing, default: 1d, uint: s
+      data-duration: 86400
+      # rebalance vtap interval, default: 1h, uint: s
+      rebalance-interval: 3600
     # automatically delete lost vtaps, uint:s
     vtap_auto_delete_interval: 3600
     # warrant

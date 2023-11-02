@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
@@ -49,7 +50,15 @@ func (r *RebalanceCheck) Start() {
 		}
 		for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
 			r.controllerRebalance()
-			r.analyzerRebalance()
+		}
+		if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+			for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
+				r.analyzerRebalance()
+			}
+		} else {
+			for range time.Tick(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second) {
+				r.analyzerRebalanceByTraffic(r.cfg.IngesterLoadBalancingConfig.DataDuration)
+			}
 		}
 	}()
 }
@@ -77,7 +86,7 @@ func (r *RebalanceCheck) controllerRebalance() {
 				"check": false,
 				"type":  "controller",
 			}
-			if result, err := service.VTapRebalance(args); err != nil {
+			if result, err := service.VTapRebalance(args, r.cfg.IngesterLoadBalancingConfig); err != nil {
 				log.Error(err)
 			} else {
 				data, _ := json.Marshal(result)
@@ -104,7 +113,7 @@ func (r *RebalanceCheck) analyzerRebalance() {
 				"check": false,
 				"type":  "analyzer",
 			}
-			if result, err := service.VTapRebalance(args); err != nil {
+			if result, err := service.VTapRebalance(args, r.cfg.IngesterLoadBalancingConfig); err != nil {
 				log.Error(err)
 			} else {
 				data, _ := json.Marshal(result)
@@ -112,5 +121,20 @@ func (r *RebalanceCheck) analyzerRebalance() {
 			}
 			break
 		}
+	}
+}
+
+func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
+	analyzerInfo := rebalance.NewAnalyzerInfo()
+	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
+	if err != nil {
+		log.Errorf("fail to rebalance analyzer by data(if check: true): %v", err)
+		return
+	}
+	if result.TotalSwitchVTapNum != 0 {
+		log.Infof("need rebalance, total switch vtap num(%d)", result.TotalSwitchVTapNum)
+		_, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration)
+		log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+		return
 	}
 }
