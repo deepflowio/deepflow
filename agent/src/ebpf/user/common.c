@@ -71,7 +71,8 @@ int parse_num_range(const char *config_str, int bytes_count,
 		} else if (n == 1) {
 			end = start;
 		}
-		if (start < 0 || start > end) {
+
+		if (start < 0 || start > end || start <= *count - 1) {
 			goto failed;
 		}
 
@@ -93,7 +94,9 @@ int parse_num_range(const char *config_str, int bytes_count,
 
 	return 0;
 failed:
-	ebpf_warning("CPU range error\n");
+	ebpf_warning("Number range (\"%s\") error, Please make sure the range "
+		     "list is in ascending order and there is no overlap in "
+		     "the numbers.\n", config_str);
 	if (*mask != NULL) {
 		free(*mask);
 		*mask = NULL;

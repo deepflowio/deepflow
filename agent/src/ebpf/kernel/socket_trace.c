@@ -112,6 +112,9 @@ MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 // 0: allow bitmap; 1: bypass bitmap
 MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
+// l7-protocol-ports
+MAP_ARRAY(proto_ports_bitmap, __u32, struct kprobe_port_bitmap, PROTO_NUM)
+
 // write() syscall's input argument.
 // Key is {tgid, pid}.
 BPF_HASH(active_write_args_map, __u64, struct data_args_t)

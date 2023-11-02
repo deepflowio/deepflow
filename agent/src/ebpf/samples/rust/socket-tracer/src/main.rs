@@ -390,6 +390,9 @@ fn main() {
             set_allow_port_bitmap(allow_port_bitmap.as_ptr());
         */
 
+        let _ports = CString::new("443".as_bytes()).unwrap();
+        set_protocol_ports_bitmap(SOCK_DATA_TLS as c_int, _ports.as_c_str().as_ptr());
+
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
