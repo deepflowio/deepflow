@@ -57,7 +57,6 @@ l7_protocol                , 应用协议                   ,
 app_service                , 应用服务                   ,
 app_instance               , 应用实例                   ,
 endpoint                   , 端点                       ,
-netns_id                   , Netns ID                   ,
 
 tap                        , 采集点                     , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。
 vtap                       , 采集器                     ,

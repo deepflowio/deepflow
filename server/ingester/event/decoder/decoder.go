@@ -165,7 +165,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
 	s.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
 	s.Duration = uint64(e.EndTime - e.StartTime)
-	s.NetnsID = e.NetnsId
+	s.PodID = e.PodId
 
 	if e.EventType == pb.EventType_IoEvent {
 		s.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_IO)
@@ -185,7 +185,10 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.VTAPID = vtapId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
 
-	info := d.platformData.QueryNetnsIdInfo(uint32(s.VTAPID), s.NetnsID)
+	var info *grpc.Info
+	if e.PodId != 0 {
+		info = d.platformData.QueryEpcIDPodInfo(int32(s.VTAPID), e.PodId)
+	}
 	podGroupType := uint8(0)
 	if info != nil {
 		s.RegionID = uint16(info.RegionID)

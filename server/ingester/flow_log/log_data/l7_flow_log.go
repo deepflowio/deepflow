@@ -70,8 +70,6 @@ type L7Base struct {
 	EndTime      int64  `json:"end_time"`   // us
 	GPID0        uint32
 	GPID1        uint32
-	NetnsID0     uint32
-	NetnsID1     uint32
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -121,8 +119,6 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("gprocess_id_0", ckdb.UInt32).SetComment("全局客户端进程ID"),
 		ckdb.NewColumn("gprocess_id_1", ckdb.UInt32).SetComment("全局服务端进程ID"),
-		ckdb.NewColumn("netns_id_0", ckdb.UInt32).SetComment("客户端网络命名空间ID"),
-		ckdb.NewColumn("netns_id_1", ckdb.UInt32).SetComment("服务端网络命名空间ID"),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -170,8 +166,6 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 		f.EndTime,
 		f.GPID0,
 		f.GPID1,
-		f.NetnsID0,
-		f.NetnsID1,
 
 		int32(f.ProcessID0),
 		int32(f.ProcessID1),
@@ -538,8 +532,6 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 	b.GPID0 = l.Gpid_0
 	b.GPID1 = l.Gpid_1
-	b.NetnsID0 = l.NetnsId_0
-	b.NetnsID1 = l.NetnsId_1
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1
@@ -556,20 +548,22 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	// 知识图谱
 	b.Protocol = uint8(log.Base.Protocol)
-	if l.Gpid_0 != 0 && l.NetnsId_0 == 0 {
-		vtapId, netnsId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if netnsId != 0 && l.VtapId == vtapId {
-			b.NetnsID0 = netnsId
+
+	if l.Gpid_0 != 0 && l.PodId_0 == 0 {
+		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
+		if podId != 0 && l.VtapId == vtapId {
+			b.PodID0 = podId
 			b.TagSource0 |= uint8(zerodoc.GpId)
 		}
 	}
-	if l.Gpid_1 != 0 && l.NetnsId_1 == 0 {
-		vtapId, netnsId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if netnsId != 0 && l.VtapId == vtapId {
-			b.NetnsID1 = netnsId
+	if l.Gpid_1 != 0 && l.PodId_1 == 0 {
+		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
+		if podId != 0 && l.VtapId == vtapId {
+			b.PodID1 = podId
 			b.TagSource1 |= uint8(zerodoc.GpId)
 		}
 	}
+
 	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 }
 
@@ -582,7 +576,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		l.Gpid_0, l.Gpid_1,
-		l.VtapId, l.NetnsId_0, l.NetnsId_1,
+		l.VtapId, l.PodId_0, l.PodId_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,

@@ -54,7 +54,6 @@ type EventStore struct {
 	EventDescription string
 
 	GProcessID uint32
-	NetnsID    uint32
 
 	RegionID     uint16
 	AZID         uint16
@@ -102,7 +101,6 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 		e.EventDescription,
 
 		e.GProcessID,
-		e.NetnsID,
 
 		e.RegionID,
 		e.AZID,
@@ -165,7 +163,6 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
 
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
-		ckdb.NewColumn("netns_id", ckdb.UInt32).SetComment("网络命名空间ID"),
 
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),

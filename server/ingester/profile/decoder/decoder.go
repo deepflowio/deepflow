@@ -37,7 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 	"github.com/google/uuid"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/jfr"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/pprof"
 	pprofile "github.com/pyroscope-io/pyroscope/pkg/convert/profile"
@@ -164,8 +164,7 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			callBack:        d.profileWriter.Write,
 			platformData:    d.platformData,
 			IP:              make([]byte, len(profile.Ip)),
-			netNsID:         profile.NetnsId,
-			containerID:     profile.ContainerId,
+			podID:           profile.PodId,
 			compressionAlgo: d.compressionAlgo,
 			observer:        &observer{},
 			Counter:         d.counter,
