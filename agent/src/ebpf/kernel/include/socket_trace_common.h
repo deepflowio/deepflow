@@ -156,6 +156,8 @@ struct kprobe_port_bitmap {
 	__u8 bitmap[65536 / 8];
 } __attribute__((packed));
 
+typedef struct kprobe_port_bitmap ports_bitmap_t;
+
 struct __io_event_buffer {
 	__u32 bytes_count;
 

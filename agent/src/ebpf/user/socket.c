@@ -88,8 +88,16 @@ static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 static uint32_t io_event_collect_mode = 1;
 static uint64_t io_event_minimal_duration = 1000000;
 
-// socket map 进行回收的最大阈值，超过这个值进行map回收。
+/*
+ * The maximum threshold for socket map reclamation, with map
+ * reclamation occurring if this value is exceeded.
+ */
 static uint32_t conf_socket_map_max_reclaim;
+
+/*
+ * The table for L7 protocol filtering ports.
+ */
+ports_bitmap_t *ports_bitmap[PROTO_NUM];
 
 extern int major, minor;
 extern char linux_release[128];
@@ -355,7 +363,7 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 }
 
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				 void **out, size_t *outsize)
+				 void **out, size_t * outsize)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
@@ -481,7 +489,7 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				void **out, size_t *outsize)
+				void **out, size_t * outsize)
 {
 	return 0;
 }
@@ -535,7 +543,7 @@ static int register_events_handle(struct event_meta *meta,
 	}
 
 	struct extra_event *e;
-	void (*fn)(void *) = NULL;
+	void (*fn) (void *) = NULL;
 	list_for_each_entry(e, &events_list, list) {
 		if (e->type & meta->event_type) {
 			fn = e->h;
@@ -1290,8 +1298,10 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 
 static void update_kprobe_port_bitmap(struct bpf_tracer *tracer)
 {
-	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0, &allow_port_bitmap);
-	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1, &bypass_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0,
+			    &allow_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1,
+			    &bypass_port_bitmap);
 }
 
 static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
@@ -1568,7 +1578,7 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 }
 #endif
 
-extern __thread uword thread_index; // for symbol pid caches hash
+extern __thread uword thread_index;	// for symbol pid caches hash
 static void poller(void *t)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
@@ -1770,9 +1780,9 @@ int running_socket_tracer(tracer_callback_t handle,
 	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
-	     setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
-			      bpf_bin_buffer, buffer_sz, tps,
-			      thread_nr, NULL, NULL, (void *)handle, 0);
+	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
+			     bpf_bin_buffer, buffer_sz, tps,
+			     thread_nr, NULL, NULL, (void *)handle, 0);
 	if (tracer == NULL)
 		return -EINVAL;
 
@@ -1974,7 +1984,7 @@ int socket_tracer_start(void)
 enum tracer_state __unused get_socket_tracer_state(void)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
-	if (t == NULL) 
+	if (t == NULL)
 		return TRACER_STOP_ERR;
 
 	return t->state;
@@ -2142,9 +2152,9 @@ struct socket_trace_stats socket_tracer_stats(void)
  *
  * @return 0 is success, if not 0 is failed
  */
-int register_event_handle(uint32_t type, void (*fn)(void *))
+int register_event_handle(uint32_t type, void (*fn) (void *))
 {
-	if(type < EVENT_TYPE_MIN || fn == NULL) {
+	if (type < EVENT_TYPE_MIN || fn == NULL) {
 		ebpf_warning("Parameter is invalid, type %d fn %p\n", type, fn);
 		return -1;
 	}
@@ -2181,7 +2191,7 @@ void print_uprobe_http2_info(const char *data, int len)
 		__u32 stream_id;
 		__u32 header_len;
 		__u32 value_len;
-	} __attribute__((packed)) header;
+	} __attribute__ ((packed)) header;
 
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
@@ -2209,7 +2219,7 @@ void print_io_event_info(const char *data, int len)
 		__u32 operation;
 		__u64 latency;
 		char filename[64];
-	} __attribute__((packed)) event;
+	} __attribute__ ((packed)) event;
 
 	memcpy(&event, data, sizeof(event));
 
@@ -2229,10 +2239,10 @@ void print_uprobe_grpc_dataframe(const char *data, int len)
 		__u32 stream_id;
 		__u32 data_len;
 		char data[1024];
-	} __attribute__((packed)) dataframe;
+	} __attribute__ ((packed)) dataframe;
 
 	memcpy(&dataframe, data, len);
-	
+
 	fprintf(datadump_file, "stream_id=[%d]\n", dataframe.stream_id);
 	fprintf(datadump_file, "data_len=[%d]\n", dataframe.data_len);
 
@@ -2474,4 +2484,65 @@ static void datadump_process(void *data)
 	if (unlikely(datadump_enable))
 		print_socket_data(sd);
 	pthread_mutex_unlock(&datadump_mutex);
+}
+
+static inline int __set_protocol_ports_bitmap(int proto_type,
+					      bool * allow_ports,
+					      int count, const char *ports)
+{
+	int i;
+	ports_bitmap_t *map = NULL;
+	map =
+	    clib_mem_alloc_aligned("ports_bitmap", sizeof(ports_bitmap_t), 0,
+				   NULL);
+	if (map == NULL) {
+		ebpf_warning("clib_mem_alloc_aligned() failed."
+			     "Set ports_bitmap[%s] failed, ports %s\n",
+			     get_proto_name(proto_type), ports);
+		return -1;
+	}
+
+	memset(map, 0, sizeof(*map));
+	for (i = 0; i < count; i++) {
+		if (allow_ports[i])
+			map->bitmap[i / 8] |= 1 << (i % 8);
+	}
+
+	if (ports_bitmap[proto_type])
+		clib_mem_free(ports_bitmap[proto_type]);
+
+	ports_bitmap[proto_type] = map;
+
+	ebpf_info("Set ports_bitmap[%s] success, ports %s\n",
+		  get_proto_name(proto_type), ports);
+
+	return 0;
+}
+
+int set_protocol_ports_bitmap(int proto_type, const char *ports)
+{
+	ASSERT(proto_type < ARRAY_SIZE(ports_bitmap));
+
+	bool *allow_ports = NULL;
+	int err, n = 0;
+	err = parse_num_range(ports, strlen(ports), &allow_ports, &n);
+	if (err) {
+		allow_ports = NULL;
+		goto failed;
+	}
+
+	if (__set_protocol_ports_bitmap(proto_type, allow_ports, n, ports))
+		goto failed;
+
+	free(allow_ports);
+	return 0;
+
+failed:
+	if (allow_ports)
+		free(allow_ports);
+
+	ebpf_warning
+	    ("failed to get proto_type %d mask, ports %s err %d\n",
+	     proto_type, ports, err);
+	return -1;
 }

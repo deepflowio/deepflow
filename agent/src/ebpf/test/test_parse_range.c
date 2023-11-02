@@ -21,14 +21,46 @@
 
 int main(void)
 {
-	printf("Test func parse_num_range() : ");
 	log_to_stdout = true;
 	bool *online = NULL;
 	int err, n = 0;
-	const char *online_cpus_str = "3, 5, 8-10, 12,15-32";
+	const char *online_cpus_str = "3, 5, 8-10, 10-12, 15-32";
 	err =
 	    parse_num_range(online_cpus_str, strlen(online_cpus_str), &online,
 			    &n);
+	if (err == 0)
+		goto failed;
+	printf("Test \"%s\" err %d done\n", online_cpus_str, err);
+
+	free(online);
+	online = NULL;
+	n = 0;
+	const char *online_cpus_str_0 = "3, 5, 8-10, 9-12, 15-32";
+	err =
+	    parse_num_range(online_cpus_str_0, strlen(online_cpus_str_0),
+			    &online, &n);
+	if (err == 0)
+		goto failed;
+	printf("Test \"%s\" err %d done\n", online_cpus_str_0, err);
+
+	free(online);
+	online = NULL;
+	n = 0;
+	const char *online_cpus_str_1 = "3, 5, 12, 8-10, 15-32";
+	err =
+	    parse_num_range(online_cpus_str_1, strlen(online_cpus_str_1),
+			    &online, &n);
+	if (err == 0)
+		goto failed;
+	printf("Test \"%s\" err %d done\n", online_cpus_str_1, err);
+
+	free(online);
+	online = NULL;
+	n = 0;
+	const char *online_cpus_str_2 = "3, 5, 8-10, 12, 15-32";
+	err =
+	    parse_num_range(online_cpus_str_2, strlen(online_cpus_str_2),
+			    &online, &n);
 	if (err) {
 		ebpf_warning("failed to get online CPU mask: %d\n", err);
 		return -1;
@@ -48,6 +80,7 @@ int main(void)
 		}
 	}
 
+	printf("Test \"%s\" err %d done\n", online_cpus_str_2, err);
 	free(online);
 	printf("[OK]\n");
 	return 0;
