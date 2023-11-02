@@ -81,7 +81,6 @@ type InProcessProfile struct {
 	PodNSID      uint16
 	PodClusterID uint16
 	PodGroupID   uint32
-	NetnsID      uint32
 
 	IP4    uint32 `json:"ip4"`
 	IP6    net.IP `json:"ip6"`
@@ -156,7 +155,6 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID"),
 		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID"),
 		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID"),
-		ckdb.NewColumn("netns_id", ckdb.UInt32).SetComment("应用网络命名空间ID"),
 
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
@@ -224,7 +222,6 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.PodNSID,
 		p.PodClusterID,
 		p.PodGroupID,
-		p.NetnsID,
 		p.L3DeviceType,
 		p.L3DeviceID,
 		p.ServiceID,
@@ -263,8 +260,7 @@ func ReleaseInProcess(p *InProcessProfile) {
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
 	vtapID uint16,
-	netNsID uint64,
-	containerID string,
+	podID uint32,
 	profileName string,
 	eventType string,
 	location string,
@@ -280,7 +276,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.Time = uint32(input.StartTime.Unix())
 	p._id = genID(uint32(input.StartTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
 	p.VtapID = vtapID
-	p.NetnsID = uint32(netNsID)
+	p.PodID = podID
 	p.AppService = profileName
 	p.ProfileLocationStr = location
 	p.CompressionAlgo = compressionAlgo
@@ -301,7 +297,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
-	p.fillResource(uint32(vtapID), containerID, platformData)
+	p.fillResource(uint32(vtapID), podID, platformData)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -309,7 +305,7 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
 	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
@@ -327,26 +323,14 @@ func (p *InProcessProfile) fillResource(vtapID uint32, containerID string, platf
 	}
 
 	var info *grpc.Info
-	if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
-		// ebpf profile will submit netns from agent
-		// 1. try to find platform info by containerid
-		if containerID != "" {
-			p.fillPodInfo(vtapID, containerID, platformData)
-			if p.PodID != 0 {
-				info = platformData.QueryEpcIDPodInfo(p.L3EpcID, p.PodID)
-			}
-		}
-
-		// 2. if find nothing, try to find platform info by netnsid
-		if info == nil && p.NetnsID != 0 {
-			info = platformData.QueryNetnsIdInfo(vtapID, p.NetnsID)
-		}
+	// 1. try to find platform info by podID first
+	if podID != 0 {
+		info = platformData.QueryEpcIDPodInfo(p.L3EpcID, podID)
 	}
 
-	// 3. try to fix platform info by IP
+	// 2. try to fix platform info by IP
 	if info == nil {
 		// app profile: submit IP from agent
-		// ebpf profile: submit netns from agent, info != nil
 		// ebpf profile with hostnetwork: when PodID get nil infos, try to get info from PodNodeID
 		if p.IsIPv4 {
 			info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
