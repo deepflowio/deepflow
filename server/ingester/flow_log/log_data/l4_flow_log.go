@@ -700,7 +700,7 @@ func (k *KnowledgeGraph) fill(
 	ip60, ip61 net.IP,
 	mac0, mac1 uint64,
 	gpID0, gpID1 uint32,
-	vtapId, netnsId0, netnsId1 uint32,
+	vtapId, podId0, podId1 uint32,
 	port uint16,
 	tapSide uint32,
 	protocol layers.IPProtocol) {
@@ -723,14 +723,14 @@ func (k *KnowledgeGraph) fill(
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
-	// use vtapId + netnsId to match first
-	if netnsId0 != 0 {
-		k.TagSource0 |= uint8(zerodoc.NetnsId)
-		info0 = platformData.QueryNetnsIdInfo(vtapId, netnsId0)
+	// use vtapId + podId to match first
+	if podId0 != 0 {
+		k.TagSource0 |= uint8(zerodoc.PodId)
+		info0 = platformData.QueryEpcIDPodInfo(l3EpcID0, podId0)
 	}
-	if netnsId1 != 0 {
-		k.TagSource1 |= uint8(zerodoc.NetnsId)
-		info1 = platformData.QueryNetnsIdInfo(vtapId, netnsId1)
+	if podId1 != 0 {
+		k.TagSource1 |= uint8(zerodoc.PodId)
+		info1 = platformData.QueryEpcIDPodInfo(l3EpcID1, podId1)
 	}
 
 	if info0 == nil {

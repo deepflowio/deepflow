@@ -44,6 +44,5 @@ event_type                 , event_type                , event_type             
 event_desc                 , event_desc                , event_desc                , string         ,                       , Event Info      , 111
 
 app_instance               , app_instance              , app_instance              , string         ,                           , Service Info    , 111
-netns_id                   , netns_id                  , netns_id                  , int            ,                           , Service Info    , 111
 vtap                       , vtap                      , vtap                      , resource       ,                           , Capture Info    , 111
 signal_source              , signal_source             , signal_source             , int_enum       , perf_event_signal_source  , Capture Info    , 111
