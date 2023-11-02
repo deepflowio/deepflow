@@ -137,6 +137,15 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		controllerIPToRegion[conn.ControllerIP] = conn.Region
 	}
 
+	syncIPLcuuidSet := map[string]bool{}
+	syncHostLcuuidSet := map[string]bool{}
+	syncLLDPLcuuidSet := map[string]bool{}
+	syncNetworkLcuuidSet := map[string]bool{}
+	syncPortLcuuidSet := map[string]bool{}
+	syncVMLcuuidSet := map[string]bool{}
+	syncVPCLcuuidSet := map[string]bool{}
+	syncVinterfaceLcuuidSet := map[string]bool{}
+	syncProcessLcuuidSet := map[string]bool{}
 	for _, controller := range controllers {
 		// skip other region controller
 		if region, ok := controllerIPToRegion[controller.IP]; !ok || region != currentRegion {
@@ -179,17 +188,21 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[ip.GetVtapId()]; !ok {
 				continue
 			}
+			sIPLcuuid := ip.GetLcuuid()
+			if _, ok := syncIPLcuuidSet[sIPLcuuid]; ok {
+				continue
+			}
+			syncIPLcuuidSet[sIPLcuuid] = false
 			ipLastSeenStr := ip.GetLastSeen()
 			ipLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, ipLastSeenStr, time.Local)
-			gIP := model.GenesisIP{
+			retGenesisSyncData.IPLastSeens = append(retGenesisSyncData.IPLastSeens, model.GenesisIP{
 				Masklen:          ip.GetMasklen(),
 				IP:               ip.GetIp(),
-				Lcuuid:           ip.GetLcuuid(),
+				Lcuuid:           sIPLcuuid,
 				VinterfaceLcuuid: ip.GetVinterfaceLcuuid(),
 				NodeIP:           ip.GetNodeIp(),
 				LastSeen:         ipLastSeen,
-			}
-			retGenesisSyncData.IPLastSeens = append(retGenesisSyncData.IPLastSeens, gIP)
+			})
 		}
 
 		genesisSyncHosts := genesisSyncData.GetHost()
@@ -197,13 +210,17 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[host.GetVtapId()]; !ok {
 				continue
 			}
-			gHost := model.GenesisHost{
-				Lcuuid:   host.GetLcuuid(),
+			sHostLcuuid := host.GetLcuuid()
+			if _, ok := syncHostLcuuidSet[sHostLcuuid]; ok {
+				continue
+			}
+			syncHostLcuuidSet[sHostLcuuid] = false
+			retGenesisSyncData.Hosts = append(retGenesisSyncData.Hosts, model.GenesisHost{
+				Lcuuid:   sHostLcuuid,
 				Hostname: host.GetHostname(),
 				IP:       host.GetIp(),
 				NodeIP:   host.GetNodeIp(),
-			}
-			retGenesisSyncData.Hosts = append(retGenesisSyncData.Hosts, gHost)
+			})
 		}
 
 		genesisSyncLldps := genesisSyncData.GetLldp()
@@ -211,10 +228,15 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[l.GetVtapId()]; !ok {
 				continue
 			}
+			sLLDPLcuuid := l.GetLcuuid()
+			if _, ok := syncLLDPLcuuidSet[sLLDPLcuuid]; ok {
+				continue
+			}
+			syncLLDPLcuuidSet[sLLDPLcuuid] = false
 			lLastSeenStr := l.GetLastSeen()
 			lLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, lLastSeenStr, time.Local)
-			gLldp := model.GenesisLldp{
-				Lcuuid:                l.GetLcuuid(),
+			retGenesisSyncData.Lldps = append(retGenesisSyncData.Lldps, model.GenesisLldp{
+				Lcuuid:                sLLDPLcuuid,
 				HostIP:                l.GetHostIp(),
 				HostInterface:         l.GetHostInterface(),
 				SystemName:            l.GetSystemName(),
@@ -223,8 +245,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				VinterfaceDescription: l.GetVinterfaceDescription(),
 				NodeIP:                l.GetNodeIp(),
 				LastSeen:              lLastSeen,
-			}
-			retGenesisSyncData.Lldps = append(retGenesisSyncData.Lldps, gLldp)
+			})
 		}
 
 		genesisSyncNetworks := genesisSyncData.GetNetwork()
@@ -232,16 +253,20 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[network.GetVtapId()]; !ok {
 				continue
 			}
-			gNetwork := model.GenesisNetwork{
+			sNetworkLcuuid := network.GetLcuuid()
+			if _, ok := syncNetworkLcuuidSet[sNetworkLcuuid]; ok {
+				continue
+			}
+			syncNetworkLcuuidSet[sNetworkLcuuid] = false
+			retGenesisSyncData.Networks = append(retGenesisSyncData.Networks, model.GenesisNetwork{
 				SegmentationID: network.GetSegmentationId(),
 				NetType:        network.GetNetType(),
 				External:       network.GetExternal(),
 				Name:           network.GetName(),
-				Lcuuid:         network.GetLcuuid(),
+				Lcuuid:         sNetworkLcuuid,
 				VPCLcuuid:      network.GetVpcLcuuid(),
 				NodeIP:         network.GetNodeIp(),
-			}
-			retGenesisSyncData.Networks = append(retGenesisSyncData.Networks, gNetwork)
+			})
 		}
 
 		genesisSyncPorts := genesisSyncData.GetPort()
@@ -249,17 +274,21 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[port.GetVtapId()]; !ok {
 				continue
 			}
-			gPort := model.GenesisPort{
+			sPortLcuuid := port.GetLcuuid()
+			if _, ok := syncPortLcuuidSet[sPortLcuuid]; ok {
+				continue
+			}
+			syncPortLcuuidSet[sPortLcuuid] = false
+			retGenesisSyncData.Ports = append(retGenesisSyncData.Ports, model.GenesisPort{
 				Type:          port.GetType(),
 				DeviceType:    port.GetDeviceType(),
-				Lcuuid:        port.GetLcuuid(),
+				Lcuuid:        sPortLcuuid,
 				Mac:           port.GetMac(),
 				DeviceLcuuid:  port.GetDeviceLcuuid(),
 				NetworkLcuuid: port.GetNetworkLcuuid(),
 				VPCLcuuid:     port.GetVpcLcuuid(),
 				NodeIP:        port.GetNodeIp(),
-			}
-			retGenesisSyncData.Ports = append(retGenesisSyncData.Ports, gPort)
+			})
 		}
 
 		genesisSyncVms := genesisSyncData.GetVm()
@@ -267,19 +296,23 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[vm.GetVtapId()]; !ok {
 				continue
 			}
+			sVMLcuuid := vm.GetLcuuid()
+			if _, ok := syncVMLcuuidSet[sVMLcuuid]; ok {
+				continue
+			}
+			syncVMLcuuidSet[sVMLcuuid] = false
 			vCreatedAtStr := vm.GetCreatedAt()
 			vCreatedAt, _ := time.ParseInLocation(common.GO_BIRTHDAY, vCreatedAtStr, time.Local)
-			gVm := model.GenesisVM{
+			retGenesisSyncData.VMs = append(retGenesisSyncData.VMs, model.GenesisVM{
 				State:        vm.GetState(),
-				Lcuuid:       vm.GetLcuuid(),
+				Lcuuid:       sVMLcuuid,
 				Name:         vm.GetName(),
 				Label:        vm.GetLabel(),
 				VPCLcuuid:    vm.GetVpcLcuuid(),
 				LaunchServer: vm.GetLaunchServer(),
 				NodeIP:       vm.GetNodeIp(),
 				CreatedAt:    vCreatedAt,
-			}
-			retGenesisSyncData.VMs = append(retGenesisSyncData.VMs, gVm)
+			})
 		}
 
 		genesisSyncVpcs := genesisSyncData.GetVpc()
@@ -287,12 +320,16 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[vpc.GetVtapId()]; !ok {
 				continue
 			}
-			gVpc := model.GenesisVpc{
-				Lcuuid: vpc.GetLcuuid(),
+			sVPCLcuuid := vpc.GetLcuuid()
+			if _, ok := syncVPCLcuuidSet[sVPCLcuuid]; ok {
+				continue
+			}
+			syncVPCLcuuidSet[sVPCLcuuid] = false
+			retGenesisSyncData.VPCs = append(retGenesisSyncData.VPCs, model.GenesisVpc{
+				Lcuuid: sVPCLcuuid,
 				Name:   vpc.GetName(),
 				NodeIP: vpc.GetNodeIp(),
-			}
-			retGenesisSyncData.VPCs = append(retGenesisSyncData.VPCs, gVpc)
+			})
 		}
 
 		genesisSyncVinterfaces := genesisSyncData.GetVinterface()
@@ -300,11 +337,16 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[v.GetVtapId()]; !ok {
 				continue
 			}
+			sVinterfaceLcuuid := v.GetLcuuid()
+			if _, ok := syncVinterfaceLcuuidSet[sVinterfaceLcuuid]; ok {
+				continue
+			}
+			syncVinterfaceLcuuidSet[sVinterfaceLcuuid] = false
 			vLastSeenStr := v.GetLastSeen()
 			vpLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, vLastSeenStr, time.Local)
-			gVinterface := model.GenesisVinterface{
+			retGenesisSyncData.Vinterfaces = append(retGenesisSyncData.Vinterfaces, model.GenesisVinterface{
 				VtapID:              v.GetVtapId(),
-				Lcuuid:              v.GetLcuuid(),
+				Lcuuid:              sVinterfaceLcuuid,
 				Name:                v.GetName(),
 				IPs:                 v.GetIps(),
 				Mac:                 v.GetMac(),
@@ -317,8 +359,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				KubernetesClusterID: v.GetKubernetesClusterId(),
 				NodeIP:              v.GetNodeIp(),
 				LastSeen:            vpLastSeen,
-			}
-			retGenesisSyncData.Vinterfaces = append(retGenesisSyncData.Vinterfaces, gVinterface)
+			})
 		}
 
 		genesisSyncProcesses := genesisSyncData.GetProcess()
@@ -326,12 +367,17 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			if _, ok := vtapIDMap[p.GetVtapId()]; !ok {
 				continue
 			}
+			sProcessLcuuid := p.GetLcuuid()
+			if _, ok := syncProcessLcuuidSet[sProcessLcuuid]; ok {
+				continue
+			}
+			syncProcessLcuuidSet[sProcessLcuuid] = false
 			pStartTimeStr := p.GetStartTime()
 			pStartTime, _ := time.ParseInLocation(common.GO_BIRTHDAY, pStartTimeStr, time.Local)
-			gProcess := model.GenesisProcess{
+			retGenesisSyncData.Processes = append(retGenesisSyncData.Processes, model.GenesisProcess{
 				VtapID:      p.GetVtapId(),
 				PID:         p.GetPid(),
-				Lcuuid:      p.GetLcuuid(),
+				Lcuuid:      sProcessLcuuid,
 				Name:        p.GetName(),
 				ProcessName: p.GetProcessName(),
 				CMDLine:     p.GetCmdLine(),
@@ -339,8 +385,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				OSAPPTags:   p.GetOsAppTags(),
 				NodeIP:      p.GetNodeIp(),
 				StartTime:   pStartTime,
-			}
-			retGenesisSyncData.Processes = append(retGenesisSyncData.Processes, gProcess)
+			})
 		}
 	}
 	return retGenesisSyncData, nil
