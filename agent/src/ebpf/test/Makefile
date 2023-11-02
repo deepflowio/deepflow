@@ -24,7 +24,7 @@ ARCH ?= $(shell uname -m)
 CC ?= gcc
 CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
-EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id
+EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id test_parse_range
 ifeq ($(ARCH), x86_64)
 #-lbcc -lstdc++
         LDLIBS += ../libtrace.a -ljattach -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl
