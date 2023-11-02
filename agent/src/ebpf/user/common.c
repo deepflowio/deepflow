@@ -54,33 +54,18 @@ bool is_core_kernel(void)
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
-static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
+int parse_num_range(const char *config_str, int bytes_count,
+		    bool **mask, int *count)
 {
-	int fd, i, n, len, start, end = -1;
+	int i, n, len, start, end = -1;
 	bool *tmp;
-	char buf[1024];
-	if ((fd = open(cpu_file, O_RDONLY | O_CLOEXEC)) < 0) {
-		ebpf_warning("Failed to open file (%s: %d)\n", cpu_file, errno);
-		return -1;
-	}
-
-	len = read(fd, buf, sizeof(buf));
-	close(fd);
-	if (len <= 0) {
-		ebpf_warning("Failed to read file (%s: %d)\n", cpu_file, errno);
-		return -1;
-	}
-
-	if (len >= sizeof(buf)) {
-		ebpf_warning("File is too big %s\n", cpu_file);
-		return -1;
-	}
-
-	for (i = 0; i < len; i++) {
-		if (buf[i] == ',' || buf[i] == '\n') {
+	for (i = 0; i < bytes_count; i++) {
+		if (config_str[i] == ',' || config_str[i] == '\n' ||
+		    config_str[i] == ' ') {
 			continue;
 		}
-		n = sscanf(&buf[i], "%d%n-%d%n", &start, &len, &end, &len);
+
+		n = sscanf(&config_str[i], "%d%n-%d%n", &start, &len, &end, &len);
 		if (n <= 0 || n > 2) {
 			goto failed;
 		} else if (n == 1) {
@@ -94,14 +79,15 @@ static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
 		if (!tmp) {
 			goto failed;
 		}
+
 		*mask = tmp;
-		memset(tmp + *cpu_count, 0, start - *cpu_count);
+		memset(tmp + *count, 0, start - *count);
 		memset(tmp + start, 1, end - start + 1);
-		*cpu_count = end + 1;
+		*count = end + 1;
 		i += (len - 1);
 	}
 
-	if (*cpu_count == 0) {
+	if (*count == 0) {
 		goto failed;
 	}
 
@@ -113,8 +99,32 @@ failed:
 		*mask = NULL;
 	}
 
-	*cpu_count = 0;
+	*count = 0;
 	return -1;
+}
+
+static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
+{
+	int fd, len;
+	char buf[1024];
+	if ((fd = open(cpu_file, O_RDONLY | O_CLOEXEC)) < 0) {
+		ebpf_warning("Failed to open file (%s: %d)\n", cpu_file, errno);
+		return -1;
+	}
+
+	len = read(fd, buf, sizeof(buf));
+	close(fd);
+	if (len <= 0) {
+		ebpf_warning("Failed to read file (%s: %d)\n", cpu_file, errno);
+		return -1;
+	}
+
+	if (len > sizeof(buf)) {
+		ebpf_warning("File is too big %s\n", cpu_file);
+		return -1;
+	}
+
+	return parse_num_range(buf, len, mask, cpu_count);
 }
 
 int get_cpus_count(bool ** mask)

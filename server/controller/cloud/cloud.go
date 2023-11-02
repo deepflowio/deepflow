@@ -391,6 +391,10 @@ func getContentFromAdditionalResource(domainUUID string) (*mysql.DomainAdditiona
 func (c *Cloud) appendCloudTags(resource model.Resource, additionalResource model.AdditionalResource) model.Resource {
 	chostCloudTags := additionalResource.CHostCloudTags
 	for i, chost := range resource.VMs {
+		if len(chost.CloudTags) != 0 {
+			log.Infof("vm (%s) already tags (%v), do not need to add it", chost.Name, chost.CloudTags)
+			continue
+		}
 		if value, ok := chostCloudTags[chost.Lcuuid]; ok {
 			resource.VMs[i].CloudTags = value
 		}

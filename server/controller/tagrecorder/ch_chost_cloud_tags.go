@@ -18,7 +18,6 @@ package tagrecorder
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -48,12 +47,8 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 	keyToItem := make(map[CloudTagsKey]mysql.ChChostCloudTags)
 	for _, vm := range vms {
 		cloudTagsMap := map[string]string{}
-		splitCloudTags := strings.Split(vm.CloudTags, ", ")
-		for _, singleCloudTag := range splitCloudTags {
-			splitSingleLabel := strings.Split(singleCloudTag, ":")
-			if len(splitSingleLabel) == 2 {
-				cloudTagsMap[splitSingleLabel[0]] = splitSingleLabel[1]
-			}
+		for k, v := range vm.CloudTags {
+			cloudTagsMap[k] = v
 		}
 		if len(cloudTagsMap) > 0 {
 			cloudTagsStr, err := json.Marshal(cloudTagsMap)

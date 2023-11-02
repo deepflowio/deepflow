@@ -267,7 +267,9 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
             )),
             OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Ok(Self::ParentProcessName(re, action)),
             OS_PROC_REGEXP_MATCH_TYPE_TAG => Ok(Self::Tag(re, action)),
-            _ => Err(regex::Error::__Nonexhaustive),
+            _ => Err(regex::Error::Syntax(
+                "regexp match type incorrect".to_string(),
+            )),
         }
     }
 }

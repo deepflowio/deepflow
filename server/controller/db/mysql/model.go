@@ -554,7 +554,7 @@ func (c compressedBytes) Value() (driver.Value, error) {
 	if err = w.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close zlib writer: %v", err)
 	}
-	log.Info("compress time comsumed: %v", time.Since(t1))
+	log.Infof("compress time comsumed: %v", time.Since(t1))
 	return b.String(), nil
 }
 

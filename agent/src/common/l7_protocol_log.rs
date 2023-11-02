@@ -36,8 +36,8 @@ use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
-    DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
-    SofaRpcLog, TlsLog,
+    DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, OracleLog, PostgresqlLog,
+    RedisLog, SofaRpcLog, TlsLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
 use crate::plugin::wasm::WasmVm;
@@ -169,6 +169,7 @@ impl_protocol_parser! {
         PostgreSQL(PostgresqlLog),
         Dubbo(DubboLog),
         FastCGI(FastCGILog),
+        Oracle(OracleLog),
         MQTT(MqttLog),
         Tls(TlsLog),
         // add protocol below
