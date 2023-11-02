@@ -170,19 +170,19 @@ func (Host) TableName() string {
 type VM struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
-	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
-	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	HType          int    `gorm:"column:htype;type:int;default:1" json:"HTYPE" mapstructure:"HTYPE"`                         // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
-	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER" mapstructure:"LAUNCH_SERVER"`
-	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"` // separated by ,
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
-	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
+	State          int               `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
+	Name           string            `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
+	Alias          string            `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
+	Label          string            `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
+	CreateMethod   int               `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
+	HType          int               `gorm:"column:htype;type:int;default:1" json:"HTYPE" mapstructure:"HTYPE"`                         // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
+	LaunchServer   string            `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER" mapstructure:"LAUNCH_SERVER"`
+	VPCID          int               `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
+	Domain         string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	AZ             string            `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
+	Region         string            `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
+	UID            string            `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
+	CloudTags      map[string]string `gorm:"column:cloud_tags;type:text;default:'';serializer:json" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"`
 }
 
 func (VM) TableName() string {
@@ -649,14 +649,14 @@ type PodCluster struct {
 type PodNamespace struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
-	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"` // separated by ,
-	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Name           string            `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
+	Alias          string            `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
+	PodClusterID   int               `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
+	AZ             string            `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
+	Region         string            `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
+	SubDomain      string            `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain         string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	CloudTags      map[string]string `gorm:"column:cloud_tags;type:text;default:'';serializer:json" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"`
 }
 
 type PodNode struct {

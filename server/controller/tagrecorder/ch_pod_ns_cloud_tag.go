@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -46,19 +44,15 @@ func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudT
 
 	keyToItem := make(map[CloudTagKey]mysql.ChPodNSCloudTag)
 	for _, podNamespace := range podNamespaces {
-		splitTags := strings.Split(podNamespace.CloudTags, ", ")
-		for _, singleTag := range splitTags {
-			splitSingleTag := strings.Split(singleTag, ":")
-			if len(splitSingleTag) == 2 {
-				key := CloudTagKey{
-					ID:  podNamespace.ID,
-					Key: splitSingleTag[0],
-				}
-				keyToItem[key] = mysql.ChPodNSCloudTag{
-					ID:    podNamespace.ID,
-					Key:   splitSingleTag[0],
-					Value: splitSingleTag[1],
-				}
+		for k, v := range podNamespace.CloudTags {
+			key := CloudTagKey{
+				ID:  podNamespace.ID,
+				Key: k,
+			}
+			keyToItem[key] = mysql.ChPodNSCloudTag{
+				ID:    podNamespace.ID,
+				Key:   k,
+				Value: v,
 			}
 		}
 	}

@@ -698,3 +698,16 @@ func GenerateWANVInterfaceMac(mac string) string {
 	}
 	return "ff" + mac[2:]
 }
+
+func DiffMap(base, another map[string]string) bool {
+	for k, v := range another {
+		bValue, ok := base[k]
+		if !ok {
+			return true
+		}
+		if v != bValue {
+			return true
+		}
+	}
+	return false
+}

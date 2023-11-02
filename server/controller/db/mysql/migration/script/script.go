@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package migration
+package script
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.4.1.1"
-)
+import "github.com/op/go-logging"
+
+var log = logging.MustGetLogger("db.mysql.migration.script")
