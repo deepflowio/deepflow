@@ -29,7 +29,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use neli::{
     attr::Attribute,
     consts::{genl::*, nl::*, rtnl::*, socket::*},
@@ -344,9 +344,33 @@ thread_local! {
     // set at first `setns` call
     // used to restore net namespace
     static ORIGINAL_NETNS: OnceCell<File> = OnceCell::new();
+    // check if current system supports network namespace
+    // if not, setns calls will be NOOP
+    static SUPPORTS_NETNS: OnceCell<bool> = OnceCell::new();
+}
+
+const SELF_NS_PATH: &'static str = "/proc/self/ns/net";
+
+pub fn supported() -> bool {
+    SUPPORTS_NETNS.with(|f| {
+        *f.get_or_init(|| {
+            if fs::metadata(SELF_NS_PATH).is_ok() {
+                true
+            } else {
+                info!(
+                    "path {} is not accessible, setns() calls will be NOOP",
+                    SELF_NS_PATH
+                );
+                false
+            }
+        })
+    })
 }
 
 pub fn set_netns(fp: &File) -> Result<()> {
+    if !supported() {
+        return Ok(());
+    }
     let cur_path = current_netns_path();
     ORIGINAL_NETNS.with(|f| {
         f.get_or_init(|| File::open(&cur_path).expect("open thread net namespace file failed"));
@@ -377,6 +401,9 @@ pub fn set_netns(fp: &File) -> Result<()> {
 }
 
 pub fn reset_netns() -> Result<()> {
+    if !supported() {
+        return Ok(());
+    }
     ORIGINAL_NETNS.with(|f| {
         if let Some(fp) = f.get() {
             // do nothing if current ns is target ns
@@ -402,6 +429,9 @@ pub fn reset_netns() -> Result<()> {
 }
 
 pub fn open_named_and_setns(ns: &NsFile) -> Result<()> {
+    if !supported() {
+        return Ok(());
+    }
     let path = match ns {
         NsFile::Root => Cow::Borrowed(Path::new(ROOT_NS_PATH)),
         NsFile::Named(name) => Cow::Owned(Path::new(NAMED_PATH).join(name)),

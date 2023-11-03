@@ -62,6 +62,9 @@ pub use recv_engine::{
 #[cfg(target_os = "linux")]
 use self::base_dispatcher::TapInterfaceWhitelist;
 use crate::config::handler::CollectorAccess;
+#[cfg(target_os = "linux")]
+use crate::platform::GenericPoller;
+use crate::utils::environment::get_mac_by_name;
 use crate::{
     common::{enums::TapType, flow::L7Stats, FlowAclListener, TaggedFlow, TapTyper},
     config::{
@@ -73,13 +76,8 @@ use crate::{
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
-    utils::{
-        environment::get_mac_by_name,
-        stats::{self, Collector},
-    },
+    utils::stats::{self, Collector},
 };
-#[cfg(target_os = "linux")]
-use crate::{platform::GenericPoller, utils::environment::running_in_container};
 #[cfg(target_os = "linux")]
 use public::netns;
 use public::{
@@ -817,9 +815,7 @@ impl DispatcherBuilder {
         let netns = self.netns.unwrap_or_default();
         // set ns before creating af packet socket
         #[cfg(target_os = "linux")]
-        if running_in_container() {
-            let _ = netns::open_named_and_setns(&netns)?;
-        }
+        let _ = netns::open_named_and_setns(&netns)?;
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -1049,9 +1045,7 @@ impl DispatcherBuilder {
         };
         dispatcher.init();
         #[cfg(target_os = "linux")]
-        if running_in_container() {
-            let _ = netns::reset_netns()?;
-        }
+        let _ = netns::reset_netns()?;
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
             terminated,
