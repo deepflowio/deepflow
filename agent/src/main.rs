@@ -28,7 +28,12 @@ use ::deepflow_agent::*;
 #[derive(Parser)]
 struct Opts {
     /// Specify config file location
-    #[clap(short = 'f', long, default_value = "/etc/deepflow-agent.yaml")]
+    #[clap(
+        short = 'f',
+        visible_short_alias = 'c',
+        long,
+        default_value = "/etc/deepflow-agent.yaml"
+    )]
     config_file: String,
 
     /// Enable standalone mode, default config path is /etc/deepflow-agent-standalone.yaml
