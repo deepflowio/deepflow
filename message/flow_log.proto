@@ -267,10 +267,12 @@ message AppProtoLogsBaseInfo {
     uint32 syscall_cap_seq_1 = 34;
     uint32 gpid_0 = 35;
     uint32 gpid_1 = 36;
-    uint32 netns_id_0 = 37;
-    uint32 netns_id_1 = 38;
+    uint32 netns_id_0 = 37; // TODO: deprecated in v6.4.1: uint32 netns_id_0 = 37;
+    uint32 netns_id_1 = 38; // TODO: deprecated in v6.4.1: uint32 netns_id_1 = 38;
     uint64 syscall_coroutine_0 = 39;
     uint64 syscall_coroutine_1 = 40;
+    uint32 pod_id_0 = 41;
+    uint32 pod_id_1 = 42;
 }
 
 message AppProtoHead {
