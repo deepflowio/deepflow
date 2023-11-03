@@ -618,7 +618,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		}
 
 		/* check and clean symbol cache */
-		exec_symbol_cache_update();
+		exec_proc_info_cache_update();
 	}
 
 	vec_free(raw_stack_data);
@@ -778,7 +778,7 @@ static void cp_reader_work(void *arg)
 		 */
 		if (unlikely(!regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
-			exec_symbol_cache_update();
+			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
@@ -854,10 +854,6 @@ static int create_profiler(struct bpf_tracer *tracer)
 	/* clear old perf files */
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
-
-	/* syms_cache_hash maps from pid to BCC symbol cache.
-	 * Use of void* is inherited from the BCC library. */
-	create_and_init_symbolizer_caches();
 
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
@@ -1339,6 +1335,11 @@ int set_profiler_cpu_aggregation(int flag)
 	return (0);
 }
 
+struct bpf_tracer *get_profiler_tracer(void)
+{
+        return profiler_tracer;
+}
+
 #else /* defined AARCH64_MUSL */
 #include "../tracer.h"
 #include "perf_profiler.h"
@@ -1374,5 +1375,10 @@ int set_profiler_regex(const char *pattern)
 int set_profiler_cpu_aggregation(int flag)
 {
 	return (-1);
+}
+
+struct bpf_tracer *get_profiler_tracer(void)
+{
+	return NULL;
 }
 #endif /* AARCH64_MUSL */

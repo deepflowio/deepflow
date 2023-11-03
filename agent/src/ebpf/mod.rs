@@ -163,8 +163,8 @@ pub struct SK_BPF_DATA {
     pub source: u8,        // Value is DATA_SOURCE_*
 
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING + 1], // comm in task_struct, always 16 bytes
-
-    pub tuple: tuple_t, // Socket五元组信息
+    pub container_id: [u8; CONTAINER_ID_SIZE],             // container id
+    pub tuple: tuple_t,                                    // Socket五元组信息
 
     /*
      * 为每一个数据通信的套接字创建唯一的ID，可用于流标识。
