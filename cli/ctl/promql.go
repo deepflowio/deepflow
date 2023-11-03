@@ -178,7 +178,7 @@ func statsQuery(cmd *cobra.Command, from, to int64, metric string, targetLabels,
 	if len(appLabels) > 0 {
 		url += fmt.Sprintf("&app=%s", strings.Join(appLabels, ","))
 	}
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return err
