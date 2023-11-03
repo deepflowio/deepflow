@@ -19,6 +19,7 @@ package ctl
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -41,6 +42,7 @@ func Execute(version string) {
 	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service node port")
 	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "deepflow-server service grpc port")
 	root.PersistentFlags().Uint32P("svc-port", "", 20417, "deepflow-server service http port")
+	root.PersistentFlags().DurationP("timeout", "", time.Second*30, "deepflow-ctl timeout")
 	root.ParseFlags(os.Args[1:])
 
 	// support output version

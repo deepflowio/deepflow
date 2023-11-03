@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
+	_ "net"
 	"net/http"
 	"os"
 	"regexp"
@@ -31,14 +31,31 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 	"github.com/spf13/cobra"
-	"github.com/vishvananda/netlink"
+	_ "github.com/vishvananda/netlink"
 )
 
 // Filter query string parameters
 type Filter map[string]interface{}
 
+type HTTPConf struct {
+	Timeout time.Duration
+}
+
+type HTTPOption func(*HTTPConf)
+
+func WithTimeout(t time.Duration) HTTPOption {
+	return func(h *HTTPConf) {
+		h.Timeout = t
+	}
+}
+
 // 功能：调用其他模块API并获取返回结果
-func CURLPerform(method string, url string, body map[string]interface{}, strBody string) (*simplejson.Json, error) {
+func CURLPerform(method string, url string, body map[string]interface{}, strBody string, opts ...HTTPOption) (*simplejson.Json, error) {
+	cfg := &HTTPConf{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	var err error
 	var contentType string
 	req := &http.Request{}
@@ -61,13 +78,13 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	req.Header.Set("X-User-Id", "1")
 	req.Header.Set("X-User-Type", "1")
 
-	return parseResponse(req)
+	return parseResponse(req, cfg)
 }
 
-func parseResponse(req *http.Request) (*simplejson.Json, error) {
+func parseResponse(req *http.Request, cfg *HTTPConf) (*simplejson.Json, error) {
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
 	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 30}
+	client := &http.Client{Timeout: cfg.Timeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", req.URL, err))
@@ -95,7 +112,12 @@ func parseResponse(req *http.Request) (*simplejson.Json, error) {
 	return response, nil
 }
 
-func CURLPostFormData(url, contentType string, body *bytes.Buffer) (*simplejson.Json, error) {
+func CURLPostFormData(url, contentType string, body *bytes.Buffer, opts ...HTTPOption) (*simplejson.Json, error) {
+	cfg := &HTTPConf{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		return nil, err
@@ -106,14 +128,18 @@ func CURLPostFormData(url, contentType string, body *bytes.Buffer) (*simplejson.
 	req.Header.Set("X-User-Type", "1")
 	req.Close = true
 
-	return parseResponse(req)
+	return parseResponse(req, cfg)
 }
 
-func CURLResponseRawJson(method string, url string) (*simplejson.Json, error) {
+func CURLResponseRawJson(method string, url string, opts ...HTTPOption) (*simplejson.Json, error) {
+	cfg := &HTTPConf{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
 
 	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 30}
+	client := &http.Client{Timeout: cfg.Timeout}
 
 	var err error
 	req := &http.Request{}
@@ -150,26 +176,6 @@ func CURLResponseRawJson(method string, url string) (*simplejson.Json, error) {
 	return response, nil
 }
 
-func GetDefaultRouteIP() string {
-	defaultRouteIP := "127.0.0.1"
-	routeList, _ := netlink.RouteList(nil, netlink.FAMILY_V4)
-	for _, route := range routeList {
-		// a nil Dst means that this is the default route.
-		if route.Dst == nil {
-			i, err := net.InterfaceByIndex(route.LinkIndex)
-			if err != nil {
-				continue
-			}
-			addresses, _ := i.Addrs()
-			for _, address := range addresses {
-				defaultRouteIP = strings.Split(address.String(), "/")[0]
-				break
-			}
-		}
-	}
-	return defaultRouteIP
-}
-
 type Server struct {
 	IP      string
 	Port    uint32
@@ -183,6 +189,11 @@ func GetServerInfo(cmd *cobra.Command) *Server {
 	rpcPort, _ := cmd.Flags().GetUint32("rpc-port")
 	svcPort, _ := cmd.Flags().GetUint32("svc-port")
 	return &Server{ip, port, rpcPort, svcPort}
+}
+
+func GetTimeout(cmd *cobra.Command) time.Duration {
+	t, _ := cmd.Flags().GetDuration("timeout")
+	return t
 }
 
 func PrettyPrint(data interface{}) {
@@ -203,7 +214,7 @@ func JsonFormat(jsonByte []byte) (string, error) {
 }
 
 // GetByFilter 通过 Get 方法获取数据，自动拼接 url param 参数
-func GetByFilter(url string, body, filters map[string]interface{}) (*simplejson.Json, error) {
+func GetByFilter(url string, body, filters map[string]interface{}, opts ...HTTPOption) (*simplejson.Json, error) {
 	if !strings.HasSuffix(url, "/") {
 		url = url + "/"
 	}
@@ -219,7 +230,7 @@ func GetByFilter(url string, body, filters map[string]interface{}) (*simplejson.
 		}
 		i++
 	}
-	return CURLPerform("GET", url, body, "")
+	return CURLPerform("GET", url, body, "", opts...)
 }
 
 var chinesePunctuationRegex = regexp.MustCompile("[(\u4e00-\u9fa5)(\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\u2019|\uff08|\uff09|\u300a|\u300b|\u3010|\u3011|\u007e)]+")
@@ -254,12 +265,12 @@ func ConvertControllerAddrToPodIP(controllerIP string, controllerPort uint32) (s
 	return podIP, nil
 }
 
-func GetURLInfo(cmd *cobra.Command, urlPath string) {
+func GetURLInfo(cmd *cobra.Command, urlPath string, opts ...HTTPOption) {
 
 	server := GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d", server.IP, server.Port) + urlPath
 
-	response, err := CURLPerform("GET", url, nil, "")
+	response, err := CURLPerform("GET", url, nil, "", opts...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
