@@ -34,7 +34,7 @@ pub use sidecar_poller::SidecarPoller;
 
 mod resource_watcher;
 
-use public::netns::{InterfaceInfo, NsFile};
+use public::netns::{self, InterfaceInfo, NsFile};
 
 use crate::config::{handler::PlatformAccess, KubernetesPollerType};
 
@@ -56,14 +56,15 @@ pub trait Poller {
 }
 
 pub fn check_set_ns() -> bool {
-    match fs::File::open("/proc/self/ns/net") {
-        Ok(f) => setns(f.as_raw_fd(), CloneFlags::CLONE_NEWNET).is_ok(),
-        Err(_) => false,
-    }
+    netns::supported()
+        && match fs::File::open("/proc/self/ns/net") {
+            Ok(f) => setns(f.as_raw_fd(), CloneFlags::CLONE_NEWNET).is_ok(),
+            Err(_) => false,
+        }
 }
 
 pub fn check_read_link_ns() -> bool {
-    fs::read_link("/proc/1/ns/net").is_ok()
+    netns::supported() && fs::read_link("/proc/1/ns/net").is_ok()
 }
 
 impl GenericPoller {

@@ -396,8 +396,6 @@ impl Trident {
             );
         }
 
-        let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
-
         #[cfg(target_os = "linux")]
         let agent_id = if sidecar_mode {
             AgentId {
@@ -412,6 +410,7 @@ impl Trident {
                 thread::sleep(Duration::from_secs(1));
                 process::exit(-1);
             }
+            let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
             let (ip, mac) = get_ctrl_ip_and_mac(&controller_ip);
             if let Err(e) = netns::reset_netns() {
                 warn!("reset setns error: {}", e);
@@ -1078,7 +1077,7 @@ impl DomainNameListener {
                                     warn!("reset setns error: {}", e);
                                     thread::sleep(Duration::from_secs(1));
                                     process::exit(-1);
-                                };
+                                }
                                 AgentId { ip, mac }
                             };
                             #[cfg(any(target_os = "windows", target_os = "android"))]

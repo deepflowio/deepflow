@@ -412,6 +412,7 @@ impl From<Tagger> for metric::MiniTag {
                 app_instance: t.otel_instance.unwrap_or_default(),
                 endpoint: t.endpoint.unwrap_or_default(),
                 netns_id: t.netns_id,
+                pod_id: 0,
             }),
         }
     }
