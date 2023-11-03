@@ -84,7 +84,7 @@ func getCache(cmd *cobra.Command, args []string, subDomain string, onlyDiffBase,
 		url += "tool-maps/"
 	}
 
-	resp, err := common.CURLResponseRawJson("GET", url)
+	resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return

@@ -114,7 +114,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -189,7 +189,7 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 		return
 	}
 
-	resp, err := common.CURLPerform("POST", url, body, "")
+	resp, err := common.CURLPerform("POST", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -216,7 +216,7 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, args[0])
 	// curl domain API，list lcuuid
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -237,7 +237,7 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 		}
 
 		body["TYPE"] = domainTypeInt
-		resp, err := common.CURLPerform("PATCH", url, body, "")
+		resp, err := common.CURLPerform("PATCH", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -265,7 +265,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, args[0])
 	// curl domain API，list lcuuid
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -275,7 +275,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
 		// 调用domain API，删除对应的云平台
-		resp, err := common.CURLPerform("DELETE", url, nil, "")
+		resp, err := common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
