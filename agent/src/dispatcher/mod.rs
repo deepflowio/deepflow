@@ -53,23 +53,25 @@ pub use recv_engine::{
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use self::base_dispatcher::TapInterfaceWhitelist;
-use crate::config::handler::CollectorAccess;
+
 #[cfg(target_os = "linux")]
 use crate::platform::LibvirtXmlExtractor;
-use crate::utils::environment::get_mac_by_name;
 use crate::{
     common::{
         enums::TapType, flow::L7Stats, FlowAclListener, FlowAclListenerId, TaggedFlow, TapTyper,
     },
     config::{
-        handler::{FlowAccess, LogParserAccess},
+        handler::{CollectorAccess, FlowAccess, LogParserAccess},
         DispatcherConfig,
     },
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     policy::PolicyGetter,
-    utils::stats::{self, Collector},
+    utils::{
+        environment::get_mac_by_name,
+        stats::{self, Collector},
+    },
 };
 
 #[cfg(target_os = "linux")]
