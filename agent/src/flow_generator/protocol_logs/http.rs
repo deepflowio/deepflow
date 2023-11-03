@@ -71,8 +71,10 @@ pub struct HttpInfo {
     pub version: String,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
+    trace_id_from_plugin: bool,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
+    span_id_from_plugin: bool,
 
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub method: String,
@@ -149,9 +151,11 @@ impl HttpInfo {
         //trace info rewrite
         if custom.trace.trace_id.is_some() {
             self.trace_id = custom.trace.trace_id.unwrap();
+            self.trace_id_from_plugin = true;
         }
         if custom.trace.span_id.is_some() {
             self.span_id = custom.trace.span_id.unwrap();
+            self.span_id_from_plugin = true;
         }
 
         // extend attribute
@@ -280,12 +284,42 @@ impl HttpInfo {
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
         }
-        if self.trace_id.is_empty() {
-            self.trace_id = other.trace_id;
+
+        // merge trace
+        // trace info can force rewrite by plugin. if all from plugin or all not from plugin, req and resp trace info must equal, if not
+        // equal, not merge to session
+        match (self.trace_id_from_plugin, other.trace_id_from_plugin) {
+            (true, true) | (false, false) => {
+                if !self.trace_id.is_empty()
+                    && !other.trace_id.is_empty()
+                    && self.trace_id != other.trace_id
+                {
+                    return Err(Error::L7ProtocolUnknown);
+                }
+                if self.trace_id.is_empty() {
+                    self.trace_id = other.trace_id
+                }
+            }
+            (false, true) => self.trace_id = other.trace_id,
+            (true, false) => {}
         }
-        if self.span_id.is_empty() {
-            self.span_id = other.span_id;
+
+        match (self.span_id_from_plugin, other.span_id_from_plugin) {
+            (true, true) | (false, false) => {
+                if !self.span_id.is_empty()
+                    && !other.span_id.is_empty()
+                    && self.span_id != other.span_id
+                {
+                    return Err(Error::L7ProtocolUnknown);
+                }
+                if self.span_id.is_empty() {
+                    self.span_id = other.span_id
+                }
+            }
+            (false, true) => self.span_id = other.span_id,
+            (true, false) => {}
         }
+
         if self.x_request_id_0.is_empty() {
             self.x_request_id_0 = other.x_request_id_0.clone();
         }
