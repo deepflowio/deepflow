@@ -29,10 +29,8 @@ use log::{debug, info, warn};
 use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
-#[cfg(target_os = "linux")]
-use crate::utils::environment::running_in_container;
+use crate::config::handler::EnvironmentAccess;
 use crate::{
-    config::handler::EnvironmentAccess,
     error::{Error, Result},
     utils::{
         process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
@@ -339,12 +337,10 @@ impl Monitor {
             let mut link_map_guard = link_map.lock().unwrap();
 
             #[cfg(target_os = "linux")]
-            if running_in_container() {
-                if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
-                    warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
-                    warn!("setns error: {}", e);
-                    return;
-                }
+            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                warn!("setns error: {}", e);
+                return;
             }
 
             // resolve network interface update
@@ -432,11 +428,9 @@ impl Monitor {
             }
 
             #[cfg(target_os = "linux")]
-            if running_in_container() {
-                if let Err(e) = netns::reset_netns() {
-                    warn!("reset netns error: {}", e);
-                };
-            }
+            if let Err(e) = netns::reset_netns() {
+                warn!("reset netns error: {}", e);
+            };
         }));
 
         self.stats.register_countable(

@@ -402,7 +402,7 @@ impl Trident {
         }
 
         #[cfg(target_os = "linux")]
-        let agent_id = if sidecar_mode || !running_in_container() {
+        let agent_id = if sidecar_mode {
             AgentId {
                 ip: ctrl_ip.clone(),
                 mac: ctrl_mac,
@@ -1064,7 +1064,7 @@ impl DomainNameListener {
                                 ctrl_ip
                             );
                             #[cfg(target_os = "linux")]
-                            let agent_id = if sidecar_mode || !running_in_container() {
+                            let agent_id = if sidecar_mode {
                                 AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
