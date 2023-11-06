@@ -708,7 +708,7 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x664 for 4.19.90-2107.6.0.0100.oe1.bclinux
 	// 0x5cc for 4.19.91-21.al7.x86_64
 	// 0x5dc for 4.19.91-23.al7.x86_64, 4.19.91-24.1.al7.x86_64, 4.19.91-25.6.al7.x86_64,
-	//           4.19.91-26.6.al7.x86_64
+	//           4.19.91-26.6.al7.x86_64, 4.19.91-26.al7.x86_64
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
 				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
 				    0x564, 0x56c, 0x574, 0x57c, 0x584,
@@ -739,7 +739,7 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x7dc for 4.18.0-372.9.1.15.po1.x86_64
 	// 0x73c for 4.19.91-21.al7.x86_64
 	// 0x74c for 4.19.91-23.al7.x86_64, 4.19.91-24.1.al7.x86_64, 4.19.91-25.6.al7.x86_64
-	//           4.19.91-26.6.al7.x86_64
+	//           4.19.91-26.6.al7.x86_64, 4.19.91-26.al7.x86_64
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
 				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
 				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,

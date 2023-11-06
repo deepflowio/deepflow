@@ -143,7 +143,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 	// 0x740 for 4.19.113-300.el7.x86_64
 	// 0x6c0 for 4.19.0-25-amd64 #1 SMP Debian 4.19.289-2 (2023-08-08)
 	// 0x7b0 for 4.19.91-21.al7.x86_64, 4.19.91-23.al7.x86_64
-	// 0xcc8 for 4.19.91-26.1.al7.x86_64
+	// 0xcc8 for 4.19.91-26.1.al7.x86_64, 4.19.91-26.al7.x86_64
 	// 0xb70 for 4.19.91-24.1.al7.x86_64
 	// 0xbb0 for 4.19.91-25.6.al7.x86_64
 	int files_offset_array[] = {
