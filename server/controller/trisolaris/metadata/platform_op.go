@@ -389,9 +389,9 @@ func (p *PlatformDataOP) generateGProcessInfo() {
 	gprocessData := newGProcessInfoProto(len(processes))
 	for _, process := range processes {
 		p := &trident.GProcessInfo{
-			GprocessId: proto.Uint32(uint32(process.ID)),
-			NetnsId:    proto.Uint32(process.NetnsID),
-			VtapId:     proto.Uint32(uint32(process.VTapID)),
+			GprocessId:  proto.Uint32(uint32(process.ID)),
+			ContainerId: proto.String(process.ContainerID),
+			VtapId:      proto.Uint32(uint32(process.VTapID)),
 		}
 		gprocessData.gprocessInfo = append(gprocessData.gprocessInfo, p)
 	}
