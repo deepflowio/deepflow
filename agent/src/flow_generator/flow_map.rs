@@ -20,6 +20,7 @@ use std::{
     collections::{HashMap, HashSet},
     mem,
     net::Ipv4Addr,
+    num::NonZeroUsize,
     rc::Rc,
     str::FromStr,
     sync::{
@@ -31,6 +32,7 @@ use std::{
 
 use ahash::AHashMap;
 use log::{debug, error, warn};
+use lru::LruCache;
 
 use super::{
     app_table::AppTable,
@@ -38,7 +40,10 @@ use super::{
     flow_state::{StateMachine, StateValue},
     perf::{tcp::TcpPerf, FlowLog, FlowPerfCounter, L7ProtocolChecker},
     pool::MemoryPool,
-    protocol_logs::MetaAppProto,
+    protocol_logs::{
+        sql::{ObfuscateCache, OBFUSCATE_CACHE_SIZE},
+        MetaAppProto,
+    },
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
     FLOW_METRICS_PEER_SRC, QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY,
@@ -57,7 +62,9 @@ use crate::{
             L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
+        l7_protocol_log::{
+            L7PerfCache, L7ProtocolBitmap, L7ProtocolParser, L7ProtocolParserInterface,
+        },
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader, ProtocolData},
         tagged_flow::TaggedFlow,
@@ -164,6 +171,8 @@ pub struct FlowMap {
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
     flow_node_pool: MemoryPool<FlowNode>,
+
+    obfuscate_cache: Option<ObfuscateCache>,
 }
 
 impl FlowMap {
@@ -365,6 +374,13 @@ impl FlowMap {
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
             l7_stats_output_queue,
+            obfuscate_cache: if config.obfuscate_enabled_protocols != L7ProtocolBitmap::default() {
+                Some(Rc::new(RefCell::new(LruCache::new(
+                    NonZeroUsize::new(OBFUSCATE_CACHE_SIZE).unwrap(),
+                ))))
+            } else {
+                None
+            },
         }
     }
 
@@ -1255,6 +1271,7 @@ impl FlowMap {
                 flow_config.l7_protocol_inference_ttl as u64,
                 last,
                 self.ntp_diff.clone(),
+                self.obfuscate_cache.as_ref().map(|o| o.clone()),
             )
             .map(|o| Box::new(o));
         }

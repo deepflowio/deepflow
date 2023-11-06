@@ -18,6 +18,7 @@ use public::{
     bytes::{read_u32_be, read_u64_be},
     l7_protocol::L7Protocol,
 };
+
 use serde::Serialize;
 
 use crate::{
@@ -40,6 +41,8 @@ use super::{
     super::value_is_default,
     postgre_convert::{get_code_desc, get_request_str},
     sql_check::is_postgresql,
+    sql_obfuscate::attempt_obfuscation,
+    ObfuscateCache,
 };
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
@@ -160,15 +163,10 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default)]
 pub struct PostgresqlLog {
     perf_stats: Option<L7PerfStats>,
-}
-
-impl Default for PostgresqlLog {
-    fn default() -> Self {
-        Self { perf_stats: None }
-    }
+    obfuscate_cache: Option<ObfuscateCache>,
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
@@ -214,6 +212,10 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
+    }
+
+    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
+        self.obfuscate_cache = obfuscate_cache;
     }
 }
 
@@ -288,7 +290,11 @@ impl PostgresqlLog {
         match tag {
             'Q' => {
                 info.req_type = tag;
-                info.context = strip_string_end_with_zero(data)?;
+                let payload = strip_string_end_with_zero(data)?;
+                info.context = attempt_obfuscation(&self.obfuscate_cache, payload)
+                    .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
+                        String::from_utf8_lossy(&m).to_string()
+                    });
                 info.ignore = false;
                 if !check {
                     self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -308,8 +314,13 @@ impl PostgresqlLog {
 
                     // parse query
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
-                        info.context = String::from_utf8_lossy(&data[..idx]).to_string();
-                        if is_postgresql(&info.context) {
+                        let payload = &data[..idx];
+                        let postgresql = is_postgresql(payload);
+                        info.context = attempt_obfuscation(&self.obfuscate_cache, payload)
+                            .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
+                                String::from_utf8_lossy(&m).to_string()
+                            });
+                        if postgresql {
                             if !check {
                                 self.perf_stats.as_mut().map(|p| p.inc_req());
                             }
@@ -442,9 +453,9 @@ fn read_block(payload: &[u8]) -> Option<(char, usize)> {
 
 // strip the latest 0x0 in string
 // if not end with 0x0, presume it is not pg protocol
-fn strip_string_end_with_zero(data: &[u8]) -> Result<String> {
+fn strip_string_end_with_zero(data: &[u8]) -> Result<&[u8]> {
     if data.ends_with(&[0]) {
-        return Ok(String::from_utf8_lossy(&data[..data.len() - 1]).to_string());
+        return Ok(&data[..data.len() - 1]);
     }
     Err(Error::L7ProtocolUnknown)
 }

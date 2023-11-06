@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-pub mod bitmap;
-pub mod hash;
-pub mod net;
-pub mod string;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
-#[cfg(windows)]
-const WIN_ERROR_CODE_STR: &str = "please browse website(https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes) to get more detail";
+pub fn hash_to_u64<T: Hash>(data: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    data.hash(&mut hasher);
+    hasher.finish()
+}

@@ -45,7 +45,7 @@ use crate::utils::{
 use public::{
     buffer::BatchedBox,
     queue::{DebugSender, Error, Receiver},
-    utils::string::hash_endpoint,
+    utils::hash::hash_to_u64,
 };
 
 const FLOW_ID_LEN: usize = 8;
@@ -559,7 +559,10 @@ impl L7QuadrupleGenerator {
         }
         let l7_stats = l7_stats.unwrap();
 
-        let endpoint_hash = hash_endpoint(&l7_stats.endpoint) as u32;
+        let endpoint_hash = match &l7_stats.endpoint {
+            Some(e) => hash_to_u64(e) as u32,
+            None => 0,
+        };
 
         let app_meter = if config.l7_metrics_enabled {
             Self::generate_app_meter(&l7_stats)

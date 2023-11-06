@@ -1008,6 +1008,15 @@ vtap_group_id: g-xxxxxx
         ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
         ## Default: 2
         #keep-segments: 2
+  
+    ## List of L7 protocols that need to be obfuscated
+    ## Note: For the sake of data security, the data of the protocol that needs
+    ## to be desensitized is configured here and is not processed by default.
+    #obfuscate-enabled-protocols:
+    #- MySQL
+    #- PostgreSQL
+    #- Redis
+
 
   #oracle-parse-config:
     #is-be: true
