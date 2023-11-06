@@ -30,6 +30,7 @@ use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
 
+use super::protocol_logs::sql::ObfuscateCache;
 use super::{
     app_table::AppTable,
     error::{Error, Result},
@@ -213,6 +214,7 @@ pub struct FlowLog {
     l7_protocol_inference_ttl: u64,
 
     ntp_diff: Arc<AtomicI64>,
+    obfuscate_cache: Option<ObfuscateCache>,
 }
 
 impl FlowLog {
@@ -233,6 +235,7 @@ impl FlowLog {
     fn l7_parse_log(
         &mut self,
         flow_config: &FlowConfig,
+        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
@@ -241,6 +244,13 @@ impl FlowLog {
     ) -> Result<L7ParseResult> {
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
+
+            if log_parser_config
+                .obfuscate_enabled_protocols
+                .is_enabled(self.l7_protocol_enum.get_l7_protocol())
+            {
+                parser.set_obfuscate_cache(self.obfuscate_cache.as_ref().map(|o| o.clone()));
+            }
 
             let ret = parser.parse_payload(
                 {
@@ -342,6 +352,12 @@ impl FlowLog {
                 let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
                     continue;
                 };
+                if log_parser_config
+                    .obfuscate_enabled_protocols
+                    .is_enabled(*protocol)
+                {
+                    parser.set_obfuscate_cache(self.obfuscate_cache.as_ref().map(|o| o.clone()));
+                }
                 if parser.check_payload(cut_payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocol_enum();
 
@@ -366,6 +382,7 @@ impl FlowLog {
                     self.l7_protocol_log_parser = Some(Box::new(parser));
                     return self.l7_parse_log(
                         flow_config,
+                        log_parser_config,
                         packet,
                         app_table,
                         &param,
@@ -440,7 +457,15 @@ impl FlowLog {
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
-            return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
+            return self.l7_parse_log(
+                flow_config,
+                log_parser_config,
+                packet,
+                app_table,
+                param,
+                local_epc,
+                remote_epc,
+            );
         }
 
         if packet.l4_payload_len() < 2 {
@@ -482,6 +507,7 @@ impl FlowLog {
         l7_protocol_inference_ttl: u64,
         last_time: Option<u64>,
         ntp_diff: Arc<AtomicI64>,
+        obfuscate_cache: Option<ObfuscateCache>,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -514,11 +540,12 @@ impl FlowLog {
             so_plugin,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin_counter,
-            stats_counter: stats_counter,
-            rrt_timeout: rrt_timeout,
+            stats_counter,
+            rrt_timeout,
             last_fail: last_time,
             l7_protocol_inference_ttl,
             ntp_diff,
+            obfuscate_cache,
         })
     }
 

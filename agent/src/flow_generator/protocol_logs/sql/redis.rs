@@ -18,7 +18,11 @@ use serde::{Serialize, Serializer};
 
 use std::{fmt, str};
 
-use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::{
+    super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType},
+    redis_obfuscate::attempt_obfuscation,
+    ObfuscateCache,
+};
 
 use crate::{
     common::{
@@ -168,6 +172,7 @@ impl From<RedisInfo> for L7ProtocolSendLog {
 pub struct RedisLog {
     has_request: bool,
     perf_stats: Option<L7PerfStats>,
+    obfuscate_cache: Option<ObfuscateCache>,
 }
 
 impl L7ProtocolParserInterface for RedisLog {
@@ -220,6 +225,10 @@ impl L7ProtocolParserInterface for RedisLog {
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
     }
+
+    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
+        self.obfuscate_cache = obfuscate_cache;
+    }
 }
 
 impl RedisLog {
@@ -233,7 +242,8 @@ impl RedisLog {
             _ => context.clone(),
         };
         info.msg_type = LogMessageType::Request;
-        info.request = context;
+        info.request =
+            attempt_obfuscation(&self.obfuscate_cache, &context, false).map_or(context, |m| m);
         self.has_request = true;
         self.perf_stats.as_mut().map(|p| p.inc_req());
     }

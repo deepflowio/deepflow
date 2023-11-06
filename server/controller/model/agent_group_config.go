@@ -222,7 +222,8 @@ type HttpEndpointExtraction struct {
 }
 
 type L7ProtocolAdvancedFeatures struct {
-	HttpEndpointExtraction *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
+	HttpEndpointExtraction    *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
+	ObfuscateEnabledProtocols []string                `yaml:"obfuscate-enabled-protocols,omitempty"`
 }
 
 type OracleConfig struct {

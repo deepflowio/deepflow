@@ -382,6 +382,8 @@ pub struct FlowConfig {
     pub batched_buffer_size_limit: usize,
 
     pub oracle_parse_conf: OracleParseConfig,
+
+    pub obfuscate_enabled_protocols: L7ProtocolBitmap,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -439,6 +441,12 @@ impl From<&RuntimeConfig> for FlowConfig {
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
             batched_buffer_size_limit: conf.yaml_config.batched_buffer_size_limit,
             oracle_parse_conf: conf.yaml_config.oracle_parse_config,
+            obfuscate_enabled_protocols: L7ProtocolBitmap::from(
+                &conf
+                    .yaml_config
+                    .l7_protocol_advanced_features
+                    .obfuscate_enabled_protocols,
+            ),
         }
     }
 }
@@ -576,6 +584,7 @@ pub struct LogParserConfig {
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
+    pub obfuscate_enabled_protocols: L7ProtocolBitmap,
 }
 
 impl Default for LogParserConfig {
@@ -587,6 +596,7 @@ impl Default for LogParserConfig {
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
+            obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
         }
     }
 }
@@ -1201,6 +1211,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .yaml_config
                         .l7_protocol_advanced_features
                         .http_endpoint_extraction,
+                ),
+                obfuscate_enabled_protocols: L7ProtocolBitmap::from(
+                    &conf
+                        .yaml_config
+                        .l7_protocol_advanced_features
+                        .obfuscate_enabled_protocols,
                 ),
             },
             debug: DebugConfig {
