@@ -31,6 +31,7 @@
 #define MAP_PROTO_FILTER_NAME		"__protocol_filter"
 #define MAP_KPROBE_PORT_BITMAP_NAME	"__kprobe_port_bitmap"
 #define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
+#define MAP_PROTO_PORTS_BITMAPS_NAME	"__proto_ports_bitmap"
 
 //Program jmp tables
 #define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"

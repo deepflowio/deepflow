@@ -25,6 +25,23 @@
 #include "common.h"
 #include "socket_trace.h"
 
+static __inline bool
+protocol_port_check(enum traffic_protocol proto,
+		    struct conn_info_t *conn_info)
+{
+	if (!is_protocol_enabled(proto)) {
+		return false;
+	}
+
+	if (!proto_port_is_allowed((__u32)proto,
+				   conn_info->tuple.num,
+				   conn_info->tuple.dport)) {
+		return false;
+	}
+
+	return true;
+}
+
 static __inline bool is_same_command(char *a, char *b)
 {
 	static const int KERNEL_COMM_MAX = 16;
@@ -360,9 +377,8 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_HTTP2)) {
+	if (!protocol_port_check(PROTO_HTTP2, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
 	if (skip_http2_kprobe()) {
@@ -407,14 +423,6 @@ static __inline enum message_type infer_http_message(const char *buf,
 						     struct conn_info_t
 						     *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_HTTP1)) {
-		return MSG_UNKNOWN;
-	}
-
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
-			return MSG_UNKNOWN;
-	}
 	// HTTP/1.1 200 OK\r\n (HTTP response is 17 characters)
 	// GET x HTTP/1.1\r\n (HTTP response is 16 characters)
 	// MAY be without "OK", ref:https://www.rfc-editor.org/rfc/rfc7231
@@ -422,6 +430,14 @@ static __inline enum message_type infer_http_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
+	if (!protocol_port_check(PROTO_HTTP1, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
+			return MSG_UNKNOWN;
+	}
+	
 	if (is_http_response(buf)) {
 		return MSG_RESPONSE;
 	}
@@ -491,9 +507,8 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_MYSQL)) {
+	if (!protocol_port_check(PROTO_MYSQL, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	if (count == 4) {
 		save_prev_data(buf, conn_info, 4);
@@ -704,9 +719,8 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 {
 #define POSTGRE_INFER_BUF_SIZE 32
 
-	if (!is_protocol_enabled(PROTO_POSTGRESQL)) {
+	if (!protocol_port_check(PROTO_POSTGRESQL, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	if (conn_info->tuple.l4_protocol != IPPROTO_TCP){
 		return MSG_UNKNOWN;
@@ -797,7 +811,10 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	static const __u8 codec_protobuf = 11;
 	static const __u8 codec_json = 12;
 
-	if (count < bolt_resp_header_len || !is_protocol_enabled(PROTO_SOFARPC))
+	if (count < bolt_resp_header_len)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check(PROTO_SOFARPC, conn_info))
 		return MSG_UNKNOWN;
 
 	const __u8 *infer_buf = (const __u8 *)buf;
@@ -909,15 +926,6 @@ static __inline enum message_type infer_dns_message(const char *buf,
 						    struct conn_info_t
 						    *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_DNS)) {
-		return MSG_UNKNOWN;
-	}
-
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
-			return MSG_UNKNOWN;
-	}
-
 	const int dns_header_size = 12;
 
 	// This is the typical maximum size for DNS.
@@ -929,6 +937,15 @@ static __inline enum message_type infer_dns_message(const char *buf,
 
 	if (count < dns_header_size || count > dns_msg_max_size) {
 		return MSG_UNKNOWN;
+	}
+
+
+	if (!protocol_port_check(PROTO_DNS, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
+			return MSG_UNKNOWN;
 	}
 
 	bool update_tcp_dns_prev_count = false;
@@ -1016,9 +1033,8 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (count < 4)
 		return MSG_UNKNOWN;
 
-	if (!is_protocol_enabled(PROTO_REDIS)) {
+	if (!protocol_port_check(PROTO_REDIS, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
@@ -1096,9 +1112,8 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (count < 4)
 		return MSG_UNKNOWN;
 
-	if (!is_protocol_enabled(PROTO_MQTT)) {
+	if (!protocol_port_check(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr))
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
@@ -1218,17 +1233,17 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_DUBBO)) {
+	// dubbo_header 大小是16字节，如果接收数量比16字节小直接返回。
+	if (count < 16) {
 		return MSG_UNKNOWN;
 	}
+
+	if (!protocol_port_check(PROTO_DUBBO, conn_info))
+		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
-	}
-	// dubbo_header 大小是16字节，如果接收数量比16字节小直接返回。
-	if (count < 16) {
-		return MSG_UNKNOWN;
 	}
 
 	struct dubbo_header *dubbo_hdr = (struct dubbo_header *)buf;
@@ -1382,9 +1397,8 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_KAFKA)) {
+	if (!protocol_port_check(PROTO_KAFKA, conn_info))
 		return MSG_UNKNOWN;
-	}
 
 	if (count == 4) {
 		save_prev_data(buf, conn_info, 4);
@@ -1504,9 +1518,12 @@ static __inline enum message_type
 infer_fastcgi_message(const char *buf, size_t count,
 		      struct conn_info_t *conn_info)
 {
-	if (count < 8 || !is_protocol_enabled(PROTO_FASTCGI)) {
+	if (count < 8) {
 		return MSG_UNKNOWN;
 	}
+
+	if (!protocol_port_check(PROTO_FASTCGI, conn_info))
+		return MSG_UNKNOWN;
 
 	struct fastcgi_header *header = NULL;
 	header = (struct fastcgi_header *)buf;
@@ -1651,15 +1668,30 @@ infer_protocol(struct ctx_info_s *ctx,
 	}
 
 	/*
-	 * HTTPS protocol datas cause other L7 protocols inference misjudgment,
+	 * TLS protocol datas cause other L7 protocols inference misjudgment,
 	 * sometimes HTTPS protocol datas is incorrectly inferred as MQTT, DUBBO protocol.
-	 * HTTPS protocol is difficult to identify with features, port 443 is directly filtered out.
-	 *
-	 * If extra->tls is true, the datas is obtained by the uprobe.
-	 * The obtained datas is unencrypted, not filtered.
+	 * TLS protocol is difficult to identify with features, the port filtering for
+	 * the TLS protocol is performed here.
 	 */
-	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) &&
+
+	/*
+	 * If the current port number is configured for the TLS protocol.
+	 * If the data source comes from kernel system calls, it is discarded
+	 * directly because some kernel probes do not handle TLS data. 
+	 */
+	if (protocol_port_check(PROTO_TLS, conn_info) &&
 	    extra->source == DATA_SOURCE_SYSCALL) {
+		return inferred_message;
+	}
+
+	/*
+	 * If data source is DATA_SOURCE_GO_TLS_UPROBE or DATA_SOURCE_OPENSSL_UPROBE,
+	 * the current port number must fall within the range of TLS protocol ports;
+	 * otherwise, the data is discarded.
+	 */
+	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
+	     extra->source == DATA_SOURCE_OPENSSL_UPROBE) &&
+	    !protocol_port_check(PROTO_TLS, conn_info)) {
 		return inferred_message;
 	}
 
