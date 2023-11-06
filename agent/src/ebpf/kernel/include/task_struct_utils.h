@@ -139,7 +139,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		0xcc8, 0xa48, 0xc60
 	};
 #else
-	// 0xd08 for kernel-devel-4.19.91-26.6.al7
+	// 0xd08 for kernel-devel-4.19.91-26.6.al7, 4.19.91-27.1.al7.x86_64
 	// 0x740 for 4.19.113-300.el7.x86_64
 	// 0x6c0 for 4.19.0-25-amd64 #1 SMP Debian 4.19.289-2 (2023-08-08)
 	// 0x7b0 for 4.19.91-21.al7.x86_64, 4.19.91-23.al7.x86_64
