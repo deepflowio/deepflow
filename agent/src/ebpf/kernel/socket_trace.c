@@ -112,8 +112,13 @@ MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 // 0: allow bitmap; 1: bypass bitmap
 MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
-// l7-protocol-ports
-MAP_ARRAY(proto_ports_bitmap, __u32, struct kprobe_port_bitmap, PROTO_NUM)
+/*
+ * l7-protocol-ports
+ * Configuring application layer protocol ports, when performing protocol
+ * inference, inference is only targeted at specified ports of Layer 7
+ * protocols.
+ */
+MAP_ARRAY(proto_ports_bitmap, __u32, ports_bitmap_t, PROTO_NUM)
 
 // write() syscall's input argument.
 // Key is {tgid, pid}.
@@ -156,6 +161,19 @@ static __inline bool is_protocol_enabled(int protocol)
 {
 	int *enabled = protocol_filter__lookup(&protocol);
 	return (enabled) ? (*enabled) : (0);
+}
+
+static __inline bool proto_port_is_allowed(__u32 protocol, __u16 lport, __u16 dport)
+{
+	ports_bitmap_t *ports = proto_ports_bitmap__lookup(&protocol);
+	if (ports) {
+		if (is_set_bitmap(ports->bitmap, dport) ||
+		    is_set_bitmap(ports->bitmap, lport)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static __inline void delete_socket_info(__u64 conn_key,

@@ -1304,6 +1304,27 @@ static void update_kprobe_port_bitmap(struct bpf_tracer *tracer)
 			    &bypass_port_bitmap);
 }
 
+static void config_proto_ports_bitmap(struct bpf_tracer *tracer)
+{
+	int i;			// l7 protocol type 
+	for (i = 0; i < ARRAY_SIZE(ports_bitmap); i++) {
+		if (ports_bitmap[i]) {
+			if (bpf_table_set_value
+			    (tracer, MAP_PROTO_PORTS_BITMAPS_NAME, i,
+			     ports_bitmap[i]))
+				ebpf_info
+				    ("%s, update eBPF ports_bitmap[%s] success.\n",
+				     __func__, get_proto_name(i));
+			else
+				ebpf_info
+				    ("%s, update eBPF ports_bitmap[%s] failed.\n",
+				     __func__, get_proto_name(i));
+			clib_mem_free(ports_bitmap[i]);
+			ports_bitmap[i] = NULL;
+		}
+	}
+}
+
 static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
 {
 	bpf_table_set_value(tracer, MAP_ADAPT_KERN_UID_NAME, 0,
@@ -1877,6 +1898,9 @@ int running_socket_tracer(tracer_callback_t handle,
 	update_protocol_filter_array(tracer);
 
 	update_kprobe_port_bitmap(tracer);
+
+	// Configure l7 protocol ports
+	config_proto_ports_bitmap(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

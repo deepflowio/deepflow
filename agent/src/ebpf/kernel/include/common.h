@@ -70,6 +70,7 @@ enum traffic_protocol {
 	PROTO_KAFKA = 100,
 	PROTO_MQTT = 101,
 	PROTO_DNS = 120,
+	PROTO_TLS = 121,
 	PROTO_NUM = 130
 };
 
