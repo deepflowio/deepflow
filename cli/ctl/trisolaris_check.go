@@ -94,6 +94,13 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{segments})
 		},
 	}
+	containersCmd := &cobra.Command{
+		Use:   "containers",
+		Short: "get containers from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			initCmd(cmd, []CmdExecute{containers})
+		},
+	}
 	vpcIPCmd := &cobra.Command{
 		Use:   "vpc-ip",
 		Short: "get vpc-ip from deepflow-server",
@@ -181,7 +188,7 @@ func regiterCommand() []*cobra.Command {
 		Short: "get all data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes,
-				segments, vpcIP, configData, skipInterface, localServers})
+				segments, containers, vpcIP, configData, skipInterface, localServers})
 		},
 	}
 
@@ -194,7 +201,7 @@ func regiterCommand() []*cobra.Command {
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
+		tapTypesCmd, configCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
 		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd, universalTagNameCmd}
 	return commands
@@ -614,6 +621,14 @@ func segments(response *trident.SyncResponse) {
 	remoteSegments := response.GetRemoteSegments()
 	for index, remoteSegment := range remoteSegments {
 		JsonFormat(index+1, remoteSegment)
+	}
+}
+
+func containers(response *trident.SyncResponse) {
+	fmt.Println("containers:")
+	containers := response.GetContainers()
+	for index, container := range containers {
+		JsonFormat(index+1, container)
 	}
 }
 

@@ -403,6 +403,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	upgradeRevision := vtapCache.GetExpectedRevision()
 	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
+	Containers := gVTapInfo.GetContainers(int(vtapCache.GetVTapID()))
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
@@ -415,6 +416,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		VersionGroups:       proto.Uint64(versionGroups),
 		VersionAcls:         proto.Uint64(versionPolicy),
 		TapTypes:            tapTypes,
+		Containers:          Containers,
 		SkipInterface:       skipInterface,
 		SelfUpdateUrl:       proto.String(gVTapInfo.GetSelfUpdateUrl()),
 		Revision:            proto.String(upgradeRevision),
@@ -687,6 +689,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
+	Containers := gVTapInfo.GetContainers(int(vtapCache.GetVTapID()))
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
@@ -700,6 +703,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		FlowAcls:            acls,
 		VersionAcls:         proto.Uint64(versionPolicy),
 		TapTypes:            tapTypes,
+		Containers:          Containers,
 	}, nil
 }
 
