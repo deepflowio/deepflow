@@ -270,10 +270,14 @@ impl Labeler {
             let key = EpcNetIpKey::new(&item.ip.network(), item.ip.prefix_len(), epc_id);
 
             if let Some(old) = epc_table.insert(key, item.clone()) {
-                warn!(
-                    "Found the same cidr, please check {:?} and {:?}.",
-                    item, old
-                );
+                if (item.cidr_type == CidrType::Wan && item.epc_id != old.epc_id)
+                    || item.is_vip != old.is_vip
+                {
+                    warn!(
+                        "Found the same cidr, please check {:?} and {:?}.",
+                        item, old
+                    );
+                }
             }
             masklen_table
                 .entry(epc_id)
