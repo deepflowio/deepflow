@@ -558,6 +558,15 @@ func (v *VTapInfo) GetSkipInterface(c *VTapCache) []*trident.SkipInterface {
 	return nil
 }
 
+func (v *VTapInfo) GetContainers(vtapID int) []*trident.Container {
+	rawData := v.metaData.GetPlatformDataOP().GetRawData()
+	if rawData != nil {
+		return rawData.GetContainers(vtapID)
+	}
+
+	return nil
+}
+
 func (v *VTapInfo) GetConfigTSDBIP() string {
 	return v.config.TsdbIP
 }

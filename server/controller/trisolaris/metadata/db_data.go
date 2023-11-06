@@ -594,7 +594,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id"})
+	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id", "type"})
 	if err == nil {
 		d.vtaps = vtaps
 	} else {
