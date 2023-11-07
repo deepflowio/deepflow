@@ -1040,18 +1040,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return SUBMIT_INVALID;
 	}
 
-	// ignore non-http protocols that are go tls
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
-		if (conn_info->protocol != PROTO_HTTP1)
-			return SUBMIT_INVALID;
-	}
-
-	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
-		if (conn_info->protocol != PROTO_HTTP1 &&
-		    conn_info->protocol != PROTO_HTTP2)
-			return SUBMIT_INVALID;
-	}
-
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
 		return SUBMIT_INVALID;
 	}
@@ -1204,15 +1192,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
-
-	if (conn_info->protocol == PROTO_HTTP1 &&
-	    (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	     extra->source == DATA_SOURCE_OPENSSL_UPROBE))
-		v->data_type = PROTO_TLS_HTTP1;
-
-	if (conn_info->protocol == PROTO_HTTP2 &&
-	    (extra->source == DATA_SOURCE_OPENSSL_UPROBE))
-		v->data_type = PROTO_TLS_HTTP2;
 
 	__u32 *socket_role = socket_role_map__lookup(&conn_key);
 	v->socket_role = socket_role ? *socket_role : 0;

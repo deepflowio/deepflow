@@ -102,8 +102,6 @@ static void datadump_help(void)
 	fprintf(stderr, "    1:   PROTO_ORTHER\n");
 	fprintf(stderr, "    20:  PROTO_HTTP1\n");
 	fprintf(stderr, "    21:  PROTO_HTTP2\n");
-	fprintf(stderr, "    22:  PROTO_TLS_HTTP1\n");
-	fprintf(stderr, "    23:  PROTO_TLS_HTTP2\n");
 	fprintf(stderr, "    40:  PROTO_DUBBO\n");
 	fprintf(stderr, "    43:  PROTO_SOFARPC\n");
 	fprintf(stderr, "    60:  PROTO_MYSQL\n");
@@ -112,6 +110,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    100: PROTO_KAFKA\n");
 	fprintf(stderr, "    101: PROTO_MQTT\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
+	fprintf(stderr, "    121: PROTO_TLS\n");
 	fprintf(stderr, "PID:\n");
 	fprintf(stderr, "    0:   all process/thread\n");
 	fprintf(stderr, "COMM:\n");
