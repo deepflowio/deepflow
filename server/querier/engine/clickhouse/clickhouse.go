@@ -581,6 +581,10 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
+				if strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(sqlparser.String(colName), "_0"), "_1")) {
+					errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", sqlparser.String(colName))
+					return errors.New(errStr)
+				}
 				// pod_ingress/lb_listener is not supported by select
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
@@ -793,6 +797,10 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		colName, ok := group.(*sqlparser.ColName)
 		if ok {
 			groupTag := sqlparser.String(colName)
+			if strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(groupTag, "_0"), "_1")) {
+				errStr := fmt.Sprintf("Cannot group by  tags that exist in auto custom tag : %s", groupTag)
+				return errors.New(errStr)
+			}
 			preAsGroup, ok := e.AsTagMap[groupTag]
 			if ok {
 				groupSlice = append(groupSlice, preAsGroup)
