@@ -50,6 +50,7 @@ struct socket_bpf_data {
 	// 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
 	uint8_t msg_type;	// 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 	bool need_reconfirm;	// 是否需要上层再确认 
+	bool is_tls;
 
 	/* trace info */
 	uint64_t tcp_seq;	// 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet

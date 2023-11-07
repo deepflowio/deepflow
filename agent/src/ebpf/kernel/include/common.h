@@ -72,6 +72,15 @@ enum traffic_protocol {
 	PROTO_NUM = 130
 };
 
+enum process_data_extra_source {
+	DATA_SOURCE_SYSCALL,
+	DATA_SOURCE_GO_TLS_UPROBE,
+	DATA_SOURCE_GO_HTTP2_UPROBE,
+	DATA_SOURCE_OPENSSL_UPROBE,
+	DATA_SOURCE_IO_EVENT,
+	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
+};
+
 struct protocol_message_t {
 	enum traffic_protocol protocol;
 	enum message_type type;
