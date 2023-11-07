@@ -230,10 +230,10 @@ impl HttpInfo {
                 if self.method.is_empty() {
                     self.method = other.method;
                 }
-                if self.user_agent.is_some() {
+                if self.user_agent.is_none() {
                     self.user_agent = other.user_agent;
                 }
-                if self.referer.is_some() {
+                if self.referer.is_none() {
                     self.referer = other.referer;
                 }
                 if self.endpoint.is_none() {
