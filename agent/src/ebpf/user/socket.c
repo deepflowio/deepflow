@@ -735,6 +735,12 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->thread_id = sd->pid;
 		submit_data->coroutine_id = sd->coroutine_id;
 		submit_data->source = sd->source;
+		if (sd->source == DATA_SOURCE_GO_TLS_UPROBE ||
+		    sd->source == DATA_SOURCE_OPENSSL_UPROBE)
+			submit_data->is_tls = true;
+		else
+			submit_data->is_tls = false;
+
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;

@@ -349,8 +349,6 @@ fn main() {
     unsafe {
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
@@ -361,6 +359,93 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
+        enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
+
+        set_protocol_ports_bitmap(
+            SOCK_DATA_HTTP1 as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_HTTP2 as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_DUBBO as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_SOFARPC as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_FASTCGI as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MYSQL as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_POSTGRESQL as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_REDIS as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_KAFKA as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MQTT as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_DNS as c_int,
+            CString::new("53".as_bytes()).unwrap().as_c_str().as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MONGO as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_TLS as c_int,
+            CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
+        );
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
@@ -389,9 +474,6 @@ fn main() {
             allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
             set_allow_port_bitmap(allow_port_bitmap.as_ptr());
         */
-
-        let _ports = CString::new("443".as_bytes()).unwrap();
-        set_protocol_ports_bitmap(SOCK_DATA_TLS as c_int, _ports.as_c_str().as_ptr());
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()

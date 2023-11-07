@@ -1684,17 +1684,6 @@ infer_protocol(struct ctx_info_s *ctx,
 		return inferred_message;
 	}
 
-	/*
-	 * If data source is DATA_SOURCE_GO_TLS_UPROBE or DATA_SOURCE_OPENSSL_UPROBE,
-	 * the current port number must fall within the range of TLS protocol ports;
-	 * otherwise, the data is discarded.
-	 */
-	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	     extra->source == DATA_SOURCE_OPENSSL_UPROBE) &&
-	    !protocol_port_check(PROTO_TLS, conn_info)) {
-		return inferred_message;
-	}
-
 	if (conn_info->sk == NULL)
 		return inferred_message;
 
