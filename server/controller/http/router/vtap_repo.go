@@ -62,7 +62,7 @@ func createVtapRepo(c *gin.Context) {
 	}
 	defer file.Close()
 
-	buf := bytes.NewBuffer(nil)
+	buf := bytes.NewBuffer(make([]byte, 0))
 	_, err = io.Copy(buf, file)
 	if err != nil {
 		JsonResponse(c, nil, err)

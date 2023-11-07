@@ -21,6 +21,7 @@ use std::sync::{
 };
 
 use ahash::AHashMap;
+use log::warn;
 
 use super::bit::count_trailing_zeros32;
 use crate::common::decapsulate::TunnelInfo;
@@ -33,10 +34,46 @@ use public::utils::net::is_unicast_link_local;
 const BROADCAST_MAC: u64 = 0xffffffffffff;
 const MULTICAST_MAC: u64 = 0x010000000000;
 
-#[derive(Hash, std::cmp::Eq, PartialEq)]
+#[derive(Debug, Hash, std::cmp::Eq, PartialEq)]
 struct EpcIpKey {
     ip: u128,
     epc_id: i32,
+}
+
+const IPV4_BITS: usize = 32;
+const IPV6_BITS: usize = 128;
+
+#[derive(Debug, Hash, std::cmp::Eq, PartialEq)]
+struct EpcNetIpKey {
+    ip: u128,
+    masklen: u8,
+    epc_id: i32,
+}
+
+impl EpcNetIpKey {
+    fn new(ip: &IpAddr, masklen: u8, epc_id: i32) -> EpcNetIpKey {
+        match ip {
+            IpAddr::V4(i) => EpcNetIpKey {
+                ip: u32::from_be_bytes(i.octets()) as u128,
+                epc_id,
+                masklen,
+            },
+            IpAddr::V6(i) => EpcNetIpKey {
+                ip: u128::from_be_bytes(i.octets()),
+                epc_id,
+                masklen,
+            },
+        }
+    }
+
+    fn clone_by_masklen(&self, masklen: usize, is_ipv4: bool) -> Self {
+        let max_prefix = if is_ipv4 { IPV4_BITS } else { IPV6_BITS };
+        Self {
+            ip: self.ip & (u128::MAX << (max_prefix - masklen)),
+            epc_id: self.epc_id,
+            masklen: masklen as u8,
+        }
+    }
 }
 
 pub struct Labeler {
@@ -50,7 +87,8 @@ pub struct Labeler {
     // 对等连接表
     peer_table: RwLock<AHashMap<i32, Vec<i32>>>,
     // CIDR表
-    epc_cidr_table: RwLock<AHashMap<i32, Vec<Arc<Cidr>>>>,
+    epc_cidr_masklen_table: RwLock<AHashMap<i32, (u8, u8)>>,
+    epc_cidr_table: RwLock<AHashMap<EpcNetIpKey, Arc<Cidr>>>,
     tunnel_cidr_table: RwLock<AHashMap<u32, Vec<Arc<Cidr>>>>,
 }
 
@@ -63,6 +101,7 @@ impl Default for Labeler {
             ip_netmask_table: RwLock::new(AHashMap::new()),
             ip_table: RwLock::new(AHashMap::new()),
             peer_table: RwLock::new(AHashMap::new()),
+            epc_cidr_masklen_table: RwLock::new(AHashMap::new()),
             epc_cidr_table: RwLock::new(AHashMap::new()),
             tunnel_cidr_table: RwLock::new(AHashMap::new()),
         }
@@ -211,8 +250,16 @@ impl Labeler {
         }
     }
 
+    fn get_cidr_masklen_range(&self, epc_id: i32) -> (usize, usize) {
+        if let Some((min, max)) = self.epc_cidr_masklen_table.read().unwrap().get(&epc_id) {
+            return (*min as usize, *max as usize);
+        }
+        return (0, 0);
+    }
+
     pub fn update_cidr_table(&mut self, cidrs: &Vec<Arc<Cidr>>) {
-        let mut epc_table: AHashMap<i32, Vec<Arc<Cidr>>> = AHashMap::new();
+        let mut masklen_table: AHashMap<i32, (u8, u8)> = AHashMap::new();
+        let mut epc_table: AHashMap<EpcNetIpKey, Arc<Cidr>> = AHashMap::new();
         let mut tunnel_table: AHashMap<u32, Vec<Arc<Cidr>>> = AHashMap::new();
 
         for item in cidrs {
@@ -220,8 +267,30 @@ impl Labeler {
             if item.cidr_type == CidrType::Wan {
                 epc_id = EPC_FROM_DEEPFLOW;
             }
+            let key = EpcNetIpKey::new(&item.ip.network(), item.ip.prefix_len(), epc_id);
 
-            epc_table.entry(epc_id).or_default().push(Arc::clone(item));
+            if let Some(old) = epc_table.insert(key, item.clone()) {
+                if (item.cidr_type == CidrType::Wan && item.epc_id != old.epc_id)
+                    || item.is_vip != old.is_vip
+                {
+                    warn!(
+                        "Found the same cidr, please check {:?} and {:?}.",
+                        item, old
+                    );
+                }
+            }
+            masklen_table
+                .entry(epc_id)
+                .and_modify(|(min, max)| {
+                    let netmask_len = item.netmask_len();
+                    if *min > netmask_len {
+                        *min = netmask_len
+                    } else if *max < netmask_len {
+                        *max = netmask_len
+                    }
+                })
+                .or_insert((item.netmask_len(), item.netmask_len()));
+
             if item.tunnel_id > 0 {
                 tunnel_table
                     .entry(item.tunnel_id)
@@ -229,14 +298,8 @@ impl Labeler {
                     .push(Arc::clone(item));
             }
         }
+
         // 排序使用降序是为了CIDR的最长前缀匹配
-        for (_k, v) in &mut epc_table.iter_mut() {
-            v.sort_by(|a, b| {
-                b.netmask_len()
-                    .partial_cmp(&Arc::clone(a).netmask_len())
-                    .unwrap()
-            });
-        }
         for (_k, v) in &mut tunnel_table.iter_mut() {
             v.sort_by(|a, b| {
                 b.netmask_len()
@@ -246,21 +309,25 @@ impl Labeler {
         }
 
         *self.tunnel_cidr_table.write().unwrap() = tunnel_table;
+        *self.epc_cidr_masklen_table.write().unwrap() = masklen_table;
         *self.epc_cidr_table.write().unwrap() = epc_table;
     }
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记
     // 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
     fn set_epc_by_cidr(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.read().unwrap().get(&epc_id) {
-            for cidr in list {
-                if cidr.ip.contains(&ip) {
-                    endpoint.l3_epc_id = cidr.epc_id;
-                    endpoint.is_vip = cidr.is_vip;
-                    return true;
-                }
+        let (min, max) = self.get_cidr_masklen_range(epc_id);
+        let cidr_key = EpcNetIpKey::new(&ip, max as u8, epc_id);
+        let table = self.epc_cidr_table.read().unwrap();
+        for i in (min..=max).rev() {
+            let key = cidr_key.clone_by_masklen(i, ip.is_ipv4());
+            if let Some(cidr) = table.get(&key) {
+                endpoint.l3_epc_id = cidr.epc_id;
+                endpoint.is_vip = cidr.is_vip;
+                return true;
             }
         }
+
         false
     }
 
@@ -295,15 +362,18 @@ impl Labeler {
         false
     }
 
-    fn set_vip_by_cidr(&self, ip: IpAddr, epc: i32, info: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.read().unwrap().get(&epc) {
-            for cidr in list {
-                if cidr.ip.contains(&ip) {
-                    info.is_vip = cidr.is_vip;
-                    return true;
-                }
+    fn set_vip_by_cidr(&self, ip: IpAddr, epc_id: i32, info: &mut EndpointInfo) -> bool {
+        let (min, max) = self.get_cidr_masklen_range(epc_id);
+        let cidr_key = EpcNetIpKey::new(&ip, max as u8, epc_id);
+        let table = self.epc_cidr_table.read().unwrap();
+        for i in (min..=max).rev() {
+            let key = cidr_key.clone_by_masklen(i, ip.is_ipv4());
+            if let Some(cidr) = table.get(&key) {
+                info.is_vip = cidr.is_vip;
+                return true;
             }
         }
+
         return false;
     }
 
@@ -931,23 +1001,51 @@ mod tests {
     fn test_cidr_order() {
         let mut labeler: Labeler = Default::default();
         let cidr1: Cidr = Cidr {
-            ip: IpNet::from_str("192.168.10.100/24").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/26").unwrap(),
             epc_id: 10,
             ..Default::default()
         };
         let cidr2: Cidr = Cidr {
-            ip: IpNet::from_str("192.168.10.100/25").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/27").unwrap(),
             epc_id: 10,
             is_vip: true,
             ..Default::default()
         };
-        let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2)];
+        let cidr3: Cidr = Cidr {
+            ip: IpNet::from_str("192.168.10.100/25").unwrap(),
+            epc_id: 10,
+            ..Default::default()
+        };
+        let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2), Arc::new(cidr3)];
         let mut endpoint: EndpointInfo = Default::default();
 
         labeler.update_cidr_table(&cidrs);
 
         labeler.set_epc_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.is_vip, true);
+    }
+
+    #[test]
+    fn test_cidr_match() {
+        let mut labeler: Labeler = Default::default();
+        let cidr1: Cidr = Cidr {
+            ip: IpNet::from_str("10.0.0.0/24").unwrap(),
+            epc_id: 10,
+            is_vip: true,
+            ..Default::default()
+        };
+        let cidr2: Cidr = Cidr {
+            ip: IpNet::from_str("192.168.10.100/8").unwrap(),
+            epc_id: 10,
+            is_vip: true,
+            ..Default::default()
+        };
+        let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2)];
+        labeler.update_cidr_table(&cidrs);
+
+        let mut endpoint: EndpointInfo = Default::default();
+        labeler.set_epc_by_cidr("10.1.2.3".parse().unwrap(), 10, &mut endpoint);
+        assert_eq!(endpoint.is_vip, false);
     }
 
     #[test]

@@ -317,6 +317,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             gpid_1: f.gpid_1,
             netns_id_0: f.netns_id_0,
             netns_id_1: f.netns_id_1,
+            pod_id_0: 0,
+            pod_id_1: 0,
         }
     }
 }

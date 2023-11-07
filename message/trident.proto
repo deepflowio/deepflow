@@ -438,6 +438,11 @@ message GProcessInfo {
     optional uint32 vtap_id = 3;  // 限制在64000
 }
 
+message Container {
+    optional uint32 pod_id = 1;
+    optional string container_id = 2;
+}
+
 message PlatformData {
     repeated Interface interfaces = 1;
     repeated PeerConnection peer_connections = 3;
@@ -532,6 +537,13 @@ message SyncResponse {
     optional uint64 version_acls = 7 [default = 0];
     optional uint64 version_groups = 8 [default = 0];
 
+    // The controller sends a container list to each agent, which contains a list of
+    // containers in the operating system that the agent is running on (Note that only
+    // the local container will be issued, not other machines)
+    // =================================================================================
+    // 控制器向每个 Agent 下发一个 container list，其内容为该 Agent 运行操作
+    // 系统中的 container 列表（注意仅会下发本机的 container，不会包含其他机器的）
+    repeated Container containers = 9;
     repeated Segment local_segments = 10;
     repeated Segment remote_segments = 11;
     optional bytes platform_data = 12; // serialized result of `message PlatformData`, transmitted only when the content changes
@@ -750,7 +762,7 @@ message GPIDSyncEntry {
     optional uint32 pid_real = 13 [default = 0];    // pid or gpid
     optional RoleType role_real = 14 [default = ROLE_NONE]; // role of real ip, ROLE_NONE means compressed
 
-    // the net nsmaspace index,  neither netns id nor netns inode 
+    // the net namespace index,  neither netns id nor netns inode
     optional uint32 netns_idx = 15 [default = 0];  // u16
 }
 
@@ -845,7 +857,7 @@ message RVData {
 
 message GPIDVTapData {
     optional uint32  update_time = 1 [default = 0];
-    optional GPIDSyncRequest  sync_request = 2;    
+    optional GPIDSyncRequest  sync_request = 2;
 }
 
 message AgentCacheRequest {

@@ -1611,6 +1611,9 @@ infer_mongo_message(const char *buf, size_t count,
 	if (header.request_id < 0) {
 		return MSG_UNKNOWN;
 	}
+	if (header.op_code == MONGO_OP_REPLY) {
+		return MSG_RESPONSE;
+	}
 	if (header.op_code < MONGO_OP_UPDATE) {
 		return MSG_UNKNOWN;
 	}
@@ -1619,9 +1622,6 @@ infer_mongo_message(const char *buf, size_t count,
 	}
 	if (header.op_code > MONGO_OP_MSG) {
 		return MSG_UNKNOWN;
-	}
-	if (header.op_code == MONGO_OP_REPLY) {
-		return MSG_RESPONSE;
 	}
 	return MSG_REQUEST;
 }

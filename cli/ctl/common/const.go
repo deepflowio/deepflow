@@ -16,6 +16,8 @@
 
 package common
 
+import "time"
+
 const (
 	SUCCESS = "SUCCESS"
 
@@ -175,3 +177,7 @@ func GetVtapTapModeByName(tapModeName string) VtapTapMode {
 	}
 	return VTAP_TAP_MODE_LOCAL
 }
+
+var (
+	DefaultTimeout = time.Duration(time.Second * 30)
+)

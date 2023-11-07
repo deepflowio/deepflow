@@ -164,6 +164,13 @@ fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
     }
 }
 
+fn sd_container_id_safe(sd: *mut SK_BPF_DATA) -> String {
+    unsafe {
+        let v = &(*sd).container_id;
+        String::from_utf8_lossy(v).to_string()
+    }
+}
+
 extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
     unsafe {
         let mut proto_tag = String::from("");
@@ -204,7 +211,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 || sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -213,6 +220,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).process_id,
                      (*sd).thread_id,
                      (*sd).coroutine_id,
+                     sd_container_id_safe(sd),
                      (*sd).source,
 		     (*sd).socket_role,
                      process_name_safe(sd),
@@ -227,7 +235,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -236,6 +244,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).process_id,
                      (*sd).thread_id,
                      (*sd).coroutine_id,
+                     sd_container_id_safe(sd),
                      (*sd).source,
 		     (*sd).socket_role,
                      process_name_safe(sd),
@@ -353,21 +362,21 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
 
-        set_feature_regex(
-            FEATURE_UPROBE_OPENSSL,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
-        set_feature_regex(
-            FEATURE_UPROBE_GOLANG,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
+        //set_feature_regex(
+        //    FEATURE_UPROBE_OPENSSL,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
+        //set_feature_regex(
+        //    FEATURE_UPROBE_GOLANG,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
 
-        set_io_event_collect_mode(1);
+        //set_io_event_collect_mode(1);
 
-        set_io_event_minimal_duration(1000000);
+        //set_io_event_minimal_duration(1000000);
 
-        // enable go auto traceing,
-        set_go_tracing_timeout(120);
+        //// enable go auto traceing,
+        //set_go_tracing_timeout(120);
 
         /*
             let bypass_port = 443;
