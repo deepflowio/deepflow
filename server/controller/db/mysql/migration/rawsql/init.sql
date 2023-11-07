@@ -1652,6 +1652,7 @@ CREATE TABLE IF NOT EXISTS npb_tunnel (
     name                CHAR(64) NOT NULL,
     ip                  CHAR(64),
     type                INTEGER COMMENT '(0-VXLAN；1-ERSPAN)',
+    vni_input_type      TINYINT(1) DEFAULT 1 COMMENT '1. entire one 2. two parts',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     lcuuid              CHAR(64)
