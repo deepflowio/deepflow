@@ -199,10 +199,6 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "HTTP1";
 	case PROTO_HTTP2:
 		return "HTTP2";
-	case PROTO_TLS_HTTP1:
-		return "TLS_HTTP1";
-	case PROTO_TLS_HTTP2:
-		return "TLS_HTTP2";
 	case PROTO_MYSQL:
 		return "MySQL";
 	case PROTO_DNS:
@@ -223,6 +219,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "FastCGI";
 	case PROTO_MONGO:
 		return "MongoDB";
+	case PROTO_TLS:
+		return "TLS";
 	default:
 		return "Unknown";
 	}
