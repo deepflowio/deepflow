@@ -289,6 +289,9 @@ querier:
       cache-max-count: 1024 # max capacity of cache list
       cache-max-allow-deviation: 3600 # unit:s 
 
+  auto-custom-tag:
+    tag-name: 
+    tag-values: 
   # external-apm:
   # - name: skywalking
   #   addr: 127.0.0.1:11800

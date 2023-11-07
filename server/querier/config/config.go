@@ -55,6 +55,7 @@ type QuerierConfig struct {
 	MaxCacheableEntrySize           int                           `default:"1000" yaml:"max-cacheable-entry-size"`
 	MaxPrometheusIdSubqueryLruEntry int                           `default:"8000" yaml:"max-prometheus-id-subquery-lru-entry"`
 	PrometheusIdSubqueryLruTimeout  int                           `default:"60" yaml:"prometheus-id-subquery-lru-timeout"`
+	AutoCustomTag                   AutoCustomTag                 `yaml:"auto-custom-tag"`
 }
 
 type DeepflowApp struct {
@@ -70,6 +71,10 @@ type Clickhouse struct {
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
 	MaxConnection  int    `default:"20" yaml:"max-connection"`
+}
+type AutoCustomTag struct {
+	TagName   string `default:"" yaml:"tag-name"`
+	TagValues string `default:"" yaml:"tag-values"`
 }
 
 func (c *Config) expendEnv() {

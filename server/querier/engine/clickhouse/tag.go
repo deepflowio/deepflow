@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch"
@@ -139,6 +140,8 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 				return nil, "", err
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+		} else if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(selectTag, config.Cfg.AutoCustomTag.TagName) {
+			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: ""}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
