@@ -1794,9 +1794,6 @@ impl AgentComponents {
         for src_if in yaml_config.src_interfaces.iter() {
             src_interfaces_and_namespaces.push((src_if.clone(), NsFile::Root));
         }
-        if src_interfaces_and_namespaces.is_empty() {
-            src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
-        }
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
             let re = Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
@@ -1804,6 +1801,16 @@ impl AgentComponents {
             nss.sort_unstable();
             for ns in nss {
                 src_interfaces_and_namespaces.push(("".into(), ns));
+            }
+        }
+        if src_interfaces_and_namespaces.is_empty() {
+            let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local {
+                yaml_config.local_dispatcher_count
+            } else {
+                1
+            };
+            for _ in 0..local_dispatcher_count {
+                src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
             }
         }
 
@@ -1828,7 +1835,7 @@ impl AgentComponents {
             exception_handler.clone(),
             false,
         );
-
+        let local_dispatcher_count = src_interfaces_and_namespaces.len();
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -2008,6 +2015,7 @@ impl AgentComponents {
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
                 .pcap_interfaces(pcap_interfaces)
+                .local_dispatcher_count(local_dispatcher_count)
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );

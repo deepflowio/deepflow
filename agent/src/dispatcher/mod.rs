@@ -245,6 +245,21 @@ impl DispatcherListener {
         }
     }
 
+    fn id(&self) -> usize {
+        match self {
+            Self::Local(a) => a.id(),
+            Self::Mirror(a) => a.id(),
+            Self::Analyzer(a) => a.id(),
+        }
+    }
+
+    fn local_dispatcher_count(&self) -> usize {
+        match self {
+            Self::Local(a) => a.local_dispatcher_count(),
+            _ => 1,
+        }
+    }
+
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
@@ -268,13 +283,20 @@ impl DispatcherListener {
 
     pub fn on_tap_interface_change(
         &self,
-        interfaces: &Vec<Link>,
+        interfaces: &[Link],
         if_mac_source: IfMacSource,
         trident_type: TridentType,
         blacklist: &Vec<u64>,
     ) {
         match self {
             Self::Local(l) => {
+                let width = interfaces.len() / self.local_dispatcher_count();
+                let start = self.id() * width;
+                let interfaces = if self.id() == self.local_dispatcher_count() - 1 {
+                    &interfaces[start..]
+                } else {
+                    &interfaces[start..start + width]
+                };
                 l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
             }
             // Enterprise Edition Feature: analyzer_mode
@@ -624,6 +646,7 @@ impl stats::RefCountable for PacketCounter {
 #[derive(Default)]
 pub struct DispatcherBuilder {
     id: Option<usize>,
+    local_dispatcher_count: usize,
     src_interface: Option<String>,
     ctrl_mac: Option<MacAddr>,
     leaky_bucket: Option<Arc<LeakyBucket>>,
@@ -811,6 +834,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn local_dispatcher_count(mut self, v: usize) -> Self {
+        self.local_dispatcher_count = v;
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
         // set ns before creating af packet socket
@@ -864,6 +892,7 @@ impl DispatcherBuilder {
             engine,
 
             id,
+            local_dispatcher_count: self.local_dispatcher_count,
             src_interface: src_interface.clone(),
             src_interface_index: 0,
             ctrl_mac: self
