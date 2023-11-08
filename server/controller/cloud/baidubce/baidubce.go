@@ -26,6 +26,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/csn"
 	"github.com/baidubce/bce-sdk-go/services/eni"
 	"github.com/baidubce/bce-sdk-go/services/rds"
+	"github.com/baidubce/bce-sdk-go/services/scs"
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
@@ -229,6 +230,17 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)
 	ips = append(ips, tmpIPs...)
 
+	// Redis
+	redisInstances, redisVInterfaces, redisIPs, err := b.getRedisInstances(
+		region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid,
+	)
+	if err != nil {
+		log.Error("get redis_instance data failed")
+		return resource, err
+	}
+	vinterfaces = append(vinterfaces, redisVInterfaces...)
+	ips = append(ips, redisIPs...)
+
 	// 附属容器集群
 	subDomains, err := b.getSubDomains(region, vpcIdToLcuuid)
 	if err != nil {
@@ -253,6 +265,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.PeerConnections = peerConnections
 	resource.CENs = cens
 	resource.RDSInstances = rdsInstances
+	resource.RedisInstances = redisInstances
 	resource.SubDomains = subDomains
 	b.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(b)
@@ -264,7 +277,7 @@ type BCEResultStruct interface {
 	api.ZoneModel | *blb.DescribeLoadBalancersResult | *vpc.ListNatGatewayResult | *vpc.ListSubnetResult |
 		*vpc.ListPeerConnsResult | *rds.ListRdsResult | *vpc.GetRouteTableResult | *api.ListSecurityGroupResult |
 		*cce.ListClusterResult | *api.ListInstanceResult | *eni.ListEniResult | *vpc.ListVPCResult | csn.Csn | csn.Instance |
-		*appblb.DescribeLoadBalancersResult
+		*appblb.DescribeLoadBalancersResult | *scs.ListInstancesResult
 }
 
 func structToJson[T BCEResultStruct](structs []T) (jsonList []*simplejson.Json) {
