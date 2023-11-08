@@ -424,6 +424,7 @@ pub struct YamlConfig {
     pub enable_qos_bypass: bool,
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
+    pub local_dispatcher_count: usize,
     pub src_interfaces: Vec<String>,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
@@ -740,6 +741,9 @@ impl YamlConfig {
         if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
             c.process_scheduling_priority = 0;
         }
+        if c.local_dispatcher_count == 0 {
+            c.local_dispatcher_count = 1;
+        }
 
         Ok(c)
     }
@@ -893,6 +897,7 @@ impl Default for YamlConfig {
             ntp_max_interval: Duration::from_secs(300),
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
+            local_dispatcher_count: 1,
         }
     }
 }
