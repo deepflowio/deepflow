@@ -472,6 +472,7 @@ impl Labeler {
         l2_end: bool,
         l3_end: bool,
         tunnel_id: u32,
+        is_loopback: bool,
     ) -> (EndpointInfo, bool) {
         let mut is_wan = false;
         let mut info: EndpointInfo = EndpointInfo {
@@ -481,7 +482,7 @@ impl Labeler {
         };
 
         // The loopback packet epc id is local epc id, and no query is required.
-        if ip.is_loopback() {
+        if is_loopback {
             info.set_loopback(self.local_epc.load(Ordering::Relaxed));
             return (info, false);
         }
@@ -659,6 +660,7 @@ impl Labeler {
     }
 
     pub fn get_endpoint_data(&self, key: &LookupKey) -> EndpointData {
+        let is_loopback = key.src_mac == key.dst_mac;
         // l2: mac查询
         // l3: l2epc+ip查询
         let (src_info, mut is_src_wan) = self.get_endpoint_info(
@@ -667,6 +669,7 @@ impl Labeler {
             key.l2_end_0,
             key.l3_end_0,
             key.tunnel_id,
+            is_loopback,
         );
         let (dst_info, mut is_dst_wan) = self.get_endpoint_info(
             u64::from(key.dst_mac),
@@ -674,6 +677,7 @@ impl Labeler {
             key.l2_end_1,
             key.l3_end_1,
             key.tunnel_id,
+            is_loopback,
         );
         let mut endpoint = EndpointData::new(src_info, dst_info);
         // l3: 私有网络 VPC内部路由
