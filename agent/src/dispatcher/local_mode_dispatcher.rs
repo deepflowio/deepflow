@@ -325,6 +325,10 @@ impl LocalModeDispatcherListener {
         return self.base.id;
     }
 
+    pub fn local_dispatcher_count(&self) -> usize {
+        return self.base.local_dispatcher_count;
+    }
+
     pub fn flow_acl_change(&self) {
         // Start capturing traffic after resource information is distributed
         self.base.pause.store(false, Ordering::Relaxed);
@@ -333,7 +337,7 @@ impl LocalModeDispatcherListener {
 
     pub fn on_tap_interface_change(
         &self,
-        interfaces: &Vec<Link>,
+        interfaces: &[Link],
         if_mac_source: IfMacSource,
         trident_type: TridentType,
         blacklist: &Vec<u64>,

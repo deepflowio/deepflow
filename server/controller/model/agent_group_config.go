@@ -37,6 +37,7 @@ type StaticConfig struct {
 	FastPathMapSize                    *int                       `yaml:"fast-path-map-size,omitempty"`
 	FirstPathLevel                     *int                       `yaml:"first-path-level,omitempty"`
 	SrcInterfaces                      []string                   `yaml:"src-interfaces,omitempty"`
+	LocalDispatcherCount               *int                       `yaml:"local-dispatcher-count,omitempty"`
 	CloudGatewayTraffic                *bool                      `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                   *uint16                    `yaml:"mirror-traffic-pcp,omitempty"`
 	PCap                               *PCapConfig                `yaml:"pcap,omitempty"`
