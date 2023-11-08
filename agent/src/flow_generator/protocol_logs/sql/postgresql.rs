@@ -96,17 +96,17 @@ impl L7ProtocolInfoInterface for PostgreInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::PostgreInfo(pg) = other {
             match pg.msg_type {
                 LogMessageType::Request => {
                     self.req_type = pg.req_type;
-                    self.context = pg.context.clone();
+                    std::mem::swap(&mut self.context, &mut pg.context);
                 }
                 LogMessageType::Response => {
                     self.resp_type = pg.resp_type;
-                    self.result = pg.result;
-                    self.error_message = pg.error_message;
+                    std::mem::swap(&mut self.result, &mut pg.result);
+                    std::mem::swap(&mut self.error_message, &mut pg.error_message);
                     self.status = pg.status;
                     self.affected_rows = pg.affected_rows;
                 }
@@ -561,12 +561,12 @@ mod test {
         let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
-        let resp = (&mut parser)
+        let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()
             .unwrap_single();
 
-        req.merge_log(resp).unwrap();
+        req.merge_log(&mut resp).unwrap();
         if let L7ProtocolInfo::PostgreInfo(info) = req {
             return (info, parser.perf_stats.unwrap());
         }

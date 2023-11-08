@@ -78,7 +78,7 @@ impl L7ProtocolInfoInterface for RedisInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::RedisInfo(other) = other {
             return self.merge(other);
         }
@@ -106,9 +106,9 @@ where
 }
 
 impl RedisInfo {
-    pub fn merge(&mut self, other: Self) -> Result<()> {
-        self.status = other.status;
-        self.error = other.error;
+    pub fn merge(&mut self, other: &mut Self) -> Result<()> {
+        std::mem::swap(&mut self.status, &mut other.status);
+        std::mem::swap(&mut self.error, &mut other.error);
         self.resp_status = other.resp_status;
         Ok(())
     }

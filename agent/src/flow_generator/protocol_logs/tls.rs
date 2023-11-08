@@ -54,7 +54,10 @@ impl L7ProtocolInfoInterface for TlsInfo {
         None
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(
+        &mut self,
+        other: &mut crate::common::l7_protocol_info::L7ProtocolInfo,
+    ) -> Result<()> {
         if let L7ProtocolInfo::TlsInfo(other) = other {
             self.merge(other);
         }
@@ -75,16 +78,16 @@ impl L7ProtocolInfoInterface for TlsInfo {
 }
 
 impl TlsInfo {
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         match other.msg_type {
             LogMessageType::Request => {
-                self.handshake_protocol = other.handshake_protocol;
-                self.version = other.version;
-                self.request_resource = other.request_resource;
+                std::mem::swap(&mut self.handshake_protocol, &mut other.handshake_protocol);
+                std::mem::swap(&mut self.version, &mut other.version);
+                std::mem::swap(&mut self.request_resource, &mut other.request_resource);
             }
             LogMessageType::Response => {
                 self.status = other.status;
-                self.response_result = other.response_result;
+                std::mem::swap(&mut self.response_result, &mut other.response_result);
             }
             _ => {}
         }

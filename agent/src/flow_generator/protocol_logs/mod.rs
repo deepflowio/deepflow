@@ -322,18 +322,18 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 
 impl AppProtoLogsBaseInfo {
     // 请求调用回应来合并
-    fn merge(&mut self, log: AppProtoLogsBaseInfo) {
+    fn merge(&mut self, log: &mut AppProtoLogsBaseInfo) {
         // adjust protocol when change, now only use for http2 change to grpc.
         if self.head.proto != log.head.proto {
             self.head.proto = log.head.proto;
         }
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
-            self.process_kname_0 = log.process_kname_0;
+            std::mem::swap(&mut self.process_kname_0, &mut log.process_kname_0);
         }
         if log.process_id_1 > 0 {
             self.process_id_1 = log.process_id_1;
-            self.process_kname_1 = log.process_kname_1;
+            std::mem::swap(&mut self.process_kname_1, &mut log.process_kname_1);
         }
         self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
@@ -455,3 +455,18 @@ fn decode_base64_to_string(value: &str) -> String {
         Err(_) => value.to_string(),
     }
 }
+
+macro_rules! swap_if {
+    ($this:expr, $field:ident, is_none, $other:expr) => {
+        if $this.$field.is_none() {
+            std::mem::swap(&mut $this.$field, &mut $other.$field);
+        }
+    };
+    ($this:expr, $field:ident, is_empty, $other:expr) => {
+        if $this.$field.is_empty() {
+            std::mem::swap(&mut $this.$field, &mut $other.$field);
+        }
+    };
+}
+
+pub(crate) use swap_if;

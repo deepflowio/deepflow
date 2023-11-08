@@ -80,7 +80,7 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::MongoDBInfo(other) = other {
             self.merge(other);
         }
@@ -102,22 +102,22 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
 
 // 协议文档: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
 impl MongoDBInfo {
-    fn merge(&mut self, other: Self) {
+    fn merge(&mut self, other: &mut Self) {
         match other.msg_type {
             LogMessageType::Request => {
                 self.req_len = other.req_len;
-                self.op_code_name = other.op_code_name;
+                std::mem::swap(&mut self.op_code_name, &mut other.op_code_name);
                 self.op_code = other.op_code;
-                self.request = other.request;
+                std::mem::swap(&mut self.request, &mut other.request);
                 self.request_id = other.request_id;
             }
             LogMessageType::Response => {
                 self.response_code = other.response_code;
                 self.resp_len = other.resp_len;
-                self.exception = other.exception;
+                std::mem::swap(&mut self.exception, &mut other.exception);
                 self.status = other.status;
                 self.response_id = other.response_id;
-                self.response = other.response;
+                std::mem::swap(&mut self.response, &mut other.response);
             }
             _ => {}
         }
