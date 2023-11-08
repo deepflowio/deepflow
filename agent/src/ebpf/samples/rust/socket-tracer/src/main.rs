@@ -180,10 +180,6 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("HTTP1");
         } else if sk_proto_safe(sd) == SOCK_DATA_HTTP2 {
             proto_tag.push_str("HTTP2");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
-            proto_tag.push_str("TLS_HTTP1");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP2 {
-            proto_tag.push_str("TLS_HTTP2");
         } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
             proto_tag.push_str("DNS");
         } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
@@ -204,12 +200,14 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("FASTCGI");
         } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
             proto_tag.push_str("MONGO");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
+            proto_tag.push_str("TLS");
         } else {
             proto_tag.push_str("UNSPEC");
         }
 
         println!("+ --------------------------------- +");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 || sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
+        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
             println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),

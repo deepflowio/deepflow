@@ -937,8 +937,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	__u64 pre_trace_id = 0;
 	int ret;
 	if (is_socket_info_valid(socket_info_ptr) &&
-	    conn_info->direction == socket_info_ptr->direction &&
-	    conn_info->message_type == socket_info_ptr->msg_type) {
+	    conn_info->direction == socket_info_ptr->direction) {
 		if (trace_info_ptr)
 			pre_trace_id = trace_info_ptr->thread_trace_id;
 		conn_info->keep_data_seq = true; // 同时这里确保捕获数据的序列号保持不变。
