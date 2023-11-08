@@ -18,7 +18,7 @@
 use std::mem::swap;
 use std::{
     cmp::min,
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     fmt,
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
@@ -45,10 +45,7 @@ use crate::{
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{
-        error::{Error, Result},
-        FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
-    },
+    flow_generator::{error::Result, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     rpc::get_timestamp,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -249,24 +246,12 @@ impl MetaAppProto {
         }
     }
 
-    pub fn session_merge(&mut self, log: Self) -> Result<()> {
-        if let Err(err) = self.protocol_merge(log.l7_info) {
-            /*
-                if can not merge, return log which can not merge to self.
-                the follow circumstance can not merge:
-                    when ebpf disorder, http1 can not match req/resp.
-            */
-            if let Error::L7ProtocolCanNotMerge(l7_info) = err {
-                return Err(Error::L7LogCanNotMerge(Self { l7_info, ..log }));
-            }
-            return Err(err);
-        };
-        self.base_info.merge(log.base_info);
+    pub fn session_merge(&mut self, log: &mut Self) -> Result<()> {
+        // merge will fail under the following circumstances:
+        //     when ebpf disorder, http1 can not match req/resp.
+        let _ = self.l7_info.merge_log(&mut log.l7_info)?;
+        self.base_info.merge(&mut log.base_info);
         Ok(())
-    }
-
-    fn protocol_merge(&mut self, log: L7ProtocolInfo) -> Result<()> {
-        self.l7_info.merge_log(log)
     }
 
     // 是否需要进一步聚合
@@ -474,6 +459,11 @@ impl SessionQueue {
             return;
         }
 
+        if matches!(item.base_info.head.msg_type, LogMessageType::Session) {
+            self.send(item);
+            return;
+        }
+
         let mut slot = ((slot_time - self.aggregate_start_time.as_secs()) / SLOT_WIDTH) as usize;
         let mut time_window = match self.time_window.take() {
             Some(t) => t,
@@ -487,138 +477,90 @@ impl SessionQueue {
         }
 
         // 因为数组提前分配hashmap, slot < self.window_size 所以必然存在
-        let map = time_window.get_mut(slot).unwrap();
+        let time_map = time_window.get_mut(slot).unwrap();
         let key = if item.base_info.signal_source == SignalSource::EBPF {
             // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
             item.ebpf_flow_session_id()
         } else {
             Self::calc_key(&item)
         };
-        match item.base_info.head.msg_type {
-            LogMessageType::Request => {
-                self.on_request_log(map, item, key);
-            }
-            LogMessageType::Response => {
-                self.on_response_log(map, item, key);
-            }
-            LogMessageType::Session => self.send(item),
-            _ => (),
-        }
+        self.merge_log(time_map, item, key);
 
         self.time_window.replace(time_window);
     }
 
-    fn on_request_log(
+    fn merge_log(
         &mut self,
-        map: &mut HashMap<u64, Box<MetaAppProto>>,
+        time_map: &mut HashMap<u64, Box<MetaAppProto>>,
         mut item: Box<MetaAppProto>,
         key: u64,
     ) {
-        if let Some(mut p) = map.remove(&key) {
-            if item.need_protocol_merge() {
-                let _ = p.session_merge(*item);
-                if p.l7_info.is_session_end() {
+        match time_map.entry(key) {
+            Entry::Occupied(mut v) if item.need_protocol_merge() => {
+                let _ = v.get_mut().session_merge(&mut item);
+                if v.get_mut().l7_info.is_session_end() {
+                    let p = v.remove();
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(p);
-                } else {
-                    map.insert(key, p);
                 }
-            } else {
+            }
+            Entry::Occupied(mut v) => match item.base_info.head.msg_type {
+                // normal order, but if can not merge, send req and resp directly.
+                LogMessageType::Response
+                    if v.get().is_request()
+                        && item.base_info.start_time > v.get().base_info.start_time =>
+                {
+                    let mut p = v.remove();
+                    if let Err(_) = p.session_merge(&mut item) {
+                        self.send(item);
+                    }
+                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.counter.merge.fetch_add(1, Ordering::Relaxed);
+                    self.send(p);
+                }
                 // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
                 // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
-                if p.is_response() && p.base_info.start_time > item.base_info.start_time {
+                LogMessageType::Request
+                    if v.get().is_response()
+                        && v.get().base_info.start_time > item.base_info.start_time =>
+                {
                     // if can not merge, send req and resp directly.
-                    if let Err(Error::L7LogCanNotMerge(p)) = item.session_merge(*p) {
-                        self.send(Box::new(p));
+                    let mut p = v.remove();
+                    if let Err(_) = item.session_merge(&mut p) {
+                        self.send(p);
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
                     self.send(item);
-                } else {
-                    // If p is req or resp time lt req time, p is not item corresponding response, send the earlier log and save the later log
-                    if p.base_info.start_time > item.base_info.start_time {
+                }
+                // if entry and item cannot merge, send the early one and cache the other
+                _ => {
+                    if v.get().base_info.start_time > item.base_info.start_time {
                         self.send(item);
-                        map.insert(key, p);
                     } else {
-                        self.send(p);
-                        map.insert(key, item);
+                        // swap out old item and send
+                        self.send(v.insert(item));
                     }
                 }
-            }
-        } else {
-            if item.need_protocol_merge() {
-                let (req_end, resp_end) = item.l7_info.is_req_resp_end();
-                // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
-                if req_end || resp_end {
-                    return;
+            },
+            Entry::Vacant(v) => {
+                if item.need_protocol_merge() {
+                    let (req_end, resp_end) = item.l7_info.is_req_resp_end();
+                    // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
+                    // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
+                    if req_end || resp_end {
+                        return;
+                    }
                 }
-            }
 
-            if self.counter.cached.load(Ordering::Relaxed)
-                >= self.window_size as u64 * SLOT_CACHED_COUNT
-            {
-                self.send(item); // Prevent too many logs from being cached
-            } else {
-                map.insert(key, item);
-                self.counter.cached.fetch_add(1, Ordering::Relaxed);
-            }
-        }
-    }
-
-    fn on_response_log(
-        &mut self,
-        map: &mut HashMap<u64, Box<MetaAppProto>>,
-        item: Box<MetaAppProto>,
-        key: u64,
-    ) {
-        // response, 需要找到request并merge
-        if let Some(mut p) = map.remove(&key) {
-            if item.need_protocol_merge() {
-                let _ = p.session_merge(*item);
-
-                if p.l7_info.is_session_end() {
-                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                    self.send(p);
+                if self.counter.cached.load(Ordering::Relaxed)
+                    >= self.window_size as u64 * SLOT_CACHED_COUNT
+                {
+                    self.send(item); // Prevent too many logs from being cached
                 } else {
-                    map.insert(key, p);
+                    v.insert(item);
+                    self.counter.cached.fetch_add(1, Ordering::Relaxed);
                 }
-            } else {
-                if p.is_request() && item.base_info.start_time > p.base_info.start_time {
-                    // if can not merge, send req and resp directly.
-                    if let Err(Error::L7LogCanNotMerge(item)) = p.session_merge(*item) {
-                        self.send(Box::new(item));
-                    }
-                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                    self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                    self.send(p);
-                } else {
-                    // If p is resp or resp time lt req time, p is not the item corresponding req, send the earlier log and save the later log
-                    if p.base_info.start_time < item.base_info.start_time {
-                        self.send(p);
-                        map.insert(key, item);
-                    } else {
-                        self.send(item);
-                        map.insert(key, p);
-                    }
-                }
-            }
-        } else {
-            if item.need_protocol_merge() {
-                let (req_end, resp_end) = item.l7_info.is_req_resp_end();
-                // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
-                // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
-                if req_end || resp_end {
-                    return;
-                }
-            }
-
-            if self.counter.cached.load(Ordering::Relaxed)
-                >= self.window_size as u64 * SLOT_CACHED_COUNT
-            {
-                self.send(item); // Prevent too many logs from being cached
-            } else {
-                map.insert(key, item);
-                self.counter.cached.fetch_add(1, Ordering::Relaxed);
             }
         }
     }

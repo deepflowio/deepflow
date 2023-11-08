@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
@@ -66,7 +67,10 @@ impl L7ProtocolInfoInterface for DnsInfo {
         Some(self.trans_id as u32)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(
+        &mut self,
+        other: &mut crate::common::l7_protocol_info::L7ProtocolInfo,
+    ) -> Result<()> {
         if let L7ProtocolInfo::DnsInfo(other) = other {
             self.merge(other);
         }
@@ -87,8 +91,8 @@ impl L7ProtocolInfoInterface for DnsInfo {
 }
 
 impl DnsInfo {
-    pub fn merge(&mut self, other: Self) {
-        self.answers = other.answers;
+    pub fn merge(&mut self, other: &mut Self) {
+        std::mem::swap(&mut self.answers, &mut other.answers);
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }

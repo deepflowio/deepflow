@@ -106,7 +106,7 @@ pub struct DubboInfo {
 }
 
 impl DubboInfo {
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         if self.resp_msg_size.is_none() {
             self.resp_msg_size = other.resp_msg_size;
         }
@@ -124,7 +124,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
         Some(self.request_id as u32)
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::DubboInfo(other) = other {
             self.merge(other);
         }

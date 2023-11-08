@@ -80,7 +80,7 @@ impl L7ProtocolInfoInterface for MqttInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::MqttInfo(mqtt) = other {
             self.merge(mqtt);
         }
@@ -129,7 +129,7 @@ impl Default for MqttInfo {
 }
 
 impl MqttInfo {
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
         }
@@ -141,10 +141,10 @@ impl MqttInfo {
         }
         match other.pkt_type {
             PacketKind::Publish { .. } => {
-                self.publish_topic = other.publish_topic;
+                std::mem::swap(&mut self.publish_topic, &mut other.publish_topic);
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                self.subscribe_topics = other.subscribe_topics;
+                std::mem::swap(&mut self.subscribe_topics, &mut other.subscribe_topics);
             }
             _ => (),
         }
