@@ -198,72 +198,10 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("UNSPEC");
         }
 
-        println!("+ --------------------------------- +");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
-            let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
-                     date_time((*sd).timestamp),
-                     proto_tag,
-                     (*sd).need_reconfirm,
-                     (*sd).direction,
-                     (*sd).msg_type,
-                     (*sd).process_id,
-                     (*sd).thread_id,
-                     (*sd).coroutine_id,
-                     (*sd).source,
-		     (*sd).socket_role,
-                     process_name_safe(sd),
-                     flow_info(sd),
-                     (*sd).cap_len,
-                     (*sd).syscall_len,
-                     (*sd).socket_id,
-                     (*sd).syscall_trace_id_call,
-                     (*sd).tcp_seq,
-                     (*sd).cap_seq,
-                     (*sd).timestamp,
-                     data);
-        } else {
-            let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
-                     date_time((*sd).timestamp),
-                     proto_tag,
-                     (*sd).need_reconfirm,
-                     (*sd).direction,
-                     (*sd).msg_type,
-                     (*sd).process_id,
-                     (*sd).thread_id,
-                     (*sd).coroutine_id,
-                     (*sd).source,
-		     (*sd).socket_role,
-                     process_name_safe(sd),
-                     flow_info(sd),
-                     (*sd).cap_len,
-                     (*sd).syscall_len,
-                     (*sd).socket_id,
-                     (*sd).syscall_trace_id_call,
-                     (*sd).tcp_seq,
-                     (*sd).cap_seq,
-                     (*sd).timestamp);
-            if (*sd).source == 2 {
-                print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 4 {
-                print_io_event_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 5 {
-                print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
-            } else {
-                for x in data.into_iter() {
-                    if x < 32 || x > 126 {
-                        print!(".");
-                        continue;
-                    }
-                    let b = x as char;
-                    print!("{0}", b);
-                }
-            }
-            print!("\x1b[0m\n");
-        }
+        //if (*sd).source == 4 {
+        //        print_io_event_info((*sd).cap_data, (*sd).cap_len);
+        //}
 
-        println!("+ --------------------------------- +\n");
     }
 }
 
@@ -295,7 +233,7 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 #[allow(dead_code)]
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-        process_stack_trace_data_for_flame_graph(cp);
+        //process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count, 1);
         increment_counter(1, 0);
         //let data = cp_data_str_safe(cp);
@@ -342,21 +280,21 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
 
-        set_feature_regex(
-            FEATURE_UPROBE_OPENSSL,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
-        set_feature_regex(
-            FEATURE_UPROBE_GOLANG,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
+        //set_feature_regex(
+        //    FEATURE_UPROBE_OPENSSL,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
+        //set_feature_regex(
+        //    FEATURE_UPROBE_GOLANG,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
 
-        set_io_event_collect_mode(1);
+        //set_io_event_collect_mode(1);
 
-        set_io_event_minimal_duration(1000000);
+        //set_io_event_minimal_duration(1000000);
 
-        // enable go auto traceing,
-        set_go_tracing_timeout(120);
+        //// enable go auto traceing,
+        //set_go_tracing_timeout(120);
 
         /*
             let bypass_port = 443;
@@ -409,22 +347,22 @@ fn main() {
         print!("{:#?}\n", stats);
 
         //// enable continuous profiler
-        //if start_continuous_profiler(99, continuous_profiler_callback) != 0 {
-        //    println!("start_continuous_profiler() error.");
-        //    ::std::process::exit(1);
-        //}
+        if start_continuous_profiler(99, 10, 300, continuous_profiler_callback) != 0 {
+            println!("start_continuous_profiler() error.");
+            ::std::process::exit(1);
+        }
 
-        //set_profiler_regex(
-        //    CString::new(
-        //        "^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*|socket_tracer)$".as_bytes(),
-        //    )
-        //    .unwrap()
-        //    .as_c_str()
-        //    .as_ptr(),
-        //);
+        set_profiler_regex(
+            CString::new(
+                "^(java|deepflow-.*)$".as_bytes(),
+            )
+            .unwrap()
+            .as_c_str()
+            .as_ptr(),
+        );
 
-        //// CPUID will not be included in the aggregation of stack trace data.
-        //set_profiler_cpu_aggregation(0);
+        // CPUID will not be included in the aggregation of stack trace data.
+        set_profiler_cpu_aggregation(0);
 
         bpf_tracer_finish();
 

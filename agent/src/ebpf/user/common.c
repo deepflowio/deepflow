@@ -502,6 +502,8 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 		memset(name_base, 0, len);
 		memcpy_s_inline((void *)name_base, len,
 				(void *)start + 1, src_len);
+		fprintf(stdout, "[FILE] func %s pid %d name %s\n", __func__, pid, name_base);
+		fflush(stdout);
 	}
 
 	free(start);
@@ -1027,6 +1029,9 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 	snprintf(file, sizeof(file), "/proc/%d/cgroup", pid);
 	if (access(file, F_OK))
 		return -1;
+
+	fprintf(stdout, "[FILE] func %s path %s\n", __func__, file);
+	fflush(stdout);
 
 	FILE *fp;
 	char *lf;

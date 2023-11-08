@@ -42,6 +42,11 @@
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 
+static u64 g_write_bytes;
+static u64 g_read_bytes;
+static u64 g_write_bytes_pre;
+static u64 g_read_bytes_pre;
+
 /*
  * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
  * when the number of probes is very large. Because we have to spend a
@@ -355,7 +360,7 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 }
 
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				 void **out, size_t *outsize)
+				 void **out, size_t * outsize)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
@@ -481,7 +486,7 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				void **out, size_t *outsize)
+				void **out, size_t * outsize)
 {
 	return 0;
 }
@@ -535,7 +540,7 @@ static int register_events_handle(struct event_meta *meta,
 	}
 
 	struct extra_event *e;
-	void (*fn)(void *) = NULL;
+	void (*fn) (void *) = NULL;
 	list_for_each_entry(e, &events_list, list) {
 		if (e->type & meta->event_type) {
 			fn = e->h;
@@ -1064,7 +1069,23 @@ static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
 	struct bpf_tracer *t = arg;
+	u64 count = 0, diff_read = 0, diff_write = 0;
+	u64 loop_num_per_sec = 1000000UL/LOOP_DELAY_US;
 	for (;;) {
+		if ((count % loop_num_per_sec) == 0) {
+			diff_read = g_read_bytes - g_read_bytes_pre;
+			g_read_bytes_pre = g_read_bytes;
+			diff_write = g_write_bytes - g_write_bytes_pre;
+			g_write_bytes_pre = g_write_bytes;
+			char *timestamp = gen_timestamp_str(0);
+			if (timestamp != NULL) {
+				fprintf(stdout, "%s [FILE] read %lu Kbytes/sec write %lu Kbytes/sec\n",
+					timestamp, diff_read / 1024, diff_write / 1024);
+				fflush(stdout);
+				free(timestamp);
+			}
+		}
+
 		/*
 		 * Will attach/detach all probes in the following cases:
 		 *
@@ -1083,6 +1104,7 @@ static void process_events_handle_main(__unused void *arg)
 		ssl_events_handle();
 		check_datadump_timeout();
 		usleep(LOOP_DELAY_US);
+		count++;
 	}
 }
 
@@ -1290,8 +1312,10 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 
 static void update_kprobe_port_bitmap(struct bpf_tracer *tracer)
 {
-	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0, &allow_port_bitmap);
-	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1, &bypass_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0,
+			    &allow_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1,
+			    &bypass_port_bitmap);
 }
 
 static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
@@ -1568,7 +1592,7 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 }
 #endif
 
-extern __thread uword thread_index; // for symbol pid caches hash
+extern __thread uword thread_index;	// for symbol pid caches hash
 static void poller(void *t)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
@@ -1770,9 +1794,9 @@ int running_socket_tracer(tracer_callback_t handle,
 	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
-	     setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
-			      bpf_bin_buffer, buffer_sz, tps,
-			      thread_nr, NULL, NULL, (void *)handle, 0);
+	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
+			     bpf_bin_buffer, buffer_sz, tps,
+			     thread_nr, NULL, NULL, (void *)handle, 0);
 	if (tracer == NULL)
 		return -EINVAL;
 
@@ -1974,7 +1998,7 @@ int socket_tracer_start(void)
 enum tracer_state __unused get_socket_tracer_state(void)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
-	if (t == NULL) 
+	if (t == NULL)
 		return TRACER_STOP_ERR;
 
 	return t->state;
@@ -2142,9 +2166,9 @@ struct socket_trace_stats socket_tracer_stats(void)
  *
  * @return 0 is success, if not 0 is failed
  */
-int register_event_handle(uint32_t type, void (*fn)(void *))
+int register_event_handle(uint32_t type, void (*fn) (void *))
 {
-	if(type < EVENT_TYPE_MIN || fn == NULL) {
+	if (type < EVENT_TYPE_MIN || fn == NULL) {
 		ebpf_warning("Parameter is invalid, type %d fn %p\n", type, fn);
 		return -1;
 	}
@@ -2181,7 +2205,7 @@ void print_uprobe_http2_info(const char *data, int len)
 		__u32 stream_id;
 		__u32 header_len;
 		__u32 value_len;
-	} __attribute__((packed)) header;
+	} __attribute__ ((packed)) header;
 
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
@@ -2209,17 +2233,50 @@ void print_io_event_info(const char *data, int len)
 		__u32 operation;
 		__u64 latency;
 		char filename[64];
-	} __attribute__((packed)) event;
+	} __attribute__ ((packed)) event;
 
 	memcpy(&event, data, sizeof(event));
 
 	fprintf(datadump_file,
-		"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]\nfilename=[%s]\n",
-		event.bytes_count, event.operation,
-		event.latency, event.filename);
+		"%s %u bytes latency %lu filename %s\n",
+		event.operation == T_EGRESS ? "write" : "read",
+		event.bytes_count, event.latency, event.filename);
 
 	fflush(stdout);
 	return;
+}
+
+void print_io_event_data(struct socket_bpf_data *sd)
+{
+	struct {
+		__u32 bytes_count;
+		__u32 operation;
+		__u64 latency;
+		char filename[64];
+	} __attribute__ ((packed)) event;
+
+	memcpy(&event, sd->cap_data, sizeof(event));
+
+	char flag[2];
+	flag[0] = flag[1] = 0;
+	if (event.bytes_count > 4096)
+		flag[0] = 'A';
+	char *timestamp = gen_timestamp_str(0);
+	if (timestamp == NULL)
+		return;
+	fprintf(stdout,
+		"%s [FILE] %s PID %d TID %d comm %s %s %u bytes latency %luns filename %s\n",
+		timestamp, flag, sd->process_id, sd->thread_id, sd->process_kname,
+		event.operation == T_EGRESS ? "write" : "read",
+		event.bytes_count, event.latency, event.filename);
+
+	fflush(stdout);
+	free(timestamp);
+
+	if (event.operation == T_EGRESS)
+		g_write_bytes += event.bytes_count;
+	else
+		g_read_bytes += event.bytes_count;
 }
 
 void print_uprobe_grpc_dataframe(const char *data, int len)
@@ -2229,10 +2286,10 @@ void print_uprobe_grpc_dataframe(const char *data, int len)
 		__u32 stream_id;
 		__u32 data_len;
 		char data[1024];
-	} __attribute__((packed)) dataframe;
+	} __attribute__ ((packed)) dataframe;
 
 	memcpy(&dataframe, data, len);
-	
+
 	fprintf(datadump_file, "stream_id=[%d]\n", dataframe.stream_id);
 	fprintf(datadump_file, "data_len=[%d]\n", dataframe.data_len);
 
@@ -2474,4 +2531,6 @@ static void datadump_process(void *data)
 	if (unlikely(datadump_enable))
 		print_socket_data(sd);
 	pthread_mutex_unlock(&datadump_mutex);
+	if (sd->source == 4)
+		print_io_event_data(sd);
 }

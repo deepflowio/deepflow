@@ -2185,29 +2185,39 @@ static __inline void trace_io_event_common(void *ctx,
 	__u32 k0 = 0;
 	__u32 tgid = pid_tgid >> 32;
 
-	if (data_args->bytes_count == 0) {
+	if (data_args->bytes_count <= 0) {
 		return;
 	}
+
+	__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
+	if (!adapt_uid)
+		return;
+
+	//bpf_debug("PID %d\n", (__u32)((*adapt_uid) >> 32)); 
+	// Only a preset uid can be adapted to the kernel
+	if ((__u32)((*adapt_uid) >> 32) !=
+	    (__u32)(bpf_get_current_pid_tgid() >> 32))
+		return;
 
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL) {
 		return;
 	}
 
-	if (trace_conf->io_event_collect_mode == 0) {
-		return;
-	}
+	//if (trace_conf->io_event_collect_mode == 0) {
+	//	return;
+	//}
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout, false);
-	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
-	if (trace_info_ptr) {
-		trace_id = trace_info_ptr->thread_trace_id;
-	}
+	//__u32 timeout = trace_conf->go_tracing_timeout;
+	//struct trace_key_t trace_key = get_trace_key(timeout, false);
+	//struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
+	//if (trace_info_ptr) {
+	//	trace_id = trace_info_ptr->thread_trace_id;
+	//}
 
-	if (trace_id == 0 && trace_conf->io_event_collect_mode == 1) {
-		return;
-	}
+	//if (trace_id == 0 && trace_conf->io_event_collect_mode == 1) {
+	//	return;
+	//}
 
 	int data_max_sz = trace_conf->data_limit_max;
 
@@ -2216,9 +2226,9 @@ static __inline void trace_io_event_common(void *ctx,
 	}
 
 	latency = bpf_ktime_get_ns() - data_args->enter_ts;
-	if (latency < trace_conf->io_event_minimal_duration) {
-		return;
-	}
+	//if (latency < trace_conf->io_event_minimal_duration) {
+	//	return;
+	//}
 
 	char *name = fd_to_name(data_args->fd);
 
@@ -2247,7 +2257,7 @@ static __inline void trace_io_event_common(void *ctx,
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
 	v->tgid = tgid;
 	v->pid = (__u32)pid_tgid;
-	v->coroutine_id = trace_key.goid;
+	v->coroutine_id = 0;
 	v->timestamp = data_args->enter_ts;
 
 	v->syscall_len = sizeof(*buffer);

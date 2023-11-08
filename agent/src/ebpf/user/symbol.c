@@ -669,7 +669,6 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 		return ETR_INVAL;
 
 	fetch_container_id(pid, p->container_id, sizeof(p->container_id));
-
 	p->stime = (u64) get_process_starttime_and_comm(pid,
 							p->comm,
 							sizeof(p->comm));

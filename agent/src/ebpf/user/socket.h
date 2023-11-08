@@ -189,7 +189,7 @@ struct clear_list_elem {
 struct extra_event {
 	struct list_head list;
 	uint32_t type;
-	void (*h)(void *);
+	void (*h) (void *);
 };
 
 static inline char *get_proto_name(uint16_t proto_id)
@@ -255,8 +255,8 @@ static inline const char *get_tracer_state_name(enum tracer_state s)
 #define _PREFETCH(n,size,type)				\
   if ((size) > (n)*CACHE_LINE_BYTES)			\
     __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, 	\
-            PREFETCH_##type,              		\
-            /* locality */ 3);
+      PREFETCH_##type,              		\
+      /* locality */ 3);
 
 #define PREFETCH(addr,size,type)		\
 do {						\
@@ -319,8 +319,9 @@ int running_socket_tracer(tracer_callback_t handle,
 			  uint32_t max_socket_entries,
 			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim);
-int register_event_handle(uint32_t type, void (*fn)(void *));
+int register_event_handle(uint32_t type, void (*fn) (void *));
 int socket_tracer_stop(void);
 int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
+void print_io_event_data(struct socket_bpf_data *sd);
 #endif /* DF_USER_SOCKET_H */

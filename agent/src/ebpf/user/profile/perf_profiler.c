@@ -492,6 +492,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (unlikely(profiler_stop == 1))
 			break;
 
+		//if ((strcmp(v->comm, "du") == 0) || (strcmp(v->comm, "nice") == 0) || (strcmp(v->comm, "kubelet") == 0))
+		//	continue;
+
 		/*
 		 * If cpu_aggregation_flag=0, the CPU value for stack trace data
 		 * reporting is a special value (CPU_INVALID:0xfff) used to indicate
