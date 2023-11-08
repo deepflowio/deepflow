@@ -26,14 +26,13 @@
 #include "socket_trace.h"
 
 static __inline bool
-protocol_port_check(enum traffic_protocol proto,
-		    struct conn_info_t *conn_info)
+protocol_port_check(enum traffic_protocol proto, struct conn_info_t *conn_info)
 {
 	if (!is_protocol_enabled(proto)) {
 		return false;
 	}
 
-	if (!proto_port_is_allowed((__u32)proto,
+	if (!proto_port_is_allowed((__u32) proto,
 				   conn_info->tuple.num,
 				   conn_info->tuple.dport)) {
 		return false;
@@ -168,9 +167,8 @@ do { \
 		table_idx = buf[++offset] & 0x7f; \
 } while(0)
 
-static __inline __u8 find_idx_from_block_fragment(const __u8 *buf,
-						  __u8 offset,
-						  __u8 max)
+static __inline __u8 find_idx_from_block_fragment(const __u8 * buf,
+						  __u8 offset, __u8 max)
 {
 	/*
 	 * Header Block Fragment解析出静态表索引值，最多取前面6个字节。
@@ -254,7 +252,11 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
+#ifdef LINUX_VER_5_2_PLUS
 #define HTTPV2_LOOP_MAX 8
+#else
+#define HTTPV2_LOOP_MAX 6
+#endif
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -283,7 +285,6 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		static const int HTTP2_MAGIC_SIZE = 24;
 		offset = HTTP2_MAGIC_SIZE;
 	}
-
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
 
@@ -297,8 +298,8 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 			break;
 
 		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
-		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
-			HTTPV2_FRAME_PROTO_SZ;
+		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +
+		    HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
 
 		// 如果不是Header继续寻找下一个Frame
@@ -326,14 +327,13 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		 * 来确定HEADERS帧的内容从而得到Header Block Fragment的偏移。
 		 */
 		block_fragment_offset =
-			get_block_fragment_offset(HTTPV2_FRAME_PROTO_SZ,
-						  flags_padding,
-						  flags_priority);
+		    get_block_fragment_offset(HTTPV2_FRAME_PROTO_SZ,
+					      flags_padding, flags_priority);
 
 		// 对Header Block Fragment的内容进行分析得到静态表的索引。
 		static_table_idx =
-			find_idx_from_block_fragment(buf, block_fragment_offset,
-						     HTTPV2_STATIC_TABLE_IDX_MAX);
+		    find_idx_from_block_fragment(buf, block_fragment_offset,
+						 HTTPV2_STATIC_TABLE_IDX_MAX);
 
 		// 静态索引表的Index取值范围 [1, 61]
 		if (static_table_idx > HTTPV2_STATIC_TABLE_IDX_MAX &&
@@ -343,12 +343,13 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		// HTTPV2 REQUEST
 		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-	    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
 			msg_type = MSG_REQUEST;
 			conn_info->role =
-			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+			    (conn_info->direction ==
+			     T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 
 		} else {
 
@@ -388,7 +389,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 				.tgid = bpf_get_current_pid_tgid() >> 32,
 				.fd = conn_info->fd,
 				.tcp_seq_end =
-					get_tcp_read_seq_from_fd(conn_info->fd),
+				    get_tcp_read_seq_from_fd(conn_info->fd),
 			};
 			// make linux 4.14 validator happy
 			__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;
@@ -402,17 +403,17 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 
-		if (parse_http2_headers_frame(buf_src, count, conn_info, false) !=
-		    MSG_RECONFIRM)
+		if (parse_http2_headers_frame(buf_src, count, conn_info, false)
+		    != MSG_RECONFIRM)
 			return MSG_UNKNOWN;
-		
+
 		if (conn_info->socket_info_ptr->role == ROLE_SERVER)
 			return (conn_info->direction == T_INGRESS) ?
-				MSG_REQUEST : MSG_RESPONSE;
+			    MSG_REQUEST : MSG_RESPONSE;
 
 		if (conn_info->socket_info_ptr->role == ROLE_CLIENT)
 			return (conn_info->direction == T_INGRESS) ?
-				MSG_RESPONSE: MSG_REQUEST;
+			    MSG_RESPONSE : MSG_REQUEST;
 	}
 
 	return parse_http2_headers_frame(buf_src, count, conn_info, true);
@@ -437,7 +438,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
 	}
-	
+
 	if (is_http_response(buf)) {
 		return MSG_RESPONSE;
 	}
@@ -466,8 +467,7 @@ static __inline void save_prev_data(const char *buf,
 	}
 }
 
-// MySQL、Kafka推断需要之前的4字节数据
-// MySQL and Kafka need the previous 4 bytes of data for inference
+// MySQL and Kafka need the previous n bytes of data for inference
 static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
@@ -480,7 +480,8 @@ static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 			bpf_probe_read(conn_info->prev_buf,
 				       sizeof(conn_info->prev_buf),
 				       conn_info->socket_info_ptr->prev_data);
-			conn_info->prev_count = conn_info->socket_info_ptr->prev_data_len;
+			conn_info->prev_count =
+			    conn_info->socket_info_ptr->prev_data_len;
 		}
 
 		/*
@@ -563,7 +564,8 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	 * the judgment is completed as the MySQL protocol.
 	 */
 	if (is_mysqld) {
-		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+		return conn_info->direction ==
+		    T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
 	}
 
 	if (seq != 0)
@@ -573,7 +575,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (len > 10000) {
 		return MSG_UNKNOWN;
 	}
-		
+
 	if (com != kComConnect && com != kComQuery && com != kComStmtPrepare &&
 	    com != kComStmtExecute && com != kComStmtClose) {
 		return MSG_UNKNOWN;
@@ -581,9 +583,11 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 out:
 	if (is_mysqld)
-		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+		return conn_info->direction ==
+		    T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
 	else
-		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
+		return conn_info->direction ==
+		    T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
 
 	return MSG_UNKNOWN;
 
@@ -630,8 +634,7 @@ out:
 	 */
 }
 
-static __inline bool infer_pgsql_startup_message(const char* buf,
-						 size_t count)
+static __inline bool infer_pgsql_startup_message(const char *buf, size_t count)
 {
 	// ref: https://developer.aliyun.com/article/751984#slide-5
 	// int32 len | int32 protocol | "user" string 4 bytes
@@ -642,7 +645,7 @@ static __inline bool infer_pgsql_startup_message(const char* buf,
 	if (count < min_msg_len)
 		return false;
 
-	__u32 length = __bpf_ntohl(*(__u32 *)&buf[0]);
+	__u32 length = __bpf_ntohl(*(__u32 *) & buf[0]);
 	if (length < min_msg_len || length > max_msg_len)
 		return false;
 
@@ -686,12 +689,10 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (count < min_msg_len) {
 		return MSG_UNKNOWN;
 	}
-
 	// Tag check
 	if (buf[0] != tag_q) {
 		return MSG_UNKNOWN;
 	}
-
 	// Payload length check
 	__u32 length;
 	bpf_probe_read(&length, sizeof(length), s_buf + 1);
@@ -699,11 +700,10 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (length < min_payload_len || length > max_payload_len) {
 		return MSG_UNKNOWN;
 	}
-
 	// If the input includes a whole message (1 byte tag + length),
 	// check the last character.
-	if (length + 1 <= (__u32)count) {
-		char last_char = ' '; //Non-zero initial value
+	if (length + 1 <= (__u32) count) {
+		char last_char = ' ';	//Non-zero initial value
 		bpf_probe_read(&last_char, sizeof(last_char), s_buf + length);
 		if (last_char != '\0')
 			return MSG_UNKNOWN;
@@ -722,17 +722,18 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	if (!protocol_port_check(PROTO_POSTGRESQL, conn_info))
 		return MSG_UNKNOWN;
 
-	if (conn_info->tuple.l4_protocol != IPPROTO_TCP){
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP) {
 		return MSG_UNKNOWN;
 	}
 
 	char infer_buf[POSTGRE_INFER_BUF_SIZE];
 	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
-	
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
 		char tag = infer_buf[0];
+		/* *INDENT-OFF* */
 		switch (tag) {
 		// req, common, can not infer msg type, return MSG_REQUEST
 		case 'Q': case 'P': case 'B': case 'F': case 'X': case 'f':
@@ -746,6 +747,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 		default:
 			return MSG_UNKNOWN;
 		}
+		/* *INDENT-ON* */
 	}
 
 	if (infer_pgsql_startup_message(infer_buf, count))
@@ -939,7 +941,6 @@ static __inline enum message_type infer_dns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-
 	if (!protocol_port_check(PROTO_DNS, conn_info))
 		return MSG_UNKNOWN;
 
@@ -982,15 +983,14 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (num_rr > max_num_rr) {
 		return MSG_UNKNOWN;
 	}
-
 	// FIXME: Remove this code when the call chain can correctly handle the
 	// Go DNS case.
-	__u8 *queries_start = (__u8 *)(dns + 1);
+	__u8 *queries_start = (__u8 *) (dns + 1);
 	conn_info->dns_q_type = 0;
 	for (int idx = 0; idx < 32; ++idx) {
 		if (queries_start[idx] == 0) {
-			conn_info->dns_q_type = __bpf_ntohs(
-				*(__u16 *)(queries_start + idx + 1));
+			conn_info->dns_q_type =
+			    __bpf_ntohs(*(__u16 *) (queries_start + idx + 1));
 			break;
 		}
 	}
@@ -1057,7 +1057,8 @@ static __inline enum message_type infer_redis_message(const char *buf,
 
 	//-ERR unknown command 'foobar'
 	//-WRONGTYPE Operation against a key holding the wrong kind of value
-	if (first_byte == '-' && ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R'))
+	if (first_byte == '-'
+	    && ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R'))
 		return MSG_UNKNOWN;
 
 	return MSG_REQUEST;
@@ -1073,7 +1074,8 @@ static __inline enum message_type infer_redis_message(const char *buf,
 //   value += (digit AND 127) * multiplier 
 //   multiplier *= 128
 // while ((digit AND 128) != 0)
-static __inline bool mqtt_decoding_length(const __u8 *buffer, int *length, int *lensize)
+static __inline bool mqtt_decoding_length(const __u8 * buffer, int *length,
+					  int *lensize)
 {
 	int multiplier = 1;
 	__u8 digit;
@@ -1094,7 +1096,8 @@ static __inline bool mqtt_decoding_length(const __u8 *buffer, int *length, int *
 	return true;
 }
 
-static __inline bool mqtt_decoding_message_type(const __u8 *buffer, int *message_type)
+static __inline bool mqtt_decoding_message_type(const __u8 * buffer,
+						int *message_type)
 {
 	*message_type = ((*buffer) >> 4) & 0x0F;
 
@@ -1120,11 +1123,11 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 			return MSG_UNKNOWN;
 
 	int mqtt_type;
-	if (!mqtt_decoding_message_type((__u8 *)buf, &mqtt_type))
+	if (!mqtt_decoding_message_type((__u8 *) buf, &mqtt_type))
 		return MSG_UNKNOWN;
 
 	int length, lensize;
-	if (!mqtt_decoding_length((__u8 *)buf, &length, &lensize))
+	if (!mqtt_decoding_length((__u8 *) buf, &length, &lensize))
 		return MSG_UNKNOWN;
 
 	if (1 + lensize + length != count)
@@ -1137,16 +1140,18 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	// CONNACK PUBACK PUBREC PUBREL PUBCOMP UNSUBACK 仅有两个字节的 Variable header
-	if ((mqtt_type == 2 || mqtt_type == 4 || mqtt_type == 5 || 
-	     mqtt_type == 6 || mqtt_type == 7 || mqtt_type == 11) && length != 2)
+	if ((mqtt_type == 2 || mqtt_type == 4 || mqtt_type == 5 ||
+	     mqtt_type == 6 || mqtt_type == 7 || mqtt_type == 11)
+	    && length != 2)
 		return MSG_UNKNOWN;
 
 	// SUBSCRIBE SUBACK UNSUBSCRIBE 至少有两个字节的 Variable header 和一个字节的 Payload
 	if ((mqtt_type == 8 || mqtt_type == 9 || mqtt_type == 10) && length < 3)
 		return MSG_UNKNOWN;
-	
+
 	// PINGREQ PINGRESP DISCONNECT 没有 Variable header 和 Payload
-	if ((mqtt_type == 12 || mqtt_type == 13 || mqtt_type == 14) && length != 0)
+	if ((mqtt_type == 12 || mqtt_type == 13 || mqtt_type == 14)
+	    && length != 0)
 		return MSG_UNKNOWN;
 
 	// AUTH 类型的数据部分长度很灵活,不能通过上述过滤其他类型的方式进行过滤,
@@ -1487,10 +1492,10 @@ struct fastcgi_header {
 	__u8 version;
 	__u8 type;
 	__u16 request_id;
-	__u16 content_length; // cannot be 0
+	__u16 content_length;	// cannot be 0
 	__u8 padding_length;
 	__u8 __unused;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 #define FCGI_BEGIN_REQUEST 1
 #define FCGI_PARAMS 4
@@ -1505,8 +1510,7 @@ static bool fastcgi_header_common_check(struct fastcgi_header *header)
 		return false;
 	}
 
-	if ((__bpf_ntohs(header->content_length) + header->padding_length) %
-	    8) {
+	if ((__bpf_ntohs(header->content_length) + header->padding_length) % 8) {
 		return false;
 	}
 	return true;
@@ -1542,7 +1546,8 @@ infer_fastcgi_message(const char *buf, size_t count,
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
 			return MSG_UNKNOWN;
-		if (header->type == FCGI_BEGIN_REQUEST || header->type == FCGI_PARAMS)
+		if (header->type == FCGI_BEGIN_REQUEST
+		    || header->type == FCGI_PARAMS)
 			return MSG_REQUEST;
 		else
 			return MSG_RESPONSE;
@@ -1590,10 +1595,10 @@ infer_fastcgi_message(const char *buf, size_t count,
 #define MONGO_OP_MSG 2013
 
 struct mongo_header {
-    __s32   message_length;
-    __s32   request_id;
-    __s32   response_to;
-    __s32   op_code;
+	__s32 message_length;
+	__s32 request_id;
+	__s32 response_to;
+	__s32 op_code;
 };
 
 static __inline enum message_type
@@ -1620,13 +1625,193 @@ infer_mongo_message(const char *buf, size_t count,
 	if (header.op_code < MONGO_OP_UPDATE) {
 		return MSG_UNKNOWN;
 	}
-	if (header.op_code > MONGO_OP_KILL_CURSORS && header.op_code < MONGO_OP_COMPRESSED) {
+	if (header.op_code > MONGO_OP_KILL_CURSORS
+	    && header.op_code < MONGO_OP_COMPRESSED) {
 		return MSG_UNKNOWN;
 	}
 	if (header.op_code > MONGO_OP_MSG) {
 		return MSG_UNKNOWN;
 	}
 	return MSG_REQUEST;
+}
+
+/*
+ * ref: https://wiki.osdev.org/TLS_Handshake
+ *
+ * Most packets during the communication are of type Handshake (0x16) and are followed by
+ * a Handshake packet header.
+ * TLS Record Layer:
+ * ----------------------
+ *    1 bytes     Content Type: Handshake (0x16); Change Cipher Spec (0x14); Encrypted Alert (0x15)
+ *    2 bytes     Version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2
+ *    2 bytes     Length
+ *
+ * =================================================================================
+ * Handshake:
+ *    1 bytes content_type: 0x16
+ *    2 bytes version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2
+ *    2 bytes Length
+ * 
+ * This header may be followed by another TLS header, such as a TLS Handshake header.
+ * Handshake Protocol:
+ *    1 bytes   handshake_type:
+ *              ----------------------------------------
+ *              0x01: handshake type=Client Hello
+ *		0x02: Handshake type=Server Hello
+ *              0x0B: handshake type=Certificate
+ *              0x0C: handshake type=server key exchange
+ *              0x0E: handshake type=Server Hello Done Message
+ *              0x10: handshake type=client key exchange
+ *              0x04: handshake type=New Session Ticket
+ *
+ *    3 bytes   length
+ * =================================================================================
+ * Change Cipher Spec Message
+ *    1 bytes content_type: 0x14
+ *    2 bytes version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2
+ *    2 bytes Length
+ * typedef struct __attribute__((packed)) {
+ *	uint8_t content_type;  // 0x14
+ *       uint16_t version; // 0x0303 for TLS 1.2
+ *	uint8_t length;  // 0x01
+ *       uint8_t content;  // 0x01
+ * } TLSChangeCipherSpec;
+ * =================================================================================
+ * Encrypted Alert:
+ *    1 bytes  content_type: 0x15
+ *    2 bytes  version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2
+ *    2 bytes  Length
+ *
+ *
+ * Like for a TCP connection, a TLS connection starts with a handshake between the client and the server:
+ *
+ * 1.The client sends a Client Hello message (Content_Type:0x16, handshake_type:0x01)
+ *
+ * 2.The server responds with a Server Hello message (Content_Type:0x16, handshake_type:0x02)
+ * 3.The server sends its certificates. (Content_Type:0x16, handshake_type:0x0B)
+ * 4.The server sends a Server Key Exchange message (Content_Type:0x16, handshake_type:0x0C)
+ * 5.The server sends a Server Hello Done message (Content_Type:0x16, handshake_type:0x0E)
+ *
+ * 6.The client sends a Client Key Exchange message (Content_Type:0x16, handshake_type:0x10)
+ * 7.The client sends a Change Cipher Spec message,
+ *   indicate it has completed its part of the handshake. (ontent_Type:0x14, length; 0x01)
+ * 8.The client sends a Encrypted Handshake Message (content_type 0x16)
+ *
+ * 9.The server sends a Change Cipher Spec (ontent_Type:0x14, length; 0x01)
+ * 10.The server sends a Encrypted Handshake Message (content_type 0x16)
+ *    The TLS handshake is concluded with the two parties sending a hash of the complete handshake exchange, 
+ * 11.The client and the server can communicate by exchanging encrypted Application Data messages (content_type 0x17)
+ *
+ * client test data:
+ *
+ *       client send:
+ *       --------------
+ *       (1) curl-29772 handshake handshake.content_type 0x16 version 0x301 handshake_type 0x1
+ *                                count 193   dir send (client hello)
+ *
+ *       client recv:
+ *       --------------
+ *       (2) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0x2
+ *                                count 92    dir recv (server hello)
+ *       (3) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0xb
+ *                                count 2812  dir recv
+ *       (4) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0xc
+ *                                count 338   dir recv
+ *       (5) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0xe
+ *                                count 9     dir recv
+ *
+ *       client send:
+ *       ------------
+ *       (6) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0x10
+ *                                count 126   dir send
+ *           (7) (8) together with (6);
+ *           (7) is Change Cipher Spec message, content_Type:0x14 (client finish)
+ *
+ *       client recv:
+ *       ------------
+ *       (9)  curl-29772 ChangeCipherSpec content_type 0x14 version 0x303 handshake_type 0x1
+ *                                count 6 dir recv
+ *           (9) is Change Cipher Spec message, content_Type:0x14 (server finish)
+ *       (10) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0x0
+ *                                count 45    dir recv
+ *
+ * server test data:
+ *
+ *       server recv:
+ *       ------------
+ *       (1) openresty-5024 handshake(type 0x16) count 517 version 0x301 handshake_type 0x1 (clilent hello)
+ *
+ *       server send:
+ *       ------------
+ *       (2) openresty-5024 handshake(type 0x16) count 1369 version 0x303 handshake_type 0x2 (server hello)
+ *           (3),(4),(5) together with (2)
+ *
+ *       server recv:
+ *       ------------
+ *       (6) openresty-5024 handshake(type 0x16) count 93 version 0x303 handshake_type 0x10
+ *           (7),(8) together with (6)
+ *           (7) is Change Cipher Spec message, content_Type:0x14 (client finish)
+ *
+ *       server send:
+ *       ------------
+ *       openresty-5024 type 0x16 version 0x303 handshake_type 0x4
+ *           (9),(10) are included in this message
+ *           (9) is Change Cipher Spec message, content_Type:0x14 (server finish)
+ */
+
+typedef struct __attribute__ ((packed)) {
+	__u8 content_type;
+	__u16 version;
+	__u16 length;
+	__u8 handshake_type;
+} tls_handshake_t;
+
+static __inline enum message_type
+infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
+{
+	tls_handshake_t handshake = { 0 };
+
+	if (conn_info->prev_count == 5)
+		count += 5;
+
+	if (count == 5) {
+		handshake.content_type = buf[0];
+		handshake.version = __bpf_ntohs(*(__u16 *) & buf[1]);
+		goto check;
+	}
+
+	// content type: ChangeCipherSpec(0x14) minimal length is 6
+	if (count < 6)
+		return MSG_UNKNOWN;
+
+	if (conn_info->prev_count == 5) {
+		handshake.content_type = conn_info->prev_buf[0];
+		handshake.version =
+		    __bpf_ntohs(*(__u16 *) & conn_info->prev_buf[1]);
+		handshake.handshake_type = buf[0];
+
+	} else {
+		handshake.content_type = buf[0];
+		handshake.version = __bpf_ntohs(*(__u16 *) & buf[1]);
+		handshake.handshake_type = buf[5];
+	}
+
+check:
+	if (!(handshake.content_type == 0x16 || handshake.content_type == 0x14))
+		return MSG_UNKNOWN;
+
+	if (!(handshake.version == 0x301 || handshake.version == 0x303))
+		return MSG_UNKNOWN;
+
+	if (count == 5) {
+		save_prev_data(buf, conn_info, 5);
+		return MSG_PRESTORE;
+	}
+
+	if (handshake.handshake_type == 0x1 || handshake.handshake_type == 0x10)
+		return MSG_REQUEST;
+	else
+		return MSG_RESPONSE;
 }
 
 static __inline bool drop_msg_by_comm(void)
@@ -1653,14 +1838,16 @@ infer_protocol(struct ctx_info_s *ctx,
 	       const struct data_args_t *args,
 	       size_t count,
 	       struct conn_info_t *conn_info,
-	       __u8 sk_state,
-	       const struct process_data_extra *extra)
+	       __u8 sk_state, const struct process_data_extra *extra)
 {
 #define DATA_BUF_MAX  32
 
 	struct protocol_message_t inferred_message;
 	inferred_message.protocol = PROTO_UNKNOWN;
 	inferred_message.type = MSG_UNKNOWN;
+
+	if (conn_info->sk == NULL)
+		return inferred_message;
 
 	if (conn_info->sk_type == SOCK_STREAM &&
 	    sk_state != SOCK_CHECK_TYPE_TCP_ES)
@@ -1671,26 +1858,9 @@ infer_protocol(struct ctx_info_s *ctx,
 	}
 
 	/*
-	 * TLS protocol datas cause other L7 protocols inference misjudgment,
-	 * sometimes HTTPS protocol datas is incorrectly inferred as MQTT, DUBBO protocol.
-	 * TLS protocol is difficult to identify with features, the port filtering for
-	 * the TLS protocol is performed here.
+	 * The socket that is indeed determined to be a protocol does not
+	 * enter drop_msg_by_comm().
 	 */
-
-	/*
-	 * If the current port number is configured for the TLS protocol.
-	 * If the data source comes from kernel system calls, it is discarded
-	 * directly because some kernel probes do not handle TLS data. 
-	 */
-	if (protocol_port_check(PROTO_TLS, conn_info) &&
-	    extra->source == DATA_SOURCE_SYSCALL) {
-		return inferred_message;
-	}
-
-	if (conn_info->sk == NULL)
-		return inferred_message;
-
-	// 明确被判定了协议的socket不进入drop_msg_by_comm
 	if (!is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (drop_msg_by_comm())
 			return inferred_message;
@@ -1722,7 +1892,8 @@ infer_protocol(struct ctx_info_s *ctx,
 		if (syscall_infer_len > count)
 			syscall_infer_len = count;
 	} else {
-		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
+		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data),
+			       buf);
 		syscall_infer_buf = (char *)buf;
 		syscall_infer_len = count;
 	}
@@ -1731,6 +1902,33 @@ infer_protocol(struct ctx_info_s *ctx,
 
 	check_and_fetch_prev_data(conn_info);
 
+	/*
+	 * TLS protocol datas cause other L7 protocols inference misjudgment,
+	 * sometimes HTTPS protocol datas is incorrectly inferred as MQTT, DUBBO protocol.
+	 * TLS protocol is difficult to identify with features, the port filtering for
+	 * the TLS protocol is performed here.
+	 */
+
+	/*
+	 * If the current port number is configured for the TLS protocol.
+	 * If the data source comes from kernel system calls, it is discarded
+	 * directly because some kernel probes do not handle TLS data. 
+	 */
+	if (protocol_port_check(PROTO_TLS, conn_info) &&
+	    extra->source == DATA_SOURCE_SYSCALL) {
+		/*
+		 * TLS first performs handshake protocol inference and discards the data
+		 * directly if it is unsuccessful.
+		 */
+		if ((inferred_message.type =
+		     infer_tls_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+			inferred_message.protocol = PROTO_TLS;
+			return inferred_message;
+		} else {
+			return inferred_message;
+		}
+	}
 #ifdef LINUX_VER_5_2_PLUS
 	/*
 	 * Protocol inference fast matching.
@@ -1828,7 +2026,7 @@ infer_protocol(struct ctx_info_s *ctx,
 		case PROTO_FASTCGI:
 			if ((inferred_message.type =
 			     infer_fastcgi_message(infer_buf, count,
-						  conn_info)) != MSG_UNKNOWN) {
+						   conn_info)) != MSG_UNKNOWN) {
 				if (inferred_message.type == MSG_PRESTORE)
 					return inferred_message;
 				inferred_message.protocol = PROTO_FASTCGI;
@@ -1837,16 +2035,17 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-				infer_http2_message(syscall_infer_buf,
-						    syscall_infer_len,
-						    conn_info)) != MSG_UNKNOWN) {
+			     infer_http2_message(syscall_infer_buf,
+						 syscall_infer_len,
+						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
 				return inferred_message;
 			}
 			break;
 		case PROTO_POSTGRESQL:
 			if ((inferred_message.type =
-			     infer_postgre_message(syscall_infer_buf, syscall_infer_len,
+			     infer_postgre_message(syscall_infer_buf,
+						   syscall_infer_len,
 						   conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_POSTGRESQL;
 				return inferred_message;
@@ -1854,7 +2053,8 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_MONGO:
 			if ((inferred_message.type =
-			     infer_mongo_message(syscall_infer_buf, syscall_infer_len,
+			     infer_mongo_message(syscall_infer_buf,
+						 syscall_infer_len,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_MONGO;
 				return inferred_message;
@@ -1948,8 +2148,7 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	if ((inferred_message.type =
 #endif
-		    infer_mysql_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
+	     infer_mysql_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
@@ -1969,7 +2168,7 @@ infer_protocol(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_sofarpc_message(infer_buf, count,
-					  conn_info)) != MSG_UNKNOWN){
+					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_SOFARPC;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_FASTCGI && (inferred_message.type =
@@ -1986,7 +2185,7 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(syscall_infer_buf, syscall_infer_len, 
+		    infer_http2_message(syscall_infer_buf, syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 #ifdef LINUX_VER_5_2_PLUS
@@ -1995,7 +2194,7 @@ infer_protocol(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_postgre_message(syscall_infer_buf, syscall_infer_len,
-					conn_info)) != MSG_UNKNOWN){
+					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
 
