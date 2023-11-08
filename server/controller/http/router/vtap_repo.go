@@ -17,9 +17,6 @@
 package router
 
 import (
-	"bytes"
-	"io"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -52,6 +49,7 @@ func createVtapRepo(c *gin.Context) {
 		RevCount: c.PostForm("REV_COUNT"),
 		CommitID: c.PostForm("COMMIT_ID"),
 		OS:       c.PostForm("OS"),
+		Image:    []byte{},
 	}
 
 	// get file
@@ -62,13 +60,11 @@ func createVtapRepo(c *gin.Context) {
 	}
 	defer file.Close()
 
-	buf := bytes.NewBuffer(nil)
-	_, err = io.Copy(buf, file)
+	_, err = file.Read(vtapRepo.Image)
 	if err != nil {
 		JsonResponse(c, nil, err)
 		return
 	}
-	vtapRepo.Image = buf.Bytes()
 
 	data, err := service.CreateVtapRepo(vtapRepo)
 	JsonResponse(c, data, err)

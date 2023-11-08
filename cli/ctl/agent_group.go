@@ -84,7 +84,7 @@ func listAgentGroup(cmd *cobra.Command, args []string, output string) {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -115,7 +115,7 @@ func createAgentGroup(cmd *cobra.Command, args []string, groupID string) {
 
 	// 调用采集器组API，并输出返回结果
 	body := map[string]interface{}{"name": args[0], "group_id": groupID}
-	_, err := common.CURLPerform("POST", url, body, "")
+	_, err := common.CURLPerform("POST", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -131,7 +131,7 @@ func deleteAgentGroup(cmd *cobra.Command, args []string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?name=%s", server.IP, server.Port, args[0])
 	// 调用采集器组API，获取lcuuid
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -142,7 +142,7 @@ func deleteAgentGroup(cmd *cobra.Command, args []string) {
 		lcuuid := group.Get("LCUUID").MustString()
 
 		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/%s/", server.IP, server.Port, lcuuid)
-		_, err := common.CURLPerform("DELETE", url, nil, "")
+		_, err := common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return

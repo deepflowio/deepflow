@@ -68,7 +68,8 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
-	db.Order("updated_at DESC").Find(&vtapRepoes)
+	fieldsExculdImage := []string{"id", "name", "arch", "os", "branch", "rev_count", "commit_id", "created_at", "updated_at"}
+	db.Order("updated_at DESC").Select(fieldsExculdImage).Find(&vtapRepoes)
 
 	var resp []model.VtapRepo
 	for _, vtapRepo := range vtapRepoes {
@@ -88,7 +89,7 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 
 func DeleteVtapRepo(name string) error {
 	var vtapRepo mysql.VTapRepo
-	if err := mysql.Db.Where("name = ?", name).First(&vtapRepo).Error; err != nil {
+	if err := mysql.Db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
 	}
 

@@ -81,7 +81,7 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 	lcuuid := domainLcuuid
 	if lcuuid == "" {
 		url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, domainName)
-		resp, err := common.CURLResponseRawJson("GET", url)
+		resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 		if err != nil {
 			fmt.Println("get domain info by name failed.")
 			fmt.Fprintln(os.Stderr, err)
@@ -101,7 +101,7 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/v1/info/%s/", podIP, server.SvcPort, lcuuid)
-	resp, err := common.CURLResponseRawJson("GET", url)
+	resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -138,7 +138,7 @@ func getTask(cmd *cobra.Command, args []string) {
 	}
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/tasks/%s/", server.IP, server.Port, lcuuid)
-	resp, err := common.CURLResponseRawJson("GET", url)
+	resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return

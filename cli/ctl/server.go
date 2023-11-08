@@ -66,7 +66,7 @@ func listController(cmd *cobra.Command) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
 
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -128,7 +128,7 @@ func listIngerter(cmd *cobra.Command) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/analyzers/", server.IP, server.Port)
 
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return

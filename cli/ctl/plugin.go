@@ -120,14 +120,14 @@ func createPlugin(cmd *cobra.Command, t, image, name string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/plugin/", server.IP, server.Port)
-	_, err = common.CURLPostFormData(url, contentType, bodyBuf)
+	_, err = common.CURLPostFormData(url, contentType, bodyBuf, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	return err
 }
 
 func listPlugin(cmd *cobra.Command) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/plugin/", server.IP, server.Port)
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -159,6 +159,6 @@ func deletePlugin(cmd *cobra.Command, args []string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/plugin/%s/", server.IP, server.Port, args[0])
-	_, err := common.CURLPerform("DELETE", url, nil, "")
+	_, err := common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	return err
 }
