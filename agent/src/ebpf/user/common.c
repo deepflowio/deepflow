@@ -54,8 +54,56 @@ bool is_core_kernel(void)
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
+int parse_num_range_disorder(const char *config_str,
+			     int bytes_count, bool ** mask)
+{
+	if (bytes_count <= 0)
+		return -1;
+
+	int i, n, len, start, end = -1;
+	bool *tmp = malloc(sizeof(bool) * PORT_NUM_MAX);
+	if (tmp == NULL) {
+		ebpf_warning("malloc() failed.\n");
+		return -1;
+	}
+	memset(tmp, 0, sizeof(bool) * PORT_NUM_MAX);
+	*mask = tmp;
+
+	for (i = 0; i < bytes_count; i++) {
+		if (config_str[i] == ',' || config_str[i] == '\n' ||
+		    config_str[i] == ' ') {
+			continue;
+		}
+
+		n = sscanf(&config_str[i], "%d%n-%d%n", &start, &len, &end,
+			   &len);
+		if (n <= 0 || n > 2) {
+			goto failed;
+		} else if (n == 1) {
+			end = start;
+		}
+
+		if (start < 0 || start > end) {
+			goto failed;
+		}
+
+		memset(tmp + start, 1, end - start + 1);
+		i += (len - 1);
+	}
+
+	return 0;
+
+failed:
+	if (*mask != NULL) {
+		free(*mask);
+		*mask = NULL;
+	}
+
+	return -1;
+}
+
 int parse_num_range(const char *config_str, int bytes_count,
-		    bool **mask, int *count)
+		    bool ** mask, int *count)
 {
 	int i, n, len, start, end = -1;
 	bool *tmp;
@@ -65,7 +113,8 @@ int parse_num_range(const char *config_str, int bytes_count,
 			continue;
 		}
 
-		n = sscanf(&config_str[i], "%d%n-%d%n", &start, &len, &end, &len);
+		n = sscanf(&config_str[i], "%d%n-%d%n", &start, &len, &end,
+			   &len);
 		if (n <= 0 || n > 2) {
 			goto failed;
 		} else if (n == 1) {
@@ -1055,7 +1104,7 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 }
 
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
-int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg)
+int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 {
 	int ret;
 	ret = pthread_create(t, NULL, fn, arg);

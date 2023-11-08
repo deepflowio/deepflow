@@ -966,10 +966,7 @@ vtap_group_id: g-xxxxxx
   ## Application Protocol Port Numbers
   ## Default: 53 for DNS, 443 for TLS, 1-65535 for other Protocols.
   ## Format: map<protocol-name, port-list>
-  ## Make sure the range list is in ascending order and there is no overlap in the numbers.
-  ## Example: "HTTP": 80,1000-2000 (correct)
-  ##          "HTTP": 1000-2000, 80 (incorrect, should be arranged in ascending order.)
-  ##          "HTTP": 1000-2000, 1500-3000 (incorrect, range list has overlapping values.)
+  ## Example: "HTTP": 80,1000-2000
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC

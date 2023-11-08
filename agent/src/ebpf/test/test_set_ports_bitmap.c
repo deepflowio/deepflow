@@ -35,7 +35,7 @@ static int print_prots_bitmap(void)
 	int i, j, count = 0;
 	for (i = 0; i < ARRAY_SIZE(ports_bitmap); i++) {
 		if (ports_bitmap[i]) {
-			for (j = 0; j < 65536; j++) {
+			for (j = 0; j < PORT_NUM_MAX; j++) {
 				if (is_set_bitmap(ports_bitmap[i]->bitmap, j)) {
 					printf("Proto %s port %d allow\n",
 					       get_proto_name(i), j);
@@ -64,12 +64,12 @@ int main(void)
 	log_to_stdout = true;
 
 	int err, n;
-	err = set_protocol_ports_bitmap(PROTO_HTTP1, "80, 8080, 9000-9010");
+	err = set_protocol_ports_bitmap(PROTO_HTTP1, "80, 8080, 70-100");
 	if (err)
 		goto failed;
-	printf("1 Set PROTO_HTTP1 ports \"80, 8080, 9000-9010\"\n");
+	printf("1 Set PROTO_HTTP1 ports \"80, 8080, 70-100\"\n");
 	n = print_prots_bitmap();
-	if (n != 13)
+	if (n != 32)
 		goto failed;
 
 	err = set_protocol_ports_bitmap(PROTO_HTTP2, "5678, 9000-9010, 10000");
@@ -77,7 +77,7 @@ int main(void)
 		goto failed;
 	printf("2 Set PROTO_HTTP2 ports \"5678, 9000-9010, 10000\"\n");
 	n = print_prots_bitmap();
-	if (n != 26)
+	if (n != 45)
 		goto failed;
 
 	free_prots_bitmap();

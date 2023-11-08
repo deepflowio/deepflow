@@ -1233,7 +1233,10 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	// dubbo_header 大小是16字节，如果接收数量比16字节小直接返回。
+	/*
+	 * The size of dubbo_header is 16 bytes. If the received quantity
+	 * is less than 16 bytes, it will be returned directly.
+	 */
 	if (count < 16) {
 		return MSG_UNKNOWN;
 	}

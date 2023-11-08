@@ -2531,7 +2531,7 @@ static void datadump_process(void *data)
 
 static inline int __set_protocol_ports_bitmap(int proto_type,
 					      bool * allow_ports,
-					      int count, const char *ports)
+					      const char *ports)
 {
 	int i;
 	ports_bitmap_t *map = NULL;
@@ -2546,7 +2546,7 @@ static inline int __set_protocol_ports_bitmap(int proto_type,
 	}
 
 	memset(map, 0, sizeof(*map));
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < PORT_NUM_MAX; i++) {
 		if (allow_ports[i])
 			map->bitmap[i / 8] |= 1 << (i % 8);
 	}
@@ -2567,14 +2567,14 @@ int set_protocol_ports_bitmap(int proto_type, const char *ports)
 	ASSERT(proto_type < ARRAY_SIZE(ports_bitmap));
 
 	bool *allow_ports = NULL;
-	int err, n = 0;
-	err = parse_num_range(ports, strlen(ports), &allow_ports, &n);
+	int err;
+	err = parse_num_range_disorder(ports, strlen(ports), &allow_ports);
 	if (err) {
 		allow_ports = NULL;
 		goto failed;
 	}
 
-	if (__set_protocol_ports_bitmap(proto_type, allow_ports, n, ports))
+	if (__set_protocol_ports_bitmap(proto_type, allow_ports, ports))
 		goto failed;
 
 	free(allow_ports);
