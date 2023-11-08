@@ -36,6 +36,7 @@ type StaticConfig struct {
 	EnableQosBypass                    *bool                       `yaml:"enable-qos-bypass,omitempty"`
 	FastPathMapSize                    *int                        `yaml:"fast-path-map-size,omitempty"`
 	FirstPathLevel                     *int                        `yaml:"first-path-level,omitempty"`
+	LocalDispatcherCount               *int                        `yaml:"local-dispatcher-count,omitempty"`
 	SrcInterfaces                      []string                    `yaml:"src-interfaces,omitempty"`
 	CloudGatewayTraffic                *bool                       `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                   *uint16                     `yaml:"mirror-traffic-pcp,omitempty"`

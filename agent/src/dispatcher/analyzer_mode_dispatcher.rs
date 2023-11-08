@@ -77,7 +77,7 @@ impl AnalyzerModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &Vec<Link>, _: IfMacSource) {
+    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource) {
         self.base
             .on_tap_interface_change(vec![], IfMacSource::IfMac);
     }
