@@ -2185,7 +2185,7 @@ static __inline void trace_io_event_common(void *ctx,
 	__u32 k0 = 0;
 	__u32 tgid = pid_tgid >> 32;
 
-	if (data_args->bytes_count == 0) {
+	if (data_args->bytes_count <= 0) {
 		return;
 	}
 
