@@ -79,9 +79,9 @@ impl OracleInfo {
         match (self.data_id, self.call_id) {
             (DATA_ID_PIGGY_BACK_FUNC, CALL_ID_CURSOR_CLOSE_ALL)
             | (DATA_ID_PIGGY_BACK_FUNC, CALL_ID_SWITCHING_PIGGYBACK) => {
-                "PIGGY_BACK_FUNC".to_string()
+                "PIGGY_BACK_FUNCTION_FOLLOW".to_string()
             }
-            (DATA_ID_USER_OCI_FUNC, CALL_ID_BUNDLED_EXE_ALL) => "USER_OCI_FUNC".to_string(),
+            (DATA_ID_USER_OCI_FUNC, CALL_ID_BUNDLED_EXE_ALL) => "USER_OCI_FUNCTIONS".to_string(),
             _ => "".to_string(),
         }
     }
