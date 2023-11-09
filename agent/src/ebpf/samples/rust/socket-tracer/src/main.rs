@@ -266,19 +266,19 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
-        enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
-        enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
-        enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
-        enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
-        enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
-        enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
+        //enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
@@ -310,8 +310,8 @@ fn main() {
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
-        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-            println!("bpf_tracer_init() file:{:?} error", log_file);
+        if bpf_tracer_init(std::ptr::null(), true) != 0 {
+            println!("bpf_tracer_init() error");
             ::std::process::exit(1);
         }
         /*
@@ -347,22 +347,22 @@ fn main() {
         print!("{:#?}\n", stats);
 
         //// enable continuous profiler
-        if start_continuous_profiler(99, 10, 300, continuous_profiler_callback) != 0 {
-            println!("start_continuous_profiler() error.");
-            ::std::process::exit(1);
-        }
+        //if start_continuous_profiler(99, 10, 300, continuous_profiler_callback) != 0 {
+        //    println!("start_continuous_profiler() error.");
+        //    ::std::process::exit(1);
+        //}
 
-        set_profiler_regex(
-            CString::new(
-                "^(java|deepflow-.*)$".as_bytes(),
-            )
-            .unwrap()
-            .as_c_str()
-            .as_ptr(),
-        );
+        //set_profiler_regex(
+        //    CString::new(
+        //        "^(java|deepflow-.*)$".as_bytes(),
+        //    )
+        //    .unwrap()
+        //    .as_c_str()
+        //    .as_ptr(),
+        //);
 
         // CPUID will not be included in the aggregation of stack trace data.
-        set_profiler_cpu_aggregation(0);
+        //set_profiler_cpu_aggregation(0);
 
         bpf_tracer_finish();
 

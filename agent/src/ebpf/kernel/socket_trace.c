@@ -2189,15 +2189,15 @@ static __inline void trace_io_event_common(void *ctx,
 		return;
 	}
 
-	__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
-	if (!adapt_uid)
-		return;
+	//__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
+	//if (!adapt_uid)
+	//	return;
 
 	//bpf_debug("PID %d\n", (__u32)((*adapt_uid) >> 32)); 
 	// Only a preset uid can be adapted to the kernel
-	if ((__u32)((*adapt_uid) >> 32) !=
-	    (__u32)(bpf_get_current_pid_tgid() >> 32))
-		return;
+	//if ((__u32)((*adapt_uid) >> 32) !=
+	//    (__u32)(bpf_get_current_pid_tgid() >> 32))
+	//	return;
 
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL) {
