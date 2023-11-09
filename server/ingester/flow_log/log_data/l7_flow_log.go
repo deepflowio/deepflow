@@ -450,8 +450,7 @@ func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
 	}
 	code := l.Resp.Code
 	switch datatype.L7Protocol(h.L7Protocol) {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2,
-		datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		h.ResponseException = GetHTTPExceptionDesc(uint16(code))
 	case datatype.L7_PROTOCOL_DNS:
 		h.ResponseException = GetDNSExceptionDesc(uint16(code))
