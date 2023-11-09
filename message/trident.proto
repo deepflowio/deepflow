@@ -95,6 +95,7 @@ message SyncRequest {
     optional string ctrl_mac = 25;
     optional string vtap_group_id_request = 26; // 支持采集器自动加入组
     optional bool kubernetes_force_watch = 27 [default = false];
+    optional AgentIdentifier agent_unique_identifier = 28 [default = IP_AND_MAC];
 
     repeated CommunicationVtap communication_vtaps = 31; // 仅对数据节点有意义
 
@@ -123,6 +124,11 @@ enum TapMode {
     MIRROR = 1; // 部署在虚拟机之上，抓取镜像而来的流量
     ANALYZER = 2; // 部署在专属服务器采集器之上
     DECAP = 3; //隧道解封装采集器
+}
+
+enum AgentIdentifier {
+    IP_AND_MAC = 1;
+    IP = 2;
 }
 
 enum IfMacSource {
