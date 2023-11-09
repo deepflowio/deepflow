@@ -461,6 +461,7 @@ fn link_wasi(
         "path_open",
         "path_readlink",
         "proc_exit",
+        "sched_yield",
     ];
 
     for f in link_func {
