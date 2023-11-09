@@ -328,7 +328,7 @@ func (d *Decoder) updateCounter(l7Protocol datatype.L7Protocol, dropped bool) {
 		drop = 1
 	}
 	switch l7Protocol {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
 	case datatype.L7_PROTOCOL_DNS:

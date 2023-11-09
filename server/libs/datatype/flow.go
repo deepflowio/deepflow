@@ -147,25 +147,22 @@ const (
 type L7Protocol uint8
 
 const (
-	L7_PROTOCOL_UNKNOWN    L7Protocol = 0
-	L7_PROTOCOL_OTHER      L7Protocol = 1
-	L7_PROTOCOL_HTTP_1     L7Protocol = 20
-	L7_PROTOCOL_HTTP_2     L7Protocol = 21
-	L7_PROTOCOL_HTTP_1_TLS L7Protocol = 22
-	L7_PROTOCOL_HTTP_2_TLS L7Protocol = 23
-	L7_PROTOCOL_DUBBO      L7Protocol = 40
-	L7_PROTOCOL_GRPC       L7Protocol = 41
-	L7_PROTOCOL_SOFARPC    L7Protocol = 43
-	L7_PROTOCOL_FASTCGI    L7Protocol = 44
-	L7_PROTOCOL_MYSQL      L7Protocol = 60
-	L7_PROTOCOL_POSTGRE    L7Protocol = 61
-	L7_PROTOCOL_ORACLE     L7Protocol = 62
-	L7_PROTOCOL_REDIS      L7Protocol = 80
-	L7_PROTOCOL_MONGODB    L7Protocol = 81
-	L7_PROTOCOL_KAFKA      L7Protocol = 100
-	L7_PROTOCOL_MQTT       L7Protocol = 101
-	L7_PROTOCOL_DNS        L7Protocol = 120
-	L7_PROTOCOL_CUSTOM     L7Protocol = 127
+	L7_PROTOCOL_UNKNOWN L7Protocol = 0
+	L7_PROTOCOL_HTTP_1  L7Protocol = 20
+	L7_PROTOCOL_HTTP_2  L7Protocol = 21
+	L7_PROTOCOL_DUBBO   L7Protocol = 40
+	L7_PROTOCOL_GRPC    L7Protocol = 41
+	L7_PROTOCOL_SOFARPC L7Protocol = 43
+	L7_PROTOCOL_FASTCGI L7Protocol = 44
+	L7_PROTOCOL_MYSQL   L7Protocol = 60
+	L7_PROTOCOL_POSTGRE L7Protocol = 61
+	L7_PROTOCOL_ORACLE  L7Protocol = 62
+	L7_PROTOCOL_REDIS   L7Protocol = 80
+	L7_PROTOCOL_MONGODB L7Protocol = 81
+	L7_PROTOCOL_KAFKA   L7Protocol = 100
+	L7_PROTOCOL_MQTT    L7Protocol = 101
+	L7_PROTOCOL_DNS     L7Protocol = 120
+	L7_PROTOCOL_CUSTOM  L7Protocol = 127
 )
 
 // size = 9 * 4B = 36B
@@ -617,10 +614,6 @@ func (p L7Protocol) String() string {
 		formatted = "HTTP"
 	case L7_PROTOCOL_HTTP_2:
 		formatted = "HTTP2"
-	case L7_PROTOCOL_HTTP_1_TLS:
-		formatted = "HTTP1_TLS"
-	case L7_PROTOCOL_HTTP_2_TLS:
-		formatted = "HTTP2_TLS"
 	case L7_PROTOCOL_DNS:
 		formatted = "DNS"
 	case L7_PROTOCOL_MYSQL:
@@ -647,8 +640,6 @@ func (p L7Protocol) String() string {
 		formatted = "MQTT"
 	case L7_PROTOCOL_CUSTOM:
 		formatted = "Custom"
-	case L7_PROTOCOL_OTHER:
-		formatted = "Others"
 	default:
 		formatted = "N/A"
 	}
@@ -656,19 +647,16 @@ func (p L7Protocol) String() string {
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	L7_PROTOCOL_HTTP_1.String():     L7_PROTOCOL_HTTP_1,
-	L7_PROTOCOL_HTTP_2.String():     L7_PROTOCOL_HTTP_2,
-	L7_PROTOCOL_HTTP_1_TLS.String(): L7_PROTOCOL_HTTP_1_TLS,
-	L7_PROTOCOL_HTTP_2_TLS.String(): L7_PROTOCOL_HTTP_2_TLS,
-	L7_PROTOCOL_DNS.String():        L7_PROTOCOL_DNS,
-	L7_PROTOCOL_MYSQL.String():      L7_PROTOCOL_MYSQL,
-	L7_PROTOCOL_REDIS.String():      L7_PROTOCOL_REDIS,
-	L7_PROTOCOL_DUBBO.String():      L7_PROTOCOL_DUBBO,
-	L7_PROTOCOL_GRPC.String():       L7_PROTOCOL_GRPC,
-	L7_PROTOCOL_KAFKA.String():      L7_PROTOCOL_KAFKA,
-	L7_PROTOCOL_MQTT.String():       L7_PROTOCOL_MQTT,
-	L7_PROTOCOL_OTHER.String():      L7_PROTOCOL_OTHER,
-	L7_PROTOCOL_UNKNOWN.String():    L7_PROTOCOL_UNKNOWN,
+	L7_PROTOCOL_HTTP_1.String():  L7_PROTOCOL_HTTP_1,
+	L7_PROTOCOL_HTTP_2.String():  L7_PROTOCOL_HTTP_2,
+	L7_PROTOCOL_DNS.String():     L7_PROTOCOL_DNS,
+	L7_PROTOCOL_MYSQL.String():   L7_PROTOCOL_MYSQL,
+	L7_PROTOCOL_REDIS.String():   L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_DUBBO.String():   L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_GRPC.String():    L7_PROTOCOL_GRPC,
+	L7_PROTOCOL_KAFKA.String():   L7_PROTOCOL_KAFKA,
+	L7_PROTOCOL_MQTT.String():    L7_PROTOCOL_MQTT,
+	L7_PROTOCOL_UNKNOWN.String(): L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {
@@ -859,8 +847,7 @@ func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {
 	if f.L4Protocol == L4_PROTOCOL_UNKOWN {
 		f.L4Protocol = rhs.L4Protocol
 	}
-	if f.L7Protocol == L7_PROTOCOL_UNKNOWN || (f.L7Protocol == L7_PROTOCOL_OTHER &&
-		rhs.L7Protocol != L7_PROTOCOL_UNKNOWN) {
+	if f.L7Protocol == L7_PROTOCOL_UNKNOWN {
 		f.L7Protocol = rhs.L7Protocol
 	}
 	f.TCPPerfStats.SequentialMerge(&rhs.TCPPerfStats)
