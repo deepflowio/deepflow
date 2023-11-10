@@ -157,6 +157,10 @@ type PlatformRawData struct {
 
 	launchServerToSkipInterface map[string][]*trident.SkipInterface
 
+	vtapIDToContainer    map[int][]*trident.Container
+	launchServerIDToVTap map[int]*models.VTap
+	containerIdToPodId   map[string]int
+
 	launchServerToVRouterIDs map[string][]int
 }
 
@@ -239,6 +243,10 @@ func NewPlatformRawData() *PlatformRawData {
 		deviceTypeAndIDToVInterfaceID: make(map[TypeIDKey][]int),
 		typeIDToDevice:                make(map[TypeIDKey]*TypeIDData),
 		launchServerToSkipInterface:   make(map[string][]*trident.SkipInterface),
+
+		vtapIDToContainer:    make(map[int][]*trident.Container),
+		launchServerIDToVTap: make(map[int]*models.VTap),
+		containerIdToPodId:   make(map[string]int),
 
 		launchServerToVRouterIDs: make(map[string][]int),
 	}
@@ -459,12 +467,34 @@ func (r *PlatformRawData) ConvertDBDHCPPort(dbDataCache *DBDataCache) {
 	}
 }
 
+func (r *PlatformRawData) GetContainers(vtapID int) []*trident.Container {
+	return r.vtapIDToContainer[vtapID]
+}
+
+func (r *PlatformRawData) addContainers(pod *models.Pod) {
+	if pod.ContainerIDs == "" {
+		return
+	}
+	vtap, ok := r.launchServerIDToVTap[pod.PodNodeID]
+	for _, cid := range strings.Split(pod.ContainerIDs, ", ") {
+		r.containerIdToPodId[cid] = pod.ID
+		if ok {
+			container := &trident.Container{
+				PodId:       proto.Uint32(uint32(pod.ID)),
+				ContainerId: proto.String(cid),
+			}
+			r.vtapIDToContainer[vtap.ID] = append(r.vtapIDToContainer[vtap.ID], container)
+		}
+	}
+}
+
 func (r *PlatformRawData) ConvertDBPod(dbDataCache *DBDataCache) {
 	pods := dbDataCache.GetPods()
 	if pods == nil {
 		return
 	}
 	for _, pod := range pods {
+		r.addContainers(pod)
 		r.idToPod[pod.ID] = pod
 		r.podIDs.Add(pod.ID)
 		podIDs, ok := r.podNodeIDtoPodIDs[pod.PodNodeID]
@@ -1099,12 +1129,17 @@ func (r *PlatformRawData) ConvertDBVIPs(dbDataCache *DBDataCache) {
 
 func (r *PlatformRawData) ConvertDBVTaps(dbDataCache *DBDataCache) {
 	for _, vtap := range dbDataCache.GetVTapsIDAndName() {
+		if vtap.Type == VTAP_TYPE_POD_HOST || vtap.Type == VTAP_TYPE_POD_VM {
+			r.launchServerIDToVTap[vtap.LaunchServerID] = vtap
+		}
 		r.vtapIdToVtap[vtap.ID] = vtap
 	}
 }
 
 // 有依赖 需要按顺序convert
 func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
+	r.ConvertDBVTaps(dbDataCache)
+	r.ConvertDBVIPs(dbDataCache)
 	r.ConvertHost(dbDataCache)
 	r.ConvertDBVPC(dbDataCache)
 	r.ConvertDBVM(dbDataCache)
@@ -1131,8 +1166,6 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBVipDomain(dbDataCache)
 	r.ConvertSkipVTapVIfIDs(dbDataCache)
 	r.ConvertDBProcesses(dbDataCache)
-	r.ConvertDBVTaps(dbDataCache)
-	r.ConvertDBVIPs(dbDataCache)
 }
 
 func (r *PlatformRawData) checkVifIsVip(vif *models.VInterface) bool {

@@ -52,7 +52,6 @@ const (
 	ServiceID
 	Resource // 1<< 14
 	GPID     // 1<< 15
-	NetnsID  // 1<< 16
 
 	// Make sure the max offset <= 19
 )
@@ -74,7 +73,6 @@ const (
 	ServiceIDPath
 	ResourcePath // 1<< 34
 	GPIDPath     // 1<< 35
-	NetnsIDPath  // 1<< 36
 
 	// Make sure the max offset <= 39
 )
@@ -248,9 +246,9 @@ const (
 type TagSource uint8
 
 const (
-	GpId    TagSource = 1 << iota // if the GpId exists but the netnsId does not exist, first obtain the netnsId through the GprocessId table delivered by the Controller
-	NetnsId                       // use vtapId + netnsId to match first
-	Mac                           // if vtapId + netnsId cannot be matched, finally use Mac/EpcIP to match resources
+	GpId  TagSource = 1 << iota // if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
+	PodId                       // use vtapId + podId to match first
+	Mac                         // if vtapId + podId cannot be matched, finally use Mac/EpcIP to match resources
 	EpcIP
 	Peer           // Multicast, filled with peer information
 	None TagSource = 0
@@ -285,7 +283,6 @@ type Field struct {
 	AutoServiceID    uint32
 	AutoServiceType  uint8
 	GPID             uint32
-	NetnsID          uint32
 
 	MAC1              uint64
 	IP61              net.IP // FIXME: 合并IP61和IP1
@@ -308,7 +305,6 @@ type Field struct {
 	AutoServiceID1    uint32
 	AutoServiceType1  uint8
 	GPID1             uint32
-	NetnsID1          uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -474,8 +470,8 @@ const (
 
 	VTAP_FLOW_PORT      = BaseCode | BasePortCode | Direction
 	VTAP_FLOW_EDGE_PORT = BasePathCode | BasePortCode | TAPPort
-	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol | NetnsID
-	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol | NetnsIDPath
+	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol
+	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol
 
 	VTAP_ACL = ACLGID | TagType | TagValue | VTAPID
 )
@@ -607,16 +603,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GPID), 10))
 		offset += copy(b[offset:], ",gprocess_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GPID1), 10))
-	}
-	if t.Code&NetnsID != 0 {
-		offset += copy(b[offset:], ",netns_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.NetnsID), 10))
-	}
-	if t.Code&NetnsIDPath != 0 {
-		offset += copy(b[offset:], ",netns_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.NetnsID), 10))
-		offset += copy(b[offset:], ",netns_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.NetnsID1), 10))
 	}
 	if t.Code&HostID != 0 {
 		offset += copy(b[offset:], ",host_id=")
@@ -938,13 +924,6 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id_0", ckdb.UInt32).SetComment("ip0对应的全局进程ID"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id_1", ckdb.UInt32).SetComment("ip1对应的全局进程ID"))
 	}
-	if code&NetnsID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("netns_id", ckdb.UInt32).SetComment("全局网卡命名空间ID"))
-	}
-	if code&NetnsIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("netns_id_0", ckdb.UInt32).SetComment("ip0对应的全局网卡命名空间ID"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("netns_id_1", ckdb.UInt32).SetComment("ip1对应的全局网卡命名空间ID"))
-	}
 	if code&HostID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id", ckdb.UInt16).SetComment("宿主机ID"))
 	}
@@ -1160,12 +1139,6 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	}
 	if code&GPIDPath != 0 {
 		block.Write(t.GPID, t.GPID1)
-	}
-	if code&NetnsID != 0 {
-		block.Write(t.NetnsID)
-	}
-	if code&NetnsIDPath != 0 {
-		block.Write(t.NetnsID, t.NetnsID1)
 	}
 	if code&HostID != 0 {
 		block.Write(t.HostID)
@@ -1407,24 +1380,18 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath
 		t.Code |= SignalSource
-		if t.Code&L7Protocol != 0 {
-			t.Code |= NetnsIDPath
-		}
 	} else if t.Code != VTAP_ACL {
 		t.Code |= GPID
 		t.Code |= SignalSource
-		if t.Code&L7Protocol != 0 {
-			t.Code |= NetnsID
-		}
 	}
 	t.GPID = p.Field.Gpid
 	t.GPID1 = p.Field.Gpid1
 
-	if p.Field.NetnsId != 0 {
-		if t.Code&NetnsIDPath != 0 && t.Direction.IsServerToClient() {
-			t.NetnsID1 = p.Field.NetnsId
+	if p.Field.PodId != 0 {
+		if t.Code&IPPath != 0 && t.Direction.IsServerToClient() {
+			t.PodID1 = p.Field.PodId
 		} else {
-			t.NetnsID = p.Field.NetnsId
+			t.PodID = p.Field.PodId
 		}
 	}
 	t.SignalSource = uint16(p.Field.SignalSource)

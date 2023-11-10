@@ -440,8 +440,8 @@ message Cidr {
 
 message GProcessInfo {
     optional uint32 gprocess_id = 1;
-    optional uint32 netns_id = 2 [default = 0];
     optional uint32 vtap_id = 3;  // 限制在64000
+    optional uint32 pod_id = 4; 
 }
 
 message Container {
