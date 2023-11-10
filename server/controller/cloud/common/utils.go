@@ -711,3 +711,57 @@ func DiffMap(base, another map[string]string) bool {
 	}
 	return false
 }
+
+func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
+	vtapIDToSubDomain := make(map[int]string)
+
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain = ?", domain).Find(&azs).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	azLcuuids := []string{}
+	for _, az := range azs {
+		azLcuuids = append(azLcuuids, az.Lcuuid)
+	}
+
+	var podNodes []mysql.PodNode
+	err = mysql.Db.Where("domain = ?", domain).Find(&podNodes).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	podNodeIDToSubDomain := make(map[int]string)
+	for _, podNode := range podNodes {
+		podNodeIDToSubDomain[podNode.ID] = podNode.SubDomain
+	}
+
+	var pods []mysql.Pod
+	err = mysql.Db.Where("domain = ?", domain).Find(&pods).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	podIDToSubDomain := make(map[int]string)
+	for _, pod := range pods {
+		podIDToSubDomain[pod.ID] = pod.SubDomain
+	}
+
+	var vtaps []mysql.VTap
+	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	for _, vtap := range vtaps {
+		vtapIDToSubDomain[vtap.ID] = ""
+		if vtap.Type == common.VTAP_TYPE_POD_HOST || vtap.Type == common.VTAP_TYPE_POD_VM {
+			if subDomain, ok := podNodeIDToSubDomain[vtap.LaunchServerID]; ok {
+				vtapIDToSubDomain[vtap.ID] = subDomain
+			}
+		} else if vtap.Type == common.VTAP_TYPE_K8S_SIDECAR {
+			if subDomain, ok := podIDToSubDomain[vtap.LaunchServerID]; ok {
+				vtapIDToSubDomain[vtap.ID] = subDomain
+			}
+		}
+	}
+
+	return vtapIDToSubDomain, nil
+}
