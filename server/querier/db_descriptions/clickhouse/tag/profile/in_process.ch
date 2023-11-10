@@ -23,6 +23,7 @@ pod_group_type             , K8s 工作负载类型           ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
+gprocess                   , 进程                       ,
 
 k8s.label                  , K8s Label                  ,
 k8s.annotation             , K8s Annotation             ,

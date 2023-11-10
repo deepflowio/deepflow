@@ -23,6 +23,7 @@ pod_group_type             , pod_group_type            , pod_group_type         
 pod_group                  , pod_group                 , pod_group                 , resource      ,                       , Universal Tag   , 111
 pod                        , pod                       , pod                       , resource      ,                       , Universal Tag   , 111
 service                    , service                   , service                   , resource      ,                       , Universal Tag   , 111
+gprocess                   , gprocess                  , gprocess                  , resource      ,                       , Universal Tag   , 111
 
 k8s.label                  , k8s.label                 , k8s.label                 , map           ,                       , Custom Tag      , 111
 k8s.annotation             , k8s.annotation            , k8s.annotation            , map           ,                       , Custom Tag      , 111
