@@ -578,6 +578,21 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 
 	}
 
+	// auto_custom_tag
+	if config.Cfg.AutoCustomTag.TagName != "" {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, "auto_custom_tag",
+				"Custom Tag", []string{}, []bool{true, true, true}, config.Cfg.AutoCustomTag.TagValues, "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName + "_0", config.Cfg.AutoCustomTag.TagName + "_1", config.Cfg.AutoCustomTag.TagName, "auto_custom_tag",
+				"Custom Tag", []string{}, []bool{true, true, true}, config.Cfg.AutoCustomTag.TagValues, "",
+			})
+		}
+	}
+
 	// 查询外部字段
 	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != ckcommon.DB_NAME_PROMETHEUS) || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
@@ -626,22 +641,6 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			"Native Tag", []string{}, []bool{true, true, true}, "tag", "",
 		})
 	}
-
-	// auto_custom_tag
-	if config.Cfg.AutoCustomTag.TagName != "" {
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-			response.Values = append(response.Values, []interface{}{
-				config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName, "auto_custom_tag",
-				"Custom Tag", []string{}, []bool{true, true, true}, config.Cfg.AutoCustomTag.TagValues, "",
-			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
-			response.Values = append(response.Values, []interface{}{
-				config.Cfg.AutoCustomTag.TagName, config.Cfg.AutoCustomTag.TagName + "_0", config.Cfg.AutoCustomTag.TagName + "_1", config.Cfg.AutoCustomTag.TagName, "auto_custom_tag",
-				"Custom Tag", []string{}, []bool{true, true, true}, config.Cfg.AutoCustomTag.TagValues, "",
-			})
-		}
-	}
-
 	return response, nil
 }
 
