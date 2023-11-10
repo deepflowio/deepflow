@@ -68,6 +68,7 @@ type InProcessProfile struct {
 	// Ebpf Profile Infos
 	ProcessID        uint32 `json:"process_id"`
 	ProcessStartTime int64  `json:"process_start_time"`
+	GPID             uint32
 
 	// Universal Tag
 	VtapID       uint16
@@ -142,6 +143,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
 		ckdb.NewColumn("process_id", ckdb.UInt32).SetComment("进程 id"),
 		ckdb.NewColumn("process_start_time", ckdb.DateTime64ms).SetComment("进程启动时间"),
+		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Process"),
 
 		// universal tag
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -210,6 +212,7 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.CompressionAlgo,
 		p.ProcessID,
 		p.ProcessStartTime,
+		p.GPID,
 
 		p.VtapID,
 		p.RegionID,
@@ -292,6 +295,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime
+	p.GPID = platformData.QueryProcessInfo(uint32(vtapID), pid)
 	tagNames = append(tagNames, LabelAppService, LabelLanguageType, LabelTraceID, LabelSpanName, LabelAppInstance)
 	tagValues = append(tagValues, p.AppService, p.ProfileLanguageType, p.TraceID, p.SpanName, p.AppInstance)
 	p.TagNames = tagNames

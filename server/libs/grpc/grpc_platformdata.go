@@ -153,8 +153,9 @@ type PlatformInfoTable struct {
 	epcIDBaseInfos     map[int32]*BaseInfo
 	epcIDBaseMissCount map[int32]*uint64
 
-	gprocessInfos map[uint32]uint64
-	epcIDPodInfos map[uint64]*Info
+	gprocessInfos      map[uint32]uint64
+	vtapIDProcessInfos map[uint64]uint32
+	epcIDPodInfos      map[uint64]*Info
 
 	bootTime            uint32
 	moduleName          string
@@ -394,6 +395,7 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		epcIDBaseInfos:     make(map[int32]*BaseInfo),
 		epcIDBaseMissCount: make(map[int32]*uint64),
 		gprocessInfos:      make(map[uint32]uint64),
+		vtapIDProcessInfos: make(map[uint64]uint32),
 		epcIDPodInfos:      make(map[uint64]*Info),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
@@ -1003,6 +1005,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 		log.Infof("Update slave(%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
 		t.peerConnections = masterTable.peerConnections
 		t.gprocessInfos = masterTable.gprocessInfos
+		t.vtapIDProcessInfos = masterTable.vtapIDProcessInfos
 		t.epcIDPodInfos = masterTable.epcIDPodInfos
 
 		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
@@ -1619,11 +1622,16 @@ func (t *PlatformInfoTable) queryPeerConnections(epcId int32) []int32 {
 
 func (t *PlatformInfoTable) updateGprocessInfos(infos []*trident.GProcessInfo) {
 	gProcessInfos := make(map[uint32]uint64, 1024)
+	vtapIDProcessInfos := make(map[uint64]uint32, 1024)
 
 	for _, info := range infos {
 		vtapId := info.GetVtapId()
 		gProcessId := info.GetGprocessId()
 		podId := info.GetPodId()
+		pid := info.GetPid()
+		if pid != 0 {
+			vtapIDProcessInfos[uint64(vtapId)<<32|uint64(pid)] = gProcessId
+		}
 		if vtapId == 0 || gProcessId == 0 || podId == 0 {
 			continue
 		}
@@ -1631,22 +1639,35 @@ func (t *PlatformInfoTable) updateGprocessInfos(infos []*trident.GProcessInfo) {
 	}
 
 	t.gprocessInfos = gProcessInfos
+	t.vtapIDProcessInfos = vtapIDProcessInfos
 }
 
 func (t *PlatformInfoTable) gprocessInfosString() string {
 	sb := &strings.Builder{}
 	sb.WriteString("gprocessId         vtapId        podId\n")
+	sb.WriteString("--------------------------------------\n")
 	for gpid, vtapPodId := range t.gprocessInfos {
 		sb.WriteString(fmt.Sprintf("%-10d         %-6d       %d\n", gpid, vtapPodId>>32, vtapPodId<<32>>32))
+	}
+	sb.WriteString("\nprocessId         vtapId        gprocessId\n")
+	sb.WriteString("----------------------------------------\n")
+	for vtapIdPid, gprocessId := range t.vtapIDProcessInfos {
+		sb.WriteString(fmt.Sprintf("%-9d         %-6d       %d\n", vtapIdPid>>32, vtapIdPid<<32>>32, gprocessId))
 	}
 	return sb.String()
 }
 
+// return vtapID, podID
 func (t *PlatformInfoTable) QueryGprocessInfo(gprocessId uint32) (uint32, uint32) {
 	if vtapPod, ok := t.gprocessInfos[gprocessId]; ok {
 		return uint32(vtapPod >> 32), uint32(vtapPod << 32 >> 32)
 	}
 	return 0, 0
+}
+
+// return gProcessID
+func (t *PlatformInfoTable) QueryProcessInfo(vtapId, processId uint32) uint32 {
+	return t.vtapIDProcessInfos[uint64(vtapId)<<32|uint64(processId)]
 }
 
 func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {

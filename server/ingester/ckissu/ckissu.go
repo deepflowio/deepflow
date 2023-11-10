@@ -984,6 +984,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		ColumnNames: []string{"rtt_client", "rtt_server"},
 		ColumnType:  ckdb.Float64,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"gprocess_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var IndexAdd64 = []*IndexAdds{
