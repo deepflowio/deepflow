@@ -73,6 +73,38 @@ pub enum ConfigError {
     YamlConfigInvalid(String),
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum AgentIdType {
+    #[default]
+    IpMac,
+    Ip,
+}
+
+impl<'de> Deserialize<'de> for AgentIdType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "ip-and-mac" | "ip_and_mac" => Ok(Self::IpMac),
+            "ip" => Ok(Self::Ip),
+            other => Err(de::Error::invalid_value(
+                Unexpected::Str(other),
+                &"ip|ip-and-mac|ip_and_mac",
+            )),
+        }
+    }
+}
+
+impl From<AgentIdType> for trident::AgentIdentifier {
+    fn from(t: AgentIdType) -> Self {
+        match t {
+            AgentIdType::IpMac => trident::AgentIdentifier::IpAndMac,
+            AgentIdType::Ip => trident::AgentIdentifier::Ip,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct Config {
@@ -89,6 +121,7 @@ pub struct Config {
     pub agent_mode: RunningMode,
     pub override_os_hostname: Option<String>,
     pub async_worker_thread_number: u16,
+    pub agent_unique_identifier: AgentIdType,
 }
 
 impl Config {
@@ -244,6 +277,7 @@ impl Default for Config {
             agent_mode: Default::default(),
             override_os_hostname: None,
             async_worker_thread_number: 16,
+            agent_unique_identifier: Default::default(),
         }
     }
 }

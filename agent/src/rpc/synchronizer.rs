@@ -90,6 +90,7 @@ pub struct StaticConfig {
     pub kubernetes_cluster_name: Option<String>,
 
     pub override_os_hostname: Option<String>,
+    pub agent_unique_identifier: crate::config::AgentIdType,
 }
 
 const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
@@ -114,6 +115,7 @@ impl Default for StaticConfig {
             kubernetes_cluster_id: Default::default(),
             kubernetes_cluster_name: Default::default(),
             override_os_hostname: None,
+            agent_unique_identifier: Default::default(),
         }
     }
 }
@@ -458,6 +460,7 @@ impl Synchronizer {
         kubernetes_cluster_id: String,
         kubernetes_cluster_name: Option<String>,
         override_os_hostname: Option<String>,
+        agent_unique_identifier: crate::config::AgentIdType,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
@@ -475,6 +478,7 @@ impl Synchronizer {
                 kubernetes_cluster_id,
                 kubernetes_cluster_name,
                 override_os_hostname,
+                agent_unique_identifier,
             }),
             agent_id: Arc::new(RwLock::new(agent_id)),
             trident_state,
@@ -595,6 +599,9 @@ impl Synchronizer {
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
+            agent_unique_identifier: Some(tp::AgentIdentifier::from(
+                static_config.agent_unique_identifier,
+            ) as i32),
 
             ..Default::default()
         }
