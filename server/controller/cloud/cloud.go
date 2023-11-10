@@ -436,7 +436,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	vtapIDToLcuuid, err := GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
 	if err != nil {
 		log.Errorf("domain (%s) add process failed: %s", c.basicInfo.Name, err.Error())
 		return resource
@@ -495,7 +495,7 @@ func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	vtapIDToLcuuid, err := GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
 	if err != nil {
 		log.Errorf("domain (%s) add vip failed: %s", c.basicInfo.Name, err.Error())
 		return resource
@@ -513,58 +513,4 @@ func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
 		})
 	}
 	return resource
-}
-
-func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
-	vtapIDToSubDomain := make(map[int]string)
-
-	var azs []mysql.AZ
-	err := mysql.Db.Where("domain = ?", domain).Find(&azs).Error
-	if err != nil {
-		return vtapIDToSubDomain, err
-	}
-	azLcuuids := []string{}
-	for _, az := range azs {
-		azLcuuids = append(azLcuuids, az.Lcuuid)
-	}
-
-	var podNodes []mysql.PodNode
-	err = mysql.Db.Where("domain = ?", domain).Find(&podNodes).Error
-	if err != nil {
-		return vtapIDToSubDomain, err
-	}
-	podNodeIDToSubDomain := make(map[int]string)
-	for _, podNode := range podNodes {
-		podNodeIDToSubDomain[podNode.ID] = podNode.SubDomain
-	}
-
-	var pods []mysql.Pod
-	err = mysql.Db.Where("domain = ?", domain).Find(&pods).Error
-	if err != nil {
-		return vtapIDToSubDomain, err
-	}
-	podIDToSubDomain := make(map[int]string)
-	for _, pod := range pods {
-		podIDToSubDomain[pod.ID] = pod.SubDomain
-	}
-
-	var vtaps []mysql.VTap
-	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
-	if err != nil {
-		return vtapIDToSubDomain, err
-	}
-	for _, vtap := range vtaps {
-		vtapIDToSubDomain[vtap.ID] = ""
-		if vtap.Type == common.VTAP_TYPE_POD_HOST || vtap.Type == common.VTAP_TYPE_POD_VM {
-			if subDomain, ok := podNodeIDToSubDomain[vtap.LaunchServerID]; ok {
-				vtapIDToSubDomain[vtap.ID] = subDomain
-			}
-		} else if vtap.Type == common.VTAP_TYPE_K8S_SIDECAR {
-			if subDomain, ok := podIDToSubDomain[vtap.LaunchServerID]; ok {
-				vtapIDToSubDomain[vtap.ID] = subDomain
-			}
-		}
-	}
-
-	return vtapIDToSubDomain, nil
 }
