@@ -293,7 +293,8 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 				in.GetCtrlMac(),
 				in.GetHostIps(),
 				in.GetHost(),
-				in.GetVtapGroupIdRequest())
+				in.GetVtapGroupIdRequest(),
+				int(in.GetAgentUniqueIdentifier()))
 		}
 		return e.noVTapResponse(in), nil
 	}
