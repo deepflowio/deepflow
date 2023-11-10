@@ -580,6 +580,11 @@ const (
 	TAPMODE_DECAP    = 3
 )
 
+const (
+	AGENT_IDENTIFIE_IP_AND_MAC = 1
+	AGENT_IDENTIFIE_IP         = 2
+)
+
 var VtapTapModeName = map[int]string{
 	TAPMODE_LOCAL:    "本地",
 	TAPMODE_MIRROR:   "镜像",

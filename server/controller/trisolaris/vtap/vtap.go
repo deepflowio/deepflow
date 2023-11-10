@@ -1089,8 +1089,9 @@ func (v *VTapInfo) getVTapAutoRegister() bool {
 	return v.config.VTapAutoRegister
 }
 
-func (v *VTapInfo) Register(tapMode int, ctrlIP string, ctrlMac string, hostIPs []string, host string, vTapGroupID string) {
-	vTapRegister := newVTapRegister(tapMode, ctrlIP, ctrlMac, hostIPs, host, vTapGroupID)
+func (v *VTapInfo) Register(tapMode int, ctrlIP string, ctrlMac string,
+	hostIPs []string, host string, vTapGroupID string, agentUniqueIdentifier int) {
+	vTapRegister := newVTapRegister(tapMode, ctrlIP, ctrlMac, hostIPs, host, vTapGroupID, agentUniqueIdentifier)
 	v.registerMU.Lock()
 	v.register[vTapRegister.getKey()] = vTapRegister
 	v.registerMU.Unlock()
