@@ -72,6 +72,8 @@ pub const SOCK_DATA_KAFKA: u16 = 100;
 pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
+#[allow(dead_code)]
+pub const SOCK_DATA_TLS: u16 = 121;
 
 // Feature
 #[allow(dead_code)]

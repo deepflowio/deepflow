@@ -186,6 +186,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("TLS_HTTP2");
         } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
             proto_tag.push_str("DNS");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
+		proto_tag.push_str("TLS");
         } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
             proto_tag.push_str("MYSQL");
         } else if sk_proto_safe(sd) == SOCK_DATA_POSTGRESQL {
@@ -262,18 +264,9 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 5 {
                 print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
-            } else if sk_proto_safe(sd) == SOCK_DATA_OTHER {
-                for x in data.into_iter() {
-                    print!("{} ", format!("{:02x}", x));
-                }
             } else {
                 for x in data.into_iter() {
-                    if x < 32 || x > 126 {
-                        print!(".");
-                        continue;
-                    }
-                    let b = x as char;
-                    print!("{0}", b);
+                    print!("{} ", format!("{:02x}", x));
                 }
             }
             print!("\x1b[0m\n");
@@ -361,6 +354,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
+	enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
