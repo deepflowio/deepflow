@@ -71,7 +71,7 @@ func applyDomainAdditionalResource(cmd *cobra.Command, args []string, filename s
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domain-additional-resources/", server.IP, server.Port)
-	_, err = common.CURLPerform("PUT", url, body, "")
+	_, err = common.CURLPerform("PUT", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

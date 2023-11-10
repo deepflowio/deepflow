@@ -531,6 +531,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 */
 		stack_trace_msg_kv_t kv;
 		char name[TASK_COMM_LEN];
+		memset(name, 0, sizeof(name));
 		u64 stime, netns_id;
 		void *info_p = NULL;
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
