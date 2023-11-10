@@ -40,3 +40,6 @@ controller-ips:
 ## async workers are used mainly used for grpc calls, synchronizer and
 ## kubernetes api watcher
 #async-worker-thread-number: 16
+
+## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
+#agent-unique-identifier: ip-and-mac

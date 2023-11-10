@@ -490,6 +490,7 @@ impl Trident {
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
             config_handler.static_config.override_os_hostname.clone(),
+            config_handler.static_config.agent_unique_identifier,
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
