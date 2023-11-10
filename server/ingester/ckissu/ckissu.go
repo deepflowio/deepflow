@@ -40,6 +40,7 @@ type Issu struct {
 	columnRenames      []*ColumnRename
 	columnMods         []*ColumnMod
 	columnAdds         []*ColumnAdd
+	indexAdds          []*IndexAdd
 	columnDrops        []*ColumnDrop
 	datasourceInfo     map[string]*DatasourceInfo
 	Connections        common.DBs
@@ -111,6 +112,20 @@ type ColumnDrops struct {
 	Dbs         []string
 	Tables      []string
 	ColumnNames []string
+}
+
+type IndexAdds struct {
+	Dbs         []string
+	Tables      []string
+	ColumnNames []string
+	IndexType   ckdb.IndexType
+}
+
+type IndexAdd struct {
+	Db         string
+	Table      string
+	ColumnName string
+	IndexType  ckdb.IndexType
 }
 
 var TableRenames611 = []*TableRename{
@@ -965,6 +980,21 @@ var ColumnAdd64 = []*ColumnAdds{
 	},
 }
 
+var IndexAdd64 = []*IndexAdds{
+	&IndexAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local"},
+		ColumnNames: []string{"trace_id", "x_request_id_0", "x_request_id_1"},
+		IndexType:   ckdb.IndexBloomfilter,
+	},
+	&IndexAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local"},
+		ColumnNames: []string{"_id"},
+		IndexType:   ckdb.IndexMinmax,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1353,6 +1383,10 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		}
 	}
 
+	for _, v := range [][]*IndexAdd{getIndexAdds(IndexAdd64)} {
+		i.indexAdds = append(i.indexAdds, v...)
+	}
+
 	for _, v := range [][]*ColumnMod{ColumnMod611, ColumnMod615} {
 		i.columnMods = append(i.columnMods, v...)
 	}
@@ -1461,6 +1495,33 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 		}
 		log.Error(err)
 		return err
+	}
+	return nil
+}
+
+func (i *Issu) addIndex(connect *sql.DB, c *IndexAdd) error {
+	indexName := c.ColumnName + "_idx"
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD INDEX %s %s TYPE %s GRANULARITY 3",
+		c.Db, c.Table, indexName, c.ColumnName, c.IndexType)
+	log.Info(sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		// if it already exists, you need to skip it
+		if strings.Contains(err.Error(), "index with this name already exists") {
+			log.Infof("index db: %s, table: %s error: %s", c.Db, c.Table, err)
+			return nil
+			// The 'metrics/metrics_local' table is created after receiving the ext_metric data. If the table field is modified just after the system starts, it will cause an error. Ignore it
+		} else if strings.Contains(err.Error(), "Table ext_metrics.metrics doesn't exist") || strings.Contains(err.Error(), "Table ext_metrics.metrics_local doesn't exist") {
+			log.Infof("db: %s, table: %s error: %s", c.Db, c.Table, err)
+			return nil
+		}
+		log.Error(err)
+		return err
+	} else {
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` MATERIALIZE INDEX %s",
+			c.Db, c.Table, indexName)
+		log.Info(sql)
+		connect.Exec(sql)
 	}
 	return nil
 }
@@ -1776,6 +1837,25 @@ func getColumnAdds(columnAdds *ColumnAdds) []*ColumnAdd {
 	return adds
 }
 
+func getIndexAdds(indexAddss []*IndexAdds) []*IndexAdd {
+	adds := []*IndexAdd{}
+	for _, indexAdds := range indexAddss {
+		for _, db := range indexAdds.Dbs {
+			for _, tbl := range indexAdds.Tables {
+				for _, clmn := range indexAdds.ColumnNames {
+					adds = append(adds, &IndexAdd{
+						Db:         db,
+						Table:      tbl,
+						ColumnName: clmn,
+						IndexType:  indexAdds.IndexType,
+					})
+				}
+			}
+		}
+	}
+	return adds
+}
+
 func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	dones := []*ColumnAdd{}
 	for _, add := range i.columnAdds {
@@ -1813,6 +1893,26 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	return dones, nil
 }
 
+func (i *Issu) addIndexs(connect *sql.DB) ([]*IndexAdd, error) {
+	dones := []*IndexAdd{}
+	for _, add := range i.indexAdds {
+		version, err := i.getTableVersion(connect, add.Db, add.Table)
+		if err != nil {
+			return dones, err
+		}
+		if version == common.CK_VERSION {
+			log.Infof("db(%s) table(%s) already updated", add.Db, add.Table)
+			continue
+		}
+		if err := i.addIndex(connect, add); err != nil {
+			log.Warningf("db(%s) table(%s) add index failed.err: %s", add.Db, add.Table, err)
+			continue
+		}
+		dones = append(dones, add)
+	}
+	return dones, nil
+}
+
 func (i *Issu) Start() error {
 	connects := i.Connections
 	if len(connects) == 0 {
@@ -1833,6 +1933,11 @@ func (i *Issu) Start() error {
 			return errAdds
 		}
 
+		addIndexs, errAddIndexs := i.addIndexs(connect)
+		if errAddIndexs != nil {
+			log.Warning(errAddIndexs)
+		}
+
 		drops, errDrops := i.dropColumns(connect)
 		if errDrops != nil {
 			return errDrops
@@ -1849,6 +1954,11 @@ func (i *Issu) Start() error {
 			}
 		}
 		for _, cr := range adds {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
+		}
+		for _, cr := range addIndexs {
 			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 				return err
 			}

@@ -394,6 +394,7 @@ func (p *PlatformDataOP) generateGProcessInfo() {
 			GprocessId: proto.Uint32(uint32(process.ID)),
 			VtapId:     proto.Uint32(uint32(process.VTapID)),
 			PodId:      proto.Uint32(uint32(podId)),
+			Pid:        proto.Uint32(uint32(process.PID)),
 		}
 		gprocessData.gprocessInfo = append(gprocessData.gprocessInfo, p)
 	}
