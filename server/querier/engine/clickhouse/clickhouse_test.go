@@ -339,6 +339,15 @@ var (
 		input:  "select Avg(`bpp`) AS `Avg(bpp)`, Avg(`retrans_syn_ratio`) AS `Avg(retrans_syn_ratio)`, auto_service_id from vtap_flow_edge_port group by auto_service_id limit 1",
 		output: "SELECT auto_service_id, AVGIf(`_div__sum_byte__sum_packet`, `_div__sum_byte__sum_packet` >= 0) AS `Avg(bpp)`, AVG(`_div__sum_retrans_syn__sum_syn_count`)*100 AS `Avg(retrans_syn_ratio)` FROM (WITH if(SUM(packet)>0, divide(SUM(byte), SUM(packet)), null) AS `divide_0diveider_as_null_sum_byte_sum_packet`, if(SUM(syn_count)>0, divide(SUM(retrans_syn), SUM(syn_count)), null) AS `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_byte_sum_packet` AS `_div__sum_byte__sum_packet`, `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count` AS `_div__sum_retrans_syn__sum_syn_count` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`) GROUP BY `auto_service_id` LIMIT 1",
 		db:     "flow_metrics",
+	}, {
+		index:  "exist_trans_support_tag_0",
+		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(l3_epc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
+		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1",
+	}, {
+		index:  "exist_trans_support_tag_1",
+		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0_0) AND exist(resource_gl1_1) LIMIT 1",
+		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_app_port` WHERE (auto_instance_type_0 not in (101,102)) AND (auto_service_type_1 not in (10)) LIMIT 1",
+		db:     "flow_metrics",
 	}}
 )
 
