@@ -67,21 +67,17 @@ client_half_close_flow      ,                      , counter    , TCP Error     
 server_half_close_flow      ,                      , counter    , TCP Error      , 111
 
 rtt                         , rtt                  , delay      , Delay          , 111
-rtt_client                  ,                      , delay      , Delay          , 111
-rtt_server                  ,                      , delay      , Delay          , 111
+rtt_client                  , rtt_client           , delay      , Delay          , 111
+rtt_server                  , rtt_server           , delay      , Delay          , 111
 srt                         ,                      , delay      , Delay          , 111
 art                         ,                      , delay      , Delay          , 111
 cit                         ,                      , delay      , Delay          , 111
 rtt_max                     , rtt                  , delay      , Delay          , 111
-rtt_client_max              , rtt_client_max       , delay      , Delay          , 111
-rtt_server_max              , rtt_server_max       , delay      , Delay          , 111
+rtt_client_max              , rtt_client           , delay      , Delay          , 111
+rtt_server_max              , rtt_server           , delay      , Delay          , 111
 srt_max                     , srt_max              , delay      , Delay          , 111
 art_max                     , art_max              , delay      , Delay          , 111
 cit_max                     , cit_max              , delay      , Delay          , 111
-rtt_client_sum              , rtt_client_sum       , counter    , Delay          , 111
-rtt_client_count            , rtt_client_count     , counter    , Delay          , 111
-rtt_server_sum              , rtt_server_sum       , counter    , Delay          , 111
-rtt_server_count            , rtt_server_count     , counter    , Delay          , 111
 srt_sum                     , srt_sum              , counter    , Delay          , 111
 srt_count                   , srt_count            , counter    , Delay          , 111
 art_sum                     , art_sum              , counter    , Delay          , 111

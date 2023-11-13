@@ -978,6 +978,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		ColumnNames: []string{"is_tls"},
 		ColumnType:  ckdb.UInt8,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"rtt_client", "rtt_server"},
+		ColumnType:  ckdb.Float64,
+	},
 }
 
 var IndexAdd64 = []*IndexAdds{
