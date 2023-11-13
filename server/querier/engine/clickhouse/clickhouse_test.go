@@ -279,7 +279,17 @@ var (
 		index:  "count_3",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
-		db:     "flow_metrics"}}
+		db:     "flow_metrics",
+	}, {
+		index:  "exist_trans_support_tag_0",
+		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(l3_epc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
+		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1",
+	}, {
+		index:  "exist_trans_support_tag_1",
+		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0_0) AND exist(resource_gl1_1) LIMIT 1",
+		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_app_port` WHERE (auto_instance_type_0 not in (101,102)) AND (auto_service_type_1 not in (10)) LIMIT 1",
+		db:     "flow_metrics",
+	}}
 )
 
 func TestGetSql(t *testing.T) {
