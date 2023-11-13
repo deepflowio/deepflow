@@ -183,36 +183,26 @@ func (h *HuaWei) GetStatter() statsd.StatsdStatter {
 	}
 }
 
-func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejson.Json, err error) {
+func (h *HuaWei) getRawData(ctx rawDataGetContext) (jsonList []*simplejson.Json, err error) {
 	statsdAPIStartTime := time.Now()
 	statsdAPIDataCount := 0
 
-	noLimitKeys := []string{"projects", "regions", "availabilityZoneInfo"}
-	if common.Contains(noLimitKeys, resultKey) {
-		resp, err := cloudcommon.RequestGet(url, token, time.Duration(h.httpTimeout))
-		if err != nil {
-			return []*simplejson.Json{}, err
-		}
-		jData := resp.Get(resultKey)
-		for i := range jData.MustArray() {
-			jsonList = append(jsonList, jData.GetIndex(i))
-		}
-	} else {
+	if ctx.pageQuery {
 		var marker string
 		limit := 50
-		baseURL := url
+		baseURL := ctx.url
 		for {
 			if marker == "" {
-				url = fmt.Sprintf("%s?limit=%d", baseURL, limit)
+				ctx.url = fmt.Sprintf("%s?limit=%d", baseURL, limit)
 			} else {
-				url = fmt.Sprintf("%s?limit=%d&marker=%s", baseURL, limit, marker)
+				ctx.url = fmt.Sprintf("%s?limit=%d&marker=%s", baseURL, limit, marker)
 			}
-			resp, err := cloudcommon.RequestGet(url, token, time.Duration(h.httpTimeout))
+			resp, err := RequestGet(ctx.url, ctx.token, time.Duration(h.httpTimeout), ctx.additionalHeaders)
 			if err != nil {
 				return []*simplejson.Json{}, err
 			}
 
-			jData := resp.Get(resultKey)
+			jData := resp.Get(ctx.resultKey)
 			curCount := len(jData.MustArray())
 			for i := range jData.MustArray() {
 				jsonList = append(jsonList, jData.GetIndex(i))
@@ -228,10 +218,42 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 				break
 			}
 		}
+	} else {
+		resp, err := RequestGet(ctx.url, ctx.token, time.Duration(h.httpTimeout), ctx.additionalHeaders)
+		if err != nil {
+			return []*simplejson.Json{}, err
+		}
+		jData := resp.Get(ctx.resultKey)
+		for i := range jData.MustArray() {
+			jsonList = append(jsonList, jData.GetIndex(i))
+		}
 	}
 
-	h.cloudStatsd.RefreshAPIMoniter(resultKey, statsdAPIDataCount, statsdAPIStartTime)
+	h.cloudStatsd.RefreshAPIMoniter(ctx.resultKey, statsdAPIDataCount, statsdAPIStartTime)
 
-	h.debugger.WriteJson(resultKey, url, jsonList)
+	h.debugger.WriteJson(ctx.resultKey, ctx.url, jsonList)
 	return
+}
+
+type rawDataGetContext struct {
+	url               string
+	token             string
+	pageQuery         bool
+	resultKey         string
+	additionalHeaders map[string]string
+}
+
+func newRawDataGetContext(url, token, resultKey string, pageQuery bool) rawDataGetContext {
+	return rawDataGetContext{
+		url:               url,
+		token:             token,
+		resultKey:         resultKey,
+		pageQuery:         pageQuery,
+		additionalHeaders: make(map[string]string),
+	}
+}
+
+func (c rawDataGetContext) addHeader(key, value string) rawDataGetContext {
+	c.additionalHeaders[key] = value
+	return c
 }
