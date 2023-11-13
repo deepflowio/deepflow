@@ -201,10 +201,6 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "HTTP1";
 	case PROTO_HTTP2:
 		return "HTTP2";
-	case PROTO_TLS_HTTP1:
-		return "TLS_HTTP1";
-	case PROTO_TLS_HTTP2:
-		return "TLS_HTTP2";
 	case PROTO_MYSQL:
 		return "MySQL";
 	case PROTO_DNS:
@@ -225,6 +221,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "FastCGI";
 	case PROTO_MONGO:
 		return "MongoDB";
+	case PROTO_TLS:
+		return "TLS";
 	default:
 		return "Unknown";
 	}
@@ -329,4 +327,5 @@ int register_event_handle(uint32_t type, void (*fn)(void *));
 int socket_tracer_stop(void);
 int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
+int set_protocol_ports_bitmap(int proto_type, const char *ports);
 #endif /* DF_USER_SOCKET_H */

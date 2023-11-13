@@ -72,6 +72,8 @@ pub const SOCK_DATA_KAFKA: u16 = 100;
 pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
+#[allow(dead_code)]
+pub const SOCK_DATA_TLS: u16 = 121;
 
 // Feature
 #[allow(dead_code)]
@@ -407,6 +409,36 @@ extern "C" {
     pub fn set_bypass_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
+    /*
+     * Configuring application layer protocol ports
+     *
+     * When 'l7-protocol-enabled' includes application layer protocol types,
+     * 'l7-protocol-ports' specifies the port numbers or port number ranges
+     * for these protocols. eBPF will perform protocol inference on the
+     * specified port numbers for a given protocol. If a protocol's port number
+     * is not within the configured range, inference for that protocol will not
+     * be performed.
+     *
+     * Parameters:
+     * @proto_type: Protocol type, e.g., SOCK_DATA_HTTP1/SOCK_DATA_HTTP2 ...
+     * @ports: Port range, e.g., "443, 4467-5678"
+     *
+     * @return: Returns 0 on success, a non-zero value on error.
+     *
+     * For example, with the following configuration:
+     * ```
+     * l7-protocol-enabled:
+     *    TLS
+     * l7-protocol-ports:
+     *    "TLS": "443, 4467-5678"
+     * ```
+     * During the eBPF protocol inference phase, TLS protocol inference will be
+     * performed on the port numbers and range "443, 4467-5678." If the inference
+     * fails, data will be discarded.
+     *
+     * Note: that the default value for 'TLS' in 'l7-protocol-ports' is "443".
+     */
+    pub fn set_protocol_ports_bitmap(proto_type: c_int, ports: *const c_char) -> c_int;
 
     // 初始化tracer用于设置eBPF环境初始化。
     // 参数：

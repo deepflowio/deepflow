@@ -252,11 +252,7 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 
 	// data_type
 	enum traffic_protocol protocol;
-	if (is_http2_tls()) {
-		protocol = PROTO_TLS_HTTP2;
-	} else {
-		protocol = PROTO_HTTP2;
-	}
+	protocol = PROTO_HTTP2;
 
 	send_buffer->data_type = protocol;
 
@@ -942,15 +938,12 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	send_buffer->direction = direction;
 	int tgid = pid_tgid >> 32;
 
-#if 1
-	// The header contains the following fields, no need to report repeatedly
 	send_buffer->tgid = tgid;
 	send_buffer->pid = (__u32)pid_tgid;
 	send_buffer->timestamp = bpf_ktime_get_ns();
 	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 	send_buffer->tcp_seq = 0;
-	send_buffer->data_type = stack->tls ? PROTO_TLS_HTTP2 : PROTO_HTTP2;
-#endif
+	send_buffer->data_type = PROTO_HTTP2;
 
 	// Refer to the logic of process_data in socket_trace.c to
 	// obtain quintuple information

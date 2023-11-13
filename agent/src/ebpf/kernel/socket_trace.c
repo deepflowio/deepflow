@@ -112,6 +112,14 @@ MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 // 0: allow bitmap; 1: bypass bitmap
 MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
+/*
+ * l7-protocol-ports
+ * Configuring application layer protocol ports, when performing protocol
+ * inference, inference is only targeted at specified ports of Layer 7
+ * protocols.
+ */
+MAP_ARRAY(proto_ports_bitmap, __u32, ports_bitmap_t, PROTO_NUM)
+
 // write() syscall's input argument.
 // Key is {tgid, pid}.
 BPF_HASH(active_write_args_map, __u64, struct data_args_t)
@@ -153,6 +161,19 @@ static __inline bool is_protocol_enabled(int protocol)
 {
 	int *enabled = protocol_filter__lookup(&protocol);
 	return (enabled) ? (*enabled) : (0);
+}
+
+static __inline bool proto_port_is_allowed(__u32 protocol, __u16 lport, __u16 dport)
+{
+	ports_bitmap_t *ports = proto_ports_bitmap__lookup(&protocol);
+	if (ports) {
+		if (is_set_bitmap(ports->bitmap, dport) ||
+		    is_set_bitmap(ports->bitmap, lport)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static __inline void delete_socket_info(__u64 conn_key,
@@ -916,8 +937,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	__u64 pre_trace_id = 0;
 	int ret;
 	if (is_socket_info_valid(socket_info_ptr) &&
-	    conn_info->direction == socket_info_ptr->direction &&
-	    conn_info->message_type == socket_info_ptr->msg_type) {
+	    conn_info->direction == socket_info_ptr->direction) {
 		if (trace_info_ptr)
 			pre_trace_id = trace_info_ptr->thread_trace_id;
 		conn_info->keep_data_seq = true; // 同时这里确保捕获数据的序列号保持不变。
@@ -1017,18 +1037,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 {
 	if (conn_info == NULL) {
 		return SUBMIT_INVALID;
-	}
-
-	// ignore non-http protocols that are go tls
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
-		if (conn_info->protocol != PROTO_HTTP1)
-			return SUBMIT_INVALID;
-	}
-
-	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
-		if (conn_info->protocol != PROTO_HTTP1 &&
-		    conn_info->protocol != PROTO_HTTP2)
-			return SUBMIT_INVALID;
 	}
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
@@ -1183,15 +1191,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
-
-	if (conn_info->protocol == PROTO_HTTP1 &&
-	    (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	     extra->source == DATA_SOURCE_OPENSSL_UPROBE))
-		v->data_type = PROTO_TLS_HTTP1;
-
-	if (conn_info->protocol == PROTO_HTTP2 &&
-	    (extra->source == DATA_SOURCE_OPENSSL_UPROBE))
-		v->data_type = PROTO_TLS_HTTP2;
 
 	__u32 *socket_role = socket_role_map__lookup(&conn_key);
 	v->socket_role = socket_role ? *socket_role : 0;

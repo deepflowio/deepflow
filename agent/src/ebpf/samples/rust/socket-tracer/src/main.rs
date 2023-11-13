@@ -180,10 +180,6 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("HTTP1");
         } else if sk_proto_safe(sd) == SOCK_DATA_HTTP2 {
             proto_tag.push_str("HTTP2");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
-            proto_tag.push_str("TLS_HTTP1");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP2 {
-            proto_tag.push_str("TLS_HTTP2");
         } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
             proto_tag.push_str("DNS");
         } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
@@ -204,12 +200,14 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("FASTCGI");
         } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
             proto_tag.push_str("MONGO");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
+            proto_tag.push_str("TLS");
         } else {
             proto_tag.push_str("UNSPEC");
         }
 
         println!("+ --------------------------------- +");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 || sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
+        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
             println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
@@ -349,8 +347,6 @@ fn main() {
     unsafe {
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
@@ -361,6 +357,93 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
+        enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
+
+        set_protocol_ports_bitmap(
+            SOCK_DATA_HTTP1 as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_HTTP2 as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_DUBBO as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_SOFARPC as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_FASTCGI as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MYSQL as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_POSTGRESQL as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_REDIS as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_KAFKA as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MQTT as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_DNS as c_int,
+            CString::new("53".as_bytes()).unwrap().as_c_str().as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_MONGO as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_TLS as c_int,
+            CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
+        );
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,

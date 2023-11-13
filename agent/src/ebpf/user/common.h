@@ -29,6 +29,7 @@
 
 #define __unused __attribute__((__unused__))
 
+#define PORT_NUM_MAX	65536
 #define NS_IN_SEC       1000000000ULL
 #define NS_IN_MSEC      1000000ULL
 #define TIME_TYPE_NAN   1
@@ -281,6 +282,8 @@ int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
 int fetch_container_id(pid_t pid, char *id, int copy_bytes);
 int parse_num_range(const char *config_str, int bytes_count,
 		    bool **mask, int *count);
+int parse_num_range_disorder(const char *config_str,
+			     int bytes_count, bool ** mask);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
