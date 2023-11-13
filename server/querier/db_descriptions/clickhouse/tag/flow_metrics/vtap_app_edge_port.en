@@ -57,7 +57,6 @@ l7_protocol                , Application Protocol          ,
 app_service                , Application Service           ,
 app_instance               , Application Instance          ,
 endpoint                   , Endpoint                      ,
-netns_id                   , Netns ID                      ,
 
 tap                        , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                       , DeepFlow Agent                ,

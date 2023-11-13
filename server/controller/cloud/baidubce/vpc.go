@@ -71,6 +71,6 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 			b.regionLcuuidToResourceNum[retVPC.RegionLcuuid]++
 		}
 	}
-	log.Debug("Get vpcs complete")
+	log.Debug("get vpcs complete")
 	return retVPCs, vpcIdToLcuuid, vpcIdToName, nil
 }

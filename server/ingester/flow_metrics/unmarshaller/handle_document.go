@@ -40,22 +40,22 @@ const (
 func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
 	var info, info1 *grpc.Info
 	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
-		// if the GpId exists but the netnsId does not exist, first obtain the netnsId through the GprocessId table delivered by the Controller
-		if t.GPID != 0 && t.NetnsID == 0 {
-			vtapId, netnsId := platformData.QueryGprocessInfo(t.GPID)
-			if netnsId != 0 && vtapId == uint32(t.VTAPID) {
-				t.NetnsID = netnsId
+		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
+		if t.GPID != 0 && t.PodID == 0 {
+			vtapId, podId := platformData.QueryGprocessInfo(t.GPID)
+			if podId != 0 && vtapId == uint32(t.VTAPID) {
+				t.PodID = podId
 				t.TagSource |= uint8(zerodoc.GpId)
 			}
 		}
 
-		// if netnsId exist, use vtapId + netnsId to match first
-		if t.NetnsID != 0 {
-			info = platformData.QueryNetnsIdInfo(uint32(t.VTAPID), t.NetnsID)
-			t.TagSource |= uint8(zerodoc.NetnsId)
+		// if podId exist, use vtapId + podId to match first
+		if t.PodID != 0 {
+			info = platformData.QueryEpcIDPodInfo(int32(t.VTAPID), t.PodID)
+			t.TagSource |= uint8(zerodoc.PodId)
 		}
 
-		// If vtapId + netnsId cannot be matched, finally use Mac/EpcIP to match resources
+		// If vtapId + podId cannot be matched, finally use Mac/EpcIP to match resources
 		if info == nil {
 			if t.MAC != 0 {
 				t.TagSource |= uint8(zerodoc.Mac)
@@ -75,17 +75,18 @@ func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*gr
 	}
 
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
-		if t.GPID1 != 0 && t.NetnsID1 == 0 {
-			vtapId, netnsId := platformData.QueryGprocessInfo(t.GPID1)
-			if netnsId != 0 && vtapId == uint32(t.VTAPID) {
-				t.NetnsID1 = netnsId
+		if t.GPID1 != 0 && t.PodID1 == 0 {
+			vtapId, podId := platformData.QueryGprocessInfo(t.GPID1)
+			if podId != 0 && vtapId == uint32(t.VTAPID) {
+				t.PodID1 = podId
 				t.TagSource1 |= uint8(zerodoc.GpId)
 			}
+
 		}
 
-		if t.NetnsID1 != 0 {
-			info1 = platformData.QueryNetnsIdInfo(uint32(t.VTAPID), t.NetnsID1)
-			t.TagSource1 |= uint8(zerodoc.NetnsId)
+		if t.PodID1 != 0 {
+			info1 = platformData.QueryEpcIDPodInfo(int32(t.VTAPID), t.PodID1)
+			t.TagSource1 |= uint8(zerodoc.PodId)
 		}
 
 		if info1 == nil {

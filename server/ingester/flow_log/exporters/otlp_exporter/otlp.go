@@ -251,7 +251,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		switch datatype.L7Protocol(l7.L7Protocol) {
 		case datatype.L7_PROTOCOL_DNS:
 			setDNS(&span, spanAttrs, l7)
-		case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+		case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 			setHTTP(&span, spanAttrs, l7)
 		case datatype.L7_PROTOCOL_DUBBO:
 			setDubbo(&span, spanAttrs, resAttrs, l7)

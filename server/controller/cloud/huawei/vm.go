@@ -18,6 +18,7 @@ package huawei
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
@@ -74,6 +75,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: regionLcuuid,
 				VPCLcuuid:    vpcLcuuid,
+				CloudTags:    h.formatVMCloudTags(jVM.Get("tags")),
 			}
 
 			jc, ok := jVM.CheckGet("created")
@@ -103,6 +105,24 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 		}
 	}
 	return vms, vmSGs, vifs, ips, nil
+}
+
+// 华为云云服务器标签规则：
+//
+//	key与value使用“=”连接，如“key=value”。
+//	如果value为空字符串，则仅返回key。
+func (h *HuaWei) formatVMCloudTags(tags *simplejson.Json) map[string]string {
+	resp := make(map[string]string)
+	for i := range tags.MustArray() {
+		jTag := tags.GetIndex(i).MustString()
+		parts := strings.SplitN(jTag, "=", 2)
+		if len(parts) == 2 {
+			resp[parts[0]] = parts[1]
+		} else {
+			resp[jTag] = ""
+		}
+	}
+	return resp
 }
 
 func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, projectID, vmLcuuid string) (vmSGs []model.VMSecurityGroup) {

@@ -51,7 +51,6 @@ l7_protocol                , l7_protocol               , l7_protocol            
 app_service                , app_service               , app_service               , string        ,                      , Application Layer , 111
 app_instance               , app_instance              , app_instance              , string        ,                      , Application Layer , 111
 endpoint                   , endpoint                  , endpoint                  , string        ,                      , Application Layer , 111
-netns_id                   , netns_id                  , netns_id                  , int           ,                      , Application Layer , 111
 
 tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 111
 vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111

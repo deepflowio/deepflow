@@ -78,7 +78,6 @@ app_instance              , app_instance              , app_instance            
 endpoint                  , endpoint                  , endpoint                   , string         ,                       , Service Info      , 111
 process_id                , process_id_0              , process_id_1               , int            ,                       , Service Info      , 111
 process_kname             , process_kname_0           , process_kname_1            , string         ,                       , Service Info      , 111
-netns_id                  , netns_id_0                , netns_id_1                 , int            ,                       , Service Info      , 111
 
 trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info      , 111
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info      , 111

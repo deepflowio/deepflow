@@ -44,6 +44,5 @@ event_type            , Event Type                   ,
 event_desc            , Event Message                ,
 
 app_instance          , Application Instance         ,
-netns_id              , Netns ID                     ,
 vtap                  , DeepFlow Agent               ,
 signal_source         , Signal Source                ,

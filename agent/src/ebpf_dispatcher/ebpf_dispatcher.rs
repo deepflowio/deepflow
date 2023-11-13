@@ -41,7 +41,6 @@ use crate::ebpf::{
 };
 use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
 use crate::integration_collector::Profile;
-use crate::platform::PlatformSynchronizer;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
 use public::{
@@ -281,16 +280,30 @@ static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
-static mut PLATFORM_SYNC: Option<Arc<PlatformSynchronizer>> = None;
+static mut POLICY_GETTER: Option<PolicyGetter> = None;
 static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
 static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
 
 impl EbpfCollector {
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn convert_to_string(ptr: *const u8) -> String {
+        CStr::from_ptr(ptr as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn convert_to_string(ptr: *const u8) -> String {
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+
     extern "C" fn ebpf_l7_callback(sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
+
+            let container_id = Self::convert_to_string((*sd).container_id.as_ptr());
             let event_type = EventType::from((*sd).source);
             if event_type != EventType::OtherEvent {
                 // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
@@ -300,8 +313,8 @@ impl EbpfCollector {
                     return;
                 }
                 let mut event = event.unwrap();
-                if let Some(m) = PLATFORM_SYNC.as_ref() {
-                    event.0.netns_id = m.get_netns_id_by_pid(event.0.pid).unwrap_or_default();
+                if let Some(policy) = POLICY_GETTER.as_ref() {
+                    event.0.pod_id = policy.lookup_pod_id(&container_id);
                 }
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
@@ -314,8 +327,8 @@ impl EbpfCollector {
                 return;
             }
             let mut packet = packet.unwrap();
-            if let Some(m) = PLATFORM_SYNC.as_ref() {
-                packet.netns_id = m.get_netns_id_by_pid(packet.process_id).unwrap_or_default();
+            if let Some(policy) = POLICY_GETTER.as_ref() {
+                packet.pod_id = policy.lookup_pod_id(&container_id);
             }
             if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet)) {
                 warn!("meta packet send ebpf error: {:?}", e);
@@ -323,7 +336,6 @@ impl EbpfCollector {
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
     extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
         unsafe {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
@@ -337,51 +349,8 @@ impl EbpfCollector {
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
-            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            profile.u_stack_id = data.u_stack_id;
-            profile.k_stack_id = data.k_stack_id;
-            profile.cpu = data.cpu;
-            profile.count = data.count;
-            profile.netns_id = data.netns_id;
-            profile.data =
-                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
-                    .to_vec();
-            profile.container_id = CStr::from_ptr(data.container_id.as_ptr() as *const i8)
-                .to_string_lossy()
-                .into_owned();
-
-            if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
-                warn!("ebpf profile send error: {:?}", e);
-            }
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
-        unsafe {
-            if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
-                return;
-            }
-            let time_diff = TIME_DIFF.as_ref().unwrap().load(Ordering::Relaxed);
-            let mut profile = metric::Profile::default();
-            let data = &mut *data;
-            profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
-            profile.timestamp = (data.timestamp as i64 + time_diff) as u64;
-            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
-            profile.stime = (data.stime as i64 + time_diff) as u64;
-            profile.pid = data.pid;
-            profile.tid = data.tid;
-            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const u8)
-                .to_string_lossy()
-                .into_owned();
-            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
-                .to_string_lossy()
-                .into_owned();
+            profile.thread_name = Self::convert_to_string(data.comm.as_ptr());
+            profile.process_name = Self::convert_to_string(data.process_name.as_ptr());
             profile.u_stack_id = data.u_stack_id;
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
@@ -389,7 +358,10 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
-
+            let container_id = Self::convert_to_string(data.container_id.as_ptr());
+            if let Some(policy_getter) = POLICY_GETTER.as_ref() {
+                profile.pod_id = policy_getter.lookup_pod_id(&container_id);
+            }
             if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
                 warn!("ebpf profile send error: {:?}", e);
             }
@@ -402,7 +374,7 @@ impl EbpfCollector {
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
-        platform_sync: Arc<PlatformSynchronizer>,
+        policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         // ebpf内核模块初始化
@@ -572,7 +544,7 @@ impl EbpfCollector {
             SENDER = Some(sender);
             PROC_EVENT_SENDER = Some(proc_event_sender);
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
-            PLATFORM_SYNC = Some(platform_sync);
+            POLICY_GETTER = Some(policy_getter);
             ON_CPU_PROFILE_FREQUENCY = config.ebpf.on_cpu_profile.frequency as u32;
             TIME_DIFF = Some(time_diff);
         }
@@ -650,7 +622,6 @@ impl EbpfCollector {
         ebpf_profile_sender: DebugSender<Profile>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
-        platform_sync: Arc<PlatformSynchronizer>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -667,7 +638,7 @@ impl EbpfCollector {
             proc_event_output,
             ebpf_profile_sender,
             ebpf_config.l7_protocol_enabled_bitmap,
-            platform_sync,
+            policy_getter,
             time_diff.clone(),
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);

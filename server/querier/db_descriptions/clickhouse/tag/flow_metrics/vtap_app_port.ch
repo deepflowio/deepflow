@@ -51,7 +51,6 @@ l7_protocol                , 应用协议                   ,
 app_service                , 应用服务                   ,
 app_instance               , 应用实例                   ,
 endpoint                   , 端点                       ,
-netns_id                   , Netns ID                   ,
 
 tap                        , 采集点                     ,
 vtap                       , 采集器                     ,

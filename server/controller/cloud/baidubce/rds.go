@@ -25,10 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
-func (b *BaiduBce) getRDSInstances(
-	region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string,
-	zoneNameToAZLcuuid map[string]string,
-) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
+func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
 	var retRDSInstances []model.RDSInstance
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP

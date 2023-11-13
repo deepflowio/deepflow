@@ -80,12 +80,7 @@ impl MirrorModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(
-        &self,
-        _: &Vec<Link>,
-        _: IfMacSource,
-        trident_type: TridentType,
-    ) {
+    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, trident_type: TridentType) {
         let mut old_trident_type = self.trident_type.lock().unwrap();
         *old_trident_type = trident_type;
         self.base

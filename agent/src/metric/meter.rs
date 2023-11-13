@@ -545,6 +545,7 @@ impl UsageMeter {
         self.packet_tx += other.packet_tx;
         self.packet_rx += other.packet_rx;
         self.byte_tx += other.byte_tx;
+        self.byte_rx += other.byte_rx;
         self.l3_byte_rx += other.l3_byte_rx;
         self.l3_byte_tx += other.l3_byte_tx;
         self.l4_byte_rx += other.l4_byte_rx;

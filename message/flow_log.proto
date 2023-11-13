@@ -128,12 +128,12 @@ message TCPPerfStats {
     uint32 art_max = 4;
 
     uint32 rtt = 5;
-    uint32 rtt_client_sum = 6;
-    uint32 rtt_server_sum = 7;
+    uint32 rtt_client_sum = 6; // TODO: deprecated in v6.4.1: uint32 rtt_client_sum = 6;
+    uint32 rtt_server_sum = 7; // TODO: deprecated in v6.4.1: uint32 rtt_client_sum = 7;
     uint32 srt_sum = 8;
     uint32 art_sum = 9;
-    uint32 rtt_client_count = 10;
-    uint32 rtt_server_count = 11;
+    uint32 rtt_client_count = 10; // TODO: deprecated in v6.4.1: uint32 rtt_client_count = 10;
+    uint32 rtt_server_count = 11; // TODO: deprecated in v6.4.1: uint32 rtt_client_count = 11;
     uint32 srt_count = 12;
     uint32 art_count = 13;
 

@@ -42,7 +42,7 @@ pub struct MiniFlow {
 
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
-    pub netns_id: u32,
+    pub pod_id: u32,
 }
 
 impl From<&Flow> for MiniFlow {
@@ -60,7 +60,7 @@ impl From<&Flow> for MiniFlow {
 
             otel_service: flow.otel_service.clone(),
             otel_instance: flow.otel_instance.clone(),
-            netns_id: flow.netns_id,
+            pod_id: flow.pod_id,
         }
     }
 }

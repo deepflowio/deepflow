@@ -49,7 +49,7 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::endpoint::EPC_FROM_INTERNET;
 use crate::common::policy::Acl;
-use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
+use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::RuntimeConfig;
@@ -90,6 +90,7 @@ pub struct StaticConfig {
     pub kubernetes_cluster_name: Option<String>,
 
     pub override_os_hostname: Option<String>,
+    pub agent_unique_identifier: crate::config::AgentIdType,
 }
 
 const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
@@ -114,6 +115,7 @@ impl Default for StaticConfig {
             kubernetes_cluster_id: Default::default(),
             kubernetes_cluster_name: Default::default(),
             override_os_hostname: None,
+            agent_unique_identifier: Default::default(),
         }
     }
 }
@@ -265,7 +267,6 @@ impl Status {
                         warn!("{:?}: {}", item, result.unwrap_err());
                     }
                 }
-
                 self.update_platform_data(version, interfaces, peers, cidrs);
             } else {
                 error!("Invalid platform data.");
@@ -459,6 +460,7 @@ impl Synchronizer {
         kubernetes_cluster_id: String,
         kubernetes_cluster_name: Option<String>,
         override_os_hostname: Option<String>,
+        agent_unique_identifier: crate::config::AgentIdType,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
@@ -476,6 +478,7 @@ impl Synchronizer {
                 kubernetes_cluster_id,
                 kubernetes_cluster_name,
                 override_os_hostname,
+                agent_unique_identifier,
             }),
             agent_id: Arc::new(RwLock::new(agent_id)),
             trident_state,
@@ -596,6 +599,9 @@ impl Synchronizer {
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
+            agent_unique_identifier: Some(tp::AgentIdentifier::from(
+                static_config.agent_unique_identifier,
+            ) as i32),
 
             ..Default::default()
         }
@@ -630,6 +636,14 @@ impl Synchronizer {
             }
             _ => (),
         }
+    }
+
+    fn parse_containers(resp: &tp::SyncResponse) -> Vec<Arc<Container>> {
+        let mut containers = vec![];
+        for item in &resp.containers {
+            containers.push(Arc::new(Container::from(item)));
+        }
+        return containers;
     }
 
     fn parse_segment(
@@ -737,6 +751,10 @@ impl Synchronizer {
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
+        let containers = Self::parse_containers(&resp);
+        for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+            listener.containers_change(&containers);
+        }
         let (_, macs, gateway_vmac_addrs) = Self::parse_segment(runtime_config.tap_mode, &resp);
 
         let mut status_guard = status.write();

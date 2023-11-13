@@ -1631,7 +1631,7 @@ impl FlowMap {
         };
 
         if meta_packet.signal_source == SignalSource::EBPF {
-            node.tagged_flow.flow.netns_id = meta_packet.netns_id;
+            node.tagged_flow.flow.pod_id = meta_packet.pod_id;
             if node.meta_flow_log.is_some() && node.meta_flow_log.as_ref().unwrap().server_port == 0
             {
                 // For ebpf data, if server_port is 0, it means that parsed data failed,

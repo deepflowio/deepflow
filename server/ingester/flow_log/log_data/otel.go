@@ -280,33 +280,19 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	}
 
 	if len(h.L7ProtocolStr) > 0 {
-		if strings.Contains(strings.ToLower(h.L7ProtocolStr), "http") {
-			if strings.HasPrefix(h.Version, "2") {
-				if strings.Contains(strings.ToLower(h.L7ProtocolStr), "https") {
-					h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2_TLS)
-				} else {
-					h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
-				}
-			} else {
-				if strings.Contains(strings.ToLower(h.L7ProtocolStr), "https") {
-					h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_1_TLS)
-				} else {
-					h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_1)
-				}
-			}
-		} else {
-			for l7ProtocolStr, l7Protocol := range datatype.L7ProtocolStringMap {
-				if strings.Contains(strings.ToLower(l7ProtocolStr), strings.ToLower(h.L7ProtocolStr)) {
-					h.L7Protocol = uint8(l7Protocol)
-					break
-				}
+		l7ProtocolStrLower := strings.ToLower(h.L7ProtocolStr)
+		if strings.Contains(l7ProtocolStrLower, "https") {
+			h.IsTLS = 1
+		}
+		for l7ProtocolStr, l7Protocol := range datatype.L7ProtocolStringMap {
+			if strings.Contains(strings.ToLower(l7ProtocolStr), l7ProtocolStrLower) {
+				h.L7Protocol = uint8(l7Protocol)
+				break
 			}
 		}
-	}
-
-	// Unrecognized protocols in OTEL are set to Other protocol
-	if h.L7Protocol == uint8(datatype.L7_PROTOCOL_UNKNOWN) {
-		h.L7Protocol = uint8(datatype.L7_PROTOCOL_OTHER)
+		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) && strings.HasPrefix(h.Version, "2") {
+			h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
+		}
 	}
 
 	h.AttributeNames = attributeNames

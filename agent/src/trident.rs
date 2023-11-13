@@ -490,6 +490,7 @@ impl Trident {
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
             config_handler.static_config.override_os_hostname.clone(),
+            config_handler.static_config.agent_unique_identifier,
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
@@ -1794,13 +1795,6 @@ impl AgentComponents {
                 netns::NsFile::Root,
             ));
         }
-        if src_interfaces_and_namespaces.is_empty() {
-            src_interfaces_and_namespaces.push((
-                "".into(),
-                #[cfg(target_os = "linux")]
-                netns::NsFile::Root,
-            ));
-        }
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
             let re = regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
@@ -1808,6 +1802,23 @@ impl AgentComponents {
             nss.sort_unstable();
             for ns in nss {
                 src_interfaces_and_namespaces.push(("".into(), ns));
+            }
+        }
+        if src_interfaces_and_namespaces.is_empty() {
+            #[cfg(target_os = "linux")]
+            let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local {
+                yaml_config.local_dispatcher_count
+            } else {
+                1
+            };
+            #[cfg(any(target_os = "windows", target_os = "android"))]
+            let local_dispatcher_count = 1;
+            for _ in 0..local_dispatcher_count {
+                src_interfaces_and_namespaces.push((
+                    "".into(),
+                    #[cfg(target_os = "linux")]
+                    netns::NsFile::Root,
+                ));
             }
         }
 
@@ -1833,6 +1844,7 @@ impl AgentComponents {
             false,
         );
 
+        let local_dispatcher_count = src_interfaces_and_namespaces.len();
         for (i, entry) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let src_interface = entry.0;
             #[cfg(target_os = "linux")]
@@ -2018,6 +2030,7 @@ impl AgentComponents {
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
                 .pcap_interfaces(pcap_interfaces)
+                .local_dispatcher_count(local_dispatcher_count)
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );
@@ -2220,7 +2233,6 @@ impl AgentComponents {
                 profile_sender.clone(),
                 &queue_debugger,
                 stats_collector.clone(),
-                platform_synchronizer.clone(),
             ) {
                 Ok(collector) => {
                     synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));

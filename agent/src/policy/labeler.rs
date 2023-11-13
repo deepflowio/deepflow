@@ -28,7 +28,7 @@ use crate::common::decapsulate::TunnelInfo;
 use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::{IfType, PlatformData};
-use crate::common::policy::{Cidr, CidrType, PeerConnection};
+use crate::common::policy::{Cidr, CidrType, Container, PeerConnection};
 use public::utils::net::is_unicast_link_local;
 
 const BROADCAST_MAC: u64 = 0xffffffffffff;
@@ -90,6 +90,8 @@ pub struct Labeler {
     epc_cidr_masklen_table: RwLock<AHashMap<i32, (u8, u8)>>,
     epc_cidr_table: RwLock<AHashMap<EpcNetIpKey, Arc<Cidr>>>,
     tunnel_cidr_table: RwLock<AHashMap<u32, Vec<Arc<Cidr>>>>,
+    // Container
+    container_table: RwLock<AHashMap<String, u32>>,
 }
 
 impl Default for Labeler {
@@ -104,6 +106,7 @@ impl Default for Labeler {
             epc_cidr_masklen_table: RwLock::new(AHashMap::new()),
             epc_cidr_table: RwLock::new(AHashMap::new()),
             tunnel_cidr_table: RwLock::new(AHashMap::new()),
+            container_table: RwLock::new(AHashMap::new()),
         }
     }
 }
@@ -313,6 +316,22 @@ impl Labeler {
         *self.epc_cidr_table.write().unwrap() = epc_table;
     }
 
+    pub fn update_container(&mut self, containers: &Vec<Arc<Container>>) {
+        let mut table = AHashMap::new();
+        for item in containers {
+            table.insert(item.container_id.clone(), item.pod_id);
+        }
+        *self.container_table.write().unwrap() = table;
+    }
+
+    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+        if let Some(pod_id) = self.container_table.read().unwrap().get(container_id) {
+            return *pod_id;
+        }
+
+        0
+    }
+
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记
     // 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
     fn set_epc_by_cidr(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) -> bool {
@@ -472,6 +491,7 @@ impl Labeler {
         l2_end: bool,
         l3_end: bool,
         tunnel_id: u32,
+        is_loopback: bool,
     ) -> (EndpointInfo, bool) {
         let mut is_wan = false;
         let mut info: EndpointInfo = EndpointInfo {
@@ -481,7 +501,7 @@ impl Labeler {
         };
 
         // The loopback packet epc id is local epc id, and no query is required.
-        if ip.is_loopback() {
+        if is_loopback {
             info.set_loopback(self.local_epc.load(Ordering::Relaxed));
             return (info, false);
         }
@@ -659,6 +679,7 @@ impl Labeler {
     }
 
     pub fn get_endpoint_data(&self, key: &LookupKey) -> EndpointData {
+        let is_loopback = key.src_mac == key.dst_mac;
         // l2: mac查询
         // l3: l2epc+ip查询
         let (src_info, mut is_src_wan) = self.get_endpoint_info(
@@ -667,6 +688,7 @@ impl Labeler {
             key.l2_end_0,
             key.l3_end_0,
             key.tunnel_id,
+            is_loopback,
         );
         let (dst_info, mut is_dst_wan) = self.get_endpoint_info(
             u64::from(key.dst_mac),
@@ -674,6 +696,7 @@ impl Labeler {
             key.l2_end_1,
             key.l3_end_1,
             key.tunnel_id,
+            is_loopback,
         );
         let mut endpoint = EndpointData::new(src_info, dst_info);
         // l3: 私有网络 VPC内部路由

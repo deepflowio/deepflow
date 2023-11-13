@@ -529,16 +529,29 @@ impl HttpEndpointTrie {
     pub fn find_matching_rule(&self, input: &str) -> usize {
         const DEFAULT_KEEP_SEGMENTS: usize = 2;
         let mut node = &self.root;
-        let mut keep_segments = DEFAULT_KEEP_SEGMENTS;
+        let mut keep_segments = if node.keep_segments.is_some() {
+            node.keep_segments.unwrap()
+        } else {
+            DEFAULT_KEEP_SEGMENTS
+        };
+        let has_rules = node.keep_segments.is_some() || !node.children.is_empty();
+        let mut matched = node.keep_segments.is_some() && node.children.is_empty(); // if it has a rule, and the prefix is "", any path is matched
         for c in input.chars() {
             if let Some(child) = node.children.get(&c) {
                 keep_segments = child.keep_segments.unwrap_or(keep_segments);
+                if !matched {
+                    matched = child.keep_segments.is_some(); // if the child is a leaf, then matched
+                }
                 node = child.as_ref();
             } else {
                 break;
             }
         }
-        keep_segments
+        if !matched && has_rules {
+            0
+        } else {
+            keep_segments
+        }
     }
 }
 

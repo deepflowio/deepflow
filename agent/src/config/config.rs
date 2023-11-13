@@ -73,6 +73,38 @@ pub enum ConfigError {
     YamlConfigInvalid(String),
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum AgentIdType {
+    #[default]
+    IpMac,
+    Ip,
+}
+
+impl<'de> Deserialize<'de> for AgentIdType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "ip-and-mac" | "ip_and_mac" => Ok(Self::IpMac),
+            "ip" => Ok(Self::Ip),
+            other => Err(de::Error::invalid_value(
+                Unexpected::Str(other),
+                &"ip|ip-and-mac|ip_and_mac",
+            )),
+        }
+    }
+}
+
+impl From<AgentIdType> for trident::AgentIdentifier {
+    fn from(t: AgentIdType) -> Self {
+        match t {
+            AgentIdType::IpMac => trident::AgentIdentifier::IpAndMac,
+            AgentIdType::Ip => trident::AgentIdentifier::Ip,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct Config {
@@ -89,6 +121,7 @@ pub struct Config {
     pub agent_mode: RunningMode,
     pub override_os_hostname: Option<String>,
     pub async_worker_thread_number: u16,
+    pub agent_unique_identifier: AgentIdType,
 }
 
 impl Config {
@@ -244,6 +277,7 @@ impl Default for Config {
             agent_mode: Default::default(),
             override_os_hostname: None,
             async_worker_thread_number: 16,
+            agent_unique_identifier: Default::default(),
         }
     }
 }
@@ -424,6 +458,7 @@ pub struct YamlConfig {
     pub enable_qos_bypass: bool,
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
+    pub local_dispatcher_count: usize,
     pub src_interfaces: Vec<String>,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
@@ -740,6 +775,9 @@ impl YamlConfig {
         if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
             c.process_scheduling_priority = 0;
         }
+        if c.local_dispatcher_count == 0 {
+            c.local_dispatcher_count = 1;
+        }
 
         Ok(c)
     }
@@ -859,7 +897,7 @@ impl Default for YamlConfig {
                 .to_string(),
 
             log_file: DEFAULT_LOG_FILE.into(),
-            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
+            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53,5353"))]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
             os_proc_root: "/proc".into(),
@@ -893,6 +931,7 @@ impl Default for YamlConfig {
             ntp_max_interval: Duration::from_secs(300),
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
+            local_dispatcher_count: 1,
         }
     }
 }

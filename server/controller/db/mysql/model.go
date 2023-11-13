@@ -450,13 +450,14 @@ func (NpbPolicy) TableName() string {
 
 // NpbTunnel [...]
 type NpbTunnel struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:char(64);not null" json:"NAME"`
-	IP        string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Type      int       `gorm:"column:type;type:int;default:null" json:"TYPE"` // (0-VXLAN；1-ERSPAN)
-	CreatedAt time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
-	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
-	Lcuuid    string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string    `gorm:"column:name;type:char(64);not null" json:"NAME"`
+	IP           string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	Type         int       `gorm:"column:type;type:int;default:null" json:"TYPE"`                         // (0-VXLAN；1-ERSPAN)
+	VNIInputType int       `gorm:"column:vni_input_type;type:tinyint(1);default:1" json:"VNI_INPUT_TYPE"` // 1: entire one, 2: two parts
+	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 }
 
 func (NpbTunnel) TableName() string {

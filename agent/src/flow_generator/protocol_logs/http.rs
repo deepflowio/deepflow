@@ -230,10 +230,10 @@ impl HttpInfo {
                 if self.method.is_empty() {
                     self.method = other.method;
                 }
-                if self.user_agent.is_some() {
+                if self.user_agent.is_none() {
                     self.user_agent = other.user_agent;
                 }
-                if self.referer.is_some() {
+                if self.referer.is_none() {
                     self.referer = other.referer;
                 }
                 if self.endpoint.is_none() {
@@ -1308,15 +1308,32 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
 
 pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
     let keep_segments = config.http_endpoint_trie.find_matching_rule(path);
+    if keep_segments <= 0 {
+        return "".to_string();
+    }
     let output = path.split('?').next().unwrap();
-    let cleaned_output = output
-        .split('/')
-        .filter(|&s| !s.is_empty() && s != ".")
-        .collect::<Vec<&str>>();
-    format!(
-        "/{}",
-        cleaned_output[..keep_segments.min(cleaned_output.len())].join("/")
-    )
+    let cleaned_output = output.split('/').collect::<Vec<&str>>();
+    let mut start = 0;
+    let mut end = 0;
+    let mut k = 0;
+    // if endpoint start with '/', remove excess '/'
+    if let Some(f) = cleaned_output.get(start) {
+        if f.is_empty() {
+            start += 1;
+            end += 1;
+        }
+    }
+    for (i, segment) in cleaned_output.iter().enumerate() {
+        if k >= keep_segments {
+            break;
+        }
+        if segment.is_empty() || segment.eq(&".") {
+            continue;
+        }
+        k += 1;
+        end = i + 1;
+    }
+    format!("/{}", cleaned_output[start..end].join("/"))
 }
 
 #[cfg(test)]
@@ -1683,6 +1700,9 @@ mod tests {
         let path = String::from("");
         let expected_output = "/"; // take "/" for an empty string
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+        let path = String::from("api/v1/users");
+        let expected_output = "/api/v1";
+        assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let path = String::from("/api/v1/users/123");
         let expected_output = "/api/v1"; // the default value is 2 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
@@ -1690,7 +1710,7 @@ mod tests {
         let expected_output = "/api/v1"; // without parameters
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let path = String::from("///././/api/v1//.//./users/123?query=456");
-        let expected_output = "/api/v1"; // appear continuous "/" or appear "."
+        let expected_output = "///././/api/v1"; // appear continuous "/" or appear "."
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
             disabled: false,
@@ -1704,7 +1724,7 @@ mod tests {
         let expected_output = "/api"; // prefixes match, take 1 segment
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let path = String::from("/app/v1/users/123?query=456");
-        let expected_output = "/app/v1"; // prefixes do not match, default is 2 segments
+        let expected_output = ""; // prefixes do not match, endpoint is ""
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
             disabled: false,
@@ -1723,7 +1743,7 @@ mod tests {
         let path = String::from("/api/v1/users/123?query=456");
         let expected_output = "/api/v1/users/123"; // longest prefix match: /api/v1/users, take 4 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
-        let path = String::from("/api/v1/users/123?query=456");
+        let path = String::from("/api/v1/users?query=456");
         let expected_output = "/api/v1/users"; // the longest prefix matches: /api/v1/users, but there are only 3 segments in path
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
         let path = String::from("/api/v1/123?query=456");

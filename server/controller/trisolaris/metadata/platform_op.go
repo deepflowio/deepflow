@@ -384,14 +384,17 @@ func (p *PlatformDataOP) generateCIDRs() {
 }
 
 func (p *PlatformDataOP) generateGProcessInfo() {
+	rawData := p.GetRawData()
 	dbDataCache := p.metaData.GetDBDataCache()
 	processes := dbDataCache.GetProcesses()
 	gprocessData := newGProcessInfoProto(len(processes))
 	for _, process := range processes {
+		podId := rawData.containerIdToPodId[process.ContainerID]
 		p := &trident.GProcessInfo{
 			GprocessId: proto.Uint32(uint32(process.ID)),
-			NetnsId:    proto.Uint32(process.NetnsID),
 			VtapId:     proto.Uint32(uint32(process.VTapID)),
+			PodId:      proto.Uint32(uint32(podId)),
+			Pid:        proto.Uint32(uint32(process.PID)),
 		}
 		gprocessData.gprocessInfo = append(gprocessData.gprocessInfo, p)
 	}

@@ -456,12 +456,8 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
             srt_max: p.srt_max,
             art_max: p.art_max,
             rtt: p.rtt,
-            rtt_client_sum: p.rtt_client_sum,
-            rtt_server_sum: p.rtt_server_sum,
             srt_sum: p.srt_sum,
             art_sum: p.art_sum,
-            rtt_client_count: p.rtt_client_count,
-            rtt_server_count: p.rtt_server_count,
             srt_count: p.srt_count,
             art_count: p.art_count,
             counts_peer_tx: Some(p.counts_peers[0].into()),
@@ -472,6 +468,7 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
             cit_max: p.cit_max,
             syn_count: p.syn_count,
             synack_count: p.synack_count,
+            ..Default::default()
         }
     }
 }
@@ -941,7 +938,7 @@ pub struct Flow {
     #[serde(skip)]
     pub last_endpoint: Option<String>,
     pub direction_score: u8,
-    pub netns_id: u32,
+    pub pod_id: u32,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
