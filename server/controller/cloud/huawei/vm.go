@@ -38,9 +38,11 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 	var vifs []model.VInterface
 	var ips []model.IP
 	for project, token := range h.projectTokenMap {
-		jVMs, err := h.getRawData(
-			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers",
-		)
+		// 华为云官方文档：
+		// 云服务器的标签列表。微版本2.26及以上版本支持，如果不使用微版本查询，响应中无tags字段。
+		jVMs, err := h.getRawData(newRawDataGetContext(
+			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers", true,
+		).addHeader("X-OpenStack-Nova-API-Version", "2.26"))
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -107,6 +109,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 	return vms, vmSGs, vifs, ips, nil
 }
 
+// 华为云官方文档：
 // 华为云云服务器标签规则：
 //
 //	key与value使用“=”连接，如“key=value”。

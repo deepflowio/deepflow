@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package common // TODO remove
+package huawei
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ import (
 	"github.com/bitly/go-simplejson"
 )
 
-func GetUnverifyHTTPClient(timeout time.Duration) *http.Client {
+func getUnverifiedHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
@@ -42,7 +42,7 @@ func newErr(url, msg string) error {
 	return errors.New(fmt.Sprintf("request url: %s, %s", url, msg))
 }
 
-func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.Json, err error) {
+func RequestGet(url, token string, timeout time.Duration, header map[string]string) (jsonResp *simplejson.Json, err error) {
 	log.Debugf("url: %s", url)
 	log.Debugf("token: %s", token)
 	req, err := http.NewRequest("GET", url, nil)
@@ -54,9 +54,11 @@ func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("Accept", "application/json, text/plain")
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
 
-	// TODO: 通过配置文件获取API超时时间
-	client := GetUnverifyHTTPClient(time.Second * timeout)
+	client := getUnverifiedHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))
@@ -97,8 +99,7 @@ func RequestPost(url string, timeout time.Duration, body map[string]interface{})
 	}
 	req.Header.Set("content-type", "application/json")
 
-	// TODO: 通过配置文件获取API超时时间
-	client := GetUnverifyHTTPClient(time.Second * timeout)
+	client := getUnverifiedHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		err = newErr(url, fmt.Sprintf("failed: %s", err.Error()))

@@ -27,9 +27,9 @@ import (
 func (h *HuaWei) getAZs() ([]model.AZ, error) {
 	var azs []model.AZ
 	for project, token := range h.projectTokenMap {
-		jAZs, err := h.getRawData(
-			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/os-availability-zone", project.name, h.config.Domain, project.id), token.token, "availabilityZoneInfo",
-		)
+		jAZs, err := h.getRawData(newRawDataGetContext(
+			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/os-availability-zone", project.name, h.config.Domain, project.id), token.token, "availabilityZoneInfo", false,
+		))
 		if err != nil {
 			return nil, err
 		}
