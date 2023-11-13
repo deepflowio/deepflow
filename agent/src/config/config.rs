@@ -897,7 +897,7 @@ impl Default for YamlConfig {
                 .to_string(),
 
             log_file: DEFAULT_LOG_FILE.into(),
-            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
+            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53,5353"))]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
             os_proc_root: "/proc".into(),
