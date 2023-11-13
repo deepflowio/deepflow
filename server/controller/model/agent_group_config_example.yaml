@@ -962,6 +962,8 @@ vtap_group_id: g-xxxxxx
   ## Default: 53 for DNS, 443 for TLS, 1-65535 for other Protocols.
   ## Format: map<protocol-name, port-list>
   ## Example: "HTTP": 80,1000-2000
+  ## Note: HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
+  ##   All data obtained through Uprobe is not subject to port restrictions.
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
