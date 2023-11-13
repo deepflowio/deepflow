@@ -115,6 +115,24 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
 			filter = fmt.Sprintf("(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
+
+		} else if slices.Contains[string](tag.TAG_RESOURCE_TYPE_DEFAULT, resourceNoSuffix) ||
+			resourceNoSuffix == "host" || resourceNoSuffix == "service" {
+			filter = strings.Join([]string{resourceNoSuffix, "_id", suffix, "!=0"}, "")
+
+		} else if resourceNoSuffix == "l3_epc" {
+			filter = strings.Join([]string{"l3_epc_id", suffix, "!=-2"}, "")
+
+		} else if resourceNoSuffix == "l2_epc" {
+			filter = strings.Join([]string{"epc_id", suffix, "!=-2"}, "")
+
+		} else if slices.Contains[string](tag.TAG_RESOURCE_TYPE_AUTO, resourceNoSuffix) {
+			if slices.Contains[string]([]string{"resource_gl0", "auto_instance"}, resourceNoSuffix) {
+
+				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (101,102)"}, "")
+			} else {
+				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
+			}
 		}
 	}
 	return
