@@ -1119,4 +1119,9 @@ void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
 	fetch_container_id(pid, id, id_size);
 }
 
+int create_and_init_proc_info_caches(void)
+{
+	return 0;
+}
+
 #endif /* AARCH64_MUSL */
