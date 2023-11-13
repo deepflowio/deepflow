@@ -469,27 +469,24 @@ type Metrics struct {
 	L7Response    uint32 `json:"l7_response,omitempty"`
 	L7ParseFailed uint32 `json:"l7_parse_failed,omitempty"`
 
-	RTT          uint32 `json:"rtt,omitempty"` // us
-	RTTClientSum uint32 `json:"rtt_client_sum,omitempty"`
-	RTTServerSum uint32 `json:"rtt_server_sum,omitempty"`
-	SRTSum       uint32 `json:"srt_sum,omitempty"`
-	ARTSum       uint32 `json:"art_sum,omitempty"`
-	RRTSum       uint64 `json:"rrt_sum,omitempty"`
-	CITSum       uint32 `json:"cit_sum,omitempty"`
+	RTT       uint32 `json:"rtt,omitempty"`        // us
+	RTTClient uint32 `json:"rtt_client,omitempty"` // us
+	RTTServer uint32 `json:"rtt_server,omitempty"` // us
 
-	RTTClientCount uint32 `json:"rtt_client_count,omitempty"`
-	RTTServerCount uint32 `json:"rtt_server_count,omitempty"`
-	SRTCount       uint32 `json:"srt_count,omitempty"`
-	ARTCount       uint32 `json:"art_count,omitempty"`
-	RRTCount       uint32 `json:"rrt_count,omitempty"`
-	CITCount       uint32 `json:"cit_count,omitempty"`
+	SRTSum uint32 `json:"srt_sum,omitempty"`
+	ARTSum uint32 `json:"art_sum,omitempty"`
+	RRTSum uint64 `json:"rrt_sum,omitempty"`
+	CITSum uint32 `json:"cit_sum,omitempty"`
 
-	RTTClientMax uint32 `json:"rtt_client_max,omitempty"` // us
-	RTTServerMax uint32 `json:"rtt_server_max,omitempty"` // us
-	SRTMax       uint32 `json:"srt_max,omitempty"`        // us
-	ARTMax       uint32 `json:"art_max,omitempty"`        // us
-	RRTMax       uint32 `json:"rrt_max,omitempty"`        // us
-	CITMax       uint32 `json:"cit_max,omitempty"`        // us
+	SRTCount uint32 `json:"srt_count,omitempty"`
+	ARTCount uint32 `json:"art_count,omitempty"`
+	RRTCount uint32 `json:"rrt_count,omitempty"`
+	CITCount uint32 `json:"cit_count,omitempty"`
+
+	SRTMax uint32 `json:"srt_max,omitempty"` // us
+	ARTMax uint32 `json:"art_max,omitempty"` // us
+	RRTMax uint32 `json:"rrt_max,omitempty"` // us
+	CITMax uint32 `json:"cit_max,omitempty"` // us
 
 	RetransTx       uint32 `json:"retrans_tx,omitempty"`
 	RetransRx       uint32 `json:"retrans_rx,omitempty"`
@@ -524,22 +521,19 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_parse_failed", ckdb.UInt32),
 
 	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
-	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
-	ckdb.NewColumn("rtt_server_sum", ckdb.Float64),
+	ckdb.NewColumn("rtt_client", ckdb.Float64).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rtt_server", ckdb.Float64).SetComment("单位: 微秒"),
+
 	ckdb.NewColumn("srt_sum", ckdb.Float64),
 	ckdb.NewColumn("art_sum", ckdb.Float64),
 	ckdb.NewColumn("rrt_sum", ckdb.Float64),
 	ckdb.NewColumn("cit_sum", ckdb.Float64),
 
-	ckdb.NewColumn("rtt_client_count", ckdb.UInt64),
-	ckdb.NewColumn("rtt_server_count", ckdb.UInt64),
 	ckdb.NewColumn("srt_count", ckdb.UInt64),
 	ckdb.NewColumn("art_count", ckdb.UInt64),
 	ckdb.NewColumn("rrt_count", ckdb.UInt64),
 	ckdb.NewColumn("cit_count", ckdb.UInt64),
 
-	ckdb.NewColumn("rtt_client_max", ckdb.UInt32).SetComment("单位: 微秒"),
-	ckdb.NewColumn("rtt_server_max", ckdb.UInt32).SetComment("单位: 微秒"),
 	ckdb.NewColumn("srt_max", ckdb.UInt32).SetComment("单位: 微秒"),
 	ckdb.NewColumn("art_max", ckdb.UInt32).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetComment("单位: 微秒"),
@@ -578,22 +572,19 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) {
 		m.L7ParseFailed,
 
 		float64(m.RTT),
-		float64(m.RTTClientSum),
-		float64(m.RTTServerSum),
+		float64(m.RTTClient),
+		float64(m.RTTServer),
+
 		float64(m.SRTSum),
 		float64(m.ARTSum),
 		float64(m.RRTSum),
 		float64(m.CITSum),
 
-		uint64(m.RTTClientCount),
-		uint64(m.RTTServerCount),
 		uint64(m.SRTCount),
 		uint64(m.ARTCount),
 		uint64(m.RRTCount),
 		uint64(m.CITCount),
 
-		m.RTTClientMax,
-		m.RTTServerMax,
 		m.SRTMax,
 		m.ARTMax,
 		m.RRTMax,
@@ -903,11 +894,8 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.L7ParseFailed = p.L7FailedCount
 
 		m.RTT = p.Tcp.Rtt
-		m.RTTClientSum = p.Tcp.RttClientSum
-		m.RTTClientCount = p.Tcp.RttClientCount
-
-		m.RTTServerSum = p.Tcp.RttServerSum
-		m.RTTServerCount = p.Tcp.RttServerCount
+		m.RTTClient = p.Tcp.RttClientMax
+		m.RTTServer = p.Tcp.RttServerMax
 
 		m.SRTSum = p.Tcp.SrtSum
 		m.SRTCount = p.Tcp.SrtCount
@@ -921,8 +909,6 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.CITSum = p.Tcp.CitSum
 		m.CITCount = p.Tcp.CitCount
 
-		m.RTTClientMax = p.Tcp.RttClientMax
-		m.RTTServerMax = p.Tcp.RttServerMax
 		m.SRTMax = p.Tcp.SrtMax
 		m.ARTMax = p.Tcp.ArtMax
 		m.RRTMax = p.L7.RrtMax
