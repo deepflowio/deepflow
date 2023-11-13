@@ -1725,15 +1725,15 @@ infer_mongo_message(const char *buf, size_t count,
  *       (6) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0x10
  *                                count 126   dir send
  *           (7) (8) together with (6);
- *           (7) is Change Cipher Spec message, content_Type:0x14 (client finish)
+ *           (8) Encrypted Handshake Message (content_type 0x16) (client finish)
  *
  *       client recv:
  *       ------------
- *       (9)  curl-29772 ChangeCipherSpec content_type 0x14 version 0x303 handshake_type 0x1
+ *       (9)(droped) curl-29772 ChangeCipherSpec content_type 0x14 version 0x303 handshake_type 0x1
  *                                count 6 dir recv
- *           (9) is Change Cipher Spec message, content_Type:0x14 (server finish)
  *       (10) curl-29772 handshake handshake.content_type 0x16 version 0x303 handshake_type 0x0
  *                                count 45    dir recv
+ *           (10) Encrypted Handshake Message (content_type 0x16) (server finish)
  *
  * server test data:
  *
@@ -1750,13 +1750,13 @@ infer_mongo_message(const char *buf, size_t count,
  *       ------------
  *       (6) openresty-5024 handshake(type 0x16) count 93 version 0x303 handshake_type 0x10
  *           (7),(8) together with (6)
- *           (7) is Change Cipher Spec message, content_Type:0x14 (client finish)
+ *           (7) is Change Cipher Spec message, content_Type:0x14
  *
  *       server send:
  *       ------------
  *       openresty-5024 type 0x16 version 0x303 handshake_type 0x4
  *           (9),(10) are included in this message
- *           (9) is Change Cipher Spec message, content_Type:0x14 (server finish)
+ *           (9) is Change Cipher Spec message, content_Type:0x14
  */
 
 typedef struct __attribute__ ((packed)) {
@@ -1797,7 +1797,7 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
 	}
 
 check:
-	if (!(handshake.content_type == 0x16 || handshake.content_type == 0x14))
+	if (handshake.content_type != 0x16)
 		return MSG_UNKNOWN;
 
 	if (!(handshake.version == 0x301 || handshake.version == 0x303))
