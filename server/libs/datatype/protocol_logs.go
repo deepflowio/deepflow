@@ -138,7 +138,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("VtapId: %v ", i.VtapId)
 	formatted += fmt.Sprintf("TapType: %v ", i.TapType)
 	formatted += fmt.Sprintf("TapPort: %s ", i.TapPort)
-	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String())
+	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String(false))
 	formatted += fmt.Sprintf("MsgType: %s ", i.MsgType.String())
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
 	formatted += fmt.Sprintf("Status: %v ", i.Status)
