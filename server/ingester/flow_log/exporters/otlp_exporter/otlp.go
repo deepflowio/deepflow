@@ -243,7 +243,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	}
 
 	if dataTypeBits&config.APPLICATION_LAYER != 0 {
-		putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String())
+		putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String(l7.IsTLS == 1))
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.name", "deepflow")
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.version", common.CK_VERSION)
 		span.Status().SetCode(responseStatusToSpanStatus(l7.ResponseStatus))
