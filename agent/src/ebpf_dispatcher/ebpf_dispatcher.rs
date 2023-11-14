@@ -498,6 +498,20 @@ impl EbpfCollector {
                 return Err(Error::EbpfInitError);
             }
 
+            for (protocol, port_range) in &config.l7_protocol_ports {
+                let l7_protocol = L7Protocol::from(protocol.clone());
+                #[cfg(target_arch = "x86_64")]
+                let ports = port_range.as_ptr() as *const i8;
+                #[cfg(target_arch = "aarch64")]
+                let ports = port_range.as_ptr();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                    warn!(
+                        "Ebpf set_protocol_ports_bitmap error: {} {}",
+                        protocol, port_range
+                    );
+                }
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -535,20 +549,6 @@ impl EbpfCollector {
 
                 // CPUID will not be included in the aggregation of stack trace data.
                 set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
-            }
-
-            for (protocol, port_range) in &config.l7_protocol_ports {
-                let l7_protocol = L7Protocol::from(protocol.clone());
-                #[cfg(target_arch = "x86_64")]
-                let ports = port_range.as_ptr() as *const i8;
-                #[cfg(target_arch = "aarch64")]
-                let ports = port_range.as_ptr();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
-                    warn!(
-                        "Ebpf set_protocol_ports_bitmap error: {} {}",
-                        protocol, port_range
-                    );
-                }
             }
 
             ebpf::bpf_tracer_finish();
