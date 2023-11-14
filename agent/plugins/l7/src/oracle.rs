@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+pub struct OracleParseConfig {
+    pub is_be: bool,
+    pub int_compress: bool,
+    pub resp_0x04_extra_byte: bool,
+}
+
 #[derive(Default, PartialEq, Debug)]
 pub struct OracleParser {
     pub sql: String,
@@ -31,7 +37,7 @@ impl OracleParser {
         false
     }
 
-    pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+    pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &OracleParseConfig) -> bool {
         unreachable!();
     }
 }

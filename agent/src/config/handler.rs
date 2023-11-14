@@ -41,6 +41,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
+use super::config::OracleParseConfig;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -381,6 +382,8 @@ pub struct FlowConfig {
     pub rrt_udp_timeout: usize, //micro sec
 
     pub batched_buffer_size_limit: usize,
+
+    pub oracle_parse_conf: OracleParseConfig,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -437,6 +440,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
             batched_buffer_size_limit: conf.yaml_config.batched_buffer_size_limit,
+            oracle_parse_conf: conf.yaml_config.oracle_parse_config,
         }
     }
 }
