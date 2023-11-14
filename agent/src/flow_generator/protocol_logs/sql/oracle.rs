@@ -30,7 +30,7 @@ use crate::{
         AppProtoHead, Result,
     },
 };
-use l7::oracle::OracleParser;
+use l7::oracle::{OracleParseConfig, OracleParser};
 use public::l7_protocol::L7Protocol;
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq)]
@@ -153,10 +153,15 @@ impl L7ProtocolParserInterface for OracleLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if !self
-            .parser
-            .parse_payload(payload, param.direction == PacketDirection::ClientToServer)
-        {
+        if !self.parser.parse_payload(
+            payload,
+            param.direction == PacketDirection::ClientToServer,
+            &OracleParseConfig {
+                is_be: param.oracle_parse_conf.is_be,
+                int_compress: param.oracle_parse_conf.int_compress,
+                resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
+            },
+        ) {
             return Err(Error::L7ProtocolUnknown);
         };
 

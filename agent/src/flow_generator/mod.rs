@@ -36,7 +36,7 @@ pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: pa
 pub use protocol_logs::L7ProtoRawDataType;
 pub use protocol_logs::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, HttpLog, KafkaLog,
-    LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog,
+    LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog, TlsLog,
 };
 
 use std::time::Duration;

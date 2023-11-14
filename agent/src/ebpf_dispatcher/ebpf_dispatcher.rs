@@ -37,7 +37,7 @@ use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserA
 use crate::config::FlowAccess;
 use crate::ebpf::{
     self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
-    set_profiler_regex, start_continuous_profiler,
+    set_profiler_regex, set_protocol_ports_bitmap, start_continuous_profiler,
 };
 use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
 use crate::integration_collector::Profile;
@@ -47,6 +47,7 @@ use public::{
     buffer::BatchedBox,
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
+    l7_protocol::L7Protocol,
     proto::{common::TridentType, metric},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
@@ -534,6 +535,20 @@ impl EbpfCollector {
 
                 // CPUID will not be included in the aggregation of stack trace data.
                 set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
+            }
+
+            for (protocol, port_range) in &config.l7_protocol_ports {
+                let l7_protocol = L7Protocol::from(protocol.clone());
+                #[cfg(target_arch = "x86_64")]
+                let ports = port_range.as_ptr() as *const i8;
+                #[cfg(target_arch = "aarch64")]
+                let ports = port_range.as_ptr();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                    warn!(
+                        "Ebpf set_protocol_ports_bitmap error: {} {}",
+                        protocol, port_range
+                    );
+                }
             }
 
             ebpf::bpf_tracer_finish();

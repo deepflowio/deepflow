@@ -25,7 +25,6 @@ use std::{
 
 use public::enums::IpProtocol;
 
-use crate::flow_generator::protocol_logs::{pb_adapter::KeyVal, L7ResponseStatus, LogMessageType};
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -37,6 +36,10 @@ use crate::{
 use crate::{
     common::{flow::PacketDirection, l7_protocol_log::L7ProtocolParserInterface},
     flow_generator::protocol_logs::plugin::shared_obj::SoLog,
+};
+use crate::{
+    config::OracleParseConfig,
+    flow_generator::protocol_logs::{pb_adapter::KeyVal, L7ResponseStatus, LogMessageType},
 };
 
 use super::{load_plugin, SoPluginFunc};
@@ -81,6 +84,7 @@ fn get_req_param<'a>(
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
+        oracle_parse_conf: OracleParseConfig::default(),
     }
 }
 
@@ -116,6 +120,7 @@ fn get_resp_param<'a>(
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
+        oracle_parse_conf: OracleParseConfig::default(),
     }
 }
 

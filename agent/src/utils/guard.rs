@@ -257,7 +257,7 @@ impl Guard {
                         if check_cgroup_result {
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
-                                error!("check cgroups failed, limit cpu or memory without cgroups");
+                                warn!("check cgroups failed, limit cpu or memory without cgroups");
                             }
                         }
                         if !check_cgroup_result {

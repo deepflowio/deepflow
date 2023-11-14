@@ -1338,15 +1338,18 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::{
-        l7_protocol_log::{EbpfParam, L7PerfCache},
-        MetaPacket,
-    };
     use crate::config::{
         handler::LogParserConfig, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
+    use crate::{
+        common::{
+            l7_protocol_log::{EbpfParam, L7PerfCache},
+            MetaPacket,
+        },
+        config::OracleParseConfig,
+    };
 
     use std::cell::RefCell;
     use std::collections::HashSet;
@@ -1507,6 +1510,7 @@ mod tests {
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
+            oracle_parse_conf: OracleParseConfig::default(),
         };
 
         //测试长度不正确
