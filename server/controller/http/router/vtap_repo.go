@@ -49,17 +49,17 @@ func createVtapRepo(c *gin.Context) {
 		RevCount: c.PostForm("REV_COUNT"),
 		CommitID: c.PostForm("COMMIT_ID"),
 		OS:       c.PostForm("OS"),
-		Image:    []byte{},
 	}
 
 	// get file
-	file, _, err := c.Request.FormFile("IMAGE")
+	file, fileHeader, err := c.Request.FormFile("IMAGE")
 	if err != nil {
 		JsonResponse(c, nil, err)
 		return
 	}
 	defer file.Close()
 
+	vtapRepo.Image = make([]byte, fileHeader.Size)
 	_, err = file.Read(vtapRepo.Image)
 	if err != nil {
 		JsonResponse(c, nil, err)
