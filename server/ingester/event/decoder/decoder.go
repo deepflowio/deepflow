@@ -188,7 +188,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	var info *grpc.Info
 	if e.PodId != 0 {
-		info = d.platformData.QueryEpcIDPodInfo(int32(s.VTAPID), e.PodId)
+		info = d.platformData.QueryEpcIDPodInfo(s.L3EpcID, e.PodId)
 	}
 	podGroupType := uint8(0)
 	if info != nil {

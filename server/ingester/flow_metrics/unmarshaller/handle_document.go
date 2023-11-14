@@ -51,7 +51,7 @@ func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*gr
 
 		// if podId exist, use vtapId + podId to match first
 		if t.PodID != 0 {
-			info = platformData.QueryEpcIDPodInfo(int32(t.VTAPID), t.PodID)
+			info = platformData.QueryEpcIDPodInfo(t.L3EpcID, t.PodID)
 			t.TagSource |= uint8(zerodoc.PodId)
 		}
 
@@ -85,7 +85,7 @@ func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*gr
 		}
 
 		if t.PodID1 != 0 {
-			info1 = platformData.QueryEpcIDPodInfo(int32(t.VTAPID), t.PodID1)
+			info1 = platformData.QueryEpcIDPodInfo(t.L3EpcID1, t.PodID1)
 			t.TagSource1 |= uint8(zerodoc.PodId)
 		}
 
