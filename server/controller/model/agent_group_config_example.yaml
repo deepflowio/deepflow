@@ -1002,6 +1002,11 @@ vtap_group_id: g-xxxxxx
         ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
         ## Default: 2
         #keep-segments: 2
+        
+  #oracle-parse-config:
+    #is-be: true
+    #int-compress: true
+    #resp-0x04-extra-byte: false
 
   ########################
   ## L4 Packet Sequence ##

@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
-use public::l7_protocol::DEFAULT_DNS_PORT;
+use public::l7_protocol::{DEFAULT_DNS_PORT, DEFAULT_TLS_PORT};
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -34,7 +34,7 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
-use crate::flow_generator::DnsLog;
+use crate::flow_generator::{DnsLog, TlsLog};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -441,6 +441,14 @@ pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
 }
 
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OracleParseConfig {
+    pub is_be: bool,
+    pub int_compress: bool,
+    pub resp_0x04_extra_byte: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -554,6 +562,7 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
+    pub oracle_parse_config: OracleParseConfig,
 }
 
 impl YamlConfig {
@@ -811,6 +820,13 @@ impl YamlConfig {
             bitmap.set(DEFAULT_DNS_PORT as usize, true).unwrap();
             port_bitmap.push((dns_str.to_string(), bitmap));
         }
+        let tls_str = L7ProtocolParser::Tls(TlsLog::default()).as_str();
+        // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+        if !self.l7_protocol_ports.contains_key(tls_str) {
+            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
+            bitmap.set(DEFAULT_TLS_PORT as usize, true).unwrap();
+            port_bitmap.push((tls_str.to_string(), bitmap));
+        }
         port_bitmap
     }
 }
@@ -897,7 +913,10 @@ impl Default for YamlConfig {
                 .to_string(),
 
             log_file: DEFAULT_LOG_FILE.into(),
-            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53,5353"))]),
+            l7_protocol_ports: HashMap::from([
+                (String::from("DNS"), String::from("53,5353")),
+                (String::from("TLS"), String::from("443")),
+            ]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
             os_proc_root: "/proc".into(),
@@ -932,6 +951,11 @@ impl Default for YamlConfig {
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
             local_dispatcher_count: 1,
+            oracle_parse_config: OracleParseConfig {
+                is_be: true,
+                int_compress: true,
+                resp_0x04_extra_byte: false,
+            },
         }
     }
 }
