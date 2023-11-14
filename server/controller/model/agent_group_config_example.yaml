@@ -90,6 +90,12 @@ vtap_group_id: g-xxxxxx
 ## Note: Regular expression of NIC name for collecting traffic
 #tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
 
+## Extra Capture Network Namespace
+## Default: "", means no extra network namespace (default namespace only)
+## Description: Traffic will be captured in regex matched namespaces besides the default
+#    namespace. NICs captured in extra namespaces are also filtered with `tap_interface_regex`.
+#extra_netns_regex:
+
 ## Traffic Capture Filter
 ## Length: [1, 512]
 ## Note: If not configured, all traffic will be collected. Please
