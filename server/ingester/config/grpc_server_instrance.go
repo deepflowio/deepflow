@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"golang.org/x/net/context"
@@ -27,6 +28,8 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 )
+
+const SYNC_INTERVAL_FAST = 5 * time.Second // When the system first starts, increase the request frequency and obtain Node/Pod information as soon as possible.
 
 func (p *ServerInstanceInfo) Close() {
 	p.GrpcSession.Close()
@@ -54,6 +57,7 @@ func (p *ServerInstanceInfo) GetNodePodNames() map[string][]string {
 		nodeName := v.NodeName
 		nodePodNames[nodeName] = append(nodePodNames[nodeName], podName)
 	}
+
 	return nodePodNames
 }
 
@@ -67,6 +71,8 @@ type ServerInstanceInfo struct {
 	GrpcSession *grpc.GrpcSession
 
 	instanceInfos []InstanceInfo
+
+	firstGetInstanceTime int64
 }
 
 func NewServerInstranceInfo(ips []net.IP, port, rpcMaxMsgSize int) *ServerInstanceInfo {
@@ -78,7 +84,7 @@ func NewServerInstranceInfo(ips []net.IP, port, rpcMaxMsgSize int) *ServerInstan
 			log.Warning(err)
 		}
 	}
-	info.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, runOnce)
+	info.GrpcSession.Init(ips, uint16(port), SYNC_INTERVAL_FAST, rpcMaxMsgSize, runOnce)
 	info.Reload()
 	log.Infof("New ServerInstranceInfo ips:%v port:%d rpcMaxMsgSize:%d", ips, port, rpcMaxMsgSize)
 	info.GrpcSession.Start()
@@ -121,6 +127,16 @@ func (p *ServerInstanceInfo) Reload() error {
 			PodName:  *v.PodName,
 			NodeName: *v.NodeName,
 		})
+	}
+
+	if len(instanceInfos) != 0 && p.firstGetInstanceTime == 0 {
+		p.firstGetInstanceTime = time.Now().UnixNano()
+		log.Infof("get instance info: %+v", instanceInfos)
+	}
+
+	// 1 minute after the data is obtained, the request frequency is reduced to once per minute
+	if p.firstGetInstanceTime > 0 && time.Now().UnixNano()-p.firstGetInstanceTime > int64(time.Minute) {
+		p.GrpcSession.SetSyncInterval(grpc.DEFAULT_SYNC_TIMEOUT)
 	}
 
 	p.instanceInfos = instanceInfos
