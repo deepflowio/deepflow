@@ -330,6 +330,7 @@ impl FlowLog {
             if let Some(p) = self.so_plugin.as_ref() {
                 param.set_so_func(p.clone());
             }
+            param.set_oracle_conf(flow_config.oracle_parse_conf);
 
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
@@ -431,6 +432,7 @@ impl FlowLog {
             param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            param.set_oracle_conf(flow_config.oracle_parse_conf);
             #[cfg(any(target_os = "linux", target_os = "android"))]
             if let Some(p) = self.so_plugin.as_ref() {
                 param.set_so_func(p.clone());

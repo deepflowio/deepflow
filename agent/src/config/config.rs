@@ -441,6 +441,14 @@ pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
 }
 
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OracleParseConfig {
+    pub is_be: bool,
+    pub int_compress: bool,
+    pub resp_0x04_extra_byte: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -554,6 +562,7 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
+    pub oracle_parse_config: OracleParseConfig,
 }
 
 impl YamlConfig {
@@ -932,6 +941,11 @@ impl Default for YamlConfig {
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
             local_dispatcher_count: 1,
+            oracle_parse_config: OracleParseConfig {
+                is_be: true,
+                int_compress: true,
+                resp_0x04_extra_byte: false,
+            },
         }
     }
 }

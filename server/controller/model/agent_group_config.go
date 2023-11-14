@@ -76,6 +76,7 @@ type StaticConfig struct {
 	BpfDisabled                        *bool                       `yaml:"bpf-disabled,omitempty"`
 	L7ProtocolInferenceMaxFailCount    *uint64                     `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
 	L7ProtocolInferenceTtl             *uint64                     `yaml:"l7-protocol-inference-ttl,omitempty"`
+	OracleParseConfig                  *OracleConfig               `yaml:"oracle-parse-config,omitempty"`
 	PacketSequenceBlockSize            *int                        `yaml:"packet-sequence-block-size,omitempty"`
 	PacketSequenceQueueSize            *int                        `yaml:"packet-sequence-queue-size,omitempty"`
 	PacketSequenceQueueCount           *int                        `yaml:"packet-sequence-queue-count,omitempty"`
@@ -223,4 +224,10 @@ type HttpEndpointExtraction struct {
 
 type L7ProtocolAdvancedFeatures struct {
 	HttpEndpointExtraction *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
+}
+
+type OracleConfig struct {
+	IsBE              bool `yaml:"is-be,omitempty"`
+	IntCompress       bool `yaml:"int-compress,omitempty"`
+	Resp0x04ExtraByte bool `yaml:"resp-0x04-extra-byte,omitempty"`
 }

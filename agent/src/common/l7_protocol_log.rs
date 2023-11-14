@@ -31,6 +31,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
+use crate::config::OracleParseConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
 use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
@@ -367,6 +368,8 @@ pub struct ParseParam<'a> {
 
     // the config of `l7_log_packet_size`, must set in parse_payload and check_payload
     pub buf_size: u16,
+
+    pub oracle_parse_conf: OracleParseConfig,
 }
 
 impl ParseParam<'_> {
@@ -411,6 +414,8 @@ impl ParseParam<'_> {
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
 
             buf_size: 0,
+
+            oracle_parse_conf: OracleParseConfig::default(),
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -469,6 +474,10 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_log_parse_config(&mut self, conf: &'a LogParserConfig) {
         self.parse_config = Some(conf);
+    }
+
+    pub fn set_oracle_conf(&mut self, conf: OracleParseConfig) {
+        self.oracle_parse_conf = conf;
     }
 }
 
