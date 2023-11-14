@@ -26,10 +26,12 @@ use crate::{
     common::flow::PacketDirection,
     common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
     flow_generator::{
-        protocol_logs::pb_adapter::{
-            ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+        protocol_logs::{
+            pb_adapter::{
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+            },
+            swap_if, L7ResponseStatus, LogMessageType,
         },
-        protocol_logs::{L7ResponseStatus, LogMessageType},
         AppProtoHead, Error,
     },
 };
@@ -369,23 +371,13 @@ impl L7ProtocolInfoInterface for CustomInfo {
         self.request_id
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> crate::flow_generator::Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> crate::flow_generator::Result<()> {
         if let L7ProtocolInfo::CustomInfo(w) = other {
             // req merge
-            if self.req.domain.is_empty() {
-                self.req.domain = w.req.domain;
-            }
-            if self.req.endpoint.is_empty() {
-                self.req.endpoint = w.req.endpoint;
-            }
-
-            if self.req.req_type.is_empty() {
-                self.req.req_type = w.req.req_type;
-            }
-
-            if self.req.resource.is_empty() {
-                self.req.resource = w.req.resource;
-            }
+            swap_if!(self.req, req_type, is_empty, w.req);
+            swap_if!(self.req, domain, is_empty, w.req);
+            swap_if!(self.req, resource, is_empty, w.req);
+            swap_if!(self.req, endpoint, is_empty, w.req);
 
             if self.req_len.is_none() {
                 self.req_len = w.req_len;
@@ -396,10 +388,6 @@ impl L7ProtocolInfoInterface for CustomInfo {
             }
 
             // resp merge
-            if self.resp.exception.is_empty() {
-                self.resp.exception = w.resp.exception;
-            }
-
             if self.resp.status == L7ResponseStatus::default() {
                 self.resp.status = w.resp.status;
             }
@@ -408,9 +396,8 @@ impl L7ProtocolInfoInterface for CustomInfo {
                 self.resp.code = w.resp.code;
             }
 
-            if self.resp.result.is_empty() {
-                self.resp.result = w.resp.result;
-            }
+            swap_if!(self.resp, exception, is_empty, w.resp);
+            swap_if!(self.resp, result, is_empty, w.resp);
 
             if self.resp_len.is_none() {
                 self.resp_len = w.resp_len;
@@ -421,17 +408,10 @@ impl L7ProtocolInfoInterface for CustomInfo {
             }
 
             // trace merge
-            if self.trace.trace_id.is_none() {
-                self.trace.trace_id = w.trace.trace_id;
-            }
-
-            if self.trace.span_id.is_none() {
-                self.trace.span_id = w.trace.span_id;
-            }
-            if self.trace.parent_span_id.is_none() {
-                self.trace.parent_span_id = w.trace.parent_span_id;
-            }
-            self.attributes.extend(w.attributes);
+            swap_if!(self.trace, trace_id, is_none, w.trace);
+            swap_if!(self.trace, span_id, is_none, w.trace);
+            swap_if!(self.trace, parent_span_id, is_none, w.trace);
+            self.attributes.append(&mut w.attributes);
         }
         Ok(())
     }

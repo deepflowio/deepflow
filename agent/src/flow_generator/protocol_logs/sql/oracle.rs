@@ -61,10 +61,10 @@ pub struct OracleInfo {
     pub rrt: u64,
 }
 impl OracleInfo {
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         self.affected_rows = other.affected_rows;
         self.ret_code = other.ret_code;
-        self.error_message = other.error_message;
+        std::mem::swap(&mut self.error_message, &mut other.error_message);
         self.status = other.status;
     }
 
@@ -92,7 +92,7 @@ impl L7ProtocolInfoInterface for OracleInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::OracleInfo(other) = other {
             self.merge(other);
         }

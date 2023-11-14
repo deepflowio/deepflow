@@ -166,7 +166,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
         self.stream_id
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::HttpInfo(other) = other {
             return self.merge(other);
         }
@@ -215,30 +215,18 @@ impl L7ProtocolInfoInterface for HttpInfo {
 }
 
 impl HttpInfo {
-    pub fn merge(&mut self, other: Self) -> Result<()> {
+    pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         let other_is_grpc = other.is_grpc();
 
         match other.msg_type {
             // merge with request
             LogMessageType::Request => {
-                if self.path.is_empty() {
-                    self.path = other.path;
-                }
-                if self.host.is_empty() {
-                    self.host = other.host;
-                }
-                if self.method.is_empty() {
-                    self.method = other.method;
-                }
-                if self.user_agent.is_none() {
-                    self.user_agent = other.user_agent;
-                }
-                if self.referer.is_none() {
-                    self.referer = other.referer;
-                }
-                if self.endpoint.is_none() {
-                    self.endpoint = other.endpoint;
-                }
+                super::swap_if!(self, path, is_empty, other);
+                super::swap_if!(self, host, is_empty, other);
+                super::swap_if!(self, method, is_empty, other);
+                super::swap_if!(self, user_agent, is_none, other);
+                super::swap_if!(self, referer, is_none, other);
+                super::swap_if!(self, endpoint, is_none, other);
                 // 下面用于判断是否结束
                 // ================
                 // determine whether request is end
@@ -258,13 +246,8 @@ impl HttpInfo {
                     self.status_code = other.status_code;
                 }
 
-                if other.custom_exception.is_some() {
-                    self.custom_exception = other.custom_exception;
-                }
-
-                if other.custom_result.is_some() {
-                    self.custom_result = other.custom_result
-                }
+                super::swap_if!(self, custom_exception, is_none, other);
+                super::swap_if!(self, custom_result, is_none, other);
 
                 if self.resp_content_length.is_none() {
                     self.resp_content_length = other.resp_content_length;
@@ -280,19 +263,11 @@ impl HttpInfo {
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
         }
-        if self.trace_id.is_empty() {
-            self.trace_id = other.trace_id;
-        }
-        if self.span_id.is_empty() {
-            self.span_id = other.span_id;
-        }
-        if self.x_request_id_0.is_empty() {
-            self.x_request_id_0 = other.x_request_id_0.clone();
-        }
-        if self.x_request_id_1.is_empty() {
-            self.x_request_id_1 = other.x_request_id_1.clone();
-        }
-        self.attributes.extend(other.attributes);
+        super::swap_if!(self, trace_id, is_empty, other);
+        super::swap_if!(self, span_id, is_empty, other);
+        super::swap_if!(self, x_request_id_0, is_empty, other);
+        super::swap_if!(self, x_request_id_1, is_empty, other);
+        self.attributes.append(&mut other.attributes);
         Ok(())
     }
 

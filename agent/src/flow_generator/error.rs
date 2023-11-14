@@ -18,7 +18,7 @@ use std::str::Utf8Error;
 
 use thiserror::Error;
 
-use super::AppProtoLogsData;
+use super::MetaAppProto;
 
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 
@@ -74,7 +74,7 @@ pub enum Error {
     #[error("l7 protocol can not merge")]
     L7ProtocolCanNotMerge(L7ProtocolInfo),
     #[error("l7 log can not merge")]
-    L7LogCanNotMerge(AppProtoLogsData),
+    L7LogCanNotMerge(MetaAppProto),
     #[error("parse config not provided")]
     NoParseConfig,
     #[error("wasm parse fail")]

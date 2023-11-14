@@ -105,16 +105,12 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
         Some(self.request_id)
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::FastCGIInfo(info) = other {
             self.status = info.status;
             self.status_code = info.status_code;
-            if self.trace_id.is_empty() {
-                self.trace_id = info.trace_id;
-            }
-            if self.span_id.is_empty() {
-                self.span_id = info.span_id;
-            }
+            super::swap_if!(self, trace_id, is_empty, info);
+            super::swap_if!(self, span_id, is_empty, info);
         }
 
         Ok(())
@@ -653,12 +649,12 @@ mod test {
         let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
-        let resp = (&mut parser)
+        let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()
             .unwrap_single();
 
-        req.merge_log(resp).unwrap();
+        req.merge_log(&mut resp).unwrap();
         if let L7ProtocolInfo::FastCGIInfo(info) = req {
             return (info, parser.perf_stats.unwrap());
         }

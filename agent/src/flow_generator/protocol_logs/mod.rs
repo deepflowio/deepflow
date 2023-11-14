@@ -56,7 +56,6 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
-use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -64,8 +63,6 @@ use crate::{
         flow::{L7Protocol, PacketDirection, SignalSource},
         tap_port::TapPort,
     },
-    flow_generator::error::Error,
-    flow_generator::error::Result,
     metric::document::TapSide,
 };
 use public::proto::flow_log;
@@ -325,18 +322,18 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 
 impl AppProtoLogsBaseInfo {
     // 请求调用回应来合并
-    fn merge(&mut self, log: AppProtoLogsBaseInfo) {
+    fn merge(&mut self, log: &mut AppProtoLogsBaseInfo) {
         // adjust protocol when change, now only use for http2 change to grpc.
         if self.head.proto != log.head.proto {
             self.head.proto = log.head.proto;
         }
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
-            self.process_kname_0 = log.process_kname_0;
+            std::mem::swap(&mut self.process_kname_0, &mut log.process_kname_0);
         }
         if log.process_id_1 > 0 {
             self.process_id_1 = log.process_id_1;
-            self.process_kname_1 = log.process_kname_1;
+            std::mem::swap(&mut self.process_kname_1, &mut log.process_kname_1);
         }
         self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
@@ -367,110 +364,8 @@ impl AppProtoLogsBaseInfo {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct AppProtoLogsData {
-    #[serde(flatten)]
-    pub base_info: AppProtoLogsBaseInfo,
-    #[serde(flatten)]
-    pub special_info: L7ProtocolInfo,
-    pub direction_score: u8,
-}
-
-impl fmt::Display for AppProtoLogsData {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} direction_score: {}\n",
-            self.base_info, self.direction_score
-        )?;
-        write!(f, "\t{:?}", self.special_info)
-    }
-}
-
-impl AppProtoLogsData {
-    pub fn new(
-        base_info: AppProtoLogsBaseInfo,
-        special_info: L7ProtocolInfo,
-        direction_score: u8,
-    ) -> Self {
-        Self {
-            base_info,
-            special_info,
-            direction_score,
-        }
-    }
-
-    pub fn is_request(&self) -> bool {
-        self.base_info.head.msg_type == LogMessageType::Request
-    }
-
-    pub fn is_response(&self) -> bool {
-        return self.base_info.head.msg_type == LogMessageType::Response;
-    }
-
-    pub fn ebpf_flow_session_id(&self) -> u64 {
-        // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
-        // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
-
-        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
-        let proto = if self.base_info.head.proto == L7Protocol::Grpc {
-            if let L7ProtocolInfo::HttpInfo(_) = &self.special_info {
-                L7Protocol::Http2
-            } else {
-                unreachable!()
-            }
-        } else {
-            self.base_info.head.proto
-        };
-
-        let flow_id_part =
-            (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
-        if let Some(session_id) = self.special_info.session_id() {
-            flow_id_part | (proto as u64) << 24 | ((session_id as u64) & 0xffffff)
-        } else {
-            let mut cap_seq = self
-                .base_info
-                .syscall_cap_seq_0
-                .max(self.base_info.syscall_cap_seq_1);
-            if self.base_info.head.msg_type == LogMessageType::Request {
-                cap_seq += 1;
-            };
-            flow_id_part | ((proto as u64) << 24) | (cap_seq & 0xffffff)
-        }
-    }
-
-    pub fn session_merge(&mut self, log: Self) -> Result<()> {
-        if let Err(err) = self.protocol_merge(log.special_info) {
-            /*
-                if can not merge, return log which can not merge to self.
-                the follow circumstance can not merge:
-                    when ebpf disorder, http1 can not match req/resp.
-            */
-            if let Error::L7ProtocolCanNotMerge(special_info) = err {
-                return Err(Error::L7LogCanNotMerge(Self {
-                    special_info,
-                    ..log
-                }));
-            }
-            return Err(err);
-        };
-        self.base_info.merge(log.base_info);
-        Ok(())
-    }
-
-    fn protocol_merge(&mut self, log: L7ProtocolInfo) -> Result<()> {
-        self.special_info.merge_log(log)
-    }
-
-    // 是否需要进一步聚合
-    // 目前仅http2 uprobe 需要聚合多个请求
-    pub fn need_protocol_merge(&self) -> bool {
-        self.special_info.need_merge()
-    }
-}
-
 #[derive(Debug)]
-pub struct BoxAppProtoLogsData(pub Box<AppProtoLogsData>);
+pub struct BoxAppProtoLogsData(pub Box<MetaAppProto>);
 
 impl Sendable for BoxAppProtoLogsData {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
@@ -480,7 +375,7 @@ impl Sendable for BoxAppProtoLogsData {
             ..Default::default()
         };
 
-        let log: L7ProtocolSendLog = self.0.special_info.into();
+        let log: L7ProtocolSendLog = self.0.l7_info.into();
         log.fill_app_proto_log(&mut pb_proto_logs_data);
         pb_proto_logs_data
             .encode(buf)
@@ -560,3 +455,18 @@ fn decode_base64_to_string(value: &str) -> String {
         Err(_) => value.to_string(),
     }
 }
+
+macro_rules! swap_if {
+    ($this:expr, $field:ident, is_none, $other:expr) => {
+        if $this.$field.is_none() {
+            std::mem::swap(&mut $this.$field, &mut $other.$field);
+        }
+    };
+    ($this:expr, $field:ident, is_empty, $other:expr) => {
+        if $this.$field.is_empty() {
+            std::mem::swap(&mut $this.$field, &mut $other.$field);
+        }
+    };
+}
+
+pub(crate) use swap_if;
