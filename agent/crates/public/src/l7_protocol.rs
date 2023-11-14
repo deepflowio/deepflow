@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-use num_enum::FromPrimitive;
+use num_enum::{FromPrimitive, IntoPrimitive};
 use serde::Serialize;
 
 pub const DEFAULT_DNS_PORT: u16 = 53;
+pub const DEFAULT_TLS_PORT: u16 = 443;
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq, FromPrimitive, num_enum::Default)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq, FromPrimitive, IntoPrimitive, num_enum::Default)]
 #[repr(u8)]
 pub enum L7Protocol {
     #[num_enum(default)]
