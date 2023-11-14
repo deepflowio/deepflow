@@ -607,56 +607,114 @@ func formatStruct(s interface{}) string {
 	return formatted
 }
 
-func (p L7Protocol) String() string {
-	formatted := ""
+func (p L7Protocol) String(isTLS bool) string {
 	switch p {
 	case L7_PROTOCOL_HTTP_1:
-		formatted = "HTTP"
+		if isTLS {
+			return "HTTP_TLS"
+		} else {
+			return "HTTP"
+		}
 	case L7_PROTOCOL_HTTP_2:
-		formatted = "HTTP2"
+		if isTLS {
+			return "HTTP2_TLS"
+		} else {
+			return "HTTP2"
+		}
 	case L7_PROTOCOL_DNS:
-		formatted = "DNS"
+		if isTLS {
+			return "DNS_TLS"
+		} else {
+			return "DNS"
+		}
 	case L7_PROTOCOL_MYSQL:
-		formatted = "MySQL"
+		if isTLS {
+			return "MySQL_TLS"
+		} else {
+			return "MySQL"
+		}
 	case L7_PROTOCOL_POSTGRE:
-		formatted = "PostgreSQL"
+		if isTLS {
+			return "PostgreSQL_TLS"
+		} else {
+			return "PostgreSQL"
+		}
 	case L7_PROTOCOL_ORACLE:
-		formatted = "Oracle"
+		if isTLS {
+			return "Oracle_TLS"
+		} else {
+			return "Oracle"
+		}
 	case L7_PROTOCOL_REDIS:
-		formatted = "Redis"
+		if isTLS {
+			return "Redis_TLS"
+		} else {
+			return "Redis"
+		}
 	case L7_PROTOCOL_MONGODB:
-		formatted = "MongoDB"
+		if isTLS {
+			return "MongoDB_TLS"
+		} else {
+			return "MongoDB"
+		}
 	case L7_PROTOCOL_DUBBO:
-		formatted = "Dubbo"
+		if isTLS {
+			return "Dubbo_TLS"
+		} else {
+			return "Dubbo"
+		}
 	case L7_PROTOCOL_GRPC:
-		formatted = "gRPC"
+		if isTLS {
+			return "gRPC_TLS"
+		} else {
+			return "gRPC"
+		}
 	case L7_PROTOCOL_SOFARPC:
-		formatted = "SofaRPC"
+		if isTLS {
+			return "SofaRPC_TLS"
+		} else {
+			return "SofaRPC"
+		}
 	case L7_PROTOCOL_FASTCGI:
-		formatted = "FastCGI"
+		if isTLS {
+			return "FastCGI_TLS"
+		} else {
+			return "FastCGI"
+		}
 	case L7_PROTOCOL_KAFKA:
-		formatted = "Kafka"
+		if isTLS {
+			return "Kafka_TLS"
+		} else {
+			return "Kafka"
+		}
 	case L7_PROTOCOL_MQTT:
-		formatted = "MQTT"
+		if isTLS {
+			return "MQTT_TLS"
+		} else {
+			return "MQTT"
+		}
 	case L7_PROTOCOL_CUSTOM:
-		formatted = "Custom"
+		if isTLS {
+			return "Custom_TLS"
+		} else {
+			return "Custom"
+		}
 	default:
-		formatted = "N/A"
+		return "N/A"
 	}
-	return formatted
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	L7_PROTOCOL_HTTP_1.String():  L7_PROTOCOL_HTTP_1,
-	L7_PROTOCOL_HTTP_2.String():  L7_PROTOCOL_HTTP_2,
-	L7_PROTOCOL_DNS.String():     L7_PROTOCOL_DNS,
-	L7_PROTOCOL_MYSQL.String():   L7_PROTOCOL_MYSQL,
-	L7_PROTOCOL_REDIS.String():   L7_PROTOCOL_REDIS,
-	L7_PROTOCOL_DUBBO.String():   L7_PROTOCOL_DUBBO,
-	L7_PROTOCOL_GRPC.String():    L7_PROTOCOL_GRPC,
-	L7_PROTOCOL_KAFKA.String():   L7_PROTOCOL_KAFKA,
-	L7_PROTOCOL_MQTT.String():    L7_PROTOCOL_MQTT,
-	L7_PROTOCOL_UNKNOWN.String(): L7_PROTOCOL_UNKNOWN,
+	L7_PROTOCOL_HTTP_1.String(false):  L7_PROTOCOL_HTTP_1,
+	L7_PROTOCOL_HTTP_2.String(false):  L7_PROTOCOL_HTTP_2,
+	L7_PROTOCOL_DNS.String(false):     L7_PROTOCOL_DNS,
+	L7_PROTOCOL_MYSQL.String(false):   L7_PROTOCOL_MYSQL,
+	L7_PROTOCOL_REDIS.String(false):   L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_DUBBO.String(false):   L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_GRPC.String(false):    L7_PROTOCOL_GRPC,
+	L7_PROTOCOL_KAFKA.String(false):   L7_PROTOCOL_KAFKA,
+	L7_PROTOCOL_MQTT.String(false):    L7_PROTOCOL_MQTT,
+	L7_PROTOCOL_UNKNOWN.String(false): L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {
@@ -715,7 +773,7 @@ func (p *FlowPerfStats) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("L4Protocol:%s ", p.L4Protocol.String())
 	formatted += fmt.Sprintf("TCPPerfStats:{%s} ", p.TCPPerfStats.String())
-	formatted += fmt.Sprintf("\n\tL7Protocol:%s ", p.L7Protocol.String())
+	formatted += fmt.Sprintf("\n\tL7Protocol:%s ", p.L7Protocol.String(false))
 	formatted += fmt.Sprintf("L7PerfStats:{%s}", p.L7PerfStats.String())
 	return formatted
 }
