@@ -1183,12 +1183,12 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmt, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
+	stmts, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
-	if stmt != nil {
-		e.Statements = append(e.Statements, stmt)
+	if len(stmts) != 0 {
+		e.Statements = append(e.Statements, stmts...)
 	}
 	return nil
 }
@@ -1199,15 +1199,17 @@ func (e *CHEngine) AddTable(table string) {
 }
 
 func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
-	stmt, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+
+	stmts, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+
 	if err != nil {
 		return labelType, err
 	}
-	if stmt != nil {
-		e.Statements = append(e.Statements, stmt)
+	if len(stmts) != 0 {
+		e.Statements = append(e.Statements, stmts...)
 		return labelType, nil
 	}
-	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
+	stmt, err := GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
 	if err != nil {
 		return labelType, err
 	}

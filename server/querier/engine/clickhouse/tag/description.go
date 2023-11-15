@@ -221,21 +221,46 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 
 	if config.Cfg.AutoCustomTag.TagName != "" {
 		for _, suffix := range []string{"", "_0", "_1"} {
-			var selectTranslater string
-			var selectPrefixTranslater string
+			var selectPrefixTranslator string
+			var nodeTypeTranslator string
+			var iconIDTranslator string
 			tagNameSuffix := config.Cfg.AutoCustomTag.TagName + suffix
+			TagResoureMap[tagNameSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"",
+					"",
+					"",
+					"",
+				),
+				"node_type": NewTag(
+					"",
+					"",
+					"",
+					"",
+				),
+				"icon_id": NewTag(
+					"",
+					"",
+					"",
+					"",
+				),
+			}
+			TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap = map[string]string{}
 			for _, tagValue := range autoCustomTagValueSlice {
-				if selectPrefixTranslater == "" {
+				if selectPrefixTranslator == "" {
 					switch tagValue {
-					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vtap", "vpc", "l2_vpc":
+					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vpc", "l2_vpc":
 						tagValueName := tagValue + suffix
 						tagValueID := tagValue + "_id" + suffix
 						tagValueMap := tagValue + "_map"
 						if tagValue == "vpc" || tagValue == "l2_vpc" {
 							tagValueMap = "l3_epc_map"
 						}
-						selectTranslater = fmt.Sprintf("dictGet(flow_tag.%s, 'name', toUInt64(%s)) AS `%s`, %s AS `%s`", tagValueMap, tagValueID, tagValueName, tagValueID, tagValueID)
-						selectPrefixTranslater = tagValueID + "!=0"
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueID] = ""
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("dictGet(flow_tag.%s, 'name', toUInt64(%s))", tagValueMap, tagValueID)
+						selectPrefixTranslator = tagValueID + "!=0"
+						iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, tagValueID)
+						nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 
 					default:
 						if strings.HasPrefix(tagValue, "cloud.tag.") {
@@ -244,46 +269,59 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 							podNSIDSuffix := "pod_ns_id" + suffix
 							deviceIDSuffix := "l3_device_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "cloud.tag.")
-							selectTranslater = "if(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))) AS `" + tagValueName + "`"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "if(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
 							tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
-							selectPrefixTranslater = tagSelectPrefixTranslaterStr
+							selectPrefixTranslator = tagSelectPrefixTranslaterStr
+							iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.label.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							serviceIDSuffix := "service_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.label.")
-							selectTranslater = "if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))) AS `" + tagValueName + "`"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
 							tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
-							selectPrefixTranslater = tagSelectPrefixTranslaterStr
+							selectPrefixTranslator = tagSelectPrefixTranslaterStr
+							iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.annotation.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							serviceIDSuffix := "service_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.annotation.")
-							selectTranslater = "if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))) AS `" + tagValueName + "`"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
 							tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
-							selectPrefixTranslater = tagSelectPrefixTranslaterStr
+							selectPrefixTranslator = tagSelectPrefixTranslaterStr
+							iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.env.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.env.")
-							selectTranslater = "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')) AS `" + tagValueName + "`"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
 							tagSelectPrefixTranslaterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
-							selectPrefixTranslater = tagSelectPrefixTranslaterStr
+							selectPrefixTranslator = tagSelectPrefixTranslaterStr
+							iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						} else if strings.HasPrefix(tagValue, "os.app.") {
 							tagValueName := tagValue + suffix
 							processIDSuffix := "gprocess_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "os.app.")
-							selectTranslater = "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "')) AS `" + tagValueName + "`"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
 							tagSelectPrefixTranslaterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
-							selectPrefixTranslater = tagSelectPrefixTranslaterStr
+							selectPrefixTranslator = tagSelectPrefixTranslaterStr
+							iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						}
 						deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
 						if ok {
 							tagValueName := tagValue + suffix
 							tagValueID := tagValue + "_id" + suffix
-							selectTranslater = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%s), toUInt64(%s))) AS `%s`, %s AS `%s`", deviceType, tagValueID, tagValueName, tagValueID, tagValueID)
-							selectPrefixTranslater = tagValueID + "!=0"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueID] = ""
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%s), toUInt64(%s)))", deviceType, tagValueID)
+							selectPrefixTranslator = tagValueID + "!=0"
+							iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s), toUInt64(%s)))", selectPrefixTranslator, deviceType, tagValueID)
+							nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 						}
 					}
 				} else {
@@ -295,8 +333,11 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						if tagValue == "vpc" || tagValue == "l2_vpc" {
 							tagValueMap = "l3_epc_map"
 						}
-						selectTranslater += fmt.Sprintf(", IF(%s, '', dictGet(flow_tag.%s, 'name', toUInt64(%s))) AS `%s`, IF(%s, -1, %s) AS `%s`", selectPrefixTranslater, tagValueMap, tagValueID, tagValueName, selectPrefixTranslater, tagValueID, tagValueID)
-						selectPrefixTranslater += " OR " + tagValueID + "!=0"
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagValueID)
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.%s, 'name', toUInt64(%s)))", selectPrefixTranslator, tagValueMap, tagValueID)
+						selectPrefixTranslator += " OR " + tagValueID + "!=0"
+						iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", tagValueID+"!=0", tagValueMap, tagValueID)
+						nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagValueID+"!=0", tagValue)
 					default:
 						if strings.HasPrefix(tagValue, "cloud.tag.") {
 							tagValueName := tagValue + suffix
@@ -305,62 +346,69 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 							deviceIDSuffix := "l3_device_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "cloud.tag.")
 							tagSelectFilterStr := "if(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
-							selectTranslater += fmt.Sprintf(", IF(%s, '', %s) AS `%s`", selectPrefixTranslater, tagSelectFilterStr, tagValueName)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 							tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
-							selectPrefixTranslater += " OR " + tagSelectPrefixTranslaterStr
+							selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+							iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.label.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							serviceIDSuffix := "service_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.label.")
 							tagSelectFilterStr := "if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
-							selectTranslater += fmt.Sprintf(", IF(%s, '', %s) AS `%s`", selectPrefixTranslater, tagSelectFilterStr, tagValueName)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 							tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
-							selectPrefixTranslater += " OR " + tagSelectPrefixTranslaterStr
+							selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+							iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.annotation.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							serviceIDSuffix := "service_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.annotation.")
 							tagSelectFilterStr := "if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
-							selectTranslater += fmt.Sprintf(", IF(%s, '', %s) AS `%s`", selectPrefixTranslater, tagSelectFilterStr, tagValueName)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 							tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
-							selectPrefixTranslater += " OR " + tagSelectPrefixTranslaterStr
+							selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+							iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 						} else if strings.HasPrefix(tagValue, "k8s.env.") {
 							tagValueName := tagValue + suffix
 							podIDSuffix := "pod_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "k8s.env.")
 							tagSelectFilterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
-							selectTranslater += fmt.Sprintf(", IF(%s, '', %s) AS `%s`", selectPrefixTranslater, tagSelectFilterStr, tagValueName)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 							tagSelectPrefixTranslaterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
-							selectPrefixTranslater += " OR " + tagSelectPrefixTranslaterStr
+							selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+							iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 						} else if strings.HasPrefix(tagValue, "os.app.") {
 							tagValueName := tagValue + suffix
 							processIDSuffix := "gprocess_id" + suffix
 							tagKey := strings.TrimPrefix(tagValue, "os.app.")
 							tagSelectFilterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
-							selectTranslater += fmt.Sprintf(", IF(%s, '', %s) AS `%s`", selectPrefixTranslater, tagSelectFilterStr, tagValueName)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 							tagSelectPrefixTranslaterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
-							selectPrefixTranslater += " OR " + tagSelectPrefixTranslaterStr
+							selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+							iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 						}
 						deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
 						if ok {
 							tagValueName := tagValue + suffix
 							tagValueID := tagValue + "_id" + suffix
-							selectTranslater += fmt.Sprintf(", IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%s), toUInt64(%s) ))) AS `%s`, IF(%s, -1, %s) AS `%s`", selectPrefixTranslater, deviceType, tagValueID, tagValueName, selectPrefixTranslater, tagValueID, tagValueID)
-							selectPrefixTranslater += " OR " + tagValueID + "!=0"
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagValueID)
+							TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%s), toUInt64(%s) )))", selectPrefixTranslator, deviceType, tagValueID)
+							selectPrefixTranslator += " OR " + tagValueID + "!=0"
+							iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s), toUInt64(%s)))", tagValueID+"!=0", deviceType, tagValueID)
+							nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagValueID+"!=0", tagValue)
 						}
 					}
 				}
 			}
-			TagResoureMap[tagNameSuffix] = map[string]*Tag{
-				"default": NewTag(
-					selectTranslater,
-					"",
-					"",
-					"",
-				),
-			}
+			TagResoureMap[tagNameSuffix]["node_type"].TagTranslator = "multiIf(" + nodeTypeTranslator + ", '')"
+			TagResoureMap[tagNameSuffix]["icon_id"].TagTranslator = "multiIf(" + iconIDTranslator + ", 0)"
 		}
 	}
 
@@ -913,7 +961,6 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 
 		case "tap":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM flow_tag.tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-
 		case "vtap":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM flow_tag.%s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		case "gprocess":

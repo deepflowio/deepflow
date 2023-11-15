@@ -335,6 +335,12 @@ impl AppProtoLogsBaseInfo {
             self.process_id_1 = log.process_id_1;
             std::mem::swap(&mut self.process_kname_1, &mut log.process_kname_1);
         }
+        if log.syscall_coroutine_0 > 0 {
+            self.syscall_coroutine_0 = log.syscall_coroutine_0;
+        }
+        if log.syscall_coroutine_1 > 0 {
+            self.syscall_coroutine_1 = log.syscall_coroutine_1;
+        }
         self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
 

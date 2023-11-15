@@ -31,8 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) (Statement, string, error) {
-	var stmt Statement
+func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error) {
+	var stmts []Statement
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
@@ -53,7 +53,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if strings.HasPrefix(name, "k8s.annotation.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
@@ -66,7 +66,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if strings.HasPrefix(name, "k8s.env.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
@@ -79,7 +79,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if strings.HasPrefix(name, "cloud.tag.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
@@ -92,7 +92,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if strings.HasPrefix(name, "os.app.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
@@ -105,7 +105,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
@@ -113,8 +113,8 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 					if err != nil {
 						return nil, "", err
 					}
-					stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
-					return stmt, labelType, nil
+					stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
+					return stmts, labelType, nil
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
@@ -123,7 +123,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			nameNoPreffix := strings.TrimPrefix(name, "tag.")
 			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		}
 	} else {
 		if name == "metrics" {
@@ -133,26 +133,34 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			} else {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
 			}
-			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
 			tagTranslator, err := GetPrometheusAllTagTranslator(table)
 			if err != nil {
 				return nil, "", err
 			}
-			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(selectTag, config.Cfg.AutoCustomTag.TagName) {
-			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: ""}
+			autoTagMap := tagItem.TagTranslatorMap
+			for autoTagKey, autoTagTranslator := range autoTagMap {
+				if autoTagTranslator != "" {
+					stmts = append(stmts, &SelectTag{Value: autoTagTranslator, Alias: autoTagKey})
+				} else {
+					stmts = append(stmts, &SelectTag{Value: autoTagKey})
+				}
+			}
+			stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
-				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
+				stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
 			}
 		} else if alias != "" {
-			stmt = &SelectTag{Value: name, Alias: selectTag}
+			stmts = append(stmts, &SelectTag{Value: name, Alias: selectTag})
 		} else {
-			stmt = &SelectTag{Value: selectTag}
+			stmts = append(stmts, &SelectTag{Value: selectTag})
 		}
 	}
-	return stmt, labelType, nil
+	return stmts, labelType, nil
 }
 
 func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
@@ -236,15 +244,18 @@ type SelectTag struct {
 }
 
 func (t *SelectTag) Format(m *view.Model) {
-	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-	if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
-		alias := t.Value
-		if t.Alias != "" {
-			alias = t.Alias
+	if !(config.Cfg.AutoCustomTag.TagName != "" && (strings.HasPrefix(t.Alias, config.Cfg.AutoCustomTag.TagName) || strings.HasPrefix(t.Value, config.Cfg.AutoCustomTag.TagName))) {
+		m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
+		if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+			alias := t.Value
+			if t.Alias != "" {
+				alias = t.Alias
+			}
+			m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
 		}
-		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
+		if t.Value == "packet_batch" {
+			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
+		}
 	}
-	if t.Value == "packet_batch" {
-		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
-	}
+
 }
