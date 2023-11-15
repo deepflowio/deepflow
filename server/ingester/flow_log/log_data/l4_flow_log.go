@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
@@ -683,6 +684,14 @@ func (i *Internet) Fill(f *pb.Flow) {
 	i.Province1 = geo.QueryProvince(f.FlowKey.IpDst)
 }
 
+func isLocalIP(isIPv6 bool, ip4 uint32, ip6 net.IP) bool {
+	ip := ip6
+	if !isIPv6 {
+		ip = utils.IpFromUint32(ip4)
+	}
+	return !ip.IsGlobalUnicast()
+}
+
 func (k *KnowledgeGraph) fill(
 	platformData *grpc.PlatformInfoTable,
 	isIPv6, isVipInterface0, isVipInterface1 bool,
@@ -702,7 +711,8 @@ func (k *KnowledgeGraph) fill(
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(zerodoc.Local) {
-		lookupByMac0, lookupByMac1 = true, true
+		// for local non-unicast IPs, MAC matching is preferred.
+		lookupByMac0, lookupByMac1 = isLocalIP(isIPv6, ip40, ip60), isLocalIP(isIPv6, ip41, ip61)
 	} else if tapSide == uint32(zerodoc.ClientProcess) || tapSide == uint32(zerodoc.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
