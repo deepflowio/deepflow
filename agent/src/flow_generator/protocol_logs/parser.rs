@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use std::mem::swap;
 use std::{
     cmp::min,
     collections::{hash_map::Entry, HashMap},
@@ -38,7 +36,6 @@ use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData, LogMessageT
 
 use crate::{
     common::{
-        enums::EthernetType,
         flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         meta_packet::ProtocolData,
@@ -96,8 +93,8 @@ impl MetaAppProto {
         head: AppProtoHead,
     ) -> Option<Self> {
         let mut base_info = AppProtoLogsBaseInfo {
-            start_time: meta_packet.lookup_key.timestamp.into(),
-            end_time: meta_packet.lookup_key.timestamp.into(),
+            start_time: meta_packet.lookup_key.timestamp,
+            end_time: meta_packet.lookup_key.timestamp,
             flow_id: flow.flow.flow_id,
             vtap_id: flow.flow.flow_key.vtap_id,
             tap_type: flow.flow.flow_key.tap_type,
@@ -116,7 +113,6 @@ impl MetaAppProto {
             mac_dst: MacAddr::ZERO,
             ip_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_ip,
             ip_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_ip,
-            is_ipv6: meta_packet.lookup_key.eth_type == EthernetType::IPV6,
             port_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_port,
             port_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_port,
             l3_epc_id_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id,
@@ -145,28 +141,31 @@ impl MetaAppProto {
             let is_src = meta_packet.lookup_key.l2_end_0;
             let process_name = get_string_from_chars(&meta_packet.process_kname);
             if is_src {
-                base_info.process_id_0 = meta_packet.process_id;
-                base_info.process_kname_0 = process_name;
                 base_info.syscall_coroutine_0 = meta_packet.coroutine_id;
                 base_info.pod_id_0 = meta_packet.pod_id;
             } else {
-                base_info.process_id_1 = meta_packet.process_id;
-                base_info.process_kname_1 = process_name;
                 base_info.syscall_coroutine_1 = meta_packet.coroutine_id;
                 base_info.pod_id_1 = meta_packet.pod_id;
             }
+            match (is_src, meta_packet.lookup_key.direction) {
+                (true, PacketDirection::ClientToServer)
+                | (false, PacketDirection::ServerToClient) => {
+                    base_info.process_id_0 = meta_packet.process_id;
+                    base_info.process_kname_0 = process_name;
+                }
+                (false, PacketDirection::ClientToServer)
+                | (true, PacketDirection::ServerToClient) => {
+                    base_info.process_id_1 = meta_packet.process_id;
+                    base_info.process_kname_1 = process_name;
+                }
+            }
         }
 
-        if flow.flow.tap_side == TapSide::Local {
+        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_src {
             base_info.mac_src = flow.flow.flow_key.mac_src;
+        }
+        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_dst {
             base_info.mac_dst = flow.flow.flow_key.mac_dst;
-        } else {
-            if base_info.is_vip_interface_src {
-                base_info.mac_src = flow.flow.flow_key.mac_src;
-            }
-            if base_info.is_vip_interface_dst {
-                base_info.mac_dst = flow.flow.flow_key.mac_dst;
-            }
         }
 
         let seq = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
@@ -180,23 +179,14 @@ impl MetaAppProto {
             // ebpf info
             base_info.syscall_trace_id_request = meta_packet.syscall_trace_id;
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
-            base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
+            base_info.syscall_cap_seq_0 = meta_packet.cap_seq as u32;
         } else {
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            if meta_packet.signal_source == SignalSource::EBPF {
-                swap(&mut base_info.process_id_0, &mut base_info.process_id_1);
-                swap(
-                    &mut base_info.process_kname_0,
-                    &mut base_info.process_kname_1,
-                );
-            }
-
             base_info.resp_tcp_seq = seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_response = meta_packet.syscall_trace_id;
             base_info.syscall_trace_id_thread_1 = meta_packet.thread_id;
-            base_info.syscall_cap_seq_1 = meta_packet.cap_seq;
+            base_info.syscall_cap_seq_1 = meta_packet.cap_seq as u32;
         }
 
         Some(Self {
@@ -242,7 +232,7 @@ impl MetaAppProto {
             if self.base_info.head.msg_type == LogMessageType::Request {
                 cap_seq += 1;
             };
-            flow_id_part | ((proto as u64) << 24) | (cap_seq & 0xffffff)
+            flow_id_part | ((proto as u64) << 24) | (cap_seq as u64 & 0xffffff)
         }
     }
 
@@ -632,7 +622,7 @@ impl SessionQueue {
             return;
         }
 
-        if !self.throttle.acquire(item.base_info.start_time) {
+        if !self.throttle.acquire(item.base_info.start_time.into()) {
             self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
             return;
         }
