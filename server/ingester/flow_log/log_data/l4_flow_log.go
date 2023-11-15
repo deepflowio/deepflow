@@ -712,7 +712,12 @@ func (k *KnowledgeGraph) fill(
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(zerodoc.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
-		lookupByMac0, lookupByMac1 = isLocalIP(isIPv6, ip40, ip60), isLocalIP(isIPv6, ip41, ip61)
+		if isLocalIP(isIPv6, ip40, ip60) {
+			lookupByMac0 = true
+		}
+		if isLocalIP(isIPv6, ip41, ip61) {
+			lookupByMac1 = true
+		}
 	} else if tapSide == uint32(zerodoc.ClientProcess) || tapSide == uint32(zerodoc.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
