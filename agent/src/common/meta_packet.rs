@@ -168,6 +168,7 @@ pub struct MetaPacket<'a> {
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+    pub second_in_minute: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,

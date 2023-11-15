@@ -95,6 +95,7 @@ use public::{
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
+    packet::SECONDS_IN_MINUTE,
     proto::common::TridentType,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
@@ -614,12 +615,15 @@ impl FlowMap {
 
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
-                meta_packet.flow_id = node.tagged_flow.flow.flow_id;
                 let flow_closed = match meta_packet.lookup_key.proto {
                     IpProtocol::TCP => self.update_tcp_node(config, node, meta_packet),
                     IpProtocol::UDP => self.update_udp_node(config, node, meta_packet),
                     _ => self.update_other_node(config, node, meta_packet),
                 };
+                let flow = &node.tagged_flow.flow;
+                meta_packet.flow_id = flow.flow_id;
+                meta_packet.second_in_minute =
+                    (flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
 
                 if flow_closed {
                     let node = nodes.swap_remove(index);
@@ -667,10 +671,11 @@ impl FlowMap {
 
     fn append_to_block(&self, config: &FlowConfig, node: &mut FlowNode, meta_packet: &MetaPacket) {
         const MINUTE: u64 = 60;
+        let packet_sequence_start_time = node.tagged_flow.flow.start_time_in_minute();
         if node.packet_sequence_block.is_some() {
             if !node.packet_sequence_block.as_ref().unwrap().is_available(
                 config.packet_sequence_block_size,
-                meta_packet.lookup_key.timestamp.as_secs() as u32,
+                packet_sequence_start_time as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
                 if let Err(_) = self
@@ -681,13 +686,14 @@ impl FlowMap {
                 {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
+
                 node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
-                    meta_packet.lookup_key.timestamp.as_secs() as u32,
+                    packet_sequence_start_time as u32,
                 )));
             }
         } else {
             node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
-                meta_packet.lookup_key.timestamp.as_secs() as u32,
+                packet_sequence_start_time as u32,
             )));
         }
 
@@ -1470,6 +1476,8 @@ impl FlowMap {
         let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        meta_packet.second_in_minute =
+            (node.tagged_flow.flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
@@ -1519,6 +1527,8 @@ impl FlowMap {
         let flow_config = config.flow;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        meta_packet.second_in_minute =
+            (node.tagged_flow.flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         node.flow_state = FlowState::Established;
         // For eBPF UDP Flow, there is no special treatment for timeout.
@@ -1537,6 +1547,8 @@ impl FlowMap {
     fn new_other_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        meta_packet.second_in_minute =
+            (node.tagged_flow.flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = config.flow.flow_timeout.opening;

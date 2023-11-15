@@ -49,6 +49,7 @@ use crate::{
 use public::utils::net::MacAddr;
 use public::{
     buffer::BatchedBox,
+    packet::SECONDS_IN_MINUTE,
     proto::{common::TridentType, flow_log},
 };
 
@@ -949,6 +950,12 @@ fn tunnel_is_none(t: &TunnelField) -> bool {
 }
 
 impl Flow {
+    pub fn start_time_in_minute(&self) -> u64 {
+        let second_in_minute = self.start_time.as_secs() % SECONDS_IN_MINUTE;
+        (self.flow_stat_time.as_secs() - second_in_minute) / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE
+            + second_in_minute
+    }
+
     fn swap_flow_ip_and_real_ip(&mut self) {
         let metric = &mut self.flow_metrics_peers[PacketDirection::ClientToServer as usize];
         swap(&mut self.flow_key.port_src, &mut metric.nat_real_port);
