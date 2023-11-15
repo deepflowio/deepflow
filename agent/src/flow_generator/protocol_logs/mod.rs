@@ -50,7 +50,6 @@ use std::{
     fmt,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str,
-    time::Duration,
 };
 
 use prost::Message;
@@ -62,6 +61,7 @@ use crate::{
         enums::{IpProtocol, TapType},
         flow::{L7Protocol, PacketDirection, SignalSource},
         tap_port::TapPort,
+        Timestamp,
     },
     metric::document::TapSide,
 };
@@ -151,18 +151,16 @@ impl From<AppProtoHead> for flow_log::AppProtoHead {
 
 #[derive(Serialize, Debug, Clone)]
 pub struct AppProtoLogsBaseInfo {
-    #[serde(serialize_with = "duration_to_micros")]
-    pub start_time: Duration,
-    #[serde(serialize_with = "duration_to_micros")]
-    pub end_time: Duration,
+    #[serde(serialize_with = "timestamp_to_micros")]
+    pub start_time: Timestamp,
+    #[serde(serialize_with = "timestamp_to_micros")]
+    pub end_time: Timestamp,
     pub flow_id: u64,
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     pub signal_source: SignalSource,
     pub vtap_id: u16,
     pub tap_type: TapType,
-    #[serde(skip)]
-    pub is_ipv6: bool,
     pub tap_side: TapSide,
     #[serde(flatten)]
     pub head: AppProtoHead,
@@ -218,9 +216,9 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_coroutine_1: u64,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub syscall_cap_seq_0: u64,
+    pub syscall_cap_seq_0: u32,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub syscall_cap_seq_1: u64,
+    pub syscall_cap_seq_1: u32,
 
     pub protocol: IpProtocol,
     #[serde(skip)]
@@ -233,7 +231,7 @@ pub struct AppProtoLogsBaseInfo {
     pub pod_id_1: u32,
 }
 
-pub fn duration_to_micros<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+pub fn timestamp_to_micros<S>(d: &Timestamp, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -280,7 +278,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             tap_port: f.tap_port.0,
             vtap_id: f.vtap_id as u32,
             tap_type: u16::from(f.tap_type) as u32,
-            is_ipv6: f.is_ipv6 as u32,
+            is_ipv6: f.ip_src.is_ipv6() as u32,
             tap_side: f.tap_side as u32,
             head: Some(f.head.into()),
             mac_src: f.mac_src.into(),
@@ -306,8 +304,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_trace_id_response: f.syscall_trace_id_response,
             syscall_trace_id_thread_0: f.syscall_trace_id_thread_0,
             syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
-            syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
-            syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
+            syscall_cap_seq_0: f.syscall_cap_seq_0,
+            syscall_cap_seq_1: f.syscall_cap_seq_1,
             syscall_coroutine_0: f.syscall_coroutine_0,
             syscall_coroutine_1: f.syscall_coroutine_1,
             gpid_0: f.gpid_0,
