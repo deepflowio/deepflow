@@ -76,8 +76,6 @@ impl LocalModeDispatcher {
             base.stats.clone(),
             false, // !from_ebpf
         );
-        // In local dispatch mode, just set pause flag to false in order to collector metrics data
-        base.pause.store(false, Ordering::Relaxed);
 
         while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
