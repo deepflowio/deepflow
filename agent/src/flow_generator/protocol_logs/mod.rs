@@ -341,8 +341,25 @@ impl AppProtoLogsBaseInfo {
         if log.syscall_coroutine_1 > 0 {
             self.syscall_coroutine_1 = log.syscall_coroutine_1;
         }
-        self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
-        self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
+        if log.syscall_trace_id_thread_0 > 0 {
+            self.syscall_trace_id_thread_0 = log.syscall_trace_id_thread_0;
+        }
+        if log.syscall_trace_id_thread_1 > 0 {
+            self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
+        }
+        if log.syscall_cap_seq_0 > 0 {
+            self.syscall_cap_seq_0 = log.syscall_cap_seq_0;
+        }
+        if log.syscall_cap_seq_1 > 0 {
+            self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
+        }
+
+        if log.syscall_trace_id_request > 0 {
+            self.syscall_trace_id_request = log.syscall_trace_id_request;
+        }
+        if log.syscall_trace_id_response > 0 {
+            self.syscall_trace_id_response = log.syscall_trace_id_response;
+        }
 
         self.start_time = log.start_time.min(self.start_time);
         self.end_time = log.end_time.max(self.end_time);
@@ -356,7 +373,6 @@ impl AppProtoLogsBaseInfo {
             _ => {}
         }
 
-        self.syscall_trace_id_response = log.syscall_trace_id_response;
         // go http2 uprobe  may merge multi times, if not req and resp merge can not set to session
         if self.head.msg_type != log.head.msg_type {
             self.head.msg_type = LogMessageType::Session;
