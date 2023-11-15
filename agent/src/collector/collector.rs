@@ -48,6 +48,7 @@ use crate::{
         meter::{AppMeter, FlowMeter, Meter, UsageMeter},
     },
     rpc::get_timestamp,
+    trident::RunningMode,
     utils::stats::{
         self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
     },
@@ -337,6 +338,7 @@ struct Stash {
     global_thread_id: u8,
     doc_flag: DocumentFlag,
     context: Context,
+    agent_mode: RunningMode,
 }
 
 impl Stash {
@@ -348,6 +350,7 @@ impl Stash {
         ctx: Context,
         sender: DebugSender<BoxedDocument>,
         counter: Arc<CollectorCounter>,
+        agent_mode: RunningMode,
     ) -> Self {
         let (slot_interval, doc_flag) = match ctx.metric_type {
             MetricsType::SECOND => (1, DocumentFlag::PER_SECOND_METRICS),
@@ -371,6 +374,7 @@ impl Stash {
             stash_init_capacity,
             doc_flag,
             context: ctx,
+            agent_mode,
         }
     }
 
@@ -524,6 +528,7 @@ impl Stash {
                     config,
                     None,
                     acc_flow.l7_protocol,
+                    self.agent_mode,
                 );
                 self.fill_single_l4_stats(tagger, flow_meter);
             }
@@ -536,6 +541,7 @@ impl Stash {
                 config,
                 None,
                 acc_flow.l7_protocol,
+                self.agent_mode,
             );
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
@@ -559,6 +565,7 @@ impl Stash {
                 config,
                 None,
                 acc_flow.l7_protocol,
+                self.agent_mode,
             );
             self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
         }
@@ -686,6 +693,7 @@ impl Stash {
                     config,
                     meter.endpoint.clone(),
                     meter.l7_protocol,
+                    self.agent_mode,
                 );
                 tagger.code |= Code::L7_PROTOCOL;
                 self.fill_single_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
@@ -699,6 +707,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.l7_protocol,
+                self.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
             // edge_stats: If the direction of a certain end is known, the statistical data
@@ -723,6 +732,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.l7_protocol,
+                self.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
             self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
@@ -826,39 +836,53 @@ fn get_single_tagger(
     config: &CollectorConfig,
     endpoint: Option<String>,
     l7_protocol: L7Protocol,
+    agent_mode: RunningMode,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
     let side = &flow.peers[ep];
     let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
     let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
-    let ip = if !is_active_host && !config.inactive_ip_enabled {
-        if is_ipv6 {
-            Ipv6Addr::UNSPECIFIED.into()
-        } else {
-            Ipv4Addr::UNSPECIFIED.into()
-        }
-    } else if ep == FLOW_METRICS_PEER_SRC {
-        if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-            flow.peers[0].nat_real_ip
-        } else {
-            if is_ipv6 {
-                Ipv6Addr::UNSPECIFIED.into()
+    // In standalone mode, we don't relay on any extra information to rewrite ip
+    let ip = match agent_mode {
+        RunningMode::Standalone => {
+            if ep == FLOW_METRICS_PEER_SRC {
+                flow.peers[0].nat_real_ip
             } else {
-                Ipv4Addr::UNSPECIFIED.into()
+                flow.peers[1].nat_real_ip
             }
         }
-    } else {
-        if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-            flow.peers[1].nat_real_ip
-        } else {
-            if is_ipv6 {
-                Ipv6Addr::UNSPECIFIED.into()
+        RunningMode::Managed => {
+            if !is_active_host && !config.inactive_ip_enabled {
+                if is_ipv6 {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
+            } else if ep == FLOW_METRICS_PEER_SRC {
+                if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+                    flow.peers[0].nat_real_ip
+                } else {
+                    if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    }
+                }
             } else {
-                Ipv4Addr::UNSPECIFIED.into()
+                if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+                    flow.peers[1].nat_real_ip
+                } else {
+                    if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    }
+                }
             }
         }
     };
+
     Tagger {
         global_thread_id,
         vtap_id: config.vtap_id,
@@ -920,6 +944,7 @@ fn get_edge_tagger(
     config: &CollectorConfig,
     endpoint: Option<String>,
     l7_protocol: L7Protocol,
+    agent_mode: RunningMode,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
     let src_ep = &flow.peers[FLOW_METRICS_PEER_SRC];
@@ -927,46 +952,50 @@ fn get_edge_tagger(
 
     let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
-    let (src_ip, dst_ip) = {
-        let (mut src_ip, mut dst_ip) = (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip);
-        if !config.inactive_ip_enabled {
-            if !is_active_host0 {
-                src_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
+    // In standalone mode, we don't relay on any extra information to rewrite src and dst ip
+    let (src_ip, dst_ip) = match agent_mode {
+        RunningMode::Standalone => (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip),
+        RunningMode::Managed => {
+            let (mut src_ip, mut dst_ip) = (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip);
+            if !config.inactive_ip_enabled {
+                if !is_active_host0 {
+                    src_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+                if !is_active_host1 {
+                    dst_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+            } else {
+                // After enabling the storage of inactive IP addresses,
+                // the Internet IP address also needs to be saved as 0,
+                // except for otel data
+                // =======================================
+                // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
+                if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
+                    src_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+                if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
+                    dst_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
             }
-            if !is_active_host1 {
-                dst_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
-            }
-        } else {
-            // After enabling the storage of inactive IP addresses,
-            // the Internet IP address also needs to be saved as 0,
-            // except for otel data
-            // =======================================
-            // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
-            if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                src_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
-            }
-            if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                dst_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
-            }
-        }
 
-        (src_ip, dst_ip)
+            (src_ip, dst_ip)
+        }
     };
 
     let (src_mac, dst_mac) = {
@@ -1057,6 +1086,7 @@ pub struct Collector {
     sender: DebugSender<BoxedDocument>,
     config: CollectorAccess,
     context: Context,
+    agent_mode: RunningMode,
 }
 
 impl Collector {
@@ -1069,6 +1099,7 @@ impl Collector {
         stats: &Arc<stats::Collector>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
+        agent_mode: RunningMode,
     ) -> Self {
         let delay_seconds = delay_seconds as u64;
         let (kind, name) = match metric_type {
@@ -1110,6 +1141,7 @@ impl Collector {
                 metric_type,
                 ntp_diff,
             },
+            agent_mode,
         }
     }
 
@@ -1124,11 +1156,11 @@ impl Collector {
         let sender = self.sender.clone();
         let ctx = self.context.clone();
         let config = self.config.clone();
-
+        let agent_mode = self.agent_mode;
         let thread = thread::Builder::new()
             .name("collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter);
+                let mut stash = Stash::new(ctx, sender, counter, agent_mode);
                 let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
@@ -1187,6 +1219,7 @@ pub struct L7Collector {
     sender: DebugSender<BoxedDocument>,
     config: CollectorAccess,
     context: Context,
+    agent_mode: RunningMode,
 }
 
 impl L7Collector {
@@ -1199,6 +1232,7 @@ impl L7Collector {
         stats: &Arc<stats::Collector>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
+        agent_mode: RunningMode,
     ) -> Self {
         let delay_seconds = delay_seconds as u64;
         let (kind, name) = match metric_type {
@@ -1240,6 +1274,7 @@ impl L7Collector {
                 metric_type,
                 ntp_diff,
             },
+            agent_mode,
         }
     }
 
@@ -1254,11 +1289,11 @@ impl L7Collector {
         let sender = self.sender.clone();
         let ctx = self.context.clone();
         let config = self.config.clone();
-
+        let agent_mode = self.agent_mode;
         let thread = thread::Builder::new()
             .name("l7_collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter);
+                let mut stash = Stash::new(ctx, sender, counter, agent_mode);
                 let mut l7_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
