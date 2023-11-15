@@ -854,30 +854,18 @@ fn get_single_tagger(
         }
         RunningMode::Managed => {
             if !is_active_host && !config.inactive_ip_enabled {
-                if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                }
+                unspecified_ip(is_ipv6)
             } else if ep == FLOW_METRICS_PEER_SRC {
                 if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
                     flow.peers[0].nat_real_ip
                 } else {
-                    if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    }
+                    unspecified_ip(is_ipv6)
                 }
             } else {
                 if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
                     flow.peers[1].nat_real_ip
                 } else {
-                    if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    }
+                    unspecified_ip(is_ipv6)
                 }
             }
         }
@@ -959,18 +947,10 @@ fn get_edge_tagger(
             let (mut src_ip, mut dst_ip) = (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip);
             if !config.inactive_ip_enabled {
                 if !is_active_host0 {
-                    src_ip = if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    };
+                    src_ip = unspecified_ip(is_ipv6);
                 }
                 if !is_active_host1 {
-                    dst_ip = if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    };
+                    dst_ip = unspecified_ip(is_ipv6);
                 }
             } else {
                 // After enabling the storage of inactive IP addresses,
@@ -979,18 +959,10 @@ fn get_edge_tagger(
                 // =======================================
                 // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
                 if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                    src_ip = if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    };
+                    src_ip = unspecified_ip(is_ipv6);
                 }
                 if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                    dst_ip = if is_ipv6 {
-                        Ipv6Addr::UNSPECIFIED.into()
-                    } else {
-                        Ipv4Addr::UNSPECIFIED.into()
-                    };
+                    dst_ip = unspecified_ip(is_ipv6);
                 }
             }
 
@@ -1341,6 +1313,15 @@ impl L7Collector {
             let _ = t.join();
         }
         info!("{} id=({}) stopped", self.context.name, self.context.id);
+    }
+}
+
+#[inline(always)]
+fn unspecified_ip(is_ipv6: bool) -> IpAddr {
+    if is_ipv6 {
+        IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+    } else {
+        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
     }
 }
 

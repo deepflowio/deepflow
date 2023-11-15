@@ -1250,7 +1250,7 @@ impl RuntimeConfig {
         // reset below switch in standalone mode
         c.app_proto_log_enabled = !c.l7_log_store_tap_types.is_empty();
         c.ntp_enabled = false;
-        // c.collector_socket_type = trident::SocketType::Tcp;
+        // c.collector_socket_type = trident::SocketType::File;
         c.max_memory <<= 20;
         c.server_tx_bandwidth_threshold <<= 20;
 

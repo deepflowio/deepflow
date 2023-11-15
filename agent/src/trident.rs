@@ -2045,6 +2045,7 @@ impl AgentComponents {
 
             let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
+                .pause(agent_mode == RunningMode::Managed)
                 .handler_builders(handler_builder)
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
