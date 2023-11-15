@@ -105,24 +105,38 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 				continue
 			}
 
-			vinterfaceLcuuid := common.GenerateUUID(redisLcuuid + redis.VnetIP)
-			vinterfaces = append(vinterfaces, model.VInterface{
-				Lcuuid:        vinterfaceLcuuid,
-				Type:          common.VIF_TYPE_LAN,
-				Mac:           common.VIF_DEFAULT_MAC,
-				DeviceLcuuid:  redisLcuuid,
-				DeviceType:    common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-				NetworkLcuuid: networkLcuuid,
-				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  region.Lcuuid,
-			})
-			ips = append(ips, model.IP{
-				Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + redis.VnetIP),
-				VInterfaceLcuuid: vinterfaceLcuuid,
-				IP:               redis.VnetIP,
-				SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
-				RegionLcuuid:     region.Lcuuid,
-			})
+			for index, ip := range []string{redis.VnetIP, redis.Eip} {
+				if ip == "" {
+					continue
+				}
+
+				var ipType int
+				switch index {
+				case 0:
+					ipType = common.VIF_TYPE_LAN
+				case 1:
+					ipType = common.VIF_TYPE_WAN
+				}
+
+				vinterfaceLcuuid := common.GenerateUUID(redisLcuuid + ip)
+				vinterfaces = append(vinterfaces, model.VInterface{
+					Lcuuid:        vinterfaceLcuuid,
+					Type:          ipType,
+					Mac:           common.VIF_DEFAULT_MAC,
+					DeviceLcuuid:  redisLcuuid,
+					DeviceType:    common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+					NetworkLcuuid: networkLcuuid,
+					VPCLcuuid:     vpcLcuuid,
+					RegionLcuuid:  region.Lcuuid,
+				})
+				ips = append(ips, model.IP{
+					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+					VInterfaceLcuuid: vinterfaceLcuuid,
+					IP:               ip,
+					SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+					RegionLcuuid:     region.Lcuuid,
+				})
+			}
 		}
 	}
 	log.Debug("get redis complete")
