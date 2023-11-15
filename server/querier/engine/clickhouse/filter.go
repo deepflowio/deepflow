@@ -133,10 +133,10 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 
 			filter = strings.Join([]string{resourceNoSuffix, "_id", suffix, "!=0"}, "")
 
-		} else if resourceNoSuffix == "l3_epc" {
+		} else if resourceNoSuffix == "vpc" {
 			filter = strings.Join([]string{"l3_epc_id", suffix, "!=-2"}, "")
 
-		} else if resourceNoSuffix == "l2_epc" {
+		} else if resourceNoSuffix == "l2_vpc" {
 			filter = strings.Join([]string{"epc_id", suffix, "!=-2"}, "")
 
 		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_AUTO) {

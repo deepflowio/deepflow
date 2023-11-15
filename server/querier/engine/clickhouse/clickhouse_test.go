@@ -341,7 +341,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		index:  "exist_trans_support_tag_0",
-		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(l3_epc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
+		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(vpc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1",
 	}, {
 		index:  "exist_trans_support_tag_1",
