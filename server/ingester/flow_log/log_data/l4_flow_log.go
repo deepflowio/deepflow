@@ -732,11 +732,11 @@ func (k *KnowledgeGraph) fill(
 	// use vtapId + podId to match first
 	if podId0 != 0 {
 		k.TagSource0 |= uint8(zerodoc.PodId)
-		info0 = platformData.QueryEpcIDPodInfo(l3EpcID0, podId0)
+		info0 = platformData.QueryPodIdInfo(podId0)
 	}
 	if podId1 != 0 {
 		k.TagSource1 |= uint8(zerodoc.PodId)
-		info1 = platformData.QueryEpcIDPodInfo(l3EpcID1, podId1)
+		info1 = platformData.QueryPodIdInfo(podId1)
 	}
 
 	if info0 == nil {

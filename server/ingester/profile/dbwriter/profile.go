@@ -329,7 +329,7 @@ func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformDat
 	var info *grpc.Info
 	// 1. try to find platform info by podID first
 	if podID != 0 {
-		info = platformData.QueryEpcIDPodInfo(p.L3EpcID, podID)
+		info = platformData.QueryPodIdInfo(podID)
 	}
 
 	// 2. try to fix platform info by IP
