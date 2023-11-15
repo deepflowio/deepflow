@@ -180,6 +180,7 @@ pub struct MetaPacket<'a> {
     // for PcapAssembler
     pub flow_id: u64,
     pub socket_role: u8,
+    pub second_in_minute: u8,
 
     /********** for GPID **********/
     pub gpid_0: u32,

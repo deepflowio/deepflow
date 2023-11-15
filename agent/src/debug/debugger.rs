@@ -543,7 +543,11 @@ pub struct Client {
 
 impl Client {
     pub fn new(addr: SocketAddr) -> Result<Self> {
-        let sock = UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0))?;
+        let sock = if addr.is_ipv4() {
+            UdpSocket::bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 0))?
+        } else {
+            UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0))?
+        };
         Ok(Self {
             sock,
             conf: config::standard(),

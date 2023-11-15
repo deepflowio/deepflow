@@ -20,6 +20,8 @@ use std::time::Duration;
 
 use crate::consts::RECORD_HEADER_LEN;
 
+pub const SECONDS_IN_MINUTE: u64 = 60;
+
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
     pub timestamp: Duration,
@@ -48,6 +50,7 @@ pub struct MiniPacket {
     pub timestamp: Duration,
     pub flow_id: u64,
     pub acl_gids: Vec<u16>,
+    pub second_in_minute: u8,
 }
 
 impl fmt::Debug for MiniPacket {
@@ -55,6 +58,7 @@ impl fmt::Debug for MiniPacket {
         f.debug_struct("MiniPacket")
             .field("packet_len", &self.packet.len())
             .field("timestamp", &self.timestamp)
+            .field("second_in_minute", &self.second_in_minute)
             .field("flow_id", &self.flow_id)
             .field("acl_gids", &self.flow_id)
             .finish()
@@ -64,6 +68,14 @@ impl fmt::Debug for MiniPacket {
 impl MiniPacket {
     pub fn record_len(&self) -> usize {
         self.packet.len() + RECORD_HEADER_LEN
+    }
+
+    pub fn start_time_in_minute(&self) -> Duration {
+        let second_in_minute = self.second_in_minute as u64;
+        Duration::from_secs(
+            (self.timestamp.as_secs() - second_in_minute) / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE
+                + second_in_minute,
+        )
     }
 }
 
