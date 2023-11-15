@@ -1170,7 +1170,6 @@ pub struct RuntimeConfig {
     pub log_threshold: u32,
     #[serde(deserialize_with = "to_log_level")]
     pub log_level: log::Level,
-    #[serde(skip)]
     pub analyzer_ip: String,
     pub analyzer_port: u16,
     #[serde(rename = "max_escape_seconds")]
@@ -1251,7 +1250,7 @@ impl RuntimeConfig {
         // reset below switch in standalone mode
         c.app_proto_log_enabled = !c.l7_log_store_tap_types.is_empty();
         c.ntp_enabled = false;
-        c.collector_socket_type = trident::SocketType::File;
+        // c.collector_socket_type = trident::SocketType::Tcp;
         c.max_memory <<= 20;
         c.server_tx_bandwidth_threshold <<= 20;
 
@@ -1268,7 +1267,7 @@ impl RuntimeConfig {
             max_memory: 768,
             sync_interval: 60,
             stats_interval: 10,
-            global_pps_threshold: 200,
+            global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
             tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"

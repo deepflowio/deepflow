@@ -1259,6 +1259,7 @@ impl AgentComponents {
         config_handler: &ConfigHandler,
         queue_debugger: &QueueDebugger,
         synchronizer: &Arc<Synchronizer>,
+        agent_mode: RunningMode,
     ) -> CollectorThread {
         let yaml_config = &config_handler.candidate_config.yaml_config;
 
@@ -1370,6 +1371,7 @@ impl AgentComponents {
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
+                agent_mode,
             ));
         }
         if metrics_type.contains(MetricsType::MINUTE) {
@@ -1382,6 +1384,7 @@ impl AgentComponents {
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
+                agent_mode,
             ));
         }
 
@@ -1402,6 +1405,7 @@ impl AgentComponents {
         config_handler: &ConfigHandler,
         queue_debugger: &QueueDebugger,
         synchronizer: &Arc<Synchronizer>,
+        agent_mode: RunningMode,
     ) -> L7CollectorThread {
         let yaml_config = &config_handler.candidate_config.yaml_config;
 
@@ -1478,6 +1482,7 @@ impl AgentComponents {
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
+                agent_mode,
             ));
         }
         if metrics_type.contains(MetricsType::MINUTE) {
@@ -1490,6 +1495,7 @@ impl AgentComponents {
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
+                agent_mode,
             ));
         }
 
@@ -2131,6 +2137,7 @@ impl AgentComponents {
                 config_handler,
                 &queue_debugger,
                 &synchronizer,
+                agent_mode,
             );
             collectors.push(collector);
             let l7_collector = Self::new_l7_collector(
@@ -2142,6 +2149,7 @@ impl AgentComponents {
                 config_handler,
                 &queue_debugger,
                 &synchronizer,
+                agent_mode,
             );
             l7_collectors.push(l7_collector);
         }
@@ -2234,6 +2242,7 @@ impl AgentComponents {
                 config_handler,
                 &queue_debugger,
                 &synchronizer,
+                agent_mode,
             );
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -2271,6 +2280,7 @@ impl AgentComponents {
                 config_handler,
                 &queue_debugger,
                 &synchronizer,
+                agent_mode,
             );
             l7_collectors.push(l7_collector);
             match EbpfCollector::new(
@@ -2348,6 +2358,7 @@ impl AgentComponents {
             config_handler,
             &queue_debugger,
             &synchronizer,
+            agent_mode,
         );
         l7_collectors.push(l7_collector);
 
