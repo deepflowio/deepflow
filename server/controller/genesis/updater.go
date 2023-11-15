@@ -992,7 +992,10 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 			instance := labels.Get("instance").MustString()
 
 			labelsSlice := []string{}
-			honorLabelsConfig := pJobNameToHonorLabelsConfig[job]
+			honorLabelsConfig, ok := pJobNameToHonorLabelsConfig[job]
+			if !ok {
+				honorLabelsConfig = true
+			}
 			labelsMap := labels.MustMap()
 			delete(labelsMap, "job")
 			delete(labelsMap, "instance")
