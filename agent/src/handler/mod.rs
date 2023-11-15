@@ -67,6 +67,7 @@ pub struct MiniPacket<'a> {
     header_type: HeaderType,
     l2_l3_opt_size: u16,
     packet_len: u32,
+    second_in_minute: u8,
 }
 
 impl<'a> MiniPacket<'a> {
@@ -94,6 +95,7 @@ impl<'a> MiniPacket<'a> {
             header_type: meta_packet.header_type,
             l2_l3_opt_size: meta_packet.l2_l3_opt_size,
             packet_len: meta_packet.packet_len,
+            second_in_minute: meta_packet.second_in_minute,
         }
     }
 }
@@ -149,6 +151,7 @@ impl PacketHandler {
                     flow_id: packet.flow_id,
                     timestamp: Duration::from_nanos(packet.timestamp),
                     acl_gids: Vec::from(acl_gids.list()),
+                    second_in_minute: packet.second_in_minute,
                 };
                 if let Err(e) = sender.send(mini_packet) {
                     debug!("send mini packet to pcap assembler error: {e:?}");
