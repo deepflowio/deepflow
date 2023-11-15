@@ -217,12 +217,16 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "SofaRPC";
 	case PROTO_POSTGRESQL:
 		return "PgSQL";
+	case PROTO_ORACLE:
+		return "Oracle";
 	case PROTO_FASTCGI:
 		return "FastCGI";
 	case PROTO_MONGO:
 		return "MongoDB";
 	case PROTO_TLS:
 		return "TLS";
+	case PROTO_CUSTOM:
+		return "Custom";
 	default:
 		return "Unknown";
 	}
