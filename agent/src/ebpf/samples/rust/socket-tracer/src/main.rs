@@ -359,6 +359,51 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
 
+        //set_feature_regex(
+        //    FEATURE_UPROBE_OPENSSL,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
+        //set_feature_regex(
+        //    FEATURE_UPROBE_GOLANG,
+        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        //);
+
+        //set_io_event_collect_mode(1);
+
+        //set_io_event_minimal_duration(1000000);
+
+        //// enable go auto traceing,
+        //set_go_tracing_timeout(120);
+
+        /*
+            let bypass_port = 443;
+            let mut bypass_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+            bypass_port_bitmap[bypass_port / 8] |= 1 << (bypass_port % 8);
+            set_bypass_port_bitmap(bypass_port_bitmap.as_ptr());
+
+            let allow_port = 443;
+            let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+            allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
+            set_allow_port_bitmap(allow_port_bitmap.as_ptr());
+        */
+
+        // The first parameter passed by a null pointer can be
+        // filled with std::ptr::null()
+        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
+            println!("bpf_tracer_init() file:{:?} error", log_file);
+            ::std::process::exit(1);
+        }
+        /*
+                if register_event_handle(
+                    EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
+                    process_event_handle,
+                ) != 0
+                {
+                    println!("register_event_handle() faild");
+                    ::std::process::exit(1);
+                }
+        */
+ 
         set_protocol_ports_bitmap(
             SOCK_DATA_HTTP1 as c_int,
             CString::new("1-65535".as_bytes())
@@ -445,51 +490,7 @@ fn main() {
             CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
-        //set_feature_regex(
-        //    FEATURE_UPROBE_OPENSSL,
-        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        //);
-        //set_feature_regex(
-        //    FEATURE_UPROBE_GOLANG,
-        //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        //);
-
-        //set_io_event_collect_mode(1);
-
-        //set_io_event_minimal_duration(1000000);
-
-        //// enable go auto traceing,
-        //set_go_tracing_timeout(120);
-
-        /*
-            let bypass_port = 443;
-            let mut bypass_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
-            bypass_port_bitmap[bypass_port / 8] |= 1 << (bypass_port % 8);
-            set_bypass_port_bitmap(bypass_port_bitmap.as_ptr());
-
-            let allow_port = 443;
-            let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
-            allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
-            set_allow_port_bitmap(allow_port_bitmap.as_ptr());
-        */
-
-        // The first parameter passed by a null pointer can be
-        // filled with std::ptr::null()
-        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-            println!("bpf_tracer_init() file:{:?} error", log_file);
-            ::std::process::exit(1);
-        }
-        /*
-                if register_event_handle(
-                    EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
-                    process_event_handle,
-                ) != 0
-                {
-                    println!("register_event_handle() faild");
-                    ::std::process::exit(1);
-                }
-        */
-        if running_socket_tracer(
+       if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
             128, /* Number of page frames occupied by kernel-shared memory, must be a power of 2. Used for perf data transfer */
