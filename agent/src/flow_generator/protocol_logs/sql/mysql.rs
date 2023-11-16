@@ -87,7 +87,7 @@ impl L7ProtocolInfoInterface for MysqlInfo {
         None
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::MysqlInfo(other) = other {
             self.merge(other);
         }
@@ -108,19 +108,19 @@ impl L7ProtocolInfoInterface for MysqlInfo {
 }
 
 impl MysqlInfo {
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         if self.protocol_version == 0 {
             self.protocol_version = other.protocol_version
         }
         match other.msg_type {
             LogMessageType::Request => {
                 self.command = other.command;
-                self.context = other.context;
+                std::mem::swap(&mut self.context, &mut other.context);
             }
             LogMessageType::Response => {
                 self.response_code = other.response_code;
                 self.affected_rows = other.affected_rows;
-                self.error_message = other.error_message;
+                std::mem::swap(&mut self.error_message, &mut other.error_message);
                 self.status = other.status;
                 if self.error_code.is_none() {
                     self.error_code = other.error_code;

@@ -89,6 +89,7 @@ func (b *BaiduBce) getVMs(
 			retVM := model.VM{
 				Lcuuid:       vmLcuuid,
 				Name:         vm.InstanceName,
+				Label:        vm.InstanceId,
 				HType:        common.VM_HTYPE_VM_C,
 				VPCLcuuid:    vpcLcuuid,
 				State:        vmState,

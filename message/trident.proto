@@ -509,6 +509,9 @@ message PodIp {
     optional uint32 pod_cluster_id = 5;
     repeated string container_ids = 6;
     optional string pod_node_ip = 7;
+    optional uint32 pod_ns_id = 8;
+    optional uint32 pod_group_id = 9;
+    optional uint32 pod_group_type = 10;
 }
 
 message VtapIp {
@@ -652,6 +655,8 @@ message InterfaceInfo {
 
     optional string netns = 7 [default = ""];
     optional uint32 netns_id = 8 [default = 0];
+
+    optional string if_type = 9 [default = ""];
 }
 
 message Tag {

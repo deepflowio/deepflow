@@ -38,6 +38,7 @@ use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
 
 macro_rules! all_protocol_info {
     ($($name:ident($info_struct:ident)),+$(,)?) => {
+
         #[derive(Serialize, Debug, Clone)]
         #[enum_dispatch]
         #[serde(untagged)]
@@ -87,7 +88,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     // 返回的错误暂时无视
     // =============================================================
     // merge request and response. now return err will have no effect.
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()>;
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()>;
 
     fn app_proto_head(&self) -> Option<AppProtoHead>;
 

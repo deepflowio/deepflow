@@ -81,6 +81,67 @@ pub use {
     policy::labeler::Labeler as _Labeler,
 };
 
+#[allow(unused)]
+macro_rules! gen_sizes {
+    ($(#[$struct_meta:meta])*
+    $sv:vis struct $name:ident {
+        $($(#[$field_meta:meta])* $fv:vis $fname:ident: $ftype:ty),* $(,)?
+    }
+    ) => {
+        $(#[$struct_meta])*
+        $sv struct $name {
+            $($(#[$field_meta])* $fv $fname: $ftype,)*
+        }
+
+        impl $name {
+            pub fn print_sizes() {
+                println!("{}\t{} struct {{", std::mem::size_of::<$name>(), stringify!($name));
+                $(println!("{}\t\t{}: {},", std::mem::size_of::<$ftype>(), stringify!($fname), stringify!($ftype));)*
+                println!("\t}}");
+            }
+        }
+    };
+
+    ($(#[$struct_meta:meta])*
+    $sv:vis struct $name:ident (
+        $($(#[$field_meta:meta])* $fv:vis $ftype:ty),*
+    );
+    ) => {
+        $(#[$struct_meta])*
+        $sv struct $name ($($(#[$field_meta])* $fv $ftype),*);
+
+        impl $name {
+            pub fn print_sizes() {
+                println!("{}\t{} struct {{", std::mem::size_of::<$name>(), stringify!($name));
+                $(println!("{}\t\t{},", std::mem::size_of::<$ftype>(), stringify!($ftype));)*
+                println!("\t}}");
+            }
+        }
+    };
+
+    ($(#[$struct_meta:meta])*
+    $sv:vis enum $name:ident {
+        $($(#[$field_meta:meta])* $fname:ident($ftype:ty)),* $(,)?
+    }
+    ) => {
+        $(#[$struct_meta])*
+        $sv enum $name {
+            $($(#[$field_meta])* $fname($ftype),)*
+        }
+
+        impl $name {
+            pub fn print_sizes() {
+                println!("{}\t{} enum {{", std::mem::size_of::<$name>(), stringify!($name));
+                $(println!("{}\t\t{}: {},", std::mem::size_of::<$ftype>(), stringify!($fname), stringify!($ftype));)*
+                println!("\t}}");
+            }
+        }
+    };
+}
+
+#[allow(unused)]
+pub(crate) use gen_sizes;
+
 #[cfg(test)]
 mod tests {
     macro_rules! print_size_of {

@@ -21,6 +21,7 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use ahash::HashSet;
 use arc_swap::access::Access;
 use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
@@ -498,6 +499,41 @@ impl EbpfCollector {
                 return Err(Error::EbpfInitError);
             }
 
+            let mut all_proto_map = get_all_protocol()
+                .iter()
+                .map(|p| p.as_str().to_string())
+                .collect::<HashSet<String>>();
+            for (protocol, port_range) in &config.l7_protocol_ports {
+                all_proto_map.remove(protocol);
+                let l7_protocol = L7Protocol::from(protocol.clone());
+                #[cfg(target_arch = "x86_64")]
+                let ports = port_range.as_ptr() as *const i8;
+                #[cfg(target_arch = "aarch64")]
+                let ports = port_range.as_ptr();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                    warn!(
+                        "Ebpf set_protocol_ports_bitmap error: {} {}",
+                        protocol, port_range
+                    );
+                }
+            }
+
+            // if not config the port range, default is parse in all port
+            let all_port = "1-65535".to_string();
+            for protocol in all_proto_map.iter() {
+                let l7_protocol = L7Protocol::from(protocol.clone());
+                #[cfg(target_arch = "x86_64")]
+                let ports = all_port.as_ptr() as *const i8;
+                #[cfg(target_arch = "aarch64")]
+                let ports = all_port.as_ptr();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                    warn!(
+                        "Ebpf set_protocol_ports_bitmap error: {} {}",
+                        protocol, all_port
+                    );
+                }
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -535,20 +571,6 @@ impl EbpfCollector {
 
                 // CPUID will not be included in the aggregation of stack trace data.
                 set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
-            }
-
-            for (protocol, port_range) in &config.l7_protocol_ports {
-                let l7_protocol = L7Protocol::from(protocol.clone());
-                #[cfg(target_arch = "x86_64")]
-                let ports = port_range.as_ptr() as *const i8;
-                #[cfg(target_arch = "aarch64")]
-                let ports = port_range.as_ptr();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
-                    warn!(
-                        "Ebpf set_protocol_ports_bitmap error: {} {}",
-                        protocol, port_range
-                    );
-                }
             }
 
             ebpf::bpf_tracer_finish();

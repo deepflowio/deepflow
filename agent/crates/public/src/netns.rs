@@ -89,6 +89,7 @@ pub struct InterfaceInfo {
     pub name: String,
     pub device_id: String,
     pub ns_inode: u64,
+    pub if_type: Option<String>,
 }
 
 impl fmt::Display for InterfaceInfo {
@@ -378,6 +379,7 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
                     name: link.name,
                     device_id: current_ns.to_string(),
                     ns_inode: *ino,
+                    if_type: link.if_type,
                 };
                 debug!("found {:?}", info);
                 result

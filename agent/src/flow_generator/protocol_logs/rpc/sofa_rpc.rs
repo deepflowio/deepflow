@@ -206,7 +206,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
         Some(self.req_id)
     }
 
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::SofaRpcInfo(s) = other {
             self.resp_len = s.resp_len;
             self.resp_code = s.resp_code;

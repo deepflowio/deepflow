@@ -79,7 +79,10 @@ impl L7ProtocolInfoInterface for KafkaInfo {
         Some(self.correlation_id)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(
+        &mut self,
+        other: &mut crate::common::l7_protocol_info::L7ProtocolInfo,
+    ) -> Result<()> {
         if let L7ProtocolInfo::KafkaInfo(other) = other {
             self.merge(other);
         }
@@ -102,7 +105,7 @@ impl L7ProtocolInfoInterface for KafkaInfo {
 impl KafkaInfo {
     // https://kafka.apache.org/protocol.html
     const API_KEY_MAX: u16 = 67;
-    pub fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: &mut Self) {
         if self.resp_msg_size.is_none() {
             self.resp_msg_size = other.resp_msg_size;
         }
@@ -112,9 +115,7 @@ impl KafkaInfo {
         if other.status_code.is_some() {
             self.status_code = other.status_code;
         }
-        if other.topic_name.len() > 0 {
-            self.topic_name = other.topic_name;
-        }
+        crate::flow_generator::protocol_logs::swap_if!(self, topic_name, is_empty, other);
     }
 
     pub fn check(&self) -> bool {

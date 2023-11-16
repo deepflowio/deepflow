@@ -1372,6 +1372,10 @@ func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
 	return r.idToPodNode[podNodeID]
 }
 
+func (r *PlatformRawData) GetPodGroup(podGroupID int) *models.PodGroup {
+	return r.idToPodGroup[podGroupID]
+}
+
 func (r *PlatformRawData) GetPod(podID int) *models.Pod {
 	return r.idToPod[podID]
 }

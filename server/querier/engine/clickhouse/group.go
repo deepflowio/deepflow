@@ -27,29 +27,32 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetGroup(name string, asTagMap map[string]string, db, table string) (Statement, error) {
+func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Statement, error) {
+	var stmts []Statement
 	if asTagMap[name] == "time" {
-		return nil, nil
+		return stmts, nil
 	}
-	var stmt Statement
 	tag, ok := tag.GetTag(name, db, table, "default")
 	if ok {
 		if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(name, config.Cfg.AutoCustomTag.TagName) {
-			stmt = &GroupTag{Value: tag.TagTranslator, AsTagMap: asTagMap}
+			autoTagMap := tag.TagTranslatorMap
+			for autoTagKey, _ := range autoTagMap {
+				stmts = append(stmts, &GroupTag{Value: autoTagKey, AsTagMap: asTagMap})
+			}
 		} else if tag.TagTranslator != "" {
-			stmt = &GroupTag{Value: tag.TagTranslator, Alias: name, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: tag.TagTranslator, Alias: name, AsTagMap: asTagMap})
 		} else {
-			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS {
 			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
-			stmt = &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
 		} else {
-			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
 	}
-	return stmt, nil
+	return stmts, nil
 }
 
 func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
