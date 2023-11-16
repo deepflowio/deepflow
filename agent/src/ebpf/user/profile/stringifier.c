@@ -389,18 +389,6 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
 
-	/*
-	 * The stringifier clears stack-ids out of the stack traces table
-	 * when it first encounters them. If a stack-id is reused by a
-	 * different stack-trace-key, the stringifier returns its memoized
-	 * stack trace string.
-	 */
-	if (!bpf_table_delete_key(t, stack_map_name, (u64) stack_id)) {
-		ebpf_warning
-		    ("stack_map_name %s, delete failed, stack-ID %d\n",
-		     stack_map_name, stack_id);
-	}
-
 	if (str == NULL)
 		return NULL;
 

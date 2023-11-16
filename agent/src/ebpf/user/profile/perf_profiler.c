@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include "../config.h"
+#include "../utils.h"
 #include "../common.h"
 #include "../mem.h"
 #include "../log.h"
@@ -156,6 +157,13 @@ static pthread_mutex_t cpdbg_mutex;
 static bool cpdbg_enable;
 static uint32_t cpdbg_start_time;
 static uint32_t cpdbg_timeout;
+
+/* Record all stack IDs in each iteration for quick retrieval. */
+struct stack_ids_bitmap stack_ids;
+/* This vector table is used to remove a stack from the stack map. */
+static int *clear_stack_ids;
+
+static volatile u64 g_enable_perf_sample;
 
 static u64 get_process_lost_count(void)
 {
@@ -478,6 +486,22 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	}
 }
 
+static inline void add_stack_id_to_bitmap(int stack_id)
+{
+	if (stack_id < 0)
+		return;
+
+	if (!is_set_bitmap(stack_ids.bitmap, stack_id)) {
+		set_bitmap(stack_ids.bitmap, stack_id);
+		int ret = VEC_OK;
+		vec_add1(clear_stack_ids, stack_id, ret);
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed\n");
+		}
+		stack_ids.count++;
+	}
+}
+
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
 				   stack_str_hash_t * stack_str_hash,
@@ -518,6 +542,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		if (v->userstack == -EEXIST)
 			stack_trace_lost++;
+
+		add_stack_id_to_bitmap(v->kernstack);
+		add_stack_id_to_bitmap(v->userstack);
 
 		/* Total iteration count for this iteration. */
 		(*count)++;
@@ -625,6 +652,21 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 	vec_free(raw_stack_data);
 }
 
+static void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
+{
+	if (bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
+				ENABLE_IDX, &enable_flag) == false) {
+		ebpf_warning("profiler state map update error."
+			     "(%s enable_flag %lu) - %s\n",
+			     MAP_PROFILER_STATE_MAP,
+			     enable_flag, strerror(errno));
+	}
+
+	g_enable_perf_sample = enable_flag;
+
+	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
+}
+
 static void process_bpf_stacktraces(struct bpf_tracer *t,
 				    struct bpf_perf_reader *r_a,
 				    struct bpf_perf_reader *r_b)
@@ -696,6 +738,8 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 		}
 	}
 
+	stack_ids.count = 0;
+
 	if (nfds > 0) {
 
 	      check_again:
@@ -736,6 +780,28 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	}
 
 release_iter:
+
+	if (stack_ids.count != vec_len(clear_stack_ids)) {
+		ebpf_warning
+		    ("stack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
+		     stack_ids.count, vec_len(clear_stack_ids));
+	}
+
+	int *sid;
+	vec_foreach(sid, clear_stack_ids) {
+		int id = *sid;
+		if (!bpf_table_delete_key(t, stack_map_name, (u64) id)) {
+			ebpf_warning
+			    ("stack_map_name %s, delete failed, stack-ID %d, flag 0x%X\n",
+			     stack_map_name, id,
+			     is_set_bitmap(stack_ids.bitmap, id));
+		}
+
+		clear_bitmap(stack_ids.bitmap, id);
+	}
+
+	vec_free(clear_stack_ids);
+
 	/* Now that we've consumed the data, reset the sample count in BPF. */
 	sample_cnt_val = 0;
 	bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
@@ -764,8 +830,12 @@ static void cp_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
-		if (unlikely(profiler_stop == 1))
+		if (unlikely(profiler_stop == 1)) {
+			if (g_enable_perf_sample)
+				set_enable_perf_sample(t, 0);
+
 			goto exit;
+		}
 
 		/* 
 		 * Waiting for the regular expression to be configured
@@ -779,10 +849,15 @@ static void cp_reader_work(void *arg)
 		 */
 		if (unlikely(!regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
+			if (g_enable_perf_sample)
+				set_enable_perf_sample(t, 0);
 			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
+
+		if (unlikely(!g_enable_perf_sample))
+			set_enable_perf_sample(t, 1);
 
 		tracer_reader_lock(t);
 		process_bpf_stacktraces(t, reader_a, reader_b);
@@ -825,6 +900,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
+
+	set_enable_perf_sample(tracer, 0);
+
 	/*
 	 * create reader for read eBPF-profiler data.
 	 * To implement eBPF perf-profiler double buffering output,
@@ -861,8 +939,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
-				 (void *)java_syms_update_work,
-				 (void *)tracer);
+				 (void *)java_syms_update_work, (void *)tracer);
 
 	if (ret) {
 		goto error;
@@ -1338,7 +1415,7 @@ int set_profiler_cpu_aggregation(int flag)
 
 struct bpf_tracer *get_profiler_tracer(void)
 {
-        return profiler_tracer;
+	return profiler_tracer;
 }
 
 #else /* defined AARCH64_MUSL */
