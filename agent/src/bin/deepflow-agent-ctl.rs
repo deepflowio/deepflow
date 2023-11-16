@@ -250,9 +250,20 @@ impl Controller {
     }
 
     fn new_client(&self) -> Result<Client> {
+        let addr = match self.addr {
+            IpAddr::V4(a) => IpAddr::V4(a),
+            IpAddr::V6(a) => {
+                if let Some(v4) = a.to_ipv4() {
+                    IpAddr::V4(v4)
+                } else {
+                    IpAddr::V6(a)
+                }
+            }
+        };
+
         let client = Client::new(
             (
-                self.addr,
+                addr,
                 self.port.expect("need input a port to connect debugger"),
             )
                 .into(),
