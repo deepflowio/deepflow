@@ -296,6 +296,7 @@ pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<In
                     name: link.name,
                     device_id: current_ns.to_string(),
                     ns_inode: *ino,
+                    if_type: link.if_type,
                 };
                 debug!("found {:?}", info);
                 result
