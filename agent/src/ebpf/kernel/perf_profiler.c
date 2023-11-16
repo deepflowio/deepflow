@@ -27,8 +27,8 @@
 #include "bpf_endian.h"
 #include "perf_profiler.h"
 
-#define KERN_STACKID_FLAGS (0 | BPF_F_FAST_STACK_CMP)
-#define USER_STACKID_FLAGS (0 | BPF_F_FAST_STACK_CMP | BPF_F_USER_STACK)
+#define KERN_STACKID_FLAGS (0)
+#define USER_STACKID_FLAGS (0 | BPF_F_USER_STACK)
 
 /*
  * To keep the stack trace profiler "always on," we utilize a double
@@ -68,54 +68,52 @@ MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES)
  * switching between buffer a and buffer b.
  */
 MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT)
-
-SEC("perf_event")
+ SEC("perf_event")
 int bpf_perf_event(struct bpf_perf_event_data *ctx)
 {
 	__u32 count_idx;
 
 	count_idx = TRANSFER_CNT_IDX;
-	__u64 *transfer_count_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *transfer_count_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = SAMPLE_CNT_A_IDX;
-	__u64 *sample_count_a_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *sample_count_a_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = SAMPLE_CNT_B_IDX;
-	__u64 *sample_count_b_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *sample_count_b_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = SAMPLE_CNT_DROP;
-	__u64 *drop_count_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *drop_count_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = SAMPLE_ITER_CNT_MAX;
-	__u64 *iter_count_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *iter_count_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = OUTPUT_CNT_IDX;
-	__u64 *output_count_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *output_count_ptr = profiler_state_map__lookup(&count_idx);
+
+	count_idx = ENABLE_IDX;
+	__u64 *enable_ptr = profiler_state_map__lookup(&count_idx);
 
 	count_idx = ERROR_IDX;
-	__u64 *error_count_ptr =
-		profiler_state_map__lookup(&count_idx);
+	__u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
 
 	if (transfer_count_ptr == NULL || sample_count_a_ptr == NULL ||
 	    sample_count_b_ptr == NULL || drop_count_ptr == NULL ||
 	    iter_count_ptr == NULL || error_count_ptr == NULL ||
-	    output_count_ptr == NULL) {
+	    output_count_ptr == NULL || enable_ptr == NULL) {
 		count_idx = ERROR_IDX;
 		__u64 err_val = 1;
 		profiler_state_map__update(&count_idx, &err_val);
 		return 0;
 	}
 
+	if (unlikely(*enable_ptr == 0))
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	struct stack_trace_key_t key = { 0 };
 	key.tgid = id >> 32;
-	key.pid = (__u32)id;
+	key.pid = (__u32) id;
 
 	/*
 	 * CPU idle stacks will not be collected. 
@@ -131,7 +129,7 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	 * Note:
 	 * ------------------------------------------------------
 	 * int bpf_get_stackid(struct pt_reg *ctx,
-	 * 		       struct bpf_map *map, u64 flags);
+	 *                     struct bpf_map *map, u64 flags);
 	 * define in include/uapi/linux/bpf.h, implementation in
 	 * file "./kernel/bpf/stackmap.c"
 	 *
