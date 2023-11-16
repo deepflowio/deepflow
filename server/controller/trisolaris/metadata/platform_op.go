@@ -595,6 +595,10 @@ func (p *PlatformDataOP) generatePodIPS() {
 		if podNode := rawData.GetPodNode(pod.PodNodeID); podNode != nil {
 			podNodeIP = podNode.IP
 		}
+		podGroupType := 0
+		if podGroup := rawData.GetPodGroup(pod.PodGroupID); podGroup != nil {
+			podGroupType = podGroup.Type
+		}
 		data := &trident.PodIp{
 			PodId:        proto.Uint32(uint32(pod.ID)),
 			PodName:      proto.String(pod.Name),
@@ -602,6 +606,9 @@ func (p *PlatformDataOP) generatePodIPS() {
 			PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
 			ContainerIds: strings.Split(pod.ContainerIDs, ", "),
 			PodNodeIp:    proto.String(podNodeIP),
+			PodNsId:      proto.Uint32(uint32(pod.PodNamespaceID)),
+			PodGroupId:   proto.Uint32(uint32(pod.PodGroupID)),
+			PodGroupType: proto.Uint32(uint32(podGroupType)),
 		}
 		if vifs, ok := rawData.podIDToVifs[pod.ID]; ok == true {
 			vifs.Each(func(vif interface{}) bool {
