@@ -135,6 +135,19 @@ do {                                                        			\
 	} 									\
 } while(0)
 
+#define probes_set_exit_symbol(t, fn)						\
+do {                                                        			\
+	char *func = (char*)calloc(PROBE_NAME_SZ, 1);             		\
+	if (func != NULL) {                                       		\
+		curr_idx = index++;                  		            	\
+		t->ksymbols[curr_idx].isret = true;                 	    	\
+		snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);           	\
+		t->ksymbols[curr_idx].func = func;                        	\
+	} else {								\
+		ebpf_error("no memory, probe (kretprobe/%s) set failed", fn); 	\
+	} 									\
+} while(0)
+
 #define probes_set_symbol(t, fn)						\
 do {                            						\
 	char *func = (char*)calloc(PROBE_NAME_SZ, 1);      			\
