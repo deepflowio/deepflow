@@ -28,19 +28,22 @@
  * The meaning of the "__profiler_state_map" index.
  */
 typedef enum {
-	TRANSFER_CNT_IDX = 0,	/* buffer-a and buffer-b transfer count.*/
+	TRANSFER_CNT_IDX = 0,	/* buffer-a and buffer-b transfer count. */
 	SAMPLE_CNT_A_IDX,	/* sample count A */
 	SAMPLE_CNT_B_IDX,	/* sample count B */
 	SAMPLE_CNT_DROP,	/* sample drop */
 	SAMPLE_ITER_CNT_MAX,	/* Iteration sample number max value */
-	OUTPUT_CNT_IDX,		/* Count the total number of data outputs.*/
-	ERROR_IDX,		/* Count the number of failed push notifications.*/
+	OUTPUT_CNT_IDX,		/* Count the total number of data outputs. */
+	ERROR_IDX,		/* Count the number of failed push notifications. */
+	ENABLE_IDX,		/* Enable profiler sampling flag.
+				   0: disable sampling; 1: enable sampling. */
+
 	PROFILER_CNT
 } profiler_idx;
 
 struct stack_trace_key_t {
-	__u32 pid;	// processID or threadID
-	__u32 tgid;	// processID
+	__u32 pid;		// processID or threadID
+	__u32 tgid;		// processID
 	__u32 cpu;
 	char comm[TASK_COMM_LEN];
 	int kernstack;

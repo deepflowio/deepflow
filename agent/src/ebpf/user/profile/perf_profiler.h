@@ -17,6 +17,7 @@
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
 #include "../bihash_24_8.h"
+#include "../../kernel/include/perf_profiler.h"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -140,6 +141,11 @@ typedef struct {
 	u64 data_ptr;
 	u8 data[0];
 } stack_trace_msg_t;
+
+struct stack_ids_bitmap {
+	u64 count;
+	u8 bitmap[STACK_MAP_ENTRIES / 8];
+} __attribute__((packed));
 
 int stop_continuous_profiler(void);
 int start_continuous_profiler(int freq, int java_syms_space_limit,

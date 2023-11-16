@@ -19,17 +19,23 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
-#ifndef DF_UTILS_H
-#define DF_UTILS_H
+#ifndef DF_USER_UTILS_H
+#define DF_USER_UTILS_H
 
-#include <arpa/inet.h>
-#include "../../user/utils.h"
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
+#endif
 
-#undef __inline
-#define __inline inline __attribute__((__always_inline__))
+#ifndef unlikely
+#define unlikely(x)             __builtin_expect(!!(x), 0)
+#endif
 
-#define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
+#ifndef likely
+#define likely(x)               __builtin_expect(!!(x), 1)
+#endif
 
-#include "bpf_endian.h"
+#define is_set_bitmap(bitmap, idx) (bitmap[(idx) / 8] & (1 << ((idx) % 8)))
+#define set_bitmap(bitmap, idx)	(bitmap[(idx) / 8] |= 1 << ((idx) % 8))
+#define clear_bitmap(bitmap, idx) (bitmap[(idx) / 8] &= (~(1 << ((idx) % 8))))
 
-#endif /* DF_UTILS_H */
+#endif /* DF_USER_UTILS_H */
