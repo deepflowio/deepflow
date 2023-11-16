@@ -245,3 +245,18 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 		return nil
 	}
 }
+
+func ColumnNameSwap(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		tagName := args[0].(string)
+		newColumnNames := make([]interface{}, len(result.Columns))
+		for i, columnName := range result.Columns {
+			if strings.HasPrefix(columnName.(string), tagName) {
+				columnName = strings.TrimPrefix(columnName.(string), tagName+"_")
+			}
+			newColumnNames[i] = columnName
+		}
+		result.Columns = newColumnNames
+		return nil
+	}
+}
