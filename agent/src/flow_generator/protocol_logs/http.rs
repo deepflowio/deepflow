@@ -661,9 +661,12 @@ impl HttpLog {
         };
 
         if direction == PacketDirection::ServerToClient {
+            const HTTP_STATUS_CODE_CONTINUE: u16 = 100;
             // HTTP响应行：HTTP/1.1 404 Not Found.
             let (version, status_code) = get_http_resp_info(first_line)?;
-
+            if status_code == HTTP_STATUS_CODE_CONTINUE {
+                return Err(Error::HttpHeaderParseFailed);
+            }
             info.version = version.to_owned();
             info.status_code = Some(status_code as i32);
 

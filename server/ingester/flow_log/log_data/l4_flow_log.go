@@ -712,7 +712,12 @@ func (k *KnowledgeGraph) fill(
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(zerodoc.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
-		lookupByMac0, lookupByMac1 = isLocalIP(isIPv6, ip40, ip60), isLocalIP(isIPv6, ip41, ip61)
+		if isLocalIP(isIPv6, ip40, ip60) {
+			lookupByMac0 = true
+		}
+		if isLocalIP(isIPv6, ip41, ip61) {
+			lookupByMac1 = true
+		}
 	} else if tapSide == uint32(zerodoc.ClientProcess) || tapSide == uint32(zerodoc.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
@@ -727,11 +732,11 @@ func (k *KnowledgeGraph) fill(
 	// use vtapId + podId to match first
 	if podId0 != 0 {
 		k.TagSource0 |= uint8(zerodoc.PodId)
-		info0 = platformData.QueryEpcIDPodInfo(l3EpcID0, podId0)
+		info0 = platformData.QueryPodIdInfo(podId0)
 	}
 	if podId1 != 0 {
 		k.TagSource1 |= uint8(zerodoc.PodId)
-		info1 = platformData.QueryEpcIDPodInfo(l3EpcID1, podId1)
+		info1 = platformData.QueryPodIdInfo(podId1)
 	}
 
 	if info0 == nil {
