@@ -634,9 +634,10 @@ impl PlatformSynchronizer {
                 device_id: Some(interface_info.device_id.to_string()),
                 tap_index: Some(interface_info.tap_idx),
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
-                device_name: None,
                 netns: Some(interface_info.tap_ns.to_string()),
                 netns_id: Some(interface_info.ns_inode as u32),
+                if_type: interface_info.if_type.clone(),
+                ..Default::default()
             })
             .chain(
                 self_xml_interfaces
@@ -646,10 +647,7 @@ impl PlatformSynchronizer {
                         mac: Some(entry.mac.into()),
                         device_id: Some(entry.domain_uuid.clone()),
                         device_name: Some(entry.domain_name.clone()),
-                        ip: vec![],
-                        tap_index: None,
-                        netns: None,
-                        netns_id: None,
+                        ..Default::default()
                     }),
             )
             .collect();

@@ -581,9 +581,15 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
-				if (common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName, tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_0", tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_1", tagSlice)) && strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(sqlparser.String(colName), "_0"), "_1")) {
-					errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", sqlparser.String(colName))
-					return errors.New(errStr)
+				if common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName, tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_0", tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_1", tagSlice) {
+					if strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(sqlparser.String(colName), "_0"), "_1")) {
+						errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", sqlparser.String(colName))
+						return errors.New(errStr)
+					}
+					if strings.Contains(config.Cfg.AutoCustomTag.TagValues, "ip") && strings.Split(config.Cfg.AutoCustomTag.TagValues, ", ")[len(strings.Split(config.Cfg.AutoCustomTag.TagValues, ", "))-1] != "ip" {
+						errStr := "ip can only be the last tag in the auto custom tag"
+						return errors.New(errStr)
+					}
 				}
 				// pod_ingress/lb_listener is not supported by select
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {

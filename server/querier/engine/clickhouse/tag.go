@@ -149,7 +149,6 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 					stmts = append(stmts, &SelectTag{Value: autoTagKey})
 				}
 			}
-			stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
@@ -244,18 +243,18 @@ type SelectTag struct {
 }
 
 func (t *SelectTag) Format(m *view.Model) {
-	if !(config.Cfg.AutoCustomTag.TagName != "" && (strings.HasPrefix(t.Alias, config.Cfg.AutoCustomTag.TagName) || strings.HasPrefix(t.Value, config.Cfg.AutoCustomTag.TagName))) {
-		m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-		if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
-			alias := t.Value
-			if t.Alias != "" {
-				alias = t.Alias
-			}
-			m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
-		}
-		if t.Value == "packet_batch" {
-			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
-		}
+	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
+	if config.Cfg.AutoCustomTag.TagName != "" {
+		m.AddCallback(config.Cfg.AutoCustomTag.TagName, ColumnNameSwap([]interface{}{config.Cfg.AutoCustomTag.TagName}))
 	}
-
+	if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+		alias := t.Value
+		if t.Alias != "" {
+			alias = t.Alias
+		}
+		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
+	}
+	if t.Value == "packet_batch" {
+		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
+	}
 }
