@@ -506,11 +506,8 @@ impl EbpfCollector {
             for (protocol, port_range) in &config.l7_protocol_ports {
                 all_proto_map.remove(protocol);
                 let l7_protocol = L7Protocol::from(protocol.clone());
-                #[cfg(target_arch = "x86_64")]
-                let ports = port_range.as_ptr() as *const i8;
-                #[cfg(target_arch = "aarch64")]
-                let ports = port_range.as_ptr();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                let ports = CString::new(port_range.as_str()).unwrap();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
                     warn!(
                         "Ebpf set_protocol_ports_bitmap error: {} {}",
                         protocol, port_range
@@ -522,11 +519,8 @@ impl EbpfCollector {
             let all_port = "1-65535".to_string();
             for protocol in all_proto_map.iter() {
                 let l7_protocol = L7Protocol::from(protocol.clone());
-                #[cfg(target_arch = "x86_64")]
-                let ports = all_port.as_ptr() as *const i8;
-                #[cfg(target_arch = "aarch64")]
-                let ports = all_port.as_ptr();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports) != 0 {
+                let ports = CString::new(all_port.as_str()).unwrap();
+                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
                     warn!(
                         "Ebpf set_protocol_ports_bitmap error: {} {}",
                         protocol, all_port
