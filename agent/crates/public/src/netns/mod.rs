@@ -75,6 +75,7 @@ pub struct InterfaceInfo {
     pub name: String,
     pub device_id: String,
     pub ns_inode: u64,
+    pub if_type: Option<String>,
 }
 
 impl fmt::Display for InterfaceInfo {
