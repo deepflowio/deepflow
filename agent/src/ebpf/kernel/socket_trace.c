@@ -343,6 +343,20 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 	return bytes_copy;
 }
 
+static __inline struct member_fields_offset *
+retrieve_ready_kern_offset(void)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return NULL;
+
+	if (unlikely(!offset->ready))
+		return NULL;
+
+	return offset;
+}
+
 #include "uprobe_base_bpf.c"
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
