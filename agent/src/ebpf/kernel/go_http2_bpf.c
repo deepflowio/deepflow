@@ -223,7 +223,8 @@ static __inline void report_http2_dataframe(struct pt_regs *ctx)
 
 static __inline bool
 http2_fill_common_socket_1(struct http2_header_data *data,
-			   struct __socket_data *send_buffer)
+			   struct __socket_data *send_buffer,
+			   struct member_fields_offset *offset)
 {
 	// Assigned at the end of the function,
 	// 0 means that the function returns during execution
@@ -259,13 +260,6 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 	// Refer to the logic of process_data in socket_trace.c to
 	// obtain quintuple information
 	__u32 tgid = id >> 32;
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		return false;
-
-	if (unlikely(!offset->ready))
-		return false;
 
 	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(data->fd, offset);
@@ -380,13 +374,14 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 
 // Fill all fields except data in buffer->send_buffer
 static __inline void http2_fill_common_socket(struct http2_header_data *data,
-					      struct __socket_data *send_buffer)
+					      struct __socket_data *send_buffer,
+					      struct member_fields_offset *offset)
 {
 	// When the function implementation is too complex, the compiled
 	// bytecode cannot pass the verification of some kernels (4.14).
 	// Split the complex function and reduce the complexity of the
 	// generated syntax tree to pass the verification
-	if (!http2_fill_common_socket_1(data, send_buffer))
+	if (!http2_fill_common_socket_1(data, send_buffer, offset))
 		return;
 
 	if (!http2_fill_common_socket_2(data, send_buffer))
@@ -452,7 +447,8 @@ struct http2_headers_data {
 };
 
 // Send multiple header messages and add an end marker message at the end
-static __inline int submit_http2_headers(struct http2_headers_data *headers)
+static __inline int submit_http2_headers(struct http2_headers_data *headers,
+					 struct member_fields_offset *offset)
 {
 	struct http2_header_data data = {
 		.read = headers->read,
@@ -469,7 +465,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 	struct __http2_buffer *buffer = &(stack->http2_buffer);
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
-	http2_fill_common_socket(&data, send_buffer);
+	http2_fill_common_socket(&data, send_buffer, offset);
 
 	int idx;
 	struct go_http2_header_field *tmp;
@@ -543,6 +539,10 @@ static __inline bool skip_http2_uprobe(struct ebpf_proc_info *info)
 SEC("uprobe/go_http2ClientConn_writeHeader")
 int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
 
@@ -574,7 +574,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 	struct __http2_buffer *buffer = &(stack->http2_buffer);
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
-	http2_fill_common_socket(&data, send_buffer);
+	http2_fill_common_socket(&data, send_buffer, offset);
 
 	if (is_register_based_call(info)) {
 		data.name.ptr = (void *)PT_GO_REGS_PARM2(ctx);
@@ -599,6 +599,10 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 SEC("uprobe/go_http2ClientConn_writeHeaders")
 int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
 
@@ -631,7 +635,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	struct __http2_buffer *buffer = &(stack->http2_buffer);
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
-	http2_fill_common_socket(&data, send_buffer);
+	http2_fill_common_socket(&data, send_buffer, offset);
 	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 
 	return 0;
@@ -641,6 +645,10 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 SEC("uprobe/go_http2serverConn_processHeaders")
 int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	struct go_slice fields;
 	void *frame;
 	__u64 id = bpf_get_current_pid_tgid();
@@ -669,13 +677,17 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 		.ctx = ctx,
 	};
 
-	return submit_http2_headers(&headers);
+	return submit_http2_headers(&headers, offset);
 }
 
 // func (sc *http2serverConn) writeHeaders(st *http2stream, headerData *http2writeResHeaders) error
 SEC("uprobe/go_http2serverConn_writeHeaders")
 int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
 
@@ -701,7 +713,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	struct __http2_buffer *buffer = &(stack->http2_buffer);
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
-	http2_fill_common_socket(&data, send_buffer);
+	http2_fill_common_socket(&data, send_buffer, offset);
 
 	if (is_register_based_call(info)) {
 		ptr = (void *)PT_GO_REGS_PARM3(ctx);
@@ -762,6 +774,10 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 SEC("uprobe/go_http2clientConnReadLoop_handleResponse")
 int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	struct go_slice fields;
 	void *frame;
 
@@ -790,13 +806,17 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 		.message_type = MSG_RESPONSE,
 		.ctx = ctx,
 	};
-	return submit_http2_headers(&headers);
+	return submit_http2_headers(&headers, offset);
 }
 
 // func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.HeaderField, onWrite func()) error
 SEC("uprobe/go_loopyWriter_writeHeader")
 int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
 
@@ -831,13 +851,17 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 
 	int is_server_side = get_side_from_grpc_loopyWriter(ctx, info);
 	headers.message_type = is_server_side ? MSG_RESPONSE : MSG_REQUEST;
-	return submit_http2_headers(&headers);
+	return submit_http2_headers(&headers, offset);
 }
 
 // func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool)
 SEC("uprobe/go_http2Server_operateHeaders")
 int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	struct go_slice fields;
 	void *frame;
 
@@ -867,13 +891,17 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 		.ctx = ctx,
 	};
 
-	return submit_http2_headers(&headers);
+	return submit_http2_headers(&headers, offset);
 }
 
 // func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame)
 SEC("uprobe/go_http2Client_operateHeaders")
 int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	struct go_slice fields;
 	void *frame;
 
@@ -903,7 +931,7 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 		.ctx = ctx,
 	};
 
-	return submit_http2_headers(&headers);
+	return submit_http2_headers(&headers, offset);
 }
 
 static __inline int
@@ -930,7 +958,8 @@ get_fd_from_grpc_http2_Framer_ctx(struct pt_regs *ctx,
 
 static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 					      int fd, __u64 pid_tgid,
-					      enum traffic_direction direction)
+					      enum traffic_direction direction,
+					      struct member_fields_offset *offset)
 {
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
@@ -944,16 +973,6 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 	send_buffer->tcp_seq = 0;
 	send_buffer->data_type = PROTO_HTTP2;
-
-	// Refer to the logic of process_data in socket_trace.c to
-	// obtain quintuple information
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		return -1;
-
-	if (unlikely(!offset->ready))
-		return -1;
 
 	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(fd, offset);
@@ -1003,6 +1022,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 		send_buffer->tuple.addr_len = 16;
 	}
 
+	__u32 k0 = 0;
 	// trace_conf, generator for socket_id
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL)
@@ -1070,6 +1090,10 @@ SEC("uprobe/golang_org_x_net_http2_Framer_checkFrameOrder")
 static int
 uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	pid_t tgid = pid_tgid >> 32;
 
@@ -1108,7 +1132,7 @@ uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 		return 0;
 	}
 
-	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_INGRESS)) {
+	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_INGRESS, offset)) {
 		return 0;
 	}
 
@@ -1125,6 +1149,10 @@ SEC("uprobe/golang_org_x_net_http2_Framer_WriteDataPadded")
 static int
 uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	pid_t tgid = pid_tgid >> 32;
 
@@ -1145,7 +1173,7 @@ uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
 		return 0;
 	}
 
-	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_EGRESS)) {
+	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_EGRESS, offset)) {
 		return 0;
 	}
 
