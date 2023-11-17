@@ -1873,6 +1873,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     device_lcuuid         CHAR(64),
     device_name           VARCHAR(512),
     device_type           CHAR(64),
+    if_type               CHAR(64) DEFAULT '',
     host_ip               CHAR(48),
     node_ip               CHAR(48),
     last_seen             DATETIME,

@@ -276,6 +276,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			continue
 		}
 		vIF.NetnsID = iface.GetNetnsId()
+		vIF.IFType = iface.GetIfType()
 		vIF.HostIP = peer
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
