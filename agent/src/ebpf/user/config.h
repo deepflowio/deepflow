@@ -225,4 +225,27 @@ enum {
  */
 #define JAVA_POD_EXTRA_SPACE_MMA 307200 // 300Ki
 
+/*
+ * The perf profiler utilizes a perf buffer (per CPUs) for transporting stack data,
+ * which may lead to out-of-order behavior in a multi-core environment, as illustrated
+ * below:
+ *
+ * User-received  eBPF (Kernel) Data  Description
+ * Order          recv-time (ns)	     
+ * ---------------------------------------------------------
+ * 0	       1043099273143475	   First stack data with stack ID 'A'
+ * 1	       1043099276726460    Successfully removed 'A' from the stack map
+ * 2	       1043099169934151	   Second stack data with stack ID also 'A'
+ *                                 (failed lookup in stack map for 'A')
+ * 3	       1043099314811542	   Attempted duplicate removal of 'A' from the
+ *                                 stack map, failed
+ * ---------------------------------------------------------
+ *
+ * We have introduced a threshold to delay the removal of 'A' from the stack map to
+ * avoid the aforementioned out-of-order scenario. After each iteration, stack map
+ * cleanup is performed only if the number of entries in the stack map exceeds this
+ * threshold.
+ */
+#define STACKMAP_CLEANUP_THRESHOLD 50
+
 #endif /* DF_EBPF_CONFIG_H */
