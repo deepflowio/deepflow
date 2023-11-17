@@ -646,9 +646,16 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	int i, start = 0;
 	struct __socket_data *sd;
-
-	// 确定分发到哪个队列上，通过第一个socket_data来确定
 	sd = (struct __socket_data *)&buf->data[start];
+
+	/* check uprobe data(GO HTTP2) message type */
+	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE ||
+			sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
+		if (sd->msg_type == MSG_UNKNOWN)
+			return;
+	}
+
+	/* Determine which queue to distribute to based on the first socket_data. */
 	q_idx =
 	    dispatch_queue_index(sd->socket_id, tracer->dispatch_workers_nr);
 	q = &tracer->queues[q_idx];
