@@ -91,16 +91,16 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			vtapNameToID[vtap.Name] = vtap.ID
 			vTapIDToTraffic[vtap.ID] = 0
 		}
-		if len(r.regionToVTapNameToTraffic[az.Region]) == 0 {
-			log.Warningf("get vtaps traffic null, region(%s)", az.Region)
-			continue
-		}
 		for vtapName, traffic := range r.regionToVTapNameToTraffic[az.Region] {
 			vtapID, ok := vtapNameToID[vtapName]
 			if !ok {
 				continue
 			}
 			vTapIDToTraffic[vtapID] = traffic
+		}
+		if len(vTapIDToTraffic) == 0 {
+			log.Warningf("no vtaps to balance, region(%s)", az.Region)
+			continue
 		}
 		p := &AZInfo{
 			lcuuid:          az.Lcuuid,
