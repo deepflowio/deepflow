@@ -120,9 +120,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		// genesis上报的资源优先使用device_uuid
 		// 如果没有device_uuid则使用uuid
 		// trident有权限拿到网卡ip的掩码的时候，uuid和device_uuid是相同的，否则不同
-		deviceUUID := vItem.DeviceLcuuid
-		if deviceUUID != "" {
-			deviceUUIDToPodLcuuid[deviceUUID] = podLcuuid
+		if vItem.DeviceLcuuid != "" {
+			deviceUUIDToPodLcuuid[vItem.DeviceLcuuid] = podLcuuid
 		} else {
 			vUUID := vItem.Lcuuid
 			if vUUID == "" {
@@ -140,27 +139,29 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		if vItem.DeviceType != "docker-container" {
 			continue
 		}
-		deviceUUID := vItem.DeviceLcuuid
-		vMAC := vItem.Mac
-		vTAPMAC := vItem.TapMac
-		podLcuuid := deviceUUIDToPodLcuuid[deviceUUID]
+		podLcuuid := deviceUUIDToPodLcuuid[vItem.DeviceLcuuid]
 		if podLcuuid == "" {
 			vUUID := vItem.Lcuuid
 			podLcuuid = deviceUUIDToPodLcuuid[vUUID]
 		}
 		if podLcuuid == "" {
-			log.Debugf("vinterface,ip port (%s) pod not found", vMAC)
+			log.Debugf("vinterface,ip port (%s) pod not found", vItem.Mac)
 			continue
 		}
 
-		vinterfaceLcuuid := common.GetUUID(podLcuuid+vMAC, uuid.Nil)
+		vMac := vItem.Mac
+		if vItem.IFType == "ipvlan" {
+			vMac = common.VIF_DEFAULT_MAC
+		}
+
+		vinterfaceLcuuid := common.GetUUID(podLcuuid+vItem.Mac, uuid.Nil)
 		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 			vinterfaceLcuuids.Add(vinterfaceLcuuid)
 			vinterface := model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_LAN,
-				Mac:           vMAC,
-				TapMac:        vTAPMAC,
+				Mac:           vMac,
+				TapMac:        vItem.TapMac,
 				NetnsID:       vItem.NetnsID,
 				VTapID:        vItem.VtapID,
 				DeviceType:    common.VIF_DEVICE_TYPE_POD,
