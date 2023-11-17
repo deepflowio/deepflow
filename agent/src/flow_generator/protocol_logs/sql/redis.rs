@@ -277,7 +277,7 @@ impl RedisLog {
             PacketDirection::ServerToClient if self.has_request || is_from_ebpf => {
                 self.fill_response(context, error_response, info)
             }
-            _ => {}
+            _ => return Err(Error::L7ProtocolUnknown),
         };
         Ok(())
     }
