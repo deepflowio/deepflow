@@ -385,6 +385,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				DeviceLcuuid:        v.GetDeviceLcuuid(),
 				DeviceName:          v.GetDeviceName(),
 				DeviceType:          v.GetDeviceType(),
+				IFType:              v.GetIfType(),
 				HostIP:              v.GetHostIp(),
 				KubernetesClusterID: v.GetKubernetesClusterId(),
 				NodeIP:              v.GetNodeIp(),
