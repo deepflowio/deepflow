@@ -27,7 +27,10 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
+            consts::{
+                KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN, KAFKA_STATUS_CODE_CHECKER,
+                KAFKA_STATUS_CODE_OFFSET,
+            },
             decode_base64_to_string,
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
@@ -280,7 +283,11 @@ impl L7ProtocolParserInterface for KafkaLog {
                             self.set_status_code(
                                 req.api_key,
                                 req.api_version,
-                                read_i16_be(&payload[12..]),
+                                if payload.len() >= KAFKA_STATUS_CODE_CHECKER {
+                                    read_i16_be(&payload[KAFKA_STATUS_CODE_OFFSET..])
+                                } else {
+                                    0
+                                },
                                 &mut info,
                             )
                         }
@@ -307,7 +314,11 @@ impl L7ProtocolParserInterface for KafkaLog {
             Some(KafkaInfoCache {
                 api_key: info.api_key,
                 api_version: info.api_version,
-                code: read_i16_be(&payload[12..]),
+                code: if payload.len() >= KAFKA_STATUS_CODE_CHECKER {
+                    read_i16_be(&payload[KAFKA_STATUS_CODE_OFFSET..])
+                } else {
+                    0
+                },
             }),
         )
         .map(|rrt| {
