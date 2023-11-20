@@ -180,11 +180,6 @@ struct bpf_socktrace_params {
 	struct bpf_offset_param_array offset_array;
 };
 
-struct clear_list_elem {
-	struct list_head list;
-	const char p[0];
-};
-
 /*
  * This structure is used for registration of additional events. 
  */
