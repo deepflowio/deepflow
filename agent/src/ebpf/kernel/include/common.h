@@ -77,6 +77,15 @@ struct protocol_message_t {
 	enum message_type type;
 };
 
+enum process_data_extra_source {
+	DATA_SOURCE_SYSCALL,
+	DATA_SOURCE_GO_TLS_UPROBE,
+	DATA_SOURCE_GO_HTTP2_UPROBE,
+	DATA_SOURCE_OPENSSL_UPROBE,
+	DATA_SOURCE_IO_EVENT,
+	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
+};
+
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
 #endif

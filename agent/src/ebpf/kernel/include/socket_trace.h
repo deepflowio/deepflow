@@ -181,15 +181,6 @@ struct conn_info_t {
 	__u16 dns_q_type;
 };
 
-enum process_data_extra_source {
-	DATA_SOURCE_SYSCALL,
-	DATA_SOURCE_GO_TLS_UPROBE,
-	DATA_SOURCE_GO_HTTP2_UPROBE,
-	DATA_SOURCE_OPENSSL_UPROBE,
-	DATA_SOURCE_IO_EVENT,
-	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
-};
-
 struct process_data_extra {
 	bool vecs : 1;
 	bool is_go_process : 1;
