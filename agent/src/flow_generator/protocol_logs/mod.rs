@@ -310,8 +310,6 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_coroutine_1: f.syscall_coroutine_1,
             gpid_0: f.gpid_0,
             gpid_1: f.gpid_1,
-            netns_id_0: 0, // TODO
-            netns_id_1: 0,
             pod_id_0: f.pod_id_0,
             pod_id_1: f.pod_id_1,
         }

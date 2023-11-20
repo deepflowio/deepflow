@@ -186,22 +186,24 @@ type VtapRepo struct {
 }
 
 type HostVTapRebalanceResult struct {
-	IP            string `json:"IP"`
-	AZ            string `json:"AZ"`
-	State         int    `json:"STATE"`
-	BeforeVTapNum int    `json:"BEFORE_VTAP_NUM"`
-	AfterVTapNum  int    `json:"AFTER_VTAP_NUM"`
-	SwitchVTapNum int    `json:"SWITCH_VTAP_NUM"`
+	IP                string  `json:"IP"`
+	AZ                string  `json:"AZ"`
+	State             int     `json:"STATE"`
+	BeforeVTapNum     int     `json:"BEFORE_VTAP_NUM"`
+	AfterVTapNum      int     `json:"AFTER_VTAP_NUM"`
+	SwitchVTapNum     int     `json:"SWITCH_VTAP_NUM"`
+	BeforeVTapWeights float64 `json:"BEFORE_VTAP_WEIGHTS"`
+	AfterVTapWeights  float64 `json:"AFTER_VTAP_WEIGHTS"`
 }
 
 type AZVTapRebalanceResult struct {
-	TotalSwitchVTapNum int                       `json:"TOTAL_SWITCH_VTAP_NUM"`
-	Details            []HostVTapRebalanceResult `json:"DETAILS"`
+	TotalSwitchVTapNum int                        `json:"TOTAL_SWITCH_VTAP_NUM"`
+	Details            []*HostVTapRebalanceResult `json:"DETAILS"`
 }
 
 type VTapRebalanceResult struct {
-	TotalSwitchVTapNum int                       `json:"TOTAL_SWITCH_VTAP_NUM"`
-	Details            []HostVTapRebalanceResult `json:"DETAILS"`
+	TotalSwitchVTapNum int                        `json:"TOTAL_SWITCH_VTAP_NUM"`
+	Details            []*HostVTapRebalanceResult `json:"DETAILS"`
 }
 
 type VtapGroup struct {

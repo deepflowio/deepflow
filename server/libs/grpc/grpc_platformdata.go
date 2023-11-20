@@ -1370,24 +1370,26 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			}
 		}
 	}
-	l3EpcMac := mac | uint64(epcID)<<48 // 取l3EpcID的低16位和Mac组成新的Mac，防止mac跨AZ冲突
-	macInfos[l3EpcMac] = &Info{
-		EpcID:        epcID,
-		L2EpcID:      epcID,
-		DeviceType:   deviceType,
-		DeviceID:     deviceID,
-		HostID:       hostID,
-		Mac:          mac,
-		RegionID:     regionID,
-		SubnetID:     firstSubnetID,
-		PodNodeID:    podNodeID,
-		PodGroupID:   podGroupID,
-		PodGroupType: podGroupType,
-		PodID:        podID,
-		PodClusterID: podClusterID,
-		AZID:         azID,
-		VtapID:       vtapId,
-		HitCount:     new(uint64),
+	if mac != 0 {
+		l3EpcMac := mac | uint64(epcID)<<48 // 取l3EpcID的低16位和Mac组成新的Mac，防止mac跨AZ冲突
+		macInfos[l3EpcMac] = &Info{
+			EpcID:        epcID,
+			L2EpcID:      epcID,
+			DeviceType:   deviceType,
+			DeviceID:     deviceID,
+			HostID:       hostID,
+			Mac:          mac,
+			RegionID:     regionID,
+			SubnetID:     firstSubnetID,
+			PodNodeID:    podNodeID,
+			PodGroupID:   podGroupID,
+			PodGroupType: podGroupType,
+			PodID:        podID,
+			PodClusterID: podClusterID,
+			AZID:         azID,
+			VtapID:       vtapId,
+			HitCount:     new(uint64),
+		}
 	}
 }
 

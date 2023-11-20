@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
@@ -68,11 +69,21 @@ func (c *AnalyzerCheck) Start() {
 		}
 	}()
 
+	cfg := c.cfg.IngesterLoadBalancingConfig
 	// 根据ch信息，针对部分采集器分配/重新分配数据节点
 	go func() {
 		for {
 			excludeIPs := <-c.ch
-			c.vtapAnalyzerAlloc(excludeIPs)
+
+			if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+				c.vtapAnalyzerAlloc(excludeIPs)
+			} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+				rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(false, cfg.DataDuration)
+			} else {
+				log.Errorf("algorithm(%s) is not supported, only supports: %s, %s", cfg.Algorithm,
+					common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
+				return
+			}
 			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()

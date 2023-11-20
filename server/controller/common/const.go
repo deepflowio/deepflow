@@ -580,6 +580,11 @@ const (
 	TAPMODE_DECAP    = 3
 )
 
+const (
+	AGENT_IDENTIFIE_IP_AND_MAC = 1
+	AGENT_IDENTIFIE_IP         = 2
+)
+
 var VtapTapModeName = map[int]string{
 	TAPMODE_LOCAL:    "本地",
 	TAPMODE_MIRROR:   "镜像",
@@ -635,4 +640,9 @@ var (
 const (
 	PROMETHEUS_TARGET_CREATE_METHOD_RECORDER   = 1
 	PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS = 2
+)
+
+const (
+	ANALYZER_ALLOC_BY_INGESTED_DATA = "by-ingested-data"
+	ANALYZER_ALLOC_BY_AGENT_COUNT   = "by-agent-count"
 )

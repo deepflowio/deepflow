@@ -103,7 +103,7 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewDebug(s.manager, s.genesis),
 		router.NewController(s.controllerConfig, s.controllerChecker),
 		router.NewAnalyzer(s.controllerConfig, s.analyzerChecker),
-		router.NewVtap(),
+		router.NewVtap(s.controllerConfig),
 		router.NewVtapGroup(s.controllerConfig),
 		router.NewDataSource(s.controllerConfig),
 		router.NewVTapGroupConfig(),
