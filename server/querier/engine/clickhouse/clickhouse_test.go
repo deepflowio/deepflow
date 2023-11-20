@@ -63,8 +63,11 @@ var (
 		input:  "select (Max(byte_tx) + Sum(byte_tx))/1 as max_byte_tx from l4_flow_log limit 1",
 		output: "SELECT divide(plus(MAX(byte_tx), SUM(byte_tx)), 1) AS `max_byte_tx` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
+		input:  "select AAvg(byte_tx) as aavg_byte_tx from l4_flow_log where `time`>=60 and `time`<=180 having Spread(byte_tx)>=0 limit 1",
+		output: "SELECT AVG(byte_tx) AS `aavg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
+	}, {
 		input:  "select Avg(byte_tx) as avg_byte_tx from l4_flow_log where `time`>=60 and `time`<=180 having Spread(byte_tx)>=0 limit 1",
-		output: "SELECT AVG(byte_tx) AS `avg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
+		output: "SELECT Avg(byte_tx) AS `avg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
 	}, {
 		input:  "select Stddev(byte_tx) as stddev_byte_tx from l4_flow_log limit 1",
 		output: "SELECT stddevPopStable(byte_tx) AS `stddev_byte_tx` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -188,7 +191,11 @@ var (
 		input:  "select Enum(tap_side) from l7_flow_log limit 0, 50",
 		output: "WITH dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)` SELECT `Enum(tap_side)` FROM flow_log.`l7_flow_log` LIMIT 0, 50",
 	}, {
-		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port group by region_0 limit 1",
+		input:  "select AAvg(`byte_tx`) AS `AAvg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port where `time` >= 60 AND `time` <= 180 group by region_0 limit 1",
+		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx`, if(count(byte_tx)=1, sum(byte_tx)/120/1, 0) AS `avg_fillnullaszero_byte_tx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `avg_fillnullaszero_byte_tx` AS `AAvg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
+		db:     "flow_metrics",
+	}, {
+		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port where `time` >= 60 AND `time` <= 180 group by region_0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
@@ -214,9 +221,21 @@ var (
 		input:  "select time(time, 0.2) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(1)) + toIntervalSecond(arrayJoin([0]) * 1) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, divide(plus(SUM(byte_tx+byte_rx), 100), 1) AS `persecond_max_byte_100` FROM flow_log.`l4_flow_log` GROUP BY `toi` LIMIT 1",
 	}, {
-		input:  "select time(time, 1.2) as toi, Avg(`byte_tx`) AS `Avg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
+		input:  "select time(time, 1.2) as toi, AAvg(`byte_tx`) AS `AAvg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `AAvg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
 		db:     "flow_metrics",
+	}, {
+		input:  "select time(time, 1.2) as toi, AAvg(`byte_tx`) AS `AAvg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `AAvg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
+		db:     "flow_metrics",
+	}, {
+		input:  "select time(time, 1.2) as toi, Avg(`byte_tx`) AS `Avg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi`, if(count(byte_tx)=2, sum(byte_tx)/2/1, 0) AS `avg_fillnullaszero_byte_tx` SELECT toUnixTimestamp(`_toi`) AS `toi`, `avg_fillnullaszero_byte_tx` AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `toi` LIMIT 1",
+		db:     "flow_metrics",
+	}, {
+		input:  "SELECT time(time,5,1,0) as toi, AAvg(`metrics.dropped`) AS `AAvg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(10)) + toIntervalSecond(arrayJoin([0]) * 10) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `AAvg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(10)) + toIntervalSecond(arrayJoin([0]) * 10) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",

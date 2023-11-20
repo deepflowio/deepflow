@@ -286,7 +286,7 @@ func (f *AggFunction) SetAlias(alias string) {
 
 func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	switch f.Metrics.Type {
-	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
+	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
 		innerFunction := view.DefaultFunction{
@@ -369,19 +369,21 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+		// When Avg is forced (due to the need for other metrics in the same statement)
+		// to use two layers of SQL calculation, the calculation logic of AAvg is directly used
+		if f.Name == view.FUNCTION_AVG {
+			outFunc = view.GetFunc(view.FUNC_NAME_MAP[view.FUNCTION_AAVG])
+		}
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
 		case metrics.METRICS_TYPE_DELAY:
 			// 时延类和商值类，忽略0值
 			outFunc.SetIsGroupArray(true)
 			outFunc.SetIgnoreZero(true)
-		case metrics.METRICS_TYPE_QUOTIENT:
-			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
-			// 比例类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
 			outFunc.SetMath("*100")
 		case metrics.METRICS_TYPE_TAG:
@@ -390,15 +392,30 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetFields([]view.Node{&view.Field{Value: innerAlias}})
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER:
-			if m.DB == "flow_metrics" {
-				outFunc.SetFillNullAsZero(true)
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
+			// Counter/Gauge type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_COUNTER_AVG)
+			}
+		case metrics.METRICS_TYPE_BOUNDED_GAUGE:
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNC_NAME_MAP[view.FUNCTION_AAVG])
 			}
 		case metrics.METRICS_TYPE_DELAY:
+			// Delay type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
+			}
 			outFunc.SetIgnoreZero(true)
+		case metrics.METRICS_TYPE_QUOTIENT:
+			// Quotient type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
+			}
 		case metrics.METRICS_TYPE_PERCENTAGE:
-			if m.DB == "flow_metrics" {
-				outFunc.SetFillNullAsZero(true)
+			// Percentage type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
 			}
 			outFunc.SetMath("*100")
 		}
