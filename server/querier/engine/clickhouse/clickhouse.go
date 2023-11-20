@@ -757,18 +757,14 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				e.Statements = append(e.Statements, &whereStmt)
 				table = "samples"
 			}
+			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			e.Model.Time.DatasourceInterval = interval
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
-				interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
-				if err != nil {
-					log.Error(err)
-					return err
-				}
-				e.Model.Time.DatasourceInterval = interval
-			} else if e.DB == "deepflow_system" {
-				// when DB is deepflow_system, DatasourceInterval is set to 10
-				e.Model.Time.DatasourceInterval = chCommon.DB_DEEPFLOW_SYSTEM_INTERVAL
-				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			} else {
 				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			}

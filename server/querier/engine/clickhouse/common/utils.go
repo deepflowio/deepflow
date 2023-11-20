@@ -141,11 +141,16 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		} else if table == "vtap_acl" {
 			return 60, nil
 		}
+	case DB_NAME_DEEPFLOW_SYSTEM, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:
+		tsdbType = db
 	default:
 		return 1, nil
 	}
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?name=%s&type=%s", name, tsdbType)
+	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
+	if name != "" {
+		url += fmt.Sprintf("&name=%s", name)
+	}
 	reqest, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return 1, err

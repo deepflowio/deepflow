@@ -30,6 +30,9 @@ const (
 	FUNCTION_MAX         = "Max"
 	FUNCTION_MIN         = "Min"
 	FUNCTION_AVG         = "Avg"
+	FUNCTION_COUNTER_AVG = "Counter_Avg"
+	FUNCTION_DELAY_AVG   = "Delay_Avg"
+	FUNCTION_AAVG        = "AAvg"
 	FUNCTION_PCTL        = "Percentile"
 	FUNCTION_PCTL_EXACT  = "PercentileExact"
 	FUNCTION_STDDEV      = "Stddev"
@@ -55,7 +58,7 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_SUM:         "SUM",
 	FUNCTION_MAX:         "MAX",
 	FUNCTION_MIN:         "MIN",
-	FUNCTION_AVG:         "AVG",
+	FUNCTION_AAVG:        "AVG",
 	FUNCTION_PCTL:        "quantile",
 	FUNCTION_PCTL_EXACT:  "quantileExact",
 	FUNCTION_STDDEV:      "stddevPopStable",
@@ -93,6 +96,10 @@ func GetFunc(name string) Function {
 		return &PerSecondFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_HISTOGRAM:
 		return &HistogramFunction{DefaultFunction: DefaultFunction{Name: name}}
+	case FUNCTION_COUNTER_AVG:
+		return &CounterAvgFunction{DefaultFunction: DefaultFunction{Name: FUNC_NAME_MAP[FUNCTION_AAVG]}}
+	case FUNCTION_DELAY_AVG:
+		return &DelayAvgFunction{DefaultFunction: DefaultFunction{Name: FUNC_NAME_MAP[FUNCTION_AAVG]}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -811,5 +818,81 @@ func (f *MinFunction) GetWiths() []Node {
 		))
 		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 		return f.Withs
+	}
+}
+
+type CounterAvgFunction struct {
+	DefaultFunction
+}
+
+func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
+	var interval int
+	if f.Time.Interval > 0 {
+		interval = f.Time.Interval
+	} else {
+		interval = int(f.Time.TimeEnd - f.Time.TimeStart)
+	}
+	buf.WriteString(fmt.Sprintf("sum(%s)/(%d/%d)", f.Fields[0].ToString(), interval, f.Time.DatasourceInterval))
+	buf.WriteString(f.Math)
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
+	}
+}
+
+type DelayAvgFunction struct {
+	DefaultFunction
+	divFunction *DivFunction
+}
+
+func (f *DelayAvgFunction) Init() {
+	// Sum(Numerator)/Sum(Denominator)
+	if strings.Contains(f.Fields[0].ToString(), "/") {
+		fieldsSlice := strings.Split(f.Fields[0].ToString(), "/")
+		if len(fieldsSlice) > 1 {
+			dividendSumFunc := DefaultFunction{
+				Name:   FUNCTION_SUM,
+				Fields: []Node{&Field{Value: fieldsSlice[0]}},
+				Nest:   true,
+			}
+			divisorSumFunc := DefaultFunction{
+				Name:      FUNCTION_SUM,
+				Fields:    []Node{&Field{Value: fieldsSlice[1]}},
+				Nest:      true,
+				Condition: fmt.Sprintf("%s>0", fieldsSlice[1]),
+			}
+			f.divFunction = &DivFunction{
+				DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+				DefaultFunction: DefaultFunction{
+					Name:   FUNCTION_DIV,
+					Fields: []Node{&dividendSumFunc, &divisorSumFunc},
+					Math:   f.Math,
+				},
+			}
+		}
+	}
+}
+
+func (f *DelayAvgFunction) WriteTo(buf *bytes.Buffer) {
+	if !strings.Contains(f.Fields[0].ToString(), "/") {
+		f.DefaultFunction.WriteTo(buf)
+	} else {
+		f.divFunction.WriteTo(buf)
+		if f.Alias != "" {
+			buf.WriteString(" AS ")
+			buf.WriteString("`")
+			buf.WriteString(strings.Trim(f.Alias, "`"))
+			buf.WriteString("`")
+		}
+	}
+}
+
+func (f *DelayAvgFunction) GetWiths() []Node {
+	if !strings.Contains(f.Fields[0].ToString(), "/") {
+		return f.DefaultFunction.GetWiths()
+	} else {
+		return f.divFunction.GetWiths()
 	}
 }
