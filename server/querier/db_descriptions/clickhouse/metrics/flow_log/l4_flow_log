@@ -23,7 +23,7 @@ synack_count                , synack_count         , counter    , L4 Throughput 
 l4_byte                     ,                      , counter    , L4 Throughput  , 111
 l4_byte_tx                  , l4_byte_tx           , counter    , L4 Throughput  , 111
 l4_byte_rx                  , l4_byte_rx           , counter    , L4 Throughput  , 111
-direction_score             , direction_score      , gauge      , L4 Throughput  , 111
+direction_score             , direction_score      , bounded_gauge      , L4 Throughput  , 111
 log_count                   ,                      , counter    , L4 Throughput  , 111
 
 retrans_syn                 , retrans_syn          , counter    , TCP Slow       , 111
