@@ -301,7 +301,8 @@ func (b *PrometheusSamplesBuilder) GetPodClusterId(vtapID uint16) (uint16, error
 	podClusterId := uint16(0)
 	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
 		podClusterId = uint16(vtapInfo.PodClusterId)
-	} else {
+	}
+	if podClusterId == 0 {
 		b.counter.PodClusterMiss++
 		return 0, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
 	}
