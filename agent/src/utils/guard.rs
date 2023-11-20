@@ -18,7 +18,6 @@ use std::io::Read;
 use std::path::Path;
 use std::{
     fs::{self, File},
-    process::exit,
     string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
@@ -70,19 +69,11 @@ impl Guard {
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
         memory_trim_disabled: bool,
-    ) -> Self {
-        let pid = match get_current_pid() {
-            Ok(p) => p,
-            Err(e) => {
-                error!(
-                    "get the process' pid failed: {}, deepflow-agent restart...",
-                    e
-                );
-                thread::sleep(Duration::from_secs(1));
-                exit(-1);
-            }
+    ) -> Result<Self, &'static str> {
+        let Ok(pid) = get_current_pid() else {
+            return Err("get the process' pid failed: {}, deepflow-agent restart...");
         };
-        Self {
+        Ok(Self {
             config,
             log_dir,
             interval,
@@ -94,7 +85,7 @@ impl Guard {
             memory_trim_disabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
-        }
+        })
     }
 
     fn release_log_files(file_and_size_sum: FileAndSizeSum, log_file_size: u64) {
@@ -264,8 +255,8 @@ impl Guard {
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
                                     error!("cpu usage over cpu limit twice, deepflow-agent restart...");
-                                    thread::sleep(Duration::from_secs(1));
-                                    exit(-1);
+                                    crate::utils::notify_exit(-1);
+                                    break;
                                 } else {
                                     warn!("cpu usage over cpu limit");
                                     over_cpu_limit = true;
@@ -278,8 +269,8 @@ impl Guard {
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
-                                thread::sleep(Duration::from_secs(1));
-                                exit(-1);
+                                crate::utils::notify_exit(-1);
+                                break;
                             } else {
                                 warn!("cpu usage over cpu limit");
                                 over_cpu_limit = true;
@@ -311,8 +302,8 @@ impl Guard {
                                     "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
                                     ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
                                     );
-                                        thread::sleep(Duration::from_secs(1));
-                                        exit(-1);
+                                        crate::utils::notify_exit(-1);
+                                        break;
                                     } else {
                                         warn!(
                                     "memory usage over memory limit, current={}, memory_limit={}",
@@ -342,8 +333,8 @@ impl Guard {
                                     "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, deepflow-agent restart...",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
-                            thread::sleep(Duration::from_secs(1));
-                            exit(-1);
+                            crate::utils::notify_exit(-1);
+                            break;
                         } else {
                             warn!(
                                     "current system free memory percentage is less than sys_free_memory_limit, current system free memory percentage={}%, sys_free_memory_limit={}%",
@@ -364,8 +355,8 @@ impl Guard {
                             );
                             if thread_num > thread_limit * 2 {
                                 error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
-                                thread::sleep(Duration::from_secs(1));
-                                exit(NORMAL_EXIT_WITH_RESTART);
+                                crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                break;
                             }
                             exception_handler.set(Exception::ThreadThresholdExceeded);
                         } else {

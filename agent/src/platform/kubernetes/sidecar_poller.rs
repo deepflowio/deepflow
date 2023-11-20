@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-use std::{net::IpAddr, process, thread, time::Duration};
+use std::net::IpAddr;
 
-use log::{info, warn};
+use log::info;
 use regex::Regex;
 
 use super::Poller;
@@ -30,27 +30,24 @@ use public::{
 pub struct SidecarPoller(InterfaceInfo);
 
 impl SidecarPoller {
-    pub fn new(dest: IpAddr) -> Self {
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&dest);
+    pub fn new(dest: IpAddr) -> Result<Self, String> {
+        let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&dest) {
+            Ok(tuple) => tuple,
+            Err(e) => return Err(format!("call get_ctrl_ip_and_mac() failed: {}", e)),
+        };
         let Ok(links) = link_list() else {
-            warn!("call link_list() failed");
-            thread::sleep(Duration::from_secs(1));
-            process::exit(-1);
+            return Err("call link_list() failed".to_owned());
         };
         let Some(link) = links
             .into_iter()
             .filter(|link| link.mac_addr == ctrl_mac)
             .next()
         else {
-            warn!("cannot find ctrl interface with mac {}", ctrl_mac);
-            thread::sleep(Duration::from_secs(1));
-            process::exit(-1);
+            return Err(format!("cannot find ctrl interface with mac {}", ctrl_mac));
         };
         let path = netns::current_netns_path();
         let Ok(ns): Result<NsFile, _> = path.as_path().try_into() else {
-            warn!("cannot open ns file {}", path.display());
-            thread::sleep(Duration::from_secs(1));
-            process::exit(-1);
+            return Err(format!("cannot open ns file {}", path.display()));
         };
         let info = InterfaceInfo {
             tap_idx: link.if_index,
@@ -62,7 +59,7 @@ impl SidecarPoller {
             ..Default::default()
         };
         info!("Sidecar poller: {:?}", info);
-        Self(info)
+        Ok(Self(info))
     }
 }
 
