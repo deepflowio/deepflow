@@ -29,7 +29,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
 use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
@@ -59,7 +59,6 @@ use crate::{
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
         FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
-        NORMAL_EXIT_WITH_RESTART,
     },
     config::PcapConfig,
     config::{
@@ -212,6 +211,8 @@ impl fmt::Display for AgentId {
 pub struct Trident {
     state: TridentState,
     handle: Option<JoinHandle<()>>,
+    #[cfg(target_os = "linux")]
+    pid_file: Option<crate::utils::pid_file::PidFile>,
 }
 
 impl Trident {
@@ -249,9 +250,21 @@ impl Trident {
                 conf
             }
         };
+        #[cfg(target_os = "linux")]
+        let pid_file = if !config.pid_file.is_empty() {
+            match crate::utils::pid_file::PidFile::open(&config.pid_file) {
+                Ok(file) => Some(file),
+                Err(e) => return Err(anyhow!("Create pid file {} failed: {}", config.pid_file, e)),
+            }
+        } else {
+            None
+        };
 
         let controller_ip: IpAddr = config.controller_ips[0].parse()?;
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
+        let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&controller_ip) {
+            Ok(tuple) => tuple,
+            Err(e) => return Err(anyhow!("get ctrl ip and mac failed: {}", e)),
+        };
         let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac);
 
         let config = &config_handler.static_config;
@@ -367,11 +380,16 @@ impl Trident {
                     "Launching deepflow-agent failed: {}, deepflow-agent restart...",
                     e
                 );
-                process::exit(1);
+                crate::utils::notify_exit(1);
             }
         }));
 
-        Ok(Trident { state, handle })
+        Ok(Trident {
+            state,
+            handle,
+            #[cfg(target_os = "linux")]
+            pid_file,
+        })
     }
 
     fn run(
@@ -405,17 +423,15 @@ impl Trident {
         } else {
             // use host ip/mac as agent id if not in sidecar mode
             if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
-                warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
-                warn!("setns error: {}", e);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
+                return Err(anyhow!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'. setns error: {}", e));
             }
             let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
-            let (ip, mac) = get_ctrl_ip_and_mac(&controller_ip);
+            let (ip, mac) = match get_ctrl_ip_and_mac(&controller_ip) {
+                Ok(tuple) => tuple,
+                Err(e) => return Err(anyhow!("get ctrl ip and mac failed with error: {}", e)),
+            };
             if let Err(e) = netns::reset_netns() {
-                warn!("reset setns error: {}", e);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
+                return Err(anyhow!("reset netns error: {}", e));
             };
             AgentId { ip, mac }
         };
@@ -539,7 +555,7 @@ impl Trident {
 
         let log_dir = Path::new(config_handler.static_config.log_file.as_str());
         let log_dir = log_dir.parent().unwrap().to_str().unwrap();
-        let guard = Guard::new(
+        let guard = match Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
             config_handler.candidate_config.yaml_config.guard_interval,
@@ -550,7 +566,13 @@ impl Trident {
                 .candidate_config
                 .yaml_config
                 .memory_trim_disabled,
-        );
+        ) {
+            Ok(g) => g,
+            Err(e) => {
+                warn!("guard create failed");
+                return Err(anyhow!(e));
+            }
+        };
         guard.start();
 
         let monitor = Monitor::new(
@@ -579,10 +601,13 @@ impl Trident {
             ));
             ext.start();
             let poller = if sidecar_mode {
-                let p: Arc<GenericPoller> = Arc::new(
-                    SidecarPoller::new(config_handler.static_config.controller_ips[0].parse()?)
-                        .into(),
-                );
+                let p = match SidecarPoller::new(
+                    config_handler.static_config.controller_ips[0].parse()?,
+                ) {
+                    Ok(p) => p,
+                    Err(e) => return Err(anyhow!(e)),
+                };
+                let p: Arc<GenericPoller> = Arc::new(p.into());
                 syn.set_kubernetes_poller(p.clone());
                 Some(p)
             } else {
@@ -703,9 +728,10 @@ impl Trident {
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
-                    warn!("yaml_config updated, deepflow-agent restart...");
+                    let info = "yaml_config updated, deepflow-agent restart...";
+                    warn!("{}", info);
                     thread::sleep(Duration::from_secs(1));
-                    process::exit(NORMAL_EXIT_WITH_RESTART);
+                    return Err(anyhow!(info));
                 }
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
@@ -1057,7 +1083,15 @@ impl DomainNameListener {
                         }
 
                         if changed {
-                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
+                            let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
+                                Ok(tuple) => tuple,
+                                Err(e) => {
+                                    warn!("get ctrl ip and mac failed with error: {}", e);
+                                    crate::utils::notify_exit(1);
+                                    thread::sleep(Duration::from_secs(1));
+                                    continue;
+                                }
+                            };
                             info!(
                                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                                 ctrl_ip
@@ -1070,14 +1104,24 @@ impl DomainNameListener {
                                 if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}", e);
+                                    crate::utils::notify_exit(1);
                                     thread::sleep(Duration::from_secs(1));
-                                    process::exit(-1);
+                                    continue;
                                 }
-                                let (ip, mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
+                                let (ip, mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
+                                    Ok(tuple) => tuple,
+                                    Err(e) => {
+                                        warn!("get ctrl ip and mac failed with error: {}", e);
+                                        crate::utils::notify_exit(1);
+                                        thread::sleep(Duration::from_secs(1));
+                                        continue;
+                                    }
+                                };
                                 if let Err(e) = netns::reset_netns() {
                                     warn!("reset setns error: {}", e);
+                                    crate::utils::notify_exit(1);
                                     thread::sleep(Duration::from_secs(1));
-                                    process::exit(-1);
+                                    continue;
                                 }
                                 AgentId { ip, mac }
                             };
@@ -2047,7 +2091,7 @@ impl AgentComponents {
                         e
                     );
                     thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
+                    return Err(e.into());
                 }
             };
             let mut dispatcher_listener = dispatcher.listener();

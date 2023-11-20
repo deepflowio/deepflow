@@ -122,6 +122,8 @@ pub struct Config {
     pub override_os_hostname: Option<String>,
     pub async_worker_thread_number: u16,
     pub agent_unique_identifier: AgentIdType,
+    #[cfg(target_os = "linux")]
+    pub pid_file: String,
 }
 
 impl Config {
@@ -278,6 +280,8 @@ impl Default for Config {
             override_os_hostname: None,
             async_worker_thread_number: 16,
             agent_unique_identifier: Default::default(),
+            #[cfg(target_os = "linux")]
+            pid_file: Default::default(),
         }
     }
 }

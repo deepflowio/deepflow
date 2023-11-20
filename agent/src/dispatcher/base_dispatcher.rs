@@ -18,7 +18,6 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
     Arc, Mutex,
@@ -299,15 +298,15 @@ impl BaseDispatcher {
 
 #[cfg(target_os = "windows")]
 impl BaseDispatcher {
-    pub(super) fn init(&mut self) {
+    pub(super) fn init(&mut self) -> Result<()> {
         if let Err(e) = self.engine.init() {
             error!(
                 "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                 e
             );
-            thread::sleep(Duration::from_secs(1));
-            process::exit(1);
+            return Err(e.into());
         }
+        Ok(())
     }
 
     pub(super) fn decapsulate(
@@ -413,7 +412,7 @@ impl BaseDispatcher {
         false
     }
 
-    pub(super) fn init(&mut self) {
+    pub(super) fn init(&mut self) -> Result<()> {
         match self.engine.init() {
             Ok(_) => {
                 if &self.src_interface != "" {
@@ -421,14 +420,14 @@ impl BaseDispatcher {
                         self.src_interface_index = link.if_index;
                     }
                 }
+                Ok(())
             }
             Err(e) => {
                 error!(
                     "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                     e
                 );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(1);
+                Err(e.into())
             }
         }
     }
@@ -821,8 +820,8 @@ impl BaseDispatcherListener {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
+            crate::utils::notify_exit(1);
             thread::sleep(Duration::from_secs(1));
-            process::exit(1);
         }
     }
 }

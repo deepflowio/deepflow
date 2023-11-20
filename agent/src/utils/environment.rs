@@ -20,7 +20,7 @@ use std::{
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::{Path, PathBuf},
-    process, thread,
+    thread,
     time::Duration,
 };
 #[cfg(target_os = "windows")]
@@ -251,8 +251,7 @@ pub fn controller_ip_check(ips: &[String]) {
         ips
     );
 
-    thread::sleep(Duration::from_secs(1));
-    process::exit(-1);
+    crate::utils::notify_exit(-1);
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -396,8 +395,7 @@ pub fn trident_process_check(process_threshold: u32) {
                     "the number of process exceeds the limit({} > {}), deepflow-agent restart...",
                     num, process_threshold
                 );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
+                crate::utils::notify_exit(-1);
             }
         }
         Err(e) => {
@@ -498,7 +496,7 @@ pub fn get_executable_path() -> Result<PathBuf, io::Error> {
         "/proc/self/exe".to_owned(),
         "/proc/curproc/exe".to_owned(),
         "/proc/curproc/file".to_owned(),
-        format!("/proc/{}/path/a.out", process::id()),
+        format!("/proc/{}/path/a.out", std::process::id()),
     ];
     for path in possible_paths {
         if let Ok(path) = fs::read_link(path) {
@@ -542,7 +540,7 @@ pub fn get_mac_by_name(src_interface: String) -> u32 {
     }
 }
 
-pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
+pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     // Steps to find ctrl ip and mac:
     // 1. If environment variable `ENV_INTERFACE_NAME` exists, use it as ctrl interface
     //    a) Use environment variable `K8S_POD_IP_FOR_DEEPFLOW` as ctrl ip if it exists
@@ -551,9 +549,10 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
     // 3. Find ctrl ip and mac from controller address
     if let Ok(name) = env::var(ENV_INTERFACE_NAME) {
         let Ok(link) = link_by_name(&name) else {
-            warn!("interface {} in env {} not found", name, ENV_INTERFACE_NAME);
-            thread::sleep(Duration::from_secs(1));
-            process::exit(-1);
+            return Err(Error::Environment(format!(
+                "interface {} in env {} not found",
+                name, ENV_INTERFACE_NAME
+            )));
         };
         let ips = match env::var(K8S_POD_IP_FOR_DEEPFLOW) {
             Ok(ips) => ips
@@ -582,20 +581,18 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
         };
         for ip in ips {
             if is_global(&ip) {
-                return (ip, link.mac_addr);
+                return Ok((ip, link.mac_addr));
             }
         }
-        warn!(
+        return Err(Error::Environment(format!(
             "interface {} in env {} does not have valid ip address",
             name, ENV_INTERFACE_NAME
-        );
-        thread::sleep(Duration::from_secs(1));
-        process::exit(-1);
+        )));
     };
     if let Some(ip) = get_k8s_local_node_ip() {
         let ctrl_mac = get_mac_by_ip(ip);
         if let Ok(mac) = ctrl_mac {
-            return (ip, mac);
+            return Ok((ip, mac));
         }
     }
 
@@ -636,17 +633,17 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
                         warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
                         continue 'outer;
                     }
-                    return tuple.unwrap();
+                    return Ok(tuple.unwrap());
                 }
                 break;
             }
         }
 
-        return (ip, mac);
+        return Ok((ip, mac));
     }
-    error!("failed getting control ip and mac, deepflow-agent restart...");
-    thread::sleep(Duration::from_secs(1));
-    process::exit(-1);
+    Err(Error::Environment(
+        "failed getting control ip and mac, deepflow-agent restart...".to_owned(),
+    ))
 }
 
 //TODO Windows 相关
