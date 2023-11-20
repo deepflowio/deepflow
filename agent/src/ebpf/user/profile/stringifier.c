@@ -188,7 +188,8 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
+static char *resolve_addr(struct bpf_tracer *t, pid_t pid, u64 address,
+			  bool is_create, void *info_p)
 {
 	ASSERT(pid >= 0);
 
@@ -202,20 +203,6 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 
 	int ret = symcache_resolve(pid, resolver, address, &sym);
 	if (ret == 0) {
-		if (info_p && pid > 0) {
-			struct symbolizer_proc_info *p = info_p;
-			if (p->new_java_syms_file) {
-				/*
-				 * TODO @jiping
-				 * If you delete the local file perf-PID.map immediately,
-				 * it will leave many symbolic links in /tmp/perf-PID.map.
-				 * We need a better method to delete these map files. Currently,
-				 * they are first saved in the local directory '/tmp'.
-				 */
-				//clean_local_java_symbols_files(pid);
-				p->new_java_syms_file = false;
-			}
-		}
 		ptr = symbol_name_fetch(pid, &sym);
 		if (ptr) {
 			char *p = ptr;
@@ -268,7 +255,8 @@ finish:
 }
 
 static int get_stack_ips(struct bpf_tracer *t,
-			 const char *stack_map_name, int stack_id, u64 * ips)
+			 const char *stack_map_name, int stack_id, u64 * ips,
+			 u64 ts)
 {
 	ASSERT(stack_id >= 0);
 
@@ -285,7 +273,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val, void *info_p)
+				      int *ret_val, void *info_p, u64 ts)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -301,7 +289,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
 	int ret;
-	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips))) {
+	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
 		stack_table_data_miss++;
 		*ret_val = ret;
 		return NULL;
@@ -319,7 +307,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
 
-		str = resolve_addr(pid, ips[i], new_cache, info_p);
+		str = resolve_addr(t, pid, ips[i], new_cache, info_p);
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
@@ -365,7 +353,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       pid_t pid,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p)
+				       bool new_cache, void *info_p, u64 ts)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -384,7 +372,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p);
+				       h, new_cache, &ret_val, info_p, ts);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -457,14 +445,16 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h, new_cache, info_p);
+							h, new_cache, info_p,
+							v->timestamp);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
 							stack_map_name,
-							h, new_cache, info_p);
+							h, new_cache, info_p,
+							v->timestamp);
 	}
 
 	/* 
