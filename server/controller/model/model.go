@@ -735,6 +735,7 @@ type GenesisVinterface struct {
 	DeviceLcuuid        string    `gorm:"column:device_lcuuid;type:char(64);default:null" json:"DEVICE_LCUUID"`
 	DeviceName          string    `gorm:"column:device_name;type:varchar(512);default:null" json:"DEVICE_NAME"`
 	DeviceType          string    `gorm:"column:device_type;type:char(64);default:null" json:"DEVICE_TYPE"`
+	IFType              string    `gorm:"column:if_type;type:char(64);default:null" json:"IF_TYPE"`
 	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
 	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
 	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
