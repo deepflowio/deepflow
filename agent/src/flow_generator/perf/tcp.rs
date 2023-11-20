@@ -85,7 +85,7 @@ pub(crate) struct SessionPeer {
     seq_list_len: isize,
 
     timestamp: Timestamp,
-    first_syn_timestamp: Timestamp,
+    first_handshake_timestamp: Timestamp, // Client: First SYN; Server: First SYN_ACK
 
     seq_threshold: u32, // fast syn_retrans check
     seq: u32,
@@ -395,8 +395,8 @@ impl TimeStats {
 // 后2个包是server端的应答包，art表示后2个包之间的时间间隔
 #[derive(Default, Debug, PartialEq, Eq)]
 pub(crate) struct PerfData {
-    rtt_0: TimeStats,
-    rtt_1: TimeStats,
+    rtt_0: TimeStats, // The time difference between the first SYN and the last SYN_ACK
+    rtt_1: TimeStats, // The time difference between the first SYN_ACK and the last ACK
     art_0: TimeStats,
     art_1: TimeStats,
     srt_0: TimeStats,
@@ -636,7 +636,7 @@ impl TcpPerf {
             if same_dir.seq_threshold == 0 {
                 // first SYN
                 same_dir.seq_threshold = tcp_data.seq + 1;
-                same_dir.first_syn_timestamp = p.lookup_key.timestamp.into();
+                same_dir.first_handshake_timestamp = p.lookup_key.timestamp.into();
                 self.handshaking = true;
             } else if same_dir.syn_transmitted {
                 self.perf_data.calc_retrans_syn(fpd);
@@ -649,6 +649,7 @@ impl TcpPerf {
         if p.is_syn_ack() {
             if same_dir.seq_threshold == 0 {
                 // first
+                same_dir.first_handshake_timestamp = p.lookup_key.timestamp.into();
                 same_dir.seq_threshold = tcp_data.seq + 1;
                 if oppo_dir.seq_threshold == 0 {
                     // no syn before first syn/ack
@@ -734,35 +735,43 @@ impl TcpPerf {
         } else {
             (&mut self.ctrl_info.1, &mut self.ctrl_info.0)
         };
-        let mut is_opening = false;
 
         if same_dir.rtt_calculable {
-            // 不考虑SYN, SYN/ACK, PSH/ACK的情况
-            // rtt0 = Time(SYN/ACK) - Time(SYN)
-            // rtt1 = Time(SYN/ACK/ACK) - Time(SYN/ACK)
-            if (Self::is_handshake_ack_packet(same_dir, oppo_dir, p) || p.is_syn_ack())
-                && oppo_dir.is_reply_packet(p)
-            {
-                let rtt = adjust_rtt(
-                    (p.lookup_key.timestamp - oppo_dir.timestamp).into(),
-                    RTT_MAX,
-                );
-                if !rtt.is_zero() {
-                    self.perf_data.calc_rtt(rtt, fpd);
+            if oppo_dir.is_reply_packet(p) {
+                // rtt0 = Time(Last SYN_ACK) - Time(First SYN)
+                // rtt1 = Time(Last ACK) - Time(First SYN_ACK)
+                // Example:
+                // Packet：
+                // - A: SYN
+                // - B: SYN
+                // - C: SYN_ACK
+                // - D: SYN_ACK
+                // - E: ACK
+                // - F: ACK
+                // rtt0: TimeStats{Count: 2, Sum: (C-A)+(D-A), Max: D-A}
+                // rtt1: TimeStats{Count: 2, Sum: (E-C)+(F-C), Max: F-C}
+                if (Self::is_handshake_ack_packet(same_dir, oppo_dir, p) || p.is_syn_ack())
+                    && !oppo_dir.first_handshake_timestamp.is_zero()
+                {
+                    let rtt = adjust_rtt(
+                        (p.lookup_key.timestamp - oppo_dir.first_handshake_timestamp).into(),
+                        RTT_MAX,
+                    );
+                    if !rtt.is_zero() {
+                        self.perf_data.calc_rtt(rtt, fpd);
+                    }
                 }
-                is_opening = true;
             }
         }
         if same_dir.rtt_full_calculable {
             if oppo_dir.is_sync_ack_ack_packet(p) {
                 let rtt_full = adjust_rtt(
-                    (p.lookup_key.timestamp - same_dir.first_syn_timestamp).into(),
+                    (p.lookup_key.timestamp - same_dir.first_handshake_timestamp).into(),
                     RTT_FULL_MAX,
                 );
                 if !rtt_full.is_zero() {
                     self.perf_data.calc_rtt_full(rtt_full);
                 }
-                same_dir.rtt_full_calculable = false;
             }
         }
 
@@ -771,12 +780,12 @@ impl TcpPerf {
         } else {
             unreachable!();
         };
-        if p.is_syn() || p.is_syn_ack() {
+        let is_opening = if p.is_syn() || p.is_syn_ack() {
             if tcp_data.win_scale > 0 {
                 same_dir.win_scale = WIN_SCALE_FLAG | tcp_data.win_scale.min(WIN_SCALE_MAX);
             }
 
-            same_dir.rtt_calculable = false;
+            same_dir.rtt_calculable = true;
             same_dir.srt_calculable = false;
             same_dir.art_calculable = false;
 
@@ -784,15 +793,19 @@ impl TcpPerf {
             oppo_dir.srt_calculable = false;
             oppo_dir.art_calculable = false;
 
-            is_opening = true;
-
             if p.is_syn_ack() && oppo_dir.rtt_full_precondition {
                 oppo_dir.rtt_full_calculable = true;
             }
+
+            true
         } else {
-            same_dir.rtt_calculable = false;
-            oppo_dir.rtt_calculable = false;
-        }
+            if !p.is_ack() {
+                same_dir.rtt_calculable = false;
+                oppo_dir.rtt_calculable = false;
+                same_dir.rtt_full_calculable = false;
+            }
+            p.is_ack()
+        };
 
         if Self::is_handshake_ack_packet(same_dir, oppo_dir, p) {
             same_dir.is_handshake_ack_packet = true;
