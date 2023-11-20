@@ -630,6 +630,12 @@ impl FlowMap {
                     Some(meta_packet),
                 );
 
+                let flow = &node.tagged_flow.flow;
+                // PCAP and L7 Log
+                meta_packet.flow_id = flow.flow_id;
+                // For PCAP
+                meta_packet.second_in_minute =
+                    (flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 let flow_closed = match meta_packet.lookup_key.proto {
@@ -637,10 +643,6 @@ impl FlowMap {
                     IpProtocol::UDP => self.update_udp_node(config, node, meta_packet),
                     _ => self.update_other_node(config, node, meta_packet),
                 };
-                let flow = &node.tagged_flow.flow;
-                meta_packet.flow_id = flow.flow_id;
-                meta_packet.second_in_minute =
-                    (flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
 
                 if flow_closed {
                     let node = nodes.swap_remove(index);
