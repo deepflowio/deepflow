@@ -873,6 +873,40 @@ fetch_proc_info:
 	*ptr = p;
 }
 
+static void *symbols_cache_update(symbol_caches_hash_t * h,
+				  struct symbolizer_cache_kvp *kv,
+				  struct symbolizer_proc_info *p)
+{
+	if (kv->v.cache)
+		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
+
+	kv->v.cache =
+	    pointer_to_uword(bcc_symcache_new((int)kv->k.pid, &lazy_opt));
+
+	if (kv->v.cache <= 0) {
+		kv->v.cache = 0;
+		goto failed;
+	}
+
+	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *)
+				       kv, 1 /* is_add */ )) {
+		ebpf_warning
+		    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+		     (int)kv->k.pid);
+		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
+		kv->v.cache = 0;
+	} else {
+		add_symcache_count++;
+	}
+
+failed:
+	p->unknown_syms_found = false;
+	p->update_syms_table_time = 0;
+	p->new_java_syms_file = false;
+	p->add_task_list = false;
+	return (void *)kv->v.cache;
+}
+
 /*
  * Cache for obtaining symbol information of the binary
  * executable corresponding to a PID, and rebuilding it
@@ -893,6 +927,9 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 		sys_btime_msecs = get_sys_btime_msecs();
 	}
 
+	if (!new_cache)
+		return NULL;
+
 	if (pid == 0)
 		return k_resolver;
 
@@ -904,9 +941,6 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
-		if (!new_cache)
-			return NULL;
-
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		u64 curr_time = current_sys_time_secs();
 		if (p->verified) {
@@ -915,52 +949,51 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			 * the address of the Java process, we need to re-obtain the sy-
 			 * mbols table of the Java process after a delay.
 			 */
-			if (p->is_java && p->unknown_syms_found
+			if ((p->unknown_syms_found
+			     || (void *)kv.v.cache == NULL)
 			    && p->update_syms_table_time == 0) {
-				p->update_syms_table_time =
-				    curr_time + get_java_syms_fetch_delay();
+				if (p->is_java) {
+					p->update_syms_table_time =
+					    curr_time +
+					    get_java_syms_fetch_delay();
+				}
+
+				/*
+				 * When the deepflow-agent is started, to avoid the sudden
+				 * generation of Java symbol tables, additional random value
+				 * for each java process's delay.
+				 */
+				if (kv.v.cache == 0)
+					p->update_syms_table_time +=
+					    generate_random_integer
+					    (PROFILER_DEFER_RANDOM_MAX);
 			}
 
 			if (p->update_syms_table_time > 0
 			    && curr_time >= p->update_syms_table_time) {
-				/* Update java symbols table, will be executed during
-				 * the next Java symbolication */
+				if (p->is_java) {
+					/* Update java symbols table, will be executed during
+					 * the next Java symbolication */
 
-				/* Has the symbol file for Java been generated ? */
-				if (AO_GET(&p->new_java_syms_file)) {
-					if (kv.v.cache) {
-						bcc_free_symcache((void *)kv.
-								  v.cache,
-								  kv.k.pid);
-						kv.v.cache =
-						    pointer_to_uword
-						    (bcc_symcache_new
-						     ((int)kv.k.pid,
-						      &lazy_opt));
-						if (symbol_caches_hash_add_del
-						    (h,
-						     (symbol_caches_hash_kv *) &
-						     kv, 1 /* is_add */ )) {
-							ebpf_warning
-							    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-							     (int)kv.k.pid);
+					/* Has the symbol file for Java been generated ? */
+					if (AO_GET(&p->new_java_syms_file)) {
+						return symbols_cache_update(h,
+									    &kv,
+									    p);
+					} else {
+						if (!p->add_task_list) {
+							add_java_syms_update_task
+							    (p);
+							p->add_task_list = true;
 						}
 					}
-
-					p->unknown_syms_found = false;
-					p->update_syms_table_time = 0;
-					p->new_java_syms_file = false;
-					p->add_task_list = false;
 				} else {
-					if (!p->add_task_list) {
-						add_java_syms_update_task(p);
-						p->add_task_list = true;
-					}
+					return symbols_cache_update(h, &kv, p);
 				}
 			}
 
-			if (p->is_java && (void *)kv.v.cache == NULL) {
-				gen_java_symbols_file(pid);
+			if (kv.v.cache == 0) {
+				return NULL;
 			}
 		} else {
 			/* Ensure that newly launched JAVA processes are detected. */
@@ -969,21 +1002,6 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 
 		if (kv.v.cache)
 			return (void *)kv.v.cache;
-
-		kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
-		if (kv.v.cache > 0)
-			add_symcache_count++;
-
-		if (symbol_caches_hash_add_del
-		    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
-			ebpf_warning
-			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-			     pid);
-			free_symbolizer_cache_kvp(&kv);
-			return NULL;
-		}
-
-		return (void *)kv.v.cache;
 	}
 
 	return NULL;
@@ -1048,7 +1066,8 @@ int create_and_init_proc_info_caches(void)
 	return ETR_OK;
 }
 
-static int __unused free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
+static int __unused free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv,
+					   void *ctx)
 {
 	struct symbolizer_cache_kvp *sym = (struct symbolizer_cache_kvp *)kv;
 	free_symbolizer_cache_kvp(sym);
@@ -1068,7 +1087,7 @@ void release_symbol_caches(void)
 	 * hash resources.
 	 * TODO(@jiping), add a synchronization lock for protection.
 	 */
-	
+
 #if 0
 	/* user symbol caches release */
 	u64 elems_count = 0;

@@ -248,4 +248,21 @@ enum {
  */
 #define STACKMAP_CLEANUP_THRESHOLD 50
 
+/*
+ * When the deepflow-agent is started, to avoid the sudden generation of Java symbol
+ * tables:
+ * - Delay the generation of symbol tables by 'java-symbol-file-refresh-defer-interval'
+ *   seconds.
+ * - Introduce an additional random value for each process's delay, on top of
+ *   the configuration specified above, to prevent the abrupt generation of symbol file
+ *   for a large number of processes.
+ *
+ * For non-Java programs, symbol loading will also be randomly delayed
+ * (time range: 0 to PROFILER_DEFER_RANDOM_MAX).
+ *
+ * The random value has a maximum limit specified above(measured in seconds). 
+ */
+
+#define PROFILER_DEFER_RANDOM_MAX 60 // 60 seconds
+
 #endif /* DF_EBPF_CONFIG_H */
