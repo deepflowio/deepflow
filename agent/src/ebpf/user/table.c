@@ -99,9 +99,9 @@ bool bpf_table_delete_key(struct bpf_tracer *tracer,
 	int map_fd = map->fd;
 
 	if (bpf_delete_elem(map_fd, (void *)&key)) {
-		ebpf_warning("bpf_map_delete_elem, err tb_name:%s, key : %"
-			     PRIu64 ", err_message:%s\n", tb_name,
-			     key, strerror(errno));
+		ebpf_debug("bpf_map_delete_elem, err tb_name:%s, key : %"
+			   PRIu64 ", err_message:%s\n", tb_name,
+			   key, strerror(errno));
 		return false;
 	}
 
