@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -142,9 +143,14 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(selectTag, config.Cfg.AutoCustomTag.TagName) {
 			autoTagMap := tagItem.TagTranslatorMap
-			for autoTagKey, autoTagTranslator := range autoTagMap {
-				if autoTagTranslator != "" {
-					stmts = append(stmts, &SelectTag{Value: autoTagTranslator, Alias: autoTagKey})
+			autoTagSlice := []string{}
+			for autoTagKey, _ := range autoTagMap {
+				autoTagSlice = append(autoTagSlice, autoTagKey)
+			}
+			sort.Strings(autoTagSlice)
+			for _, autoTagKey := range autoTagSlice {
+				if autoTagMap[autoTagKey] != "" {
+					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: autoTagKey})
 				} else {
 					stmts = append(stmts, &SelectTag{Value: autoTagKey})
 				}
