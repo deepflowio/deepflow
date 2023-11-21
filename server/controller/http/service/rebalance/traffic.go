@@ -303,23 +303,33 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 	for _, allocVTap := range allocVTaps {
 		var minAnalyzerDataSize int64
 		var allocIP string
-		i := 0
 		for ip, info := range analyzerIPToInfo {
 			if info.State != common.HOST_STATE_COMPLETE {
 				continue
 			}
-			if i == 0 || info.SumTraffic < minAnalyzerDataSize {
+			minAnalyzerDataSize = info.SumTraffic
+			allocIP = ip
+			break
+		}
+		for ip, info := range analyzerIPToInfo {
+			if info.State != common.HOST_STATE_COMPLETE {
+				continue
+			}
+			if info.SumTraffic < minAnalyzerDataSize {
 				minAnalyzerDataSize = info.SumTraffic
 				allocIP = ip
 			}
-			i++
 		}
 		if !ifCheckout {
 			mysql.Db.Model(mysql.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
 		}
-		vTapIDToChangeInfo[allocVTap.VtapID].NewIP = allocIP
+		if _, ok := analyzerIPToInfo[allocIP]; !ok {
+			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip", allocVTap.VtapID, allocIP)
+			continue
+		}
 		analyzerIPToInfo[allocIP].SumTraffic += allocVTap.Traffic
 		analyzerIPToInfo[allocIP].AfterVTapNum++
+		vTapIDToChangeInfo[allocVTap.VtapID].NewIP = allocIP
 	}
 
 	var totalSwitchVTapNum int
