@@ -422,7 +422,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				if slices.Contains(outerWhereLeftSlice, groupTag) {
+				if slices.Contains(outerWhereLeftSlice, groupTag) || (config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(groupTag, config.Cfg.AutoCustomTag.TagName)) {
 					innerGroupBySlice = append(innerGroupBySlice, groupTag)
 				}
 			}
