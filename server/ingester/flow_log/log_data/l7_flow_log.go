@@ -548,21 +548,6 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 知识图谱
 	b.Protocol = uint8(log.Base.Protocol)
 
-	if l.Gpid_0 != 0 && l.PodId_0 == 0 {
-		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if podId != 0 && l.VtapId == vtapId {
-			b.PodID0 = podId
-			b.TagSource0 |= uint8(zerodoc.GpId)
-		}
-	}
-	if l.Gpid_1 != 0 && l.PodId_1 == 0 {
-		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if podId != 0 && l.VtapId == vtapId {
-			b.PodID1 = podId
-			b.TagSource1 |= uint8(zerodoc.GpId)
-		}
-	}
-
 	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 }
 
