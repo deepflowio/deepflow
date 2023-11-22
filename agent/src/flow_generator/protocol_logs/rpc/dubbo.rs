@@ -791,6 +791,7 @@ mod tests {
                 rrt_count: 1,
                 rrt_sum: 4332,
                 rrt_max: 4332,
+                ..Default::default()
             },
         )];
 

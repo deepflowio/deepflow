@@ -513,6 +513,7 @@ fn fill_l7_stats(
         rrt_count: if rrt > 0 { 1 } else { 0 },
         rrt_sum: if rrt > 0 { rrt } else { 0 },
         rrt_max: if rrt > 0 { rrt as u32 } else { 0 },
+        ..Default::default()
     };
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
