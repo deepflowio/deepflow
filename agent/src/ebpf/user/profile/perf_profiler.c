@@ -191,30 +191,19 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 	return NULL;
 }
 
+/* 
+ * The invocation of this interface is always when the process name does
+ * not match.
+ */
 static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 				const char *process_name,
 				struct stack_trace_key_t *v, void *msg_value)
 {
-	if (process_name == NULL) {
-		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-				v->comm, strlen(v->comm));
-	} else {
-		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-				process_name, strlen(process_name));
-	}
-
+	strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
+			v->comm, strlen(v->comm));
 	kvp->c_k.cpu = v->cpu;
-
-	if (v->userstack < 0)
-		kvp->c_k.u_stack_id = STACK_ID_MAX;
-	else
-		kvp->c_k.u_stack_id = v->userstack;
-
-	if (v->kernstack < 0)
-		kvp->c_k.k_stack_id = STACK_ID_MAX;
-	else
-		kvp->c_k.k_stack_id = v->kernstack;
-
+	kvp->c_k.pid = v->tgid;
+	kvp->c_k.reserved = 0;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
@@ -285,6 +274,12 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 		/* The aggregation method is identified as 
 		 * { process name + [u,k]stack_trace_id + cpu} */
 		msg->stime = 0;
+		if (!matched) {
+			msg->pid = msg->tid = 0;
+			snprintf((char *)msg->process_name,
+				 sizeof(msg->process_name),
+				 "%s", "Total");
+		}
 	}
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
@@ -617,7 +612,6 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			((stack_trace_msg_t *) kv.msg_ptr)->count++;
-
 			continue;
 		}
 
@@ -633,7 +627,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
-						    info_p);
+						    process_name, info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string

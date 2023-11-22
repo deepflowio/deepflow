@@ -73,8 +73,8 @@ typedef struct {
 		/* Matching and combining for process/thread name. */
 		struct {
 			u8 comm[TASK_COMM_LEN];
-			u64 u_stack_id: 26,
-			    k_stack_id: 26,
+			u64 pid: 26,
+			    reserved: 26,
 			    cpu: 12;
 		} c_k;
 	};
