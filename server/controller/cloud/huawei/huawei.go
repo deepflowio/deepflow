@@ -158,6 +158,22 @@ func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	resource.VInterfaces = append(resource.VInterfaces, vifs...)
 	resource.IPs = append(resource.IPs, ips...)
 
+	rds, vifs, ips, err := h.getRDSInstances()
+	if err != nil {
+		return resource, err
+	}
+	resource.RDSInstances = append(resource.RDSInstances, rds...)
+	resource.VInterfaces = append(resource.VInterfaces, vifs...)
+	resource.IPs = append(resource.IPs, ips...)
+
+	redis, vifs, ips, err := h.getRedisInstances()
+	if err != nil {
+		return resource, err
+	}
+	resource.RedisInstances = append(resource.RedisInstances, redis...)
+	resource.VInterfaces = append(resource.VInterfaces, vifs...)
+	resource.IPs = append(resource.IPs, ips...)
+
 	log.Debugf("region resource num info: %v", h.toolDataSet.regionLcuuidToResourceNum)
 	log.Debugf("az resource num info: %v", h.toolDataSet.azLcuuidToResourceNum)
 	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, h.toolDataSet.regionLcuuidToResourceNum)
