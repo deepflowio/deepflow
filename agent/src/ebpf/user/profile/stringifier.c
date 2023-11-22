@@ -420,7 +420,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
 				      stack_str_hash_t * h,
-				      bool new_cache, void *info_p)
+				      bool new_cache,
+				      char *process_name, void *info_p)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -441,6 +442,25 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	int len = 2;
 	char *k_trace_str, *u_trace_str, *trace_str;
 	k_trace_str = u_trace_str = trace_str = NULL;
+
+	/* For processes without configuration, the stack string is in the format
+	   'process name;thread name'. */
+	if (!new_cache) {
+		len += (TASK_COMM_LEN * 2);
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		if (process_name)
+			snprintf(trace_str, len, "%s;%s", process_name,
+				 v->comm);
+		else
+			snprintf(trace_str, len, "%s;%s", v->comm, v->comm);
+
+		return trace_str;
+	}
 
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
