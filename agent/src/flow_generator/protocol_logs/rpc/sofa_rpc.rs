@@ -720,6 +720,7 @@ mod test {
                 rrt_count: 1,
                 rrt_sum: 127254,
                 rrt_max: 127254,
+                ..Default::default()
             }
         );
     }
@@ -789,6 +790,7 @@ mod test {
                 rrt_count: 1,
                 rrt_sum: 3922,
                 rrt_max: 3922,
+                ..Default::default()
             }
         );
     }

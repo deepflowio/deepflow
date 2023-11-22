@@ -15,6 +15,7 @@
  */
 
 use std::fmt::Display;
+use std::time::Duration;
 
 pub struct HandshakeHeader {}
 
@@ -68,5 +69,29 @@ impl TlsHeader {
 
     pub fn next(&self) -> usize {
         0
+    }
+
+    pub fn supported_version(&self) -> Option<u16> {
+        None
+    }
+
+    pub fn is_change_cipher_spec(&self) -> bool {
+        false
+    }
+
+    pub fn domain_name(&self) -> Option<String> {
+        None
+    }
+
+    pub fn validity(&self) -> Option<(Duration, Duration)> {
+        None
+    }
+
+    pub fn is_alert(&self) -> bool {
+        false
+    }
+
+    pub fn cipher_suite(&self) -> Option<u16> {
+        None
     }
 }

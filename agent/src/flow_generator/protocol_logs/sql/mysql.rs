@@ -716,6 +716,7 @@ mod tests {
                     rrt_count: 5,
                     rrt_sum: 373,
                     rrt_max: 123,
+                    ..Default::default()
                 },
             ),
             (
@@ -729,6 +730,7 @@ mod tests {
                     rrt_count: 3,
                     rrt_sum: 226,
                     rrt_max: 146,
+                    ..Default::default()
                 },
             ),
             (
@@ -742,6 +744,7 @@ mod tests {
                     rrt_count: 390,
                     rrt_sum: 127090,
                     rrt_max: 5355,
+                    ..Default::default()
                 },
             ),
         ];

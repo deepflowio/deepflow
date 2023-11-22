@@ -205,6 +205,7 @@ pub struct Latency {
     pub art_max: u32,
     pub rrt_max: u32,
     pub cit_max: u32, // us, the max time between the client request and the last server response (Payload > 1)
+    pub tls_rtt_max: u32,
 
     pub rtt_sum: u64,
     pub rtt_client_sum: u64,
@@ -213,6 +214,7 @@ pub struct Latency {
     pub art_sum: u64,
     pub rrt_sum: u64,
     pub cit_sum: u64,
+    pub tls_rtt_sum: u64,
 
     pub rtt_count: u32,
     pub rtt_client_count: u32,
@@ -221,6 +223,7 @@ pub struct Latency {
     pub art_count: u32,
     pub rrt_count: u32,
     pub cit_count: u32,
+    pub tls_rtt_count: u32,
 }
 
 impl Latency {
@@ -246,6 +249,9 @@ impl Latency {
         if self.cit_max < other.cit_max {
             self.cit_max = other.cit_max;
         }
+        if self.tls_rtt_max < other.tls_rtt_max {
+            self.tls_rtt_max = other.tls_rtt_max;
+        }
 
         self.rtt_sum += other.rtt_sum;
         self.rtt_client_sum += other.rtt_client_sum;
@@ -254,6 +260,7 @@ impl Latency {
         self.art_sum += other.art_sum;
         self.rrt_sum += other.rrt_sum;
         self.cit_sum += other.cit_sum;
+        self.tls_rtt_sum += other.tls_rtt_sum;
 
         self.rtt_count += other.rtt_count;
         self.rtt_client_count += other.rtt_client_count;
@@ -262,6 +269,7 @@ impl Latency {
         self.art_count += other.art_count;
         self.rrt_count += other.rrt_count;
         self.cit_count += other.cit_count;
+        self.tls_rtt_count += other.tls_rtt_count;
     }
 }
 
@@ -275,6 +283,7 @@ impl From<Latency> for metric::Latency {
             art_max: m.art_max,
             rrt_max: m.rrt_max,
             cit_max: m.cit_max,
+            tls_rtt_max: m.tls_rtt_max,
 
             rtt_sum: m.rtt_sum,
             rtt_client_sum: m.rtt_client_sum,
@@ -283,6 +292,7 @@ impl From<Latency> for metric::Latency {
             art_sum: m.art_sum,
             rrt_sum: m.rrt_sum,
             cit_sum: m.cit_sum,
+            tls_rtt_sum: m.tls_rtt_sum,
 
             rtt_count: m.rtt_count,
             rtt_client_count: m.rtt_client_count,
@@ -291,6 +301,7 @@ impl From<Latency> for metric::Latency {
             art_count: m.art_count,
             rrt_count: m.rrt_count,
             cit_count: m.cit_count,
+            tls_rtt_count: m.tls_rtt_count,
         }
     }
 }

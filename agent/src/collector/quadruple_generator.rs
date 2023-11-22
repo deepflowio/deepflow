@@ -991,6 +991,7 @@ impl QuadrupleGenerator {
                     art_count: stats.tcp.art_count,
                     rrt_count: 0,
                     cit_count: stats.tcp.cit_count,
+                    ..Default::default()
                 };
 
                 let src_perf = &stats.tcp.counts_peers[0];
@@ -1029,6 +1030,9 @@ impl QuadrupleGenerator {
                 flow_meter.latency.rrt_max = stats.l7.rrt_max;
                 flow_meter.latency.rrt_sum = stats.l7.rrt_sum;
                 flow_meter.latency.rrt_count = stats.l7.rrt_count;
+                flow_meter.latency.tls_rtt_max = stats.l7.tls_rtt_max;
+                flow_meter.latency.tls_rtt_sum = stats.l7.tls_rtt_sum;
+                flow_meter.latency.tls_rtt_count = stats.l7.tls_rtt_count;
                 flow_meter.anomaly.l7_client_error = stats.l7.err_client_count;
                 flow_meter.anomaly.l7_server_error = stats.l7.err_server_count;
                 flow_meter.anomaly.l7_timeout = stats.l7.err_timeout;
