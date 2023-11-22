@@ -158,7 +158,7 @@ type PlatformInfoTable struct {
 
 	gprocessInfos      map[uint32]uint64
 	vtapIDProcessInfos map[uint64]uint32
-	epcIDPodInfos      map[uint32]*Info
+	podIDInfos         map[uint32]*Info
 
 	bootTime            uint32
 	moduleName          string
@@ -315,7 +315,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 }
 
 func (t *PlatformInfoTable) QueryPodIdInfo(podId uint32) *Info {
-	if info, ok := t.epcIDPodInfos[podId]; ok {
+	if info, ok := t.podIDInfos[podId]; ok {
 		atomic.AddUint64(info.HitCount, 1)
 		return info
 	}
@@ -399,7 +399,7 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		epcIDBaseMissCount: make(map[int32]*uint64),
 		gprocessInfos:      make(map[uint32]uint64),
 		vtapIDProcessInfos: make(map[uint64]uint32),
-		epcIDPodInfos:      make(map[uint32]*Info),
+		podIDInfos:         make(map[uint32]*Info),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
 		ServiceTable:       NewServiceTable(nil),
@@ -966,7 +966,7 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	t.containerHitCount = make(map[string]*uint64)
 	t.containerMissCount = make(map[string]*uint64)
 
-	t.epcIDPodInfos = newEpcIDPodInfos
+	t.podIDInfos = newEpcIDPodInfos
 }
 
 func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
@@ -1009,7 +1009,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 		t.peerConnections = masterTable.peerConnections
 		t.gprocessInfos = masterTable.gprocessInfos
 		t.vtapIDProcessInfos = masterTable.vtapIDProcessInfos
-		t.epcIDPodInfos = masterTable.epcIDPodInfos
+		t.podIDInfos = masterTable.podIDInfos
 
 		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
 		t.epcIDIPV4CidrInfos = masterTable.epcIDIPV4CidrInfos
@@ -1246,7 +1246,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, epcIDPodInfos map[uint32]*Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, podIDInfos map[uint32]*Info, intf *trident.Interface) {
 	// intf.GetEpcId() in range (0,64000], when convert to int32, 0 need convert to datatype.EPC_FROM_INTERNET
 	epcID := int32(intf.GetEpcId())
 	// 由于doc中epcID为-2，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-2，便于doc数据查找
@@ -1315,7 +1315,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			}
 			epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipU32)] = info
 			if podID > 0 {
-				epcIDPodInfos[podID] = info
+				podIDInfos[podID] = info
 			}
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
@@ -1358,7 +1358,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 
 			epcIDIPV6Infos[epcIDIPV6] = info
 			if podID > 0 {
-				epcIDPodInfos[podID] = info
+				podIDInfos[podID] = info
 			}
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
@@ -1548,6 +1548,10 @@ func parseIP(ipStr string) (isIPv4 bool, ip4U32 uint32, ip6 net.IP) {
 func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	podNameInfos := make(map[string][]*PodInfo)
 	containerInfos := make(map[string][]*PodInfo)
+
+	podIDInfos := make(map[uint32]*Info)
+	// save t.podIDInfos first to prevent panic when reading and writing t.podIDInfos at the same time.
+	podIDInfos, t.podIDInfos = t.podIDInfos, podIDInfos
 	for _, podIp := range podIps {
 		podName := podIp.GetPodName()
 		// podIp.GetEpcId() in range [0,64000], convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
@@ -1587,7 +1591,7 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 				containerInfos[containerId] = []*PodInfo{podInfo}
 			}
 		}
-		if _, ok := t.epcIDPodInfos[podId]; !ok {
+		if _, ok := podIDInfos[podId]; !ok {
 			ip := pIp
 			if ip == "" {
 				ip = podNodeIp
@@ -1608,13 +1612,14 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 					info.PodNSID = podNsId
 					info.PodGroupID = podGroupId
 					info.PodGroupType = podGroupType
-					t.epcIDPodInfos[podId] = &info
+					podIDInfos[podId] = &info
 				}
 			}
 		}
 	}
 	t.podNameInfos = podNameInfos
 	t.containerInfos = containerInfos
+	t.podIDInfos = podIDInfos
 }
 
 func (t *PlatformInfoTable) podsString() string {
