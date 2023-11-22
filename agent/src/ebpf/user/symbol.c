@@ -907,6 +907,24 @@ failed:
 	return (void *)kv->v.cache;
 }
 
+static inline void java_expired_update(symbol_caches_hash_t * h,
+				       struct symbolizer_cache_kvp *kv,
+				       struct symbolizer_proc_info *p)
+{
+	/* Update java symbols table, will be executed during
+	 * the next Java symbolication */
+
+	/* Has the symbol file for Java been generated ? */
+	if (AO_GET(&p->new_java_syms_file)) {
+		symbols_cache_update(h, kv, p);
+	} else {
+		if (!p->add_task_list) {
+			add_java_syms_update_task(p);
+			p->add_task_list = true;
+		}
+	}
+}
+
 /*
  * Cache for obtaining symbol information of the binary
  * executable corresponding to a PID, and rebuilding it
@@ -972,28 +990,11 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if (p->update_syms_table_time > 0
 			    && curr_time >= p->update_syms_table_time) {
 				if (p->is_java) {
-					/* Update java symbols table, will be executed during
-					 * the next Java symbolication */
-
-					/* Has the symbol file for Java been generated ? */
-					if (AO_GET(&p->new_java_syms_file)) {
-						return symbols_cache_update(h,
-									    &kv,
-									    p);
-					} else {
-						if (!p->add_task_list) {
-							add_java_syms_update_task
-							    (p);
-							p->add_task_list = true;
-						}
-					}
+					java_expired_update(h, &kv, p);
+					return (void *)kv.v.cache;
 				} else {
 					return symbols_cache_update(h, &kv, p);
 				}
-			}
-
-			if (kv.v.cache == 0) {
-				return NULL;
 			}
 		} else {
 			/* Ensure that newly launched JAVA processes are detected. */
