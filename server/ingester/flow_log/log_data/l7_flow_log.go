@@ -614,6 +614,16 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	attributeNames := append(h.AttributeNames, extraFieldNamesNeedWriteFlowTag[:]...)
 	attributeValues := append(h.AttributeValues, extraFieldValuesNeedWriteFlowTag[:]...)
 
+	// avoid panic caused by different attributes lengths
+	namesLen, valuesLen := len(attributeNames), len(attributeValues)
+	minNamesLen := namesLen
+	if namesLen != valuesLen {
+		log.Warningf("the lengths of AttributeNames(%v) and attributeValues(%v) is different", attributeNames, attributeValues)
+		if namesLen > valuesLen {
+			minNamesLen = valuesLen
+		}
+	}
+
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
 
@@ -626,7 +636,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			PodNsId: PodNSIDs[idx],
 		}
 
-		for i, name := range attributeNames {
+		for i, name := range attributeNames[:minNamesLen] {
 			if attributeValues[i] == "" {
 				continue
 			}
