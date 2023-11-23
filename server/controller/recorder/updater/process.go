@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Process struct {
-	UpdaterBase[cloudmodel.Process, mysql.Process, *cache.Process]
+	UpdaterBase[cloudmodel.Process, mysql.Process, *diffbase.Process]
 }
 
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
 	updater := &Process{
-		UpdaterBase[cloudmodel.Process, mysql.Process, *cache.Process]{
+		UpdaterBase[cloudmodel.Process, mysql.Process, *diffbase.Process]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewProcess(),
-			diffBaseData: wholeCache.Process,
+			diffBaseData: wholeCache.DiffBaseDataSet.Process,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 	return updater
 }
 
-func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBase *cache.Process, exits bool) {
+func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBase *diffbase.Process, exits bool) {
 	diffBase, exits = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -66,7 +67,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 	return dbItem, true
 }
 
-func (p *Process) generateUpdateInfo(diffBase *cache.Process, cloudItem *cloudmodel.Process) (map[string]interface{}, bool) {
+func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

@@ -24,6 +24,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/stretchr/testify/assert"
 )
@@ -83,11 +85,11 @@ func TestVM_ProduceByAdd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.cache = &cache.Cache{
-				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
-				ToolDataSet:     cache.NewToolDataSet(),
+				DiffBaseDataSet: diffbase.NewDataSet(),
+				ToolDataSet:     tool.NewDataSet(),
 			}
 			tt.prepare(tt.cache)
-			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
+			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByAdd(tt.args.items)
 
 			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
@@ -115,8 +117,8 @@ func TestVM_ProduceByDelete(t *testing.T) {
 		{
 			name: "delete success",
 			cache: &cache.Cache{
-				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
-				ToolDataSet:     cache.NewToolDataSet(),
+				DiffBaseDataSet: diffbase.NewDataSet(),
+				ToolDataSet:     tool.NewDataSet(),
 			},
 			args: args{
 				lcuuids: []string{"vm_lcuuid"},
@@ -150,7 +152,7 @@ func TestVM_ProduceByDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare(tt.cache)
-			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
+			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
@@ -163,7 +165,7 @@ func TestVM_ProduceByDelete(t *testing.T) {
 func TestVM_ProduceByUpdate(t *testing.T) {
 	type args struct {
 		cloudItem *cloudmodel.VM
-		diffBase  *cache.VM
+		diffBase  *diffbase.VM
 	}
 	tests := []struct {
 		name      string
@@ -176,7 +178,7 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 		{
 			name: "migrate success",
 			args: args{
-				diffBase: &cache.VM{
+				diffBase: &diffbase.VM{
 					LaunchServer: "10.50.1.13",
 				},
 				cloudItem: &cloudmodel.VM{
@@ -215,7 +217,7 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 		{
 			name: "update state success",
 			args: args{
-				diffBase: &cache.VM{
+				diffBase: &diffbase.VM{
 					State: common.VM_STATE_EXCEPTION,
 				},
 				cloudItem: &cloudmodel.VM{
@@ -256,11 +258,11 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.cache = &cache.Cache{
-				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
-				ToolDataSet:     cache.NewToolDataSet(),
+				DiffBaseDataSet: diffbase.NewDataSet(),
+				ToolDataSet:     tool.NewDataSet(),
 			}
 			tt.prepare(tt.cache)
-			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
+			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByUpdate(tt.args.cloudItem, tt.args.diffBase)
 
 			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)

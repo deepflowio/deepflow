@@ -28,16 +28,17 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
 
 func TestAddPod(t *testing.T) {
-	ds := cache.NewToolDataSet()
+	ds := tool.NewDataSet()
 	id := RandID()
 	name := RandName()
 	eq := NewEventQueue()
-	em := NewPod(&ds, eq)
+	em := NewPod(ds, eq)
 	em.ProduceByAdd([]*mysql.Pod{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -51,34 +52,34 @@ func TestAddPod(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	ds := cache.NewToolDataSet()
+	ds := tool.NewDataSet()
 	id := RandID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return id, true
 	})
 	defer monkey.Reset()
 
 	name := RandName()
-	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodNameByID", func(_ *cache.ToolDataSet, _ int) (string, bool) {
+	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodNameByID", func(_ *tool.DataSet, _ int) (string, bool) {
 		return name, true
 	})
 	defer monkey1.Reset()
 
 	podNodeID := RandID()
-	monkey2 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodNodeIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey2 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodNodeIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return podNodeID, true
 	})
 	defer monkey2.Reset()
 
 	podNodeName := RandName()
-	monkey3 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodNodeNameByID", func(_ *cache.ToolDataSet, _ int) (string, bool) {
+	monkey3 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodNodeNameByID", func(_ *tool.DataSet, _ int) (string, bool) {
 		return podNodeName, true
 	})
 	defer monkey3.Reset()
 
 	eq := NewEventQueue()
-	em := NewPod(&ds, eq)
-	em.ProduceByUpdate(&cloudmodel.Pod{CreatedAt: time.Now()}, &cache.Pod{})
+	em := NewPod(ds, eq)
+	em.ProduceByUpdate(&cloudmodel.Pod{CreatedAt: time.Now()}, &diffbase.Pod{})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_RECREATE, e.Type)
@@ -86,21 +87,21 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	ds := cache.NewToolDataSet()
+	ds := tool.NewDataSet()
 	id := RandID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return id, true
 	})
 	defer monkey.Reset()
 
 	name := RandName()
-	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodNameByID", func(_ *cache.ToolDataSet, _ int) (string, bool) {
+	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodNameByID", func(_ *tool.DataSet, _ int) (string, bool) {
 		return name, true
 	})
 	defer monkey1.Reset()
 
 	eq := NewEventQueue()
-	em := NewPod(&ds, eq)
+	em := NewPod(ds, eq)
 	em.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)

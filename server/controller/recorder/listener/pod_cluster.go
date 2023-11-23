@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PodCluster struct {
@@ -37,7 +38,7 @@ func (c *PodCluster) OnUpdaterAdded(addedDBItems []*mysql.PodCluster) {
 	c.cache.AddPodClusters(addedDBItems)
 }
 
-func (c *PodCluster) OnUpdaterUpdated(cloudItem *cloudmodel.PodCluster, diffBase *cache.PodCluster) {
+func (c *PodCluster) OnUpdaterUpdated(cloudItem *cloudmodel.PodCluster, diffBase *diffbase.PodCluster) {
 	diffBase.Update(cloudItem)
 }
 

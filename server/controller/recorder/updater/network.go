@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Network struct {
-	UpdaterBase[cloudmodel.Network, mysql.Network, *cache.Network]
+	UpdaterBase[cloudmodel.Network, mysql.Network, *diffbase.Network]
 }
 
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
 	updater := &Network{
-		UpdaterBase[cloudmodel.Network, mysql.Network, *cache.Network]{
+		UpdaterBase[cloudmodel.Network, mysql.Network, *diffbase.Network]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNetwork(),
-			diffBaseData: wholeCache.Networks,
+			diffBaseData: wholeCache.DiffBaseDataSet.Networks,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 	return updater
 }
 
-func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBase *cache.Network, exists bool) {
+func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBase *diffbase.Network, exists bool) {
 	diffBase, exists = n.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -74,7 +75,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 	return dbItem, true
 }
 
-func (n *Network) generateUpdateInfo(diffBase *cache.Network, cloudItem *cloudmodel.Network) (map[string]interface{}, bool) {
+func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

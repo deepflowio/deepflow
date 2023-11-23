@@ -21,7 +21,7 @@ import (
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
@@ -34,7 +34,7 @@ var (
 	DESCRemoveIPFormat    = "%s remove ip %s(mac: %s) in subnet %s."
 )
 
-func GetDeviceOptionsByDeviceID(t *cache.ToolDataSet, deviceType, deviceID int) ([]eventapi.TagFieldOption, error) {
+func GetDeviceOptionsByDeviceID(t *tool.DataSet, deviceType, deviceID int) ([]eventapi.TagFieldOption, error) {
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_HOST:
 		return getHostOptionsByID(t, deviceID)
@@ -63,7 +63,7 @@ func GetDeviceOptionsByDeviceID(t *cache.ToolDataSet, deviceType, deviceID int) 
 	}
 }
 
-func getHostOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getHostOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetHostInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func getHostOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption
 	return opts, nil
 }
 
-func getVMOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getVMOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetVMInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func getVMOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, 
 	return opts, nil
 }
 
-func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getVRouterOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetVRouterInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 	return opts, nil
 }
 
-func getDHCPPortOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getDHCPPortOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetDHCPPortInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func getDHCPPortOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOp
 	return opts, nil
 }
 
-func getNatGateWayOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getNatGateWayOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetNATGatewayInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func getNatGateWayOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 	return opts, nil
 }
 
-func getLBOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getLBOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetLBInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func getLBOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, 
 	return opts, nil
 }
 
-func getRDSInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getRDSInstanceOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetRDSInstanceInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func getRDSInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFiel
 	return opts, nil
 }
 
-func getRedisInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getRedisInstanceOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetRedisInstanceInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -205,7 +205,7 @@ func getRedisInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFi
 	return opts, nil
 }
 
-func getPodNodeOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getPodNodeOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetPodNodeInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func getPodNodeOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 	return opts, nil
 }
 
-func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getPodServiceOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetPodServiceInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -242,7 +242,7 @@ func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 	return opts, nil
 }
 
-func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
+func getPodOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, error) {
 	info, err := t.GetPodInfoByID(id)
 	if err != nil {
 		return nil, err
@@ -262,7 +262,7 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 	return opts, nil
 }
 
-func getL3DeviceOptionsByPodNodeID(t *cache.ToolDataSet, id int) (opts []eventapi.TagFieldOption, ok bool) {
+func getL3DeviceOptionsByPodNodeID(t *tool.DataSet, id int) (opts []eventapi.TagFieldOption, ok bool) {
 	vmID, ok := t.GetVMIDByPodNodeID(id)
 	if ok {
 		opts = append(opts, []eventapi.TagFieldOption{eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_VM), eventapi.TagL3DeviceID(vmID)}...)

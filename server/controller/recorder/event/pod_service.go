@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type PodService struct {
 	deviceType int
 }
 
-func NewPodService(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
+func NewPodService(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodService {
 	mng := &PodService{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
@@ -74,7 +75,7 @@ func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
 	}
 }
 
-func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
 }
 
 func (p *PodService) ProduceByDelete(lcuuids []string) {

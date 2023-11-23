@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type AZ struct {
@@ -37,7 +38,7 @@ func (a *AZ) OnUpdaterAdded(addedDBItems []*mysql.AZ) {
 	a.cache.AddAZs(addedDBItems)
 }
 
-func (a *AZ) OnUpdaterUpdated(cloudItem *cloudmodel.AZ, diffBase *cache.AZ) {
+func (a *AZ) OnUpdaterUpdated(cloudItem *cloudmodel.AZ, diffBase *diffbase.AZ) {
 	diffBase.Update(cloudItem)
 }
 

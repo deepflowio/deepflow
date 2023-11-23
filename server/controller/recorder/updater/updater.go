@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
@@ -51,7 +52,7 @@ type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constrai
 	resourceType string
 
 	cache             *cache.Cache                    // 基于 Domain 或者 SubDomain 范围构造
-	domainToolDataSet *cache.ToolDataSet              // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
+	domainToolDataSet *tool.DataSet                   // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
 	dbOperator        db.Operator[MT]                 // 数据库操作对象
 	diffBaseData      map[string]BT                   // 用于比对的旧资源数据
 	cloudData         []CT                            // 定时获取的新资源数据

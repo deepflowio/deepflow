@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type DHCPPort struct {
 func NewDHCPPort(c *cache.Cache, eq *queue.OverwriteQueue) *DHCPPort {
 	listener := &DHCPPort{
 		cache:         c,
-		eventProducer: event.NewDHCPPort(&c.ToolDataSet, eq),
+		eventProducer: event.NewDHCPPort(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (p *DHCPPort) OnUpdaterAdded(addedDBItems []*mysql.DHCPPort) {
 	p.cache.AddDHCPPorts(addedDBItems)
 }
 
-func (p *DHCPPort) OnUpdaterUpdated(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
+func (p *DHCPPort) OnUpdaterUpdated(cloudItem *cloudmodel.DHCPPort, diffBase *diffbase.DHCPPort) {
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	p.cache.UpdateDHCPPort(cloudItem)

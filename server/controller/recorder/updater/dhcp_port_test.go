@@ -27,6 +27,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func newCloudDHCPPort() cloudmodel.DHCPPort {
@@ -44,7 +46,7 @@ func (t *SuiteTest) getDHCPPortMock(mockDB bool) (*cache.Cache, cloudmodel.DHCPP
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.DHCPPort{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
-		cache_.DHCPPorts[cloudItem.Lcuuid] = &cache.DHCPPort{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
+		cache_.DiffBaseDataSet.DHCPPorts[cloudItem.Lcuuid] = &diffbase.DHCPPort{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -55,11 +57,11 @@ func (t *SuiteTest) getDHCPPortMock(mockDB bool) (*cache.Cache, cloudmodel.DHCPP
 func (t *SuiteTest) TestHandleAddDHCPPortSucess() {
 	cache_, cloudItem := t.getDHCPPortMock(false)
 	vpcID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
 	defer monkey.Reset()
-	assert.Equal(t.T(), len(cache_.DHCPPorts), 0)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.DHCPPorts), 0)
 
 	updater := NewDHCPPort(cache_, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -67,7 +69,7 @@ func (t *SuiteTest) TestHandleAddDHCPPortSucess() {
 	var addedItem *mysql.DHCPPort
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.DHCPPorts), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.DHCPPorts), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DHCPPort{})
 }
@@ -83,7 +85,7 @@ func (t *SuiteTest) TestHandleUpdateDHCPPortSucess() {
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
-	assert.Equal(t.T(), len(cache.DHCPPorts), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.DHCPPorts), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DHCPPort{})
 }
@@ -97,7 +99,7 @@ func (t *SuiteTest) TestHandleDeleteDHCPPortSucess() {
 	var addedItem *mysql.DHCPPort
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	assert.Equal(t.T(), len(cache.DHCPPorts), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.DHCPPorts), 0)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DHCPPort{})
 }
