@@ -1607,6 +1607,7 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 				}
 				if infoPtr != nil {
 					info = *infoPtr
+					info.HitCount = new(uint64)
 					info.PodID = podId
 					info.PodClusterID = podClusterId
 					info.PodNSID = podNsId
