@@ -19,8 +19,9 @@ package statsd
 import (
 	"sync/atomic"
 
-	"github.com/deepflowio/deepflow/server/libs/stats"
 	logging "github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/libs/stats"
 )
 
 var log = logging.MustGetLogger("trisolaris/statsd")
