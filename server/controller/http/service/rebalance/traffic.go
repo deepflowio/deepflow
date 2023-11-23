@@ -510,6 +510,7 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 	for vtapID, changeInfo := range vtapIDToChangeInfo {
 		name, ok := vtapIDToName[vtapID]
 		if !ok {
+			log.Info("vtap(%d) not found", vtapID)
 			continue
 		}
 
@@ -527,11 +528,15 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 				},
 			}
 			statsd.VTapNameToCounter[name] = counter
+			b, _ := json.Marshal(counter)
+			log.Infof("agent(%v) register counter: %v", name, string(b))
 			err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", counter, stats.OptionStatTags{"host": name})
 			if err != nil {
 				log.Error(err)
 			}
 		} else {
+			log.Infof("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Infof("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
 			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
 			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
 		}
