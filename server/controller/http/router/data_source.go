@@ -37,7 +37,7 @@ func NewDataSource(cfg *config.ControllerConfig) *DataSource {
 
 func (ds *DataSource) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/data-sources/:lcuuid/", getDataSource)
-	e.GET("/v1/data-sources/", getDataSources)
+	e.GET("/v1/data-sources/", getDataSources(ds.cfg))
 	e.POST("/v1/data-sources/", createDataSource(ds.cfg))
 	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(ds.cfg))
 	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(ds.cfg))
@@ -46,20 +46,22 @@ func (ds *DataSource) RegisterTo(e *gin.Engine) {
 func getDataSource(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := service.GetDataSources(args)
+	data, err := service.GetDataSources(args, nil)
 	JsonResponse(c, data, err)
 }
 
-func getDataSources(c *gin.Context) {
-	args := make(map[string]interface{})
-	if value, ok := c.GetQuery("type"); ok {
-		args["type"] = value
-	}
-	if value, ok := c.GetQuery("name"); ok {
-		args["name"] = value
-	}
-	data, err := service.GetDataSources(args)
-	JsonResponse(c, data, err)
+func getDataSources(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		if value, ok := c.GetQuery("type"); ok {
+			args["type"] = value
+		}
+		if value, ok := c.GetQuery("name"); ok {
+			args["name"] = value
+		}
+		data, err := service.GetDataSources(args, &cfg.Spec)
+		JsonResponse(c, data, err)
+	})
 }
 
 func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
