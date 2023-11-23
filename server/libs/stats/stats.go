@@ -97,7 +97,9 @@ func registerCountable(modulePrefix, module string, countable Countable, opts ..
 	if source.tags == nil {
 		source.tags = OptionStatTags{}
 	}
-	source.tags["host"] = hostname
+	if _, ok := source.tags["host"]; !ok {
+		source.tags["host"] = hostname
+	}
 	lock.Lock()
 	statSources.Remove(func(x interface{}) bool {
 		closed := x.(*StatSource).countable.Closed()

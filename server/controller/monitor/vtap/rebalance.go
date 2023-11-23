@@ -133,6 +133,7 @@ func (r *RebalanceCheck) analyzerRebalance() {
 }
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
+	log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration)
 	analyzerInfo := rebalance.NewAnalyzerInfo()
 	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
 	if err != nil {

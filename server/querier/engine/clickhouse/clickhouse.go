@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -345,10 +346,36 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)
-						outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+						if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(sqlparser.String(colName), config.Cfg.AutoCustomTag.TagName) {
+							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+							if ok {
+								autoTagMap := tag.TagTranslatorMap
+								autoTagSlice := []string{}
+								for autoTagKey, _ := range autoTagMap {
+									autoTagSlice = append(autoTagSlice, autoTagKey)
+								}
+								sort.Strings(autoTagSlice)
+								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
+							}
+						} else {
+							outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-						outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+						if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(sqlparser.String(colName), config.Cfg.AutoCustomTag.TagName) {
+							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+							if ok {
+								autoTagMap := tag.TagTranslatorMap
+								autoTagSlice := []string{}
+								for autoTagKey, _ := range autoTagMap {
+									autoTagSlice = append(autoTagSlice, autoTagKey)
+								}
+								sort.Strings(autoTagSlice)
+								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
+							}
+						} else {
+							outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+						}
 					}
 					for _, suffix := range []string{"", "_0", "_1"} {
 						for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {

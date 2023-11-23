@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -36,7 +37,12 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	if ok {
 		if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(name, config.Cfg.AutoCustomTag.TagName) {
 			autoTagMap := tag.TagTranslatorMap
+			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
+				autoTagSlice = append(autoTagSlice, autoTagKey)
+			}
+			sort.Strings(autoTagSlice)
+			for _, autoTagKey := range autoTagSlice {
 				stmts = append(stmts, &GroupTag{Value: autoTagKey, AsTagMap: asTagMap})
 			}
 		} else if tag.TagTranslator != "" {
