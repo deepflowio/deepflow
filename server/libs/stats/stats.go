@@ -97,7 +97,10 @@ func registerCountable(modulePrefix, module string, countable Countable, opts ..
 	if source.tags == nil {
 		source.tags = OptionStatTags{}
 	}
-	if _, ok := source.tags["host"]; !ok {
+	// if already has tag "host", add tag "_host"
+	if _, ok := source.tags["host"]; ok {
+		source.tags["_host"] = hostname
+	} else {
 		source.tags["host"] = hostname
 	}
 	lock.Lock()
@@ -211,10 +214,14 @@ func sendStatsd(bp client.BatchPoints) {
 		module := point.Name()
 		tags := point.Tags()
 		tagsOption := make([]string, 0, len(tags)*2)
+		hasHost := false
 		for key, value := range tags {
+			if !hasHost && key == "host" {
+				hasHost = true
+			}
 			tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
 		}
-		if hostname != "" { // specified hostname
+		if hostname != "" && !hasHost { // specified hostname
 			tagsOption = append(tagsOption, "host", hostname)
 		}
 		fields, _ := point.Fields()
@@ -368,7 +375,11 @@ func setHostname(name string) {
 	hostname = name
 	lock.Lock()
 	for it := statSources.Iterator(); !it.Empty(); it.Next() {
-		it.Value().(*StatSource).tags["host"] = hostname
+		if _, ok := it.Value().(*StatSource).tags["_host"]; ok {
+			it.Value().(*StatSource).tags["_host"] = hostname
+		} else {
+			it.Value().(*StatSource).tags["host"] = hostname
+		}
 	}
 	lock.Unlock()
 }
