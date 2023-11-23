@@ -501,10 +501,10 @@ impl EbpfCollector {
 
             let mut all_proto_map = get_all_protocol()
                 .iter()
-                .map(|p| p.as_str().to_string())
+                .map(|p| p.as_str().to_lowercase())
                 .collect::<HashSet<String>>();
             for (protocol, port_range) in &config.l7_protocol_ports {
-                all_proto_map.remove(protocol);
+                all_proto_map.remove(&protocol.to_lowercase());
                 let l7_protocol = L7Protocol::from(protocol.clone());
                 let ports = CString::new(port_range.as_str()).unwrap();
                 if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
