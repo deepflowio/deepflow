@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type NATVMConnection struct {
@@ -37,7 +38,7 @@ func (c *NATVMConnection) OnUpdaterAdded(addedDBItems []*mysql.NATVMConnection) 
 	c.cache.AddNATVMConnections(addedDBItems)
 }
 
-func (c *NATVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.NATVMConnection, diffBase *cache.NATVMConnection) {
+func (c *NATVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.NATVMConnection, diffBase *diffbase.NATVMConnection) {
 }
 
 func (c *NATVMConnection) OnUpdaterDeleted(lcuuids []string) {

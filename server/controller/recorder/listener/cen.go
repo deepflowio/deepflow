@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type CEN struct {
@@ -37,7 +38,7 @@ func (c *CEN) OnUpdaterAdded(addedDBItems []*mysql.CEN) {
 	c.cache.AddCENs(addedDBItems)
 }
 
-func (c *CEN) OnUpdaterUpdated(cloudItem *cloudmodel.CEN, diffBase *cache.CEN) {
+func (c *CEN) OnUpdaterUpdated(cloudItem *cloudmodel.CEN, diffBase *diffbase.CEN) {
 	diffBase.Update(cloudItem)
 }
 

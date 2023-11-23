@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PodIngressRuleBackend struct {
@@ -37,7 +38,7 @@ func (b *PodIngressRuleBackend) OnUpdaterAdded(addedDBItems []*mysql.PodIngressR
 	b.cache.AddPodIngressRuleBackends(addedDBItems)
 }
 
-func (b *PodIngressRuleBackend) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngressRuleBackend, diffBase *cache.PodIngressRuleBackend) {
+func (b *PodIngressRuleBackend) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngressRuleBackend, diffBase *diffbase.PodIngressRuleBackend) {
 }
 
 func (b *PodIngressRuleBackend) OnUpdaterDeleted(lcuuids []string) {

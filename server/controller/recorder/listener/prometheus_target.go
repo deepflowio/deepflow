@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PrometheusTarget struct {
@@ -37,7 +38,7 @@ func (p *PrometheusTarget) OnUpdaterAdded(addedDBItems []*mysql.PrometheusTarget
 	p.cache.AddPrometheusTargets(addedDBItems)
 }
 
-func (p *PrometheusTarget) OnUpdaterUpdated(cloudItem *cloudmodel.PrometheusTarget, diffBase *cache.PrometheusTarget) {
+func (p *PrometheusTarget) OnUpdaterUpdated(cloudItem *cloudmodel.PrometheusTarget, diffBase *diffbase.PrometheusTarget) {
 	diffBase.Update(cloudItem)
 }
 

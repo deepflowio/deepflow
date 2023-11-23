@@ -23,7 +23,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -41,7 +42,7 @@ type VM struct {
 	deviceType int
 }
 
-func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
+func NewVM(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
@@ -83,7 +84,7 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 	}
 }
 
-func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
+func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) {
 	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
 	if err != nil {
 		log.Error(err)
@@ -137,7 +138,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 }
 
 func (v *VM) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
-	ipNetworkMap, _ := v.ToolDataSet.EventToolDataSet.GetVMIPNetworkMapByID(id)
+	ipNetworkMap, _ := v.ToolDataSet.EventDataSet.GetVMIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
 		networkIDs = append(networkIDs, uint32(nID))
 		ips = append(ips, ip.IP)

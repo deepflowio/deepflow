@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type LBListener struct {
-	UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *cache.LBListener]
+	UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]
 }
 
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
 	updater := &LBListener{
-		UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *cache.LBListener]{
+		UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLBListener(),
-			diffBaseData: wholeCache.LBListeners,
+			diffBaseData: wholeCache.DiffBaseDataSet.LBListeners,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 	return updater
 }
 
-func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (diffBase *cache.LBListener, exists bool) {
+func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (diffBase *diffbase.LBListener, exists bool) {
 	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -71,7 +72,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 	return dbItem, true
 }
 
-func (l *LBListener) generateUpdateInfo(diffBase *cache.LBListener, cloudItem *cloudmodel.LBListener) (map[string]interface{}, bool) {
+func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type SecurityGroupRule struct {
@@ -37,7 +38,7 @@ func (r *SecurityGroupRule) OnUpdaterAdded(addedDBItems []*mysql.SecurityGroupRu
 	r.cache.AddSecurityGroupRules(addedDBItems)
 }
 
-func (r *SecurityGroupRule) OnUpdaterUpdated(cloudItem *cloudmodel.SecurityGroupRule, diffBase *cache.SecurityGroupRule) {
+func (r *SecurityGroupRule) OnUpdaterUpdated(cloudItem *cloudmodel.SecurityGroupRule, diffBase *diffbase.SecurityGroupRule) {
 	diffBase.Update(cloudItem)
 }
 

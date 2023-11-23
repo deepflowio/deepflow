@@ -21,21 +21,22 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Subnet struct {
-	UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *cache.Subnet]
+	UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *diffbase.Subnet]
 }
 
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	updater := &Subnet{
-		UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *cache.Subnet]{
+		UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *diffbase.Subnet]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSubnet(),
-			diffBaseData: wholeCache.Subnets,
+			diffBaseData: wholeCache.DiffBaseDataSet.Subnets,
 			cloudData:    cloudData,
 		},
 	}
@@ -43,7 +44,7 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	return updater
 }
 
-func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase *cache.Subnet, exists bool) {
+func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase *diffbase.Subnet, exists bool) {
 	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -75,7 +76,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	return dbItem, true
 }
 
-func (s *Subnet) generateUpdateInfo(diffBase *cache.Subnet, cloudItem *cloudmodel.Subnet) (map[string]interface{}, bool) {
+func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

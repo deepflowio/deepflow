@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type VRouter struct {
 	deviceType int
 }
 
-func NewVRouter(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
+func NewVRouter(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VRouter {
 	mng := &VRouter{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
@@ -82,7 +83,7 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 	}
 }
 
-func (r *VRouter) ProduceByUpdate(cloudItem *cloudmodel.VRouter, diffBase *cache.VRouter) {
+func (r *VRouter) ProduceByUpdate(cloudItem *cloudmodel.VRouter, diffBase *diffbase.VRouter) {
 }
 
 func (r *VRouter) ProduceByDelete(lcuuids []string) {

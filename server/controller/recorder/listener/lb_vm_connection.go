@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type LBVMConnection struct {
@@ -37,7 +38,7 @@ func (c *LBVMConnection) OnUpdaterAdded(addedDBItems []*mysql.LBVMConnection) {
 	c.cache.AddLBVMConnections(addedDBItems)
 }
 
-func (c *LBVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.LBVMConnection, diffBase *cache.LBVMConnection) {
+func (c *LBVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.LBVMConnection, diffBase *diffbase.LBVMConnection) {
 }
 
 func (c *LBVMConnection) OnUpdaterDeleted(lcuuids []string) {

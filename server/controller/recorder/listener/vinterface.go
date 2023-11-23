@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type VInterface struct {
@@ -36,7 +37,7 @@ func (i *VInterface) OnUpdaterAdded(addedDBItems []*mysql.VInterface) {
 	i.cache.AddVInterfaces(addedDBItems)
 }
 
-func (i *VInterface) OnUpdaterUpdated(cloudItem *cloudmodel.VInterface, diffBase *cache.VInterface) {
+func (i *VInterface) OnUpdaterUpdated(cloudItem *cloudmodel.VInterface, diffBase *diffbase.VInterface) {
 	diffBase.Update(cloudItem)
 	i.cache.UpdateVInterface(cloudItem)
 }

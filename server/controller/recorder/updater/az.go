@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type AZ struct {
-	UpdaterBase[cloudmodel.AZ, mysql.AZ, *cache.AZ]
+	UpdaterBase[cloudmodel.AZ, mysql.AZ, *diffbase.AZ]
 }
 
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	updater := &AZ{
-		UpdaterBase[cloudmodel.AZ, mysql.AZ, *cache.AZ]{
+		UpdaterBase[cloudmodel.AZ, mysql.AZ, *diffbase.AZ]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewAZ(),
-			diffBaseData: wholeCache.AZs,
+			diffBaseData: wholeCache.DiffBaseDataSet.AZs,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	return updater
 }
 
-func (z *AZ) getDiffBaseByCloudItem(cloudItem *cloudmodel.AZ) (diffBase *cache.AZ, exists bool) {
+func (z *AZ) getDiffBaseByCloudItem(cloudItem *cloudmodel.AZ) (diffBase *diffbase.AZ, exists bool) {
 	diffBase, exists = z.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -58,7 +59,7 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysql.AZ, bool) {
 	return dbItem, true
 }
 
-func (z *AZ) generateUpdateInfo(diffBase *cache.AZ, cloudItem *cloudmodel.AZ) (map[string]interface{}, bool) {
+func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

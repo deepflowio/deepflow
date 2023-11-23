@@ -28,6 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
@@ -309,7 +310,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		_, ok := cloudSubDomainResourceMap[subDomainLcuuid]
 		if !ok {
 			log.Infof("sub_domain (lcuuid: %s) clean refresh started", subDomainLcuuid)
-			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache, &r.cacheMng.DomainCache.ToolDataSet)
+			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache, r.cacheMng.DomainCache.ToolDataSet)
 			r.executeUpdaters(subDomainUpdatersInUpdateOrder)
 			log.Infof("sub_domain (lcuuid: %s) clean refresh completed", subDomainLcuuid)
 		}
@@ -317,7 +318,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 }
 
 func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource,
-	subDomainCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) []updater.ResourceUpdater {
+	subDomainCache *cache.Cache, domainToolDataSet *tool.DataSet) []updater.ResourceUpdater {
 	if subDomainCache == nil {
 		subDomainCache = r.cacheMng.CreateSubDomainCacheIfNotExists(subDomainLcuuid)
 	}

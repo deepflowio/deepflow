@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VMSecurityGroup struct {
-	UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *cache.VMSecurityGroup]
+	UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *diffbase.VMSecurityGroup]
 }
 
 func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecurityGroup) *VMSecurityGroup {
 	updater := &VMSecurityGroup{
-		UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *cache.VMSecurityGroup]{
+		UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *diffbase.VMSecurityGroup]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVMSecurityGroup(),
-			diffBaseData: wholeCache.VMSecurityGroups,
+			diffBaseData: wholeCache.DiffBaseDataSet.VMSecurityGroups,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecuri
 	return updater
 }
 
-func (z *VMSecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMSecurityGroup) (diffBase *cache.VMSecurityGroup, exists bool) {
+func (z *VMSecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMSecurityGroup) (diffBase *diffbase.VMSecurityGroup, exists bool) {
 	diffBase, exists = z.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -74,7 +75,7 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 	return dbItem, true
 }
 
-func (v *VMSecurityGroup) generateUpdateInfo(diffBase *cache.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (map[string]interface{}, bool) {
+func (v *VMSecurityGroup) generateUpdateInfo(diffBase *diffbase.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {
 		updateInfo["priority"] = cloudItem.Priority

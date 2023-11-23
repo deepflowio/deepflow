@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodService struct {
-	UpdaterBase[cloudmodel.PodService, mysql.PodService, *cache.PodService]
+	UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
 	updater := &PodService{
-		UpdaterBase[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
+		UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodService(),
-			diffBaseData: wholeCache.PodServices,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodServices,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 	return updater
 }
 
-func (s *PodService) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodService) (diffBase *cache.PodService, exists bool) {
+func (s *PodService) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodService) (diffBase *diffbase.PodService, exists bool) {
 	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -102,7 +103,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	return dbItem, true
 }
 
-func (s *PodService) generateUpdateInfo(diffBase *cache.PodService, cloudItem *cloudmodel.PodService) (map[string]interface{}, bool) {
+func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {
 		var podIngressID int

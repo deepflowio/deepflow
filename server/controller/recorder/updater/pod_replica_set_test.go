@@ -26,6 +26,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/test"
 )
 
@@ -45,7 +47,7 @@ func (t *SuiteTest) getPodReplicaSetMock(mockDB bool) (*cache.Cache, cloudmodel.
 	c := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.PodReplicaSet{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid, Label: cloudItem.Label})
-		c.PodReplicaSets[cloudItem.Lcuuid] = &cache.PodReplicaSet{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, Label: cloudItem.Label}
+		c.DiffBaseDataSet.PodReplicaSets[cloudItem.Lcuuid] = &diffbase.PodReplicaSet{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, Label: cloudItem.Label}
 	}
 
 	c.SetSequence(c.GetSequence() + 1)
@@ -55,19 +57,19 @@ func (t *SuiteTest) getPodReplicaSetMock(mockDB bool) (*cache.Cache, cloudmodel.
 
 func (t *SuiteTest) TestHandleAddPodReplicaSetSucess() {
 	c, cloudItem := t.getPodReplicaSetMock(false)
-	assert.Equal(t.T(), len(c.PodReplicaSets), 0)
+	assert.Equal(t.T(), len(c.DiffBaseDataSet.PodReplicaSets), 0)
 	podNamespaceID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodNamespaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodNamespaceIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return podNamespaceID, true
 	})
 	defer monkey.Reset()
 	podClusterID := randID()
-	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodClusterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodClusterIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return podClusterID, true
 	})
 	defer monkey1.Reset()
 	podGroupID := randID()
-	monkey2 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodGroupIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey2 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodGroupIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return podGroupID, true
 	})
 	defer monkey2.Reset()
@@ -78,7 +80,7 @@ func (t *SuiteTest) TestHandleAddPodReplicaSetSucess() {
 	var addedItem *mysql.PodReplicaSet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(c.PodReplicaSets), 1)
+	assert.Equal(t.T(), len(c.DiffBaseDataSet.PodReplicaSets), 1)
 	assert.Equal(t.T(), cloudItem.Label, addedItem.Label)
 
 	test.ClearDBData[mysql.PodReplicaSet](t.db)
@@ -95,7 +97,7 @@ func (t *SuiteTest) TestHandleUpdatePodReplicaSetSucess() {
 	var addedItem *mysql.PodReplicaSet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.PodReplicaSets), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.PodReplicaSets), 1)
 	assert.Equal(t.T(), addedItem.Label, cloudItem.Label)
 
 	test.ClearDBData[mysql.PodReplicaSet](t.db)

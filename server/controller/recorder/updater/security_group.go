@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type SecurityGroup struct {
-	UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *cache.SecurityGroup]
+	UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *diffbase.SecurityGroup]
 }
 
 func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroup) *SecurityGroup {
 	updater := &SecurityGroup{
-		UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *cache.SecurityGroup]{
+		UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *diffbase.SecurityGroup]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSecurityGroup(),
-			diffBaseData: wholeCache.SecurityGroups,
+			diffBaseData: wholeCache.DiffBaseDataSet.SecurityGroups,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGr
 	return updater
 }
 
-func (g *SecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.SecurityGroup) (diffBase *cache.SecurityGroup, exists bool) {
+func (g *SecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.SecurityGroup) (diffBase *diffbase.SecurityGroup, exists bool) {
 	diffBase, exists = g.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -69,7 +70,7 @@ func (g *SecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroup)
 	return dbItem, true
 }
 
-func (g *SecurityGroup) generateUpdateInfo(diffBase *cache.SecurityGroup, cloudItem *cloudmodel.SecurityGroup) (map[string]interface{}, bool) {
+func (g *SecurityGroup) generateUpdateInfo(diffBase *diffbase.SecurityGroup, cloudItem *cloudmodel.SecurityGroup) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

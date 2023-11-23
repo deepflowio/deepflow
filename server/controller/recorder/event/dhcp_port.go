@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type DHCPPort struct {
 	deviceType int
 }
 
-func NewDHCPPort(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort {
+func NewDHCPPort(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *DHCPPort {
 	mng := &DHCPPort{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
@@ -71,7 +72,7 @@ func (p *DHCPPort) ProduceByAdd(items []*mysql.DHCPPort) {
 	}
 }
 
-func (p *DHCPPort) ProduceByUpdate(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
+func (p *DHCPPort) ProduceByUpdate(cloudItem *cloudmodel.DHCPPort, diffBase *diffbase.DHCPPort) {
 }
 
 func (p *DHCPPort) ProduceByDelete(lcuuids []string) {

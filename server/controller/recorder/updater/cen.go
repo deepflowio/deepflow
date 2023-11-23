@@ -21,21 +21,22 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type CEN struct {
-	UpdaterBase[cloudmodel.CEN, mysql.CEN, *cache.CEN]
+	UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
-		UpdaterBase[cloudmodel.CEN, mysql.CEN, *cache.CEN]{
+		UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewCEN(),
-			diffBaseData: wholeCache.CENs,
+			diffBaseData: wholeCache.DiffBaseDataSet.CENs,
 			cloudData:    cloudData,
 		},
 	}
@@ -43,7 +44,7 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	return updater
 }
 
-func (c *CEN) getDiffBaseByCloudItem(cloudItem *cloudmodel.CEN) (diffBase *cache.CEN, exists bool) {
+func (c *CEN) getDiffBaseByCloudItem(cloudItem *cloudmodel.CEN) (diffBase *diffbase.CEN, exists bool) {
 	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -71,7 +72,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN) (map[string]interface{}, bool) {
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

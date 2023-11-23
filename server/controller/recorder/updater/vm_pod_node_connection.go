@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VMPodNodeConnection struct {
-	UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *cache.VMPodNodeConnection]
+	UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *diffbase.VMPodNodeConnection]
 }
 
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
 	updater := &VMPodNodeConnection{
-		UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *cache.VMPodNodeConnection]{
+		UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *diffbase.VMPodNodeConnection]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVMPodNodeConnection(),
-			diffBaseData: wholeCache.VMPodNodeConnections,
+			diffBaseData: wholeCache.DiffBaseDataSet.VMPodNodeConnections,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,13 +43,13 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 	return updater
 }
 
-func (c *VMPodNodeConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMPodNodeConnection) (diffBase *cache.VMPodNodeConnection, exists bool) {
+func (c *VMPodNodeConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMPodNodeConnection) (diffBase *diffbase.VMPodNodeConnection, exists bool) {
 	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
 func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNodeConnection) (*mysql.VMPodNodeConnection, bool) {
-	vmID, exists := c.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -61,13 +62,13 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		Domain:    c.cache.DomainLcuuid,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
-		PodNodeID: c.cache.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
+		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
 // 保留接口
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *cache.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (map[string]interface{}, bool) {
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (map[string]interface{}, bool) {
 	return nil, false
 }

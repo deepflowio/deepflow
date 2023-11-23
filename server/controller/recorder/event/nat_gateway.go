@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type NATGateway struct {
 	deviceType int
 }
 
-func NewNATGateway(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGateway {
+func NewNATGateway(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *NATGateway {
 	mng := &NATGateway{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
@@ -71,7 +72,7 @@ func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 	}
 }
 
-func (n *NATGateway) ProduceByUpdate(cloudItem *cloudmodel.NATGateway, diffBase *cache.NATGateway) {
+func (n *NATGateway) ProduceByUpdate(cloudItem *cloudmodel.NATGateway, diffBase *diffbase.NATGateway) {
 }
 
 func (n *NATGateway) ProduceByDelete(lcuuids []string) {
