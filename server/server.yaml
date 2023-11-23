@@ -116,6 +116,10 @@ controller:
     az_max_per_server: 10
     data_source_max: 25
     data_source_retention_time_max: 24000
+    # unit: s
+    data_source_ext_metrics_interval: 15
+    # unit: s
+    data_source_prometheus_interval: 15
 
   # monitor module config
   monitor:

@@ -646,3 +646,7 @@ const (
 	ANALYZER_ALLOC_BY_INGESTED_DATA = "by-ingested-data"
 	ANALYZER_ALLOC_BY_AGENT_COUNT   = "by-agent-count"
 )
+
+const (
+	DATA_SOURCE_DEEPFLOW_SYSTEM_INTERVAL = 10
+)
