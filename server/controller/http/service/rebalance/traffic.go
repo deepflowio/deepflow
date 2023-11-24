@@ -128,11 +128,11 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 		// update counter
 		updateCounter(vtapIDToName, vTapIDToChangeInfo)
 	}
-	b, err := json.Marshal(response)
-	if err != nil {
-		log.Error(err)
+	log.Infof("vtap rebalance result switch_total_num(%v)", response.TotalSwitchVTapNum)
+	for _, detail := range response.Details {
+		log.Infof("vtap rebalance result az(%v) ip(%v) state(%v) before_vtap_num(%v) after_vtap_num(%v), switch_vtap_num(%v) before_vtap_weight(%v) after_vtap_weight(%v)",
+			detail.AZ, detail.IP, detail.State, detail.BeforeVTapNum, detail.AfterVTapNum, detail.SwitchVTapNum, detail.BeforeVTapWeights, detail.AfterVTapWeights)
 	}
-	log.Infof("vtap rebalance result: %s", string(b))
 
 	return response, nil
 }
