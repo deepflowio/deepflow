@@ -1103,6 +1103,19 @@ int fetch_container_id(pid_t pid, char *id, int copy_bytes)
 	return fetch_container_id_from_str(buff, id, copy_bytes);
 }
 
+int generate_random_integer(int max_value)
+{
+	if (max_value <= 0) {
+		ebpf_warning("Error: max_value must be greater than 0.\n");
+		return 0;
+	}
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	srand(ts.tv_nsec);
+	return (rand() % max_value);
+}
+
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 {

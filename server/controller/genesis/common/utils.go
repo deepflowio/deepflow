@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"gopkg.in/yaml.v3"
+	"inet.af/netaddr"
 )
 
 type VifInfo struct {
@@ -428,4 +429,17 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 	bytes := [8]byte{}
 	BigEndian.PutUint64(bytes[:], v)
 	return net.HardwareAddr(bytes[2:])
+}
+
+func IPInRanges(ip string, ipRanges ...netaddr.IPPrefix) bool {
+	ipObj, err := netaddr.ParseIP(ip)
+	if err != nil {
+		return false
+	}
+	for _, ipRange := range ipRanges {
+		if ipRange.Contains(ipObj) {
+			return true
+		}
+	}
+	return false
 }

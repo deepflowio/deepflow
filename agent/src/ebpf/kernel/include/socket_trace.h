@@ -26,15 +26,6 @@
 #include "common.h"
 #include "kernel.h"
 #include "bpf_endian.h"
-
-#ifndef unlikely
-#define unlikely(x)             __builtin_expect(!!(x), 0)
-#endif
-
-#ifndef likely
-#define likely(x)               __builtin_expect(!!(x), 1)
-#endif
-
 #include <sys/socket.h>
 #include <stddef.h>
 #include <netinet/in.h>

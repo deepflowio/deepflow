@@ -17,6 +17,7 @@
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
 #include "../bihash_24_8.h"
+#include "../../kernel/include/perf_profiler.h"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -72,8 +73,8 @@ typedef struct {
 		/* Matching and combining for process/thread name. */
 		struct {
 			u8 comm[TASK_COMM_LEN];
-			u64 u_stack_id: 26,
-			    k_stack_id: 26,
+			u64 pid: 26,
+			    reserved: 26,
 			    cpu: 12;
 		} c_k;
 	};
@@ -141,6 +142,11 @@ typedef struct {
 	u8 data[0];
 } stack_trace_msg_t;
 
+struct stack_ids_bitmap {
+	u64 count;
+	u8 bitmap[STACK_MAP_ENTRIES / 8];
+} __attribute__((packed));
+
 int stop_continuous_profiler(void);
 int start_continuous_profiler(int freq, int java_syms_space_limit,
 			      int java_syms_update_delay,
@@ -150,4 +156,5 @@ void release_flame_graph_hash(void);
 int set_profiler_regex(const char *pattern);
 int set_profiler_cpu_aggregation(int flag);
 struct bpf_tracer *get_profiler_tracer(void);
+void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 #endif /* DF_USER_PERF_PROFILER_H */

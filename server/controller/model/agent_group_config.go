@@ -227,7 +227,7 @@ type L7ProtocolAdvancedFeatures struct {
 }
 
 type OracleConfig struct {
-	IsBE              bool `yaml:"is-be,omitempty"`
-	IntCompress       bool `yaml:"int-compress,omitempty"`
-	Resp0x04ExtraByte bool `yaml:"resp-0x04-extra-byte,omitempty"`
+	IsBE              *bool `yaml:"is-be,omitempty"`
+	IntCompress       *bool `yaml:"int-compress,omitempty"`
+	Resp0x04ExtraByte *bool `yaml:"resp-0x04-extra-byte,omitempty"`
 }

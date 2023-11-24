@@ -348,6 +348,10 @@ var (
 		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0_0) AND exist(resource_gl1_1) LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_app_port` WHERE (auto_instance_type_0 not in (101,102)) AND (auto_service_type_1 not in (10)) LIMIT 1",
 		db:     "flow_metrics",
+	}, {
+		index:  "l2_vpc_filter_trans",
+		input:  "SELECT pod from l4_flow_log WHERE exist(l2_vpc_0) AND l2_vpc!=1 GROUP BY l2_vpc_1 LIMIT 1",
+		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod`, dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` FROM flow_log.`l4_flow_log` PREWHERE (epc_id_0!=0) AND (toUInt64(epc_id) IN (SELECT id FROM flow_tag.l3_epc_map WHERE name != 1)) AND (epc_id_1!=0) GROUP BY dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` LIMIT 1",
 	}}
 )
 

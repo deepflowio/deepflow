@@ -138,7 +138,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[l2VpcNameSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.l3_epc_map, 'name', (toUInt64("+l2EPCIDSuffix+")))",
-				l2EPCIDSuffix+"!=-2",
+				l2EPCIDSuffix+"!=0",
 				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
 				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),

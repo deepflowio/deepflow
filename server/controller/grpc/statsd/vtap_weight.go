@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,30 @@
  * limitations under the License.
  */
 
-#ifndef GEN_SYMS_FILE_H
-#define GEN_SYMS_FILE_H
+package statsd
 
-#define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
+var (
+	VTapNameToCounter = make(map[string]*GetVTapWeightCounter)
+)
 
-struct java_syms_update_task {
-	struct list_head list;
-	struct symbolizer_proc_info *p;
-};
+type VTapWeightCounter struct {
+	Weight            float64 `statsd:"weight"`
+	IsAnalyzerChanged uint64  `statsd:"is_analyzer_changed"`
+}
 
-void gen_java_symbols_file(int pid, bool *need_update);
-void clean_local_java_symbols_files(int pid);
-void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
-void java_syms_update_main(void *arg);
-#endif /* GEN_SYMS_FILE_H */
+func NewVTapWeightCounter() *VTapWeightCounter {
+	return &VTapWeightCounter{}
+}
+
+type GetVTapWeightCounter struct {
+	*VTapWeightCounter
+	Name string
+}
+
+func (g *GetVTapWeightCounter) GetCounter() interface{} {
+	return g.VTapWeightCounter
+}
+
+func (g *GetVTapWeightCounter) Closed() bool {
+	return false
+}

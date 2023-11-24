@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include "../config.h"
+#include "../utils.h"
 #include "../common.h"
 #include "../mem.h"
 #include "../log.h"
@@ -157,6 +158,20 @@ static bool cpdbg_enable;
 static uint32_t cpdbg_start_time;
 static uint32_t cpdbg_timeout;
 
+/* Record all stack IDs in each iteration for quick retrieval. */
+struct stack_ids_bitmap stack_ids_a;
+struct stack_ids_bitmap stack_ids_b;
+/* This vector table is used to remove a stack from the stack map. */
+static int *clear_stack_ids_a;
+static int *clear_stack_ids_b;
+static u64 stackmap_clear_failed_count;
+
+/* perf buffer queue loss statistics */
+static u64 perf_buf_lost_a_count;
+static u64 perf_buf_lost_b_count;
+
+static volatile u64 g_enable_perf_sample;
+
 static u64 get_process_lost_count(void)
 {
 	return atomic64_read(&process_lost_count);
@@ -176,30 +191,19 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 	return NULL;
 }
 
+/* 
+ * The invocation of this interface is always when the process name does
+ * not match.
+ */
 static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 				const char *process_name,
 				struct stack_trace_key_t *v, void *msg_value)
 {
-	if (process_name == NULL) {
-		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-				v->comm, strlen(v->comm));
-	} else {
-		strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-				process_name, strlen(process_name));
-	}
-
+	strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
+			v->comm, strlen(v->comm));
 	kvp->c_k.cpu = v->cpu;
-
-	if (v->userstack < 0)
-		kvp->c_k.u_stack_id = STACK_ID_MAX;
-	else
-		kvp->c_k.u_stack_id = v->userstack;
-
-	if (v->kernstack < 0)
-		kvp->c_k.k_stack_id = STACK_ID_MAX;
-	else
-		kvp->c_k.k_stack_id = v->kernstack;
-
+	kvp->c_k.pid = v->tgid;
+	kvp->c_k.reserved = 0;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
@@ -270,6 +274,12 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 		/* The aggregation method is identified as 
 		 * { process name + [u,k]stack_trace_id + cpu} */
 		msg->stime = 0;
+		if (!matched) {
+			msg->pid = msg->tid = 0;
+			snprintf((char *)msg->process_name,
+				 sizeof(msg->process_name),
+				 "%s", "Total");
+		}
 	}
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
@@ -282,10 +292,18 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	}
 }
 
-static void reader_lost_cb(void *t, u64 lost)
+static void reader_lost_cb_a(void *t, u64 lost)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	atomic64_add(&tracer->lost, lost);
+	perf_buf_lost_a_count++;
+}
+
+static void reader_lost_cb_b(void *t, u64 lost)
+{
+	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	atomic64_add(&tracer->lost, lost);
+	perf_buf_lost_b_count++;
 }
 
 static void reader_raw_cb(void *t, void *raw, int raw_size)
@@ -478,11 +496,39 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	}
 }
 
+static inline void add_stack_id_to_bitmap(int stack_id, bool is_a)
+{
+	if (stack_id < 0)
+		return;
+
+	struct stack_ids_bitmap *ids;
+	if (is_a)
+		ids = &stack_ids_a;
+	else
+		ids = &stack_ids_b;
+
+	if (!is_set_bitmap(ids->bitmap, stack_id)) {
+		set_bitmap(ids->bitmap, stack_id);
+		int ret = VEC_OK;
+
+		if (is_a)
+			vec_add1(clear_stack_ids_a, stack_id, ret);
+		else
+			vec_add1(clear_stack_ids_b, stack_id, ret);
+
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed\n");
+		}
+
+		ids->count++;
+	}
+}
+
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
 				   stack_str_hash_t * stack_str_hash,
 				   stack_trace_msg_hash_t * msg_hash,
-				   u32 * count)
+				   u32 * count, bool use_a_map)
 {
 	struct stack_trace_key_t *v;
 	vec_foreach(v, raw_stack_data) {
@@ -518,6 +564,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		if (v->userstack == -EEXIST)
 			stack_trace_lost++;
+
+		add_stack_id_to_bitmap(v->kernstack, use_a_map);
+		add_stack_id_to_bitmap(v->userstack, use_a_map);
 
 		/* Total iteration count for this iteration. */
 		(*count)++;
@@ -563,7 +612,6 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			((stack_trace_msg_t *) kv.msg_ptr)->count++;
-
 			continue;
 		}
 
@@ -579,7 +627,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
-						    info_p);
+						    process_name, info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -623,6 +671,123 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 	}
 
 	vec_free(raw_stack_data);
+}
+
+void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
+{
+	if (bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
+				ENABLE_IDX, &enable_flag) == false) {
+		ebpf_warning("profiler state map update error."
+			     "(%s enable_flag %lu) - %s\n",
+			     MAP_PROFILER_STATE_MAP,
+			     enable_flag, strerror(errno));
+	}
+
+	g_enable_perf_sample = enable_flag;
+
+	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
+}
+
+static u32 delete_all_stackmap_elems(struct bpf_tracer *tracer,
+				     const char *stack_map_name)
+{
+	struct ebpf_map *map =
+	    ebpf_obj__get_map_by_name(tracer->obj, stack_map_name);
+	if (map == NULL) {
+		ebpf_warning("[%s] map(name:%s) is NULL.\n", __func__,
+			     stack_map_name);
+		return 0;
+	}
+	int map_fd = map->fd;
+
+	u32 key = 0, next_key;
+	u32 reclaim_count = 0;
+	u32 find_count = 0;
+	struct list_head clear_elem_head;
+	init_list_head(&clear_elem_head);
+
+	while (bpf_get_next_key(map_fd, &key, &next_key) == 0) {
+		find_count++;
+		insert_list(&next_key, sizeof(next_key), &clear_elem_head);
+		key = next_key;
+	}
+
+	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
+
+	ebpf_info("[%s] table %s find_count %u reclaim_count :%u\n",
+		  __func__, stack_map_name, find_count, reclaim_count);
+
+	return reclaim_count;
+}
+
+static void cleanup_stackmap(struct bpf_tracer *t,
+			     const char *stack_map_name, bool is_a)
+{
+	struct stack_ids_bitmap *ids;
+	int *clear_stack_ids;
+	u64 *perf_buf_lost_p = NULL;
+
+	if (is_a) {
+		ids = &stack_ids_a;
+		clear_stack_ids = clear_stack_ids_a;
+		perf_buf_lost_p = &perf_buf_lost_a_count;
+	} else {
+		ids = &stack_ids_b;
+		clear_stack_ids = clear_stack_ids_b;
+		perf_buf_lost_p = &perf_buf_lost_b_count;
+	}
+
+	if (ids->count != vec_len(clear_stack_ids)) {
+		ebpf_warning
+		    ("stack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
+		     ids->count, vec_len(clear_stack_ids));
+	}
+
+	/*
+	 * The perf profiler utilizes a perf buffer (per CPUs) for transporting stack data,
+	 * which may lead to out-of-order behavior in a multi-core environment.
+	 * We have employed a threshold to delay the cleanup of the stack map, reducing the
+	 * occurrence of premature clearing of stack entries caused by the disorder in stack
+	 * data.
+	 *
+	 * Examine the detailed explanation of 'STACKMAP_CLEANUP_THRESHOLD' in
+	 * 'agent/src/ebpf/user/config.h'.
+	 */
+	if (ids->count >= STACKMAP_CLEANUP_THRESHOLD) {
+		int *sid;
+		vec_foreach(sid, clear_stack_ids) {
+			int id = *sid;
+			if (!bpf_table_delete_key(t, stack_map_name, (u64) id)) {
+				/*
+				 * It may be due to the disorder in the perf buffer transmission,
+				 * leading to the repetitive deletion of the same stack ID.
+				 */
+				stackmap_clear_failed_count++;
+			}
+
+			clear_bitmap(ids->bitmap, id);
+		}
+
+		if (is_a)
+			vec_free(clear_stack_ids_a);
+		else
+			vec_free(clear_stack_ids_b);
+
+		ids->count = 0;
+
+		/*
+		 * If data loss occurs due to the user-space receiver program
+		 * being too busy and not promptly fetching data from the perf
+		 * buffer, it is necessary to clean the stack map once to prevent
+		 * excessive remnants of stack data from affecting the acquisition
+		 * of new stack data (i.e., eBPF using the bpf_get_stackid()
+		 * interface will return -EEXIST).
+		 */
+		if (*perf_buf_lost_p > 0) {
+			delete_all_stackmap_elems(t, stack_map_name);
+			*perf_buf_lost_p = 0;
+		}
+	}
 }
 
 static void process_bpf_stacktraces(struct bpf_tracer *t,
@@ -713,10 +878,10 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 		 * data aggregation will be blocked if there is no data.
 		 */
 		aggregate_stack_traces(t, stack_map_name, &g_stack_str_hash,
-				       &g_msg_hash, &count);
+				       &g_msg_hash, &count, using_map_set_a);
 
 		/*
-		 * To ensure that all data in the perf ring-buffer is processed
+		 * To ensure that all data in the perf ring-buffer is procenssed
 		 * in this iteration, as this iteration will clean up all the
 		 * data recorded in the stackmap, any residual data in the perf
 		 * ring-buffer will be carried over to the next iteration for
@@ -736,6 +901,9 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	}
 
 release_iter:
+
+	cleanup_stackmap(t, stack_map_name, using_map_set_a);
+
 	/* Now that we've consumed the data, reset the sample count in BPF. */
 	sample_cnt_val = 0;
 	bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
@@ -764,8 +932,12 @@ static void cp_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
-		if (unlikely(profiler_stop == 1))
+		if (unlikely(profiler_stop == 1)) {
+			if (g_enable_perf_sample)
+				set_enable_perf_sample(t, 0);
+
 			goto exit;
+		}
 
 		/* 
 		 * Waiting for the regular expression to be configured
@@ -779,10 +951,15 @@ static void cp_reader_work(void *arg)
 		 */
 		if (unlikely(!regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
+			if (g_enable_perf_sample)
+				set_enable_perf_sample(t, 0);
 			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
+
+		if (unlikely(!g_enable_perf_sample))
+			set_enable_perf_sample(t, 1);
 
 		tracer_reader_lock(t);
 		process_bpf_stacktraces(t, reader_a, reader_b);
@@ -825,6 +1002,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
+
+	set_enable_perf_sample(tracer, 0);
+
 	/*
 	 * create reader for read eBPF-profiler data.
 	 * To implement eBPF perf-profiler double buffering output,
@@ -835,7 +1015,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	reader_a = create_perf_buffer_reader(tracer,
 					     MAP_PERF_PROFILER_BUF_A_NAME,
 					     reader_raw_cb,
-					     reader_lost_cb,
+					     reader_lost_cb_a,
 					     PROFILE_PG_CNT_DEF,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_a == NULL)
@@ -844,7 +1024,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	reader_b = create_perf_buffer_reader(tracer,
 					     MAP_PERF_PROFILER_BUF_B_NAME,
 					     reader_raw_cb,
-					     reader_lost_cb,
+					     reader_lost_cb_b,
 					     PROFILE_PG_CNT_DEF,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_b == NULL) {
@@ -861,8 +1041,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
-				 (void *)java_syms_update_work,
-				 (void *)tracer);
+				 (void *)java_syms_update_work, (void *)tracer);
 
 	if (ret) {
 		goto error;
@@ -942,8 +1121,10 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 	}
 
 	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
-		  "process-cnt:\t%lu\nkern_lost:\t%lu process_lost_count:\t%lu "
+		  "process-cnt:\t%lu\nkern_lost:\t%lu perf_buf_lost_a:\t%lu, "
+		  "perf_buf_lost_b:\t%lu process_lost_count:\t%lu "
 		  "stack_table_data_miss:\t%lu\n"
+		  "stackmap_clear_failed_count\t%lu\n"
 		  "stack_trace_lost:\t%lu\ntransfer_count:\t%lu "
 		  "iter_count_avg:\t%.2lf\nalloc_b:\t%lu bytes "
 		  "free_b:\t%lu bytes use:\t%lu bytes\n"
@@ -954,9 +1135,11 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 		  " - iter_max_cnt:\t%lu\n"
 		  "----------------------------\n\n",
 		  atomic64_read(&t->recv), process_count,
-		  atomic64_read(&t->lost), get_process_lost_count(),
-		  get_stack_table_data_miss_count(), stack_trace_lost,
-		  transfer_count,
+		  atomic64_read(&t->lost), perf_buf_lost_a_count,
+		  perf_buf_lost_b_count, perf_buf_lost_a_count,
+		  perf_buf_lost_b_count, get_process_lost_count(),
+		  get_stack_table_data_miss_count(),
+		  stackmap_clear_failed_count, stack_trace_lost, transfer_count,
 		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
 		  alloc_b, free_b, alloc_b - free_b, output_count,
 		  sample_drop_cnt, output_err_cnt, iter_max_cnt);
@@ -969,12 +1152,16 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
 	ebpf_debug("\n\n----------------------------\nrecv envent:\t%lu\n"
-		   "kern_lost:\t%lu\nstack_trace_lost:\t%lu\n"
+		   "kern_lost:\t%lu, perf_buf_lost_a:\t%lu, perf_buf_lost_b:\t%lu\n"
+		   "stack_trace_lost:\t%lu\n"
+		   "stackmap_clear_failed_count\t%lu\n"
 		   "ransfer_count:\t%lu iter_count:\t%lu\nall"
 		   "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
 		   "stack_str_hash.hit_count %lu\nstack_trace_msg_hash hit %lu\n",
 		   atomic64_read(&t->recv), atomic64_read(&t->lost),
-		   stack_trace_lost, transfer_count, iter_count,
+		   perf_buf_lost_a_count, perf_buf_lost_b_count,
+		   stack_trace_lost, stackmap_clear_failed_count,
+		   transfer_count, iter_count,
 		   alloc_b, free_b, alloc_b - free_b,
 		   h->hit_hash_count, msg_h->hit_hash_count);
 }
@@ -1338,7 +1525,7 @@ int set_profiler_cpu_aggregation(int flag)
 
 struct bpf_tracer *get_profiler_tracer(void)
 {
-        return profiler_tracer;
+	return profiler_tracer;
 }
 
 #else /* defined AARCH64_MUSL */
@@ -1382,4 +1569,9 @@ struct bpf_tracer *get_profiler_tracer(void)
 {
 	return NULL;
 }
+
+void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
+{
+}
+
 #endif /* AARCH64_MUSL */

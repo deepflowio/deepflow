@@ -64,6 +64,7 @@ func (r *RebalanceCheck) Start() {
 
 		if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
 			duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
+			r.analyzerRebalanceByTraffic(duration)
 			for range time.Tick(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second) {
 				r.analyzerRebalanceByTraffic(duration)
 			}
@@ -133,6 +134,7 @@ func (r *RebalanceCheck) analyzerRebalance() {
 }
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
+	log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration)
 	analyzerInfo := rebalance.NewAnalyzerInfo()
 	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
 	if err != nil {
