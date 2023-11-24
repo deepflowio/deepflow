@@ -179,6 +179,7 @@ enum DecapType {
     DECAP_TYPE_VXLAN       = 1;
     DECAP_TYPE_IPIP        = 2;
     DECAP_TYPE_TENCENT     = 3;
+    DECAP_TYPE_GENEVE      = 4;
 }
 
 message Config {
@@ -441,8 +442,8 @@ message Cidr {
 message GProcessInfo {
     optional uint32 gprocess_id = 1;
     optional uint32 vtap_id = 3;  // 限制在64000
-    optional uint32 pod_id = 4; 
-    optional uint32 pid = 5; 
+    optional uint32 pod_id = 4;
+    optional uint32 pid = 5;
 }
 
 message Container {
