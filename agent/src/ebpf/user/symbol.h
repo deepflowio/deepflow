@@ -67,6 +67,8 @@ struct symbolizer_proc_info {
 	bool add_task_list;
 	/* Have a new perf map file ? */
 	bool new_java_syms_file;
+	/* Java symbol cache needs updating? */
+	bool cache_need_update;
 	/* Unknown symbols was found, and it is currently mainly used to
 	 * obtain the match of the Java process.*/
 	bool unknown_syms_found;

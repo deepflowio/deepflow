@@ -24,7 +24,7 @@ struct java_syms_update_task {
 	struct symbolizer_proc_info *p;
 };
 
-void gen_java_symbols_file(int pid);
+void gen_java_symbols_file(int pid, bool *need_update);
 void clean_local_java_symbols_files(int pid);
 void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
 void java_syms_update_main(void *arg);
