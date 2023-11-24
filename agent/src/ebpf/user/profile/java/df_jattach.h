@@ -25,5 +25,6 @@ void clear_target_ns(int pid, int target_ns_pid);
 void clear_target_ns_so(int pid, int target_ns_pid);
 void clear_local_perf_files(int pid);
 bool is_same_mntns(int target_pid);
-void __unused clear_old_target_perf_files(int pid);
+i64 get_target_symbol_file_sz(int pid, int ns_pid);
+i64 get_local_symbol_file_sz(int pid, int ns_pid);
 #endif /* DF_JATTACH_H */

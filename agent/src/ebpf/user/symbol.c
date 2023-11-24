@@ -664,6 +664,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->add_task_list = false;
 	p->unknown_syms_found = false;
 	p->new_java_syms_file = false;
+	p->cache_need_update = false;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -796,6 +797,9 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 				  struct symbolizer_cache_kvp *kv,
 				  struct symbolizer_proc_info *p)
 {
+	if (p->is_java && !p->cache_need_update)
+		goto exit;
+
 	if (kv->v.cache)
 		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
 
@@ -804,7 +808,7 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 
 	if (kv->v.cache <= 0) {
 		kv->v.cache = 0;
-		goto failed;
+		goto exit;
 	}
 
 	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *)
@@ -815,14 +819,16 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
 		kv->v.cache = 0;
 	} else {
+		ebpf_debug("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
 		add_symcache_count++;
 	}
 
-failed:
+exit:
 	p->unknown_syms_found = false;
 	p->update_syms_table_time = 0;
 	p->new_java_syms_file = false;
 	p->add_task_list = false;
+	p->cache_need_update = false;
 	return (void *)kv->v.cache;
 }
 
