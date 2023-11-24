@@ -50,7 +50,7 @@ type GenesisSyncRpcUpdater struct {
 	vCancel               context.CancelFunc
 	storage               *SyncStorage
 	outputQueue           queue.QueueReader
-	hostIPsMap            map[string]int
+	hostIPsRanges         []netaddr.IPPrefix
 	localIPRanges         []netaddr.IPPrefix
 	excludeIPRanges       []netaddr.IPPrefix
 	multiNSMode           bool
@@ -60,14 +60,36 @@ type GenesisSyncRpcUpdater struct {
 }
 
 func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg config.GenesisConfig, ctx context.Context) *GenesisSyncRpcUpdater {
-	hostIPsMap := map[string]int{}
+	hostIPRanges := []netaddr.IPPrefix{}
 	for _, h := range cfg.HostIPs {
-		_, err := netaddr.ParseIP(h)
-		if err != nil {
-			log.Error("parse host ips error: " + err.Error())
-			continue
+		ipObj, err := netaddr.ParseIP(h)
+		if err == nil {
+			var bit uint8
+			switch {
+			case ipObj.Is4():
+				bit = 32
+			case ipObj.Is6():
+				bit = 128
+			}
+			ipPrefix, err := ipObj.Prefix(bit)
+			if err != nil {
+				log.Error("host ip convert to ip prefix error: " + err.Error())
+				continue
+			}
+			hostIPRanges = append(hostIPRanges, ipPrefix)
+		} else {
+			hostIPRange, err := netaddr.ParseIPPrefix(h)
+			if err == nil {
+				hostIPRanges = append(hostIPRanges, hostIPRange)
+			} else {
+				hostIPRangeSlice, err := netaddr.ParseIPRange(h)
+				if err != nil {
+					log.Error("parse host ip ranges error: " + err.Error())
+					continue
+				}
+				hostIPRanges = append(hostIPRanges, hostIPRangeSlice.Prefixes()...)
+			}
 		}
-		hostIPsMap[h] = 0
 	}
 
 	localIPRanges := []netaddr.IPPrefix{}
@@ -114,7 +136,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		vCancel:               vCancel,
 		storage:               storage,
 		outputQueue:           queue,
-		hostIPsMap:            hostIPsMap,
+		hostIPsRanges:         hostIPRanges,
 		localIPRanges:         localIPRanges,
 		excludeIPRanges:       excludeIPRanges,
 		multiNSMode:           cfg.MultiNSMode,
@@ -276,6 +298,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			continue
 		}
 		vIF.NetnsID = iface.GetNetnsId()
+		vIF.IFType = iface.GetIfType()
 		vIF.HostIP = peer
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
@@ -783,7 +806,7 @@ func (v *GenesisSyncRpcUpdater) UnmarshalProtobuf(info VIFRPCMessage) GenesisSyn
 	pProcess := v.ParseProcessInfo(info, info.vtapID)
 	processes := NewProcessPlatformDataOperation(pProcess)
 
-	if _, ok := v.hostIPsMap[info.peer]; ok && info.message.GetPlatformData().GetPlatformEnabled() {
+	if genesiscommon.IPInRanges(info.peer, v.hostIPsRanges...) && info.message.GetPlatformData().GetPlatformEnabled() {
 		genesisSyncDataOper = v.ParseKVMPlatformInfo(info, info.peer, info.vtapID)
 	}
 

@@ -131,6 +131,7 @@ message GenesisSyncVinterface {
     optional string node_ip = 13;
     optional string last_seen = 14;
     optional uint32 netns_id = 15;
+    optional string if_type = 16;
 }
 
 message GenesisSyncProcess {

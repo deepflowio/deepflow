@@ -254,6 +254,30 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						ip4Suffix := "ip4" + suffix
 						ip6Suffix := "ip6" + suffix
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagValueName] = "if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + "))"
+					case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
+						tagAutoIDSuffix := tagValue + "_id" + suffix
+						tagAutoTypeSuffix := tagValue + "_type" + suffix
+						autoIDSuffix := "auto_service_id" + suffix
+						autoTypeSuffix := "auto_service_type" + suffix
+						if common.IsValueInSliceString(tagValue, []string{"resource_gl0", "auto_instance"}) {
+							autoTypeSuffix = "auto_instance_type" + suffix
+							autoIDSuffix = "auto_instance_id" + suffix
+						}
+						autoNameSuffix := tagValue + suffix
+						ip4Suffix := "ip4" + suffix
+						ip6Suffix := "ip6" + suffix
+						subnetIDSuffix := "subnet_id" + suffix
+						nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
+						internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+						ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+						autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+						iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoIDSuffix] = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoTypeSuffix] = "autoTypeSuffix"
+						selectPrefixTranslator = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
+						iconIDTranslator = fmt.Sprintf("%s, %s", selectPrefixTranslator, iconIDStrSuffix)
+						nodeTypeTranslator = fmt.Sprintf("%s, %s", selectPrefixTranslator, nodeTypeStrSuffix)
 					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vpc", "l2_vpc":
 						tagValueName := tagValue + suffix
 						tagValueID := tagValue + "_id" + suffix
@@ -336,6 +360,32 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						ip4Suffix := "ip4" + suffix
 						ip6Suffix := "ip6" + suffix
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)))", selectPrefixTranslator, ip4Suffix, ip6Suffix)
+					case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
+						tagAutoIDSuffix := tagValue + "_id" + suffix
+						tagAutoTypeSuffix := tagValue + "_type" + suffix
+						autoIDSuffix := "auto_service_id" + suffix
+						autoTypeSuffix := "auto_service_type" + suffix
+						if common.IsValueInSliceString(tagValue, []string{"resource_gl0", "auto_instance"}) {
+							autoTypeSuffix = "auto_instance_type" + suffix
+							autoIDSuffix = "auto_instance_id" + suffix
+						}
+						autoNameSuffix := tagValue + suffix
+						ip4Suffix := "ip4" + suffix
+						ip6Suffix := "ip6" + suffix
+						subnetIDSuffix := "subnet_id" + suffix
+						nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
+						internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+						ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+						autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+						iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+						tagNameSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
+						tagIDSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoIDSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagIDSelectFilterStr)
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+autoNameSuffix] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagNameSelectFilterStr)
+						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoTypeSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, autoTypeSuffix)
+						selectPrefixTranslator += " OR if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
+						iconIDTranslator += fmt.Sprintf(", %s, %s", selectPrefixTranslator, iconIDStrSuffix)
+						nodeTypeTranslator += fmt.Sprintf(", %s, %s", selectPrefixTranslator, nodeTypeStrSuffix)
 					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vtap", "vpc", "l2_vpc":
 						tagValueName := tagValue + suffix
 						tagValueID := tagValue + "_id" + suffix
@@ -760,6 +810,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+")", "display_name")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], " "+tag, " value")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "("+tag, "(value")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "value_id", tag+"_id")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "value_ns_id", tag+"_ns_id")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]

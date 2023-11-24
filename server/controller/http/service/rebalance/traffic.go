@@ -33,7 +33,9 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
@@ -86,9 +88,11 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			continue
 		}
 		vtapNameToID := make(map[string]int, len(azVTaps))
+		vtapIDToName := make(map[int]string, len(azVTaps))
 		vTapIDToTraffic := make(map[int]int64)
 		for _, vtap := range azVTaps {
 			vtapNameToID[vtap.Name] = vtap.ID
+			vtapIDToName[vtap.ID] = vtap.Name
 			vTapIDToTraffic[vtap.ID] = 0
 		}
 		for vtapName, traffic := range r.regionToVTapNameToTraffic[az.Region] {
@@ -109,16 +113,20 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			analyzers:       azAnalyzers,
 		}
 		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(ifCheckout)
-		response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
-		response.Details = append(response.Details, azVTapRebalanceResult.Details...)
-
-		if azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
+		if azVTapRebalanceResult != nil {
+			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
+			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
+		}
+		if azVTapRebalanceResult != nil && azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
 			for vtapID, changeInfo := range vTapIDToChangeInfo {
 				if changeInfo.OldIP != changeInfo.NewIP {
 					log.Infof("az(%s) vtap(%v) analyzer ip changed: %s -> %s", az.Lcuuid, vtapID, changeInfo.OldIP, changeInfo.NewIP)
 				}
 			}
 		}
+
+		// update counter
+		updateCounter(vtapIDToName, vTapIDToChangeInfo)
 	}
 	b, err := json.Marshal(response)
 	if err != nil {
@@ -137,8 +145,9 @@ type AZInfo struct {
 }
 
 type ChangeInfo struct {
-	OldIP string
-	NewIP string
+	OldIP     string
+	NewIP     string
+	NewWeight float64
 }
 
 // rebalanceAnalyzer balances vtaps on the analyzer in an az
@@ -250,13 +259,19 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 
 	var allocVTaps []VTapInfo
 	vTapIDToChangeInfo := make(map[int]*ChangeInfo, len(p.vtaps))
+	if len(p.vtaps) == 0 {
+		log.Warningf("no vtaps to alloc analyzer")
+		return nil, nil
+	}
+	vtapaAerageTraffic := float64(afterTraffic) / float64(len(p.vtaps))
 	for _, vtap := range p.vtaps {
+		w, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p.vTapIDToTraffic[vtap.ID])/vtapaAerageTraffic), 64)
 		if vtap.AnalyzerIP == "" {
-			vTapIDToChangeInfo[vtap.ID] = &ChangeInfo{OldIP: ""}
+			vTapIDToChangeInfo[vtap.ID] = &ChangeInfo{OldIP: "", NewWeight: w}
 			allocVTaps = append(allocVTaps, VTapInfo{VtapID: vtap.ID, Traffic: p.vTapIDToTraffic[vtap.ID]})
 			continue
 		}
-		vTapIDToChangeInfo[vtap.ID] = &ChangeInfo{OldIP: vtap.AnalyzerIP, NewIP: vtap.AnalyzerIP}
+		vTapIDToChangeInfo[vtap.ID] = &ChangeInfo{OldIP: vtap.AnalyzerIP, NewIP: vtap.AnalyzerIP, NewWeight: w}
 
 		analyzerIPToInfo[vtap.AnalyzerIP].SumTraffic += p.vTapIDToTraffic[vtap.ID]
 		analyzerIPToInfo[vtap.AnalyzerIP].AfterVTapNum++ // hold old vtap num
@@ -276,6 +291,10 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 		}
 	}
 
+	if completeAnalyzerNum == 0 {
+		log.Warningf("no complete analyzer to rebalance vtaps, az(%v)", p.lcuuid)
+		return nil, nil
+	}
 	avg := float64(afterTraffic) / float64(completeAnalyzerNum)
 	// adjust over-allocated agents on analyzer
 	for ip, info := range analyzerIPToInfo {
@@ -303,23 +322,33 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 	for _, allocVTap := range allocVTaps {
 		var minAnalyzerDataSize int64
 		var allocIP string
-		i := 0
 		for ip, info := range analyzerIPToInfo {
 			if info.State != common.HOST_STATE_COMPLETE {
 				continue
 			}
-			if i == 0 || info.SumTraffic < minAnalyzerDataSize {
+			minAnalyzerDataSize = info.SumTraffic
+			allocIP = ip
+			break
+		}
+		for ip, info := range analyzerIPToInfo {
+			if info.State != common.HOST_STATE_COMPLETE {
+				continue
+			}
+			if info.SumTraffic < minAnalyzerDataSize {
 				minAnalyzerDataSize = info.SumTraffic
 				allocIP = ip
 			}
-			i++
 		}
 		if !ifCheckout {
 			mysql.Db.Model(mysql.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
 		}
-		vTapIDToChangeInfo[allocVTap.VtapID].NewIP = allocIP
+		if _, ok := analyzerIPToInfo[allocIP]; !ok {
+			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip", allocVTap.VtapID, allocIP)
+			continue
+		}
 		analyzerIPToInfo[allocIP].SumTraffic += allocVTap.Traffic
 		analyzerIPToInfo[allocIP].AfterVTapNum++
+		vTapIDToChangeInfo[allocVTap.VtapID].NewIP = allocIP
 	}
 
 	var totalSwitchVTapNum int
@@ -476,4 +505,42 @@ func parseBody(data []byte) (map[string]int64, error) {
 		}
 	}
 	return vtapNameToTraffic, nil
+}
+
+func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*ChangeInfo) {
+	for vtapID, changeInfo := range vtapIDToChangeInfo {
+		name, ok := vtapIDToName[vtapID]
+		if !ok {
+			log.Info("vtap(%d) not found", vtapID)
+			continue
+		}
+
+		isAnalyzerChanged := uint64(0)
+		if changeInfo.OldIP != changeInfo.NewIP {
+			isAnalyzerChanged = uint64(1)
+		}
+		counter, ok := statsd.VTapNameToCounter[name]
+		if !ok {
+			counter := &statsd.GetVTapWeightCounter{
+				Name: name,
+				VTapWeightCounter: &statsd.VTapWeightCounter{
+					Weight:            changeInfo.NewWeight,
+					IsAnalyzerChanged: isAnalyzerChanged,
+				},
+			}
+			statsd.VTapNameToCounter[name] = counter
+			b, _ := json.Marshal(counter)
+			log.Infof("agent(%v) register counter: %v", name, string(b))
+			err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", counter, stats.OptionStatTags{"host": name})
+			if err != nil {
+				log.Error(err)
+			}
+		} else {
+			log.Infof("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Infof("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
+			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
+			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
+		}
+
+	}
 }
