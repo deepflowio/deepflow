@@ -729,7 +729,22 @@ func (k *KnowledgeGraph) fill(
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
-	// use vtapId + podId to match first
+	if gpID0 != 0 && podId0 == 0 {
+		vtapID, podId := platformData.QueryGprocessInfo(gpID0)
+		if podId != 0 && vtapID == vtapId {
+			podId0 = podId
+			k.TagSource0 |= uint8(zerodoc.GpId)
+		}
+	}
+	if gpID1 != 0 && podId1 == 0 {
+		vtapID, podId := platformData.QueryGprocessInfo(gpID1)
+		if podId != 0 && vtapID == vtapId {
+			podId1 = podId
+			k.TagSource1 |= uint8(zerodoc.GpId)
+		}
+	}
+
+	// use podId to match first
 	if podId0 != 0 {
 		k.TagSource0 |= uint8(zerodoc.PodId)
 		info0 = platformData.QueryPodIdInfo(podId0)
@@ -830,7 +845,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,
 		f.MetricsPeerSrc.Gpid, f.MetricsPeerDst.Gpid,
-		0, 0, 0,
+		f.FlowKey.VtapId, 0, 0,
 		uint16(f.FlowKey.PortDst),
 		f.TapSide,
 		layers.IPProtocol(f.FlowKey.Proto))

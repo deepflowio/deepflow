@@ -178,7 +178,7 @@ pub struct MetaPacket<'a> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
-    pub flow_id: u64,
+    pub flow_id: u64, // PCAP and L7 Log
     pub socket_role: u8,
     pub second_in_minute: u8,
 

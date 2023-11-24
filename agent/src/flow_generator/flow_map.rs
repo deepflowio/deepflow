@@ -630,6 +630,12 @@ impl FlowMap {
                     Some(meta_packet),
                 );
 
+                let flow = &node.tagged_flow.flow;
+                // PCAP and L7 Log
+                meta_packet.flow_id = flow.flow_id;
+                // For PCAP
+                meta_packet.second_in_minute =
+                    (flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 let flow_closed = match meta_packet.lookup_key.proto {
@@ -637,10 +643,6 @@ impl FlowMap {
                     IpProtocol::UDP => self.update_udp_node(config, node, meta_packet),
                     _ => self.update_other_node(config, node, meta_packet),
                 };
-                let flow = &node.tagged_flow.flow;
-                meta_packet.flow_id = flow.flow_id;
-                meta_packet.second_in_minute =
-                    (flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
 
                 if flow_closed {
                     let node = nodes.swap_remove(index);
@@ -3149,5 +3151,53 @@ mod tests {
                 .map(|n| (n.timestamp_key, n.recent_time))
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn test_handshake_retrans() {
+        let (module_config, mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+
+        let capture =
+            Capture::load_pcap("resources/test/flow_generator/handshake-retrans.pcap", None);
+        let packets = capture.as_meta_packets();
+
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
+        let dst_mac = packets[0].lookup_key.dst_mac;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap();
+        for mut packet in packets {
+            packet.lookup_key.timestamp = Duration::new(
+                timestamp.as_secs(),
+                Duration::from(packet.lookup_key.timestamp).subsec_nanos(),
+            )
+            .into();
+            packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            flow_map.inject_meta_packet(&config, &mut packet);
+        }
+
+        flow_map.inject_flush_ticker(&config, timestamp.add(Duration::from_secs(120)));
+
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
+        assert_eq!(perf_stats.rtt_client_max, 1567);
+        assert_eq!(perf_stats.rtt_client_sum, 2822);
+        assert_eq!(perf_stats.rtt_client_count, 2);
+        assert_eq!(perf_stats.rtt_server_max, 1886);
+        assert_eq!(perf_stats.rtt_server_sum, 2829);
+        assert_eq!(perf_stats.rtt_server_count, 2);
+        assert_eq!(perf_stats.rtt, 2510);
     }
 }

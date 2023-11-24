@@ -403,13 +403,9 @@ func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
 		p.ArtMax = f.ARTMax
 
 		p.Rtt = f.RTT
-		p.RttClientSum = f.RTTClientSum
-		p.RttServerSum = f.RTTServerSum
 		p.SrtSum = f.SRTSum
 		p.ArtSum = f.ARTSum
 
-		p.RttClientCount = f.RTTClientCount
-		p.RttServerCount = f.RTTServerCount
 		p.SrtCount = f.SRTCount
 		p.ArtCount = f.ARTCount
 

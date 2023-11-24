@@ -382,6 +382,10 @@ _Pragma("error \"Must specify a BPF target arch\"");
 SEC("uprobe/runtime.execute")
 int runtime_execute(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = pid_tgid >> 32;
 
@@ -418,6 +422,10 @@ int runtime_execute(struct pt_regs *ctx)
 SEC("uprobe/enter_runtime.newproc1")
 int enter_runtime_newproc1(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = pid_tgid >> 32;
 
@@ -478,6 +486,10 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 SEC("uprobe/exit_runtime.newproc1")
 int exit_runtime_newproc1(struct pt_regs *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = pid_tgid >> 32;
 
@@ -532,6 +544,10 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 SEC("tracepoint/sched/sched_process_exit")
 int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 {
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
 	pid_t pid, tid;
 	__u64 id;
 
@@ -559,8 +575,11 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 SEC("tracepoint/sched/sched_process_fork")
 int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 {
-	struct process_event_t data;
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
 
+	struct process_event_t data;
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 	data.pid = ctx->child_pid;
 	bpf_get_current_comm(data.name, sizeof(data.name));

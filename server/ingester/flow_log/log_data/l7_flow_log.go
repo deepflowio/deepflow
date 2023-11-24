@@ -548,21 +548,6 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 知识图谱
 	b.Protocol = uint8(log.Base.Protocol)
 
-	if l.Gpid_0 != 0 && l.PodId_0 == 0 {
-		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if podId != 0 && l.VtapId == vtapId {
-			b.PodID0 = podId
-			b.TagSource0 |= uint8(zerodoc.GpId)
-		}
-	}
-	if l.Gpid_1 != 0 && l.PodId_1 == 0 {
-		vtapId, podId := platformData.QueryGprocessInfo(l.Gpid_0)
-		if podId != 0 && l.VtapId == vtapId {
-			b.PodID1 = podId
-			b.TagSource1 |= uint8(zerodoc.GpId)
-		}
-	}
-
 	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 }
 
@@ -629,6 +614,16 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	attributeNames := append(h.AttributeNames, extraFieldNamesNeedWriteFlowTag[:]...)
 	attributeValues := append(h.AttributeValues, extraFieldValuesNeedWriteFlowTag[:]...)
 
+	// avoid panic caused by different attributes lengths
+	namesLen, valuesLen := len(attributeNames), len(attributeValues)
+	minNamesLen := namesLen
+	if namesLen != valuesLen {
+		log.Warningf("the lengths of AttributeNames(%v) and attributeValues(%v) is different", attributeNames, attributeValues)
+		if namesLen > valuesLen {
+			minNamesLen = valuesLen
+		}
+	}
+
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
 
@@ -641,7 +636,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			PodNsId: PodNSIDs[idx],
 		}
 
-		for i, name := range attributeNames {
+		for i, name := range attributeNames[:minNamesLen] {
 			if attributeValues[i] == "" {
 				continue
 			}

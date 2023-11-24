@@ -48,16 +48,25 @@ func (r *RebalanceCheck) Start() {
 		if !r.cfg.AutoRebalanceVTap {
 			return
 		}
+
 		for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
 			r.controllerRebalance()
-		}
-		if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-			for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
+			if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 				r.analyzerRebalance()
 			}
-		} else {
+		}
+	}()
+
+	go func() {
+		if !r.cfg.AutoRebalanceVTap {
+			return
+		}
+
+		if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+			duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
+			r.analyzerRebalanceByTraffic(duration)
 			for range time.Tick(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second) {
-				r.analyzerRebalanceByTraffic(r.cfg.IngesterLoadBalancingConfig.DataDuration)
+				r.analyzerRebalanceByTraffic(duration)
 			}
 		}
 	}()
@@ -125,6 +134,7 @@ func (r *RebalanceCheck) analyzerRebalance() {
 }
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
+	log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration)
 	analyzerInfo := rebalance.NewAnalyzerInfo()
 	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
 	if err != nil {

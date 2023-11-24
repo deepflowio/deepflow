@@ -41,3 +41,7 @@ controller-ips:
 
 ## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
 #agent-unique-identifier: ip-and-mac
+
+## Pid file path, defaults to ""
+## Will create pid file in the path if specified.
+#pid-file:

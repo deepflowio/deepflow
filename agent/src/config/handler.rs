@@ -19,9 +19,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
-use std::process;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -1257,25 +1255,37 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
-                    // use host mac
-                    #[cfg(target_os = "linux")]
-                    if let Err(e) =
-                        public::netns::open_named_and_setns(&public::netns::NsFile::Root)
-                    {
-                        warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
-                        warn!("setns error: {}", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(-1);
+                    fn get_ctrl_mac(ip: &IpAddr) -> MacAddr {
+                        // use host mac
+                        #[cfg(target_os = "linux")]
+                        if let Err(e) =
+                            public::netns::open_named_and_setns(&public::netns::NsFile::Root)
+                        {
+                            warn!(
+                                "agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'."
+                            );
+                            warn!("setns error: {}", e);
+                            crate::utils::notify_exit(-1);
+                            return MacAddr::ZERO;
+                        }
+                        let ctrl_mac = match get_ctrl_ip_and_mac(ip) {
+                            Ok((_, mac)) => mac,
+                            Err(e) => {
+                                warn!("get_ctrl_ip_and_mac error: {}", e);
+                                crate::utils::notify_exit(-1);
+                                return MacAddr::ZERO;
+                            }
+                        };
+                        #[cfg(target_os = "linux")]
+                        if let Err(e) = public::netns::reset_netns() {
+                            warn!("reset setns error: {}", e);
+                            crate::utils::notify_exit(-1);
+                            return MacAddr::ZERO;
+                        };
+                        ctrl_mac
                     }
-                    let (_, ctrl_mac) =
-                        get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
-                    #[cfg(target_os = "linux")]
-                    if let Err(e) = public::netns::reset_netns() {
-                        warn!("reset setns error: {}", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(-1);
-                    };
-                    ctrl_mac
+
+                    get_ctrl_mac(&static_config.controller_ips[0].parse().unwrap())
                 } else {
                     MacAddr::ZERO
                 },
@@ -1515,7 +1525,7 @@ impl ConfigHandler {
                 "Process scheduling priority set to {}.",
                 new_config.yaml_config.process_scheduling_priority
             );
-            let pid = process::id();
+            let pid = std::process::id();
             unsafe {
                 if libc::setpriority(
                     libc::PRIO_PROCESS,
@@ -1574,7 +1584,7 @@ impl ConfigHandler {
                     new_config.yaml_config.cpu_affinity
                 );
             } else {
-                let pid = process::id() as i32;
+                let pid = std::process::id() as i32;
                 if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
                     warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                 }
@@ -1649,8 +1659,8 @@ impl ConfigHandler {
                         .map(|re| public::netns::find_ns_files_by_regex(&re));
                     if old_netns != new_netns {
                         info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                        crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                        return vec![];
                     }
 
                     c.platform_synchronizer.set_netns_regex(regex.clone());
@@ -1674,7 +1684,13 @@ impl ConfigHandler {
             {
                 fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
                     for dispatcher in comp.dispatchers.iter() {
-                        dispatcher.switch_recv_engine(&handler.candidate_config.dispatcher);
+                        if let Err(e) =
+                            dispatcher.switch_recv_engine(&handler.candidate_config.dispatcher)
+                        {
+                            error!("switch RecvEngine error: {}, deepflow-agent restart...", e);
+                            crate::utils::notify_exit(-1);
+                            return;
+                        }
                     }
                 }
                 callbacks.push(switch_recv_engine);
@@ -1687,8 +1703,8 @@ impl ConfigHandler {
                     new_config.dispatcher.capture_packet_size;
                 if !components.is_none() {
                     info!("Capture packet size update, deepflow-agent restart...");
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
+                    crate::utils::notify_exit(1);
+                    return vec![];
                 }
             }
 

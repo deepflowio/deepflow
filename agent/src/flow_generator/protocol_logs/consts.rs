@@ -58,6 +58,9 @@ pub const SPAN_ID_TYPE: usize = 1;
 // Kafka constants
 pub const KAFKA_REQ_HEADER_LEN: usize = 14;
 pub const KAFKA_RESP_HEADER_LEN: usize = 8;
+pub const KAFKA_STATUS_CODE_OFFSET: usize = 12;
+pub const KAFKA_STATUS_CODE_LEN: usize = 2;
+pub const KAFKA_STATUS_CODE_CHECKER: usize = KAFKA_STATUS_CODE_OFFSET + KAFKA_STATUS_CODE_LEN;
 
 // dubbo constants
 pub const DUBBO_MAGIC_HIGH: u8 = 0xda;

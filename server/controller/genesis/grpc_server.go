@@ -545,6 +545,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			DeviceLcuuid:        &vData.DeviceLcuuid,
 			DeviceName:          &vData.DeviceName,
 			DeviceType:          &vData.DeviceType,
+			IfType:              &vData.IFType,
 			HostIp:              &vData.HostIP,
 			KubernetesClusterId: &vData.KubernetesClusterID,
 			NodeIp:              &vData.NodeIP,

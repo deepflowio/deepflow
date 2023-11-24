@@ -47,7 +47,7 @@ use public::{
 
 const TIMESTAMP_SLOT_COUNT: usize = SECONDS_IN_MINUTE as usize;
 const QUEUE_READ_TIMEOUT: Duration = Duration::from_secs(1); // Must be less than or equal to FLUSH_TIMEOUT
-const FLUSH_TIMEOUT: Duration = Duration::from_secs(1);
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Default)]
 pub struct FlowAggrCounter {

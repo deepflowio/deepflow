@@ -23,7 +23,6 @@ mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
-use std::process;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use std::{
@@ -34,7 +33,9 @@ use std::{
     },
 };
 
-use log::{debug, error, info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use log::error;
+use log::{debug, info, warn};
 use packet_dedup::*;
 use public::debug::QueueDebugger;
 use special_recv_engine::Libpcap;
@@ -94,7 +95,7 @@ enum DispatcherFlavor {
 }
 
 impl DispatcherFlavor {
-    fn init(&mut self) {
+    fn init(&mut self) -> Result<()> {
         match self {
             DispatcherFlavor::Analyzer(d) => d.base.init(), // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Local(d) => d.base.init(),
@@ -177,21 +178,16 @@ impl Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn switch_recv_engine(&self, config: &DispatcherConfig) {
+    pub fn switch_recv_engine(&self, config: &DispatcherConfig) -> Result<()> {
         self.stop();
-        if let Err(e) = self
-            .flavor
+        self.flavor
             .lock()
             .unwrap()
             .as_mut()
-            .ok_or(Error::DispatcherFlavorEmpty)
-            .and_then(|d| d.switch_recv_engine(config))
-        {
-            error!("switch RecvEngine error: {}, deepflow-agent restart...", e);
-            thread::sleep(Duration::from_secs(1));
-            process::exit(-1);
-        }
+            .ok_or(Error::DispatcherFlavorEmpty)?
+            .switch_recv_engine(config)?;
         self.start();
+        Ok(())
     }
 }
 
@@ -1083,7 +1079,7 @@ impl DispatcherBuilder {
                 )))
             }
         };
-        dispatcher.init();
+        dispatcher.init()?;
         #[cfg(target_os = "linux")]
         let _ = public::netns::reset_netns()?;
         Ok(Dispatcher {

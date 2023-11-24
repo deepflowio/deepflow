@@ -419,7 +419,7 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpRespCtx {
         let (param, info, payload) = value;
         Self {
             base_ctx: VmCtxBase::from((param, 0, payload)),
-            code: info.status_code.map_or(0, |c| c as u16),
+            code: info.status_code,
             status: info.status,
         }
     }

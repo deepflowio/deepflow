@@ -14,9 +14,30 @@
  * limitations under the License.
  */
 
-package migration
+package statsd
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.4.1.4"
+var (
+	VTapNameToCounter = make(map[string]*GetVTapWeightCounter)
 )
+
+type VTapWeightCounter struct {
+	Weight            float64 `statsd:"weight"`
+	IsAnalyzerChanged uint64  `statsd:"is_analyzer_changed"`
+}
+
+func NewVTapWeightCounter() *VTapWeightCounter {
+	return &VTapWeightCounter{}
+}
+
+type GetVTapWeightCounter struct {
+	*VTapWeightCounter
+	Name string
+}
+
+func (g *GetVTapWeightCounter) GetCounter() interface{} {
+	return g.VTapWeightCounter
+}
+
+func (g *GetVTapWeightCounter) Closed() bool {
+	return false
+}
