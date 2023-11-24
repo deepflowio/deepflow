@@ -819,7 +819,7 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
 		kv->v.cache = 0;
 	} else {
-		ebpf_debug("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
+		ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
 		add_symcache_count++;
 	}
 
@@ -1008,17 +1008,8 @@ static int __unused free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv,
 void release_symbol_caches(void)
 {
 	/* Update symbol_cache hash from cache_del_pids. */
-	exec_proc_info_cache_update();
+	exec_symbol_cache_update();
 
-	/*
-	 * Due to socket data being queried by this hash, there is no synchronization
-	 * protection here. release_symbol_caches() is called only for testing purposes,
-	 * so ensure smooth testing, let's temporarily remove the code for releasing
-	 * hash resources.
-	 * TODO(@jiping), add a synchronization lock for protection.
-	 */
-
-#if 0
 	/* user symbol caches release */
 	u64 elems_count = 0;
 	symbol_caches_hash_t *h = &syms_cache_hash;

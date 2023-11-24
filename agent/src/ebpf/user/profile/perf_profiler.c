@@ -953,7 +953,7 @@ static void cp_reader_work(void *arg)
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (g_enable_perf_sample)
 				set_enable_perf_sample(t, 0);
-			exec_proc_info_cache_update();
+			exec_symbol_cache_update();
 			sleep(1);
 			continue;
 		}

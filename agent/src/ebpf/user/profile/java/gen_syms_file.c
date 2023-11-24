@@ -66,7 +66,7 @@ void gen_java_symbols_file(int pid, bool * need_update)
 							"log")) {
 				ebpf_warning("Copy pid %d files failed\n", pid);
 			} else {
-				ebpf_debug
+				ebpf_info
 				    ("java need update cache pid %d target file"
 				     " size %ld local file size %ld\n",
 				     pid, target_sz, local_sz);
