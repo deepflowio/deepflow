@@ -113,10 +113,11 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			analyzers:       azAnalyzers,
 		}
 		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(ifCheckout)
-		response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
-		response.Details = append(response.Details, azVTapRebalanceResult.Details...)
-
-		if azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
+		if azVTapRebalanceResult != nil {
+			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
+			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
+		}
+		if azVTapRebalanceResult != nil && azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
 			for vtapID, changeInfo := range vTapIDToChangeInfo {
 				if changeInfo.OldIP != changeInfo.NewIP {
 					log.Infof("az(%s) vtap(%v) analyzer ip changed: %s -> %s", az.Lcuuid, vtapID, changeInfo.OldIP, changeInfo.NewIP)
