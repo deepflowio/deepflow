@@ -276,8 +276,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoTypeSuffix] = "autoTypeSuffix"
 						selectPrefixTranslator = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
-						iconIDTranslator = fmt.Sprintf("%s, %s", selectPrefixTranslator, iconIDStrSuffix)
-						nodeTypeTranslator = fmt.Sprintf("%s, %s", selectPrefixTranslator, nodeTypeStrSuffix)
+						iconIDPrefixTranslator := "if(" + iconIDStrSuffix + ")!=0"
+						nodeTypePrefixTranslator := "if(" + nodeTypeStrSuffix + ")!=''"
+						iconIDTranslator = fmt.Sprintf("%s, %s", iconIDPrefixTranslator, iconIDStrSuffix)
+						nodeTypeTranslator = fmt.Sprintf("%s, %s", nodeTypePrefixTranslator, nodeTypeStrSuffix)
 					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vpc", "l2_vpc":
 						tagValueName := tagValue + suffix
 						tagValueID := tagValue + "_id" + suffix
@@ -383,9 +385,11 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoIDSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagIDSelectFilterStr)
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+autoNameSuffix] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagNameSelectFilterStr)
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[config.Cfg.AutoCustomTag.TagName+"_"+tagAutoTypeSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, autoTypeSuffix)
+						iconIDPrefixTranslator := selectPrefixTranslator + " OR (" + iconIDStrSuffix + ")!=0"
+						nodeTypePrefixTranslator := selectPrefixTranslator + " OR (" + nodeTypeStrSuffix + ")!=''"
 						selectPrefixTranslator += " OR if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
-						iconIDTranslator += fmt.Sprintf(", %s, %s", selectPrefixTranslator, iconIDStrSuffix)
-						nodeTypeTranslator += fmt.Sprintf(", %s, %s", selectPrefixTranslator, nodeTypeStrSuffix)
+						iconIDTranslator += fmt.Sprintf(", %s, %s", iconIDPrefixTranslator, iconIDStrSuffix)
+						nodeTypeTranslator += fmt.Sprintf(", %s, %s", nodeTypePrefixTranslator, nodeTypeStrSuffix)
 					case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vtap", "vpc", "l2_vpc":
 						tagValueName := tagValue + suffix
 						tagValueID := tagValue + "_id" + suffix

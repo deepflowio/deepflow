@@ -64,18 +64,6 @@ type ToolDataSet struct {
 	vinterfaceLcuuidToDeviceID   map[string]int
 	vinterfaceLcuuidToMac        map[string]string
 
-	hostIDToVinterfaceIndexes          map[int][]int
-	vmIDToVinterfaceIndexes            map[int][]int
-	vrouterIDToVinterfaceIndexes       map[int][]int
-	dhcpPortIDToVinterfaceIndexes      map[int][]int
-	natGatewayIDToVinterfaceIndexes    map[int][]int
-	lbIDToVinterfaceIndexes            map[int][]int
-	rdsInstanceIDToVinterfaceIndexes   map[int][]int
-	redisInstanceIDToVinterfaceIndexes map[int][]int
-	podNodeIDToVinterfaceIndexes       map[int][]int
-	podServiceIDToVinterfaceIndexes    map[int][]int
-	podIDToVinterfaceIndexes           map[int][]int
-
 	securityGroupLcuuidToID map[string]int
 
 	natGatewayLcuuidToID map[string]int
@@ -142,18 +130,6 @@ func NewToolDataSet() ToolDataSet {
 		vinterfaceLcuuidToDeviceType: make(map[string]int),
 		vinterfaceLcuuidToDeviceID:   make(map[string]int),
 		vinterfaceLcuuidToMac:        make(map[string]string),
-
-		hostIDToVinterfaceIndexes:          make(map[int][]int),
-		vmIDToVinterfaceIndexes:            make(map[int][]int),
-		vrouterIDToVinterfaceIndexes:       make(map[int][]int),
-		dhcpPortIDToVinterfaceIndexes:      make(map[int][]int),
-		natGatewayIDToVinterfaceIndexes:    make(map[int][]int),
-		lbIDToVinterfaceIndexes:            make(map[int][]int),
-		rdsInstanceIDToVinterfaceIndexes:   make(map[int][]int),
-		redisInstanceIDToVinterfaceIndexes: make(map[int][]int),
-		podNodeIDToVinterfaceIndexes:       make(map[int][]int),
-		podServiceIDToVinterfaceIndexes:    make(map[int][]int),
-		podIDToVinterfaceIndexes:           make(map[int][]int),
 
 		securityGroupLcuuidToID: make(map[string]int),
 
@@ -457,51 +433,6 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.vinterfaceLcuuidToIndex[item.Lcuuid] = item.Index
 	t.vinterfaceLcuuidToType[item.Lcuuid] = item.Type
 
-	if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_HOST {
-		t.hostIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.hostIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
-		t.vmIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.vmIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VROUTER {
-		t.vrouterIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.vrouterIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT {
-		t.dhcpPortIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.dhcpPortIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY {
-		t.natGatewayIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.natGatewayIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_LB {
-		t.lbIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.lbIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE {
-		t.rdsInstanceIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.rdsInstanceIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE {
-		t.redisInstanceIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.redisInstanceIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
-		t.podNodeIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.podNodeIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE {
-		t.podServiceIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.podServiceIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	} else if item.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
-		t.podIDToVinterfaceIndexes[item.DeviceID] = append(
-			t.podIDToVinterfaceIndexes[item.DeviceID], item.ID,
-		)
-	}
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.Lcuuid))
 }
 

@@ -277,6 +277,7 @@ const (
 	MICROSOFT_ACS     = 24
 	BAIDU_BCE         = 25
 	ESHORE            = 26
+	CLOUD_TOWER       = 27
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -304,6 +305,7 @@ const (
 	AGENT_SYNC_EN        = "genesis"
 	MICROSOFT_ACS_EN     = "microsoft_acs"
 	BAIDU_BCE_EN         = "baidu_bce"
+	CLOUD_TOWER_EN       = "cloudtower"
 
 	TENCENT_CH          = "腾讯云"
 	PINGAN_CH           = "平安云"
@@ -315,12 +317,13 @@ const (
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
 
-	OPENSTACK_CH  = "OpenStack"
-	VSPHERE_CH    = "vSphere"
-	NSP_CH        = "NSP"
-	AWS_CH        = "AWS"
-	ZSTACK_CH     = "ZStack"
-	KUBERNETES_CH = "Kubernetes"
+	OPENSTACK_CH   = "OpenStack"
+	VSPHERE_CH     = "vSphere"
+	NSP_CH         = "NSP"
+	AWS_CH         = "AWS"
+	ZSTACK_CH      = "ZStack"
+	KUBERNETES_CH  = "Kubernetes"
+	CLOUD_TOWER_CH = "CloudTower"
 )
 
 var DomainTypeToIconID = map[int]int{
@@ -443,13 +446,11 @@ const (
 	RDS_TYPE_MYSQL      = 1
 	RDS_TYPE_SQL_SERVER = 2
 	RDS_TYPE_PPAS       = 3
-	RDS_TYPE_PSQL       = 4
+	RDS_TYPE_PSQL       = 4 // PostgreSQL
 	RDS_TYPE_MARIADB    = 5
 
 	RDS_STATE_RUNNING   = 1
 	RDS_STATE_RESTORING = 2
-
-	REDIS_STATE_RUNNING = 1
 
 	RDS_SERIES_BASIC = 1
 	RDS_SERIES_HA    = 2
@@ -459,6 +460,10 @@ const (
 	RDS_MODEL_TEMPORARY = 3
 	RDS_MODEL_GUARD     = 4
 	RDS_MODEL_SHARE     = 5
+)
+
+const (
+	REDIS_STATE_RUNNING = 1
 )
 
 const (
