@@ -900,7 +900,7 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
 		kv->v.cache = 0;
 	} else {
-		ebpf_debug("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
+		ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
 		add_symcache_count++;
 	}
 
