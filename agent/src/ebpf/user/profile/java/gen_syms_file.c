@@ -35,8 +35,9 @@ static pthread_mutex_t list_lock;
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-void gen_java_symbols_file(int pid)
+void gen_java_symbols_file(int pid, bool * need_update)
 {
+	*need_update = false;
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
 		return;
@@ -55,10 +56,24 @@ void gen_java_symbols_file(int pid)
 	}
 
 	exec_command(DF_JAVA_ATTACH_CMD, args);
+
 	if (!is_same_mntns(pid)) {
-		if (copy_file_from_target_ns(pid, target_ns_pid, "map") ||
-		    copy_file_from_target_ns(pid, target_ns_pid, "log"))
-			ebpf_warning("Copy pid %d files failed\n", pid);
+		i64 target_sz = get_target_symbol_file_sz(pid, target_ns_pid);
+		i64 local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+		if (target_sz > local_sz) {
+			if (copy_file_from_target_ns(pid, target_ns_pid, "map")
+			    || copy_file_from_target_ns(pid, target_ns_pid,
+							"log")) {
+				ebpf_warning("Copy pid %d files failed\n", pid);
+			} else {
+				ebpf_debug
+				    ("java need update cache pid %d target file"
+				     " size %ld local file size %ld\n",
+				     pid, target_sz, local_sz);
+				*need_update = true;
+			}
+		}
+
 		clear_target_ns(pid, target_ns_pid);
 	}
 }
@@ -110,7 +125,9 @@ void java_syms_update_main(void *arg)
 			struct symbolizer_proc_info *p = task->p;
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
-				gen_java_symbols_file(p->pid);
+				bool need_update;
+				gen_java_symbols_file(p->pid, &need_update);
+				p->cache_need_update = need_update;
 				AO_SET(&p->new_java_syms_file, true);
 			}
 

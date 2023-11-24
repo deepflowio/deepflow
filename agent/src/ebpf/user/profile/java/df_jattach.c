@@ -370,6 +370,38 @@ static inline void switch_to_root_ns(int root_fd)
 	df_exit_ns(root_fd);
 }
 
+static inline i64 get_symbol_file_size(int pid, int ns_pid, bool is_target)
+{
+	char path[PERF_PATH_SZ];
+	if (is_target)
+		snprintf(path, sizeof(path), DF_AGENT_PATH_FMT ".map",
+			 pid, ns_pid);
+	else
+		snprintf(path, sizeof(path),
+			 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+
+	if (access(path, F_OK)) {
+		return -1;
+	}
+
+	struct stat st;
+	if (stat(path, &st) == 0) {
+		return (i64) st.st_size;
+	}
+
+	return -1;
+}
+
+i64 get_target_symbol_file_sz(int pid, int ns_pid)
+{
+	return get_symbol_file_size(pid, ns_pid, true);
+}
+
+i64 get_local_symbol_file_sz(int pid, int ns_pid)
+{
+	return get_symbol_file_size(pid, ns_pid, false);
+}
+
 int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 {
 	char target_path[PERF_PATH_SZ];
