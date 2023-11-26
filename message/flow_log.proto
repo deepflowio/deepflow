@@ -201,7 +201,7 @@ message ExtendedInfo {
     repeated string attribute_names = 16;
     repeated string attribute_values= 17;
     repeated string metrics_names = 18;
-    repeated float metrics_values = 19;
+    repeated double metrics_values = 19;
 }
 
 message AppProtoLogsData {
