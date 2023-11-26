@@ -53,7 +53,7 @@ vendor/${MESSAGE}/alarm_event.proto: vendor
 
 
 libs/datatype/pb/flow_log.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/
+	cp -r ../message/flow_log.proto libs/datatype/pb/
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/datatype/pb/flow_log.proto
 
@@ -61,7 +61,7 @@ libs/datatype/pb/flow_log.pb.go: libs/datatype/pb/flow_log.proto
 	cd libs/datatype/pb && go generate ./...
 
 libs/zerodoc/pb/metric.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/metric.proto libs/zerodoc/pb
+	cp -r ../message/metric.proto libs/zerodoc/pb
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/zerodoc/pb/metric.proto
 
@@ -69,7 +69,7 @@ libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
 
 vendor/${MESSAGE}/stats.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/stats.proto vendor/${MESSAGE}/
+	cp -r ../message/stats.proto vendor/${MESSAGE}/
 
 libs/stats/pb/stats.pb.go: vendor/${MESSAGE}/stats.proto
 	cp vendor/${MESSAGE}/stats.proto libs/stats/pb/stats.proto

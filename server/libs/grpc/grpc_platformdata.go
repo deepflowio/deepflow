@@ -1714,10 +1714,10 @@ func (t *PlatformInfoTable) gprocessInfosString() string {
 	for gpid, vtapPodId := range t.gprocessInfos {
 		sb.WriteString(fmt.Sprintf("%-10d         %-6d       %d\n", gpid, vtapPodId>>32, vtapPodId<<32>>32))
 	}
-	sb.WriteString("\nprocessId         vtapId        gprocessId\n")
+	sb.WriteString("\nvtapId         processId        gprocessId\n")
 	sb.WriteString("----------------------------------------\n")
 	for vtapIdPid, gprocessId := range t.vtapIDProcessInfos {
-		sb.WriteString(fmt.Sprintf("%-9d         %-6d       %d\n", vtapIdPid>>32, vtapIdPid<<32>>32, gprocessId))
+		sb.WriteString(fmt.Sprintf("%-6d         %-9d       %d\n", vtapIdPid>>32, vtapIdPid<<32>>32, gprocessId))
 	}
 	return sb.String()
 }
