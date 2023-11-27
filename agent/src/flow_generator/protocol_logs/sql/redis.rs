@@ -26,7 +26,7 @@ use crate::{
         flow::L7Protocol,
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -173,18 +173,18 @@ pub struct RedisLog {
 }
 
 impl L7ProtocolParserInterface for RedisLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
 
         if payload[0] != b'*' {
-            return false;
+            return CheckResult::Fail;
         }
-        decode_asterisk(payload, true).is_some()
+        decode_asterisk(payload, true).is_some().into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -500,7 +500,11 @@ mod tests {
                 RedisInfo::default()
             };
 
-            output.push_str(&format!("{} is_redis: {}\r\n", info, is_redis));
+            output.push_str(&format!(
+                "{} is_redis: {}\r\n",
+                info,
+                is_redis == CheckResult::Ok
+            ));
         }
         output
     }

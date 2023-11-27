@@ -36,7 +36,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{tcp::TcpPerf, FlowLog, FlowPerfCounter, L7ProtocolChecker},
+    perf::{tcp::TcpPerf, FlowLog, FlowLogLookupKey, FlowPerfCounter, L7ProtocolChecker},
     pool::MemoryPool,
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
@@ -48,6 +48,7 @@ use super::{
 
 use crate::{
     common::{
+        ebpf::EbpfType,
         endpoint::{
             EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
         },
@@ -57,7 +58,7 @@ use crate::{
             L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
+        l7_protocol_log::{EbpfParam, L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader, ProtocolData},
         tagged_flow::TaggedFlow,
@@ -1231,6 +1232,32 @@ impl FlowMap {
         }
 
         if flow_config.collector_enabled {
+            let lookup_key = &meta_packet.lookup_key;
+            let (ebpf_type, ebpf_param) = (if meta_packet.ebpf_type == EbpfType::None {
+                (
+                    meta_packet.ebpf_type,
+                    EbpfParam {
+                        is_tls: false,
+                        is_req_end: false,
+                        is_resp_end: false,
+                        process_kname: "".to_string(),
+                        pid: 0,
+                    },
+                )
+            } else {
+                (
+                    meta_packet.ebpf_type,
+                    EbpfParam {
+                        is_tls: meta_packet.is_tls(),
+                        is_req_end: false,
+                        is_resp_end: false,
+                        process_kname: String::from_utf8_lossy(&meta_packet.process_kname[..])
+                            .to_string(),
+                        pid: meta_packet.process_id,
+                    },
+                )
+            });
+
             node.meta_flow_log = FlowLog::new(
                 l4_enabled,
                 &mut self.tcp_perf_pool,
@@ -1255,6 +1282,23 @@ impl FlowMap {
                 flow_config.l7_protocol_inference_ttl as u64,
                 last,
                 self.ntp_diff.clone(),
+                flow_config.l7_log_packet_size as usize,
+                flow_config.tcp_max_frame,
+                node.tagged_flow.flow.flow_id,
+                FlowLogLookupKey {
+                    ip: lookup_key.src_ip,
+                    port: lookup_key.src_port,
+                    l2_end_0: lookup_key.l2_end_0,
+                    direction: PacketDirection::ClientToServer,
+                },
+                FlowLogLookupKey {
+                    ip: lookup_key.dst_ip,
+                    port: lookup_key.dst_port,
+                    l2_end_0: lookup_key.l2_end_1,
+                    direction: PacketDirection::ServerToClient,
+                },
+                ebpf_type,
+                ebpf_param,
             )
             .map(|o| Box::new(o));
         }
@@ -1791,6 +1835,11 @@ impl FlowMap {
         }
         self.flow_node_pool.put(node);
     }
+
+    // flush tcp reassemble buffer
+    // fn flush_node_buffer(&mut self, config: &FlowConfig, node: &mut FlowNode) {
+    //     node.
+    // }
 
     // go 版本的copyAndOutput
     fn node_updated_aftercare(

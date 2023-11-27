@@ -24,7 +24,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -173,15 +173,15 @@ impl Default for PostgresqlLog {
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         let mut info = PostgreInfo::default();
         self.set_msg_type(PacketDirection::ClientToServer, &mut info);
         info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload, &mut info) {
-            return true;
+            return CheckResult::Ok;
         }
 
-        self.parse(payload, param, true, &mut info).is_ok()
+        self.parse(payload, param, true, &mut info).is_ok().into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -458,7 +458,7 @@ mod test {
         common::{
             flow::{L7PerfStats, PacketDirection},
             l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-            l7_protocol_log::ParseParam,
+            l7_protocol_log::{CheckResult, ParseParam},
             l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface},
         },
         flow_generator::protocol_logs::PostgreInfo,
@@ -555,7 +555,10 @@ mod test {
         let mut parser = PostgresqlLog::default();
         let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
+        assert_eq!(
+            (&mut parser).check_payload(req_payload, req_param),
+            CheckResult::Ok
+        );
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
 
@@ -563,7 +566,10 @@ mod test {
 
         let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
+        assert_eq!(
+            (&mut parser).check_payload(resp_payload, resp_param),
+            CheckResult::Fail
+        );
         let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()

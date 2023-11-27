@@ -21,7 +21,9 @@ use serde::Serialize;
 
 use crate::common::flow::{L7PerfStats, PacketDirection};
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam};
+use crate::common::l7_protocol_log::{
+    CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam,
+};
 use crate::common::meta_packet::EbpfFlags;
 use crate::config::handler::L7LogDynamicConfig;
 use crate::flow_generator::protocol_logs::value_is_default;
@@ -372,30 +374,28 @@ impl<'a> Iterator for RecordIter<'a> {
 }
 
 impl L7ProtocolParserInterface for FastCGILog {
-    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> CheckResult {
         for (r, p, _) in RecordIter::new(payload) {
             match r.record_type {
-                FCGI_END_REQUEST | FCGI_STDOUT => return false,
+                FCGI_END_REQUEST | FCGI_STDOUT => return CheckResult::Fail,
                 _ => {}
             }
 
             if r.record_type == FCGI_PARAMS {
                 if let Ok(val) = get_param_val(p, "REQUEST_METHOD") {
-                    if check_http_method(
+                    return check_http_method(
                         std::str::from_utf8(val)
                             .map_err(|_| Error::L7ProtocolUnknown)
                             .unwrap_or(""),
                     )
                     .is_ok()
-                    {
-                        return true;
-                    }
+                    .into();
                 }
-                return false;
+                return CheckResult::Fail;
             }
         }
 
-        false
+        CheckResult::Fail
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -436,7 +436,7 @@ impl L7ProtocolParserInterface for FastCGILog {
                         info.version = record.version;
                         let mut is_hdr = false;
 
-                        for i in parse_v1_headers(record_payload) {
+                        for (i, _) in parse_v1_headers(record_payload) {
                             let Some(col_index) = i.find(':') else {
                                 break;
                             };
@@ -582,7 +582,9 @@ mod test {
 
     use crate::common::flow::{L7PerfStats, PacketDirection};
     use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-    use crate::common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam};
+    use crate::common::l7_protocol_log::{
+        CheckResult, L7PerfCache, L7ProtocolParserInterface, ParseParam,
+    };
     use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
     use crate::flow_generator::protocol_logs::L7ResponseStatus;
     use crate::flow_generator::LogMessageType;
@@ -637,11 +639,13 @@ mod test {
         let mut p = capture.as_meta_packets();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
-
         let mut parser = FastCGILog::default();
         let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
+        assert_eq!(
+            (&mut parser).check_payload(req_payload, req_param),
+            CheckResult::Ok
+        );
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
 
@@ -649,7 +653,10 @@ mod test {
 
         let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
+        assert_eq!(
+            (&mut parser).check_payload(resp_payload, resp_param),
+            CheckResult::Fail
+        );
         let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()

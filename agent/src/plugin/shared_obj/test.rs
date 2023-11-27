@@ -29,7 +29,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         l7_protocol_info::L7ProtocolInfo,
-        l7_protocol_log::{EbpfParam, L7PerfCache, ParseParam},
+        l7_protocol_log::{CheckResult, EbpfParam, L7PerfCache, ParseParam},
     },
     flow_generator::protocol_logs::plugin::shared_obj::get_so_parser,
 };
@@ -71,11 +71,14 @@ fn get_req_param<'a>(
             is_req_end: false,
             is_resp_end: false,
             process_kname: "test_wasm".to_string(),
+            pid: 0,
         }),
         packet_seq: 9999999,
         time: 12345678,
         parse_log: true,
+        endpoint: None,
         parse_perf: true,
+        tcp_seq: 0,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: None,
@@ -85,6 +88,8 @@ fn get_req_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_can_reassemble: false,
+        payload_in_buffer: false,
     }
 }
 
@@ -101,15 +106,17 @@ fn get_resp_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
+        endpoint: None,
         ebpf_param: Some(EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
             process_kname: "test_wasm".to_string(),
+            pid: 0,
         }),
         packet_seq: 9999999,
         time: 12345679,
+        tcp_seq: 0,
         parse_perf: true,
         parse_log: true,
         parse_config: None,
@@ -121,6 +128,8 @@ fn get_resp_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_can_reassemble: false,
+        payload_in_buffer: false,
     }
 }
 
@@ -140,7 +149,7 @@ fn test_check() {
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
     let param = get_req_param(rrt_cache, Rc::new(vec![get_plugin()]));
     let mut p = SoLog::default();
-    assert!(p.check_payload(&REQ_PAYLOAD, &param));
+    assert_eq!(p.check_payload(&REQ_PAYLOAD, &param), CheckResult::Ok);
 }
 
 #[test]

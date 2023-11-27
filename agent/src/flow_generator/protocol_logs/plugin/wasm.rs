@@ -21,7 +21,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{protocol_logs::L7ResponseStatus, Error, Result},
 };
@@ -35,9 +35,9 @@ pub struct WasmLog {
 }
 
 impl L7ProtocolParserInterface for WasmLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         let Some(vm) = param.wasm_vm.as_ref() else {
-            return false;
+            return CheckResult::Fail;
         };
 
         let mut vm = vm.borrow_mut();
@@ -46,7 +46,7 @@ impl L7ProtocolParserInterface for WasmLog {
             self.proto_num = Some(proto_num);
             self.proto_str = proto_str;
         });
-        self.proto_num.is_some()
+        self.proto_num.is_some().into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

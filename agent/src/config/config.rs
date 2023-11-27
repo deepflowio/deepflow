@@ -567,6 +567,7 @@ pub struct YamlConfig {
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
     pub oracle_parse_config: OracleParseConfig,
+    pub tcp_max_frame: usize,
 }
 
 impl YamlConfig {
@@ -960,6 +961,7 @@ impl Default for YamlConfig {
                 int_compress: true,
                 resp_0x04_extra_byte: false,
             },
+            tcp_max_frame: 4,
         }
     }
 }

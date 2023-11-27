@@ -22,8 +22,9 @@ use std::{
 use lru::LruCache;
 use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
 
-use crate::common::flow::PacketDirection;
+use crate::common::lookup_key::LookupKey;
 use crate::common::meta_packet::MetaPacket;
+use crate::common::{endpoint::EndpointDataPov, flow::PacketDirection};
 use crate::common::{L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL};
 
 #[derive(Eq, Hash, PartialEq)]
@@ -88,8 +89,12 @@ impl AppTable {
         }
     }
 
-    fn get_ip_epc_port(packet: &MetaPacket, forward: bool) -> (IpAddr, i32, u16) {
-        let (src_epc, dst_epc) = if let Some(endpoints) = packet.endpoint_data.as_ref() {
+    fn get_ip_epc_port(
+        endpoint_data: Option<EndpointDataPov>,
+        lookup_key: &LookupKey,
+        forward: bool,
+    ) -> (IpAddr, i32, u16) {
+        let (src_epc, dst_epc) = if let Some(endpoints) = endpoint_data.as_ref() {
             (
                 endpoints.src_info().l3_epc_id,
                 endpoints.dst_info().l3_epc_id,
@@ -98,17 +103,9 @@ impl AppTable {
             (0, 0)
         };
         if forward {
-            (
-                packet.lookup_key.dst_ip,
-                dst_epc,
-                packet.lookup_key.dst_port,
-            )
+            (lookup_key.dst_ip, dst_epc, lookup_key.dst_port)
         } else {
-            (
-                packet.lookup_key.src_ip,
-                src_epc,
-                packet.lookup_key.src_port,
-            )
+            (lookup_key.src_ip, src_epc, lookup_key.src_port)
         }
     }
 
@@ -173,7 +170,8 @@ impl AppTable {
     // get protocol from non ebpf packet, return (proto, fail_count, last_time)
     pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<(L7ProtocolEnum, u32, u64)> {
         let (ip, epc, port) = Self::get_ip_epc_port(
-            packet,
+            packet.endpoint_data.clone(),
+            &packet.lookup_key,
             packet.lookup_key.direction == PacketDirection::ClientToServer,
         );
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
@@ -191,7 +189,8 @@ impl AppTable {
         local_epc: i32,
         remote_epc: i32,
     ) -> Option<(L7ProtocolEnum, u16, u32, u64)> {
-        let (ip, _, dport) = Self::get_ip_epc_port(packet, true);
+        let (ip, _, dport) =
+            Self::get_ip_epc_port(packet.endpoint_data.clone(), &packet.lookup_key, true);
         let pid = if ip.is_loopback() {
             packet.process_id
         } else {
@@ -216,7 +215,8 @@ impl AppTable {
             _ => {}
         }
 
-        let (ip, _, sport) = Self::get_ip_epc_port(packet, false);
+        let (ip, _, sport) =
+            Self::get_ip_epc_port(packet.endpoint_data.clone(), &packet.lookup_key, false);
         let pid = if ip.is_loopback() {
             packet.process_id
         } else {
@@ -343,16 +343,22 @@ impl AppTable {
     }
 
     // set protocol to app_table from non ebpf packet
-    pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
+    pub fn set_protocol(
+        &mut self,
+        endpoint: Option<EndpointDataPov>,
+        lookup_key: &LookupKey,
+        protocol: L7ProtocolEnum,
+    ) -> bool {
         let (mut ip, epc, mut port) = Self::get_ip_epc_port(
-            packet,
-            packet.lookup_key.direction == PacketDirection::ClientToServer,
+            endpoint,
+            lookup_key,
+            lookup_key.direction == PacketDirection::ClientToServer,
         );
 
         if protocol.get_l7_protocol() == L7Protocol::Redis {
-            (ip, port) = packet.get_redis_server_addr();
+            (ip, port) = lookup_key.get_redis_server_addr(false, &[], lookup_key.direction);
         }
-        let time_in_sec = packet.lookup_key.timestamp.as_secs();
+        let time_in_sec = lookup_key.timestamp.as_secs();
         match ip {
             IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, 0),
             IpAddr::V6(i) => self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol, 0),
@@ -361,30 +367,29 @@ impl AppTable {
 
     pub fn set_protocol_from_ebpf(
         &mut self,
-        packet: &MetaPacket,
+        lookup_key: &LookupKey,
+        process_name: &[u8],
+        process_id: u32,
+        endpoint: Option<EndpointDataPov>,
         protocol: L7ProtocolEnum,
         local_epc: i32,
         remote_epc: i32,
     ) -> bool {
-        let is_c2s = packet.lookup_key.direction == PacketDirection::ClientToServer;
+        let is_c2s = lookup_key.direction == PacketDirection::ClientToServer;
 
         let (ip, port);
         // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
         if protocol.get_l7_protocol() == L7Protocol::Redis {
-            (ip, port) = packet.get_redis_server_addr();
+            (ip, port) = lookup_key.get_redis_server_addr(true, process_name, lookup_key.direction);
         } else {
-            (ip, _, port) = Self::get_ip_epc_port(packet, is_c2s);
+            (ip, _, port) = Self::get_ip_epc_port(endpoint, lookup_key, is_c2s);
         }
         // due to loopback may be in different protocol in container, add pid as key
         // FIXME: istio (or the similar proxy use DNAT on loopback addr and port to hijack traffic) will have different protocol in same port,
         // save the protocol to apptable use loopback addr and port will lead to get incorrect protocol in those envrioment
-        let pid = if ip.is_loopback() {
-            packet.process_id
-        } else {
-            0
-        };
-        let time_in_sec = packet.lookup_key.timestamp.as_secs();
-        let epc = if is_c2s == packet.lookup_key.l2_end_1 {
+        let pid = if ip.is_loopback() { process_id } else { 0 };
+        let time_in_sec = lookup_key.timestamp.as_secs();
+        let epc = if is_c2s == lookup_key.l2_end_1 {
             local_epc
         } else {
             remote_epc

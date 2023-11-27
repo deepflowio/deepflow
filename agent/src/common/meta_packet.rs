@@ -453,6 +453,13 @@ impl<'a> MetaPacket<'a> {
         None
     }
 
+    pub fn get_l4_payload_cut(&self, size: usize) -> Option<&[u8]> {
+        let p = self.get_l4_payload()?;
+
+        let cut_payload = if size > p.len() { p } else { &p[..size] };
+        Some(cut_payload)
+    }
+
     pub fn update<P: AsRef<[u8]> + Into<RawPacket<'a>>>(
         &mut self,
         raw_packet: P,
@@ -1006,47 +1013,6 @@ impl<'a> MetaPacket<'a> {
                 NpbMode::IPv4
             } else {
                 NpbMode::IPv6
-            }
-        }
-    }
-
-    /*
-        redis can not determine dirction by RESP protocol when pakcet is from ebpf.
-        if the process name is `redis-server`, the local addr assume is server addr
-        if one side port is 6379, this side assume is server addr
-        otherwise use addr according to direction which may be wrong
-    */
-    pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
-        const REDIS_PORT: u16 = 6379;
-
-        let (src, dst) = (
-            (self.lookup_key.src_ip, self.lookup_key.src_port),
-            (self.lookup_key.dst_ip, self.lookup_key.dst_port),
-        );
-
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        if self.signal_source == SignalSource::EBPF
-            && (self.process_kname[..12]).eq(b"redis-server")
-        {
-            if self.lookup_key.l2_end_1 && self.lookup_key.src_port != REDIS_PORT {
-                // if server side recv, dst addr is server addr
-                return dst;
-            } else if self.lookup_key.l2_end_0 && self.lookup_key.dst_port != REDIS_PORT {
-                // if server send, src addr is server addr
-                return src;
-            }
-        }
-
-        if self.lookup_key.dst_port == REDIS_PORT {
-            dst
-        } else if self.lookup_key.src_port == REDIS_PORT {
-            src
-        } else {
-            //FIXME: can not determine redis server addr, use addr according to direction which may be wrong.
-            if self.lookup_key.direction == PacketDirection::ClientToServer {
-                dst
-            } else {
-                src
             }
         }
     }

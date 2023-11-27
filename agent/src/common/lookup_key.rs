@@ -18,6 +18,8 @@ use std::fmt;
 use std::mem::swap;
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::flow_generator::perf::FlowLogLookupKey;
+
 use super::TapPort;
 use super::{
     endpoint::FeatureFlags,
@@ -29,6 +31,7 @@ use super::{
 
 use npb_pcap_policy::{DedupOperator, TapSide};
 use public::utils::net::MacAddr;
+use tcp_reassemble::tcp_reassemble::{DIRECTION_0, DIRECTION_1};
 
 #[derive(Clone, Debug)]
 pub struct LookupKey {
@@ -117,6 +120,47 @@ impl Default for LookupKey {
 }
 
 impl LookupKey {
+    /*
+        redis can not determine dirction by RESP protocol when pakcet is from ebpf.
+        if the process name is `redis-server`, the local addr assume is server addr
+        if one side port is 6379, this side assume is server addr
+        otherwise use addr according to direction which may be wrong
+    */
+    pub fn get_redis_server_addr(
+        &self,
+        is_ebpf: bool,
+        process_name: &[u8],
+        default_dir: PacketDirection,
+    ) -> (IpAddr, u16) {
+        const REDIS_PORT: u16 = 6379;
+
+        let (src, dst) = ((self.src_ip, self.src_port), (self.dst_ip, self.dst_port));
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if is_ebpf && process_name.eq(b"redis-server") {
+            if self.l2_end_1 && self.src_port != REDIS_PORT {
+                // if server side recv, dst addr is server addr
+                return dst;
+            } else if self.l2_end_0 && self.dst_port != REDIS_PORT {
+                // if server send, src addr is server addr
+                return src;
+            }
+        }
+
+        if self.dst_port == REDIS_PORT {
+            dst
+        } else if self.src_port == REDIS_PORT {
+            src
+        } else {
+            //FIXME: can not determine redis server addr, use addr according to direction which may be wrong.
+            if default_dir == PacketDirection::ClientToServer {
+                dst
+            } else {
+                src
+            }
+        }
+    }
+
     pub fn get_nat_source(&self) -> u8 {
         self.src_nat_source.max(self.dst_nat_source)
     }
@@ -212,6 +256,14 @@ impl LookupKey {
 
     pub fn is_ipv4(&self) -> bool {
         self.eth_type == EthernetType::IPV4
+    }
+
+    pub fn get_reassemble_direction(&self, lk_0: &FlowLogLookupKey) -> u8 {
+        if self.src_ip == lk_0.ip && self.src_port == lk_0.port {
+            DIRECTION_0
+        } else {
+            DIRECTION_1
+        }
     }
 }
 

@@ -43,7 +43,11 @@ const EBPF_TYPE_IO_EVENT: u8 = 4;
 const EBPF_TYPE_GO_HTTP2_UPROBE_DATA: u8 = 5;
 const EBPF_TYPE_NONE: u8 = 255;
 
-// ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
+/*
+    ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
+
+    GoHttp2UprobeData, GoHttp2Uprobe, IOEvent 不能进行 tcp 重组
+*/
 #[derive(Serialize, Debug, PartialEq, Copy, Clone)]
 #[repr(u8)]
 pub enum EbpfType {

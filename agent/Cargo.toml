@@ -73,6 +73,7 @@ signal-hook = "0.3"
 socket2 = "0.4.4"
 special_recv_engine = { path = "plugins/special_recv_engine" }
 sysinfo = { version = "0.26", default-features = false }
+tcp_reassemble = { path = "plugins/tcp_reassemble" }
 thiserror = "1.0"
 time = "0.3.9"
 tokio = { version = "1.20.1", features = ["full"] }

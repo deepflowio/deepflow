@@ -27,6 +27,7 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
+use crate::common::l7_protocol_log::CheckResult;
 use crate::plugin::CustomInfo;
 use crate::{
     common::{
@@ -493,9 +494,9 @@ pub struct HttpLog {
 }
 
 impl L7ProtocolParserInterface for HttpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
 
         let mut info = HttpInfo::default();
@@ -508,12 +509,12 @@ impl L7ProtocolParserInterface for HttpLog {
             L7Protocol::Http1 => self.http1_check_protocol(payload),
             L7Protocol::Http2 | L7Protocol::Grpc => {
                 let Some(config) = param.parse_config else {
-                    return false;
+                    return CheckResult::Fail;
                 };
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
                         if param.direction == PacketDirection::ServerToClient {
-                            return false;
+                            return CheckResult::Fail;
                         }
                         self.parse_http2_go_uprobe(
                             &config.l7_log_dynamic,
@@ -522,8 +523,9 @@ impl L7ProtocolParserInterface for HttpLog {
                             &mut info,
                         )
                         .is_ok()
+                        .into()
                     }
-                    _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
+                    _ => self.parse_http_v2(payload, param, &mut info).is_ok().into(),
                 }
             }
             _ => unreachable!(),
@@ -550,6 +552,10 @@ impl L7ProtocolParserInterface for HttpLog {
                 if param.parse_log {
                     self.wasm_hook(param, payload, &mut info);
                 }
+                info.cal_rrt(param, None).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                });
             }
             L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
                 EbpfType::GoHttp2Uprobe => {
@@ -612,6 +618,9 @@ impl L7ProtocolParserInterface for HttpLog {
 impl HttpLog {
     pub const TRACE_ID: u8 = 0;
     pub const SPAN_ID: u8 = 1;
+    // TODO 这个值有待商讨
+    pub const HTTP1_PARSE_THRESHOLD: usize = 36;
+    pub const HTTP1_HDR_END: &[u8] = b"\r\n\r\n";
 
     pub fn new_v1() -> Self {
         Self {
@@ -632,14 +641,19 @@ impl HttpLog {
         }
     }
 
-    fn http1_check_protocol(&mut self, payload: &[u8]) -> bool {
+    fn http1_check_protocol(&mut self, payload: &[u8]) -> CheckResult {
+        if payload.len() < Self::HTTP1_PARSE_THRESHOLD
+            && &payload[payload.len() - Self::HTTP1_HDR_END.len()..] != Self::HTTP1_HDR_END
+        {
+            return CheckResult::NeedMoreData;
+        }
         let mut headers = parse_v1_headers(payload);
-        let Some(first_line) = headers.next() else {
+        let Some((first_line, _)) = headers.next() else {
             // request is not http v1 without '\r\n'
-            return false;
+            return CheckResult::Fail;
         };
 
-        is_http_req_line(first_line)
+        is_http_req_line(first_line).into()
     }
 
     fn set_status(&mut self, status_code: u16, info: &mut HttpInfo) {
@@ -755,7 +769,7 @@ impl HttpLog {
         }
 
         let mut headers = parse_v1_headers(payload);
-        let Some(first_line) = headers.next() else {
+        let Some((first_line, _)) = headers.next() else {
             return Err(Error::HttpHeaderParseFailed);
         };
 
@@ -794,16 +808,13 @@ impl HttpLog {
             self.perf_stats.as_mut().map(|p| p.inc_req());
         }
 
-        info.cal_rrt(param, None).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
-
         if !param.parse_log {
             return Ok(());
         }
         let mut content_length: Option<u32> = None;
-        for body_line in headers {
+        let mut offset = 0;
+        for (body_line, off) in headers {
+            offset = off;
             let col_index = body_line.find(':');
             if col_index.is_none() {
                 continue;
@@ -835,6 +846,18 @@ impl HttpLog {
         } else {
             info.req_content_length = content_length;
         }
+
+        // TODO 目前只支持 content-length 头作为长度标识, 其他有待补充
+        // TODO 不需要每次都从头开始解析,可以记录头和头便宜,下次可以直接从跳过已解析的头部.
+        if param.payload_can_reassemble {
+            if offset + 2 + (content_length.unwrap_or_default() as usize) > payload.len()
+                || (content_length.unwrap_or_default() == 0
+                    && &payload[payload.len() - Self::HTTP1_HDR_END.len()..] != Self::HTTP1_HDR_END)
+            {
+                return Err(Error::NeedMoreData);
+            }
+        }
+
         Ok(())
     }
 
@@ -1334,10 +1357,11 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(Version, u16)> {
     Ok((version, status_code))
 }
 
-pub struct V1HeaderIterator<'a>(&'a [u8]);
+// (payload, offset)
+pub struct V1HeaderIterator<'a>(&'a [u8], usize);
 
 impl<'a> Iterator for V1HeaderIterator<'a> {
-    type Item = &'a str;
+    type Item = (&'a str, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.0.len() < 2 {
@@ -1378,14 +1402,16 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
                 // this is safe because all bytes are checked to be ascii
                 str::from_utf8_unchecked(&self.0[..end])
             };
-            self.0 = &self.0[end + 2..];
-            Some(result)
+            end += 2;
+            self.0 = &self.0[end..];
+            self.1 += end;
+            Some((result, self.1))
         }
     }
 }
 
 pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
-    V1HeaderIterator(payload)
+    V1HeaderIterator(payload, 0)
 }
 
 pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
@@ -1577,10 +1603,13 @@ mod tests {
                 is_req_end: false,
                 is_resp_end: false,
                 process_kname: "".to_string(),
+                pid: 0,
             }),
             packet_seq: 0,
             time: 0,
+            tcp_seq: 0,
             parse_perf: true,
+            endpoint: None,
             parse_log: true,
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
@@ -1593,6 +1622,8 @@ mod tests {
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
             oracle_parse_conf: OracleParseConfig::default(),
+            payload_can_reassemble: false,
+            payload_in_buffer: false,
         };
 
         //测试长度不正确
@@ -1667,15 +1698,15 @@ mod tests {
             "\n\r",
         ];
         let mut iter = parse_v1_headers(testcases[0].as_bytes());
-        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap().0);
         assert_eq!(None, iter.next());
 
         let mut iter = parse_v1_headers(testcases[1].as_bytes());
-        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap().0);
         assert_eq!(None, iter.next());
 
         let mut iter = parse_v1_headers(testcases[2].as_bytes());
-        assert_eq!("HTT\n\rP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!("HTT\n\rP/1.0 200 OK", iter.next().unwrap().0);
         assert_eq!(None, iter.next());
 
         for expected in &testcases[3..] {
@@ -1704,7 +1735,7 @@ mod tests {
             payload.extend(&[1, 2, 3, 4, 5, 6, 7, 8, 9]);
             let mut iter = parse_v1_headers(&payload);
             for h in expected {
-                assert_eq!(h, iter.next().unwrap());
+                assert_eq!(h, iter.next().unwrap().0);
             }
             assert_eq!(None, iter.next());
         }

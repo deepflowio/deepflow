@@ -24,8 +24,10 @@ use std::time::Duration;
 use enum_dispatch::enum_dispatch;
 use log::debug;
 use lru::LruCache;
+use tcp_reassemble::payload::TcpPayload;
 
 use super::ebpf::EbpfType;
+use super::endpoint::EndpointDataPov;
 use super::flow::{L7PerfStats, PacketDirection};
 use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
@@ -191,6 +193,27 @@ impl L7ParseResult {
         }
     }
 
+    pub fn extend(&mut self, other: Self) {
+        match self {
+            L7ParseResult::Single(s) => match other {
+                L7ParseResult::Single(o) => *self = Self::Multi(vec![s.clone(), o]),
+                L7ParseResult::Multi(mut o) => {
+                    o.push(s.clone());
+                    *self = Self::Multi(o);
+                }
+                L7ParseResult::None => {}
+            },
+            L7ParseResult::Multi(m) => match other {
+                L7ParseResult::Single(o) => {
+                    m.push(o);
+                }
+                L7ParseResult::Multi(o) => m.extend(o),
+                L7ParseResult::None => {}
+            },
+            L7ParseResult::None => *self = other,
+        }
+    }
+
     pub fn unwrap_single(self) -> L7ProtocolInfo {
         match self {
             L7ParseResult::Single(s) => s,
@@ -208,9 +231,26 @@ impl L7ParseResult {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum CheckResult {
+    Ok,
+    Fail,
+    NeedMoreData,
+}
+
+impl From<bool> for CheckResult {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Ok
+        } else {
+            Self::Fail
+        }
+    }
+}
+
 #[enum_dispatch]
 pub trait L7ProtocolParserInterface {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult;
     // 协议解析
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
@@ -266,6 +306,7 @@ pub struct EbpfParam {
     pub is_req_end: bool,
     pub is_resp_end: bool,
     pub process_kname: String,
+    pub pid: u32,
 }
 
 pub struct KafkaInfoCache {
@@ -350,6 +391,9 @@ pub struct ParseParam<'a> {
     pub parse_perf: bool,
     pub parse_log: bool,
 
+    pub tcp_seq: u32,
+    pub endpoint: Option<EndpointDataPov>,
+
     pub parse_config: Option<&'a LogParserConfig>,
 
     pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
@@ -370,6 +414,13 @@ pub struct ParseParam<'a> {
     pub buf_size: u16,
 
     pub oracle_parse_conf: OracleParseConfig,
+
+    // whether payload can resaaemble, in payload parse when payload can not reassemble, can not return NeedMoreData
+    // otherwise maybe lead to data lose (no more data to reassemble but not return log info)
+    pub payload_can_reassemble: bool,
+
+    // whether payload in buffer, if not in buffer need to reassemble after parse
+    pub payload_in_buffer: bool,
 }
 
 impl ParseParam<'_> {
@@ -390,7 +441,7 @@ impl ParseParam<'_> {
             port_src: packet.lookup_key.src_port,
             port_dst: packet.lookup_key.dst_port,
             flow_id: packet.flow_id,
-
+            endpoint: packet.endpoint_data.clone(),
             direction: packet.lookup_key.direction,
             ebpf_type: packet.ebpf_type,
             packet_seq: packet.cap_seq,
@@ -399,7 +450,10 @@ impl ParseParam<'_> {
             parse_perf,
             parse_log,
             parse_config: None,
-
+            tcp_seq: match packet.protocol_data.clone() {
+                super::meta_packet::ProtocolData::TcpHeader(t) => t.seq,
+                super::meta_packet::ProtocolData::IcmpData(_) => 0,
+            },
             l7_perf_cache: cache,
 
             wasm_vm: None,
@@ -416,6 +470,8 @@ impl ParseParam<'_> {
             buf_size: 0,
 
             oracle_parse_conf: OracleParseConfig::default(),
+            payload_can_reassemble: false,
+            payload_in_buffer: false,
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -426,6 +482,10 @@ impl ParseParam<'_> {
                 process_kname: String::from_utf8_lossy(&packet.process_kname[..]).to_string(),
                 #[cfg(target_os = "windows")]
                 process_kname: "".into(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                pid: packet.process_id,
+                #[cfg(target_os = "windows")]
+                pid: 0,
             });
         }
 
@@ -478,6 +538,21 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_oracle_conf(&mut self, conf: OracleParseConfig) {
         self.oracle_parse_conf = conf;
+    }
+
+    pub fn set_payload_can_reassemble(&mut self, b: bool) {
+        self.payload_can_reassemble = b;
+    }
+
+    pub fn set_payload_in_buffer(&mut self, b: bool) {
+        self.payload_in_buffer = b;
+    }
+
+    pub fn update_by_tcp_payload(&mut self, t: &TcpPayload) {
+        self.tcp_seq = t.seq;
+        self.time = t.timestamp;
+        self.payload_can_reassemble = t.can_reassemble;
+        self.packet_seq = t.cap_seq;
     }
 }
 

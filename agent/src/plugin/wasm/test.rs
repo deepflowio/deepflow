@@ -31,7 +31,7 @@ use public::l7_protocol::CustomProtocol;
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
+use crate::common::l7_protocol_log::{CheckResult, EbpfParam, L7PerfCache};
 
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleParseConfig;
@@ -61,13 +61,16 @@ fn get_req_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ClientToServer,
         ebpf_type: EbpfType::TracePoint,
+        endpoint: None,
         ebpf_param: Some(EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
             process_kname: "test_wasm".to_string(),
+            pid: 0,
         }),
         packet_seq: 9999999,
+        tcp_seq: 0,
         time: 12345678,
         parse_perf: true,
         parse_log: true,
@@ -82,6 +85,8 @@ fn get_req_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_can_reassemble: false,
+        payload_in_buffer: false,
     }
 }
 
@@ -96,14 +101,16 @@ fn get_resq_param<'a>(
         port_src: 8080,
         port_dst: 12345,
         flow_id: 1234567,
+        tcp_seq: 0,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
+        endpoint: None,
         ebpf_param: Some(EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
             process_kname: "test_wasm".to_string(),
+            pid: 0,
         }),
         packet_seq: 9999999,
         time: 12345678,
@@ -120,6 +127,8 @@ fn get_resq_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_can_reassemble: false,
+        payload_in_buffer: false,
     }
 }
 
@@ -279,7 +288,10 @@ fn test_check_payload() {
         10, 6, 100, 111, 109, 97, 105, 110, 18, 8, 114, 101, 115, 111, 117, 114, 99, 101, 26, 4,
         116, 121, 112, 101, 34, 8, 101, 110, 100, 112, 111, 105, 110, 116,
     ];
-    assert_eq!(wasm_log.check_payload(&payload[..], &param), true);
+    assert_eq!(
+        wasm_log.check_payload(&payload[..], &param),
+        CheckResult::Ok
+    );
     assert_eq!(
         wasm_log.custom_protocol().unwrap(),
         CustomProtocol::Wasm(1, "test".to_string())

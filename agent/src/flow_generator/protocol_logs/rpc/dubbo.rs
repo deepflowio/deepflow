@@ -23,7 +23,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, TraceType},
@@ -232,21 +232,21 @@ pub struct DubboLog {
 }
 
 impl L7ProtocolParserInterface for DubboLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
 
         let mut header = DubboHeader::default();
         let ret = header.parse_headers(payload);
         if ret.is_err() {
-            return false;
+            return CheckResult::Fail;
         }
 
-        header.check()
+        header.check().into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -747,7 +747,11 @@ mod tests {
             } else {
                 DubboInfo::default()
             };
-            output.push_str(&format!("{:?} is_dubbo: {}\r\n", info, is_dubbo));
+            output.push_str(&format!(
+                "{:?} is_dubbo: {}\r\n",
+                info,
+                is_dubbo == CheckResult::Ok
+            ));
         }
         output
     }
