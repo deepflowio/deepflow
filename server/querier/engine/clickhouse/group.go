@@ -18,11 +18,11 @@ package clickhouse
 
 import (
 	"fmt"
+	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -33,20 +33,20 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	if asTagMap[name] == "time" {
 		return stmts, nil
 	}
-	tag, ok := tag.GetTag(name, db, table, "default")
+	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(name, config.Cfg.AutoCustomTag.TagName) {
-			autoTagMap := tag.TagTranslatorMap
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, name) {
+			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
 				autoTagSlice = append(autoTagSlice, autoTagKey)
 			}
 			sort.Strings(autoTagSlice)
 			for _, autoTagKey := range autoTagSlice {
-				stmts = append(stmts, &GroupTag{Value: autoTagKey, AsTagMap: asTagMap})
+				stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
 			}
-		} else if tag.TagTranslator != "" {
-			stmts = append(stmts, &GroupTag{Value: tag.TagTranslator, Alias: name, AsTagMap: asTagMap})
+		} else if tagItem.TagTranslator != "" {
+			stmts = append(stmts, &GroupTag{Value: tagItem.TagTranslator, Alias: name, AsTagMap: asTagMap})
 		} else {
 			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
@@ -54,6 +54,19 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 		if db == chCommon.DB_NAME_PROMETHEUS {
 			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
 			stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
+			tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+			if ok {
+				autoTagMap := tagItem.TagTranslatorMap
+				autoTagSlice := []string{}
+				for autoTagKey, _ := range autoTagMap {
+					autoTagSlice = append(autoTagSlice, autoTagKey)
+				}
+				sort.Strings(autoTagSlice)
+				for _, autoTagKey := range autoTagSlice {
+					stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
+				}
+			}
 		} else {
 			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
