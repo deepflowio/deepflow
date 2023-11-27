@@ -113,6 +113,10 @@ impl fmt::Display for TunnelTypeBitmap {
             write!(f, "{}{}", separation, TunnelType::TencentGre)?;
             separation = " ";
         }
+        if self.has(TunnelType::Geneve) {
+            write!(f, "{}{}", separation, TunnelType::Geneve)?;
+            separation = " ";
+        }
         if self.has(TunnelType::ErspanOrTeb) {
             write!(f, "{}{}", separation, TunnelType::ErspanOrTeb)?;
         }
