@@ -454,22 +454,28 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
 	if (!new_cache) {
-		char tag[5];
-		len += (TASK_COMM_LEN * 2) + sizeof(tag) * 2;
+		/* add string "[p/t] " */
+		len += (TASK_COMM_LEN * 2) + 10;
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
 
-		snprintf(tag, sizeof(tag), "%s ",
-			 v->pid == v->tgid ? "[p]" : "[t]");
-		if (process_name)
-			snprintf(trace_str, len, "[p]%s;%s%s", process_name,
-				 tag, v->comm);
-		else
-			snprintf(trace_str, len, "%s%s;%s%s", tag, v->comm, tag,
-				 v->comm);
+		bool is_thread = (v->pid != v->tgid);
+		if (process_name) {
+			if (is_thread)
+				snprintf(trace_str, len, "[p] %s;[t] %s", process_name,
+					 v->comm);
+			else
+				snprintf(trace_str, len, "[p] %s", process_name);
+		} else {
+			/* The process has already exited. */
+			if (is_thread)
+				snprintf(trace_str, len, "[t] %s", v->comm);
+			else
+				snprintf(trace_str, len, "[p] %s", v->comm);
+		}
 
 		return trace_str;
 	}
