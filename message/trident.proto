@@ -169,6 +169,7 @@ enum DecapType {
     DECAP_TYPE_VXLAN       = 1;
     DECAP_TYPE_IPIP        = 2;
     DECAP_TYPE_TENCENT     = 3;
+    DECAP_TYPE_GENEVE      = 4;
 }
 
 message Config {
@@ -714,7 +715,7 @@ message GPIDSyncEntry {
     optional uint32 pid_real = 13 [default = 0];    // pid or gpid
     optional RoleType role_real = 14 [default = ROLE_NONE]; // role of real ip, ROLE_NONE means compressed
 
-    // the net nsmaspace index,  neither netns id nor netns inode 
+    // the net nsmaspace index,  neither netns id nor netns inode
     optional uint32 netns_idx = 15 [default = 0];  // u16
 }
 
@@ -809,7 +810,7 @@ message RVData {
 
 message GPIDVTapData {
     optional uint32  update_time = 1 [default = 0];
-    optional GPIDSyncRequest  sync_request = 2;    
+    optional GPIDSyncRequest  sync_request = 2;
 }
 
 message AgentCacheRequest {

@@ -202,9 +202,8 @@ impl TunnelInfo {
             {
                 self.decapsulate_vxlan(packet, l2_len)
             }
-            LE_GENEVE_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::Geneve) => {
-                self.decapsulate_geneve(packet, l2_len)
-            }
+            //LE_GENEVE_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::Geneve) => {
+            LE_GENEVE_PROTO_UDP_DPORT => self.decapsulate_geneve(packet, l2_len),
             _ => 0,
         }
     }
