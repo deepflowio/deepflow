@@ -145,7 +145,9 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	}
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
-	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
+	tr := tagrecorder.GetSingleton()
+	tr.Init(*cfg, ctx)
+	tr.StartSubscribers()
 	go checkAndStartAllRegionMasterFunctions(tr)
 
 	router.SetInitStageForHealthChecker("Master function init")

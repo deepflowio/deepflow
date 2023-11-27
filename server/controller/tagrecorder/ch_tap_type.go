@@ -21,18 +21,18 @@ import (
 )
 
 type ChTapType struct {
-	UpdaterBase[mysql.ChTapType, TapTypeKey]
+	UpdaterComponent[mysql.ChTapType, TapTypeKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	updater := &ChTapType{
-		UpdaterBase[mysql.ChTapType, TapTypeKey]{
-			resourceTypeName: RESOURCE_TYPE_TAP_TYPE,
-		},
+		newUpdaterComponent[mysql.ChTapType, TapTypeKey](
+			RESOURCE_TYPE_TAP_TYPE,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

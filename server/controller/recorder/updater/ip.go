@@ -66,6 +66,10 @@ func (i *IP) GetChanged() bool {
 	return i.wanIPUpdater.Changed || i.lanIPUpdater.Changed
 }
 
+func (i *IP) GetResourceType() string {
+	return ctrlrcommon.RESOURCE_TYPE_IP_EN
+}
+
 func (i *IP) GetMySQLModelString() []string {
 	return []string{i.wanIPUpdater.GetMySQLModelString()[0], i.lanIPUpdater.GetMySQLModelString()[0]}
 }

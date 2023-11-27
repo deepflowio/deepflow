@@ -24,16 +24,16 @@ import (
 )
 
 type ChPodK8sAnnotations struct {
-	UpdaterBase[mysql.ChPodK8sAnnotations, K8sAnnotationsKey]
+	UpdaterComponent[mysql.ChPodK8sAnnotations, K8sAnnotationsKey]
 }
 
 func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 	updater := &ChPodK8sAnnotations{
-		UpdaterBase[mysql.ChPodK8sAnnotations, K8sAnnotationsKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
-		},
+		newUpdaterComponent[mysql.ChPodK8sAnnotations, K8sAnnotationsKey](
+			RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

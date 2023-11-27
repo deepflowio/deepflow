@@ -34,7 +34,7 @@ import (
 const vTapPortNameLength = 256
 
 type ChVTapPort struct {
-	UpdaterBase[mysql.ChVTapPort, VtapPortKey]
+	UpdaterComponent[mysql.ChVTapPort, VtapPortKey]
 }
 
 type DeviceInfo struct {
@@ -46,11 +46,11 @@ type DeviceInfo struct {
 
 func NewChVTapPort() *ChVTapPort {
 	updater := &ChVTapPort{
-		UpdaterBase[mysql.ChVTapPort, VtapPortKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_VTAP_PORT,
-		},
+		newUpdaterComponent[mysql.ChVTapPort, VtapPortKey](
+			RESOURCE_TYPE_CH_VTAP_PORT,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VMSecurityGroup struct {
-	UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *diffbase.VMSecurityGroup]
+	UpdaterBase[
+		cloudmodel.VMSecurityGroup,
+		mysql.VMSecurityGroup,
+		*diffbase.VMSecurityGroup,
+		*message.VMSecurityGroupAdd,
+		message.VMSecurityGroupAdd,
+		*message.VMSecurityGroupUpdate,
+		message.VMSecurityGroupUpdate,
+		*message.VMSecurityGroupFieldsUpdate,
+		message.VMSecurityGroupFieldsUpdate,
+		*message.VMSecurityGroupDelete,
+		message.VMSecurityGroupDelete]
 }
 
 func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecurityGroup) *VMSecurityGroup {
 	updater := &VMSecurityGroup{
-		UpdaterBase[cloudmodel.VMSecurityGroup, mysql.VMSecurityGroup, *diffbase.VMSecurityGroup]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVMSecurityGroup(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VMSecurityGroups,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VMSecurityGroup,
+			mysql.VMSecurityGroup,
+			*diffbase.VMSecurityGroup,
+			*message.VMSecurityGroupAdd,
+			message.VMSecurityGroupAdd,
+			*message.VMSecurityGroupUpdate,
+			message.VMSecurityGroupUpdate,
+			*message.VMSecurityGroupFieldsUpdate,
+			message.VMSecurityGroupFieldsUpdate,
+			*message.VMSecurityGroupDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
+			wholeCache,
+			db.NewVMSecurityGroup(),
+			wholeCache.DiffBaseDataSet.VMSecurityGroups,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -75,14 +98,13 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 	return dbItem, true
 }
 
-func (v *VMSecurityGroup) generateUpdateInfo(diffBase *diffbase.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (v *VMSecurityGroup) generateUpdateInfo(diffBase *diffbase.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (*message.VMSecurityGroupFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.VMSecurityGroupFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {
-		updateInfo["priority"] = cloudItem.Priority
+		mapInfo["priority"] = cloudItem.Priority
+		structInfo.Priority.Set(diffBase.Priority, cloudItem.Priority)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

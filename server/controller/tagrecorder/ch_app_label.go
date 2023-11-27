@@ -23,17 +23,17 @@ import (
 )
 
 type ChAPPLabel struct {
-	UpdaterBase[mysql.ChAPPLabel, PrometheusAPPLabelKey]
+	UpdaterComponent[mysql.ChAPPLabel, PrometheusAPPLabelKey]
 }
 
 func NewChAPPLabel() *ChAPPLabel {
 	updater := &ChAPPLabel{
-		UpdaterBase[mysql.ChAPPLabel, PrometheusAPPLabelKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_APP_LABEL,
-		},
+		newUpdaterComponent[mysql.ChAPPLabel, PrometheusAPPLabelKey](
+			RESOURCE_TYPE_CH_APP_LABEL,
+		),
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

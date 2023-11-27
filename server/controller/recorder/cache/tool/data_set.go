@@ -720,7 +720,7 @@ func (t *DataSet) AddPodNode(item *mysql.PodNode) {
 
 func (t *DataSet) UpdatePodNode(cloudItem *cloudmodel.PodNode) {
 	defer log.Info(updateToolMap(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cloudItem.Lcuuid))
-	id := t.GetPodNodeIDByLcuuid(cloudItem.Lcuuid)
+	id, _ := t.GetPodNodeIDByLcuuid(cloudItem.Lcuuid)
 	if id == 0 {
 		return
 	}
@@ -745,7 +745,7 @@ func (t *DataSet) UpdatePodNode(cloudItem *cloudmodel.PodNode) {
 }
 
 func (t *DataSet) DeletePodNode(lcuuid string) {
-	id := t.GetPodNodeIDByLcuuid(lcuuid)
+	id, _ := t.GetPodNodeIDByLcuuid(lcuuid)
 	if id == 0 {
 		return
 	}
@@ -920,7 +920,7 @@ func (t *DataSet) UpdatePod(cloudItem *cloudmodel.Pod) {
 		return
 	}
 	info.Name = cloudItem.Name
-	info.PodNodeID = t.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
+	info.PodNodeID, _ = t.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 	if regionID, ok := t.GetRegionIDByLcuuid(cloudItem.RegionLcuuid); ok {
 		info.RegionID = regionID
 	}
@@ -1298,7 +1298,7 @@ func (t *DataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid string)
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE {
 		return t.GetRedisInstanceIDByLcuuid(deviceLcuuid)
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
-		return t.GetPodNodeIDByLcuuid(deviceLcuuid), true
+		return t.GetPodNodeIDByLcuuid(deviceLcuuid)
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE {
 		return t.GetPodServiceIDByLcuuid(deviceLcuuid)
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
@@ -1456,23 +1456,23 @@ func (t *DataSet) GetPodClusterIDByLcuuid(lcuuid string) (int, bool) {
 	}
 }
 
-func (t *DataSet) GetPodNodeIDByLcuuid(lcuuid string) int {
+func (t *DataSet) GetPodNodeIDByLcuuid(lcuuid string) (int, bool) {
 	if lcuuid == "" {
-		return 0
+		return 0, true
 	}
 	id, exists := t.podNodeLcuuidToID[lcuuid]
 	if exists {
-		return id
+		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
 	var podNode mysql.PodNode
 	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&podNode)
-		return podNode.ID
+		return podNode.ID, true
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
-		return 0
+		return id, false
 	}
 }
 

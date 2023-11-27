@@ -21,16 +21,16 @@ import (
 )
 
 type ChNodeType struct {
-	UpdaterBase[mysql.ChNodeType, NodeTypeKey]
+	UpdaterComponent[mysql.ChNodeType, NodeTypeKey]
 }
 
 func NewChNodeType() *ChNodeType {
 	updater := &ChNodeType{
-		UpdaterBase[mysql.ChNodeType, NodeTypeKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_NODE_TYPE,
-		},
+		newUpdaterComponent[mysql.ChNodeType, NodeTypeKey](
+			RESOURCE_TYPE_CH_NODE_TYPE,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PodServicePort struct {
-	UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *diffbase.PodServicePort]
+	UpdaterBase[
+		cloudmodel.PodServicePort,
+		mysql.PodServicePort,
+		*diffbase.PodServicePort,
+		*message.PodServicePortAdd,
+		message.PodServicePortAdd,
+		*message.PodServicePortUpdate,
+		message.PodServicePortUpdate,
+		*message.PodServicePortFieldsUpdate,
+		message.PodServicePortFieldsUpdate,
+		*message.PodServicePortDelete,
+		message.PodServicePortDelete]
 }
 
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
 	updater := &PodServicePort{
-		UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *diffbase.PodServicePort]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodServicePort(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodServicePorts,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodServicePort,
+			mysql.PodServicePort,
+			*diffbase.PodServicePort,
+			*message.PodServicePortAdd,
+			message.PodServicePortAdd,
+			*message.PodServicePortUpdate,
+			message.PodServicePortUpdate,
+			*message.PodServicePortFieldsUpdate,
+			message.PodServicePortFieldsUpdate,
+			*message.PodServicePortDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
+			wholeCache,
+			db.NewPodServicePort(),
+			wholeCache.DiffBaseDataSet.PodServicePorts,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -71,14 +94,13 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	return dbItem, true
 }
 
-func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (*message.PodServicePortFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.PodServicePortFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

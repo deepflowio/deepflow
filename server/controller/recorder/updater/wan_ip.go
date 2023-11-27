@@ -27,22 +27,46 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type WANIP struct {
-	UpdaterBase[cloudmodel.IP, mysql.WANIP, *diffbase.WANIP]
+	UpdaterBase[
+		cloudmodel.IP,
+		mysql.WANIP,
+		*diffbase.WANIP,
+		*message.WANIPAdd,
+		message.WANIPAdd,
+		*message.WANIPUpdate,
+		message.WANIPUpdate,
+		*message.WANIPFieldsUpdate,
+		message.WANIPFieldsUpdate,
+		*message.WANIPDelete,
+		message.WANIPDelete]
 }
 
 func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 	updater := &WANIP{
-		UpdaterBase[cloudmodel.IP, mysql.WANIP, *diffbase.WANIP]{
-			resourceType:      ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
-			cache:             wholeCache,
-			domainToolDataSet: domainToolDataSet,
-			dbOperator:        db.NewWANIP(),
-			diffBaseData:      wholeCache.DiffBaseDataSet.WANIPs,
-		},
+		newUpdaterBase[
+			cloudmodel.IP,
+			mysql.WANIP,
+			*diffbase.WANIP,
+			*message.WANIPAdd,
+			message.WANIPAdd,
+			*message.WANIPUpdate,
+			message.WANIPUpdate,
+			*message.WANIPFieldsUpdate,
+			message.WANIPFieldsUpdate,
+			*message.WANIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
+			wholeCache,
+			db.NewWANIP(),
+			wholeCache.DiffBaseDataSet.WANIPs,
+			nil,
+		),
 	}
+	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
 	return updater
 }
@@ -99,14 +123,16 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.WANIPFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.WANIPFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
 		if cloudItem.SubnetLcuuid == "" {
-			updateInfo["vl2_net_id"] = 0
+			mapInfo["vl2_net_id"] = 0
 		} else {
 			subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 			if !exists {
@@ -118,12 +144,14 @@ func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmod
 						ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
 					))
-					return nil, false
+					return nil, nil, false
 				}
 			}
-			updateInfo["vl2_net_id"] = subnetID
+			mapInfo["vl2_net_id"] = subnetID
 		}
+		structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
+		structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
 	}
 
-	return updateInfo, len(updateInfo) > 0
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

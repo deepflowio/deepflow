@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -27,28 +28,40 @@ import (
 
 var log = logging.MustGetLogger("tagrecorder")
 
-type TagRecorder struct {
-	tCtx    context.Context
-	tCancel context.CancelFunc
-	cfg     config.ControllerConfig
+var (
+	tagRecorderOnce sync.Once
+	tagRecorder     *TagRecorder
+)
+
+func GetSingleton() *TagRecorder {
+	tagRecorderOnce.Do(func() {
+		tagRecorder = new(TagRecorder)
+	})
+	return tagRecorder
 }
 
-func NewTagRecorder(cfg config.ControllerConfig, ctx context.Context) *TagRecorder {
+type TagRecorder struct {
+	tCtx                 context.Context
+	tCancel              context.CancelFunc
+	cfg                  config.ControllerConfig
+	domainLcuuidToIconID map[string]int // TODO
+	resourceTypeToIconID map[IconKey]int
+}
+
+func (c *TagRecorder) Init(cfg config.ControllerConfig, ctx context.Context) {
 	tCtx, tCancel := context.WithCancel(ctx)
-	return &TagRecorder{
-		tCtx:    tCtx,
-		tCancel: tCancel,
-		cfg:     cfg,
-	}
+	c.tCtx = tCtx
+	c.tCancel = tCancel
+	c.cfg = cfg
 }
 
 // 每次执行需要做的事情
-func (c *TagRecorder) run() {
-	log.Info("tagrecorder run")
+func (c *TagRecorder) runUpdaters() {
+	log.Info("tagrecorder updaters run")
 
 	// 调用API获取资源对应的icon_id
-	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo()
-	c.refresh(domainToIconID, resourceToIconID)
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = c.UpdateIconInfo()
+	c.refreshByUpdaters()
 }
 
 func (c *TagRecorder) StartChDictionaryUpdate() {
@@ -59,36 +72,33 @@ func (c *TagRecorder) StartChDictionaryUpdate() {
 	}()
 }
 
-func (c *TagRecorder) Start() {
+func (c *TagRecorder) StartUpdaters() {
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.run()
+			c.runUpdaters()
 		}
 	}()
 }
 
-func (t *TagRecorder) Stop() {
+func (t *TagRecorder) StopUpdaters() {
 	if t.tCancel != nil {
 		t.tCancel()
 	}
 	log.Info("tagrecorder stopped")
 }
 
-func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
+func (c *TagRecorder) refreshByUpdaters() {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []ChResourceUpdater{
-		NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
-		NewChAZ(domainLcuuidToIconID, resourceTypeToIconID),
-		NewChVPC(resourceTypeToIconID),
-		NewChDevice(resourceTypeToIconID),
+		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChVPC(c.resourceTypeToIconID),
+		NewChDevice(c.resourceTypeToIconID),
 		NewChIPRelation(),
 		NewChPodK8sLabel(),
 		NewChPodK8sLabels(),
 		NewChPodServiceK8sLabel(),
 		NewChPodServiceK8sLabels(),
-		NewChChostCloudTag(),
 		NewChPodNSCloudTag(),
-		NewChChostCloudTags(),
 		NewChPodNSCloudTags(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
@@ -102,17 +112,17 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChPrometheusLabelName(),
 		NewChPrometheusMetricNames(),
 		NewChPrometheusMetricAPPLabelLayout(),
-		NewChNetwork(resourceTypeToIconID),
-		NewChTapType(resourceTypeToIconID),
-		NewChVTap(resourceTypeToIconID),
-		NewChPod(resourceTypeToIconID),
-		NewChPodCluster(resourceTypeToIconID),
-		NewChPodGroup(resourceTypeToIconID),
-		NewChPodNamespace(resourceTypeToIconID),
-		NewChPodNode(resourceTypeToIconID),
-		NewChLbListener(resourceTypeToIconID),
-		NewChPodIngress(resourceTypeToIconID),
-		NewChGProcess(resourceTypeToIconID),
+		NewChNetwork(c.resourceTypeToIconID),
+		NewChTapType(c.resourceTypeToIconID),
+		NewChVTap(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
+		NewChPodCluster(c.resourceTypeToIconID),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodNode(c.resourceTypeToIconID),
+		NewChLbListener(c.resourceTypeToIconID),
+		NewChPodIngress(c.resourceTypeToIconID),
+		NewChGProcess(c.resourceTypeToIconID),
 
 		NewChPodK8sAnnotation(),
 		NewChPodK8sAnnotations(),
@@ -129,5 +139,19 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg.TagRecorderCfg)
 		updater.Refresh()
+	}
+
+}
+
+func (c *TagRecorder) StartSubscribers() {
+	log.Info("tagrecorder subscribers started")
+	subscribers := []Subscriber{
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
+	}
+	for _, subscriber := range subscribers {
+		subscriber.SetConfig(c.cfg.TagRecorderCfg)
+		subscriber.Subscribe()
 	}
 }

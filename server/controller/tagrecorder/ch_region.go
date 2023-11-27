@@ -22,20 +22,20 @@ import (
 )
 
 type ChRegion struct {
-	UpdaterBase[mysql.ChRegion, IDKey]
+	UpdaterComponent[mysql.ChRegion, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChRegion {
 	updater := &ChRegion{
-		UpdaterBase[mysql.ChRegion, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_REGION,
-		},
+		newUpdaterComponent[mysql.ChRegion, IDKey](
+			RESOURCE_TYPE_CH_REGION,
+		),
 		domainLcuuidToIconID,
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

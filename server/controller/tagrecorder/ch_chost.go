@@ -21,16 +21,16 @@ import (
 )
 
 type ChChost struct {
-	UpdaterBase[mysql.ChChost, IDKey]
+	UpdaterComponent[mysql.ChChost, IDKey]
 }
 
 func NewChChost() *ChChost {
 	updater := &ChChost{
-		UpdaterBase[mysql.ChChost, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_CHOST,
-		},
+		newUpdaterComponent[mysql.ChChost, IDKey](
+			RESOURCE_TYPE_CH_CHOST,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

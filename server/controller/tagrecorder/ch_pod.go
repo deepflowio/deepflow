@@ -21,18 +21,18 @@ import (
 )
 
 type ChPod struct {
-	UpdaterBase[mysql.ChPod, IDKey]
+	UpdaterComponent[mysql.ChPod, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 	updater := &ChPod{
-		UpdaterBase[mysql.ChPod, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD,
-		},
+		newUpdaterComponent[mysql.ChPod, IDKey](
+			RESOURCE_TYPE_CH_POD,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

@@ -24,21 +24,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type CEN struct {
-	UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]
+	UpdaterBase[
+		cloudmodel.CEN,
+		mysql.CEN,
+		*diffbase.CEN,
+		*message.CENAdd,
+		message.CENAdd,
+		*message.CENUpdate,
+		message.CENUpdate,
+		*message.CENFieldsUpdate,
+		message.CENFieldsUpdate,
+		*message.CENDelete,
+		message.CENDelete]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
-		UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewCEN(),
-			diffBaseData: wholeCache.DiffBaseDataSet.CENs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.CEN,
+			mysql.CEN,
+			*diffbase.CEN,
+			*message.CENAdd,
+			message.CENAdd,
+			*message.CENUpdate,
+			message.CENUpdate,
+			*message.CENFieldsUpdate,
+			message.CENFieldsUpdate,
+			*message.CENDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
+			wholeCache,
+			db.NewCEN(),
+			wholeCache.DiffBaseDataSet.CENs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -72,10 +95,12 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.CENFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.CENFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if !rcommon.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
 		vpcIDs := []int{}
@@ -90,11 +115,10 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 			}
 			vpcIDs = append(vpcIDs, vpcID)
 		}
-		updateInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
+		mapInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
+		structInfo.VPCIDs.SetNew(vpcIDs)
+		structInfo.VPCLcuuids.Set(diffBase.VPCLcuuids, cloudItem.VPCLcuuids)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

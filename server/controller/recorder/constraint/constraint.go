@@ -57,7 +57,7 @@ type CloudModel interface {
 }
 
 // 资源用于比对的缓存对象
-type DiffBase[MT MySQLModel] interface {
+type DiffBase interface {
 	*diffbase.Region | *diffbase.AZ | *diffbase.SubDomain | *diffbase.Host | *diffbase.VM |
 		*diffbase.VPC | *diffbase.Network | *diffbase.Subnet | *diffbase.VRouter | *diffbase.RoutingTable |
 		*diffbase.DHCPPort | *diffbase.VInterface | *diffbase.WANIP | *diffbase.LANIP | *diffbase.FloatingIP |

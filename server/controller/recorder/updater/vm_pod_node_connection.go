@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VMPodNodeConnection struct {
-	UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *diffbase.VMPodNodeConnection]
+	UpdaterBase[
+		cloudmodel.VMPodNodeConnection,
+		mysql.VMPodNodeConnection,
+		*diffbase.VMPodNodeConnection,
+		*message.VMPodNodeConnectionAdd,
+		message.VMPodNodeConnectionAdd,
+		*message.VMPodNodeConnectionUpdate,
+		message.VMPodNodeConnectionUpdate,
+		*message.VMPodNodeConnectionFieldsUpdate,
+		message.VMPodNodeConnectionFieldsUpdate,
+		*message.VMPodNodeConnectionDelete,
+		message.VMPodNodeConnectionDelete]
 }
 
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
 	updater := &VMPodNodeConnection{
-		UpdaterBase[cloudmodel.VMPodNodeConnection, mysql.VMPodNodeConnection, *diffbase.VMPodNodeConnection]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVMPodNodeConnection(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VMPodNodeConnections,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VMPodNodeConnection,
+			mysql.VMPodNodeConnection,
+			*diffbase.VMPodNodeConnection,
+			*message.VMPodNodeConnectionAdd,
+			message.VMPodNodeConnectionAdd,
+			*message.VMPodNodeConnectionUpdate,
+			message.VMPodNodeConnectionUpdate,
+			*message.VMPodNodeConnectionFieldsUpdate,
+			message.VMPodNodeConnectionFieldsUpdate,
+			*message.VMPodNodeConnectionDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
+			wholeCache,
+			db.NewVMPodNodeConnection(),
+			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -57,18 +80,25 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		))
 		return nil, false
 	}
-
+	podNodeID, exists := c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
+	if !exists {
+		log.Errorf(resourceAForResourceBNotFound(
+			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cloudItem.PodNodeLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.VMPodNodeConnection{
 		Domain:    c.cache.DomainLcuuid,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
-		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
+		PodNodeID: podNodeID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
 // 保留接口
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (map[string]interface{}, bool) {
-	return nil, false
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (*message.VMPodNodeConnectionFieldsUpdate, map[string]interface{}, bool) {
+	return nil, nil, false
 }

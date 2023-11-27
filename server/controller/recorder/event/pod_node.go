@@ -94,7 +94,7 @@ func (p *PodNode) ProduceByUpdate(cloudItem *cloudmodel.PodNode, diffBase *diffb
 func (p *PodNode) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var name string
-		id := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
+		id, _ := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
 		if id != 0 {
 			var err error
 			name, err = p.ToolDataSet.GetPodNodeNameByID(id)

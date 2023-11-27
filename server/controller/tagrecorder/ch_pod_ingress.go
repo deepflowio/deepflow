@@ -21,19 +21,19 @@ import (
 )
 
 type ChPodIngress struct {
-	UpdaterBase[mysql.ChPodIngress, IDKey]
+	UpdaterComponent[mysql.ChPodIngress, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 	updater := &ChPodIngress{
-		UpdaterBase[mysql.ChPodIngress, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD_INGRESS,
-		},
+		newUpdaterComponent[mysql.ChPodIngress, IDKey](
+			RESOURCE_TYPE_CH_POD_INGRESS,
+		),
 		resourceTypeToIconID,
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

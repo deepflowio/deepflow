@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PodService struct {
-	UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]
+	UpdaterBase[
+		cloudmodel.PodService,
+		mysql.PodService,
+		*diffbase.PodService,
+		*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
 	updater := &PodService{
-		UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodService(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodServices,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodService,
+			mysql.PodService,
+			*diffbase.PodService,
+			*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
+			wholeCache,
+			db.NewPodService(),
+			wholeCache.DiffBaseDataSet.PodServices,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -103,8 +126,9 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	return dbItem, true
 }
 
-func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.PodServiceFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.PodServiceFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {
 		var podIngressID int
 		if cloudItem.PodIngressLcuuid != "" {
@@ -115,35 +139,41 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 					ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 				))
-				return nil, false
+				return nil, nil, false
 			}
 		}
-		updateInfo["pod_ingress_id"] = podIngressID
+		mapInfo["pod_ingress_id"] = podIngressID
+		structInfo.PodIngressID.SetNew(podIngressID)
+		structInfo.PodIngressLcuuid.Set(diffBase.PodIngressLcuuid, cloudItem.PodIngressLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 	if diffBase.Annotation != cloudItem.Annotation {
-		updateInfo["annotation"] = cloudItem.Annotation
+		mapInfo["annotation"] = cloudItem.Annotation
+		structInfo.Annotation.Set(diffBase.Annotation, cloudItem.Annotation)
 	}
 	if diffBase.Selector != cloudItem.Selector {
-		updateInfo["selector"] = cloudItem.Selector
+		mapInfo["selector"] = cloudItem.Selector
+		structInfo.Selector.Set(diffBase.Selector, cloudItem.Selector)
 	}
 	if diffBase.ServiceClusterIP != cloudItem.ServiceClusterIP {
-		updateInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP
+		mapInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP
+		structInfo.ServiceClusterIP.Set(diffBase.ServiceClusterIP, cloudItem.ServiceClusterIP)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

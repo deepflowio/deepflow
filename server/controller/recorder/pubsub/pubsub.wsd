@@ -1,0 +1,121 @@
+@startuml
+
+class RecorderUpdaterComponent<MAPT msgAddPtr[MAT], MAT msgAdd, MUPT msgUpdatePtr[MUT], MUT msgUpdate, MFUPT msgFieldsUpdatePtr[MFUT], MFUT msgFieldsUpdate, MDPT msgDeletePtr[MDT], MDT msgDelete, CT CloudModel, MT MySQLModel, DT DiffBase> {
+- pubsub ResourcePubSub[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]
+}
+
+RecorderUpdaterComponent --d-> ResourcePubSub
+
+RegionUpdater *-u- RecorderUpdaterComponent
+class RegionUpdater {
+}
+
+VMUpdater *-u- RecorderUpdaterComponent
+class VMUpdater {}
+
+interface PubSub {
++ Subscribe(topic int, subscriber interface{})
++ Unsubscribe(topic int, subscriber interface{})
+}
+
+PubSub <|.....l. PubSubComponent
+
+class PubSubComponent {
+- pubSubType  int
+- subscribers map[int][]interface{}
+}
+
+PubSub -d-* ResourcePubSub
+
+interface ResourcePubSub<MAPT msgAddPtr[MAT], MAT msgAdd, MUPT msgUpdatePtr[MUT], MUT msgUpdate, MFUPT msgFieldsUpdatePtr[MFUT], MFUT msgFieldsUpdate, MDPT msgDeletePtr[MDT], MDT msgDelete>{
++ PublishChanged()
++ PublishBatchAdded(MAPT)
++ PublishUpdated(MUPT)
++ PublishBatchDeleted(MDPT)
+}
+
+ResourcePubSub <|.d. ResourcePubSubComponent
+PubSubComponent -d-* ResourcePubSubComponent
+
+class ResourcePubSubComponent<MAPT msgAddPtr[MAT], MAT msgAdd, MUPT msgUpdatePtr[MUT], MUT msgUpdate, MFUPT msgFieldsUpdatePtr[MFUT], MFUT msgFieldsUpdate, MDPT msgDeletePtr[MDT], MDT msgDelete> {
+- resourceType string
+}
+
+PubSub -d-* DomainPubSub
+
+interface DomainPubSub {
++ PublishChanged()
+}
+
+DomainPubSub <|.l. Domain
+PubSubComponent -d-* Domain
+
+class Domain {
+}
+
+ResourcePubSubComponent -r-* RegionPubSub
+
+class RegionPubSub {
+}
+
+ResourcePubSubComponent -r-* VMPubSub
+
+class VMPubSub {
+}
+
+ResourcePubSubComponent -d-> ResourceChangedSubscriber
+
+interface ResourceChangedSubscriber {
++ OnResourceChanged(msg interface{})
+}
+
+ResourcePubSubComponent -d-> ResourceBatchAddedSubscriber
+
+interface ResourceBatchAddedSubscriber {
++ OnResourceBatchAdded(msg interface{})
+}
+
+ResourcePubSubComponent -d-> ResourceUpdatedSubscriber 
+
+interface ResourceUpdatedSubscriber {
++ OnResourceUpdated(msg interface{})
+}
+
+ResourcePubSubComponent -d-> ResourceBatchDeletedSubscriber
+
+interface ResourceBatchDeletedSubscriber {
++ OnResourceBatchDeleted(msg interface{})
+}
+
+interface TagRecorderSubscriber {
++ Subscribe()
+}
+
+TagRecorderSubscriberComponent .u.|> ResourceBatchAddedSubscriber
+TagRecorderSubscriberComponent .u.|> ResourceUpdatedSubscriber
+TagRecorderSubscriberComponent .u.|> ResourceBatchDeletedSubscriber
+TagRecorderSubscriberComponent .d.|> TagRecorderSubscriber
+
+class TagRecorderSubscriberComponent<MUPT msgFieldsUpdatePtr[MUT], MUT msgFieldsUpdate, MT MySQLModel, CT MySQLChModel, KT ChModelKey> {
+- resourceType string
+- dbOperator interface{}
+- dataGenerator interface{}
+}
+
+RegionSubscriber *-u- TagRecorderSubscriberComponent
+class RegionSubscriber{}
+
+ChostSubscriber *-u- TagRecorderSubscriberComponent
+class ChostSubscriber{}
+
+ResourceAPISubscriberComponent .u.|> ResourceChangedSubscriber
+ResourceAPISubscriberComponent .d.|>  ResourceAPISubscriber
+
+interface ResourceAPISubscriber {
++ Subscribe()
+}
+
+class ResourceAPISubscriberComponent {
+}
+
+@enduml

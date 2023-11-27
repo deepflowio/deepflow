@@ -23,18 +23,18 @@ import (
 )
 
 type ChDevice struct {
-	UpdaterBase[mysql.ChDevice, DeviceKey]
+	UpdaterComponent[mysql.ChDevice, DeviceKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 	updater := &ChDevice{
-		UpdaterBase[mysql.ChDevice, DeviceKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_DEVICE,
-		},
+		newUpdaterComponent[mysql.ChDevice, DeviceKey](
+			RESOURCE_TYPE_CH_DEVICE,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

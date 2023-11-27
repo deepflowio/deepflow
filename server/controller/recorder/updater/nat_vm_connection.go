@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type NATVMConnection struct {
-	UpdaterBase[cloudmodel.NATVMConnection, mysql.NATVMConnection, *diffbase.NATVMConnection]
+	UpdaterBase[
+		cloudmodel.NATVMConnection,
+		mysql.NATVMConnection,
+		*diffbase.NATVMConnection,
+		*message.NATVMConnectionAdd,
+		message.NATVMConnectionAdd,
+		*message.NATVMConnectionUpdate,
+		message.NATVMConnectionUpdate,
+		*message.NATVMConnectionFieldsUpdate,
+		message.NATVMConnectionFieldsUpdate,
+		*message.NATVMConnectionDelete,
+		message.NATVMConnectionDelete]
 }
 
 func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMConnection) *NATVMConnection {
 	updater := &NATVMConnection{
-		UpdaterBase[cloudmodel.NATVMConnection, mysql.NATVMConnection, *diffbase.NATVMConnection]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewNATVMConnection(),
-			diffBaseData: wholeCache.DiffBaseDataSet.NATVMConnections,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.NATVMConnection,
+			mysql.NATVMConnection,
+			*diffbase.NATVMConnection,
+			*message.NATVMConnectionAdd,
+			message.NATVMConnectionAdd,
+			*message.NATVMConnectionUpdate,
+			message.NATVMConnectionUpdate,
+			*message.NATVMConnectionFieldsUpdate,
+			message.NATVMConnectionFieldsUpdate,
+			*message.NATVMConnectionDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
+			wholeCache,
+			db.NewNATVMConnection(),
+			wholeCache.DiffBaseDataSet.NATVMConnections,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -76,6 +99,6 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
-func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (map[string]interface{}, bool) {
-	return nil, false
+func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (*message.NATVMConnectionFieldsUpdate, map[string]interface{}, bool) {
+	return nil, nil, false
 }

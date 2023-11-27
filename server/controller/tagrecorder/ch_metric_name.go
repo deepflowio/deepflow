@@ -21,17 +21,17 @@ import (
 )
 
 type ChPrometheusMetricName struct {
-	UpdaterBase[mysql.ChPrometheusMetricName, IDKey]
+	UpdaterComponent[mysql.ChPrometheusMetricName, IDKey]
 }
 
 func NewChPrometheusMetricNames() *ChPrometheusMetricName {
 	updater := &ChPrometheusMetricName{
-		UpdaterBase[mysql.ChPrometheusMetricName, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_METRIC_NAME,
-		},
+		newUpdaterComponent[mysql.ChPrometheusMetricName, IDKey](
+			RESOURCE_TYPE_CH_METRIC_NAME,
+		),
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

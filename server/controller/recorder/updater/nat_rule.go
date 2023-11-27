@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type NATRule struct {
-	UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *diffbase.NATRule]
+	UpdaterBase[
+		cloudmodel.NATRule,
+		mysql.NATRule,
+		*diffbase.NATRule,
+		*message.NATRuleAdd,
+		message.NATRuleAdd,
+		*message.NATRuleUpdate,
+		message.NATRuleUpdate,
+		*message.NATRuleFieldsUpdate,
+		message.NATRuleFieldsUpdate,
+		*message.NATRuleDelete,
+		message.NATRuleDelete]
 }
 
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
 	updater := &NATRule{
-		UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *diffbase.NATRule]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewNATRule(),
-			diffBaseData: wholeCache.DiffBaseDataSet.NATRules,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.NATRule,
+			mysql.NATRule,
+			*diffbase.NATRule,
+			*message.NATRuleAdd,
+			message.NATRuleAdd,
+			*message.NATRuleUpdate,
+			message.NATRuleUpdate,
+			*message.NATRuleFieldsUpdate,
+			message.NATRuleFieldsUpdate,
+			*message.NATRuleDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
+			wholeCache,
+			db.NewNATRule(),
+			wholeCache.DiffBaseDataSet.NATRules,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -89,6 +112,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (map[string]interface{}, bool) {
-	return nil, false
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (*message.NATRuleFieldsUpdate, map[string]interface{}, bool) {
+	return nil, nil, false
 }

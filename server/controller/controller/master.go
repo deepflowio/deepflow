@@ -125,7 +125,7 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 启动tagrecorder
-				tr.Start()
+				tr.StartUpdaters()
 
 				// 控制器检查
 				controllerCheck.Start()
@@ -161,7 +161,7 @@ func checkAndStartMasterFunctions(
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
 
 				// stop tagrecorder
-				tr.Stop()
+				tr.StopUpdaters()
 
 				// stop controller check
 				controllerCheck.Stop()

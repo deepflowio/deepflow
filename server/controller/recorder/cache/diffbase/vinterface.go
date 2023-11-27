@@ -35,7 +35,7 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 		},
 		Name:            dbItem.Name,
 		Type:            dbItem.Type,
-		VtapID:          dbItem.VtapID,
+		VTapID:          dbItem.VtapID,
 		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
 		NetworkLcuuid:   networkLcuuid,
@@ -56,7 +56,7 @@ type VInterface struct {
 	Type            int    `json:"type"`
 	TapMac          string `json:"tap_mac"`
 	NetnsID         uint32 `json:"netns_id"`
-	VtapID          uint32 `json:"vtap_id"`
+	VTapID          uint32 `json:"vtap_id"`
 	NetworkLcuuid   string `json:"network_lcuuid"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
@@ -67,7 +67,7 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.Type = cloudItem.Type
 	v.TapMac = cloudItem.TapMac
 	v.NetnsID = cloudItem.NetnsID
-	v.VtapID = cloudItem.VTapID
+	v.VTapID = cloudItem.VTapID
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, v))
