@@ -703,9 +703,7 @@ mod tests {
                 rrt_count: 2,
                 rrt_sum: 102011,
                 rrt_max: 55453,
-                tls_rtt_count: 1,
-                tls_rtt_sum: 103343,
-                tls_rtt_max: 103343,
+                tls_rtt: 103343,
                 ..Default::default()
             },
         )];
