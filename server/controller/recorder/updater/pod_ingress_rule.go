@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodIngressRule struct {
-	UpdaterBase[cloudmodel.PodIngressRule, mysql.PodIngressRule, *cache.PodIngressRule]
+	UpdaterBase[cloudmodel.PodIngressRule, mysql.PodIngressRule, *diffbase.PodIngressRule]
 }
 
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
 	updater := &PodIngressRule{
-		UpdaterBase[cloudmodel.PodIngressRule, mysql.PodIngressRule, *cache.PodIngressRule]{
+		UpdaterBase[cloudmodel.PodIngressRule, mysql.PodIngressRule, *diffbase.PodIngressRule]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodIngressRule(),
-			diffBaseData: wholeCache.PodIngressRules,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodIngressRules,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 	return updater
 }
 
-func (r *PodIngressRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngressRule) (diffBase *cache.PodIngressRule, exists bool) {
+func (r *PodIngressRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngressRule) (diffBase *diffbase.PodIngressRule, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -69,6 +70,6 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 }
 
 // 保留接口
-func (r *PodIngressRule) generateUpdateInfo(diffBase *cache.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (map[string]interface{}, bool) {
+func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (map[string]interface{}, bool) {
 	return nil, false
 }

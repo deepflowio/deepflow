@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type NATRule struct {
@@ -37,7 +38,7 @@ func (r *NATRule) OnUpdaterAdded(addedDBItems []*mysql.NATRule) {
 	r.cache.AddNATRules(addedDBItems)
 }
 
-func (r *NATRule) OnUpdaterUpdated(cloudItem *cloudmodel.NATRule, diffBase *cache.NATRule) {
+func (r *NATRule) OnUpdaterUpdated(cloudItem *cloudmodel.NATRule, diffBase *diffbase.NATRule) {
 }
 
 func (r *NATRule) OnUpdaterDeleted(lcuuids []string) {

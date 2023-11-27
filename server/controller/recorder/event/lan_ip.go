@@ -22,7 +22,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -31,7 +32,7 @@ type LANIP struct {
 	EventManagerBase
 }
 
-func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
+func NewLANIP(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LANIP {
 	mng := &LANIP{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
@@ -154,7 +155,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	}
 }
 
-func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *cache.LANIP) {
+func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *diffbase.LANIP) {
 }
 
 func (i *LANIP) ProduceByDelete(lcuuids []string) {

@@ -28,6 +28,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func newCloudVRouter() cloudmodel.VRouter {
@@ -45,7 +47,7 @@ func (t *SuiteTest) getVRouterMock(mockDB bool) (*cache.Cache, cloudmodel.VRoute
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.VRouter{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
-		cache_.VRouters[cloudItem.Lcuuid] = &cache.VRouter{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
+		cache_.DiffBaseDataSet.VRouters[cloudItem.Lcuuid] = &diffbase.VRouter{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -56,11 +58,11 @@ func (t *SuiteTest) getVRouterMock(mockDB bool) (*cache.Cache, cloudmodel.VRoute
 func (t *SuiteTest) TestHandleAddVRouterSucess() {
 	cache_, cloudItem := t.getVRouterMock(false)
 	vpcID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
 	defer monkey.Reset()
-	assert.Equal(t.T(), len(cache_.VRouters), 0)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VRouters), 0)
 
 	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -68,7 +70,7 @@ func (t *SuiteTest) TestHandleAddVRouterSucess() {
 	var addedItem *mysql.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.VRouters), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VRouters), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VRouter{})
 }
@@ -78,7 +80,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	cloudItem.Name = cloudItem.Name + "new"
 	cloudItem.VPCLcuuid = uuid.NewString()
 	newVPCID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return newVPCID, true
 	})
 	defer monkey.Reset()
@@ -89,7 +91,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	var addedItem *mysql.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.VRouters), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VRouters), 1)
 	fmt.Println(addedItem)
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), addedItem.VPCID, newVPCID)
@@ -106,5 +108,5 @@ func (t *SuiteTest) TestHandleDeleteVRouterSucess() {
 	var addedItem *mysql.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	assert.Equal(t.T(), len(cache.VRouters), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VRouters), 0)
 }

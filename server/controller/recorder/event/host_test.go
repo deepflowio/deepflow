@@ -21,12 +21,14 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHost_ProduceByAdd(t *testing.T) {
-	dataSet := cache.NewToolDataSet()
+	dataSet := tool.NewDataSet()
 	type args struct {
 		items []*mysql.Host
 	}
@@ -39,7 +41,7 @@ func TestHost_ProduceByAdd(t *testing.T) {
 	}{
 		{
 			name: "add success",
-			h:    NewHost(&dataSet, NewEventQueue()),
+			h:    NewHost(dataSet, NewEventQueue()),
 			args: args{
 				items: []*mysql.Host{
 					{
@@ -79,8 +81,8 @@ func TestHost_ProduceByDelete(t *testing.T) {
 		{
 			name: "delete success",
 			cache: &cache.Cache{
-				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
-				ToolDataSet:     cache.NewToolDataSet(),
+				DiffBaseDataSet: diffbase.NewDataSet(),
+				ToolDataSet:     tool.NewDataSet(),
 			},
 			args: args{
 				lcuuids: []string{"host_lcuuid"},
@@ -105,7 +107,7 @@ func TestHost_ProduceByDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare(tt.cache)
-			tt.h = NewHost(&tt.cache.ToolDataSet, NewEventQueue())
+			tt.h = NewHost(tt.cache.ToolDataSet, NewEventQueue())
 			tt.h.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.h.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)

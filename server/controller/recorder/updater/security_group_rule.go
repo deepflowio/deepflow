@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type SecurityGroupRule struct {
-	UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *cache.SecurityGroupRule]
+	UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]
 }
 
 func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroupRule) *SecurityGroupRule {
 	updater := &SecurityGroupRule{
-		UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *cache.SecurityGroupRule]{
+		UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSecurityGroupRule(),
-			diffBaseData: wholeCache.SecurityGroupRules,
+			diffBaseData: wholeCache.DiffBaseDataSet.SecurityGroupRules,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.Securi
 	return updater
 }
 
-func (r *SecurityGroupRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.SecurityGroupRule) (diffBase *cache.SecurityGroupRule, exists bool) {
+func (r *SecurityGroupRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.SecurityGroupRule) (diffBase *diffbase.SecurityGroupRule, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -73,7 +74,7 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 	return dbItem, true
 }
 
-func (r *SecurityGroupRule) generateUpdateInfo(diffBase *cache.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (map[string]interface{}, bool) {
+func (r *SecurityGroupRule) generateUpdateInfo(diffBase *diffbase.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {
 		updateInfo["priority"] = cloudItem.Priority

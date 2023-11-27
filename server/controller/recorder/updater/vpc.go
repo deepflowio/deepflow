@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VPC struct {
-	UpdaterBase[cloudmodel.VPC, mysql.VPC, *cache.VPC]
+	UpdaterBase[cloudmodel.VPC, mysql.VPC, *diffbase.VPC]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	updater := &VPC{
-		UpdaterBase[cloudmodel.VPC, mysql.VPC, *cache.VPC]{
+		UpdaterBase[cloudmodel.VPC, mysql.VPC, *diffbase.VPC]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVPC(),
-			diffBaseData: wholeCache.VPCs,
+			diffBaseData: wholeCache.DiffBaseDataSet.VPCs,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	return updater
 }
 
-func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *cache.VPC, exists bool) {
+func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffbase.VPC, exists bool) {
 	diffBase, exists = v.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -62,7 +63,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *cache.VPC, cloudItem *cloudmodel.VPC) (map[string]interface{}, bool) {
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

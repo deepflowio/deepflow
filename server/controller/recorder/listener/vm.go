@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type VM struct {
 func NewVM(c *cache.Cache, eq *queue.OverwriteQueue) *VM {
 	listener := &VM{
 		cache:         c,
-		eventProducer: event.NewVM(&c.ToolDataSet, eq),
+		eventProducer: event.NewVM(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (vm *VM) OnUpdaterAdded(addedDBItems []*mysql.VM) {
 	vm.cache.AddVMs(addedDBItems)
 }
 
-func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
+func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) {
 	vm.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	vm.cache.UpdateVM(cloudItem)

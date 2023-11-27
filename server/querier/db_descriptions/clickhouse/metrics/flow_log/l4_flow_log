@@ -67,12 +67,14 @@ client_half_close_flow      ,                      , counter    , TCP Error     
 server_half_close_flow      ,                      , counter    , TCP Error      , 111
 
 rtt                         , rtt                  , delay      , Delay          , 111
+tls_rtt                     , tls_rtt              , delay      , Delay          , 111
 rtt_client                  , rtt_client           , delay      , Delay          , 111
 rtt_server                  , rtt_server           , delay      , Delay          , 111
 srt                         ,                      , delay      , Delay          , 111
 art                         ,                      , delay      , Delay          , 111
 cit                         ,                      , delay      , Delay          , 111
 rtt_max                     , rtt                  , delay      , Delay          , 111
+tls_rtt_max                 , tls_rtt              , delay      , Delay          , 111
 rtt_client_max              , rtt_client           , delay      , Delay          , 111
 rtt_server_max              , rtt_server           , delay      , Delay          , 111
 srt_max                     , srt_max              , delay      , Delay          , 111

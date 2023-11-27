@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type RedisInstance struct {
 func NewRedisInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RedisInstance {
 	listener := &RedisInstance{
 		cache:         c,
-		eventProducer: event.NewRedisInstance(&c.ToolDataSet, eq),
+		eventProducer: event.NewRedisInstance(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (ri *RedisInstance) OnUpdaterAdded(addedDBItems []*mysql.RedisInstance) {
 	ri.cache.AddRedisInstances(addedDBItems)
 }
 
-func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, diffBase *cache.RedisInstance) {
+func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, diffBase *diffbase.RedisInstance) {
 	diffBase.Update(cloudItem)
 	ri.cache.UpdateRedisInstance(cloudItem)
 }

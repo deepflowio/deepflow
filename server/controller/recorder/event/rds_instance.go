@@ -19,7 +19,7 @@ package event
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -29,7 +29,7 @@ type RDSInstance struct {
 	deviceType int
 }
 
-func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInstance {
+func NewRDSInstance(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *RDSInstance {
 	return &RDSInstance{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,

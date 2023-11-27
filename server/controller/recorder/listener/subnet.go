@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type Subnet struct {
@@ -36,7 +37,7 @@ func (s *Subnet) OnUpdaterAdded(addedDBItems []*mysql.Subnet) {
 	s.cache.AddSubnets(addedDBItems)
 }
 
-func (s *Subnet) OnUpdaterUpdated(cloudItem *cloudmodel.Subnet, diffBase *cache.Subnet) {
+func (s *Subnet) OnUpdaterUpdated(cloudItem *cloudmodel.Subnet, diffBase *diffbase.Subnet) {
 	diffBase.Update(cloudItem)
 }
 

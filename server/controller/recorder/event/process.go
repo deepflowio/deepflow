@@ -26,7 +26,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -36,7 +37,7 @@ type Process struct {
 	deviceType int
 }
 
-func NewProcess(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Process {
+func NewProcess(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Process {
 	mng := &Process{
 		EventManagerBase{
 			resourceType: "process",
@@ -128,7 +129,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 	}
 }
 
-func (p *Process) ProduceByUpdate(cloudItem *cloudmodel.Process, diffBase *cache.Process) {
+func (p *Process) ProduceByUpdate(cloudItem *cloudmodel.Process, diffBase *diffbase.Process) {
 }
 
 func (p *Process) ProduceByDelete(lcuuids []string) {

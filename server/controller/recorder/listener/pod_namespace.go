@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PodNamespace struct {
@@ -37,7 +38,7 @@ func (n *PodNamespace) OnUpdaterAdded(addedDBItems []*mysql.PodNamespace) {
 	n.cache.AddPodNamespaces(addedDBItems)
 }
 
-func (n *PodNamespace) OnUpdaterUpdated(cloudItem *cloudmodel.PodNamespace, diffBase *cache.PodNamespace) {
+func (n *PodNamespace) OnUpdaterUpdated(cloudItem *cloudmodel.PodNamespace, diffBase *diffbase.PodNamespace) {
 	diffBase.Update(cloudItem)
 }
 

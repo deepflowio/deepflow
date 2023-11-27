@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Pod struct {
-	UpdaterBase[cloudmodel.Pod, mysql.Pod, *cache.Pod]
+	UpdaterBase[cloudmodel.Pod, mysql.Pod, *diffbase.Pod]
 }
 
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
-		UpdaterBase[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
+		UpdaterBase[cloudmodel.Pod, mysql.Pod, *diffbase.Pod]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPod(),
-			diffBaseData: wholeCache.Pods,
+			diffBaseData: wholeCache.DiffBaseDataSet.Pods,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	return updater
 }
 
-func (p *Pod) getDiffBaseByCloudItem(cloudItem *cloudmodel.Pod) (diffBase *cache.Pod, exists bool) {
+func (p *Pod) getDiffBaseByCloudItem(cloudItem *cloudmodel.Pod) (diffBase *diffbase.Pod, exists bool) {
 	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -117,7 +118,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 	return dbItem, true
 }
 
-func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod) (map[string]interface{}, bool) {
+func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

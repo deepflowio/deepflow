@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type PodNode struct {
 	deviceType int
 }
 
-func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
+func NewPodNode(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodNode {
 	mng := &PodNode{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
@@ -87,7 +88,7 @@ func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	}
 }
 
-func (p *PodNode) ProduceByUpdate(cloudItem *cloudmodel.PodNode, diffBase *cache.PodNode) {
+func (p *PodNode) ProduceByUpdate(cloudItem *cloudmodel.PodNode, diffBase *diffbase.PodNode) {
 }
 
 func (p *PodNode) ProduceByDelete(lcuuids []string) {

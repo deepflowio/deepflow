@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodServicePort struct {
-	UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *cache.PodServicePort]
+	UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *diffbase.PodServicePort]
 }
 
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
 	updater := &PodServicePort{
-		UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *cache.PodServicePort]{
+		UpdaterBase[cloudmodel.PodServicePort, mysql.PodServicePort, *diffbase.PodServicePort]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodServicePort(),
-			diffBaseData: wholeCache.PodServicePorts,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodServicePorts,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 	return updater
 }
 
-func (s *PodServicePort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodServicePort) (diffBase *cache.PodServicePort, exists bool) {
+func (s *PodServicePort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodServicePort) (diffBase *diffbase.PodServicePort, exists bool) {
 	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -70,7 +71,7 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	return dbItem, true
 }
 
-func (p *PodServicePort) generateUpdateInfo(diffBase *cache.PodServicePort, cloudItem *cloudmodel.PodServicePort) (map[string]interface{}, bool) {
+func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

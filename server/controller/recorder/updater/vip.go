@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VIP struct {
-	UpdaterBase[cloudmodel.VIP, mysql.VIP, *cache.VIP]
+	UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]
 }
 
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	updater := &VIP{
-		UpdaterBase[cloudmodel.VIP, mysql.VIP, *cache.VIP]{
+		UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVIP(),
-			diffBaseData: wholeCache.VIP,
+			diffBaseData: wholeCache.DiffBaseDataSet.VIP,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	return updater
 }
 
-func (p *VIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.VIP) (diffBase *cache.VIP, exits bool) {
+func (p *VIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.VIP) (diffBase *diffbase.VIP, exits bool) {
 	diffBase, exits = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -58,7 +59,7 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysql.VIP, bool) 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *cache.VIP, cloudItem *cloudmodel.VIP) (map[string]interface{}, bool) {
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		updateInfo["ip"] = cloudItem.IP

@@ -34,7 +34,7 @@ type WholeDomain struct {
 func NewWholeDomain(domainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueue) *WholeDomain {
 	listener := &WholeDomain{
 		cache:         c,
-		eventProducer: event.NewDomain(domainLcuuid, &c.ToolDataSet, eq),
+		eventProducer: event.NewDomain(domainLcuuid, c.ToolDataSet, eq),
 	}
 	return listener
 }

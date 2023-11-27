@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type Region struct {
@@ -37,7 +38,7 @@ func (r *Region) OnUpdaterAdded(addedDBItems []*mysql.Region) {
 	r.cache.AddRegions(addedDBItems)
 }
 
-func (r *Region) OnUpdaterUpdated(cloudItem *cloudmodel.Region, diffBase *cache.Region) {
+func (r *Region) OnUpdaterUpdated(cloudItem *cloudmodel.Region, diffBase *diffbase.Region) {
 	diffBase.Update(cloudItem)
 }
 

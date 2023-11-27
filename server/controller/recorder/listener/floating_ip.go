@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type FloatingIP struct {
@@ -37,7 +38,7 @@ func (f *FloatingIP) OnUpdaterAdded(addedDBItems []*mysql.FloatingIP) {
 	f.cache.AddFloatingIPs(addedDBItems)
 }
 
-func (f *FloatingIP) OnUpdaterUpdated(cloudItem *cloudmodel.FloatingIP, diffBase *cache.FloatingIP) {
+func (f *FloatingIP) OnUpdaterUpdated(cloudItem *cloudmodel.FloatingIP, diffBase *diffbase.FloatingIP) {
 	diffBase.Update(cloudItem)
 }
 
