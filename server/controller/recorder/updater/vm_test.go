@@ -28,6 +28,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func newCloudVM() cloudmodel.VM {
@@ -52,7 +54,7 @@ func (t *SuiteTest) getVMMock(mockDB bool) (*cache.Cache, cloudmodel.VM) {
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.VM{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, CreateMethod: common.CREATE_METHOD_LEARN, Domain: domainLcuuid})
-		cache_.VMs[cloudItem.Lcuuid] = &cache.VM{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, VPCLcuuid: cloudItem.VPCLcuuid}
+		cache_.DiffBaseDataSet.VMs[cloudItem.Lcuuid] = &diffbase.VM{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, VPCLcuuid: cloudItem.VPCLcuuid}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -63,11 +65,11 @@ func (t *SuiteTest) getVMMock(mockDB bool) (*cache.Cache, cloudmodel.VM) {
 func (t *SuiteTest) TestHandleAddVMSucess() {
 	cache_, cloudItem := t.getVMMock(false)
 	vpcID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
 	defer monkey.Reset()
-	assert.Equal(t.T(), len(cache_.VMs), 0)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VMs), 0)
 
 	updater := NewVM(cache_, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -75,7 +77,7 @@ func (t *SuiteTest) TestHandleAddVMSucess() {
 	var addedItem *mysql.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.VMs), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VMs), 1)
 	assert.Equal(t.T(), addedItem.VPCID, vpcID)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
@@ -93,8 +95,8 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Name, cloudItem.Name)
 
-	diffBase := cache.VMs[cloudItem.Lcuuid]
-	assert.Equal(t.T(), diffBase.GetSequence(), cache.GetSequence())
+	diffBase := cache.DiffBaseDataSet.VMs[cloudItem.Lcuuid]
+	assert.Equal(t.T(), cache.GetSequence(), diffBase.GetSequence())
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
 }

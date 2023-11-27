@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type LBTargetServer struct {
@@ -37,7 +38,7 @@ func (l *LBTargetServer) OnUpdaterAdded(addedDBItems []*mysql.LBTargetServer) {
 	l.cache.AddLBTargetServers(addedDBItems)
 }
 
-func (l *LBTargetServer) OnUpdaterUpdated(cloudItem *cloudmodel.LBTargetServer, diffBase *cache.LBTargetServer) {
+func (l *LBTargetServer) OnUpdaterUpdated(cloudItem *cloudmodel.LBTargetServer, diffBase *diffbase.LBTargetServer) {
 	diffBase.Update(cloudItem)
 }
 

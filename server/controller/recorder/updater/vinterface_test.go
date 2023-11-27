@@ -29,6 +29,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func newCloudVInterface() cloudmodel.VInterface {
@@ -49,10 +51,10 @@ func (t *SuiteTest) getVInterfaceMock(mockDB bool) (*cache.Cache, cloudmodel.VIn
 	if mockDB {
 		vifID := 100
 		t.db.Create(&mysql.VInterface{Name: cloudItem.Name, Base: mysql.Base{ID: vifID, Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
-		cache_.VInterfaces[cloudItem.Lcuuid] = &cache.VInterface{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
+		cache_.DiffBaseDataSet.VInterfaces[cloudItem.Lcuuid] = &diffbase.VInterface{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 
 		t.db.Create(&mysql.LANIP{Base: mysql.Base{Lcuuid: cloudIP.Lcuuid}, Domain: domainLcuuid, VInterfaceID: vifID})
-		cache_.LANIPs[cloudIP.Lcuuid] = &cache.LANIP{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+		cache_.DiffBaseDataSet.LANIPs[cloudIP.Lcuuid] = &diffbase.LANIP{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -63,12 +65,12 @@ func (t *SuiteTest) getVInterfaceMock(mockDB bool) (*cache.Cache, cloudmodel.VIn
 func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	cache_, cloudItem, cloudIP := t.getVInterfaceMock(true)
 	cloudItem.Type = common.VIF_TYPE_WAN
-	assert.Equal(t.T(), 1, len(cache_.LANIPs))
+	assert.Equal(t.T(), 1, len(cache_.DiffBaseDataSet.LANIPs))
 
 	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem}, nil)
 	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP}, nil)
 	updater.HandleAddAndUpdate()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return 100, true
 	})
 	defer monkey.Reset()
@@ -79,13 +81,13 @@ func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	var addedItem *mysql.VInterface
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.VInterfaces), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VInterfaces), 1)
 	assert.Equal(t.T(), addedItem.Type, cloudItem.Type)
 	var wanIP *mysql.WANIP
 	t.db.Where("vifid = ?", addedItem.ID).Find(&wanIP)
 	assert.Equal(t.T(), cloudIP.IP, wanIP.IP)
-	assert.Equal(t.T(), 1, len(cache_.WANIPs))
-	assert.Equal(t.T(), 0, len(cache_.LANIPs))
+	assert.Equal(t.T(), 1, len(cache_.DiffBaseDataSet.WANIPs))
+	assert.Equal(t.T(), 0, len(cache_.DiffBaseDataSet.LANIPs))
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VInterface{})
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.WANIP{})

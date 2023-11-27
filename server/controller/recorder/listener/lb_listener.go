@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type LBListener struct {
@@ -37,7 +38,7 @@ func (l *LBListener) OnUpdaterAdded(addedDBItems []*mysql.LBListener) {
 	l.cache.AddLBListeners(addedDBItems)
 }
 
-func (l *LBListener) OnUpdaterUpdated(cloudItem *cloudmodel.LBListener, diffBase *cache.LBListener) {
+func (l *LBListener) OnUpdaterUpdated(cloudItem *cloudmodel.LBListener, diffBase *diffbase.LBListener) {
 	diffBase.Update(cloudItem)
 }
 

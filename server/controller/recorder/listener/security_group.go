@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type SecurityGroup struct {
@@ -37,7 +38,7 @@ func (sg *SecurityGroup) OnUpdaterAdded(addedDBItems []*mysql.SecurityGroup) {
 	sg.cache.AddSecurityGroups(addedDBItems)
 }
 
-func (sg *SecurityGroup) OnUpdaterUpdated(cloudItem *cloudmodel.SecurityGroup, diffBase *cache.SecurityGroup) {
+func (sg *SecurityGroup) OnUpdaterUpdated(cloudItem *cloudmodel.SecurityGroup, diffBase *diffbase.SecurityGroup) {
 	diffBase.Update(cloudItem)
 }
 

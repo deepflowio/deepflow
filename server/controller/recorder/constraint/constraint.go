@@ -20,7 +20,7 @@ package constraint
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 // 资源的MySQL orm对象
@@ -58,17 +58,17 @@ type CloudModel interface {
 
 // 资源用于比对的缓存对象
 type DiffBase[MT MySQLModel] interface {
-	*cache.Region | *cache.AZ | *cache.SubDomain | *cache.Host | *cache.VM |
-		*cache.VPC | *cache.Network | *cache.Subnet | *cache.VRouter | *cache.RoutingTable |
-		*cache.DHCPPort | *cache.VInterface | *cache.WANIP | *cache.LANIP | *cache.FloatingIP |
-		*cache.SecurityGroup | *cache.SecurityGroupRule | *cache.VMSecurityGroup |
-		*cache.NATGateway | *cache.NATRule | *cache.NATVMConnection | *cache.LB |
-		*cache.LBListener | *cache.LBTargetServer | *cache.LBVMConnection | *cache.CEN |
-		*cache.PeerConnection | *cache.RDSInstance | *cache.RedisInstance | *cache.PodCluster |
-		*cache.PodNode | *cache.VMPodNodeConnection | *cache.PodNamespace | *cache.PodIngress |
-		*cache.PodIngressRule | *cache.PodIngressRuleBackend | *cache.PodService |
-		*cache.PodServicePort | *cache.PodGroup | *cache.PodGroupPort | *cache.PodReplicaSet |
-		*cache.Pod | *cache.Process | *cache.PrometheusTarget | *cache.VIP
+	*diffbase.Region | *diffbase.AZ | *diffbase.SubDomain | *diffbase.Host | *diffbase.VM |
+		*diffbase.VPC | *diffbase.Network | *diffbase.Subnet | *diffbase.VRouter | *diffbase.RoutingTable |
+		*diffbase.DHCPPort | *diffbase.VInterface | *diffbase.WANIP | *diffbase.LANIP | *diffbase.FloatingIP |
+		*diffbase.SecurityGroup | *diffbase.SecurityGroupRule | *diffbase.VMSecurityGroup |
+		*diffbase.NATGateway | *diffbase.NATRule | *diffbase.NATVMConnection | *diffbase.LB |
+		*diffbase.LBListener | *diffbase.LBTargetServer | *diffbase.LBVMConnection | *diffbase.CEN |
+		*diffbase.PeerConnection | *diffbase.RDSInstance | *diffbase.RedisInstance | *diffbase.PodCluster |
+		*diffbase.PodNode | *diffbase.VMPodNodeConnection | *diffbase.PodNamespace | *diffbase.PodIngress |
+		*diffbase.PodIngressRule | *diffbase.PodIngressRuleBackend | *diffbase.PodService |
+		*diffbase.PodServicePort | *diffbase.PodGroup | *diffbase.PodGroupPort | *diffbase.PodReplicaSet |
+		*diffbase.Pod | *diffbase.Process | *diffbase.PrometheusTarget | *diffbase.VIP
 
 	GetSequence() int
 	SetSequence(sequence int)

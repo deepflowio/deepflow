@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type NATGateway struct {
-	UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]
+	UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *diffbase.NATGateway]
 }
 
 func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *NATGateway {
 	updater := &NATGateway{
-		UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]{
+		UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *diffbase.NATGateway]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNATGateway(),
-			diffBaseData: wholeCache.NATGateways,
+			diffBaseData: wholeCache.DiffBaseDataSet.NATGateways,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 	return updater
 }
 
-func (g *NATGateway) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATGateway) (diffBase *cache.NATGateway, exists bool) {
+func (g *NATGateway) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATGateway) (diffBase *diffbase.NATGateway, exists bool) {
 	diffBase, exists = g.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -70,7 +71,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *cache.NATGateway, cloudItem *cloudmodel.NATGateway) (map[string]interface{}, bool) {
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

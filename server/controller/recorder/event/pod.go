@@ -22,7 +22,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type Pod struct {
 	deviceType int
 }
 
-func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
+func NewPod(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
@@ -92,7 +93,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	}
 }
 
-func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
+func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod) {
 	if diffBase.CreatedAt != cloudItem.CreatedAt {
 		var (
 			id   int
@@ -180,7 +181,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 }
 
 func (p *Pod) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
-	ipNetworkMap, _ := p.ToolDataSet.EventToolDataSet.GetPodIPNetworkMapByID(id)
+	ipNetworkMap, _ := p.ToolDataSet.EventDataSet.GetPodIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
 		networkIDs = append(networkIDs, uint32(nID))
 		ips = append(ips, ip.IP)

@@ -17,7 +17,7 @@
 package event
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -25,7 +25,7 @@ type Domain struct {
 	SubDomain
 }
 
-func NewDomain(domainLcuuid string, toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Domain {
+func NewDomain(domainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Domain {
 	return &Domain{
 		SubDomain{
 			domainLcuuid,

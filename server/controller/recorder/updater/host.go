@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Host struct {
-	UpdaterBase[cloudmodel.Host, mysql.Host, *cache.Host]
+	UpdaterBase[cloudmodel.Host, mysql.Host, *diffbase.Host]
 }
 
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	updater := &Host{
-		UpdaterBase[cloudmodel.Host, mysql.Host, *cache.Host]{
+		UpdaterBase[cloudmodel.Host, mysql.Host, *diffbase.Host]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewHost(),
-			diffBaseData: wholeCache.Hosts,
+			diffBaseData: wholeCache.DiffBaseDataSet.Hosts,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	return updater
 }
 
-func (h *Host) getDiffBaseByCloudItem(cloudItem *cloudmodel.Host) (diffBase *cache.Host, exists bool) {
+func (h *Host) getDiffBaseByCloudItem(cloudItem *cloudmodel.Host) (diffBase *diffbase.Host, exists bool) {
 	diffBase, exists = h.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -67,7 +68,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 	return dbItem, true
 }
 
-func (h *Host) generateUpdateInfo(diffBase *cache.Host, cloudItem *cloudmodel.Host) (map[string]interface{}, bool) {
+func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

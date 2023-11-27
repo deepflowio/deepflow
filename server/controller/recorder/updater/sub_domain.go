@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type SubDomain struct {
-	UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *cache.SubDomain]
+	UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *diffbase.SubDomain]
 }
 
 func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *SubDomain {
 	updater := &SubDomain{
-		UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *cache.SubDomain]{
+		UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *diffbase.SubDomain]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewSubDomain(),
-			diffBaseData: wholeCache.SubDomains,
+			diffBaseData: wholeCache.DiffBaseDataSet.SubDomains,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 	return updater
 }
 
-func (d *SubDomain) getDiffBaseByCloudItem(cloudItem *cloudmodel.SubDomain) (diffBase *cache.SubDomain, exists bool) {
+func (d *SubDomain) getDiffBaseByCloudItem(cloudItem *cloudmodel.SubDomain) (diffBase *diffbase.SubDomain, exists bool) {
 	diffBase, exists = d.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -59,7 +60,7 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 	return dbItem, true
 }
 
-func (d *SubDomain) generateUpdateInfo(diffBase *cache.SubDomain, cloudItem *cloudmodel.SubDomain) (map[string]interface{}, bool) {
+func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

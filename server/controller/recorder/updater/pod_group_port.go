@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodGroupPort struct {
-	UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *cache.PodGroupPort]
+	UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *diffbase.PodGroupPort]
 }
 
 func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPort) *PodGroupPort {
 	updater := &PodGroupPort{
-		UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *cache.PodGroupPort]{
+		UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *diffbase.PodGroupPort]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodGroupPort(),
-			diffBaseData: wholeCache.PodGroupPorts,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodGroupPorts,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 	return updater
 }
 
-func (p *PodGroupPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroupPort) (diffBase *cache.PodGroupPort, exists bool) {
+func (p *PodGroupPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroupPort) (diffBase *diffbase.PodGroupPort, exists bool) {
 	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -77,7 +78,7 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 	return dbItem, true
 }
 
-func (p *PodGroupPort) generateUpdateInfo(diffBase *cache.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (map[string]interface{}, bool) {
+func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

@@ -23,21 +23,23 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VInterface struct {
-	UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *cache.VInterface]
+	UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]
 }
 
-func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *cache.ToolDataSet) *VInterface {
+func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
 	updater := &VInterface{
-		UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *cache.VInterface]{
+		UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]{
 			resourceType:      ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			cache:             wholeCache,
 			domainToolDataSet: domainToolDataSet,
 			dbOperator:        db.NewVInterface(),
-			diffBaseData:      wholeCache.VInterfaces,
+			diffBaseData:      wholeCache.DiffBaseDataSet.VInterfaces,
 			cloudData:         cloudData,
 		},
 	}
@@ -45,7 +47,7 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	return updater
 }
 
-func (i *VInterface) getDiffBaseByCloudItem(cloudItem *cloudmodel.VInterface) (diffBase *cache.VInterface, exists bool) {
+func (i *VInterface) getDiffBaseByCloudItem(cloudItem *cloudmodel.VInterface) (diffBase *diffbase.VInterface, exists bool) {
 	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -98,7 +100,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *cloudmodel.VInterface) (map[string]interface{}, bool) {
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
 		if cloudItem.NetworkLcuuid == "" {

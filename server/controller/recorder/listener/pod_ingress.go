@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PodIngress struct {
@@ -37,7 +38,7 @@ func (i *PodIngress) OnUpdaterAdded(addedDBItems []*mysql.PodIngress) {
 	i.cache.AddPodIngresses(addedDBItems)
 }
 
-func (i *PodIngress) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngress, diffBase *cache.PodIngress) {
+func (i *PodIngress) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngress, diffBase *diffbase.PodIngress) {
 	diffBase.Update(cloudItem)
 }
 

@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type WANIP struct {
 func NewWANIP(c *cache.Cache, eq *queue.OverwriteQueue) *WANIP {
 	listener := &WANIP{
 		cache:         c,
-		eventProducer: event.NewWANIP(&c.ToolDataSet, eq),
+		eventProducer: event.NewWANIP(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (i *WANIP) OnUpdaterAdded(addedDBItems []*mysql.WANIP) {
 	i.cache.AddWANIPs(addedDBItems)
 }
 
-func (i *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
+func (i *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.WANIP) {
 	i.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 }

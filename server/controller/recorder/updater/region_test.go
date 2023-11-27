@@ -24,6 +24,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 func newCloudRegion() cloudmodel.Region {
@@ -46,7 +47,7 @@ func (t *SuiteTest) getRegionMock(mockDB bool) (*cache.Cache, cloudmodel.Region)
 		dbItem.Lcuuid = cloudItem.Lcuuid
 		dbItem.Name = cloudItem.Name
 		t.db.Create(dbItem)
-		wholeCache.Regions[cloudItem.Lcuuid] = &cache.Region{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+		wholeCache.DiffBaseDataSet.Regions[cloudItem.Lcuuid] = &diffbase.Region{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
 	wholeCache.SetSequence(wholeCache.GetSequence() + 1)
@@ -76,9 +77,9 @@ func (t *SuiteTest) TestHandleUpdateRegionSucess() {
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Label, cloudItem.Label)
-	assert.Equal(t.T(), cache.Regions[cloudItem.Lcuuid].Label, cloudItem.Label)
+	assert.Equal(t.T(), cache.DiffBaseDataSet.Regions[cloudItem.Lcuuid].Label, cloudItem.Label)
 
-	diffBase := cache.Regions[cloudItem.Lcuuid]
+	diffBase := cache.DiffBaseDataSet.Regions[cloudItem.Lcuuid]
 	assert.Equal(t.T(), diffBase.GetSequence(), cache.GetSequence())
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})

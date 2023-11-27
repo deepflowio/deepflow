@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type RDSInstance struct {
-	UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]
+	UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
-		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]{
+		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRDSInstance(),
-			diffBaseData: wholeCache.RDSInstances,
+			diffBaseData: wholeCache.DiffBaseDataSet.RDSInstances,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 	return updater
 }
 
-func (r *RDSInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RDSInstance) (diffBase *cache.RDSInstance, exists bool) {
+func (r *RDSInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RDSInstance) (diffBase *diffbase.RDSInstance, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -74,7 +75,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *cache.RDSInstance, cloudItem *cloudmodel.RDSInstance) (map[string]interface{}, bool) {
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

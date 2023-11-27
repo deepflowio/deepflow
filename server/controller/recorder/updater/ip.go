@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 type IP struct {
@@ -29,7 +30,7 @@ type IP struct {
 	lanIPUpdater *LANIP
 }
 
-func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, domainToolDataSet *cache.ToolDataSet) *IP {
+func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, domainToolDataSet *tool.DataSet) *IP {
 	return &IP{
 		cache:        cache,
 		cloudData:    cloudData,

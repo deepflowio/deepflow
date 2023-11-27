@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PrometheusTarget struct {
-	UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *cache.PrometheusTarget]
+	UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *diffbase.PrometheusTarget]
 }
 
 func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.PrometheusTarget) *PrometheusTarget {
 	updater := &PrometheusTarget{
-		UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *cache.PrometheusTarget]{
+		UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *diffbase.PrometheusTarget]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPrometheusTarget(),
-			diffBaseData: wholeCache.PrometheusTarget,
+			diffBaseData: wholeCache.DiffBaseDataSet.PrometheusTarget,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.Prometh
 	return updater
 }
 
-func (p *PrometheusTarget) getDiffBaseByCloudItem(cloudItem *cloudmodel.PrometheusTarget) (diffBase *cache.PrometheusTarget, exits bool) {
+func (p *PrometheusTarget) getDiffBaseByCloudItem(cloudItem *cloudmodel.PrometheusTarget) (diffBase *diffbase.PrometheusTarget, exits bool) {
 	diffBase, exits = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -70,7 +71,7 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 	return dbItem, true
 }
 
-func (p *PrometheusTarget) generateUpdateInfo(diffBase *cache.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (map[string]interface{}, bool) {
+func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Instance != cloudItem.Instance {
 		updateInfo["name"] = cloudItem.Instance

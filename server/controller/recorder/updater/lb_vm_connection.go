@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type LBVMConnection struct {
-	UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *cache.LBVMConnection]
+	UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *diffbase.LBVMConnection]
 }
 
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
 	updater := &LBVMConnection{
-		UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *cache.LBVMConnection]{
+		UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *diffbase.LBVMConnection]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLBVMConnection(),
-			diffBaseData: wholeCache.LBVMConnections,
+			diffBaseData: wholeCache.DiffBaseDataSet.LBVMConnections,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,13 +43,13 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 	return updater
 }
 
-func (c *LBVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBVMConnection) (diffBase *cache.LBVMConnection, exists bool) {
+func (c *LBVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBVMConnection) (diffBase *diffbase.LBVMConnection, exists bool) {
 	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
 func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*mysql.LBVMConnection, bool) {
-	vmID, exists := c.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -56,7 +57,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 		))
 		return nil, false
 	}
-	lbID, exists := c.cache.GetLBIDByLcuuid(cloudItem.LBLcuuid)
+	lbID, exists := c.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
@@ -75,6 +76,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *cache.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (map[string]interface{}, bool) {
+func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (map[string]interface{}, bool) {
 	return nil, false
 }

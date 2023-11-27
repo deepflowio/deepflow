@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type PodService struct {
 func NewPodService(c *cache.Cache, eq *queue.OverwriteQueue) *PodService {
 	listener := &PodService{
 		cache:         c,
-		eventProducer: event.NewPodService(&c.ToolDataSet, eq),
+		eventProducer: event.NewPodService(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (ps *PodService) OnUpdaterAdded(addedDBItems []*mysql.PodService) {
 	ps.cache.AddPodServices(addedDBItems)
 }
 
-func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
 	ps.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	ps.cache.UpdatePodService(cloudItem)
