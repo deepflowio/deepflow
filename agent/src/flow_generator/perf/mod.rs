@@ -29,6 +29,8 @@ use std::sync::Arc;
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
+use tcp_reassemble::payload::{PaylaodIter, Payload};
+use tcp_reassemble::tcp_reassemble::TcpFlowReassembleBuf;
 
 use super::{
     app_table::AppTable,
@@ -38,7 +40,8 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
-use crate::common::l7_protocol_log::L7PerfCache;
+use crate::common::l7_protocol_log::{CheckResult, L7PerfCache};
+use crate::common::meta_packet::ProtocolData;
 use crate::common::{
     flow::{Flow, L7PerfStats},
     l7_protocol_log::L7ParseResult,
@@ -213,6 +216,8 @@ pub struct FlowLog {
     l7_protocol_inference_ttl: u64,
 
     ntp_diff: Arc<AtomicI64>,
+
+    tcp_reassemble: Option<TcpFlowReassembleBuf>,
 }
 
 impl FlowLog {
@@ -232,61 +237,95 @@ impl FlowLog {
 
     fn l7_parse_log(
         &mut self,
-        flow_config: &FlowConfig,
-        packet: &mut MetaPacket,
+        packet: &MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
         local_epc: i32,
         remote_epc: i32,
+        mut payload_iter: PaylaodIter,
     ) -> Result<L7ParseResult> {
-        if let Some(payload) = packet.get_l4_payload() {
-            let parser = self.l7_protocol_log_parser.as_mut().unwrap();
-
-            let ret = parser.parse_payload(
-                {
-                    let pkt_size = flow_config.l7_log_packet_size as usize;
-                    if pkt_size > payload.len() {
-                        payload
-                    } else {
-                        &payload[..pkt_size]
+        let parser = self.l7_protocol_log_parser.as_mut().unwrap();
+        let mut ret = None;
+        while let Some(payload) = payload_iter.get() {
+            ret = Some(parser.parse_payload(payload, parse_param));
+            match ret.as_ref().unwrap() {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => match e {
+                    Error::NeedMoreData => {
+                        payload_iter.move_next();
+                        continue;
+                    }
+                    _ => {
+                        payload_iter.move_next();
+                        payload_iter.skip_head();
+                        continue;
                     }
                 },
-                parse_param,
-            );
-
-            let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
-                SignalSource::EBPF => {
-                    app_table.set_protocol_from_ebpf(packet, proto, local_epc, remote_epc)
-                }
-                _ => app_table.set_protocol(packet, proto),
-            };
-
-            let cached = if ret.is_ok() && self.l7_protocol_enum != parser.l7_protocol_enum() {
-                // due to http2 may be upgrade grpc, need to reset the flow node protocol
-                self.l7_protocol_enum = parser.l7_protocol_enum();
-                cache_proto(self.l7_protocol_enum.clone());
-                true
-            } else {
-                false
-            };
-            parser.reset();
-
-            if !self.is_success {
-                self.is_success = ret.is_ok();
-                if self.is_success && !cached {
-                    cache_proto(self.l7_protocol_enum.clone());
-                }
-                if !self.is_success {
-                    self.is_skip = cache_proto(L7ProtocolEnum::default());
-                    if self.is_skip {
-                        self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
-                    }
-                }
             }
+        }
+
+        let Some(ret) = ret else {
+            // payload_iter.get() always have data, so ret impossible None
+            unreachable!()
+        };
+
+        self.tcp_reassemble.as_mut().map(|tcp_reassemble| {
+            payload_iter.get_skip_frame_len().map(|s| {
+                tcp_reassemble.drain_frames(packet.lookup_key.get_reassemble_direction(), s)
+            })
+        });
+
+        if let Err(Error::NeedMoreData) = ret {
+            if parse_param.payload_need_assemble {
+                self.tcp_reassemble.as_mut().map(|tcp_reassemble| {
+                    tcp_reassemble.reassemble_non_serial(
+                        {
+                            match &packet.protocol_data {
+                                ProtocolData::TcpHeader(t) => t.seq,
+                                ProtocolData::IcmpData(_) => unreachable!(),
+                            }
+                        },
+                        packet.get_l4_payload().unwrap(),
+                        packet.lookup_key.get_reassemble_direction(),
+                    )
+                });
+            }
+
             return ret;
         }
 
-        Err(Error::ZeroPayloadLen)
+        let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
+            SignalSource::EBPF => {
+                app_table.set_protocol_from_ebpf(packet, proto, local_epc, remote_epc)
+            }
+            _ => app_table.set_protocol(packet, proto),
+        };
+
+        let cached = if ret.is_ok() && self.l7_protocol_enum != parser.l7_protocol_enum() {
+            // due to http2 may be upgrade grpc, need to reset the flow node protocol
+            self.l7_protocol_enum = parser.l7_protocol_enum();
+            cache_proto(self.l7_protocol_enum.clone());
+            true
+        } else {
+            false
+        };
+        parser.reset();
+
+        if !self.is_success {
+            self.is_success = ret.is_ok();
+            if self.is_success && !cached {
+                cache_proto(self.l7_protocol_enum.clone());
+            }
+            if !self.is_success {
+                self.is_skip = cache_proto(L7ProtocolEnum::default());
+                if self.is_skip {
+                    self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
+                }
+            }
+        }
+        return ret;
     }
 
     fn l7_check(
@@ -301,78 +340,110 @@ impl FlowLog {
         remote_epc: i32,
         checker: &L7ProtocolChecker,
     ) -> Result<L7ParseResult> {
-        if let Some(payload) = packet.get_l4_payload() {
-            let pkt_size = flow_config.l7_log_packet_size as usize;
+        let mut param = ParseParam::new(
+            &*packet,
+            self.perf_cache.clone(),
+            is_parse_perf,
+            is_parse_log,
+        );
 
-            let cut_payload = if pkt_size > payload.len() {
-                payload
-            } else {
-                &payload[..pkt_size]
-            };
+        param.set_log_parse_config(log_parser_config);
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+        }
+        param.set_rrt_timeout(self.rrt_timeout);
+        param.set_buf_size(flow_config.l7_log_packet_size as usize);
+        if let Some(vm) = self.wasm_vm.as_ref() {
+            param.set_wasm_vm(vm.clone());
+        }
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if let Some(p) = self.so_plugin.as_ref() {
+            param.set_so_func(p.clone());
+        }
+        param.set_oracle_conf(flow_config.oracle_parse_conf);
 
-            let mut param = ParseParam::new(
-                &*packet,
-                self.perf_cache.clone(),
-                is_parse_perf,
-                is_parse_log,
-            );
-            param.set_log_parse_config(log_parser_config);
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            {
-                param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
-            }
-            param.set_rrt_timeout(self.rrt_timeout);
-            param.set_buf_size(pkt_size);
-            if let Some(vm) = self.wasm_vm.as_ref() {
-                param.set_wasm_vm(vm.clone());
-            }
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            if let Some(p) = self.so_plugin.as_ref() {
-                param.set_so_func(p.clone());
-            }
-            param.set_oracle_conf(flow_config.oracle_parse_conf);
+        if let Some((payload, need_reassemble, payload_is_flush_from_buf)) =
+            self.get_payload(packet, flow_config.l7_log_packet_size as usize)
+        {
+            param.set_payload_need_assemble(need_reassemble);
+            param.set_payload_from_buffer_flush(payload_is_flush_from_buf);
 
-            for protocol in checker.possible_protocols(
-                packet.lookup_key.proto.into(),
-                match packet.lookup_key.direction {
-                    PacketDirection::ClientToServer => packet.lookup_key.dst_port,
-                    PacketDirection::ServerToClient => packet.lookup_key.src_port,
-                },
-            ) {
-                let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
-                    continue;
-                };
-                if parser.check_payload(cut_payload, &param) {
-                    self.l7_protocol_enum = parser.l7_protocol_enum();
+            let mut payload_iter = PaylaodIter::new(payload);
 
-                    // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
-                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
-                        let host = packet.get_redis_server_addr();
-                        let server_ip = host.0;
-                        self.server_port = host.1;
-                        if packet.lookup_key.dst_port != self.server_port
-                            || packet.lookup_key.dst_ip != server_ip
-                        {
-                            packet.lookup_key.direction = PacketDirection::ServerToClient;
-                        } else {
-                            packet.lookup_key.direction = PacketDirection::ClientToServer;
+            /*
+                | f1 | f2 | f3 |...
+
+            */
+            while let Some(payload) = payload_iter.get() {
+                'check: for protocol in checker.possible_protocols(
+                    packet.lookup_key.proto.into(),
+                    match packet.lookup_key.direction {
+                        PacketDirection::ClientToServer => packet.lookup_key.dst_port,
+                        PacketDirection::ServerToClient => packet.lookup_key.src_port,
+                    },
+                ) {
+                    let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
+                        continue;
+                    };
+
+                    match parser.check_payload(payload, &param) {
+                        CheckResult::Ok => {
+                            return self.on_check_success(
+                                parser,
+                                packet,
+                                &mut param,
+                                app_table,
+                                local_epc,
+                                remote_epc,
+                                payload_iter,
+                            );
                         }
-                    } else {
-                        self.server_port = packet.lookup_key.dst_port;
-                        packet.lookup_key.direction = PacketDirection::ClientToServer;
-                    }
-                    param.direction = packet.lookup_key.direction;
+                        // TODO 这里有相同数据重复 check 的情况,因为只要返回 NeedMoreData 就会等待后续数据,再次 check 实际上只是数据变长但是还是会失败.
+                        CheckResult::Fail => {
+                            continue;
+                        }
+                        CheckResult::NeedMoreData => {
+                            let mut idx = 1;
+                            while let Some(p) = payload_iter.peek(idx) {
+                                match parser.check_payload(p, &param) {
+                                    CheckResult::Ok => {
+                                        return self.on_check_success(
+                                            parser,
+                                            packet,
+                                            &mut param,
+                                            app_table,
+                                            local_epc,
+                                            remote_epc,
+                                            payload_iter,
+                                        );
+                                    }
 
-                    self.l7_protocol_log_parser = Some(Box::new(parser));
-                    return self.l7_parse_log(
-                        flow_config,
-                        packet,
-                        app_table,
-                        &param,
-                        local_epc,
-                        remote_epc,
-                    );
+                                    CheckResult::Fail => break 'check,
+                                    CheckResult::NeedMoreData => idx += 1,
+                                }
+                            }
+                            if let Some(skip) = payload_iter.get_skip_frame_len() {
+                                self.tcp_reassemble.as_mut().map(|t| {
+                                    t.drain_frames(
+                                        packet.lookup_key.get_reassemble_direction(),
+                                        skip,
+                                    );
+                                });
+                            }
+                            return Err(Error::NeedMoreData);
+                        }
+                    }
                 }
+                // 全体 fail, 移动一帧
+                payload_iter.move_next();
+                payload_iter.skip_head();
+            }
+
+            if let Some(skip) = payload_iter.get_skip_frame_len() {
+                self.tcp_reassemble
+                    .as_mut()
+                    .map(|t| t.drain_frames(packet.lookup_key.get_reassemble_direction(), skip));
             }
 
             self.is_skip = match packet.signal_source {
@@ -392,6 +463,48 @@ impl FlowLog {
         return Err(Error::L7ProtocolUnknown);
     }
 
+    fn on_check_success(
+        &mut self,
+        parser: L7ProtocolParser,
+        packet: &mut MetaPacket,
+        param: &mut ParseParam,
+        app_table: &mut AppTable,
+        local_epc: i32,
+        remote_epc: i32,
+        payload_iter: PaylaodIter,
+    ) -> Result<L7ParseResult> {
+        // TODO 处理重组
+        self.l7_protocol_enum = parser.l7_protocol_enum();
+
+        // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+        if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
+            let host = packet.get_redis_server_addr();
+            let server_ip = host.0;
+            self.server_port = host.1;
+            if packet.lookup_key.dst_port != self.server_port
+                || packet.lookup_key.dst_ip != server_ip
+            {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            }
+        } else {
+            self.server_port = packet.lookup_key.dst_port;
+            packet.lookup_key.direction = PacketDirection::ClientToServer;
+        }
+        param.direction = packet.lookup_key.direction;
+
+        self.l7_protocol_log_parser = Some(Box::new(parser));
+        self.l7_parse_log(
+            packet,
+            app_table,
+            param,
+            local_epc,
+            remote_epc,
+            payload_iter,
+        )
+    }
+
     fn l7_parse(
         &mut self,
         flow_config: &FlowConfig,
@@ -407,6 +520,10 @@ impl FlowLog {
         self.check_fail_recover();
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
+        }
+
+        if packet.l4_payload_len() == 0 {
+            return Err(Error::ZeroPayloadLen);
         }
 
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
@@ -440,11 +557,24 @@ impl FlowLog {
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
-            return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
-        }
 
-        if packet.l4_payload_len() < 2 {
-            return Err(Error::L7ProtocolUnknown);
+            let Some((payload, need_reassemble, payload_is_flush_from_buf)) =
+                self.get_payload(packet, flow_config.l7_log_packet_size as usize)
+            else {
+                return Err(Error::ZeroPayloadLen);
+            };
+
+            param.set_payload_need_assemble(need_reassemble);
+            param.set_payload_from_buffer_flush(payload_is_flush_from_buf);
+
+            return self.l7_parse_log(
+                packet,
+                app_table,
+                param,
+                local_epc,
+                remote_epc,
+                PaylaodIter::new(payload),
+            );
         }
 
         self.l7_check(
@@ -458,6 +588,78 @@ impl FlowLog {
             remote_epc,
             checker,
         )
+    }
+
+    // return (payload,need_reassemble,is_from_flush)
+    fn get_payload<'a>(
+        &'a mut self,
+        meta_packet: &'a MetaPacket,
+        log_size: usize,
+    ) -> Option<(Payload<'a>, bool, bool)> {
+        let meta_packet_payload = meta_packet.get_l4_payload()?;
+        let cut_payload = if log_size > meta_packet_payload.len() {
+            meta_packet_payload
+        } else {
+            &meta_packet_payload[..log_size]
+        };
+        let Some(tcp_reassemble) = self.tcp_reassemble.as_mut() else {
+            return Some((Payload::MetaPacket(cut_payload), false, false));
+        };
+        let direction = meta_packet.lookup_key.get_reassemble_direction();
+        if tcp_reassemble.buf_is_empty(direction) {
+            Some((Payload::MetaPacket(cut_payload), true, false))
+        } else {
+            let consequent_frame_size =
+                tcp_reassemble.get_consequent_frame_size(direction).unwrap();
+            let ProtocolData::TcpHeader(ref tcp_data) = meta_packet.protocol_data else {
+                return None;
+            };
+            match tcp_reassemble.reassemble_non_serial(tcp_data.seq, meta_packet_payload, direction)
+            {
+                Ok(_) => {
+                    if tcp_reassemble
+                        .get_waitting_buf_len_before_first_frame(direction)
+                        .unwrap_or_default()
+                        == 0
+                    {
+                        // 只有 buffer 里第一帧和 base_seq 之间没有预留空间并且第一段连续的帧数据有变化(这里必定变长),才会出发解析
+                        // 由于已经重组,所以不需要再重组, can_reassemble 是 false
+                        if tcp_reassemble.get_consequent_frame_size(direction).unwrap()
+                            != consequent_frame_size
+                        {
+                            let (tcp_framse, buffer) =
+                                tcp_reassemble.get_consequent_buffer(direction).unwrap();
+                            Some((Payload::SingleBuffer(buffer, tcp_framse), false,false))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                Err(e) => match e{
+                    tcp_reassemble::tcp_reassemble::TcpReassembleError::FrameBeforeBase => {
+                        Some((Payload::MetaPacket(cut_payload), false,true))
+                    },
+                    tcp_reassemble::tcp_reassemble::TcpReassembleError::PayloadExceedMaxBufferSize => unreachable!(),
+                    tcp_reassemble::tcp_reassemble::TcpReassembleError::FrameExist => None,
+                    tcp_reassemble::tcp_reassemble::TcpReassembleError::BufferFlush(buffer) => Some((Payload::MultiBuffer(buffer), false,true)),
+                },
+            }
+        }
+    }
+
+    fn tcp_reassemble_after_parse(&mut self, seq: u32, payload: &[u8], direction: u8) {
+        self.tcp_reassemble.as_mut().map(|tcp_reassemble|{
+            match tcp_reassemble.reassemble_non_serial(seq, payload, direction.into()){
+                Ok(_) => {},
+                Err(e) => match e{
+                    // tcp_reassemble_after_parse 必定在 get_payload 之后调用,目前的逻辑这里只可能返回 PayloadExceedMaxBufferSize
+                    tcp_reassemble::tcp_reassemble::TcpReassembleError::PayloadExceedMaxBufferSize => {},
+                    _=>unreachable!()
+                } ,
+            }
+        });
     }
 
     pub fn new(
@@ -482,6 +684,8 @@ impl FlowLog {
         l7_protocol_inference_ttl: u64,
         last_time: Option<u64>,
         ntp_diff: Arc<AtomicI64>,
+        buffer_size: usize,
+        max_tcp_frame: usize,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -519,6 +723,11 @@ impl FlowLog {
             last_fail: last_time,
             l7_protocol_inference_ttl,
             ntp_diff,
+            tcp_reassemble: if l4_proto == L4Protocol::Tcp {
+                Some(TcpFlowReassembleBuf::new(buffer_size, max_tcp_frame))
+            } else {
+                None
+            },
         })
     }
 

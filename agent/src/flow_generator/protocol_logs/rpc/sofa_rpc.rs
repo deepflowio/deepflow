@@ -26,7 +26,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -287,11 +287,12 @@ impl Default for SofaRpcLog {
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         let mut info = SofaRpcInfo::default();
-        self.parse(payload, true, &mut info, param).is_ok()
+        (self.parse(payload, true, &mut info, param).is_ok()
             && info.msg_type == LogMessageType::Request
-            && info.cmd_code != CMD_CODE_HEARTBEAT
+            && info.cmd_code != CMD_CODE_HEARTBEAT)
+            .into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -617,7 +618,7 @@ mod test {
         common::{
             flow::{L7PerfStats, PacketDirection},
             l7_protocol_info::L7ProtocolInfo,
-            l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
+            l7_protocol_log::{CheckResult, L7PerfCache, L7ProtocolParserInterface, ParseParam},
         },
         flow_generator::{
             protocol_logs::rpc::sofa_rpc::{CMD_CODE_REQ, CMD_CODE_RESP, PROTO_BOLT_V1},
@@ -667,7 +668,10 @@ mod test {
 
         let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(
+            parser.check_payload(req_payload, req_param),
+            CheckResult::Ok
+        );
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
@@ -737,7 +741,10 @@ mod test {
 
         let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(
+            parser.check_payload(req_payload, req_param),
+            CheckResult::Ok
+        );
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()

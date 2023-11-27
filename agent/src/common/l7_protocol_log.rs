@@ -208,9 +208,26 @@ impl L7ParseResult {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum CheckResult {
+    Ok,
+    Fail,
+    NeedMoreData,
+}
+
+impl From<bool> for CheckResult {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Ok
+        } else {
+            Self::Fail
+        }
+    }
+}
+
 #[enum_dispatch]
 pub trait L7ProtocolParserInterface {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult;
     // 协议解析
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
@@ -370,6 +387,13 @@ pub struct ParseParam<'a> {
     pub buf_size: u16,
 
     pub oracle_parse_conf: OracleParseConfig,
+
+    // whether payload flush from tcp resaaemble, no more data can reassemble.
+    // when parse with payload_from_buffer_flush, parse the paylaod as much as possible, can not reutrn NeedMoreData Err
+    pub payload_from_buffer_flush: bool,
+
+    // whether payload need assemble after parse return NeedMoreData
+    pub payload_need_assemble: bool,
 }
 
 impl ParseParam<'_> {
@@ -416,6 +440,8 @@ impl ParseParam<'_> {
             buf_size: 0,
 
             oracle_parse_conf: OracleParseConfig::default(),
+            payload_from_buffer_flush: false,
+            payload_need_assemble: false,
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -478,6 +504,14 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_oracle_conf(&mut self, conf: OracleParseConfig) {
         self.oracle_parse_conf = conf;
+    }
+
+    pub fn set_payload_from_buffer_flush(&mut self, b: bool) {
+        self.payload_from_buffer_flush = b;
+    }
+
+    pub fn set_payload_need_assemble(&mut self, b: bool) {
+        self.payload_need_assemble = b;
     }
 }
 

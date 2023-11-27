@@ -29,7 +29,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         l7_protocol_info::L7ProtocolInfo,
-        l7_protocol_log::{EbpfParam, L7PerfCache, ParseParam},
+        l7_protocol_log::{CheckResult, EbpfParam, L7PerfCache, ParseParam},
     },
     flow_generator::protocol_logs::plugin::shared_obj::get_so_parser,
 };
@@ -85,6 +85,8 @@ fn get_req_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_from_buffer_flush: false,
+        payload_need_assemble: false,
     }
 }
 
@@ -121,6 +123,8 @@ fn get_resp_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
         oracle_parse_conf: OracleParseConfig::default(),
+        payload_from_buffer_flush: false,
+        payload_need_assemble: false,
     }
 }
 
@@ -140,7 +144,7 @@ fn test_check() {
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
     let param = get_req_param(rrt_cache, Rc::new(vec![get_plugin()]));
     let mut p = SoLog::default();
-    assert!(p.check_payload(&REQ_PAYLOAD, &param));
+    assert_eq!(p.check_payload(&REQ_PAYLOAD, &param), CheckResult::Ok);
 }
 
 #[test]

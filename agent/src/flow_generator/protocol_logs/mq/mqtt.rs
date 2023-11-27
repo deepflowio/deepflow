@@ -31,7 +31,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -218,11 +218,11 @@ pub struct MqttLog {
 }
 
 impl L7ProtocolParserInterface for MqttLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
-        Self::check_protocol(payload, param)
+        Self::check_protocol(payload, param).into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

@@ -17,6 +17,7 @@
 use serde::Serialize;
 
 use super::super::{value_is_default, LogMessageType};
+use crate::common::l7_protocol_log::CheckResult;
 use crate::flow_generator::protocol_logs::L7ResponseStatus;
 use crate::flow_generator::Error;
 use crate::{
@@ -148,8 +149,8 @@ impl Default for OracleLog {
 }
 
 impl L7ProtocolParserInterface for OracleLog {
-    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> bool {
-        self.parser.check_payload(payload)
+    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> CheckResult {
+        self.parser.check_payload(payload).into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

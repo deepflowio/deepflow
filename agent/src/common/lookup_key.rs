@@ -29,6 +29,7 @@ use super::{
 
 use npb_pcap_policy::{DedupOperator, TapSide};
 use public::utils::net::MacAddr;
+use tcp_reassemble::tcp_reassemble::{DIRECTION_0, DIRECTION_1};
 
 #[derive(Clone, Debug)]
 pub struct LookupKey {
@@ -212,6 +213,14 @@ impl LookupKey {
 
     pub fn is_ipv4(&self) -> bool {
         self.eth_type == EthernetType::IPV4
+    }
+
+    pub fn get_reassemble_direction(&self) -> u8 {
+        if self.l2_end_0 {
+            DIRECTION_0
+        } else {
+            DIRECTION_1
+        }
     }
 }
 

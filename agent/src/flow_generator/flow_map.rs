@@ -1255,6 +1255,8 @@ impl FlowMap {
                 flow_config.l7_protocol_inference_ttl as u64,
                 last,
                 self.ntp_diff.clone(),
+                flow_config.l7_log_packet_size as usize,
+                flow_config.tcp_max_frame,
             )
             .map(|o| Box::new(o));
         }

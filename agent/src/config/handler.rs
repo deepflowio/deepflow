@@ -359,6 +359,7 @@ pub struct FlowConfig {
     pub app_proto_log_enabled: bool,
     pub l4_performance_enabled: bool,
     pub l7_log_packet_size: u32,
+    pub tcp_max_frame: usize,
 
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -439,6 +440,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
             batched_buffer_size_limit: conf.yaml_config.batched_buffer_size_limit,
             oracle_parse_conf: conf.yaml_config.oracle_parse_config,
+            tcp_max_frame: conf.yaml_config.tcp_max_frame,
         }
     }
 }

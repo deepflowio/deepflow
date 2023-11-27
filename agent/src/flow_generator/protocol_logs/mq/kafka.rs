@@ -20,7 +20,9 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{KafkaInfoCache, L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{
+            CheckResult, KafkaInfoCache, L7ParseResult, L7ProtocolParserInterface, ParseParam,
+        },
         meta_packet::EbpfFlags,
     },
     config::handler::TraceType,
@@ -250,17 +252,17 @@ pub struct KafkaLog {
 }
 
 impl L7ProtocolParserInterface for KafkaLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol()
             || param.l4_protocol != IpProtocol::TCP
             || payload.len() < KAFKA_REQ_HEADER_LEN
         {
-            return false;
+            return CheckResult::Fail;
         }
         let mut info = KafkaInfo::default();
         let ok = self.request(payload, true, &mut info).is_ok() && info.check();
         self.reset();
-        ok
+        ok.into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -616,7 +618,11 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::KafkaInfo(i) => {
-                        output.push_str(&format!("{:?} is_kafka: {}\r\n", i, is_kafka));
+                        output.push_str(&format!(
+                            "{:?} is_kafka: {}\r\n",
+                            i,
+                            is_kafka == CheckResult::Ok
+                        ));
                     }
                     _ => unreachable!(),
                 }
@@ -624,7 +630,7 @@ mod tests {
                 output.push_str(&format!(
                     "{:?} is_kafka: {}\r\n",
                     KafkaInfo::default(),
-                    is_kafka
+                    is_kafka == CheckResult::Ok
                 ));
             }
         }
