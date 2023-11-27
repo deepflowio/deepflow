@@ -126,10 +126,10 @@ vtap_group_id: g-xxxxxx
 #tap_mode: 0
 
 ## Decapsulation Tunnel Protocols
-## Default: [1, 3], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (GRE), 3 (IPIP)
+## Default: [1, 2], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (IPIP), 3 (GRE), 4 (Geneve)
 #decap_type:
 #- 1
-#- 3
+#- 2
 
 ## VM MAC Address Extraction
 ## Default: 0
