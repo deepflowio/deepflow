@@ -588,6 +588,19 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		char *process_name = NULL;
 		bool matched = false;
 
+		/* 
+		 * If the data collected is from a running process, and the process
+		 * name and the command name of the task (captured by eBPF) are not
+		 * consistent, it indicates that the cached process information is
+		 * no longer valid.
+		 */
+		if (stime > 0 && v->pid == v->tgid && !strcmp(name, v->comm)) {
+			stime = netns_id = 0;
+			name[0] = '\0';
+			process_name = NULL;
+			info_p = NULL;
+		}
+
 		if (stime > 0) {
 			if (v->tgid == 0)
 				process_name = v->comm;
@@ -631,11 +644,12 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
-			 * append 2 byte for ';' and '\0'
+			 * append 2 byte for ';' '\0' '[p/t]'
 			 */
+			char pre_tag[5];
 			int str_len = strlen(trace_str) + 2;
 			if (matched)
-				str_len += strlen(v->comm);
+				str_len += strlen(v->comm) + sizeof(pre_tag);
 
 			int len = sizeof(stack_trace_msg_t) + str_len;
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
@@ -649,9 +663,12 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			set_stack_trace_msg(msg, v, matched, stime, netns_id,
 					    process_name,
 					    __p ? __p->container_id : NULL);
+
+			snprintf(pre_tag, sizeof(pre_tag), "%s ",
+				 v->pid == v->tgid ? "[p]" : "[t]");
 			if (matched)
-				snprintf((char *)&msg->data[0], str_len, "%s;%s",
-					 v->comm, trace_str);
+				snprintf((char *)&msg->data[0], str_len, "%s%s;%s",
+					 pre_tag, v->comm, trace_str);
 			else
 				snprintf((char *)&msg->data[0], str_len, "%s",
 					 trace_str);
