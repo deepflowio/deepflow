@@ -234,6 +234,7 @@ func (u *UniversalTagsManager) Start() {
 			}
 		} else {
 			log.Warningf("update universall tag maps faile: %s", err)
+			continue
 		}
 
 		if newTapPortMap, err := u.queryTapPortMap(); err == nil {
