@@ -633,7 +633,10 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			 * append process/thread name to stack string
 			 * append 2 byte for ';' and '\0'
 			 */
-			int str_len = strlen(trace_str) + strlen(v->comm) + 2;
+			int str_len = strlen(trace_str) + 2;
+			if (matched)
+				str_len += strlen(v->comm);
+
 			int len = sizeof(stack_trace_msg_t) + str_len;
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
 			if (msg == NULL) {
@@ -646,9 +649,13 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			set_stack_trace_msg(msg, v, matched, stime, netns_id,
 					    process_name,
 					    __p ? __p->container_id : NULL);
+			if (matched)
+				snprintf((char *)&msg->data[0], str_len, "%s;%s",
+					 v->comm, trace_str);
+			else
+				snprintf((char *)&msg->data[0], str_len, "%s",
+					 trace_str);
 
-			snprintf((char *)&msg->data[0], str_len, "%s;%s",
-				 v->comm, trace_str);
 			msg->data_len = str_len - 1;
 			clib_mem_free(trace_str);
 			kv.msg_ptr = pointer_to_uword(msg);
