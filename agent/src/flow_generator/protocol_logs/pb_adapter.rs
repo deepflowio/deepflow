@@ -179,7 +179,7 @@ impl L7ProtocolSendLog {
             if let Some(metrics) = ext.metrics {
                 for kv in metrics.into_iter() {
                     ext_info.metrics_names.push(kv.key);
-                    ext_info.metrics_values.push(kv.val);
+                    ext_info.metrics_values.push(kv.val as f64);
                 }
             }
             log.ext_info = Some(ext_info);

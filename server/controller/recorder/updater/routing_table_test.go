@@ -27,6 +27,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func newCloudRoutingTable() cloudmodel.RoutingTable {
@@ -44,7 +46,7 @@ func (t *SuiteTest) getRoutingTableMock(mockDB bool) (*cache.Cache, cloudmodel.R
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.RoutingTable{Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Destination: cloudItem.Destination})
-		cache_.RoutingTables[cloudItem.Lcuuid] = &cache.RoutingTable{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+		cache_.DiffBaseDataSet.RoutingTables[cloudItem.Lcuuid] = &diffbase.RoutingTable{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -55,11 +57,11 @@ func (t *SuiteTest) getRoutingTableMock(mockDB bool) (*cache.Cache, cloudmodel.R
 func (t *SuiteTest) TestHandleAddRoutingTableSucess() {
 	cache_, cloudItem := t.getRoutingTableMock(false)
 	vrouterID := randID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return vrouterID, true
 	})
 	defer monkey.Reset()
-	assert.Equal(t.T(), len(cache_.RoutingTables), 0)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.RoutingTables), 0)
 
 	updater := NewRoutingTable(cache_, []cloudmodel.RoutingTable{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -67,7 +69,7 @@ func (t *SuiteTest) TestHandleAddRoutingTableSucess() {
 	var addedItem *mysql.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache_.RoutingTables), 1)
+	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.RoutingTables), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.RoutingTable{})
 }
@@ -82,7 +84,7 @@ func (t *SuiteTest) TestHandleUpdateRoutingTableSucess() {
 	var addedItem *mysql.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.RoutingTables), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.RoutingTables), 1)
 	assert.Equal(t.T(), addedItem.Destination, cloudItem.Destination)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.RoutingTable{})
@@ -97,5 +99,5 @@ func (t *SuiteTest) TestHandleDeleteRoutingTableSucess() {
 	var addedItem *mysql.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	assert.Equal(t.T(), len(cache.RoutingTables), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.RoutingTables), 0)
 }

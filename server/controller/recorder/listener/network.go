@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type Network struct {
@@ -37,7 +38,7 @@ func (n *Network) OnUpdaterAdded(addedDBItems []*mysql.Network) {
 	n.cache.AddNetworks(addedDBItems)
 }
 
-func (n *Network) OnUpdaterUpdated(cloudItem *cloudmodel.Network, diffBase *cache.Network) {
+func (n *Network) OnUpdaterUpdated(cloudItem *cloudmodel.Network, diffBase *diffbase.Network) {
 	diffBase.Update(cloudItem)
 	n.cache.UpdateNetwork(cloudItem)
 }

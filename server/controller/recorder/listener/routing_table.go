@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type RoutingTable struct {
@@ -37,7 +38,7 @@ func (rt *RoutingTable) OnUpdaterAdded(addedDBItems []*mysql.RoutingTable) {
 	rt.cache.AddRoutingTables(addedDBItems)
 }
 
-func (rt *RoutingTable) OnUpdaterUpdated(cloudItem *cloudmodel.RoutingTable, diffBase *cache.RoutingTable) {
+func (rt *RoutingTable) OnUpdaterUpdated(cloudItem *cloudmodel.RoutingTable, diffBase *diffbase.RoutingTable) {
 	diffBase.Update(cloudItem)
 }
 

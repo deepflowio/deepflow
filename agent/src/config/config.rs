@@ -1592,7 +1592,7 @@ where
             TunnelType::try_from(t).map_err(|_| {
                 de::Error::invalid_value(
                     Unexpected::Unsigned(t as u64),
-                    &"None|Vxlan|Ipip|TencentGre|ErspanOrTeb",
+                    &"None|Vxlan|Ipip|TencentGre|Geneve|ErspanOrTeb",
                 )
             })
         })

@@ -24,6 +24,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 func newCloudSubDomain() cloudmodel.SubDomain {
@@ -41,7 +42,7 @@ func (t *SuiteTest) getSubDomainMock(mockDB bool) (*cache.Cache, cloudmodel.SubD
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.SubDomain{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
-		cache_.SubDomains[cloudItem.Lcuuid] = &cache.SubDomain{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+		cache_.DiffBaseDataSet.SubDomains[cloudItem.Lcuuid] = &diffbase.SubDomain{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -51,7 +52,7 @@ func (t *SuiteTest) getSubDomainMock(mockDB bool) (*cache.Cache, cloudmodel.SubD
 
 func (t *SuiteTest) TestHandleAddSubDomainSucess() {
 	cache, cloudItem := t.getSubDomainMock(false)
-	assert.Equal(t.T(), len(cache.SubDomains), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.SubDomains), 0)
 
 	updater := NewSubDomain(cache, []cloudmodel.SubDomain{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -59,7 +60,7 @@ func (t *SuiteTest) TestHandleAddSubDomainSucess() {
 	var addedItem *mysql.SubDomain
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.SubDomains), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.SubDomains), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.SubDomain{})
 }
@@ -73,7 +74,7 @@ func (t *SuiteTest) TestHandleDeleteSubDomainSucess() {
 	var addedItem *mysql.SubDomain
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	assert.Equal(t.T(), len(cache.SubDomains), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.SubDomains), 0)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.SubDomain{})
 }

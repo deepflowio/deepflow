@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type NATRule struct {
-	UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *cache.NATRule]
+	UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *diffbase.NATRule]
 }
 
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
 	updater := &NATRule{
-		UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *cache.NATRule]{
+		UpdaterBase[cloudmodel.NATRule, mysql.NATRule, *diffbase.NATRule]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewNATRule(),
-			diffBaseData: wholeCache.NATRules,
+			diffBaseData: wholeCache.DiffBaseDataSet.NATRules,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 	return updater
 }
 
-func (r *NATRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATRule) (diffBase *cache.NATRule, exists bool) {
+func (r *NATRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATRule) (diffBase *diffbase.NATRule, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -88,6 +89,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *cache.NATRule, cloudItem *cloudmodel.NATRule) (map[string]interface{}, bool) {
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (map[string]interface{}, bool) {
 	return nil, false
 }

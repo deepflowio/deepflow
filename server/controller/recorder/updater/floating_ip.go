@@ -21,21 +21,22 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type FloatingIP struct {
-	UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *cache.FloatingIP]
+	UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *diffbase.FloatingIP]
 }
 
 func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *FloatingIP {
 	updater := &FloatingIP{
-		UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *cache.FloatingIP]{
+		UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *diffbase.FloatingIP]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewFloatingIP(),
-			diffBaseData: wholeCache.FloatingIPs,
+			diffBaseData: wholeCache.DiffBaseDataSet.FloatingIPs,
 			cloudData:    cloudData,
 		},
 	}
@@ -43,13 +44,13 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 	return updater
 }
 
-func (f *FloatingIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.FloatingIP) (diffBase *cache.FloatingIP, exists bool) {
+func (f *FloatingIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.FloatingIP) (diffBase *diffbase.FloatingIP, exists bool) {
 	diffBase, exists = f.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
 func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mysql.FloatingIP, bool) {
-	networkID, exists := f.cache.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+	networkID, exists := f.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
@@ -57,7 +58,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 		))
 		return nil, false
 	}
-	vmID, exists := f.cache.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := f.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -65,7 +66,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 		))
 		return nil, false
 	}
-	vpcID, exists := f.cache.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -92,7 +93,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 	return dbItem, true
 }
 
-func (f *FloatingIP) generateUpdateInfo(diffBase *cache.FloatingIP, cloudItem *cloudmodel.FloatingIP) (map[string]interface{}, bool) {
+func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

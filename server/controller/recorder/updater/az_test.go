@@ -24,6 +24,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 func newCloudAZ() cloudmodel.AZ {
@@ -46,7 +47,7 @@ func (t *SuiteTest) getAZMock(mockDB bool) (*cache.Cache, cloudmodel.AZ) {
 		dbItem.Lcuuid = cloudItem.Lcuuid
 		dbItem.Name = cloudItem.Name
 		t.db.Create(dbItem)
-		wholeCache.AZs[cloudItem.Lcuuid] = &cache.AZ{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+		wholeCache.DiffBaseDataSet.AZs[cloudItem.Lcuuid] = &diffbase.AZ{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
 	wholeCache.SetSequence(wholeCache.GetSequence() + 1)
@@ -56,7 +57,7 @@ func (t *SuiteTest) getAZMock(mockDB bool) (*cache.Cache, cloudmodel.AZ) {
 
 func (t *SuiteTest) TestHandleAddAZSucess() {
 	cache, cloudItem := t.getAZMock(false)
-	assert.Equal(t.T(), len(cache.AZs), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.AZs), 0)
 
 	updater := NewAZ(cache, []cloudmodel.AZ{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -64,7 +65,7 @@ func (t *SuiteTest) TestHandleAddAZSucess() {
 	var addedItem *mysql.AZ
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.AZs), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.AZs), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
 }
@@ -80,7 +81,7 @@ func (t *SuiteTest) TestHandleUpdateAZSucess() {
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Name, cloudItem.Name)
-	assert.Equal(t.T(), cache.AZs[cloudItem.Lcuuid].Name, cloudItem.Name)
+	assert.Equal(t.T(), cache.DiffBaseDataSet.AZs[cloudItem.Lcuuid].Name, cloudItem.Name)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
 }

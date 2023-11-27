@@ -24,20 +24,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodNamespace struct {
-	UpdaterBase[cloudmodel.PodNamespace, mysql.PodNamespace, *cache.PodNamespace]
+	UpdaterBase[cloudmodel.PodNamespace, mysql.PodNamespace, *diffbase.PodNamespace]
 }
 
 func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespace) *PodNamespace {
 	updater := &PodNamespace{
-		UpdaterBase[cloudmodel.PodNamespace, mysql.PodNamespace, *cache.PodNamespace]{
+		UpdaterBase[cloudmodel.PodNamespace, mysql.PodNamespace, *diffbase.PodNamespace]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodNamespace(),
-			diffBaseData: wholeCache.PodNamespaces,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodNamespaces,
 			cloudData:    cloudData,
 		},
 	}
@@ -45,7 +46,7 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 	return updater
 }
 
-func (n *PodNamespace) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNamespace) (diffBase *cache.PodNamespace, exists bool) {
+func (n *PodNamespace) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNamespace) (diffBase *diffbase.PodNamespace, exists bool) {
 	diffBase, exists = n.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -72,7 +73,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	return dbItem, true
 }
 
-func (n *PodNamespace) generateUpdateInfo(diffBase *cache.PodNamespace, cloudItem *cloudmodel.PodNamespace) (map[string]interface{}, bool) {
+func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid

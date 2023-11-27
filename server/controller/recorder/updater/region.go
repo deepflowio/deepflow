@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type Region struct {
-	UpdaterBase[cloudmodel.Region, mysql.Region, *cache.Region]
+	UpdaterBase[cloudmodel.Region, mysql.Region, *diffbase.Region]
 }
 
 func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 	updater := &Region{
-		UpdaterBase[cloudmodel.Region, mysql.Region, *cache.Region]{
+		UpdaterBase[cloudmodel.Region, mysql.Region, *diffbase.Region]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRegion(),
-			diffBaseData: wholeCache.Regions,
+			diffBaseData: wholeCache.DiffBaseDataSet.Regions,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 	return updater
 }
 
-func (r *Region) getDiffBaseByCloudItem(cloudItem *cloudmodel.Region) (diffBase *cache.Region, exists bool) {
+func (r *Region) getDiffBaseByCloudItem(cloudItem *cloudmodel.Region) (diffBase *diffbase.Region, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -56,7 +57,7 @@ func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*mysql.Regio
 	return dbItem, true
 }
 
-func (r *Region) generateUpdateInfo(diffBase *cache.Region, cloudItem *cloudmodel.Region) (map[string]interface{}, bool) {
+func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type DHCPPort struct {
-	UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]
+	UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *diffbase.DHCPPort]
 }
 
 func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
 	updater := &DHCPPort{
-		UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]{
+		UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *diffbase.DHCPPort]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewDHCPPort(),
-			diffBaseData: wholeCache.DHCPPorts,
+			diffBaseData: wholeCache.DiffBaseDataSet.DHCPPorts,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,12 +43,12 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 	return updater
 }
 
-func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffBase *cache.DHCPPort, exists bool) {
+func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffBase *diffbase.DHCPPort, exists bool) {
 	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
-func (p *DHCPPort) generateUpdateInfo(diffBase *cache.DHCPPort, cloudItem *cloudmodel.DHCPPort) (map[string]interface{}, bool) {
+func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
