@@ -554,9 +554,7 @@ pub struct L7PerfStats {
     pub rrt_count: u32, // u32可记录40000M时延, 一条流在一分钟内的请求数远无法达到此数值
     pub rrt_sum: u64,   // us RRT(Request Response Time)
     pub rrt_max: u32,   // us agent保证在3600s以内
-    pub tls_rtt_count: u32,
-    pub tls_rtt_sum: u64,
-    pub tls_rtt_max: u32,
+    pub tls_rtt: u32,
 }
 
 impl L7PerfStats {
@@ -571,11 +569,7 @@ impl L7PerfStats {
         if self.rrt_max < other.rrt_max {
             self.rrt_max = other.rrt_max
         }
-        self.tls_rtt_count += other.tls_rtt_count;
-        self.tls_rtt_sum += other.tls_rtt_sum;
-        if self.tls_rtt_max < other.tls_rtt_max {
-            self.tls_rtt_max = other.tls_rtt_max
-        }
+        self.tls_rtt += other.tls_rtt;
     }
 
     pub fn merge_perf(
@@ -598,9 +592,7 @@ impl L7PerfStats {
             self.rrt_count += 1;
         }
         if tls_rtt != 0 {
-            self.tls_rtt_max = self.tls_rtt_max.max(tls_rtt as u32);
-            self.tls_rtt_sum += tls_rtt;
-            self.tls_rtt_count += 1;
+            self.tls_rtt += tls_rtt as u32;
         }
     }
 
@@ -640,9 +632,7 @@ impl From<L7PerfStats> for flow_log::L7PerfStats {
             rrt_count: p.rrt_count,
             rrt_sum: p.rrt_sum,
             rrt_max: p.rrt_max,
-            tls_rtt_count: p.tls_rtt_count,
-            tls_rtt_sum: p.tls_rtt_sum,
-            tls_rtt_max: p.tls_rtt_max,
+            tls_rtt: p.tls_rtt,
         }
     }
 }

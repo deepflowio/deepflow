@@ -164,9 +164,7 @@ message L7PerfStats {
     uint32 rrt_count = 6;
     uint64 rrt_sum = 7;
     uint32 rrt_max = 8;
-    uint32 tls_rtt_count = 9;
-    uint64 tls_rtt_sum = 10;
-    uint32 tls_rtt_max = 11;
+    uint32 tls_rtt = 9;
 }
 
 message L7Request {

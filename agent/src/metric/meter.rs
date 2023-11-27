@@ -283,7 +283,6 @@ impl From<Latency> for metric::Latency {
             art_max: m.art_max,
             rrt_max: m.rrt_max,
             cit_max: m.cit_max,
-            tls_rtt_max: m.tls_rtt_max,
 
             rtt_sum: m.rtt_sum,
             rtt_client_sum: m.rtt_client_sum,
@@ -292,7 +291,6 @@ impl From<Latency> for metric::Latency {
             art_sum: m.art_sum,
             rrt_sum: m.rrt_sum,
             cit_sum: m.cit_sum,
-            tls_rtt_sum: m.tls_rtt_sum,
 
             rtt_count: m.rtt_count,
             rtt_client_count: m.rtt_client_count,
@@ -301,7 +299,6 @@ impl From<Latency> for metric::Latency {
             art_count: m.art_count,
             rrt_count: m.rrt_count,
             cit_count: m.cit_count,
-            tls_rtt_count: m.tls_rtt_count,
         }
     }
 }
