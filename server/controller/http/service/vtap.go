@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	vtapop "github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
@@ -280,6 +281,7 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 	}
 
 	response, _ := GetVtaps(map[string]interface{}{"lcuuid": vtap.Lcuuid})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
