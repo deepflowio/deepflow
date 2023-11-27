@@ -64,6 +64,7 @@ static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
+static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
 
 /*
@@ -177,7 +178,14 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	if (pid > 0) {
 		len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
 		ptr = (char *)sym->demangle_name;
-		ptr = create_symbol_str(len, ptr, u_sym_prefix);
+		char *u_prefix = (char *)u_sym_prefix;
+		if (sym->module != NULL && strlen(sym->module) > 0) {
+			if (strstr(sym->module, ".so")) {
+				len += strlen(lib_sym_prefix);
+				u_prefix = (char *)lib_sym_prefix;
+			}
+		}
+		ptr = create_symbol_str(len, ptr, (char *)u_prefix);
 		bcc_symbol_free_demangle_name(sym);
 	} else if (pid == 0) {
 		len = strlen(sym->name) + strlen(k_sym_prefix);
@@ -246,7 +254,7 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, u64 address,
 	 * will simply return '[unknown]' string.
 	 */
 resolver_err:
-	snprintf(format_str, sizeof(format_str), "[unknown]");
+	snprintf(format_str, sizeof(format_str), "[unknown] 0x%016lx", address);
 	len = strlen(format_str);
 	ptr = create_symbol_str(len, format_str, "");
 
@@ -446,18 +454,22 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
 	if (!new_cache) {
-		len += (TASK_COMM_LEN * 2);
+		char tag[5];
+		len += (TASK_COMM_LEN * 2) + sizeof(tag) * 2;
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
 
+		snprintf(tag, sizeof(tag), "%s ",
+			 v->pid == v->tgid ? "[p]" : "[t]");
 		if (process_name)
-			snprintf(trace_str, len, "%s;%s", process_name,
-				 v->comm);
+			snprintf(trace_str, len, "[p]%s;%s%s", process_name,
+				 tag, v->comm);
 		else
-			snprintf(trace_str, len, "%s;%s", v->comm, v->comm);
+			snprintf(trace_str, len, "%s%s;%s%s", tag, v->comm, tag,
+				 v->comm);
 
 		return trace_str;
 	}
