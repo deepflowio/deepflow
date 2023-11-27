@@ -175,6 +175,9 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		return function
 	}
 	function := view.GetFunc(f.Name)
+	if f.Name == view.FUNCTION_AVG {
+		function = view.GetFunc(view.FUNCTION_COUNTER_AVG)
+	}
 	function.SetFields(fields)
 	function.SetFlag(view.METRICS_FLAG_OUTER)
 	function.SetTime(m.Time)
