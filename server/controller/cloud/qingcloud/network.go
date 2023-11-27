@@ -174,7 +174,7 @@ func (q *QingCloud) getSelfMgmtNetworkInfo(regionId, vxnetId string) (string, st
 	for _, ins := range insResponse {
 		for j := range ins.MustArray() {
 			networkIns := ins.GetIndex(j)
-			routerId := networkIns.Get("instance_name").MustString()
+			routerId = networkIns.Get("instance_name").MustString()
 			if routerId == "" {
 				continue
 			}
