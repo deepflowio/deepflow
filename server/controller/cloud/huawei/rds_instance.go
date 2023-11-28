@@ -31,6 +31,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 		"MySQL":      common.RDS_TYPE_MYSQL,
 		"SQLServer":  common.RDS_TYPE_SQL_SERVER,
 		"PostgreSQL": common.RDS_TYPE_PSQL,
+		"MariaDB":    common.RDS_TYPE_MARIADB,
 	}
 
 	stateStrToInt := map[string]int{
@@ -48,7 +49,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 	var ips []model.IP
 	for project, token := range h.projectTokenMap {
 		jRDSs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://rds.%s.%s/v3/%s/instances", project.name, h.config.Domain, h.config.ProjectID), token.token, "instances", true,
+			fmt.Sprintf("https://rds.%s.%s/v3/%s/instances", project.name, h.config.Domain, project.id), token.token, "instances", pageQueryMethodOffset,
 		))
 		if err != nil {
 			return nil, nil, nil, err

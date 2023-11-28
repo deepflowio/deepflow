@@ -32,7 +32,7 @@ func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGro
 	var sgRules []model.SecurityGroupRule
 	for project, token := range h.projectTokenMap {
 		jSecurityGroups, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/security-groups", project.name, h.config.Domain, project.id), token.token, "security_groups", true,
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/security-groups", project.name, h.config.Domain, project.id), token.token, "security_groups", pageQueryMethodMarker,
 		))
 		if err != nil {
 			return nil, nil, err

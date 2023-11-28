@@ -41,7 +41,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 		// 华为云官方文档：
 		// 云服务器的标签列表。微版本2.26及以上版本支持，如果不使用微版本查询，响应中无tags字段。
 		jVMs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers", true,
+			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers", pageQueryMethodMarker,
 		).addHeader("X-OpenStack-Nova-API-Version", "2.26"))
 		if err != nil {
 			return nil, nil, nil, nil, err
