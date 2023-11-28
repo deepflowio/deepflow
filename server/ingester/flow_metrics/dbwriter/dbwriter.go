@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	logging "github.com/op/go-logging"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/gogo/protobuf/proto"
 )
 
 var log = logging.MustGetLogger("flow_metrics.dbwriter")
