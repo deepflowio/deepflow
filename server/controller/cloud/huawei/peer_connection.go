@@ -27,7 +27,7 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 	var pns []model.PeerConnection
 	for project, token := range h.projectTokenMap {
 		jpns, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/peerings", project.name, h.config.Domain), token.token, "peerings", true,
+			fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/peerings", project.name, h.config.Domain), token.token, "peerings", pageQueryMethodMarker,
 		))
 		if err != nil {
 			return nil, err
