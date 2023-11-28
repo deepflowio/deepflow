@@ -1573,6 +1573,7 @@ func parseUint(s string, base int, bitSize int) (uint64, error) {
 	return strconv.ParseUint(s, base, bitSize)
 }
 
+// EncodeTagToPromLabels 将 Tag 编码成 prom Label
 func EncodeTagToPromLabels(tag *Tag) []prompb.Label {
 	if tag == nil {
 		return nil

@@ -22,12 +22,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/gopacket/layers"
+
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
-	"github.com/google/gopacket/layers"
 )
 
 const (
@@ -329,6 +330,7 @@ func (t *MiniTag) Release() {
 	ReleaseMiniTag(t)
 }
 
+// EncodeMiniTagToPromLabels 将 MiniTag 转换成 prom Label
 func EncodeMiniTagToPromLabels(tag *MiniTag) []prompb.Label {
 	if tag == nil {
 		return nil

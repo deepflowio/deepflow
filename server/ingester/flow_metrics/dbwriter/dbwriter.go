@@ -113,6 +113,7 @@ func (w *CkDbWriter) Close() {
 	}
 }
 
+// PromWriter 是 prom remotewrite 的 db.Writer 实现，负责将 metrics 数据推送给到服务端
 type PromWriter struct {
 	ctx    context.Context
 	cancel context.CancelFunc
