@@ -22,12 +22,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gopacket/layers"
-
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
+	"github.com/google/gopacket/layers"
 )
 
 const (
@@ -327,4 +327,27 @@ func (t *MiniTag) Clone() Tagger {
 
 func (t *MiniTag) Release() {
 	ReleaseMiniTag(t)
+}
+
+func EncodeMiniTagToPromLabels(tag *MiniTag) []prompb.Label {
+	if tag == nil {
+		return nil
+	}
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := tag.MarshalTo(buffer)
+	return encodePromLabels(buffer[:size])
+}
+
+func encodePromLabels(b []byte) []prompb.Label {
+	s := string(b)
+	n := strings.Count(s, ",")
+	labels := make([]prompb.Label, 0, n+1)
+	for _, part := range strings.Split(s, ",") {
+		kv := strings.Split(part, "=")
+		if len(kv) != 2 {
+			continue
+		}
+		labels = append(labels, prompb.Label{Name: kv[0], Value: kv[1]})
+	}
+	return labels
 }

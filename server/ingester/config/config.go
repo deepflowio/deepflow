@@ -108,6 +108,16 @@ type CKWriterConfig struct {
 	FlushTimeout int `yaml:"flush-timeout"`
 }
 
+type PromWriterConfig struct {
+	Enabled       bool              `yaml:"enabled"`
+	Endpoint      string            `yaml:"endpoint"`
+	Headers       map[string]string `yaml:"headers"`
+	BatchSize     int               `yaml:"batch-size"`
+	FlushTimeout  int               `yaml:"flush-timeout"`
+	Concurrency   int               `yaml:"concurrency"`
+	MetricsFilter []string          `yaml:"metrics-filter"`
+}
+
 type CKDB struct {
 	External            bool   `yaml:"external"`
 	Host                string `yaml:"host"`
