@@ -319,6 +319,7 @@ func EncodeTSDBRow(encoder *codec.SimpleEncoder, timestamp uint64, columnValues 
 	encoder.Bytes()[offset] = l
 }
 
+// EncodeCustomTagToPromLabels 将 CustomTag 编码成 prom Label
 func EncodeCustomTagToPromLabels(tag *CustomTag) []prompb.Label {
 	if tag == nil {
 		return nil

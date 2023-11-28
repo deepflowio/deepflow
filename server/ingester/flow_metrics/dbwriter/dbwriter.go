@@ -44,6 +44,7 @@ const (
 	metricsFilterApp = "app"
 )
 
+// DbWriter 指标数据写入的接口定义
 type DbWriter interface {
 	Put(items ...interface{}) error
 	Close()
