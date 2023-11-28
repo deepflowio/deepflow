@@ -367,11 +367,11 @@ type AdditionalResourceVPC struct {
 
 type AdditionalResourceSubnet struct {
 	Name       string   `json:"name" yaml:"name" binding:"required"`
-	UUID       string   `json:"uuid" yaml:"uuid" binding:"required"`
+	UUID       string   `json:"uuid,omitempty" yaml:"uuid" binding:"required"`
 	IsVIP      bool     `json:"is_vip" yaml:"is_vip"`
 	Type       int      `json:"type" yaml:"type"`
 	VPCUUID    string   `json:"vpc_uuid" yaml:"vpc_uuid" binding:"required"`
-	AZUUID     string   `json:"az_uuid" yaml:"az_uuid"`
+	AZUUID     string   `json:"az_uuid,omitempty" yaml:"az_uuid"`
 	DomainUUID string   `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
 	CIDRs      []string `json:"cidrs" yaml:"cidrs"`
 }
@@ -399,7 +399,7 @@ type AdditionalResourceChost struct {
 
 type AdditionalResourceVInterface struct {
 	SubnetUUID string   `json:"subnet_uuid" yaml:"subnet_uuid"`
-	Name       string   `json:"name" yaml:"name"`
+	Name       string   `json:"name,omitempty" yaml:"name"`
 	Mac        string   `json:"mac" yaml:"mac" binding:"required"`
 	IPs        []string `json:"ips" yaml:"ips"`
 }

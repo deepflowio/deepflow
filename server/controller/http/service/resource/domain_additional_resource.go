@@ -506,6 +506,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					VPCLcuuid:    subnet.VPCUUID,
 					AZLcuuid:     subnet.AZUUID,
 					RegionLcuuid: toolDS.regionUUID,
+					IsVIP:        subnet.IsVIP,
 				},
 			)
 			for _, cidr := range subnet.CIDRs {
