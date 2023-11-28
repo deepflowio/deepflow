@@ -56,6 +56,7 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain)
 
 	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
+	e.GET("/v1/domain-additional-resources/", listDomainAddtionalResource)
 }
 
 func getDomain(c *gin.Context) {
@@ -241,4 +242,23 @@ func applyDomainAddtionalResource(c *gin.Context) {
 
 	err = resource.ApplyDomainAddtionalResource(data)
 	common.JsonResponse(c, map[string]interface{}{}, err)
+}
+
+func listDomainAddtionalResource(c *gin.Context) {
+	var resourceType, resourceName string
+	t, ok := c.GetQuery("type")
+	if ok {
+		resourceType = t
+	}
+	name, ok := c.GetQuery("name")
+	if ok {
+		resourceName = name
+	}
+	if resourceName != "" && resourceType == "" {
+		common.JsonResponse(c, httpcommon.PARAMETER_ILLEGAL, fmt.Errorf("please enter resource type, resource name(%v)", resourceName))
+		return
+	}
+
+	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName)
+	common.JsonResponse(c, data, err)
 }
