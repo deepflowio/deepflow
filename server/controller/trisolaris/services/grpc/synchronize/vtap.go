@@ -558,11 +558,11 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			configInfo = &api.Config{
 				MaxEscapeSeconds: proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
 				MaxMemory:        proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
+				PlatformEnabled:  proto.Bool(true),
 			}
 		}
 		configInfo.Enabled = proto.Bool(false)
 		configInfo.TridentType = &tridentType
-		configInfo.PlatformEnabled = proto.Bool(true)
 
 		return &api.SyncResponse{
 			Status: &STATUS_SUCCESS,
