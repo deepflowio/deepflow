@@ -257,6 +257,10 @@ var (
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
+		input:  "SELECT time(time,120,1,0,30) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
+		output: "WITH toStartOfInterval(time-30, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) + 30 AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_system",
+	}, {
 		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
 		output: "SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1",
 	}, {
