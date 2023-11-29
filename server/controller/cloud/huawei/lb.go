@@ -31,7 +31,7 @@ func (h *HuaWei) getLBs() (
 	requiredAttrs := []string{"id", "name", "vip_port_id", "vip_subnet_id", "vip_address"}
 	for project, token := range h.projectTokenMap {
 		jLBs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.Domain), token.token, "loadbalancers", true,
+			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.Domain), token.token, "loadbalancers", pageQueryMethodMarker,
 		))
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
@@ -118,7 +118,7 @@ func (h *HuaWei) getLBs() (
 
 func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbListeners []model.LBListener, lbTargetSevers []model.LBTargetServer, err error) {
 	jLs, err := h.getRawData(newRawDataGetContext(
-		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.Domain), token, "listeners", true,
+		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.Domain), token, "listeners", pageQueryMethodMarker,
 	))
 	if err != nil {
 		return nil, nil, err
@@ -171,7 +171,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		poolID, ok := jL.CheckGet("default_pool_id")
 		if ok && poolID.MustString() != "" {
 			jTSs, err := h.getRawData(newRawDataGetContext(
-				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.Domain, poolID.MustString()), token, "members", true,
+				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.Domain, poolID.MustString()), token, "members", pageQueryMethodMarker,
 			))
 			if err != nil {
 				return nil, nil, err

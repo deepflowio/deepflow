@@ -35,7 +35,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 	var ips []model.IP
 	for project, token := range h.projectTokenMap {
 		jRs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://dcs.%s.%s/v2/%s/instances", project.name, h.config.Domain, h.config.ProjectID), token.token, "instances", true,
+			fmt.Sprintf("https://dcs.%s.%s/v2/%s/instances", project.name, h.config.Domain, project.id), token.token, "instances", pageQueryMethodOffset,
 		))
 		if err != nil {
 			return nil, nil, nil, err
@@ -44,7 +44,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jRs {
 			jRedis := jRs[i]
-			if !cloudcommon.CheckJsonAttributes(jRedis, []string{"instance_id", "name", "status", "engine_version", "nodes", "datastore"}) {
+			if !cloudcommon.CheckJsonAttributes(jRedis, []string{"instance_id", "name", "status", "az_codes", "engine_version", "vpc_id", "subnet_id", "ip", "publicip_address"}) {
 				continue
 			}
 			id := jRedis.Get("instance_id").MustString()
