@@ -16,6 +16,10 @@
 
 package tag
 
+import (
+	"strings"
+)
+
 type Tag struct {
 	TagTranslator         string            // 对tag进行翻译或转换
 	NotNullFilter         string            // 资源非空过滤
@@ -34,6 +38,7 @@ func NewTag(tagTranslator, notNullFilter, whereTranslator, whereRegexpTranslator
 }
 
 func GetTag(name, db, table, function string) (*Tag, bool) {
+	name = strings.Trim(name, "`")
 	tag, ok := TagResoureMap[name][function]
 	return tag, ok
 }
