@@ -1076,9 +1076,6 @@ vtap_group_id: g-xxxxxx
     ## Default: false
     #disabled: false
 
-    ## Log file
-    #log-file: ""
-
     ## Regex for Process Name
     ## Note: The name of the process where each feature of ebpf uprobe takes effect,
     ##   which is configured using regular expressions
