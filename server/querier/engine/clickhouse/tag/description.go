@@ -227,6 +227,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 			if tagName != "" {
 				for _, suffix := range []string{"", "_0", "_1"} {
 					tagFields := AutoCustomTag.TagFields
+					if !slices.Contains(tagFields, "ip") && tagFields[len(tagFields)-1] != "ip" {
+						tagFields = append(tagFields, "ip")
+					}
 					if len(tagFields) != 0 {
 						var selectPrefixTranslator string
 						var nodeTypeTranslator string
@@ -286,8 +289,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = "autoTypeSuffix"
 									selectPrefixTranslator = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
-									iconIDPrefixTranslator := "if(" + iconIDStrSuffix + ")!=0"
-									nodeTypePrefixTranslator := "if(" + nodeTypeStrSuffix + ")!=''"
+									iconIDPrefixTranslator := iconIDStrSuffix + "!=0"
+									nodeTypePrefixTranslator := nodeTypeStrSuffix + "!=''"
 									iconIDTranslator = fmt.Sprintf("%s, %s", iconIDPrefixTranslator, iconIDStrSuffix)
 									nodeTypeTranslator = fmt.Sprintf("%s, %s", nodeTypePrefixTranslator, nodeTypeStrSuffix)
 								case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress":
@@ -372,7 +375,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = diviceIDTranslator
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s)))", deviceType, deviceIDSuffix)
-										selectPrefixTranslator = fmt.Sprintf("(%s!=0 OR %s!=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
+										selectPrefixTranslator = fmt.Sprintf("(%s!=0 AND %s=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
 										iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", selectPrefixTranslator, deviceType, deviceIDSuffix)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 									}
@@ -383,7 +386,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									tagValueName := tagValue + suffix
 									ip4Suffix := "ip4" + suffix
 									ip6Suffix := "ip6" + suffix
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)))", selectPrefixTranslator, ip4Suffix, ip6Suffix)
+									ipTagTranslator := fmt.Sprintf("IF(%s, '', if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)))", selectPrefixTranslator, ip4Suffix, ip6Suffix)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = ipTagTranslator
+									iconIDTranslator += fmt.Sprintf(", %s, %s", ipTagTranslator+"!=''", "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))")
+									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", ipTagTranslator+"!=''", tagValue)
 								case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
 									tagAutoIDSuffix := tagValue + "_id" + suffix
 									tagAutoTypeSuffix := tagValue + "_type" + suffix
@@ -407,8 +413,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagIDSelectFilterStr)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagNameSelectFilterStr)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, autoTypeSuffix)
-									iconIDPrefixTranslator := selectPrefixTranslator + " OR (" + iconIDStrSuffix + ")!=0"
-									nodeTypePrefixTranslator := selectPrefixTranslator + " OR (" + nodeTypeStrSuffix + ")!=''"
+									iconIDPrefixTranslator := iconIDStrSuffix + "!=0"
+									nodeTypePrefixTranslator := nodeTypeStrSuffix + "!=''"
 									selectPrefixTranslator += " OR if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
 									iconIDTranslator += fmt.Sprintf(", %s, %s", iconIDPrefixTranslator, iconIDStrSuffix)
 									nodeTypeTranslator += fmt.Sprintf(", %s, %s", nodeTypePrefixTranslator, nodeTypeStrSuffix)
@@ -499,7 +505,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, diviceIDTranslator)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s) )))", selectPrefixTranslator, deviceType, deviceIDSuffix)
-										selectPrefixTranslator += fmt.Sprintf(" OR (%s!=0 OR %s!=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
+										selectPrefixTranslator += fmt.Sprintf(" OR (%s!=0 AND %s=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
 										iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", deviceIDSuffix+"!=0", deviceType, deviceIDSuffix)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", deviceIDSuffix+"!=0", tagValue)
 									}
