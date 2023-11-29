@@ -185,9 +185,9 @@ impl<'a> Iterator for L7ProtocolCheckerIterator<'a> {
     }
 }
 
-pub struct FlowLog {
+pub struct FlowLog<'a> {
     l4: Option<Box<L4FlowPerfTable>>,
-    l7_protocol_log_parser: Option<Box<L7ProtocolParser>>,
+    l7_protocol_log_parser: Option<Box<L7ProtocolParser<'a>>>,
     // use for cache previous log info, use for calculate rrt
     perf_cache: Rc<RefCell<L7PerfCache>>,
     l7_protocol_enum: L7ProtocolEnum,
@@ -215,7 +215,7 @@ pub struct FlowLog {
     ntp_diff: Arc<AtomicI64>,
 }
 
-impl FlowLog {
+impl FlowLog<'_> {
     const PROTOCOL_CHECK_LIMIT: usize = 5;
 
     // if flow parse fail exceed l7_protocol_inference_max_fail_count and time exceed l7_protocol_inference_ttl,

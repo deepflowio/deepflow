@@ -76,13 +76,13 @@ macro_rules! count {
 macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
         #[enum_dispatch(L7ProtocolParserInterface)]
-        pub enum $name {
+        pub enum $name<'a> {
             Custom(CustomWrapLog),
-            Http(HttpLog),
+            Http(HttpLog<'a>),
             $($proto($log_type)),*
         }
 
-        impl L7ProtocolParser {
+        impl L7ProtocolParser<'_> {
             pub fn as_str(&self) -> &'static str {
                 match self {
                     Self::Http(p) => {
@@ -100,7 +100,7 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        impl TryFrom<&str> for L7ProtocolParser {
+        impl TryFrom<&str> for L7ProtocolParser<'_> {
             type Error = String;
 
             fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -116,7 +116,7 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser> {
+        pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser<'static>> {
             match p {
                 L7ProtocolEnum::L7Protocol(p) => match p {
                     L7Protocol::Http1 => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
@@ -135,7 +135,7 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        pub fn get_all_protocol() -> [L7ProtocolParser; 3 + count!($($proto)*)] {
+        pub fn get_all_protocol() -> [L7ProtocolParser<'static>; 3 + count!($($proto)*)] {
             [
                 L7ProtocolParser::Custom(Default::default()),
                 L7ProtocolParser::Http(HttpLog::new_v1()),

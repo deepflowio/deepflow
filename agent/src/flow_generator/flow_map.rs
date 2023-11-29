@@ -111,7 +111,7 @@ pub struct Config<'a> {
 }
 
 // not thread-safe
-pub struct FlowMap {
+pub struct FlowMap<'a> {
     // The original std HashMap uses SipHash-1-3 and is slow.
     // Use ahash for better performance.
     //
@@ -119,7 +119,7 @@ pub struct FlowMap {
     //
     // Strangely, using AES reduces performance.
     node_map: Option<(
-        AHashMap<FlowMapKey, Vec<Box<FlowNode>>>,
+        AHashMap<FlowMapKey, Vec<Box<FlowNode<'a>>>>,
         Vec<HashSet<FlowMapKey>>,
     )>,
     id: u32,
@@ -163,10 +163,10 @@ pub struct FlowMap {
     so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
-    flow_node_pool: MemoryPool<FlowNode>,
+    flow_node_pool: MemoryPool<FlowNode<'a>>,
 }
 
-impl FlowMap {
+impl<'a> FlowMap<'a> {
     pub fn new(
         id: u32,
         output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
@@ -688,7 +688,12 @@ impl FlowMap {
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
-    fn append_to_block(&self, config: &FlowConfig, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn append_to_block(
+        &self,
+        config: &FlowConfig,
+        node: &mut FlowNode<'a>,
+        meta_packet: &MetaPacket,
+    ) {
         const MINUTE: u64 = 60;
         let packet_sequence_start_time = node.tagged_flow.flow.start_time_in_minute();
         if node.packet_sequence_block.is_some() {
@@ -741,7 +746,7 @@ impl FlowMap {
     fn update_tcp_node(
         &mut self,
         config: &Config,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         let flow_config = config.flow;
@@ -781,7 +786,7 @@ impl FlowMap {
     fn update_udp_node(
         &mut self,
         config: &Config,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         let flow_config = config.flow;
@@ -818,7 +823,7 @@ impl FlowMap {
     fn update_other_node(
         &mut self,
         config: &Config,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         self.update_flow(config, node, meta_packet);
@@ -845,7 +850,7 @@ impl FlowMap {
         &mut self,
         config: &Config,
         meta_packet: &mut MetaPacket,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
     ) -> bool {
         let flow_config = config.flow;
         let direction = meta_packet.lookup_key.direction;
@@ -889,7 +894,7 @@ impl FlowMap {
     //      1.payloadLen为0/1
     //      2.非FIN、SYN、RST
     //      3.TCP保活探测报文序列号(Seq)为前一个TCP报文序列号(Seq)减一
-    fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode<'a>, meta_packet: &MetaPacket) {
         // 保存TCP Seq用于TCP Keepalive报文判断
 
         let (next_tcp_seq0, next_tcp_seq1) = (node.next_tcp_seq0, node.next_tcp_seq1);
@@ -924,7 +929,7 @@ impl FlowMap {
         }
     }
 
-    fn update_syn_or_syn_ack_seq(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn update_syn_or_syn_ack_seq(&mut self, node: &mut FlowNode<'a>, meta_packet: &mut MetaPacket) {
         let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
             tcp_data
         } else {
@@ -942,7 +947,7 @@ impl FlowMap {
     pub(super) fn update_flow_state_machine(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         flags: TcpFlags,
         direction: PacketDirection,
     ) -> bool {
@@ -1020,7 +1025,7 @@ impl FlowMap {
         }
     }
 
-    fn init_flow(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
+    fn init_flow(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode<'a>> {
         let flow_config = config.flow;
 
         let mut tagged_flow = TaggedFlow::default();
@@ -1263,7 +1268,12 @@ impl FlowMap {
 
     // suppress warning under windows
     #[allow(unused_variables)]
-    fn update_flow(&mut self, config: &Config, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn update_flow(
+        &mut self,
+        config: &Config,
+        node: &mut FlowNode<'a>,
+        meta_packet: &mut MetaPacket,
+    ) {
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
         let flow = &mut node.tagged_flow.flow;
         if pkt_timestamp > node.recent_time {
@@ -1420,7 +1430,7 @@ impl FlowMap {
 
     fn collect_l7_stats(
         &mut self,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &MetaPacket,
         new_endpoint: Option<String>,
     ) {
@@ -1476,7 +1486,7 @@ impl FlowMap {
     fn collect_metric(
         &mut self,
         config: &Config,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         is_first_packet: bool,
@@ -1539,7 +1549,7 @@ impl FlowMap {
         }
     }
 
-    fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
+    fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode<'a>> {
         let flow_config = &config.flow;
         let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
@@ -1595,7 +1605,7 @@ impl FlowMap {
         node
     }
 
-    fn new_udp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
+    fn new_udp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode<'a>> {
         let flow_config = config.flow;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
@@ -1616,7 +1626,11 @@ impl FlowMap {
         node
     }
 
-    fn new_other_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
+    fn new_other_node(
+        &mut self,
+        config: &Config,
+        meta_packet: &mut MetaPacket,
+    ) -> Box<FlowNode<'a>> {
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.second_in_minute =
@@ -1634,7 +1648,7 @@ impl FlowMap {
         &mut self,
         config: &Config,
         meta_packet: &mut MetaPacket,
-    ) -> Option<Box<FlowNode>> {
+    ) -> Option<Box<FlowNode<'a>>> {
         // To avoid using each package to query policies that may lead to CPU increase and performance decrease,
         // there will not be use config.capacity to limit the addition of FlowNode
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
@@ -1712,7 +1726,7 @@ impl FlowMap {
     fn node_removed_aftercare(
         &mut self,
         config: &FlowConfig,
-        mut node: Box<FlowNode>,
+        mut node: Box<FlowNode<'a>>,
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
@@ -1796,7 +1810,7 @@ impl FlowMap {
     fn node_updated_aftercare(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         timestamp: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
@@ -1860,7 +1874,7 @@ impl FlowMap {
     fn write_to_app_proto_log(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
     ) {
@@ -1892,7 +1906,7 @@ impl FlowMap {
     fn update_l4_direction(
         &mut self,
         meta_packet: &mut MetaPacket,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         is_first_packet: bool,
     ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
@@ -1955,7 +1969,7 @@ impl FlowMap {
 
     // just for ebpf, tcp flow.is_active_service is always true,
     // but udp flow.is_active_service still needs to continue to judge.
-    fn update_udp_is_active(&mut self, node: &mut FlowNode, direction: PacketDirection) {
+    fn update_udp_is_active(&mut self, node: &mut FlowNode<'a>, direction: PacketDirection) {
         // If it is already an active service, we do not need to continue to query.
         if !node.tagged_flow.flow.is_active_service {
             let flow_key = &node.tagged_flow.flow.flow_key;
@@ -1979,7 +1993,11 @@ impl FlowMap {
         }
     }
 
-    fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
+    fn update_flow_direction(
+        &mut self,
+        node: &mut FlowNode<'a>,
+        meta_packet: Option<&mut MetaPacket>,
+    ) {
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // The direction of eBPF Flow is determined when FlowPerf::l7_parse is called for the
             // first time, and no further correction is required.
@@ -2030,7 +2048,7 @@ impl FlowMap {
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(flow_dst_score);
     }
 
-    fn reverse_flow(node: &mut FlowNode, is_first_packet: bool) {
+    fn reverse_flow(node: &mut FlowNode<'a>, is_first_packet: bool) {
         node.policy_in_tick.swap(0, 1);
         node.policy_data_cache.swap(0, 1);
         if let Some(ep) = node.endpoint_data_cache.as_mut() {
@@ -2049,7 +2067,7 @@ impl FlowMap {
 
     fn rectify_flow_direction(
         &mut self,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
         is_first_packet: bool,
     ) {
@@ -2084,7 +2102,7 @@ impl FlowMap {
 
     fn update_endpoint_and_policy_data(
         &mut self,
-        node: &mut FlowNode,
+        node: &mut FlowNode<'a>,
         meta_packet: &mut MetaPacket,
     ) {
         // update endpoint
@@ -2262,7 +2280,11 @@ pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
-) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
+) -> (
+    ModuleConfig,
+    FlowMap<'static>,
+    Receiver<Arc<BatchedBox<TaggedFlow>>>,
+) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -2378,7 +2400,7 @@ mod tests {
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
 
-    impl FlowMap {
+    impl FlowMap<'_> {
         fn reset_start_time(&mut self, d: Duration) {
             self.start_time = d;
             self.start_time_in_unit = (d.as_nanos() / TIME_UNIT.as_nanos()) as u64;

@@ -115,7 +115,7 @@ impl FlowMapKey {
 }
 
 #[derive(Default)]
-pub struct FlowNode {
+pub struct FlowNode<'a> {
     pub tagged_flow: TaggedFlow,
     pub min_arrived_time: Timestamp,
     // 最近一个Packet的时间戳
@@ -125,7 +125,7 @@ pub struct FlowNode {
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
 
-    pub meta_flow_log: Option<Box<FlowLog>>,
+    pub meta_flow_log: Option<Box<FlowLog<'a>>>,
     pub policy_data_cache: [Option<Arc<PolicyData>>; 2],
     pub endpoint_data_cache: Option<EndpointDataPov>,
 
@@ -142,7 +142,7 @@ pub struct FlowNode {
     pub packet_sequence_block: Option<Box<PacketSequenceBlock>>,
 }
 
-impl FlowNode {
+impl FlowNode<'_> {
     pub(super) fn reset_flow_stat_info(&mut self) {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;

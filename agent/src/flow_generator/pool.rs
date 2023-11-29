@@ -20,7 +20,7 @@ pub trait Recyclable {
     fn reset(&mut self);
 }
 
-impl Recyclable for FlowNode {
+impl Recyclable for FlowNode<'_> {
     fn reset(&mut self) {
         *self = Default::default();
     }

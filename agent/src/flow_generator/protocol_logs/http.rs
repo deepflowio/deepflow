@@ -44,7 +44,7 @@ use crate::{
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use cloud_platform::tingyun;
-use public::utils::net::h2pack;
+use public::utils::net::h2pack::parser::Parser;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -485,14 +485,16 @@ impl From<HttpInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
-pub struct HttpLog {
+#[derive(Default, Serialize)]
+pub struct HttpLog<'a> {
     proto: L7Protocol,
     is_tls: bool,
     perf_stats: Option<L7PerfStats>,
+    #[serde(skip)]
+    http2_parser: Option<Parser<'a>>,
 }
 
-impl L7ProtocolParserInterface for HttpLog {
+impl L7ProtocolParserInterface for HttpLog<'_> {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::TCP {
             return false;
@@ -609,7 +611,7 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 }
 
-impl HttpLog {
+impl HttpLog<'_> {
     pub const TRACE_ID: u8 = 0;
     pub const SPAN_ID: u8 = 1;
 
@@ -628,6 +630,7 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
+            http2_parser: Some(Parser::new()),
             ..Default::default()
         }
     }
@@ -904,8 +907,11 @@ impl HttpLog {
                 let header_frame_payload =
                     &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
 
-                let mut parser = h2pack::parser::Parser::new();
-                let parse_rst = parser.parse(header_frame_payload);
+                let parse_rst = self
+                    .http2_parser
+                    .as_mut()
+                    .unwrap()
+                    .parse(header_frame_payload);
 
                 if let Err(_) = parse_rst {
                     return Err(Error::HttpHeaderParseFailed);

@@ -44,7 +44,7 @@ pub enum CustomLog {
     SoLog(SoLog),
 }
 
-pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
+pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser<'static> {
     L7ProtocolParser::Custom(CustomWrapLog {
         parser: Some(match proto {
             CustomProtocol::Wasm(p, s) => CustomLog::WasmLog(get_wasm_parser(p, s)),
