@@ -289,7 +289,7 @@ func (f *AggFunction) SetAlias(alias string) {
 
 func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	switch f.Metrics.Type {
-	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
 		innerFunction := view.DefaultFunction{
@@ -301,7 +301,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
-	case metrics.METRICS_TYPE_DELAY:
+	case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 		// 时延类，内层结构为groupArray，忽略0值
 		innerFunction := view.DefaultFunction{
 			Name:       view.FUNCTION_GROUP_ARRAY,
