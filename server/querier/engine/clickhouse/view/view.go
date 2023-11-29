@@ -102,6 +102,7 @@ type Time struct {
 	Interval           int
 	DatasourceInterval int
 	WindowSize         int
+	Offset             int
 	Fill               string
 	Alias              string
 	TimeStartOperator  string
@@ -130,6 +131,10 @@ func (t *Time) AddWindowSize(windowSize int) {
 
 func (t *Time) AddFill(fill string) {
 	t.Fill = fill
+}
+
+func (t *Time) AddOffset(offset int) {
+	t.Offset = offset
 }
 
 func (t *Time) AddAlias(alias string) {
