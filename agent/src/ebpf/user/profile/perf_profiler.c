@@ -594,7 +594,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 * consistent, it indicates that the cached process information is
 		 * no longer valid.
 		 */
-		if (stime > 0 && v->pid == v->tgid && !strcmp(name, v->comm)) {
+		if (stime > 0 && v->pid == v->tgid && strcmp(name, v->comm)) {
 			stime = netns_id = 0;
 			name[0] = '\0';
 			process_name = NULL;
