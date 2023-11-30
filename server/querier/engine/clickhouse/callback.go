@@ -104,8 +104,8 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 		if m.Time.TimeEndOperator == "<" {
 			newTimeEnd = int(m.Time.TimeEnd) - m.Time.Interval
 		}
-		start := (newTimeStart+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		end := (newTimeEnd+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
+		start := (newTimeStart-m.Time.Offset+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8 + m.Time.Offset
+		end := (newTimeEnd-m.Time.Offset+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8 + m.Time.Offset
 		end += (m.Time.WindowSize - 1) * m.Time.Interval
 		// length after fix
 		intervalLength := (end-start)/m.Time.Interval + 1
