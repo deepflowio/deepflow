@@ -540,13 +540,17 @@ func (c *Cloud) getSubDomainVInterfaces(
 	// 检查容器节点接口是否需要更新子网信息，并补充subDomainLcuuid
 	for _, vinterface := range resource.PodNodeVInterfaces {
 		networkLcuuid := vinterface.NetworkLcuuid
+		networkType := vinterface.Type
 		if updateNetworkLcuuid, ok := updatedVInterfaceLcuuidToNetworkLcuuid[vinterface.Lcuuid]; ok {
 			networkLcuuid = updateNetworkLcuuid
+		} else {
+			// for addtional route interface, set type = LAN
+			networkType = common.VIF_TYPE_LAN
 		}
 		retVInterfaces = append(retVInterfaces, model.VInterface{
 			Lcuuid:          vinterface.Lcuuid,
 			Name:            vinterface.Name,
-			Type:            vinterface.Type,
+			Type:            networkType,
 			Mac:             vinterface.Mac,
 			NetnsID:         vinterface.NetnsID,
 			VTapID:          vinterface.VTapID,
@@ -611,13 +615,27 @@ func (c *Cloud) getSubDomainNetworks(
 
 	// 遍历Networks，更新az和subDomain信息
 	for _, network := range []model.Network{
-		resource.PodNetwork, resource.PodServiceNetwork, resource.PodNodeNetwork,
+		resource.PodNetwork, resource.PodServiceNetwork,
 	} {
 		retNetworks = append(retNetworks, model.Network{
 			Lcuuid:          network.Lcuuid,
 			Name:            network.Name,
 			Label:           network.Label,
 			NetType:         network.NetType,
+			VPCLcuuid:       network.VPCLcuuid,
+			AZLcuuid:        azLcuuid,
+			RegionLcuuid:    network.RegionLcuuid,
+			SubDomainLcuuid: subDomainLcuuid,
+		})
+	}
+
+	// set podNodeNetwork netType = LAN
+	for _, network := range []model.Network{resource.PodNodeNetwork} {
+		retNetworks = append(retNetworks, model.Network{
+			Lcuuid:          network.Lcuuid,
+			Name:            network.Name,
+			Label:           network.Label,
+			NetType:         common.NETWORK_TYPE_LAN,
 			VPCLcuuid:       network.VPCLcuuid,
 			AZLcuuid:        azLcuuid,
 			RegionLcuuid:    network.RegionLcuuid,
