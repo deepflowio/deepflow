@@ -1097,9 +1097,17 @@ vtap_group_id: g-xxxxxx
       ##   The default value is "", which means it is disabled for all Golang processes.
       #golang: ""
 
-      ## Note: The name of the process that uses the openssl library to enable HTTPS
-      ##   protocol data collection. The default is "", which means that it is disabled for
-      ##   all processes that use the openssl library.
+      ## The name of the process that uses the openssl library to enable HTTPS protocol data collection.
+      ## Default: "",  which means that it is disabled for all processes that use the openssl library.
+      ## Note: One can use the following method to determine whether an application process can use
+      ##   `Uprobe hook openssl library` to access encrypted data:
+      ##   Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
+      ##   information about openssl. If it does, it indicates that this process is using the
+      ##   openssl library. After configuring the openssl options, deepflow-agent will retrieve process
+      ##   information that matches the regular expression, hooking the corresponding encryption/decryption
+      ##   interfaces of the openssl library.
+      ##   In the logs, you will encounter a message similar to the following:
+      ##   `[eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k`
       #openssl: ""
 
     #kprobe-blacklist:
