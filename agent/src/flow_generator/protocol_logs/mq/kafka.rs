@@ -243,9 +243,8 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Serialize, Default)]
+#[derive(Default)]
 pub struct KafkaLog {
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

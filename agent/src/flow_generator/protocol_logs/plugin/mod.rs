@@ -16,7 +16,6 @@
 
 use enum_dispatch::enum_dispatch;
 use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
-use serde::Serialize;
 use wasm::WasmLog;
 
 use crate::{
@@ -36,7 +35,6 @@ pub mod custom_wrap;
 pub mod shared_obj;
 pub mod wasm;
 
-#[derive(Debug, Serialize)]
 #[enum_dispatch(L7ProtocolParserInterface)]
 pub enum CustomLog {
     WasmLog(WasmLog),
