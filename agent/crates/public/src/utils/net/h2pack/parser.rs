@@ -42,8 +42,8 @@ bitflags! {
     }
 }
 
-pub struct Parser<'a> {
-    decoder: Decoder<'a>,
+pub struct Parser {
+    decoder: Decoder<'static>,
 }
 
 fn parse_int(buf: &[u8], prefix: u8) -> Result<(usize, usize), ParseError> {
@@ -90,8 +90,8 @@ fn parse_int(buf: &[u8], prefix: u8) -> Result<(usize, usize), ParseError> {
     Err(ParseError::NotEnoughOctets)
 }
 
-impl Parser<'_> {
-    pub fn new() -> Parser<'static> {
+impl Parser {
+    pub fn new() -> Parser {
         Parser {
             decoder: Decoder::new(),
         }

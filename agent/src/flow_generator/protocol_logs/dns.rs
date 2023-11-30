@@ -143,7 +143,7 @@ impl From<DnsInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct DnsLog {
     perf_stats: Option<L7PerfStats>,
 }
