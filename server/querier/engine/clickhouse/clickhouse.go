@@ -352,7 +352,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, autoTagKey)
+									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
 								}
 								sort.Strings(autoTagSlice)
 								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
