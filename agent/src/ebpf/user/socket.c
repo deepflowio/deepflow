@@ -1519,6 +1519,10 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 	// jmp for tracepoints
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
+				    PROG_PROTO_INFER_FOR_TP,
+				    PROG_PROTO_INFER_TP_IDX);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_TP,
 				    PROG_DATA_SUBMIT_TP_IDX);
 	__insert_output_prog_to_map(tracer,
@@ -1531,6 +1535,10 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 				    PROG_IO_EVENT_TP_IDX);
 
 	// jmp for kprobe/uprobe
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_PROTO_INFER_FOR_KP,
+				    PROG_PROTO_INFER_KP_IDX);
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_KP,

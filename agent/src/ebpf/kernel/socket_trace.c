@@ -59,6 +59,17 @@ MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
  *
  * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
  * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
+ *
+ * Data flow in eBPF progs:
+ *
+ * [openssl Uprobe] ----------------
+ *                                  |
+ *                                 \|/
+ * [syscall Kprobe/tracepoint] --> [protocol infer] --> [data submit] --> [output data]
+ *        |                                                                ^
+ *        |                                                                |
+ *        |----general file io------> [io event] ---------------------------
+ *
  */
 MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM)
 MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM)
@@ -71,17 +82,8 @@ MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1)
 /*
  * For protocol infer buffer
  */
-struct ctx_info_s {
-	union {
-		struct infer_data_s {
-			__u32 len;
-			char data[64];
-		} infer_buf;
-
-		struct tail_calls_context tail_call;
-	};
-};
 MAP_PERARRAY(ctx_info, __u32, struct ctx_info_s, 1)
+
 /*
  * 结构体成员偏移
  */
@@ -161,19 +163,6 @@ static __inline bool is_protocol_enabled(int protocol)
 {
 	int *enabled = protocol_filter__lookup(&protocol);
 	return (enabled) ? (*enabled) : (0);
-}
-
-static __inline bool proto_port_is_allowed(__u32 protocol, __u16 lport, __u16 dport)
-{
-	ports_bitmap_t *ports = proto_ports_bitmap__lookup(&protocol);
-	if (ports) {
-		if (is_set_bitmap(ports->bitmap, dport) ||
-		    is_set_bitmap(ports->bitmap, lport)) {
-			return true;
-		}
-	}
-
-	return false;
 }
 
 static __inline void delete_socket_info(__u64 conn_key,
@@ -630,29 +619,49 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 }
 #endif
 
-static __inline void 
-infer_l7_class(struct ctx_info_s *ctx,
-	       struct conn_info_t* conn_info,
-	       enum traffic_direction direction,
-	       const struct data_args_t *args,
-	       size_t count, __u8 sk_type,
-	       const struct process_data_extra *extra)
+static __inline int
+infer_l7_class_1(struct ctx_info_s *ctx,
+		 struct conn_info_t* conn_info,
+		 enum traffic_direction direction,
+		 const struct data_args_t *args,
+		 size_t count, __u8 sk_type,
+		 const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
-		return;
+		return INFER_TERMINATE;
 	}
 
-	// 推断应用协议
 	struct protocol_message_t inferred_protocol =
-		infer_protocol(ctx, args, count, conn_info, sk_type, extra);
+		infer_protocol_1(ctx, args, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
-		return;
+		return INFER_CONTINUE;
 	}
 
 	conn_info->protocol = inferred_protocol.protocol;
 	conn_info->message_type = inferred_protocol.type;
+
+	return INFER_FINISH;
+}
+
+static __inline int infer_l7_class_2(struct tail_calls_context *ctx,
+				     struct conn_info_t *conn_info)
+{
+	struct infer_data_s *infer_data;
+	infer_data = (struct infer_data_s *)ctx->private_data;
+	struct protocol_message_t inferred_protocol =
+	    infer_protocol_2(infer_data->data, conn_info->count, conn_info);
+	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
+	    inferred_protocol.type == MSG_UNKNOWN) {
+		conn_info->protocol = PROTO_UNKNOWN;
+		return INFER_TERMINATE;
+	}
+
+	conn_info->protocol = inferred_protocol.protocol;
+	conn_info->message_type = inferred_protocol.type;
+
+	return INFER_FINISH;
 }
 
 static __inline __u32 retry_get_write_seq(void *sk,
@@ -660,8 +669,7 @@ static __inline __u32 retry_get_write_seq(void *sk,
 					  int snd_nxt_offset)
 {
 	/*
-	 * 判断依据
-	 *
+	 * Judgments based:
 	 * write_seq ==  snd_nxt && snd_nxt != 0 && write_seq != 0
 	 */
 	__u32 snd_nxt, write_seq;
@@ -681,7 +689,7 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 					   int offset)
 {
 	/*
-	 * 判断依据
+	 * Judgments based:
 	 * copied_seq + 1 == rcv_wup
 	 * tcp_header_len 在[20, 60]区间
 	 * rcv_wup == rcv_nxt
@@ -1362,8 +1370,24 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		conn_info->protocol = PROTO_ORTHER;
 		conn_info->message_type = MSG_REQUEST;
 	} else {
-		infer_l7_class(ctx_map, conn_info, direction, args,
-			       bytes_count, sock_state, extra);
+		int act;
+		act = infer_l7_class_1(ctx_map, conn_info, direction, args,
+				       bytes_count, sock_state, extra);
+
+		if (act == INFER_CONTINUE) {
+			ctx_map->tail_call.conn_info = __conn_info;
+			ctx_map->tail_call.extra = *extra;
+			ctx_map->tail_call.bytes_count = bytes_count;
+			ctx_map->tail_call.offset = offset;
+			ctx_map->tail_call.dir = direction;
+			/* Enter the protocol inference tail call program. */
+			if (extra->source == DATA_SOURCE_SYSCALL)
+				bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+					      PROG_PROTO_INFER_TP_IDX);
+			else
+				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+					      PROG_PROTO_INFER_KP_IDX);
+		}
 	}
 
 	// When at least one of protocol or message_type is valid, 
@@ -2135,6 +2159,72 @@ static __inline int data_submit(void *ctx)
 			    offset, enter_ts, &extra);
 
 	return ret;
+}
+
+static __inline int __proto_infer_2(void *ctx)
+{
+	__u64 id = bpf_get_current_pid_tgid();
+	__u32 k0 = 0;
+	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		goto clear_args_map_2;
+
+	enum traffic_direction dir;
+	dir = ctx_map->tail_call.dir;
+	/*
+	 * Use the following method to obtain `conn_info`, otherwise an error
+	 * similar to "R1 invalid mem access 'inv'" will appear during the eBPF
+	 * loading process.
+	 */
+	struct conn_info_t *conn_info, __conn_info;
+	__conn_info = ctx_map->tail_call.conn_info;
+	conn_info = &__conn_info;
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
+	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	int act;
+	act = infer_l7_class_2(&ctx_map->tail_call, conn_info);
+	if (act != INFER_FINISH) {
+		/*
+		 * Ignore the IO event here because it has been
+		 * confirmed before protocol inference (checking
+		 * whether the file type is socket).
+		 */
+		goto clear_args_map_1;
+	}
+
+	// When at least one of protocol or message_type is valid,
+	// data_submit can be performed, otherwise MySQL data may be lost
+	if (conn_info->protocol != PROTO_UNKNOWN ||
+	    conn_info->message_type != MSG_UNKNOWN) {
+		ctx_map->tail_call.conn_info = __conn_info;
+		return 0;
+	}
+
+clear_args_map_1:
+	if (dir == T_INGRESS)
+		active_read_args_map__delete(&id);
+	else
+		active_write_args_map__delete(&id);
+	return -1;
+
+clear_args_map_2:
+	active_read_args_map__delete(&id);
+	active_write_args_map__delete(&id);
+	return -1;
+}
+
+PROGTP(proto_infer_2) (void *ctx) {
+	if (__proto_infer_2(ctx) == 0)
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
+	return 0;
+}
+
+PROGKP(proto_infer_2) (void *ctx) {
+	if (__proto_infer_2(ctx) == 0)
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_DATA_SUBMIT_KP_IDX);
+	return 0;
 }
 
 PROGTP(data_submit) (void *ctx)

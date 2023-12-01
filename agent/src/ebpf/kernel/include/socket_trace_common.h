@@ -172,8 +172,6 @@ struct __io_event_buffer {
 	char filename[64];
 } __attribute__((packed));
 
-#define is_set_bitmap(bitmap, idx) (bitmap[(idx) / 8] & (1 << ((idx) % 8)))
-
 // struct ebpf_proc_info -> offsets[]  arrays index.
 enum offsets_index {
 	OFFSET_IDX_GOID_RUNTIME_G,
