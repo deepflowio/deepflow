@@ -219,9 +219,8 @@ impl From<DubboInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct DubboLog {
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

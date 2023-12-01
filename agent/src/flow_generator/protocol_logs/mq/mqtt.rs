@@ -198,7 +198,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct MqttLog {
     msg_type: LogMessageType,
     status: L7ResponseStatus,
