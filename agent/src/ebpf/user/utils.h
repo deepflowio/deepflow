@@ -34,8 +34,42 @@
 #define likely(x)               __builtin_expect(!!(x), 1)
 #endif
 
-#define is_set_bitmap(bitmap, idx) (bitmap[(idx) / 8] & (1 << ((idx) % 8)))
-#define set_bitmap(bitmap, idx)	(bitmap[(idx) / 8] |= 1 << ((idx) % 8))
-#define clear_bitmap(bitmap, idx) (bitmap[(idx) / 8] &= (~(1 << ((idx) % 8))))
+/*
+ * Determine whether the bitmap is set to the specified value.
+ * @M : bitmap
+ * @V : value
+ */
+#define is_set_bitmap(M, V)	\
+	((M)[(((V) >> __builtin_popcount((sizeof(__typeof__((M)[0])) << 3) - 1)) & (sizeof((M)) - 1))] & (1 << ((V) & ((sizeof(__typeof__((M)[0])) << 3) - 1))))
+
+/*
+ * Set value to bitmap.
+ * @M : bitmap
+ * @V : value
+ */
+#define set_bitmap(M, V)						\
+do {									\
+	__typeof__(V) __n = (V);					\
+	__typeof__((M)[0]) __mask, __offset;				\
+	__mask = (sizeof(__mask) << 3) - 1;				\
+	__offset = __builtin_popcount(__mask);			 	\
+	__typeof__(V) __idx = (__n >> __offset) & (sizeof((M)) - 1);	\
+	(M)[__idx] |= (1 << (__n & __mask));				\
+} while (0)
+
+/*
+ * Clear value from bitmap.
+ * @M : bitmap
+ * @V : value
+ */
+#define clear_bitmap(M, V)						\
+do {									\
+	__typeof__(V) __n = (V);					\
+	__typeof__((M)[0]) __mask, __offset;				\
+	__mask = (sizeof(__mask) << 3) - 1;				\
+	__offset = __builtin_popcount(__mask);				\
+	__typeof__(V) __idx = (__n >> __offset) & (sizeof((M)) - 1);	\
+	(M)[__idx] &= (~(1 << (__n & __mask)));				\
+} while (0)
 
 #endif /* DF_USER_UTILS_H */
