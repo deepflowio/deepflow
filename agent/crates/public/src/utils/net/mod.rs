@@ -26,7 +26,6 @@ use serde::Serialize;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod arp;
-pub mod h2pack;
 
 mod error;
 pub use error::{Error, Result};
