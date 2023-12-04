@@ -202,6 +202,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("MONGO");
         } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
             proto_tag.push_str("TLS");
+        } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
+            proto_tag.push_str("ORACLE");
         } else {
             proto_tag.push_str("UNSPEC");
         }
