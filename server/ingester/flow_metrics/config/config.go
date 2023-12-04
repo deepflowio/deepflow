@@ -30,12 +30,15 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultUnmarshallQueueCount = 4
-	DefaultUnmarshallQueueSize  = 10240
-	DefaultReceiverWindowSize   = 1024
-	DefaultCKReadTimeout        = 300
-	DefaultFlowMetrics1MTTL     = 168 // hour
-	DefaultFlowMetrics1STTL     = 24  // hour
+	DefaultUnmarshallQueueCount   = 4
+	DefaultUnmarshallQueueSize    = 10240
+	DefaultReceiverWindowSize     = 1024
+	DefaultCKReadTimeout          = 300
+	DefaultFlowMetrics1MTTL       = 168 // hour
+	DefaultFlowMetrics1STTL       = 24  // hour
+	DefaultPromWriterConcurrency  = 2
+	DefaultPromWriterBatchSize    = 2048
+	DefaultPromWriterFlushTimeout = 5
 )
 
 type PCapConfig struct {
@@ -51,14 +54,15 @@ type FlowMetricsTTL struct {
 
 type Config struct {
 	Base                 *config.Config
-	CKReadTimeout        int                   `yaml:"ck-read-timeout"`
-	CKWriterConfig       config.CKWriterConfig `yaml:"metrics-ck-writer"`
-	Pcap                 PCapConfig            `yaml:"pcap"`
-	DisableSecondWrite   bool                  `yaml:"disable-second-write"`
-	UnmarshallQueueCount int                   `yaml:"unmarshall-queue-count"`
-	UnmarshallQueueSize  int                   `yaml:"unmarshall-queue-size"`
-	ReceiverWindowSize   uint64                `yaml:"receiver-window-size"`
-	FlowMetricsTTL       FlowMetricsTTL        `yaml:"flow-metrics-ttl-hour"`
+	CKReadTimeout        int                     `yaml:"ck-read-timeout"`
+	CKWriterConfig       config.CKWriterConfig   `yaml:"metrics-ck-writer"`
+	PromWriterConfig     config.PromWriterConfig `yaml:"metrics-prom-writer"`
+	Pcap                 PCapConfig              `yaml:"pcap"`
+	DisableSecondWrite   bool                    `yaml:"disable-second-write"`
+	UnmarshallQueueCount int                     `yaml:"unmarshall-queue-count"`
+	UnmarshallQueueSize  int                     `yaml:"unmarshall-queue-size"`
+	ReceiverWindowSize   uint64                  `yaml:"receiver-window-size"`
+	FlowMetricsTTL       FlowMetricsTTL          `yaml:"flow-metrics-ttl-hour"`
 }
 
 type FlowMetricsConfig struct {
@@ -86,6 +90,18 @@ func (c *Config) Validate() error {
 		c.FlowMetricsTTL.VtapApp1S = DefaultFlowMetrics1STTL
 	}
 
+	if c.PromWriterConfig.Concurrency <= 0 {
+		c.PromWriterConfig.Concurrency = DefaultPromWriterConcurrency
+	}
+
+	if c.PromWriterConfig.BatchSize <= 0 {
+		c.PromWriterConfig.BatchSize = DefaultPromWriterBatchSize
+	}
+
+	if c.PromWriterConfig.FlushTimeout <= 0 {
+		c.PromWriterConfig.FlushTimeout = DefaultPromWriterFlushTimeout
+	}
+
 	return nil
 }
 
@@ -94,6 +110,7 @@ func Load(base *config.Config, path string) *Config {
 		FlowMetrics: Config{
 			Base:                 base,
 			CKWriterConfig:       config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			PromWriterConfig:     config.PromWriterConfig{},
 			CKReadTimeout:        DefaultCKReadTimeout,
 			UnmarshallQueueCount: DefaultUnmarshallQueueCount,
 			UnmarshallQueueSize:  DefaultUnmarshallQueueSize,

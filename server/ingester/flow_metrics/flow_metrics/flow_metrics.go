@@ -40,7 +40,7 @@ var log = logging.MustGetLogger("flow_metrics")
 type FlowMetrics struct {
 	unmarshallers []*unmarshaller.Unmarshaller
 	platformDatas []*grpc.PlatformInfoTable
-	dbwriter      *dbwriter.DbWriter
+	dbwriters     []dbwriter.DbWriter
 }
 
 func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowMetrics, error) {
@@ -57,13 +57,21 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
 	var err error
-	flowMetrics.dbwriter, err = dbwriter.NewDbWriter(cfg.Base.CKDB.ActualAddrs, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.Base.CKDB.ClusterName, cfg.Base.CKDB.StoragePolicy, cfg.Base.CKDB.TimeZone,
+	var writers []dbwriter.DbWriter
+	ckWriter, err := dbwriter.NewCkDbWriter(cfg.Base.CKDB.ActualAddrs, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.Base.CKDB.ClusterName, cfg.Base.CKDB.StoragePolicy, cfg.Base.CKDB.TimeZone,
 		cfg.CKWriterConfig, cfg.FlowMetricsTTL, cfg.Base.GetCKDBColdStorages())
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
+	writers = append(writers, ckWriter)
 
+	if cfg.PromWriterConfig.Enabled {
+		writer := dbwriter.NewPromWriter(cfg.PromWriterConfig)
+		writers = append(writers, writer)
+	}
+
+	flowMetrics.dbwriters = writers
 	flowMetrics.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	flowMetrics.platformDatas = make([]*grpc.PlatformInfoTable, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
@@ -77,7 +85,7 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 		if err != nil {
 			return nil, err
 		}
-		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter)
+		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriters)
 	}
 
 	return &flowMetrics, nil
@@ -94,6 +102,8 @@ func (r *FlowMetrics) Close() error {
 	for i := 0; i < len(r.unmarshallers); i++ {
 		r.platformDatas[i].ClosePlatformInfoTable()
 	}
-	r.dbwriter.Close()
+	for i := 0; i < len(r.dbwriters); i++ {
+		r.dbwriters[i].Close()
+	}
 	return nil
 }
