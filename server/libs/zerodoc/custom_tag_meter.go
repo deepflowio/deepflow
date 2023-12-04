@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
@@ -316,4 +317,14 @@ func EncodeTSDBRow(encoder *codec.SimpleEncoder, timestamp uint64, columnValues 
 		}
 	}
 	encoder.Bytes()[offset] = l
+}
+
+// EncodeCustomTagToPromLabels 将 CustomTag 编码成 prom Label
+func EncodeCustomTagToPromLabels(tag *CustomTag) []prompb.Label {
+	if tag == nil {
+		return nil
+	}
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := tag.MarshalTo(buffer)
+	return encodePromLabels(buffer[:size])
 }
