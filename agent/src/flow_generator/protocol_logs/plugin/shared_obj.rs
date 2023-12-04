@@ -26,7 +26,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{L7ResponseStatus, LogMessageType},
@@ -52,9 +52,9 @@ pub struct SoLog {
 }
 
 impl L7ProtocolParserInterface for SoLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         let Some(c_funcs) = param.so_func.as_ref() else {
-            return false;
+            return CheckResult::Fail;
         };
         let ctx = &ParseCtx::from((param, payload));
 
@@ -104,13 +104,13 @@ impl L7ProtocolParserInterface for SoLog {
                     None => {
                         error!("read proto str from so plugin fail");
                         counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
-                        return false;
+                        return CheckResult::Fail;
                     }
                 }
-                return true;
+                return CheckResult::Ok;
             }
         }
-        false
+        CheckResult::Fail
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

@@ -89,6 +89,9 @@ pub enum Error {
     SoReturnUnexpectVal,
     #[error("so plugin parse fail")]
     SoParseFail,
+    // need more data, cache to tcp reassemble buffer
+    #[error("need more data")]
+    NeedMoreData,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

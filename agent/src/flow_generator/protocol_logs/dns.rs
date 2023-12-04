@@ -19,7 +19,7 @@ use serde::Serialize;
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
+use crate::common::l7_protocol_log::{CheckResult, L7ParseResult};
 use crate::{
     common::{
         enums::IpProtocol,
@@ -161,14 +161,15 @@ pub struct DnsLog {
 
 //解析器接口实现
 impl L7ProtocolParserInterface for DnsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
         let mut info = DnsInfo::default();
-        self.parse(payload, &mut info, param).is_ok()
+        (self.parse(payload, &mut info, param).is_ok()
             && info.msg_type == LogMessageType::Request
-            && !info.query_name.is_empty()
+            && !info.query_name.is_empty())
+        .into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -538,12 +539,20 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
+                        output.push_str(&format!(
+                            "{:?} is_dns: {}\r\n",
+                            i,
+                            is_dns == CheckResult::Ok
+                        ));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_dns: {}\r\n", DnsInfo::default(), is_dns));
+                output.push_str(&format!(
+                    "{:?} is_dns: {}\r\n",
+                    DnsInfo::default(),
+                    is_dns == CheckResult::Ok
+                ));
             }
         }
         output

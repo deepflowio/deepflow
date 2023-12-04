@@ -22,7 +22,7 @@ use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, 
 use super::sql_check::{check_sql, is_mysql, trim_head_comment_and_get_first_word};
 
 use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
+use crate::common::l7_protocol_log::{CheckResult, L7ParseResult};
 use crate::flow_generator::protocol_logs::pb_adapter::TraceInfo;
 use crate::{
     common::{
@@ -254,11 +254,11 @@ pub struct MysqlLog {
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
-        Self::check(payload, param)
+        Self::check(payload, param).into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -637,7 +637,11 @@ mod tests {
                 if info.is_none() {
                     let mut i = MysqlInfo::default();
                     i.protocol_version = mysql.protocol_version;
-                    output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                    output.push_str(&format!(
+                        "{:?} is_mysql: {}\r\n",
+                        i,
+                        is_mysql == CheckResult::Ok
+                    ));
                     previous_command = 0;
                     continue;
                 }
@@ -653,14 +657,22 @@ mod tests {
                         }
 
                         i.rrt = 0;
-                        output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                        output.push_str(&format!(
+                            "{:?} is_mysql: {}\r\n",
+                            i,
+                            is_mysql == CheckResult::Ok
+                        ));
                     }
                     _ => unreachable!(),
                 }
             } else {
                 let mut i = MysqlInfo::default();
                 i.protocol_version = mysql.protocol_version;
-                output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                output.push_str(&format!(
+                    "{:?} is_mysql: {}\r\n",
+                    i,
+                    is_mysql == CheckResult::Ok
+                ));
             }
         }
         output

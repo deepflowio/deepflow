@@ -23,6 +23,7 @@ use super::pb_adapter::{
     ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
 };
 use super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use crate::common::l7_protocol_log::CheckResult;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -435,17 +436,17 @@ pub struct TlsLog {
 
 //解析器接口实现
 impl L7ProtocolParserInterface for TlsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
 
         if payload.len() < TlsHeader::HEADER_LEN {
-            return false;
+            return CheckResult::Fail;
         }
 
         let tls_header = TlsHeader::new(payload);
-        tls_header.is_handshake() && tls_header.is_client_hello()
+        (tls_header.is_handshake() && tls_header.is_client_hello()).into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -653,12 +654,20 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::TlsInfo(i) => {
-                        output.push_str(&format!("{:?} is_tls: {}\r\n", i, is_tls));
+                        output.push_str(&format!(
+                            "{:?} is_tls: {}\r\n",
+                            i,
+                            is_tls == CheckResult::Ok
+                        ));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_tls: {}\r\n", TlsInfo::default(), is_tls));
+                output.push_str(&format!(
+                    "{:?} is_tls: {}\r\n",
+                    TlsInfo::default(),
+                    is_tls == CheckResult::Ok
+                ));
             }
         }
         output

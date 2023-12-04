@@ -16,7 +16,7 @@
 
 use public::l7_protocol::L7Protocol;
 
-use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface};
+use crate::common::l7_protocol_log::{CheckResult, L7ParseResult, L7ProtocolParserInterface};
 
 use super::{all_plugin_log_parser, CustomLog};
 
@@ -30,14 +30,14 @@ impl L7ProtocolParserInterface for CustomWrapLog {
         &mut self,
         payload: &[u8],
         param: &crate::common::l7_protocol_log::ParseParam,
-    ) -> bool {
+    ) -> CheckResult {
         for mut p in all_plugin_log_parser().into_iter() {
-            if p.check_payload(payload, param) {
+            if p.check_payload(payload, param) == CheckResult::Ok {
                 self.parser = Some(p);
-                return true;
+                return CheckResult::Ok;
             }
         }
-        false
+        CheckResult::Fail
     }
 
     fn parse_payload(

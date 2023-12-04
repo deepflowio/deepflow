@@ -27,6 +27,7 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
+use crate::common::l7_protocol_log::CheckResult;
 use crate::plugin::CustomInfo;
 use crate::{
     common::{
@@ -494,9 +495,9 @@ pub struct HttpLog {
 }
 
 impl L7ProtocolParserInterface for HttpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
 
         let mut info = HttpInfo::default();
@@ -506,15 +507,15 @@ impl L7ProtocolParserInterface for HttpLog {
         };
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
-            L7Protocol::Http1 => self.http1_check_protocol(payload),
+            L7Protocol::Http1 => self.http1_check_protocol(payload).into(),
             L7Protocol::Http2 | L7Protocol::Grpc => {
                 let Some(config) = param.parse_config else {
-                    return false;
+                    return CheckResult::Fail;
                 };
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
                         if param.direction == PacketDirection::ServerToClient {
-                            return false;
+                            return CheckResult::Fail;
                         }
                         self.parse_http2_go_uprobe(
                             &config.l7_log_dynamic,
@@ -523,8 +524,9 @@ impl L7ProtocolParserInterface for HttpLog {
                             &mut info,
                         )
                         .is_ok()
+                        .into()
                     }
-                    _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
+                    _ => self.parse_http_v2(payload, param, &mut info).is_ok().into(),
                 }
             }
             _ => unreachable!(),
@@ -1598,6 +1600,8 @@ mod tests {
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
             oracle_parse_conf: OracleParseConfig::default(),
+            payload_from_buffer_flush: false,
+            payload_need_assemble: false,
         };
 
         //测试长度不正确

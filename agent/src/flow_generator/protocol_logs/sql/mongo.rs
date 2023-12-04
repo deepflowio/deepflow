@@ -21,7 +21,7 @@ use serde::Serialize;
 
 use super::super::{AppProtoHead, LogMessageType};
 use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
+use crate::common::l7_protocol_log::{CheckResult, L7ParseResult};
 use crate::{
     common::{
         enums::IpProtocol,
@@ -164,21 +164,21 @@ pub struct MongoDBLog {
 }
 
 impl L7ProtocolParserInterface for MongoDBLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> CheckResult {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return CheckResult::Fail;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return CheckResult::Fail;
         }
         let mut header = MongoDBHeader::default();
         let offset = header.decode(payload);
         if offset < 0 {
-            return false;
+            return CheckResult::Fail;
         }
 
         self.info.is_tls = param.is_tls();
-        return header.is_request();
+        header.is_request().into()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -641,7 +641,11 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::MongoDBInfo(i) => {
-                        output.push_str(&format!("{:?} is_mongo: {}\r\n", i, is_mongo));
+                        output.push_str(&format!(
+                            "{:?} is_mongo: {}\r\n",
+                            i,
+                            is_mongo == CheckResult::Ok
+                        ));
                     }
                     _ => unreachable!(),
                 }
@@ -649,7 +653,7 @@ mod tests {
                 output.push_str(&format!(
                     "{:?} is_mongo: {}\r\n",
                     MongoDBInfo::default(),
-                    is_mongo
+                    is_mongo == CheckResult::Ok
                 ));
             }
         }

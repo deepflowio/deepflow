@@ -18,6 +18,7 @@ use enum_dispatch::enum_dispatch;
 use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
 use wasm::WasmLog;
 
+use crate::common::l7_protocol_log::CheckResult;
 use crate::{
     common::{
         flow::L7PerfStats,
