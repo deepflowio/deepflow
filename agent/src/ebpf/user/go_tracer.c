@@ -555,7 +555,7 @@ static int resolve_bin_file(const char *path, int pid,
 
 	if (syms_count == 0) {
 		ret = ETR_NOSYMBOL;
-		ebpf_debug(
+		ebpf_warning(
 			"Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
 			pid, path, go_ver->major, go_ver->minor);
 		goto failed;

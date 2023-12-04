@@ -1081,15 +1081,51 @@ vtap_group_id: g-xxxxxx
     ##   which is configured using regular expressions
     #uprobe-process-name-regexs:
 
-      ## Note: Process name to enable Golang-specific symbol table parsing. The default
-      ##   value is "", which means that this feature is not enabled for any process.
-      ##   This feature acts on Golang processes that have trimmed the standard symbol
-      ##   table. For example, the management process of K8s generally belongs to this
-      ##   category. When this feature is enabled, for processes with Golang
+      ## Process name to enable Golang-specific symbol table parsing.
+      ## Default: "", which means that this feature is not enabled for any process.
+      ## Note: This feature acts on Golang processes that have trimmed the standard symbol
+      ##   table. When this feature is enabled, for processes with Golang
       ##   version >= 1.13 and < 1.18, when the standard symbol table is missing, the
       ##   Golang-specific symbol table will be parsed to complete uprobe data collection.
       ##   Note that enabling this feature may cause the eBPF initialization process to
-      ##   take ten minutes.
+      ##   take ten minutes. The `golang-symbol` configuration item depends on the `golang`
+      ##   configuration item, the `golang-symbol` is a subset of the `golang` configuration item.
+      ## Example:
+      ##   - Ensure that the regular expression matching for the 'golang' configuration
+      ##     item is enabled, for example: `golang: .*`
+      ##   - You've encountered the following warning log:
+      ##     ```
+      ##     [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
+      ##     [path: /proc/1946/root/usr/local/bin/kube-controller-manager] (version: go1.16). Not find any symbols!
+      ##     ``` 
+      ##     Suppose there is a Golang process with a process ID of '1946.'
+      ##   - To initially confirm whether the executable file for this process has a symbol table:
+      ##     - Retrieve the executable file's path using the process ID:
+      ##       ```
+      ##       # ls -al /proc/1946/exe
+      ##       /proc/1946/exe -> /usr/local/bin/kube-controller-manager
+      ##       ```
+      ##     - Check if there is a symbol table:
+      ##       ```
+      ##       # nm /proc/1946/root/usr/local/bin/kube-controller-manager
+      ##       nm: /proc/1946/root/usr/local/bin/kube-controller-manager: no symbols
+      ##       ```
+      ##   - If "no symbols" is encountered, it indicates the absence of a symbol table. In such a
+      ##     scenario, we need to configure the "golang-symbol" setting. To configure this:
+      ##     ```
+      ##     golang-symbol: ^(kube-controller-.*)$
+      ##     ```
+      ##     Explanation: Configure a regular expression for the trailing part 'kube-controller-manager'
+      ##     following the executable file path of the process. It can also be a regular expression for
+      ##     the process name (obtained through `/proc/<PID>/status` to extract the process `Name`).
+      ##   - During the agent startup process, you will observe the following log information: (The entry
+      ##     address for the function `crypto/tls.(*Conn).Write` has already been resolved, i.e., entry:0x25fca0).
+      ##     ```
+      ##     [eBPF] INFO Uprobe [/proc/1946/root/usr/local/bin/kube-controller-manager] pid:1946 go1.16.0
+      ##     entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
+      ##     ```
+      ##     The logs indicate that the Golang program has been successfully hooked.
+      ##   
       #golang-symbol: ""
 
       ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection
