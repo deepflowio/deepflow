@@ -335,8 +335,20 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             return None;
         };
 
-        let (cache_req_end, cache_resp_end, merged) =
-            previous_log_info.multi_merge_info.as_mut().unwrap();
+        let Some((cache_req_end, cache_resp_end, merged)) =
+            previous_log_info.multi_merge_info.as_mut()
+        else {
+            error!(
+                "{:?}:{} -> {:?}:{} flow_id: {} ebpf_type: {:?} rrt cal fail, multi_merge_info is none",
+                param.ip_src,
+                param.port_src,
+                param.ip_dst,
+                param.port_dst,
+                param.flow_id,
+                param.ebpf_type
+            );
+            return None;
+        };
 
         if req_end {
             *cache_req_end = true;

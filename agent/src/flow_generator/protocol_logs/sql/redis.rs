@@ -164,11 +164,9 @@ impl From<RedisInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct RedisLog {
-    #[serde(skip)]
     has_request: bool,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

@@ -247,10 +247,9 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct MysqlLog {
     pub protocol_version: u8,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

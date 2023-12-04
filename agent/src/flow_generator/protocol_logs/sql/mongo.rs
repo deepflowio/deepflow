@@ -157,10 +157,9 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct MongoDBLog {
     info: MongoDBInfo,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

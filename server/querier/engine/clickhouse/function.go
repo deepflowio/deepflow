@@ -289,7 +289,7 @@ func (f *AggFunction) SetAlias(alias string) {
 
 func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	switch f.Metrics.Type {
-	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
 		innerFunction := view.DefaultFunction{
@@ -301,7 +301,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
-	case metrics.METRICS_TYPE_DELAY:
+	case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 		// 时延类，内层结构为groupArray，忽略0值
 		innerFunction := view.DefaultFunction{
 			Name:       view.FUNCTION_GROUP_ARRAY,
@@ -490,6 +490,7 @@ type Time struct {
 	TimeField  string
 	Interval   int
 	WindowSize int
+	Offset     int
 	Fill       string
 }
 
@@ -512,12 +513,19 @@ func (t *Time) Trans(m *view.Model) error {
 	if len(t.Args) > 3 {
 		t.Fill = t.Args[3]
 	}
+	if len(t.Args) > 4 {
+		t.Offset, err = strconv.Atoi(t.Args[4])
+		if err != nil {
+			return err
+		}
+	}
 	m.Time.Interval = t.Interval
 	if m.Time.Interval > 0 && m.Time.Interval < m.Time.DatasourceInterval {
 		m.Time.Interval = m.Time.DatasourceInterval
 	}
 	m.Time.WindowSize = t.WindowSize
 	m.Time.Fill = t.Fill
+	m.Time.Offset = t.Offset
 	m.Time.Alias = t.Alias
 	return nil
 }
@@ -555,10 +563,19 @@ func (t *Time) Format(m *view.Model) {
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		innerTimeField = t.TimeField
 	}
-	withValue := fmt.Sprintf(
-		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
-		innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
-	)
+	offset := m.Time.Offset
+	withValue := ""
+	if offset > 0 {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s-%d, %s(%d)) + %s(arrayJoin([%s]) * %d) + %d",
+			innerTimeField, offset, toIntervalFunction, interval, toIntervalFunction, windows, interval, offset,
+		)
+	} else {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
+			innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
+		)
+	}
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)

@@ -32,7 +32,7 @@ func (h *HuaWei) getNATGateways() (
 	requiredAttrs := []string{"id", "name", "router_id"}
 	for project, token := range h.projectTokenMap {
 		jNGs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://nat.%s.%s/v2/%s/nat_gateways", project.name, h.config.Domain, project.id), token.token, "nat_gateways", true,
+			fmt.Sprintf("https://nat.%s.%s/v2/%s/nat_gateways", project.name, h.config.Domain, project.id), token.token, "nat_gateways", pageQueryMethodMarker,
 		))
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -111,7 +111,7 @@ func (h *HuaWei) getNATGateways() (
 
 func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []model.NATRule, err error) {
 	jRules, err := h.getRawData(newRawDataGetContext(
-		fmt.Sprintf("https://nat.%s.%s/v2/%s/dnat_rules", project.name, h.config.Domain, project.id), token, "dnat_rules", true,
+		fmt.Sprintf("https://nat.%s.%s/v2/%s/dnat_rules", project.name, h.config.Domain, project.id), token, "dnat_rules", pageQueryMethodMarker,
 	))
 	if err != nil {
 		return
@@ -176,7 +176,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 
 func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []model.NATRule, err error) {
 	jRules, err := h.getRawData(newRawDataGetContext(
-		fmt.Sprintf("https://nat.%s.%s/v2/%s/snat_rules", project.name, h.config.Domain, project.id), token, "snat_rules", true,
+		fmt.Sprintf("https://nat.%s.%s/v2/%s/snat_rules", project.name, h.config.Domain, project.id), token, "snat_rules", pageQueryMethodMarker,
 	))
 	if err != nil {
 		return

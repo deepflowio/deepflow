@@ -35,7 +35,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	}
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, name) {
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
 			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
