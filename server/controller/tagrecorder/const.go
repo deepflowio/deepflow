@@ -619,7 +619,7 @@ const (
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
 		"    `pod_cluster_id` UInt64,\n" +
-		"    `pod_ns_id,` UInt64,\n" +
+		"    `pod_ns_id` UInt64,\n" +
 		"    `pod_node_id` UInt64,\n" +
 		"    `pod_service_id` UInt64,\n" +
 		"    `pod_group_id` UInt64\n" +
