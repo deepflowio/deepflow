@@ -19,6 +19,28 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+/*
+ * Due to the limitation of the number of eBPF instructions to 4096 in Linux
+ * kernels lower than version 5.12, the protocol inference code, when augmented
+ * with new protocols, easily exceeds the instruction limit. To address this
+ * issue, we have split the protocol inference into two separate programs.
+ * The updated workflow is as follows:
+ *
+ * [openssl Uprobe] ----------------
+ *                                 |
+ *                                \|/
+ * [syscall Kprobe/tracepoint] --> [protocol infer] --> [data submit] --> [output data]
+ *       |                                                                ^
+ *       |                                                                |
+ *       |----general file io------> [io event] ---------------------------
+ *
+ * Explanation:
+ *   `[openssl Uprobe]` and `[syscall Kprobe/tracepoint]` encompass the preparation
+ *   work for eBPF probe entry and a portion of Layer 7 (L7) protocol inference.
+ *   `[protocol infer]` represents the second part of L7 protocol inference, and
+ *   newly added protocol inference code can be placed within the `infer_protocol_2()`
+ *   interface.
+ */
 #ifndef DF_BPF_PROTO_INFER_H
 #define DF_BPF_PROTO_INFER_H
 

@@ -60,16 +60,6 @@ MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
  * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
  * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
  *
- * Data flow in eBPF progs:
- *
- * [openssl Uprobe] ----------------
- *                                  |
- *                                 \|/
- * [syscall Kprobe/tracepoint] --> [protocol infer] --> [data submit] --> [output data]
- *        |                                                                ^
- *        |                                                                |
- *        |----general file io------> [io event] ---------------------------
- *
  */
 MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM)
 MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM)
