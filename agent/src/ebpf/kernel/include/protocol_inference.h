@@ -872,7 +872,7 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 #define REQ_CALL_ID_USER_BUNDLED_EXEC_CALL 0x5e
 #define REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK 0x6e
 
-	if (!protocol_port_check(PROTO_ORACLE, conn_info))
+	if (!protocol_port_check_2(PROTO_ORACLE, conn_info))
 		return MSG_UNKNOWN;
 	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < 12) {
 		return MSG_UNKNOWN;
@@ -2272,15 +2272,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		conn_info->infer_reliable = 1;
 		inferred_message.protocol = PROTO_HTTP1;
 #ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_oracle_tns_message(syscall_infer_buf,
-					     syscall_infer_len,
-					     conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_ORACLE;
-#ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_REDIS && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -2405,6 +2396,15 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	     infer_postgre_message(syscall_infer_addr, syscall_infer_len,
 				   conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_POSTGRESQL;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_oracle_tns_message(infer_buf,
+					     count,
+					     conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ORACLE;
 	}
 
 	return inferred_message;

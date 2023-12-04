@@ -63,6 +63,8 @@ pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;
 #[allow(dead_code)]
+pub const SOCK_DATA_ORACLE: u16 = 62;
+#[allow(dead_code)]
 pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
 pub const SOCK_DATA_MONGO: u16 = 81;
