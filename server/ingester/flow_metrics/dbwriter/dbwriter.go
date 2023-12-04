@@ -165,7 +165,7 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 		if id != uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
 			continue
 		}
-		t := doc.Timestamp * 1000 // 转换为 ms
+		t := int64(doc.Timestamp * 1000) // 转换为 ms
 
 		var metrics map[string]float64
 		// TODO: 其余 metrics 类型待实现
