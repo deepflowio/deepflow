@@ -95,7 +95,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
-	parser := parse.Parser{Engine: e}
+
 	if len(sqlList) > 0 {
 		e.DB = "flow_tag"
 		results := &common.Result{}
@@ -113,24 +113,25 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
 		for _, showSql := range sqlList {
-			err := parser.ParseSQL(showSql)
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+			showEngine.Init()
+			showParser := parse.Parser{Engine: showEngine}
+			err = showParser.ParseSQL(showSql)
 			if err != nil {
 				log.Error(err)
 				return nil, nil, err
 			}
-			for _, stmt := range e.Statements {
-				stmt.Format(e.Model)
+			for _, stmt := range showEngine.Statements {
+				stmt.Format(showEngine.Model)
 			}
-			FormatLimit(e.Model)
+			FormatModel(showEngine.Model)
 			// 使用Model生成View
-			e.View = view.NewView(e.Model)
-			e.View.NoPreWhere = e.NoPreWhere
-			chSql := e.ToSQLString()
-			callbacks := e.View.GetCallbacks()
+			showEngine.View = view.NewView(showEngine.Model)
+			chSql := showEngine.ToSQLString()
+
 			debug.Sql = chSql
 			params := &client.QueryParams{
 				Sql:             chSql,
-				Callbacks:       callbacks,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
 			}
@@ -146,6 +147,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		}
 		return results, debug.Get(), nil
 	}
+	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
 		log.Error(err)
@@ -225,6 +227,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))

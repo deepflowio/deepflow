@@ -642,12 +642,20 @@ func (f *TagFunction) Check() error {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
 	case TAG_FUNCTION_ENUM:
-		_, ok := tag.GetTag(strings.Trim(f.Args[0], "`"), f.DB, f.Table, f.Name)
-		if !ok {
-			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		if f.DB == "flow_tag" {
+			_, ok := tag.GetTag("enum_tag_name", f.DB, f.Table, f.Name)
+			if !ok {
+				return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+			}
+		} else {
+			_, ok := tag.GetTag(strings.Trim(f.Args[0], "`"), f.DB, f.Table, f.Name)
+			if !ok {
+				return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+			}
 		}
 	}
 	return nil
+
 }
 
 func (f *TagFunction) Trans(m *view.Model) view.Node {
