@@ -26,7 +26,6 @@ use serde::Serialize;
 
 #[cfg(target_os = "linux")]
 mod arp;
-pub mod h2pack;
 
 mod error;
 pub use error::{Error, Result};

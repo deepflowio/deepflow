@@ -34,6 +34,7 @@ futures = "~0.3"
 grpc = { path = "plugins/grpc" }
 hex = "0.4.3"
 hostname = "0.3.1"
+hpack = "0.3.0"
 http = "0.2.5"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
