@@ -21,21 +21,22 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VRouter struct {
-	UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]
+	UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]
 }
 
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
 	updater := &VRouter{
-		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]{
+		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewVRouter(),
-			diffBaseData: wholeCache.VRouters,
+			diffBaseData: wholeCache.DiffBaseDataSet.VRouters,
 			cloudData:    cloudData,
 		},
 	}
@@ -43,7 +44,7 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 	return updater
 }
 
-func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBase *cache.VRouter, exists bool) {
+func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBase *diffbase.VRouter, exists bool) {
 	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -70,7 +71,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRo
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *cache.VRouter, cloudItem *cloudmodel.VRouter) (map[string]interface{}, bool) {
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

@@ -64,6 +64,7 @@ static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
+static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
 
 /*
@@ -177,7 +178,14 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	if (pid > 0) {
 		len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
 		ptr = (char *)sym->demangle_name;
-		ptr = create_symbol_str(len, ptr, u_sym_prefix);
+		char *u_prefix = (char *)u_sym_prefix;
+		if (sym->module != NULL && strlen(sym->module) > 0) {
+			if (strstr(sym->module, ".so")) {
+				len += strlen(lib_sym_prefix);
+				u_prefix = (char *)lib_sym_prefix;
+			}
+		}
+		ptr = create_symbol_str(len, ptr, (char *)u_prefix);
 		bcc_symbol_free_demangle_name(sym);
 	} else if (pid == 0) {
 		len = strlen(sym->name) + strlen(k_sym_prefix);
@@ -188,7 +196,8 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
+static char *resolve_addr(struct bpf_tracer *t, pid_t pid, u64 address,
+			  bool is_create, void *info_p)
 {
 	ASSERT(pid >= 0);
 
@@ -202,20 +211,6 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 
 	int ret = symcache_resolve(pid, resolver, address, &sym);
 	if (ret == 0) {
-		if (info_p && pid > 0) {
-			struct symbolizer_proc_info *p = info_p;
-			if (p->new_java_syms_file) {
-				/*
-				 * TODO @jiping
-				 * If you delete the local file perf-PID.map immediately,
-				 * it will leave many symbolic links in /tmp/perf-PID.map.
-				 * We need a better method to delete these map files. Currently,
-				 * they are first saved in the local directory '/tmp'.
-				 */
-				//clean_local_java_symbols_files(pid);
-				p->new_java_syms_file = false;
-			}
-		}
 		ptr = symbol_name_fetch(pid, &sym);
 		if (ptr) {
 			char *p = ptr;
@@ -259,7 +254,7 @@ static char *resolve_addr(pid_t pid, u64 address, bool is_create, void *info_p)
 	 * will simply return '[unknown]' string.
 	 */
 resolver_err:
-	snprintf(format_str, sizeof(format_str), "[unknown]");
+	snprintf(format_str, sizeof(format_str), "[unknown] 0x%016lx", address);
 	len = strlen(format_str);
 	ptr = create_symbol_str(len, format_str, "");
 
@@ -268,7 +263,8 @@ finish:
 }
 
 static int get_stack_ips(struct bpf_tracer *t,
-			 const char *stack_map_name, int stack_id, u64 * ips)
+			 const char *stack_map_name, int stack_id, u64 * ips,
+			 u64 ts)
 {
 	ASSERT(stack_id >= 0);
 
@@ -285,7 +281,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val, void *info_p)
+				      int *ret_val, void *info_p, u64 ts)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -301,7 +297,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
 	int ret;
-	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips))) {
+	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
 		stack_table_data_miss++;
 		*ret_val = ret;
 		return NULL;
@@ -319,7 +315,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
 
-		str = resolve_addr(pid, ips[i], new_cache, info_p);
+		str = resolve_addr(t, pid, ips[i], new_cache, info_p);
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
@@ -365,7 +361,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       pid_t pid,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p)
+				       bool new_cache, void *info_p, u64 ts)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -384,22 +380,10 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p);
+				       h, new_cache, &ret_val, info_p, ts);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
-
-	/*
-	 * The stringifier clears stack-ids out of the stack traces table
-	 * when it first encounters them. If a stack-id is reused by a
-	 * different stack-trace-key, the stringifier returns its memoized
-	 * stack trace string.
-	 */
-	if (!bpf_table_delete_key(t, stack_map_name, (u64) stack_id)) {
-		ebpf_warning
-		    ("stack_map_name %s, delete failed, stack-ID %d\n",
-		     stack_map_name, stack_id);
-	}
 
 	if (str == NULL)
 		return NULL;
@@ -444,7 +428,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
 				      stack_str_hash_t * h,
-				      bool new_cache, void *info_p)
+				      bool new_cache,
+				      char *process_name, void *info_p)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -466,17 +451,48 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	char *k_trace_str, *u_trace_str, *trace_str;
 	k_trace_str = u_trace_str = trace_str = NULL;
 
+	/* For processes without configuration, the stack string is in the format
+	   'process name;thread name'. */
+	if (!new_cache) {
+		/* add string "[p/t] " */
+		len += (TASK_COMM_LEN * 2) + 10;
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		bool is_thread = (v->pid != v->tgid);
+		if (process_name) {
+			if (is_thread)
+				snprintf(trace_str, len, "[p] %s;[t] %s", process_name,
+					 v->comm);
+			else
+				snprintf(trace_str, len, "[p] %s", process_name);
+		} else {
+			/* The process has already exited. */
+			if (is_thread)
+				snprintf(trace_str, len, "[t] %s", v->comm);
+			else
+				snprintf(trace_str, len, "[p] %s", v->comm);
+		}
+
+		return trace_str;
+	}
+
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h, new_cache, info_p);
+							h, new_cache, info_p,
+							v->timestamp);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
 							stack_map_name,
-							h, new_cache, info_p);
+							h, new_cache, info_p,
+							v->timestamp);
 	}
 
 	/* 

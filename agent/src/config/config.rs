@@ -799,6 +799,23 @@ impl YamlConfig {
         Ok(())
     }
 
+    pub fn get_protocol_port(&self) -> HashMap<String, String> {
+        let mut new = self.l7_protocol_ports.clone();
+
+        let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
+        // dns default only parse 53 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
+        if !self.l7_protocol_ports.contains_key(dns_str) {
+            new.insert(dns_str.to_string(), DEFAULT_DNS_PORT.to_string());
+        }
+        let tls_str = L7ProtocolParser::Tls(TlsLog::default()).as_str();
+        // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+        if !self.l7_protocol_ports.contains_key(tls_str) {
+            new.insert(tls_str.to_string(), DEFAULT_TLS_PORT.to_string());
+        }
+
+        new
+    }
+
     pub fn get_protocol_port_parse_bitmap(&self) -> Vec<(String, Bitmap)> {
         /*
             parse all protocol port range
@@ -808,29 +825,15 @@ impl YamlConfig {
                     "HTTP": "80,8080,1000-2000"
                 ...
         */
+        let l7_protocol_ports = self.get_protocol_port();
         let mut port_bitmap = Vec::new();
-        for (protocol_name, port_range) in self.l7_protocol_ports.iter() {
+        for (protocol_name, port_range) in l7_protocol_ports.iter() {
             port_bitmap.push((
                 protocol_name.clone(),
                 parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
             ));
         }
         port_bitmap.sort_unstable_by_key(|p| p.0.clone());
-
-        let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
-        // dns default only parse 53 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
-        if !self.l7_protocol_ports.contains_key(dns_str) {
-            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
-            bitmap.set(DEFAULT_DNS_PORT as usize, true).unwrap();
-            port_bitmap.push((dns_str.to_string(), bitmap));
-        }
-        let tls_str = L7ProtocolParser::Tls(TlsLog::default()).as_str();
-        // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
-        if !self.l7_protocol_ports.contains_key(tls_str) {
-            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
-            bitmap.set(DEFAULT_TLS_PORT as usize, true).unwrap();
-            port_bitmap.push((tls_str.to_string(), bitmap));
-        }
         port_bitmap
     }
 }
@@ -1592,7 +1595,7 @@ where
             TunnelType::try_from(t).map_err(|_| {
                 de::Error::invalid_value(
                     Unexpected::Unsigned(t as u64),
-                    &"None|Vxlan|Ipip|TencentGre|ErspanOrTeb",
+                    &"None|Vxlan|Ipip|TencentGre|Geneve|ErspanOrTeb",
                 )
             })
         })

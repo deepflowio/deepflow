@@ -154,7 +154,7 @@ impl From<DnsInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct DnsLog {
     perf_stats: Option<L7PerfStats>,
 }
@@ -586,6 +586,7 @@ mod tests {
                 rrt_count: 2,
                 rrt_sum: 181558,
                 rrt_max: 176754,
+                ..Default::default()
             },
         )];
 

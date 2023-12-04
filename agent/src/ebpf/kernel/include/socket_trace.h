@@ -26,18 +26,13 @@
 #include "common.h"
 #include "kernel.h"
 #include "bpf_endian.h"
-
-#ifndef unlikely
-#define unlikely(x)             __builtin_expect(!!(x), 0)
-#endif
-
-#ifndef likely
-#define likely(x)               __builtin_expect(!!(x), 1)
-#endif
-
 #include <sys/socket.h>
 #include <stddef.h>
 #include <netinet/in.h>
+
+#define INFER_FINISH    0
+#define INFER_CONTINUE	1
+#define INFER_TERMINATE	2
 
 typedef long unsigned int __kernel_size_t;
 
@@ -98,21 +93,21 @@ struct member_fields_offset {
 	__u32 tcp_sock__copied_seq_offset;
 	__u32 tcp_sock__write_seq_offset;
 
-	__u32 struct_files_struct_fdt_offset; // offsetof(struct files_struct, fdt)
-	__u32 struct_files_private_data_offset; // offsetof(struct file, private_data)
-	__u32 struct_file_f_inode_offset; // offsetof(struct file, f_inode)
-	__u32 struct_inode_i_mode_offset; // offsetof(struct inode, i_mode)
-	__u32 struct_file_dentry_offset; // offsetof(struct file, f_path) + offsetof(struct path, dentry)
-	__u32 struct_dentry_name_offset; // offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
-	__u32 struct_sock_family_offset; // offsetof(struct sock_common, skc_family)
-	__u32 struct_sock_saddr_offset; // offsetof(struct sock_common, skc_rcv_saddr)
-	__u32 struct_sock_daddr_offset; // offsetof(struct sock_common, skc_daddr)
-	__u32 struct_sock_ip6saddr_offset; // offsetof(struct sock_common, skc_v6_rcv_saddr)
-	__u32 struct_sock_ip6daddr_offset; // offsetof(struct sock_common, skc_v6_daddr)
-	__u32 struct_sock_dport_offset; // offsetof(struct sock_common, skc_dport)
-	__u32 struct_sock_sport_offset; // offsetof(struct sock_common, skc_num)
-	__u32 struct_sock_skc_state_offset; // offsetof(struct sock_common, skc_state)
-	__u32 struct_sock_common_ipv6only_offset; // offsetof(struct sock_common, skc_flags)
+	__u32 struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
+	__u32 struct_files_private_data_offset;	// offsetof(struct file, private_data)
+	__u32 struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
+	__u32 struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
+	__u32 struct_file_dentry_offset;	// offsetof(struct file, f_path) + offsetof(struct path, dentry)
+	__u32 struct_dentry_name_offset;	// offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
+	__u32 struct_sock_family_offset;	// offsetof(struct sock_common, skc_family)
+	__u32 struct_sock_saddr_offset;	// offsetof(struct sock_common, skc_rcv_saddr)
+	__u32 struct_sock_daddr_offset;	// offsetof(struct sock_common, skc_daddr)
+	__u32 struct_sock_ip6saddr_offset;	// offsetof(struct sock_common, skc_v6_rcv_saddr)
+	__u32 struct_sock_ip6daddr_offset;	// offsetof(struct sock_common, skc_v6_daddr)
+	__u32 struct_sock_dport_offset;	// offsetof(struct sock_common, skc_dport)
+	__u32 struct_sock_sport_offset;	// offsetof(struct sock_common, skc_num)
+	__u32 struct_sock_skc_state_offset;	// offsetof(struct sock_common, skc_state)
+	__u32 struct_sock_common_ipv6only_offset;	// offsetof(struct sock_common, skc_flags)
 
 };
 
@@ -134,47 +129,62 @@ struct conn_info_t {
 	struct __tuple_t tuple;
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
-	__u8 skc_ipv6only : 1;
-	__u8 infer_reliable : 1; // Is protocol inference reliable?
-	__u8 padding : 6;
+	__u8 skc_ipv6only:1;
+	__u8 infer_reliable:1;	// Is protocol inference reliable?
+	__u8 padding:6;
 	__u8 skc_state;
-	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
-	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
+	/*
+	 * Whether the socket l7 protocol type needs
+	 * to be confirmed again.
+	 */
+	bool need_reconfirm;
+	/*
+	 * True to keep the sequence number of the
+	 * captured data unchanged, otherwise false.
+	 */
+	bool keep_data_seq;
+	/*
+	 * Used to skip protocol checking when Linux 5.2+
+	 * kernel protocol inference.
+	 */
+	__u8 skip_proto;
 	__u32 fd;
-	void *sk;
-
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
 	enum traffic_protocol protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
 	enum message_type message_type;
 
-	enum traffic_direction direction; //T_INGRESS or T_EGRESS
+	enum traffic_direction direction;	//T_INGRESS or T_EGRESS
 	enum endpoint_role role;
-	size_t prev_count;
-	char prev_buf[EBPF_CACHE_SIZE];
-	__s32 correlation_id; // 目前用于kafka判断
+	__s32 correlation_id;	// 目前用于kafka判断
 	enum traffic_direction prev_direction;
-	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
+	__u32 prev_count;	// Prestored data length
+	size_t count;		// syscall data length
+	char prev_buf[EBPF_CACHE_SIZE];
+	char *syscall_infer_addr;
+	void *sk;
+	struct socket_info_t *socket_info_ptr;	/* lookup __socket_info_map */
+	__u32 syscall_infer_len;
 
 	/*
-	The matching logic is:
+	   The matching logic is:
 
-	DNS 1 req ---->
-	DNS 1 res <-------
-	DNS 2 req ----> ​
-	DNS 2 res <-------
+	   DNS 1 req ---->
+	   DNS 1 res <-------
+	   DNS 2 req ---->
+	   DNS 2 res <-------
 
-	and now it is
+	   and now it is
 
-	DNS 1 req ---->
-	DNS 2 req ---->
-	DNS 1 res <-------
-	DNS 2 res <-------
+	   DNS 1 req ---->
+	   DNS 2 req ---->
+	   DNS 1 res <-------
+	   DNS 2 res <-------
 
-	Such a scene affects the whole tracking
+	   Such a scene affects the whole tracking
 
-	DNS 1 req is IPV6, DNS 2 req is IPV4
-	*/
+	   DNS 1 req is IPV6, DNS 2 req is IPV4
+	 */
 	// FIXME: Remove this field when the call chain can correctly handle
 	// the Go DNS case. Parse DNS save record type and ignore AAAA records
 	// in call chain trace
@@ -182,8 +192,8 @@ struct conn_info_t {
 };
 
 struct process_data_extra {
-	bool vecs : 1;
-	bool is_go_process : 1;
+	bool vecs:1;
+	bool is_go_process:1;
 	enum process_data_extra_source source;
 	enum traffic_protocol protocol;
 	__u64 coroutine_id;
@@ -191,17 +201,38 @@ struct process_data_extra {
 	enum message_type message_type;
 } __attribute__ ((packed));
 
+#define DATA_BUF_MAX  32
+
 /*
  * BPF Tail Calls context
  */
+struct infer_data_s {
+	__u32 len;
+	char data[DATA_BUF_MAX * 2];
+};
+
 struct tail_calls_context {
-	int max_size_limit;             // The maximum size of the socket data that can be transferred.
-	enum traffic_direction dir;     // Data flow direction.
-	bool vecs;                      // Whether a memory vector is used ? (for specific syscall)
+	/*
+	 * If it is a tail call in the protocol inference section,
+	 * the stored data here includes the inference data cache
+	 * and its length; other tail calls currently do not use
+	 * private data.
+	 */
+	char private_data[sizeof(struct infer_data_s)];
+	int max_size_limit;	// The maximum size of the socket data that can be transferred.
+	enum traffic_direction dir;	// Data flow direction.
+	bool vecs;		// Whether a memory vector is used ? (for specific syscall)
 	struct conn_info_t conn_info;
 	struct process_data_extra extra;
 	__u32 bytes_count;
 	struct member_fields_offset *offset;
+};
+
+struct ctx_info_s {
+	union {
+		struct infer_data_s infer_buf;
+		struct tail_calls_context tail_call;
+	};
 };
 
 enum syscall_src_func {
@@ -238,8 +269,8 @@ struct data_args_t {
 	};
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
-	__u32 tcp_seq; // Used to record the entry of syscalls
-	ssize_t bytes_count; // io event
+	__u32 tcp_seq;		// Used to record the entry of syscalls
+	ssize_t bytes_count;	// io event
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
@@ -248,14 +279,14 @@ struct syscall_comm_enter_ctx {
 	__u32 __pad_1;		/*    12     4 */
 	union {
 		struct {
-			__u64 fd;		/*  offset:16   8  */
-			char *buf;		/*  offset:24   8  */
+			__u64 fd;	/*  offset:16   8  */
+			char *buf;	/*  offset:24   8  */
 		};
 
 		// For clock_gettime()
 		struct {
-			clockid_t which_clock; /*   offset:16   8  */
-			struct timespec * tp;  /*   offset:24   8  */
+			clockid_t which_clock;	/*   offset:16   8  */
+			struct timespec *tp;	/*   offset:24   8  */
 		};
 	};
 	size_t count;		/*    32     8 */
@@ -263,9 +294,9 @@ struct syscall_comm_enter_ctx {
 };
 
 struct sched_comm_exit_ctx {
-	__u64 __pad_0;          /*     0     8 */
-	char comm[16];          /*     offset:8;       size:16 */
-	pid_t pid;        	/*     offset:24;      size:4  */
+	__u64 __pad_0;		/*     0     8 */
+	char comm[16];		/*     offset:8;       size:16 */
+	pid_t pid;		/*     offset:24;      size:4  */
 	int prio;		/*     offset:28;      size:4  */
 };
 
@@ -298,7 +329,7 @@ static __inline __u64 gen_conn_key_id(__u64 param_1, __u64 param_2)
 	 *  - param_1 low 32bits as key high bits.
 	 *  - param_2 low 32bits as key low bits.
 	 */
-	return ((param_1 << 32) | (__u32)param_2);
+	return ((param_1 << 32) | (__u32) param_2);
 }
 
 #define MAX_SYSTEM_THREADS 40960
@@ -323,11 +354,10 @@ struct tls_conn {
 	int fd;
 	char *buffer;
 	__u32 tcp_seq;
-	void *sp; // stack pointer
+	void *sp;		// stack pointer
 };
 
-struct tls_conn_key
-{
+struct tls_conn_key {
 	__u32 tgid;
 	__u64 goid;
 };

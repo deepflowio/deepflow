@@ -247,10 +247,9 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct MysqlLog {
     pub protocol_version: u8,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 
@@ -716,6 +715,7 @@ mod tests {
                     rrt_count: 5,
                     rrt_sum: 373,
                     rrt_max: 123,
+                    ..Default::default()
                 },
             ),
             (
@@ -729,6 +729,7 @@ mod tests {
                     rrt_count: 3,
                     rrt_sum: 226,
                     rrt_max: 146,
+                    ..Default::default()
                 },
             ),
             (
@@ -742,6 +743,7 @@ mod tests {
                     rrt_count: 390,
                     rrt_sum: 127090,
                     rrt_max: 5355,
+                    ..Default::default()
                 },
             ),
         ];

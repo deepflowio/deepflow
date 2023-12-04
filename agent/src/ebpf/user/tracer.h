@@ -135,6 +135,19 @@ do {                                                        			\
 	} 									\
 } while(0)
 
+#define probes_set_exit_symbol(t, fn)						\
+do {                                                        			\
+	char *func = (char*)calloc(PROBE_NAME_SZ, 1);             		\
+	if (func != NULL) {                                       		\
+		curr_idx = index++;                  		            	\
+		t->ksymbols[curr_idx].isret = true;                 	    	\
+		snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);           	\
+		t->ksymbols[curr_idx].func = func;                        	\
+	} else {								\
+		ebpf_error("no memory, probe (kretprobe/%s) set failed", fn); 	\
+	} 									\
+} while(0)
+
 #define probes_set_symbol(t, fn)						\
 do {                            						\
 	char *func = (char*)calloc(PROBE_NAME_SZ, 1);      			\
@@ -454,6 +467,40 @@ static inline void tracer_reader_lock(struct bpf_tracer *t)
 static inline void tracer_reader_unlock(struct bpf_tracer *t)
 {
 	__atomic_clear(t->lock, __ATOMIC_RELEASE);
+}
+
+struct clear_list_elem {
+	struct list_head list;
+	const char p[0];
+};
+
+static bool inline insert_list(void *elt, uint32_t len, struct list_head *h)
+{
+	struct clear_list_elem *cle;
+	cle = calloc(sizeof(*cle) + len, 1);
+	if (cle == NULL) {
+		ebpf_warning("calloc() failed.\n");
+		return false;
+	}
+	memcpy((void *)cle->p, (void *)elt, len);
+	list_add_tail(&cle->list, h);
+	return true;
+}
+
+static int inline __reclaim_map(int map_fd, struct list_head *h)
+{
+	int count = 0;
+	struct list_head *p, *n;
+	struct clear_list_elem *cle;
+	list_for_each_safe(p, n, h) {
+		cle = container_of(p, struct clear_list_elem, list);
+		if (!bpf_delete_elem(map_fd, (void *)cle->p))
+			count++;
+		list_head_del(&cle->list);
+		free(cle);
+	}
+
+	return count;
 }
 
 #define CACHE_LINE_BYTES 64

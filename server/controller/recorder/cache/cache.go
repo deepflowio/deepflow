@@ -23,6 +23,8 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
@@ -92,15 +94,15 @@ type Cache struct {
 	Sequence        int // 缓存的序列标识，根据刷新递增；为debug方便，设置为公有属性，需避免直接修改值，使用接口修改
 	DomainLcuuid    string
 	SubDomainLcuuid string
-	DiffBaseDataSet
-	ToolDataSet
+	DiffBaseDataSet *diffbase.DataSet
+	ToolDataSet     *tool.DataSet
 }
 
 func NewCache(domainLcuuid string) *Cache {
 	return &Cache{
 		DomainLcuuid:    domainLcuuid,
-		DiffBaseDataSet: NewDiffBaseDataSet(), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
-		ToolDataSet:     NewToolDataSet(),     // 各类资源的映射关系，用于按需进行数据转换
+		DiffBaseDataSet: diffbase.NewDataSet(), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
+		ToolDataSet:     tool.NewDataSet(),     // 各类资源的映射关系，用于按需进行数据转换
 	}
 }
 
@@ -147,8 +149,8 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
-	c.DiffBaseDataSet = NewDiffBaseDataSet()
-	c.ToolDataSet = NewToolDataSet()
+	c.DiffBaseDataSet = diffbase.NewDataSet()
+	c.ToolDataSet = tool.NewDataSet()
 
 	// 分类刷新资源的相关缓存
 
@@ -205,8 +207,8 @@ func (c *Cache) Refresh() {
 }
 
 func (c *Cache) AddRegion(item *mysql.Region) {
-	c.DiffBaseDataSet.addRegion(item, c.Sequence)
-	c.ToolDataSet.addRegion(item)
+	c.DiffBaseDataSet.AddRegion(item, c.Sequence)
+	c.ToolDataSet.AddRegion(item)
 }
 
 func (c *Cache) AddRegions(items []*mysql.Region) {
@@ -216,8 +218,8 @@ func (c *Cache) AddRegions(items []*mysql.Region) {
 }
 
 func (c *Cache) DeleteRegion(lcuuid string) {
-	c.DiffBaseDataSet.deleteRegion(lcuuid)
-	c.ToolDataSet.deleteRegion(lcuuid)
+	c.DiffBaseDataSet.DeleteRegion(lcuuid)
+	c.ToolDataSet.DeleteRegion(lcuuid)
 }
 
 func (c *Cache) DeleteRegions(lcuuids []string) {
@@ -255,8 +257,8 @@ func (c *Cache) refreshRegions() {
 }
 
 func (c *Cache) AddAZ(item *mysql.AZ) {
-	c.DiffBaseDataSet.addAZ(item, c.Sequence)
-	c.ToolDataSet.addAZ(item)
+	c.DiffBaseDataSet.AddAZ(item, c.Sequence)
+	c.ToolDataSet.AddAZ(item)
 }
 
 func (c *Cache) AddAZs(items []*mysql.AZ) {
@@ -266,8 +268,8 @@ func (c *Cache) AddAZs(items []*mysql.AZ) {
 }
 
 func (c *Cache) DeleteAZ(lcuuid string) {
-	c.DiffBaseDataSet.deleteAZ(lcuuid)
-	c.ToolDataSet.deleteAZ(lcuuid)
+	c.DiffBaseDataSet.DeleteAZ(lcuuid)
+	c.ToolDataSet.DeleteAZ(lcuuid)
 }
 
 func (c *Cache) DeleteAZs(lcuuids []string) {
@@ -290,7 +292,7 @@ func (c *Cache) refreshAZs() {
 }
 
 func (c *Cache) AddSubDomain(item *mysql.SubDomain) {
-	c.DiffBaseDataSet.addSubDomain(item, c.Sequence)
+	c.DiffBaseDataSet.AddSubDomain(item, c.Sequence)
 }
 
 func (c *Cache) AddSubDomains(items []*mysql.SubDomain) {
@@ -300,7 +302,7 @@ func (c *Cache) AddSubDomains(items []*mysql.SubDomain) {
 }
 
 func (c *Cache) DeleteSubDomain(lcuuid string) {
-	c.DiffBaseDataSet.deleteSubDomain(lcuuid)
+	c.DiffBaseDataSet.DeleteSubDomain(lcuuid)
 }
 
 func (c *Cache) DeleteSubDomains(lcuuids []string) {
@@ -323,8 +325,8 @@ func (c *Cache) refreshSubDomains() {
 }
 
 func (c *Cache) AddHost(item *mysql.Host) {
-	c.DiffBaseDataSet.addHost(item, c.Sequence)
-	c.ToolDataSet.addHost(item)
+	c.DiffBaseDataSet.AddHost(item, c.Sequence)
+	c.ToolDataSet.AddHost(item)
 }
 
 func (c *Cache) AddHosts(items []*mysql.Host) {
@@ -334,8 +336,8 @@ func (c *Cache) AddHosts(items []*mysql.Host) {
 }
 
 func (c *Cache) DeleteHost(lcuuid string) {
-	c.DiffBaseDataSet.deleteHost(lcuuid)
-	c.ToolDataSet.deleteHost(lcuuid)
+	c.DiffBaseDataSet.DeleteHost(lcuuid)
+	c.ToolDataSet.DeleteHost(lcuuid)
 }
 
 func (c *Cache) DeleteHosts(lcuuids []string) {
@@ -345,7 +347,7 @@ func (c *Cache) DeleteHosts(lcuuids []string) {
 }
 
 func (c *Cache) UpdateHost(cloudItem *cloudmodel.Host) {
-	c.ToolDataSet.updateHost(cloudItem)
+	c.ToolDataSet.UpdateHost(cloudItem)
 }
 
 func (c *Cache) refreshHosts() {
@@ -371,8 +373,8 @@ func (c *Cache) refreshHosts() {
 }
 
 func (c *Cache) AddVM(item *mysql.VM) {
-	c.DiffBaseDataSet.addVM(item, c.Sequence, &c.ToolDataSet)
-	c.ToolDataSet.addVM(item)
+	c.DiffBaseDataSet.AddVM(item, c.Sequence, c.ToolDataSet)
+	c.ToolDataSet.AddVM(item)
 }
 
 func (c *Cache) AddVMs(items []*mysql.VM) {
@@ -382,12 +384,12 @@ func (c *Cache) AddVMs(items []*mysql.VM) {
 }
 
 func (c *Cache) UpdateVM(cloudItem *cloudmodel.VM) {
-	c.ToolDataSet.updateVM(cloudItem)
+	c.ToolDataSet.UpdateVM(cloudItem)
 }
 
 func (c *Cache) DeleteVM(lcuuid string) {
-	c.DiffBaseDataSet.deleteVM(lcuuid)
-	c.ToolDataSet.deleteVM(lcuuid)
+	c.DiffBaseDataSet.DeleteVM(lcuuid)
+	c.ToolDataSet.DeleteVM(lcuuid)
 }
 
 func (c *Cache) DeleteVMs(lcuuids []string) {
@@ -411,15 +413,15 @@ func (c *Cache) refreshVMs() {
 
 func (c *Cache) AddVPCs(items []*mysql.VPC) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addVPC(item, c.Sequence)
-		c.ToolDataSet.addVPC(item)
+		c.DiffBaseDataSet.AddVPC(item, c.Sequence)
+		c.ToolDataSet.AddVPC(item)
 	}
 }
 
 func (c *Cache) DeleteVPCs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVPC(lcuuid)
-		c.ToolDataSet.deleteVPC(lcuuid)
+		c.DiffBaseDataSet.DeleteVPC(lcuuid)
+		c.ToolDataSet.DeleteVPC(lcuuid)
 	}
 }
 
@@ -437,8 +439,8 @@ func (c *Cache) refreshVPCs() {
 }
 
 func (c *Cache) AddNetwork(item *mysql.Network) {
-	c.DiffBaseDataSet.addNetwork(item, c.Sequence, &c.ToolDataSet)
-	c.ToolDataSet.addNetwork(item)
+	c.DiffBaseDataSet.AddNetwork(item, c.Sequence, c.ToolDataSet)
+	c.ToolDataSet.AddNetwork(item)
 }
 
 func (c *Cache) AddNetworks(items []*mysql.Network) {
@@ -448,13 +450,13 @@ func (c *Cache) AddNetworks(items []*mysql.Network) {
 }
 
 func (c *Cache) UpdateNetwork(cloudItem *cloudmodel.Network) {
-	c.ToolDataSet.updateNetwork(cloudItem)
+	c.ToolDataSet.UpdateNetwork(cloudItem)
 }
 
 func (c *Cache) DeleteNetworks(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteNetwork(lcuuid)
-		c.ToolDataSet.deleteNetwork(lcuuid)
+		c.DiffBaseDataSet.DeleteNetwork(lcuuid)
+		c.ToolDataSet.DeleteNetwork(lcuuid)
 	}
 }
 
@@ -480,22 +482,22 @@ func (c *Cache) refreshNetworks() []int {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err))
 		return networkIDs
 	}
-	c.ToolDataSet.publicNetworkID = publicNetwork.ID
+	c.ToolDataSet.SetPublicNetworkID(publicNetwork.ID)
 
 	return networkIDs
 }
 
 func (c *Cache) AddSubnets(items []*mysql.Subnet) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addSubnet(item, c.Sequence)
-		c.ToolDataSet.addSubnet(item)
+		c.DiffBaseDataSet.AddSubnet(item, c.Sequence)
+		c.ToolDataSet.AddSubnet(item)
 	}
 }
 
 func (c *Cache) DeleteSubnets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteSubnet(lcuuid)
-		c.ToolDataSet.deleteSubnet(lcuuid)
+		c.DiffBaseDataSet.DeleteSubnet(lcuuid)
+		c.ToolDataSet.DeleteSubnet(lcuuid)
 	}
 }
 
@@ -513,8 +515,8 @@ func (c *Cache) refreshSubnets(networkIDs []int) {
 }
 
 func (c *Cache) AddVRouter(item *mysql.VRouter) {
-	c.DiffBaseDataSet.addVRouter(item, c.Sequence, &c.ToolDataSet)
-	c.ToolDataSet.addVRouter(item)
+	c.DiffBaseDataSet.AddVRouter(item, c.Sequence, c.ToolDataSet)
+	c.ToolDataSet.AddVRouter(item)
 }
 
 func (c *Cache) AddVRouters(items []*mysql.VRouter) {
@@ -524,13 +526,13 @@ func (c *Cache) AddVRouters(items []*mysql.VRouter) {
 }
 
 func (c *Cache) UpdateVRouter(cloudItem *cloudmodel.VRouter) {
-	c.ToolDataSet.updateVRouter(cloudItem)
+	c.ToolDataSet.UpdateVRouter(cloudItem)
 }
 
 func (c *Cache) DeleteVRouters(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVRouter(lcuuid)
-		c.ToolDataSet.deleteVRouter(lcuuid)
+		c.DiffBaseDataSet.DeleteVRouter(lcuuid)
+		c.ToolDataSet.DeleteVRouter(lcuuid)
 	}
 }
 
@@ -554,13 +556,13 @@ func (c *Cache) refreshVRouters() []int {
 
 func (c *Cache) AddRoutingTables(items []*mysql.RoutingTable) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addRoutingTable(item, c.Sequence)
+		c.DiffBaseDataSet.AddRoutingTable(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteRoutingTables(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteRoutingTable(lcuuid)
+		c.DiffBaseDataSet.DeleteRoutingTable(lcuuid)
 	}
 }
 
@@ -579,19 +581,19 @@ func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 
 func (c *Cache) AddDHCPPorts(items []*mysql.DHCPPort) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addDHCPPort(item, c.Sequence, &c.ToolDataSet)
-		c.ToolDataSet.addDHCPPort(item)
+		c.DiffBaseDataSet.AddDHCPPort(item, c.Sequence, c.ToolDataSet)
+		c.ToolDataSet.AddDHCPPort(item)
 	}
 }
 
 func (c *Cache) UpdateDHCPPort(cloudItem *cloudmodel.DHCPPort) {
-	c.ToolDataSet.updateDHCPPort(cloudItem)
+	c.ToolDataSet.UpdateDHCPPort(cloudItem)
 }
 
 func (c *Cache) DeleteDHCPPorts(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteDHCPPort(lcuuid)
-		c.ToolDataSet.deleteDHCPPort(lcuuid)
+		c.DiffBaseDataSet.DeleteDHCPPort(lcuuid)
+		c.ToolDataSet.DeleteDHCPPort(lcuuid)
 	}
 }
 
@@ -610,19 +612,19 @@ func (c *Cache) refreshDHCPPorts() {
 
 func (c *Cache) AddVInterfaces(items []*mysql.VInterface) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addVInterface(item, c.Sequence, &c.ToolDataSet)
-		c.ToolDataSet.addVInterface(item)
+		c.DiffBaseDataSet.AddVInterface(item, c.Sequence, c.ToolDataSet)
+		c.ToolDataSet.AddVInterface(item)
 	}
 }
 
 func (c *Cache) UpdateVInterface(cloudItem *cloudmodel.VInterface) {
-	c.ToolDataSet.updateVInterface(cloudItem)
+	c.ToolDataSet.UpdateVInterface(cloudItem)
 }
 
 func (c *Cache) DeleteVInterfaces(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVInterface(lcuuid)
-		c.ToolDataSet.deleteVInterface(lcuuid)
+		c.DiffBaseDataSet.DeleteVInterface(lcuuid)
+		c.ToolDataSet.DeleteVInterface(lcuuid)
 	}
 }
 
@@ -641,15 +643,15 @@ func (c *Cache) refreshVInterfaces() {
 
 func (c *Cache) AddWANIPs(items []*mysql.WANIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addWANIP(item, c.Sequence, &c.ToolDataSet)
-		c.ToolDataSet.addWANIP(item)
+		c.DiffBaseDataSet.AddWANIP(item, c.Sequence, c.ToolDataSet)
+		c.ToolDataSet.AddWANIP(item)
 	}
 }
 
 func (c *Cache) DeleteWANIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteWANIP(lcuuid)
-		c.ToolDataSet.deleteWANIP(lcuuid)
+		c.DiffBaseDataSet.DeleteWANIP(lcuuid)
+		c.ToolDataSet.DeleteWANIP(lcuuid)
 	}
 }
 
@@ -668,15 +670,15 @@ func (c *Cache) refreshWANIPs() {
 
 func (c *Cache) AddLANIPs(items []*mysql.LANIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLANIP(item, c.Sequence, &c.ToolDataSet)
-		c.ToolDataSet.addLANIP(item)
+		c.DiffBaseDataSet.AddLANIP(item, c.Sequence, c.ToolDataSet)
+		c.ToolDataSet.AddLANIP(item)
 	}
 }
 
 func (c *Cache) DeleteLANIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteLANIP(lcuuid)
-		c.ToolDataSet.deleteLANIP(lcuuid)
+		c.DiffBaseDataSet.DeleteLANIP(lcuuid)
+		c.ToolDataSet.DeleteLANIP(lcuuid)
 	}
 }
 
@@ -695,13 +697,13 @@ func (c *Cache) refreshLANIPs() {
 
 func (c *Cache) AddFloatingIPs(items []*mysql.FloatingIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addFloatingIP(item, c.Sequence, &c.ToolDataSet)
+		c.DiffBaseDataSet.AddFloatingIP(item, c.Sequence, c.ToolDataSet)
 	}
 }
 
 func (c *Cache) DeleteFloatingIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteFloatingIP(lcuuid)
+		c.DiffBaseDataSet.DeleteFloatingIP(lcuuid)
 	}
 }
 
@@ -719,8 +721,8 @@ func (c *Cache) refreshFloatingIPs() {
 }
 
 func (c *Cache) AddSecurityGroup(item *mysql.SecurityGroup) {
-	c.DiffBaseDataSet.addSecurityGroup(item, c.Sequence)
-	c.ToolDataSet.addSecurityGroup(item)
+	c.DiffBaseDataSet.AddSecurityGroup(item, c.Sequence)
+	c.ToolDataSet.AddSecurityGroup(item)
 }
 
 func (c *Cache) AddSecurityGroups(items []*mysql.SecurityGroup) {
@@ -731,8 +733,8 @@ func (c *Cache) AddSecurityGroups(items []*mysql.SecurityGroup) {
 
 func (c *Cache) DeleteSecurityGroups(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteSecurityGroup(lcuuid)
-		c.ToolDataSet.deleteSecurityGroup(lcuuid)
+		c.DiffBaseDataSet.DeleteSecurityGroup(lcuuid)
+		c.ToolDataSet.DeleteSecurityGroup(lcuuid)
 	}
 }
 
@@ -756,13 +758,13 @@ func (c *Cache) refreshSecurityGroups() []int {
 
 func (c *Cache) AddSecurityGroupRules(items []*mysql.SecurityGroupRule) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addSecurityGroupRule(item, c.Sequence)
+		c.DiffBaseDataSet.AddSecurityGroupRule(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteSecurityGroupRules(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteSecurityGroupRule(lcuuid)
+		c.DiffBaseDataSet.DeleteSecurityGroupRule(lcuuid)
 	}
 }
 
@@ -781,13 +783,13 @@ func (c *Cache) refreshSecurityGroupRules(securityGroupIDs []int) {
 
 func (c *Cache) AddVMSecurityGroups(items []*mysql.VMSecurityGroup) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addVMSecurityGroup(item, c.Sequence)
+		c.DiffBaseDataSet.AddVMSecurityGroup(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteVMSecurityGroups(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVMSecurityGroup(lcuuid)
+		c.DiffBaseDataSet.DeleteVMSecurityGroup(lcuuid)
 	}
 }
 
@@ -806,19 +808,19 @@ func (c *Cache) refreshVMSecurityGroups(securityGroupIDs []int) {
 
 func (c *Cache) AddNATGateways(items []*mysql.NATGateway) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addNATGateway(item, c.Sequence)
-		c.ToolDataSet.addNATGateway(item)
+		c.DiffBaseDataSet.AddNATGateway(item, c.Sequence)
+		c.ToolDataSet.AddNATGateway(item)
 	}
 }
 
 func (c *Cache) UpdateNATGateway(cloudItem *cloudmodel.NATGateway) {
-	c.ToolDataSet.updateNATGateway(cloudItem)
+	c.ToolDataSet.UpdateNATGateway(cloudItem)
 }
 
 func (c *Cache) DeleteNATGateways(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteNATGateway(lcuuid)
-		c.ToolDataSet.deleteNATGateway(lcuuid)
+		c.DiffBaseDataSet.DeleteNATGateway(lcuuid)
+		c.ToolDataSet.DeleteNATGateway(lcuuid)
 	}
 }
 
@@ -837,13 +839,13 @@ func (c *Cache) refreshNATGateways() {
 
 func (c *Cache) AddNATVMConnections(items []*mysql.NATVMConnection) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addNATVMConnection(item, c.Sequence)
+		c.DiffBaseDataSet.AddNATVMConnection(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteNATVMConnections(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteNATVMConnection(lcuuid)
+		c.DiffBaseDataSet.DeleteNATVMConnection(lcuuid)
 	}
 }
 
@@ -862,13 +864,13 @@ func (c *Cache) refreshNATVMConnections() {
 
 func (c *Cache) AddNATRules(items []*mysql.NATRule) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addNATRule(item, c.Sequence)
+		c.DiffBaseDataSet.AddNATRule(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteNATRules(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteNATRule(lcuuid)
+		c.DiffBaseDataSet.DeleteNATRule(lcuuid)
 	}
 }
 
@@ -887,19 +889,19 @@ func (c *Cache) refreshNATRules() {
 
 func (c *Cache) AddLBs(items []*mysql.LB) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLB(item, c.Sequence)
-		c.ToolDataSet.addLB(item)
+		c.DiffBaseDataSet.AddLB(item, c.Sequence)
+		c.ToolDataSet.AddLB(item)
 	}
 }
 
 func (c *Cache) UpdateLB(cloudItem *cloudmodel.LB) {
-	c.ToolDataSet.updateLB(cloudItem)
+	c.ToolDataSet.UpdateLB(cloudItem)
 }
 
 func (c *Cache) DeleteLBs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteLB(lcuuid)
-		c.ToolDataSet.deleteLB(lcuuid)
+		c.DiffBaseDataSet.DeleteLB(lcuuid)
+		c.ToolDataSet.DeleteLB(lcuuid)
 	}
 }
 
@@ -918,13 +920,13 @@ func (c *Cache) refreshLBs() {
 
 func (c *Cache) AddLBVMConnections(items []*mysql.LBVMConnection) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLBVMConnection(item, c.Sequence)
+		c.DiffBaseDataSet.AddLBVMConnection(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteLBVMConnections(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteLBVMConnection(lcuuid)
+		c.DiffBaseDataSet.DeleteLBVMConnection(lcuuid)
 	}
 }
 
@@ -943,15 +945,15 @@ func (c *Cache) refreshLBVMConnections() {
 
 func (c *Cache) AddLBListeners(items []*mysql.LBListener) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLBListener(item, c.Sequence)
-		c.ToolDataSet.addLBListener(item)
+		c.DiffBaseDataSet.AddLBListener(item, c.Sequence)
+		c.ToolDataSet.AddLBListener(item)
 	}
 }
 
 func (c *Cache) DeleteLBListeners(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteLBListener(lcuuid)
-		c.ToolDataSet.deleteLBListener(lcuuid)
+		c.DiffBaseDataSet.DeleteLBListener(lcuuid)
+		c.ToolDataSet.DeleteLBListener(lcuuid)
 	}
 }
 
@@ -970,13 +972,13 @@ func (c *Cache) refreshLBListeners() {
 
 func (c *Cache) AddLBTargetServers(items []*mysql.LBTargetServer) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLBTargetServer(item, c.Sequence)
+		c.DiffBaseDataSet.AddLBTargetServer(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteLBTargetServers(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteLBTargetServer(lcuuid)
+		c.DiffBaseDataSet.DeleteLBTargetServer(lcuuid)
 	}
 }
 
@@ -995,13 +997,13 @@ func (c *Cache) refreshLBTargetServers() {
 
 func (c *Cache) AddPeerConnections(items []*mysql.PeerConnection) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPeerConnection(item, c.Sequence, &c.ToolDataSet)
+		c.DiffBaseDataSet.AddPeerConnection(item, c.Sequence, c.ToolDataSet)
 	}
 }
 
 func (c *Cache) DeletePeerConnections(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePeerConnection(lcuuid)
+		c.DiffBaseDataSet.DeletePeerConnection(lcuuid)
 	}
 }
 
@@ -1020,13 +1022,13 @@ func (c *Cache) refreshPeeConnections() {
 
 func (c *Cache) AddCENs(items []*mysql.CEN) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addCEN(item, c.Sequence, &c.ToolDataSet)
+		c.DiffBaseDataSet.AddCEN(item, c.Sequence, c.ToolDataSet)
 	}
 }
 
 func (c *Cache) DeleteCENs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteCEN(lcuuid)
+		c.DiffBaseDataSet.DeleteCEN(lcuuid)
 	}
 }
 
@@ -1045,19 +1047,19 @@ func (c *Cache) refreshCENs() {
 
 func (c *Cache) AddRDSInstances(items []*mysql.RDSInstance) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addRDSInstance(item, c.Sequence)
-		c.ToolDataSet.addRDSInstance(item)
+		c.DiffBaseDataSet.AddRDSInstance(item, c.Sequence)
+		c.ToolDataSet.AddRDSInstance(item)
 	}
 }
 
 func (c *Cache) UpdateRDSInstance(cloudItem *cloudmodel.RDSInstance) {
-	c.ToolDataSet.updateRDSInstance(cloudItem)
+	c.ToolDataSet.UpdateRDSInstance(cloudItem)
 }
 
 func (c *Cache) DeleteRDSInstances(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteRDSInstance(lcuuid)
-		c.ToolDataSet.deleteRDSInstance(lcuuid)
+		c.DiffBaseDataSet.DeleteRDSInstance(lcuuid)
+		c.ToolDataSet.DeleteRDSInstance(lcuuid)
 	}
 }
 
@@ -1076,19 +1078,19 @@ func (c *Cache) refreshRDSInstances() {
 
 func (c *Cache) AddRedisInstances(items []*mysql.RedisInstance) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addRedisInstance(item, c.Sequence)
-		c.ToolDataSet.addRedisInstance(item)
+		c.DiffBaseDataSet.AddRedisInstance(item, c.Sequence)
+		c.ToolDataSet.AddRedisInstance(item)
 	}
 }
 
 func (c *Cache) UpdateRedisInstance(cloudItem *cloudmodel.RedisInstance) {
-	c.ToolDataSet.updateRedisInstance(cloudItem)
+	c.ToolDataSet.UpdateRedisInstance(cloudItem)
 }
 
 func (c *Cache) DeleteRedisInstances(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteRedisInstance(lcuuid)
-		c.ToolDataSet.deleteRedisInstance(lcuuid)
+		c.DiffBaseDataSet.DeleteRedisInstance(lcuuid)
+		c.ToolDataSet.DeleteRedisInstance(lcuuid)
 	}
 }
 
@@ -1107,15 +1109,15 @@ func (c *Cache) refreshRedisInstances() {
 
 func (c *Cache) AddPodClusters(items []*mysql.PodCluster) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodCluster(item, c.Sequence)
-		c.ToolDataSet.addPodCluster(item)
+		c.DiffBaseDataSet.AddPodCluster(item, c.Sequence)
+		c.ToolDataSet.AddPodCluster(item)
 	}
 }
 
 func (c *Cache) DeletePodClusters(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodCluster(lcuuid)
-		c.ToolDataSet.deletePodCluster(lcuuid)
+		c.DiffBaseDataSet.DeletePodCluster(lcuuid)
+		c.ToolDataSet.DeletePodCluster(lcuuid)
 	}
 }
 
@@ -1134,19 +1136,19 @@ func (c *Cache) refreshPodClusters() {
 
 func (c *Cache) AddPodNodes(items []*mysql.PodNode) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodNode(item, c.Sequence)
-		c.ToolDataSet.addPodNode(item)
+		c.DiffBaseDataSet.AddPodNode(item, c.Sequence)
+		c.ToolDataSet.AddPodNode(item)
 	}
 }
 
 func (c *Cache) UpdatePodNode(cloudItem *cloudmodel.PodNode) {
-	c.ToolDataSet.updatePodNode(cloudItem)
+	c.ToolDataSet.UpdatePodNode(cloudItem)
 }
 
 func (c *Cache) DeletePodNodes(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodNode(lcuuid)
-		c.ToolDataSet.deletePodNode(lcuuid)
+		c.DiffBaseDataSet.DeletePodNode(lcuuid)
+		c.ToolDataSet.DeletePodNode(lcuuid)
 	}
 }
 
@@ -1165,13 +1167,13 @@ func (c *Cache) refreshPodNodes() {
 
 func (c *Cache) AddVMPodNodeConnections(items []*mysql.VMPodNodeConnection) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addVMPodNodeConnection(item, c.Sequence)
+		c.DiffBaseDataSet.AddVMPodNodeConnection(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteVMPodNodeConnections(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVMPodNodeConnection(lcuuid)
+		c.DiffBaseDataSet.DeleteVMPodNodeConnection(lcuuid)
 	}
 }
 
@@ -1190,15 +1192,15 @@ func (c *Cache) refreshVMPodNodeConnections() {
 
 func (c *Cache) AddPodNamespaces(items []*mysql.PodNamespace) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodNamespace(item, c.Sequence)
-		c.ToolDataSet.addPodNamespace(item)
+		c.DiffBaseDataSet.AddPodNamespace(item, c.Sequence)
+		c.ToolDataSet.AddPodNamespace(item)
 	}
 }
 
 func (c *Cache) DeletePodNamespaces(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodNamespace(lcuuid)
-		c.ToolDataSet.deletePodNamespace(lcuuid)
+		c.DiffBaseDataSet.DeletePodNamespace(lcuuid)
+		c.ToolDataSet.DeletePodNamespace(lcuuid)
 	}
 }
 
@@ -1216,8 +1218,8 @@ func (c *Cache) refreshPodNamespaces() {
 }
 
 func (c *Cache) AddPodIngress(item *mysql.PodIngress) {
-	c.DiffBaseDataSet.addPodIngress(item, c.Sequence)
-	c.ToolDataSet.addPodIngress(item)
+	c.DiffBaseDataSet.AddPodIngress(item, c.Sequence)
+	c.ToolDataSet.AddPodIngress(item)
 }
 
 func (c *Cache) AddPodIngresses(items []*mysql.PodIngress) {
@@ -1228,8 +1230,8 @@ func (c *Cache) AddPodIngresses(items []*mysql.PodIngress) {
 
 func (c *Cache) DeletePodIngresses(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodIngress(lcuuid)
-		c.ToolDataSet.deletePodIngress(lcuuid)
+		c.DiffBaseDataSet.DeletePodIngress(lcuuid)
+		c.ToolDataSet.DeletePodIngress(lcuuid)
 	}
 }
 
@@ -1253,15 +1255,15 @@ func (c *Cache) refreshPodIngresses() []int {
 
 func (c *Cache) AddPodIngressRules(items []*mysql.PodIngressRule) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodIngressRule(item, c.Sequence)
-		c.ToolDataSet.addPodIngressRule(item)
+		c.DiffBaseDataSet.AddPodIngressRule(item, c.Sequence)
+		c.ToolDataSet.AddPodIngressRule(item)
 	}
 }
 
 func (c *Cache) DeletePodIngressRules(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodIngressRule(lcuuid)
-		c.ToolDataSet.deletePodIngressRule(lcuuid)
+		c.DiffBaseDataSet.DeletePodIngressRule(lcuuid)
+		c.ToolDataSet.DeletePodIngressRule(lcuuid)
 	}
 }
 
@@ -1283,13 +1285,13 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 
 func (c *Cache) AddPodIngressRuleBackends(items []*mysql.PodIngressRuleBackend) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodIngressRuleBackend(item, c.Sequence)
+		c.DiffBaseDataSet.AddPodIngressRuleBackend(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeletePodIngressRuleBackends(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodIngressRuleBackend(lcuuid)
+		c.DiffBaseDataSet.DeletePodIngressRuleBackend(lcuuid)
 	}
 }
 
@@ -1310,8 +1312,8 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 }
 
 func (c *Cache) AddPodService(item *mysql.PodService) {
-	c.DiffBaseDataSet.addPodService(item, c.Sequence, &c.ToolDataSet)
-	c.ToolDataSet.addPodService(item)
+	c.DiffBaseDataSet.AddPodService(item, c.Sequence, c.ToolDataSet)
+	c.ToolDataSet.AddPodService(item)
 }
 
 func (c *Cache) AddPodServices(items []*mysql.PodService) {
@@ -1321,13 +1323,13 @@ func (c *Cache) AddPodServices(items []*mysql.PodService) {
 }
 
 func (c *Cache) UpdatePodService(cloudItem *cloudmodel.PodService) {
-	c.ToolDataSet.updatePodService(cloudItem)
+	c.ToolDataSet.UpdatePodService(cloudItem)
 }
 
 func (c *Cache) DeletePodServices(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodService(lcuuid)
-		c.ToolDataSet.deletePodService(lcuuid)
+		c.DiffBaseDataSet.DeletePodService(lcuuid)
+		c.ToolDataSet.DeletePodService(lcuuid)
 	}
 }
 
@@ -1351,13 +1353,13 @@ func (c *Cache) refreshPodServices() []int {
 
 func (c *Cache) AddPodServicePorts(items []*mysql.PodServicePort) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodServicePort(item, c.Sequence)
+		c.DiffBaseDataSet.AddPodServicePort(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeletePodServicePorts(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodServicePort(lcuuid)
+		c.DiffBaseDataSet.DeletePodServicePort(lcuuid)
 	}
 }
 
@@ -1379,15 +1381,15 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 
 func (c *Cache) AddPodGroups(items []*mysql.PodGroup) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodGroup(item, c.Sequence)
-		c.ToolDataSet.addPodGroup(item)
+		c.DiffBaseDataSet.AddPodGroup(item, c.Sequence)
+		c.ToolDataSet.AddPodGroup(item)
 	}
 }
 
 func (c *Cache) DeletePodGroups(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodGroup(lcuuid)
-		c.ToolDataSet.deletePodGroup(lcuuid)
+		c.DiffBaseDataSet.DeletePodGroup(lcuuid)
+		c.ToolDataSet.DeletePodGroup(lcuuid)
 	}
 }
 
@@ -1406,13 +1408,13 @@ func (c *Cache) refreshPodGroups() {
 
 func (c *Cache) AddPodGroupPorts(items []*mysql.PodGroupPort) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodGroupPort(item, c.Sequence)
+		c.DiffBaseDataSet.AddPodGroupPort(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeletePodGroupPorts(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodGroupPort(lcuuid)
+		c.DiffBaseDataSet.DeletePodGroupPort(lcuuid)
 	}
 }
 
@@ -1434,15 +1436,15 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 
 func (c *Cache) AddPodReplicaSets(items []*mysql.PodReplicaSet) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPodReplicaSet(item, c.Sequence)
-		c.ToolDataSet.addPodReplicaSet(item)
+		c.DiffBaseDataSet.AddPodReplicaSet(item, c.Sequence)
+		c.ToolDataSet.AddPodReplicaSet(item)
 	}
 }
 
 func (c *Cache) DeletePodReplicaSets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePodReplicaSet(lcuuid)
-		c.ToolDataSet.deletePodReplicaSet(lcuuid)
+		c.DiffBaseDataSet.DeletePodReplicaSet(lcuuid)
+		c.ToolDataSet.DeletePodReplicaSet(lcuuid)
 	}
 }
 
@@ -1461,19 +1463,19 @@ func (c *Cache) refreshPodReplicaSets() {
 
 func (c *Cache) AddPods(items []*mysql.Pod) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPod(item, c.Sequence, &c.ToolDataSet)
-		c.ToolDataSet.addPod(item)
+		c.DiffBaseDataSet.AddPod(item, c.Sequence, c.ToolDataSet)
+		c.ToolDataSet.AddPod(item)
 	}
 }
 
 func (c *Cache) UpdatePod(cloudItem *cloudmodel.Pod) {
-	c.ToolDataSet.updatePod(cloudItem)
+	c.ToolDataSet.UpdatePod(cloudItem)
 }
 
 func (c *Cache) DeletePods(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePod(lcuuid)
-		c.ToolDataSet.deletePod(lcuuid)
+		c.DiffBaseDataSet.DeletePod(lcuuid)
+		c.ToolDataSet.DeletePod(lcuuid)
 	}
 }
 
@@ -1492,15 +1494,15 @@ func (c *Cache) refreshPods() {
 
 func (c *Cache) AddProcesses(items []*mysql.Process) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addProcess(item, c.Sequence)
-		c.ToolDataSet.addProcess(item)
+		c.DiffBaseDataSet.AddProcess(item, c.Sequence)
+		c.ToolDataSet.AddProcess(item)
 	}
 }
 
 func (c *Cache) DeleteProcesses(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteProcess(lcuuid)
-		c.ToolDataSet.deleteProcess(lcuuid)
+		c.DiffBaseDataSet.DeleteProcess(lcuuid)
+		c.ToolDataSet.DeleteProcess(lcuuid)
 	}
 }
 
@@ -1518,13 +1520,13 @@ func (c *Cache) refreshProcesses() {
 
 func (c *Cache) AddPrometheusTargets(items []*mysql.PrometheusTarget) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addPrometheusTarget(item, c.Sequence)
+		c.DiffBaseDataSet.AddPrometheusTarget(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeletePrometheusTargets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deletePrometheusTarget(lcuuid)
+		c.DiffBaseDataSet.DeletePrometheusTarget(lcuuid)
 	}
 }
 
@@ -1541,13 +1543,13 @@ func (c *Cache) refreshPrometheusTarget() {
 
 func (c *Cache) AddVIPs(items []*mysql.VIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addVIP(item, c.Sequence)
+		c.DiffBaseDataSet.AddVIP(item, c.Sequence)
 	}
 }
 
 func (c *Cache) DeleteVIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.deleteVIP(lcuuid)
+		c.DiffBaseDataSet.DeleteVIP(lcuuid)
 	}
 }
 

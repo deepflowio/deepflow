@@ -470,9 +470,10 @@ type Metrics struct {
 	L7Response    uint32 `json:"l7_response,omitempty"`
 	L7ParseFailed uint32 `json:"l7_parse_failed,omitempty"`
 
-	RTT       uint32 `json:"rtt,omitempty"`        // us
-	RTTClient uint32 `json:"rtt_client,omitempty"` // us
-	RTTServer uint32 `json:"rtt_server,omitempty"` // us
+	RTT       uint32 `json:"rtt,omitempty"`         // us
+	RTTClient uint32 `json:"rtt_client,omitempty"`  // us
+	RTTServer uint32 `json:"rtt_server,omitempty"`  // us
+	TLSRTT    uint32 `json:"tls_rtt_sum,omitempty"` // us
 
 	SRTSum uint32 `json:"srt_sum,omitempty"`
 	ARTSum uint32 `json:"art_sum,omitempty"`
@@ -524,6 +525,7 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_client", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_server", ckdb.Float64).SetComment("单位: 微秒"),
+	ckdb.NewColumn("tls_rtt", ckdb.Float64).SetComment("单位: 微秒"),
 
 	ckdb.NewColumn("srt_sum", ckdb.Float64),
 	ckdb.NewColumn("art_sum", ckdb.Float64),
@@ -575,6 +577,7 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) {
 		float64(m.RTT),
 		float64(m.RTTClient),
 		float64(m.RTTServer),
+		float64(m.TLSRTT),
 
 		float64(m.SRTSum),
 		float64(m.ARTSum),
@@ -926,6 +929,7 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.RTT = p.Tcp.Rtt
 		m.RTTClient = p.Tcp.RttClientMax
 		m.RTTServer = p.Tcp.RttServerMax
+		m.TLSRTT = p.L7.TlsRtt
 
 		m.SRTSum = p.Tcp.SrtSum
 		m.SRTCount = p.Tcp.SrtCount

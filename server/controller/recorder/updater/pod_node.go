@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodNode struct {
-	UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]
+	UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *diffbase.PodNode]
 }
 
 func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNode {
 	updater := &PodNode{
-		UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]{
+		UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *diffbase.PodNode]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodNode(),
-			diffBaseData: wholeCache.PodNodes,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodNodes,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 	return updater
 }
 
-func (n *PodNode) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNode) (diffBase *cache.PodNode, exists bool) {
+func (n *PodNode) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNode) (diffBase *diffbase.PodNode, exists bool) {
 	diffBase, exists = n.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -83,7 +84,7 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.Pod
 	return dbItem, true
 }
 
-func (n *PodNode) generateUpdateInfo(diffBase *cache.PodNode, cloudItem *cloudmodel.PodNode) (map[string]interface{}, bool) {
+func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Type != cloudItem.Type {
 		updateInfo["type"] = cloudItem.Type

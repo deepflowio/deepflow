@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PeerConnection struct {
-	UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *cache.PeerConnection]
+	UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *diffbase.PeerConnection]
 }
 
 func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConnection) *PeerConnection {
 	updater := &PeerConnection{
-		UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *cache.PeerConnection]{
+		UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *diffbase.PeerConnection]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPeerConnection(),
-			diffBaseData: wholeCache.PeerConnections,
+			diffBaseData: wholeCache.DiffBaseDataSet.PeerConnections,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 	return updater
 }
 
-func (c *PeerConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PeerConnection) (diffBase *cache.PeerConnection, exists bool) {
+func (c *PeerConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PeerConnection) (diffBase *diffbase.PeerConnection, exists bool) {
 	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -93,7 +94,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	return dbItem, true
 }
 
-func (c *PeerConnection) generateUpdateInfo(diffBase *cache.PeerConnection, cloudItem *cloudmodel.PeerConnection) (map[string]interface{}, bool) {
+func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

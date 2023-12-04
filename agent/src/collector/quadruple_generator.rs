@@ -991,6 +991,7 @@ impl QuadrupleGenerator {
                     art_count: stats.tcp.art_count,
                     rrt_count: 0,
                     cit_count: stats.tcp.cit_count,
+                    ..Default::default()
                 };
 
                 let src_perf = &stats.tcp.counts_peers[0];

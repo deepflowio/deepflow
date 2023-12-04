@@ -305,7 +305,7 @@ impl FastCGIRecord {
     }
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Default)]
 pub struct FastCGILog {
     perf_stats: Option<L7PerfStats>,
 }
@@ -625,6 +625,7 @@ mod test {
                 rrt_count: 1,
                 rrt_sum: 174,
                 rrt_max: 174,
+                ..Default::default()
             }
         );
     }

@@ -18,7 +18,9 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -45,6 +47,7 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/domains/", createDomain(d.cfg))
 	e.PATCH("/v1/domains/:lcuuid/", updateDomain(d.cfg))
 	e.DELETE("/v1/domains/:name-or-uuid/", deleteDomainByNameOrUUID)
+	e.DELETE("/v1/domains/", deleteDomainByName)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
 	e.GET("/v2/sub-domains/", getSubDomains)
@@ -127,6 +130,16 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 func deleteDomainByNameOrUUID(c *gin.Context) {
 	nameOrUUID := c.Param("name-or-uuid")
 	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID)
+	common.JsonResponse(c, data, err)
+}
+
+func deleteDomainByName(c *gin.Context) {
+	rawQuery := strings.Split(c.Request.URL.RawQuery, "name=")
+	if len(rawQuery) < 1 {
+		common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
+		return
+	}
+	data, err := resource.DeleteDomainByNameOrUUID(rawQuery[1])
 	common.JsonResponse(c, data, err)
 }
 

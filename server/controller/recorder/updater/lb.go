@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type LB struct {
-	UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]
+	UpdaterBase[cloudmodel.LB, mysql.LB, *diffbase.LB]
 }
 
 func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	updater := &LB{
-		UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]{
+		UpdaterBase[cloudmodel.LB, mysql.LB, *diffbase.LB]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewLB(),
-			diffBaseData: wholeCache.LBs,
+			diffBaseData: wholeCache.DiffBaseDataSet.LBs,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	return updater
 }
 
-func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *cache.LB, exists bool) {
+func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *diffbase.LB, exists bool) {
 	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -71,7 +72,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 	return dbItem, true
 }
 
-func (l *LB) generateUpdateInfo(diffBase *cache.LB, cloudItem *cloudmodel.LB) (map[string]interface{}, bool) {
+func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

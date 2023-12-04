@@ -15,6 +15,7 @@
  */
 
 use std::ffi::{CStr, CString};
+use std::ptr::null_mut;
 use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -381,16 +382,6 @@ impl EbpfCollector {
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
-            let log_file = config.ebpf.log_file.clone();
-            let log_file = if !log_file.is_empty() {
-                CString::new(log_file.as_bytes())
-                    .unwrap()
-                    .as_c_str()
-                    .as_ptr()
-            } else {
-                std::ptr::null()
-            };
-
             if !config.ebpf.uprobe_proc_regexp.golang.is_empty() {
                 info!(
                     "ebpf set golang uprobe proc regexp: {}",
@@ -467,16 +458,13 @@ impl EbpfCollector {
                 }
             }
 
-            if ebpf::bpf_tracer_init(log_file, true) != 0 {
-                info!("ebpf bpf_tracer_init error: {}", config.ebpf.log_file);
+            if ebpf::bpf_tracer_init(null_mut(), true) != 0 {
+                info!("ebpf bpf_tracer_init error.");
                 return Err(Error::EbpfInitError);
             }
 
             if ebpf::set_go_tracing_timeout(config.ebpf.go_tracing_timeout as c_int) != 0 {
-                info!(
-                    "ebpf set_go_tracing_timeout error: {}",
-                    config.ebpf.log_file
-                );
+                info!("ebpf set_go_tracing_timeout error.",);
                 return Err(Error::EbpfInitError);
             }
 
@@ -501,10 +489,10 @@ impl EbpfCollector {
 
             let mut all_proto_map = get_all_protocol()
                 .iter()
-                .map(|p| p.as_str().to_string())
+                .map(|p| p.as_str().to_lowercase())
                 .collect::<HashSet<String>>();
             for (protocol, port_range) in &config.l7_protocol_ports {
-                all_proto_map.remove(protocol);
+                all_proto_map.remove(&protocol.to_lowercase());
                 let l7_protocol = L7Protocol::from(protocol.clone());
                 let ports = CString::new(port_range.as_str()).unwrap();
                 if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {

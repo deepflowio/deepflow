@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type RoutingTable struct {
-	UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *cache.RoutingTable]
+	UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *diffbase.RoutingTable]
 }
 
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
 	updater := &RoutingTable{
-		UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *cache.RoutingTable]{
+		UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *diffbase.RoutingTable]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewRoutingTable(),
-			diffBaseData: wholeCache.RoutingTables,
+			diffBaseData: wholeCache.DiffBaseDataSet.RoutingTables,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 	return updater
 }
 
-func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable) (diffBase *cache.RoutingTable, exists bool) {
+func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable) (diffBase *diffbase.RoutingTable, exists bool) {
 	diffBase, exists = t.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -66,7 +67,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
-func (t *RoutingTable) generateUpdateInfo(diffBase *cache.RoutingTable, cloudItem *cloudmodel.RoutingTable) (map[string]interface{}, bool) {
+func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Destination != cloudItem.Destination {
 		updateInfo["destination"] = cloudItem.Destination

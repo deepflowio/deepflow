@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -30,7 +30,7 @@ import (
 
 type EventManagerBase struct {
 	resourceType string
-	ToolDataSet  *cache.ToolDataSet
+	ToolDataSet  *tool.DataSet
 	Queue        *queue.OverwriteQueue
 }
 

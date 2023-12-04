@@ -24,7 +24,6 @@ const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
 const DB_NAME_PROMETHEUS = "prometheus"
-const DB_DEEPFLOW_SYSTEM_INTERVAL = 10
 
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},

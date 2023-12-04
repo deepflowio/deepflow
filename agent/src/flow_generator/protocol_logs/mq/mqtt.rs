@@ -208,7 +208,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct MqttLog {
     msg_type: LogMessageType,
     status: L7ResponseStatus,
@@ -1037,6 +1037,7 @@ mod tests {
                     rrt_count: 1,
                     rrt_sum: 256746,
                     rrt_max: 256746,
+                    ..Default::default()
                 },
             ),
             (
@@ -1050,6 +1051,7 @@ mod tests {
                     rrt_count: 1,
                     rrt_sum: 272795,
                     rrt_max: 272795,
+                    ..Default::default()
                 },
             ),
         ];

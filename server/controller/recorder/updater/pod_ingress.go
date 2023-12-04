@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodIngress struct {
-	UpdaterBase[cloudmodel.PodIngress, mysql.PodIngress, *cache.PodIngress]
+	UpdaterBase[cloudmodel.PodIngress, mysql.PodIngress, *diffbase.PodIngress]
 }
 
 func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *PodIngress {
 	updater := &PodIngress{
-		UpdaterBase[cloudmodel.PodIngress, mysql.PodIngress, *cache.PodIngress]{
+		UpdaterBase[cloudmodel.PodIngress, mysql.PodIngress, *diffbase.PodIngress]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodIngress(),
-			diffBaseData: wholeCache.PodIngresses,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodIngresses,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 	return updater
 }
 
-func (i *PodIngress) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress) (diffBase *cache.PodIngress, exists bool) {
+func (i *PodIngress) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress) (diffBase *diffbase.PodIngress, exists bool) {
 	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -77,7 +78,7 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mys
 	return dbItem, true
 }
 
-func (i *PodIngress) generateUpdateInfo(diffBase *cache.PodIngress, cloudItem *cloudmodel.PodIngress) (map[string]interface{}, bool) {
+func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name

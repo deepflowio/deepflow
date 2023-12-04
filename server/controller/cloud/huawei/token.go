@@ -102,7 +102,7 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 	h.toolDataSet.configProjectToken = token.token
 
 	projectIDs := []string{}
-	jProjects, err := h.getRawData(newRawDataGetContext(fmt.Sprintf("https://%s/v3/auth/projects", h.config.IAMHost), token.token, "projects", false))
+	jProjects, err := h.getRawData(newRawDataGetContext(fmt.Sprintf("https://%s/v3/auth/projects", h.config.IAMHost), token.token, "projects", pageQueryMethodNotPage))
 	if err != nil {
 		return
 	}
@@ -138,7 +138,7 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 			continue
 		}
 		jvpcs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.Domain, p.id), t.token, "vpcs", true,
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.Domain, p.id), t.token, "vpcs", pageQueryMethodMarker,
 		))
 		if err != nil {
 			delete(h.projectTokenMap, p)

@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch"
@@ -107,6 +107,22 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, name) {
+			autoTagMap := tagItem.TagTranslatorMap
+			autoTagSlice := []string{}
+			for autoTagKey, _ := range autoTagMap {
+				autoTagSlice = append(autoTagSlice, autoTagKey)
+			}
+			sort.Strings(autoTagSlice)
+			for _, autoTagKey := range autoTagSlice {
+				if autoTagMap[autoTagKey] != "" {
+					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})
+				} else {
+					stmts = append(stmts, &SelectTag{Value: "`" + autoTagKey + "`"})
+				}
+			}
+			// callback
+			stmts = append(stmts, &SelectTag{Value: name})
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
@@ -141,7 +157,7 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 				return nil, "", err
 			}
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
-		} else if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(selectTag, config.Cfg.AutoCustomTag.TagName) {
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(selectTag, "`")) {
 			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
@@ -150,11 +166,13 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			sort.Strings(autoTagSlice)
 			for _, autoTagKey := range autoTagSlice {
 				if autoTagMap[autoTagKey] != "" {
-					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: autoTagKey})
+					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})
 				} else {
-					stmts = append(stmts, &SelectTag{Value: autoTagKey})
+					stmts = append(stmts, &SelectTag{Value: "`" + autoTagKey + "`"})
 				}
 			}
+			// callback
+			stmts = append(stmts, &SelectTag{Value: name})
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
@@ -249,18 +267,20 @@ type SelectTag struct {
 }
 
 func (t *SelectTag) Format(m *view.Model) {
-	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-	if config.Cfg.AutoCustomTag.TagName != "" {
-		m.AddCallback(config.Cfg.AutoCustomTag.TagName, ColumnNameSwap([]interface{}{config.Cfg.AutoCustomTag.TagName}))
-	}
-	if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
-		alias := t.Value
-		if t.Alias != "" {
-			alias = t.Alias
+	if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(t.Value, "`")) {
+		m.AddCallback(strings.Trim(t.Value, "`"), ColumnNameSwap([]interface{}{strings.Trim(t.Value, "`")}))
+	} else {
+		m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
+		if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+			alias := t.Value
+			if t.Alias != "" {
+				alias = t.Alias
+			}
+			m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
 		}
-		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
+		if t.Value == "packet_batch" {
+			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
+		}
 	}
-	if t.Value == "packet_batch" {
-		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
-	}
+
 }

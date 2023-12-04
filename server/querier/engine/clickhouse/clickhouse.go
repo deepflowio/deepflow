@@ -346,7 +346,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)
-						if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(sqlparser.String(colName), config.Cfg.AutoCustomTag.TagName) {
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
 							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
@@ -362,7 +362,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-						if config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(sqlparser.String(colName), config.Cfg.AutoCustomTag.TagName) {
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
 							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
@@ -422,7 +422,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				if slices.Contains(outerWhereLeftSlice, groupTag) || (config.Cfg.AutoCustomTag.TagName != "" && strings.HasPrefix(groupTag, config.Cfg.AutoCustomTag.TagName)) {
+				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, groupTag)) {
 					innerGroupBySlice = append(innerGroupBySlice, groupTag)
 				}
 			}
@@ -608,16 +608,20 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
-				if common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName, tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_0", tagSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_1", tagSlice) {
-					if strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(sqlparser.String(colName), "_0"), "_1")) {
-						errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", sqlparser.String(colName))
-						return errors.New(errStr)
+				if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(sqlparser.String(colName), "`")) {
+					autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(sqlparser.String(colName), "`")]
+					for _, selectTag := range tagSlice {
+						if slices.Contains(autoTagValues, strings.Trim(selectTag, "`")) {
+							errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", selectTag)
+							return errors.New(errStr)
+						}
 					}
-					if strings.Contains(config.Cfg.AutoCustomTag.TagValues, "ip") && strings.Split(config.Cfg.AutoCustomTag.TagValues, ", ")[len(strings.Split(config.Cfg.AutoCustomTag.TagValues, ", "))-1] != "ip" {
+					if (slices.Contains(autoTagValues, "ip") && autoTagValues[len(autoTagValues)-1] != "ip") || (slices.Contains(autoTagValues, "ip_0") && autoTagValues[len(autoTagValues)-1] != "ip_0") || (slices.Contains(autoTagValues, "ip_1") && autoTagValues[len(autoTagValues)-1] != "ip_1") {
 						errStr := "ip can only be the last tag in the auto custom tag"
 						return errors.New(errStr)
 					}
 				}
+
 				// pod_ingress/lb_listener is not supported by select
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
@@ -797,18 +801,14 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				e.Statements = append(e.Statements, &whereStmt)
 				table = "samples"
 			}
+			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			e.Model.Time.DatasourceInterval = interval
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
-				interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
-				if err != nil {
-					log.Error(err)
-					return err
-				}
-				e.Model.Time.DatasourceInterval = interval
-			} else if e.DB == "deepflow_system" {
-				// when DB is deepflow_system, DatasourceInterval is set to 10
-				e.Model.Time.DatasourceInterval = chCommon.DB_DEEPFLOW_SYSTEM_INTERVAL
-				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			} else {
 				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			}
@@ -856,9 +856,14 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		colName, ok := group.(*sqlparser.ColName)
 		if ok {
 			groupTag := sqlparser.String(colName)
-			if (common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName, groupSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_0", groupSlice) || common.IsValueInSliceString(config.Cfg.AutoCustomTag.TagName+"_1", groupSlice)) && strings.Contains(config.Cfg.AutoCustomTag.TagValues, strings.TrimSuffix(strings.TrimSuffix(groupTag, "_0"), "_1")) {
-				errStr := fmt.Sprintf("Cannot group by tags that exist in auto custom tag : %s", groupTag)
-				return errors.New(errStr)
+			if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(groupTag, "`")) {
+				autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(groupTag, "`")]
+				for _, sliceGroup := range groupSlice {
+					if slices.Contains(autoTagValues, strings.Trim(sliceGroup, "`")) {
+						errStr := fmt.Sprintf("Cannot group by tags that exist in auto custom tag : %s", groupTag)
+						return errors.New(errStr)
+					}
+				}
 			}
 		}
 		err := e.parseGroupBy(group)

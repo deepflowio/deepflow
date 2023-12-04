@@ -826,35 +826,6 @@ static void reader_lost_cb(void *t, uint64_t lost)
 	atomic64_add(&tracer->lost, lost);
 }
 
-static bool inline insert_list(void *elt, uint32_t len, struct list_head *h)
-{
-	struct clear_list_elem *cle;
-	cle = calloc(sizeof(*cle) + len, 1);
-	if (cle == NULL) {
-		ebpf_warning("calloc() failed.\n");
-		return false;
-	}
-	memcpy((void *)cle->p, (void *)elt, len);
-	list_add_tail(&cle->list, h);
-	return true;
-}
-
-static int inline __reclaim_map(int map_fd, struct list_head *h)
-{
-	int count = 0;
-	struct list_head *p, *n;
-	struct clear_list_elem *cle;
-	list_for_each_safe(p, n, h) {
-		cle = container_of(p, struct clear_list_elem, list);
-		if (!bpf_delete_elem(map_fd, (void *)cle->p))
-			count++;
-		list_head_del(&cle->list);
-		free(cle);
-	}
-
-	return count;
-}
-
 static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 {
 	struct ebpf_map *map =
@@ -909,6 +880,7 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	if (map == NULL) {
 		ebpf_warning("[%s] map(name:%s) is NULL.\n", __func__,
 			     MAP_SOCKET_INFO_NAME);
+		return;
 	}
 	int map_fd = map->fd;
 
@@ -1547,6 +1519,10 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 	// jmp for tracepoints
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
+				    PROG_PROTO_INFER_FOR_TP,
+				    PROG_PROTO_INFER_TP_IDX);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_TP,
 				    PROG_DATA_SUBMIT_TP_IDX);
 	__insert_output_prog_to_map(tracer,
@@ -1559,6 +1535,10 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 				    PROG_IO_EVENT_TP_IDX);
 
 	// jmp for kprobe/uprobe
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_PROTO_INFER_FOR_KP,
+				    PROG_PROTO_INFER_KP_IDX);
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_KP,

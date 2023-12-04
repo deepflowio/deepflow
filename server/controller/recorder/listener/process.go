@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type Process struct {
 func NewProcess(c *cache.Cache, eq *queue.OverwriteQueue) *Process {
 	listener := &Process{
 		cache:         c,
-		eventProducer: event.NewProcess(&c.ToolDataSet, eq),
+		eventProducer: event.NewProcess(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (p *Process) OnUpdaterAdded(addedDBItems []*mysql.Process) {
 	p.cache.AddProcesses(addedDBItems)
 }
 
-func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *cache.Process) {
+func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *diffbase.Process) {
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 }

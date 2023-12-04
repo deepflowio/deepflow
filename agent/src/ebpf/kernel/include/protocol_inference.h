@@ -19,26 +19,124 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+/*
+ * Due to the limitation of the number of eBPF instructions to 4096 in Linux
+ * kernels lower than version 5.12, the protocol inference code, when augmented
+ * with new protocols, easily exceeds the instruction limit. To address this
+ * issue, we have split the protocol inference into two separate programs.
+ * The updated workflow is as follows:
+ *
+ * [openssl Uprobe] ----------------
+ *                                 |
+ *                                \|/
+ * [syscall Kprobe/tracepoint] --> [protocol infer] --> [data submit] --> [output data]
+ *       |                                                                ^
+ *       |                                                                |
+ *       |----general file io------> [io event] ---------------------------
+ *
+ * Explanation:
+ *   `[openssl Uprobe]` and `[syscall Kprobe/tracepoint]` encompass the preparation
+ *   work for eBPF probe entry and a portion of Layer 7 (L7) protocol inference.
+ *   `[protocol infer]` represents the second part of L7 protocol inference, and
+ *   newly added protocol inference code can be placed within the `infer_protocol_2()`
+ *   interface.
+ */
 #ifndef DF_BPF_PROTO_INFER_H
 #define DF_BPF_PROTO_INFER_H
 
 #include "common.h"
 #include "socket_trace.h"
 
+#define L7_PROTO_INFER_PROG_1	0
+#define L7_PROTO_INFER_PROG_2	1
+
+static __inline bool is_set_ports_bitmap(ports_bitmap_t * ports, __u16 port)
+{
+	/* 
+	 * Avoid using the form `ports->bitmap[port >> 3]` to index the
+	 * bitmap, as it may lead to the following error:
+	 *
+	 *   115: (85) call bpf_map_lookup_elem#1
+	 *   116: (15) if r0 == 0x0 goto pc+5
+	 *   117: (79) r1 = *(u64 *)(r10 -168)
+	 *   118: (77) r1 >>= 3
+	 *   119: (0f) r0 += r1
+	 *   120: (71) r1 = *(u8 *)(r0 +0)
+	 *   R0 unbounded memory access, make sure to bounds check any array
+	 *   access into a map
+	 *
+	 * The error message indicates that we need to perform boundary checks
+	 * for R0.
+	 */
+	const __u8 *end = (void *)ports + sizeof(*ports);
+	const __u8 *start = (__u8 *) ports;
+	const __u8 *addr = start + (port >> 3);
+	if (addr >= start && addr < end) {
+		/*
+		 * Here, we must restrict the type of 'mask' to 'u8'; otherwise,
+		 * when compiling as 'u64,' errors will occur upon loading the
+		 * program:
+		 *
+		 *   122: (3d) if r1 >= r0 goto pc+6
+		 *   123: (79) r2 = *(u64 *)(r10 -168)
+		 *   124: (57) r2 &= 7
+		 *   125: (71) r1 = *(u8 *)(r1 +0)
+		 *   R1 unbounded memory access, make sure to bounds check any
+		 *   array access into a map
+		 */
+		const __u8 mask = 1 << (port & 0x7);
+		if (*addr & mask)
+			return true;
+	}
+
+	return false;
+}
+
 static __inline bool
-protocol_port_check(enum traffic_protocol proto, struct conn_info_t *conn_info)
+__protocol_port_check(enum traffic_protocol proto,
+		      struct conn_info_t *conn_info, __u8 prog_num)
 {
 	if (!is_protocol_enabled(proto)) {
 		return false;
 	}
 
-	if (!proto_port_is_allowed((__u32) proto,
-				   conn_info->tuple.num,
-				   conn_info->tuple.dport)) {
-		return false;
+	__u32 key = proto;
+	ports_bitmap_t *ports = proto_ports_bitmap__lookup(&key);
+	if (ports) {
+		/*
+		 * If the "is_set_ports_bitmap()" function is used in both stages,
+		 * there may be the following error when loading an eBPF program in
+		 * the 4.14 kernel:
+		 * `failed. name: bpf_func_sys_exit_sendmmsg, Argument list too long errno: 7`
+		 * To avoid this situation, it is necessary to differentiate the calls.
+		 */
+		if (prog_num == L7_PROTO_INFER_PROG_1) {
+			if (is_set_bitmap(ports->bitmap, conn_info->tuple.num)
+			    || is_set_bitmap(ports->bitmap,
+					     conn_info->tuple.dport))
+				return true;
+		} else {
+			if (is_set_ports_bitmap(ports, conn_info->tuple.num) ||
+			    is_set_ports_bitmap(ports, conn_info->tuple.dport))
+				return true;
+		}
 	}
 
-	return true;
+	return false;
+}
+
+static __inline bool
+protocol_port_check_1(enum traffic_protocol proto,
+		      struct conn_info_t *conn_info)
+{
+	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_1);
+}
+
+static __inline bool
+protocol_port_check_2(enum traffic_protocol proto,
+		      struct conn_info_t *conn_info)
+{
+	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
 }
 
 static __inline bool is_same_command(char *a, char *b)
@@ -255,7 +353,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 #ifdef LINUX_VER_5_2_PLUS
 #define HTTPV2_LOOP_MAX 8
 #else
-#define HTTPV2_LOOP_MAX 6
+#define HTTPV2_LOOP_MAX 7
 #endif
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
@@ -378,7 +476,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!protocol_port_check(PROTO_HTTP2, conn_info))
+	if (!protocol_port_check_1(PROTO_HTTP2, conn_info))
 		return MSG_UNKNOWN;
 
 	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
@@ -431,7 +529,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (!protocol_port_check(PROTO_HTTP1, conn_info))
+	if (!protocol_port_check_1(PROTO_HTTP1, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
@@ -508,7 +606,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!protocol_port_check(PROTO_MYSQL, conn_info))
+	if (!protocol_port_check_1(PROTO_MYSQL, conn_info))
 		return MSG_UNKNOWN;
 
 	if (count == 4) {
@@ -719,7 +817,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 {
 #define POSTGRE_INFER_BUF_SIZE 32
 
-	if (!protocol_port_check(PROTO_POSTGRESQL, conn_info))
+	if (!protocol_port_check_2(PROTO_POSTGRESQL, conn_info))
 		return MSG_UNKNOWN;
 
 	if (conn_info->tuple.l4_protocol != IPPROTO_TCP) {
@@ -869,7 +967,7 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	if (count < bolt_resp_header_len)
 		return MSG_UNKNOWN;
 
-	if (!protocol_port_check(PROTO_SOFARPC, conn_info))
+	if (!protocol_port_check_1(PROTO_SOFARPC, conn_info))
 		return MSG_UNKNOWN;
 
 	const __u8 *infer_buf = (const __u8 *)buf;
@@ -994,7 +1092,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (!protocol_port_check(PROTO_DNS, conn_info))
+	if (!protocol_port_check_1(PROTO_DNS, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
@@ -1086,7 +1184,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (count < 4)
 		return MSG_UNKNOWN;
 
-	if (!protocol_port_check(PROTO_REDIS, conn_info))
+	if (!protocol_port_check_1(PROTO_REDIS, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
@@ -1168,7 +1266,7 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (count < 4)
 		return MSG_UNKNOWN;
 
-	if (!protocol_port_check(PROTO_MQTT, conn_info))
+	if (!protocol_port_check_1(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr))
@@ -1299,7 +1397,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (!protocol_port_check(PROTO_DUBBO, conn_info))
+	if (!protocol_port_check_1(PROTO_DUBBO, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
@@ -1458,7 +1556,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (!protocol_port_check(PROTO_KAFKA, conn_info))
+	if (!protocol_port_check_1(PROTO_KAFKA, conn_info))
 		return MSG_UNKNOWN;
 
 	if (count == 4) {
@@ -1582,7 +1680,7 @@ infer_fastcgi_message(const char *buf, size_t count,
 		return MSG_UNKNOWN;
 	}
 
-	if (!protocol_port_check(PROTO_FASTCGI, conn_info))
+	if (!protocol_port_check_1(PROTO_FASTCGI, conn_info))
 		return MSG_UNKNOWN;
 
 	struct fastcgi_header *header = NULL;
@@ -1664,25 +1762,24 @@ infer_mongo_message(const char *buf, size_t count,
 	if (count < sizeof(struct mongo_header)) {
 		return MSG_UNKNOWN;
 	}
-	struct mongo_header header = {};
-	bpf_probe_read(&header, sizeof(header), buf);
-	if (header.message_length < count) {
+	struct mongo_header *header = (struct mongo_header *)buf;
+	if (header->message_length < count) {
 		return MSG_UNKNOWN;
 	}
-	if (header.request_id < 0) {
+	if (header->request_id < 0) {
 		return MSG_UNKNOWN;
 	}
-	if (header.op_code == MONGO_OP_REPLY) {
+	if (header->op_code == MONGO_OP_REPLY) {
 		return MSG_RESPONSE;
 	}
-	if (header.op_code < MONGO_OP_UPDATE) {
+	if (header->op_code < MONGO_OP_UPDATE) {
 		return MSG_UNKNOWN;
 	}
-	if (header.op_code > MONGO_OP_KILL_CURSORS
-	    && header.op_code < MONGO_OP_COMPRESSED) {
+	if (header->op_code > MONGO_OP_KILL_CURSORS
+	    && header->op_code < MONGO_OP_COMPRESSED) {
 		return MSG_UNKNOWN;
 	}
-	if (header.op_code > MONGO_OP_MSG) {
+	if (header->op_code > MONGO_OP_MSG) {
 		return MSG_UNKNOWN;
 	}
 	return MSG_REQUEST;
@@ -1832,7 +1929,6 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
 		handshake.version = __bpf_ntohs(*(__u16 *) & buf[1]);
 		goto check;
 	}
-
 	// content type: ChangeCipherSpec(0x14) minimal length is 6
 	if (count < 6)
 		return MSG_UNKNOWN;
@@ -1887,14 +1983,12 @@ static __inline bool drop_msg_by_comm(void)
 }
 
 static __inline struct protocol_message_t
-infer_protocol(struct ctx_info_s *ctx,
-	       const struct data_args_t *args,
-	       size_t count,
-	       struct conn_info_t *conn_info,
-	       __u8 sk_state, const struct process_data_extra *extra)
+infer_protocol_1(struct ctx_info_s *ctx,
+		 const struct data_args_t *args,
+		 size_t count,
+		 struct conn_info_t *conn_info,
+		 __u8 sk_state, const struct process_data_extra *extra)
 {
-#define DATA_BUF_MAX  32
-
 	struct protocol_message_t inferred_message;
 	inferred_message.protocol = PROTO_UNKNOWN;
 	inferred_message.type = MSG_UNKNOWN;
@@ -1930,13 +2024,21 @@ infer_protocol(struct ctx_info_s *ctx,
 	 * In such cases, we can directly pass the buffer address of the
 	 * system call for inference.
 	 * Examples of such protocols include HTTP2 and Postgre.
+	 *
+	 * infer_buf:
+	 *     The prepared 32-byte inference data has been placed in the buffer.
+	 * syscall_infer_addr:
+	 *     Just a buffer address needs to call the bpf_probe_read() interface
+	 *     to read data. Special note is that if extra->vecs is true,
+	 *     its value is the address of the first iov, and syscall_infer_len is
+	 *     the length of the first iov.
 	 */
-	char *syscall_infer_buf = NULL;
+	char *syscall_infer_addr = NULL;
 	__u32 syscall_infer_len = 0;
 	if (extra->vecs) {
 		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
 						     count, DATA_BUF_MAX,
-						     &syscall_infer_buf,
+						     &syscall_infer_addr,
 						     &syscall_infer_len);
 		/*
 		 * The syscall_infer_len(iov_cpy.iov_len) may be larger than
@@ -1947,11 +2049,14 @@ infer_protocol(struct ctx_info_s *ctx,
 	} else {
 		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data),
 			       buf);
-		syscall_infer_buf = (char *)buf;
+		syscall_infer_addr = (char *)buf;
 		syscall_infer_len = count;
 	}
 
 	char *infer_buf = __infer_buf->data;
+	conn_info->count = count;
+	conn_info->syscall_infer_addr = syscall_infer_addr;
+	conn_info->syscall_infer_len = syscall_infer_len;
 
 	check_and_fetch_prev_data(conn_info);
 
@@ -1967,7 +2072,7 @@ infer_protocol(struct ctx_info_s *ctx,
 	 * If the data source comes from kernel system calls, it is discarded
 	 * directly because some kernel probes do not handle TLS data. 
 	 */
-	if (protocol_port_check(PROTO_TLS, conn_info) &&
+	if (protocol_port_check_1(PROTO_TLS, conn_info) &&
 	    extra->source == DATA_SOURCE_SYSCALL) {
 		/*
 		 * TLS first performs handshake protocol inference and discards the data
@@ -1982,6 +2087,12 @@ infer_protocol(struct ctx_info_s *ctx,
 			return inferred_message;
 		}
 	}
+
+	/*
+	 * Note:
+	 * Use the 'protocol_port_check_1()' interface when performing specific protocol
+	 * inference checks.
+	 */
 #ifdef LINUX_VER_5_2_PLUS
 	/*
 	 * Protocol inference fast matching.
@@ -2088,7 +2199,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-			     infer_http2_message(syscall_infer_buf,
+			     infer_http2_message(syscall_infer_addr,
 						 syscall_infer_len,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
@@ -2097,7 +2208,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_POSTGRESQL:
 			if ((inferred_message.type =
-			     infer_postgre_message(syscall_infer_buf,
+			     infer_postgre_message(syscall_infer_addr,
 						   syscall_infer_len,
 						   conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_POSTGRESQL;
@@ -2115,8 +2226,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_MONGO:
 			if ((inferred_message.type =
-			     infer_mongo_message(syscall_infer_buf,
-						 syscall_infer_len,
+			     infer_mongo_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_MONGO;
 				return inferred_message;
@@ -2132,6 +2242,7 @@ infer_protocol(struct ctx_info_s *ctx,
 		 * to avoid duplicate matches.
 		 */
 		skip_proto = this_proto;
+		conn_info->skip_proto = this_proto;
 	}
 
 	/*
@@ -2256,16 +2367,43 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(syscall_infer_buf, syscall_infer_len,
+		    infer_http2_message(syscall_infer_addr, syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
+	}
+
+	return inferred_message;
+}
+
+/* Will be called by proto_infer_2 eBPF program. */
+static __inline struct protocol_message_t
+infer_protocol_2(const char *infer_buf, size_t count,
+		 struct conn_info_t *conn_info)
+{
+	/*
+	 * Note:
+	 * infer_buf: inferred data length is within 32 bytes (including 32 bytes).
+	 * If the length that needs to be read in the inference program exceeds 32 bytes,
+	 * you can use `syscall_infer_addr` and `syscall_infer_len`, but it is strongly
+	 * recommended to complete the inference of the protocol within 32 bytes.
+	 *
+	 * Use the 'protocol_port_check_2()' interface when performing specific protocol
+	 * inference checks.
+	 */
+	struct protocol_message_t inferred_message;
+	inferred_message.protocol = PROTO_UNKNOWN;
+	inferred_message.type = MSG_UNKNOWN;
+	__u32 syscall_infer_len = conn_info->syscall_infer_len;
+	char *syscall_infer_addr = conn_info->syscall_infer_addr;
+
 #ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
+	__u8 skip_proto = conn_info->skip_proto;
+	if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else
-	} else if ((inferred_message.type =
+	if ((inferred_message.type =
 #endif
-		    infer_postgre_message(syscall_infer_buf, syscall_infer_len,
-					  conn_info)) != MSG_UNKNOWN) {
+	     infer_postgre_message(syscall_infer_addr, syscall_infer_len,
+				   conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
 

@@ -21,20 +21,21 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type PodIngressRuleBackend struct {
-	UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *cache.PodIngressRuleBackend]
+	UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *diffbase.PodIngressRuleBackend]
 }
 
 func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRuleBackend) *PodIngressRuleBackend {
 	updater := &PodIngressRuleBackend{
-		UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *cache.PodIngressRuleBackend]{
+		UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *diffbase.PodIngressRuleBackend]{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			cache:        wholeCache,
 			dbOperator:   db.NewPodIngressRuleBackend(),
-			diffBaseData: wholeCache.PodIngressRuleBackends,
+			diffBaseData: wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
 			cloudData:    cloudData,
 		},
 	}
@@ -42,7 +43,7 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 	return updater
 }
 
-func (b *PodIngressRuleBackend) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngressRuleBackend) (diffBase *cache.PodIngressRuleBackend, exists bool) {
+func (b *PodIngressRuleBackend) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngressRuleBackend) (diffBase *diffbase.PodIngressRuleBackend, exists bool) {
 	diffBase, exists = b.diffBaseData[cloudItem.Lcuuid]
 	return
 }
@@ -86,6 +87,6 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 }
 
 // 保留接口
-func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *cache.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (map[string]interface{}, bool) {
+func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (map[string]interface{}, bool) {
 	return nil, false
 }

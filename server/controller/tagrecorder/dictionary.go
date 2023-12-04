@@ -19,12 +19,13 @@ package tagrecorder
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -258,11 +259,13 @@ func (c *TagRecorder) UpdateChDictionary() {
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
 							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
-							if createSQL == dictSQL[0] {
+							// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
+							checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MySqlCfg.UserPassword, 1)
+							if createSQL == checkDictSQL {
 								continue
 							}
 							log.Infof("update dictionary %s", dictName)
-							log.Infof("exist dictionary %s", dictSQL[0])
+							log.Infof("exist dictionary %s", checkDictSQL)
 							log.Infof("wanted dictionary %s", createSQL)
 							dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", c.cfg.ClickHouseCfg.Database, dictName)
 							_, err = connect.Exec(dropSQL)

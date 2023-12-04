@@ -175,7 +175,9 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 				// range query, aggregation for time step
 				// rebuild `time` in range query, replace `toUnixTimestamp(time) as timestamp`
 				// time(time, x) means aggregation with time by interval x
-				metricsArray[0] = fmt.Sprintf("time(time, %d) AS %s", q.Hints.StepMs/1e3, PROMETHEUS_TIME_COLUMNS)
+				// calculate `offset` for range query
+				offset := q.Hints.StartMs % q.Hints.StepMs
+				metricsArray[0] = fmt.Sprintf("time(time, %d, 1, 0, %d) AS %s", q.Hints.StepMs/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS)
 			}
 
 			groupBy = make([]string, 0, len(q.Hints.Grouping)+1)

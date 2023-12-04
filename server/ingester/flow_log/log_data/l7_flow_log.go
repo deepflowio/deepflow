@@ -415,6 +415,8 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 		}
 		h.AttributeNames = append(h.AttributeNames, l.ExtInfo.AttributeNames...)
 		h.AttributeValues = append(h.AttributeValues, l.ExtInfo.AttributeValues...)
+		h.MetricsNames = append(h.MetricsNames, l.ExtInfo.MetricsNames...)
+		h.MetricsValues = append(h.MetricsValues, l.ExtInfo.MetricsValues...)
 	}
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId

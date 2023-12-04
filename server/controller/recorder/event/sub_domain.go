@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +32,7 @@ type SubDomain struct {
 	EventManagerBase
 }
 
-func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *SubDomain {
+func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQueue) *SubDomain {
 	return &SubDomain{
 		domainLcuuid,
 		subDomainLcuuid,
@@ -74,7 +74,7 @@ func (r *SubDomain) ProduceFromMySQL() {
 func (r *SubDomain) fillRecreatePodEvent(event *eventapi.ResourceEvent) {
 	var networkIDs []uint32
 	var ips []string
-	ipNetworkMap, _ := r.ToolDataSet.EventToolDataSet.GetPodIPNetworkMapByID(int(event.InstanceID))
+	ipNetworkMap, _ := r.ToolDataSet.EventDataSet.GetPodIPNetworkMapByID(int(event.InstanceID))
 	for ip, nID := range ipNetworkMap {
 		networkIDs = append(networkIDs, uint32(nID))
 		ips = append(ips, ip.IP)

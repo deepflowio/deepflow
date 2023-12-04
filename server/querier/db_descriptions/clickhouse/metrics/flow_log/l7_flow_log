@@ -5,7 +5,7 @@ session_length       ,                      , counter    , Throughput      , 111
 request_length       , request_length       , counter    , Throughput      , 111
 response_length      , response_length      , counter    , Throughput      , 111
 sql_affected_rows    , sql_affected_rows    , counter    , Throughput      , 111
-direction_score      , direction_score      , gauge      , Throughput      , 111
+direction_score      , direction_score      , bounded_gauge      , Throughput      , 111
 log_count            ,                      , counter    , Throughput      , 111        
 
 error                ,                      , counter    , Error           , 111

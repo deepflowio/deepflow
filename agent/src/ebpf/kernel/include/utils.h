@@ -23,11 +23,11 @@
 #define DF_UTILS_H
 
 #include <arpa/inet.h>
+#include "../../user/utils.h"
 
 #undef __inline
 #define __inline inline __attribute__((__always_inline__))
 
-#define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
 #define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
 
 #include "bpf_endian.h"

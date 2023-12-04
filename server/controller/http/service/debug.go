@@ -30,6 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func GetCloudBasicInfos(filter map[string]string, m *manager.Manager) (resp []cloudmodel.BasicInfo, err error) {
@@ -73,19 +75,19 @@ func GetRecorderDomainCache(domainLcuuid, subDomainLcuuid string, m *manager.Man
 	}
 }
 
-func GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp cache.DiffBaseDataSet, err error) {
+func GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp diffbase.DataSet, err error) {
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
-		return recorder.GetCache(domainLcuuid, subDomainLcuuid).DiffBaseDataSet, nil
+		return *recorder.GetCache(domainLcuuid, subDomainLcuuid).DiffBaseDataSet, nil
 	} else {
-		return cache.DiffBaseDataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
+		return diffbase.DataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
-func GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp cache.ToolDataSet, err error) {
+func GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp tool.DataSet, err error) {
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
-		return recorder.GetCache(domainLcuuid, subDomainLcuuid).ToolDataSet, nil
+		return *recorder.GetCache(domainLcuuid, subDomainLcuuid).ToolDataSet, nil
 	} else {
-		return cache.ToolDataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
+		return tool.DataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 

@@ -413,7 +413,7 @@ var ColumnMod611 = []*ColumnMod{
 var u64ColumnNameAdd612 = []string{"syn_count", "synack_count", "retrans_syn", "retrans_synack", "cit_count"}
 var u32ColumnNameAdd612 = []string{"cit_max"}
 var f64ColumnNameAdd612 = []string{"cit_sum"}
-var flowMetricsTableAdd612 = []string{
+var vtapFlowTables = []string{
 	"vtap_flow_port.1m", "vtap_flow_port.1m_local",
 	"vtap_flow_port.1s", "vtap_flow_port.1s_local",
 	"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local",
@@ -441,19 +441,19 @@ var ColumnAdd612 = []*ColumnAdds{
 	},
 	&ColumnAdds{
 		Dbs:         []string{"flow_metrics"},
-		Tables:      flowMetricsTableAdd612,
+		Tables:      vtapFlowTables,
 		ColumnNames: u64ColumnNameAdd612,
 		ColumnType:  ckdb.UInt64,
 	},
 	&ColumnAdds{
 		Dbs:         []string{"flow_metrics"},
-		Tables:      flowMetricsTableAdd612,
+		Tables:      vtapFlowTables,
 		ColumnNames: u32ColumnNameAdd612,
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
 		Dbs:         []string{"flow_metrics"},
-		Tables:      flowMetricsTableAdd612,
+		Tables:      vtapFlowTables,
 		ColumnNames: f64ColumnNameAdd612,
 		ColumnType:  ckdb.Float64,
 	},
@@ -989,6 +989,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		Tables:      []string{"in_process", "in_process_local"},
 		ColumnNames: []string{"gprocess_id"},
 		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"tls_rtt"},
+		ColumnType:  ckdb.Float64,
 	},
 }
 

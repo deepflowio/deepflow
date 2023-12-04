@@ -116,6 +116,10 @@ controller:
     az_max_per_server: 10
     data_source_max: 25
     data_source_retention_time_max: 24000
+    # unit: s
+    data_source_ext_metrics_interval: 15
+    # unit: s
+    data_source_prometheus_interval: 15
 
   # monitor module config
   monitor:
@@ -235,10 +239,22 @@ controller:
     # 数据持久化检测间隔，单位：秒
     data_persistence_interval: 60
 
+    # 采集器同步KVM时，配置的采集器IP所上报的内容会被解析
+    host_ips:
+    # - x.x.x.x
+    # - x.x.x.x/x
+    # - x.x.x.x-x.x.x.x
+
     # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
     local_ip_ranges:
+    # - x.x.x.x/x
+    # - x.x.x.x-x.x.x.x
+
     # 排除IP范围
-    exclude_ip_ranges:
+    exclude_ip_ranges: 
+    # - x.x.x.x/x
+    # - x.x.x.x-x.x.x.x
+
     # 多namespace模式开关，默认false
     multi_ns_mode:
     # 单独vpc模式开关，默认false

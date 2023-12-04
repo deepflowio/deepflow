@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::net::IpAddr;
 use std::str;
 
 use nom::AsBytes;
@@ -43,7 +44,100 @@ use crate::{
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use cloud_platform::tingyun;
-use public::utils::net::h2pack;
+use public::utils::net::h2pack::parser::Parser;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Version {
+    #[default]
+    Unknown,
+    V1_0,
+    V1_1,
+    V2,
+}
+
+impl Version {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::V1_0 => "1.0",
+            Self::V1_1 => "1.1",
+            Self::V2 => "2",
+            _ => "",
+        }
+    }
+}
+
+impl Serialize for Version {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Method {
+    #[default]
+    None,
+    Get,
+    Head,
+    Post,
+    Put,
+    Delete,
+    Connect,
+    Options,
+    Trace,
+    Patch,
+}
+
+impl Method {
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Get => "GET",
+            Self::Head => "HEAD",
+            Self::Post => "POST",
+            Self::Put => "PUT",
+            Self::Delete => "DELETE",
+            Self::Connect => "CONNECT",
+            Self::Options => "OPTIONS",
+            Self::Trace => "TRACE",
+            Self::Patch => "PATCH",
+        }
+    }
+}
+
+impl TryFrom<&str> for Method {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "GET" => Ok(Self::Get),
+            "HEAD" => Ok(Self::Head),
+            "POST" => Ok(Self::Post),
+            "PUT" => Ok(Self::Put),
+            "DELETE" => Ok(Self::Delete),
+            "CONNECT" => Ok(Self::Connect),
+            "OPTIONS" => Ok(Self::Options),
+            "TRACE" => Ok(Self::Trace),
+            "PATCH" => Ok(Self::Patch),
+            _ => Err(Error::HttpHeaderParseFailed),
+        }
+    }
+}
+
+impl Serialize for Method {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
@@ -68,14 +162,14 @@ pub struct HttpInfo {
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub stream_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub version: String,
+    pub version: Version,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
 
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
-    pub method: String,
+    pub method: Method,
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub path: String,
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
@@ -84,8 +178,8 @@ pub struct HttpInfo {
     pub user_agent: Option<String>,
     #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
     pub referer: Option<String>,
-    #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
-    pub client_ip: String,
+    #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
+    pub client_ip: Option<IpAddr>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub x_request_id_0: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -96,8 +190,9 @@ pub struct HttpInfo {
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u32>,
 
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<i32>,
+    // status_code == 0 means None
+    #[serde(rename = "response_code", skip_serializing_if = "value_is_default")]
+    pub status_code: u16,
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
@@ -118,7 +213,7 @@ impl HttpInfo {
         }
 
         if !custom.req.req_type.is_empty() {
-            self.method = custom.req.req_type;
+            self.method = Method::try_from(custom.req.req_type.as_str()).unwrap_or_default();
         }
 
         if !custom.req.resource.is_empty() {
@@ -130,8 +225,8 @@ impl HttpInfo {
         }
 
         //req write
-        if custom.resp.code.is_some() {
-            self.status_code = custom.resp.code;
+        if let Some(code) = custom.resp.code {
+            self.status_code = code as u16;
         }
 
         if custom.resp.status != self.status {
@@ -223,7 +318,7 @@ impl HttpInfo {
             LogMessageType::Request => {
                 super::swap_if!(self, path, is_empty, other);
                 super::swap_if!(self, host, is_empty, other);
-                super::swap_if!(self, method, is_empty, other);
+                super::swap_if!(self, method, is_none, other);
                 super::swap_if!(self, user_agent, is_none, other);
                 super::swap_if!(self, referer, is_none, other);
                 super::swap_if!(self, endpoint, is_none, other);
@@ -242,7 +337,7 @@ impl HttpInfo {
                 if other.status != L7ResponseStatus::default() {
                     self.status = other.status;
                 }
-                if self.status_code.is_none() {
+                if self.status_code == 0 {
                     self.status_code = other.status_code;
                 }
 
@@ -273,9 +368,9 @@ impl HttpInfo {
 
     pub fn is_empty(&self) -> bool {
         return self.host.is_empty()
-            && self.method.is_empty()
+            && self.method.is_none()
             && self.path.is_empty()
-            && self.status_code == None;
+            && self.status_code == 0;
     }
 
     pub fn is_req_resp_end(&self) -> (bool, bool) {
@@ -330,7 +425,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             )
         } else {
             (
-                f.method,
+                f.method.as_str().to_owned(),
                 f.path.clone(),
                 f.host,
                 f.endpoint.unwrap_or_default(),
@@ -345,7 +440,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             req_len: f.req_content_length,
             resp_len: f.resp_content_length,
-            version: Some(f.version),
+            version: Some(f.version.as_str().to_owned()),
             req: L7Request {
                 req_type,
                 resource,
@@ -354,7 +449,11 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.status,
-                code: f.status_code,
+                code: if f.status_code > 0 {
+                    Some(f.status_code as i32)
+                } else {
+                    None
+                },
                 exception: f.custom_exception.unwrap_or_default(),
                 result: f.custom_result.unwrap_or_default(),
             },
@@ -367,7 +466,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 request_id: f.stream_id,
                 x_request_id_0: Some(f.x_request_id_0),
                 x_request_id_1: Some(f.x_request_id_1),
-                client_ip: Some(f.client_ip),
+                client_ip: f.client_ip.map(|ip| ip.to_string()),
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: service_name,
@@ -386,11 +485,12 @@ impl From<HttpInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct HttpLog {
     proto: L7Protocol,
     is_tls: bool,
     perf_stats: Option<L7PerfStats>,
+    http2_parser: Option<Parser>,
 }
 
 impl L7ProtocolParserInterface for HttpLog {
@@ -529,6 +629,7 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
+            http2_parser: Some(Parser::new()),
             ..Default::default()
         }
     }
@@ -611,7 +712,7 @@ impl HttpLog {
         let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
         let key = &payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset];
         let val = &payload[val_offset..val_offset + val_len];
-        self.on_header(config, key, val, direction, info);
+        self.on_header(config, key, val, direction, info)?;
         if key == b"content-length" {
             info.req_content_length = Some(
                 str::from_utf8(val)
@@ -628,7 +729,7 @@ impl HttpLog {
             self.perf_stats.as_mut().map(|p| p.inc_resp());
         }
 
-        info.version = String::from("2");
+        info.version = Version::V2;
         info.stream_id = Some(stream_id);
 
         info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
@@ -674,8 +775,8 @@ impl HttpLog {
             {
                 return Err(Error::HttpHeaderParseFailed);
             }
-            info.version = version.to_owned();
-            info.status_code = Some(status_code as i32);
+            info.version = version;
+            info.status_code = status_code;
 
             info.msg_type = LogMessageType::Response;
 
@@ -687,9 +788,9 @@ impl HttpLog {
                 return Err(Error::HttpHeaderParseFailed);
             };
 
-            info.method = method.to_owned();
+            info.method = method;
             info.path = path.to_owned();
-            info.version = get_http_request_version(version)?.to_owned();
+            info.version = get_http_request_version(version)?;
 
             info.msg_type = LogMessageType::Request;
             self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -724,7 +825,7 @@ impl HttpLog {
                 value.trim().as_bytes(),
                 direction,
                 info,
-            );
+            )?;
             if &lower_key == "content-length" {
                 content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
             }
@@ -805,8 +906,11 @@ impl HttpLog {
                 let header_frame_payload =
                     &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
 
-                let mut parser = h2pack::parser::Parser::new();
-                let parse_rst = parser.parse(header_frame_payload);
+                let parse_rst = self
+                    .http2_parser
+                    .as_mut()
+                    .unwrap()
+                    .parse(header_frame_payload);
 
                 if let Err(_) = parse_rst {
                     return Err(Error::HttpHeaderParseFailed);
@@ -814,7 +918,7 @@ impl HttpLog {
                 let header_list = parse_rst.unwrap();
 
                 for (key, val) in header_list.iter() {
-                    self.on_header(config, key, val, direction, info);
+                    self.on_header(config, key, val, direction, info)?;
                     if key == b"content-length" {
                         content_length = Some(
                             str::from_utf8(val.as_slice())
@@ -867,24 +971,21 @@ impl HttpLog {
 
         if is_httpv2 {
             if direction == PacketDirection::ClientToServer {
-                if check_http_method(&info.method).is_err() {
+                if info.method.is_none() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
                 self.perf_stats.as_mut().map(|p| p.inc_req());
                 info.req_content_length = content_length;
             } else {
-                if let Some(code) = info.status_code {
-                    let code = code as u16;
-                    if code < HTTP_STATUS_CODE_MIN || code > HTTP_STATUS_CODE_MAX {
-                        return Err(Error::HttpHeaderParseFailed);
-                    }
-                } else {
+                if info.status_code == 0
+                    || !(HTTP_STATUS_CODE_MIN..=HTTP_STATUS_CODE_MAX).contains(&info.status_code)
+                {
                     return Err(Error::HttpHeaderParseFailed);
                 }
                 self.perf_stats.as_mut().map(|p| p.inc_resp());
                 info.resp_content_length = content_length;
             }
-            info.version = String::from("2");
+            info.version = Version::V2;
             if info.stream_id.is_none() {
                 info.stream_id = Some(httpv2_header.stream_id);
             }
@@ -904,16 +1005,16 @@ impl HttpLog {
         val: &[u8],
         direction: PacketDirection,
         info: &mut HttpInfo,
-    ) {
+    ) -> Result<()> {
         // key must be valid utf8
         let Ok(key) = str::from_utf8(key) else {
-            return;
+            return Ok(());
         };
 
         match key {
             ":method" => {
                 info.msg_type = LogMessageType::Request;
-                info.method = String::from_utf8_lossy(val).into_owned();
+                info.method = Method::try_from(String::from_utf8_lossy(val).as_ref())?;
             }
             ":status" => {
                 info.msg_type = LogMessageType::Response;
@@ -921,7 +1022,7 @@ impl HttpLog {
                     .unwrap_or_default()
                     .parse::<u16>()
                     .unwrap_or_default();
-                info.status_code = Some(code as i32);
+                info.status_code = code;
                 self.set_status(code, info);
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
@@ -939,12 +1040,12 @@ impl HttpLog {
         }
 
         if !key.is_ascii() {
-            return;
+            return Ok(());
         }
 
         // value must be valid utf8 from here
         let Ok(val) = str::from_utf8(val) else {
-            return;
+            return Ok(());
         };
 
         if config.is_trace_id(key) {
@@ -965,8 +1066,9 @@ impl HttpLog {
             }
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
-            info.client_ip = val.to_owned();
+            info.client_ip = Some(val.parse().map_err(|_| Error::HttpHeaderParseFailed)?);
         }
+        Ok(())
     }
 
     // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -1182,17 +1284,17 @@ pub fn check_http_method(method: &str) -> Result<()> {
     }
 }
 
-pub fn get_http_request_version(version: &str) -> Result<&str> {
+pub fn get_http_request_version(version: &str) -> Result<Version> {
     // 参考：https://baike.baidu.com/item/HTTP/243074?fr=aladdin#2
     // HTTPv1版本只有1.0及1.1
     match version {
-        HTTP_V1_0_VERSION => return Ok("1.0"),
-        HTTP_V1_1_VERSION => return Ok("1.1"),
+        HTTP_V1_0_VERSION => return Ok(Version::V1_0),
+        HTTP_V1_1_VERSION => return Ok(Version::V1_1),
         _ => return Err(Error::HttpHeaderParseFailed),
     }
 }
 
-pub fn get_http_request_info(line_info: &str) -> Result<(&str, &str, &str)> {
+pub fn get_http_request_info(line_info: &str) -> Result<(Method, &str, &str)> {
     let line_info = line_info.as_bytes();
     let mut iter = line_info.splitn(3, |c| c.is_ascii_whitespace());
     let method = iter.next();
@@ -1204,14 +1306,14 @@ pub fn get_http_request_info(line_info: &str) -> Result<(&str, &str, &str)> {
     unsafe {
         // safe because line_info is utf8
         Ok((
-            str::from_utf8_unchecked(method.unwrap()),
+            Method::try_from(str::from_utf8_unchecked(method.unwrap()))?,
             str::from_utf8_unchecked(path.unwrap()),
             str::from_utf8_unchecked(version.unwrap()),
         ))
     }
 }
 
-pub fn get_http_resp_info(line_info: &str) -> Result<(&str, u16)> {
+pub fn get_http_resp_info(line_info: &str) -> Result<(Version, u16)> {
     const VERSION_LEN: usize = HTTP_V1_0_VERSION.len();
     const CODE_OFFSET: usize = VERSION_LEN + 1;
     const CODE_LEN: usize = 3;
@@ -1220,8 +1322,8 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(&str, u16)> {
     }
     // HTTP response line: HTTP/1.1 404 Not Found.
     let version = match &line_info[..VERSION_LEN] {
-        HTTP_V1_0_VERSION => "1.0",
-        HTTP_V1_1_VERSION => "1.1",
+        HTTP_V1_0_VERSION => Version::V1_0,
+        HTTP_V1_1_VERSION => Version::V1_1,
         _ => return Err(Error::HttpHeaderParseFailed),
     };
 
@@ -1627,6 +1729,7 @@ mod tests {
                     rrt_count: 1,
                     rrt_sum: 84051,
                     rrt_max: 84051,
+                    ..Default::default()
                 },
             ),
             (
@@ -1640,6 +1743,7 @@ mod tests {
                     rrt_count: 1,
                     rrt_sum: 2023,
                     rrt_max: 2023,
+                    ..Default::default()
                 },
             ),
         ];

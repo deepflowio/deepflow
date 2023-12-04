@@ -15,7 +15,6 @@
  */
 
 use public::l7_protocol::{CustomProtocol, L7Protocol};
-use serde::Serialize;
 
 use crate::{
     common::{
@@ -26,11 +25,10 @@ use crate::{
     flow_generator::{protocol_logs::L7ResponseStatus, Error, Result},
 };
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct WasmLog {
     proto_num: Option<u8>,
     proto_str: String,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

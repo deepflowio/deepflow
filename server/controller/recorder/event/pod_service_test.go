@@ -25,16 +25,16 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
 
 func TestAddPodService(t *testing.T) {
-	ds := cache.NewToolDataSet()
+	ds := tool.NewDataSet()
 	id := RandID()
 	name := RandName()
 	eq := NewEventQueue()
-	dbItem := NewPodService(&ds, eq)
+	dbItem := NewPodService(ds, eq)
 	dbItem.ProduceByAdd([]*mysql.PodService{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -48,21 +48,21 @@ func TestAddPodService(t *testing.T) {
 }
 
 func TestDeletePodService(t *testing.T) {
-	ds := cache.NewToolDataSet()
+	ds := tool.NewDataSet()
 	id := RandID()
-	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodServiceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodServiceIDByLcuuid", func(_ *tool.DataSet, _ string) (int, bool) {
 		return id, true
 	})
 	defer monkey.Reset()
 
 	name := RandName()
-	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&ds), "GetPodServiceNameByID", func(_ *cache.ToolDataSet, _ int) (string, bool) {
+	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(ds), "GetPodServiceNameByID", func(_ *tool.DataSet, _ int) (string, bool) {
 		return name, true
 	})
 	defer monkey1.Reset()
 
 	eq := NewEventQueue()
-	wanIP := NewPodService(&ds, eq)
+	wanIP := NewPodService(ds, eq)
 	wanIP.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)

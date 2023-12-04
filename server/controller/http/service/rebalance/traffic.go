@@ -113,10 +113,11 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			analyzers:       azAnalyzers,
 		}
 		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(ifCheckout)
-		response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
-		response.Details = append(response.Details, azVTapRebalanceResult.Details...)
-
-		if azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
+		if azVTapRebalanceResult != nil {
+			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
+			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
+		}
+		if azVTapRebalanceResult != nil && azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
 			for vtapID, changeInfo := range vTapIDToChangeInfo {
 				if changeInfo.OldIP != changeInfo.NewIP {
 					log.Infof("az(%s) vtap(%v) analyzer ip changed: %s -> %s", az.Lcuuid, vtapID, changeInfo.OldIP, changeInfo.NewIP)
@@ -127,11 +128,11 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 		// update counter
 		updateCounter(vtapIDToName, vTapIDToChangeInfo)
 	}
-	b, err := json.Marshal(response)
-	if err != nil {
-		log.Error(err)
+	log.Infof("vtap rebalance result switch_total_num(%v)", response.TotalSwitchVTapNum)
+	for _, detail := range response.Details {
+		log.Infof("vtap rebalance result az(%v) ip(%v) state(%v) before_vtap_num(%v) after_vtap_num(%v), switch_vtap_num(%v) before_vtap_weight(%v) after_vtap_weight(%v)",
+			detail.AZ, detail.IP, detail.State, detail.BeforeVTapNum, detail.AfterVTapNum, detail.SwitchVTapNum, detail.BeforeVTapWeights, detail.AfterVTapWeights)
 	}
-	log.Infof("vtap rebalance result: %s", string(b))
 
 	return response, nil
 }
@@ -510,6 +511,7 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 	for vtapID, changeInfo := range vtapIDToChangeInfo {
 		name, ok := vtapIDToName[vtapID]
 		if !ok {
+			log.Info("vtap(%d) not found", vtapID)
 			continue
 		}
 
@@ -527,11 +529,15 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 				},
 			}
 			statsd.VTapNameToCounter[name] = counter
+			b, _ := json.Marshal(counter)
+			log.Infof("agent(%v) register counter: %v", name, string(b))
 			err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", counter, stats.OptionStatTags{"host": name})
 			if err != nil {
 				log.Error(err)
 			}
 		} else {
+			log.Infof("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Infof("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
 			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
 			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
 		}

@@ -250,6 +250,9 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		return function
 	}
 	function := view.GetFunc(f.Name)
+	if f.Name == view.FUNCTION_AVG {
+		function = view.GetFunc(view.FUNCTION_COUNTER_AVG)
+	}
 	function.SetFields(fields)
 	function.SetFlag(view.METRICS_FLAG_OUTER)
 	function.SetTime(m.Time)
@@ -298,7 +301,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
-	case metrics.METRICS_TYPE_DELAY:
+	case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 		// 时延类，内层结构为groupArray，忽略0值
 		innerFunction := view.DefaultFunction{
 			Name:       view.FUNCTION_GROUP_ARRAY,
@@ -369,19 +372,21 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+		// When Avg is forced (due to the need for other metrics in the same statement)
+		// to use two layers of SQL calculation, the calculation logic of AAvg is directly used
+		if f.Name == view.FUNCTION_AVG {
+			outFunc = view.GetFunc(view.FUNC_NAME_MAP[view.FUNCTION_AAVG])
+		}
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
 		case metrics.METRICS_TYPE_DELAY:
 			// 时延类和商值类，忽略0值
 			outFunc.SetIsGroupArray(true)
 			outFunc.SetIgnoreZero(true)
-		case metrics.METRICS_TYPE_QUOTIENT:
-			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
-			// 比例类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
 			outFunc.SetMath("*100")
 		case metrics.METRICS_TYPE_TAG:
@@ -390,15 +395,30 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetFields([]view.Node{&view.Field{Value: innerAlias}})
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER:
-			if m.DB == "flow_metrics" {
-				outFunc.SetFillNullAsZero(true)
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
+			// Counter/Gauge type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_COUNTER_AVG)
+			}
+		case metrics.METRICS_TYPE_BOUNDED_GAUGE:
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNC_NAME_MAP[view.FUNCTION_AAVG])
 			}
 		case metrics.METRICS_TYPE_DELAY:
+			// Delay type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
+			}
 			outFunc.SetIgnoreZero(true)
+		case metrics.METRICS_TYPE_QUOTIENT:
+			// Quotient type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
+			}
 		case metrics.METRICS_TYPE_PERCENTAGE:
-			if m.DB == "flow_metrics" {
-				outFunc.SetFillNullAsZero(true)
+			// Percentage type weighted average
+			if f.Name == view.FUNCTION_AVG {
+				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
 			}
 			outFunc.SetMath("*100")
 		}
@@ -470,6 +490,7 @@ type Time struct {
 	TimeField  string
 	Interval   int
 	WindowSize int
+	Offset     int
 	Fill       string
 }
 
@@ -492,12 +513,19 @@ func (t *Time) Trans(m *view.Model) error {
 	if len(t.Args) > 3 {
 		t.Fill = t.Args[3]
 	}
+	if len(t.Args) > 4 {
+		t.Offset, err = strconv.Atoi(t.Args[4])
+		if err != nil {
+			return err
+		}
+	}
 	m.Time.Interval = t.Interval
 	if m.Time.Interval > 0 && m.Time.Interval < m.Time.DatasourceInterval {
 		m.Time.Interval = m.Time.DatasourceInterval
 	}
 	m.Time.WindowSize = t.WindowSize
 	m.Time.Fill = t.Fill
+	m.Time.Offset = t.Offset
 	m.Time.Alias = t.Alias
 	return nil
 }
@@ -535,10 +563,19 @@ func (t *Time) Format(m *view.Model) {
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		innerTimeField = t.TimeField
 	}
-	withValue := fmt.Sprintf(
-		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
-		innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
-	)
+	offset := m.Time.Offset
+	withValue := ""
+	if offset > 0 {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s-%d, %s(%d)) + %s(arrayJoin([%s]) * %d) + %d",
+			innerTimeField, offset, toIntervalFunction, interval, toIntervalFunction, windows, interval, offset,
+		)
+	} else {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
+			innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
+		)
+	}
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)

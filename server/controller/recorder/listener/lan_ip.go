@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -32,7 +33,7 @@ type LANIP struct {
 func NewLANIP(c *cache.Cache, eq *queue.OverwriteQueue) *LANIP {
 	listener := &LANIP{
 		cache:         c,
-		eventProducer: event.NewLANIP(&c.ToolDataSet, eq),
+		eventProducer: event.NewLANIP(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -42,7 +43,7 @@ func (i *LANIP) OnUpdaterAdded(addedDBItems []*mysql.LANIP) {
 	i.cache.AddLANIPs(addedDBItems)
 }
 
-func (i *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
+func (i *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.LANIP) {
 	i.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 }

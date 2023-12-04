@@ -47,6 +47,14 @@ pub struct KeyVal {
     pub val: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricKeyVal {
+    pub key: String,
+    pub val: f32,
+}
+
+impl Eq for MetricKeyVal {}
+
 #[derive(Default, Debug)]
 pub struct ExtendedInfo {
     pub service_name: Option<String>,
@@ -59,6 +67,7 @@ pub struct ExtendedInfo {
     pub referer: Option<String>,
     pub protocol_str: Option<String>,
     pub attributes: Option<Vec<KeyVal>>,
+    pub metrics: Option<Vec<MetricKeyVal>>,
 }
 
 /*
@@ -165,6 +174,12 @@ impl L7ProtocolSendLog {
                 for kv in attr.into_iter() {
                     ext_info.attribute_names.push(kv.key);
                     ext_info.attribute_values.push(kv.val);
+                }
+            }
+            if let Some(metrics) = ext.metrics {
+                for kv in metrics.into_iter() {
+                    ext_info.metrics_names.push(kv.key);
+                    ext_info.metrics_values.push(kv.val as f64);
                 }
             }
             log.ext_info = Some(ext_info);

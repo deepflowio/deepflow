@@ -112,6 +112,9 @@ pub const FIELD_OFFSET_TCP_WIN: usize = 48;
 pub const FIELD_OFFSET_TCPV6_WIN: usize = 68;
 pub const FIELD_OFFSET_VXLAN_FLAGS: usize = 42;
 pub const FIELD_OFFSET_VXLAN_VNI: usize = 46;
+pub const FIELD_OFFSET_GENEVE_VERSION: usize = 42;
+pub const FIELD_OFFSET_GENEVE_PROTOCOL: usize = 44;
+pub const FIELD_OFFSET_GENEVE_VNI: usize = 46;
 
 pub const FIELD_LEN_DA: usize = 6;
 pub const FIELD_LEN_SA: usize = 6;
@@ -177,6 +180,7 @@ pub const ERSPAN_I_HEADER_SIZE: usize = 0;
 pub const ERSPAN_II_HEADER_SIZE: usize = 8;
 pub const ERSPAN_III_HEADER_SIZE: usize = 12;
 pub const ERSPAN_III_SUBHEADER_SIZE: usize = 8;
+pub const GENEVE_HEADER_SIZE: usize = 8;
 pub const TCP_HEADER_SIZE: usize = 20;
 
 // min packet size
@@ -393,6 +397,15 @@ pub const GRE_FLAGS_CSUM_MASK: u16 = 1 << 15;
 pub const GRE_SEQ_LEN: usize = 4;
 pub const GRE_KEY_LEN: usize = 4;
 pub const GRE_CSUM_LEN: usize = 4;
+
+pub const GENEVE_VERSION_OFFSET: usize = 0;
+pub const GENEVE_PROTOCOL_OFFSET: usize = 2;
+pub const GENEVE_VNI_OFFSET: usize = 4;
+
+pub const GENEVE_OPTION_LENGTH_MASK: u8 = 0x3f;
+
+pub const GENEVE_VERSION_SHIFT: u8 = 6;
+pub const GENEVE_VNI_SHIFT: u32 = 8;
 
 pub const IP_IHL_OFFSET: usize = 0;
 pub const IP6_PROTO_OFFSET: usize = 6;

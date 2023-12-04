@@ -1,1 +1,1 @@
-TlsInfo { handshake_protocol: "", version: "0x303", request_resource: "Encrypted Alert", status: Ok, response_result: "", msg_type: Request, rrt: 0 } is_tls: false
+TlsInfo { handshake_protocol: "", version: "1.2", request_resource: "Encrypted Alert", request_type: "Encrypted Alert", request_domain: "", status: Ok, response_result: "", cipher_suite: None, server_cert_not_before: 0ns, server_cert_not_after: 0ns, client_cert_not_before: 0ns, client_cert_not_after: 0ns, msg_type: Request, rrt: 0, tls_rtt: 0, session_id: None } is_tls: false

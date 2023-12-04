@@ -124,7 +124,9 @@ fn get_counter(counter_type: u32) -> u32 {
 
 fn main() {
     set_var("RUST_LOG", "info");
-    env_logger::init();
+    env_logger::builder()
+      .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+      .init();
 
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();

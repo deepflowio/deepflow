@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type VMPodNodeConnection struct {
@@ -36,7 +37,7 @@ func (c *VMPodNodeConnection) OnUpdaterAdded(addedDBItems []*mysql.VMPodNodeConn
 	c.cache.AddVMPodNodeConnections(addedDBItems)
 }
 
-func (c *VMPodNodeConnection) OnUpdaterUpdated(cloudItem *cloudmodel.VMPodNodeConnection, diffBase *cache.VMPodNodeConnection) {
+func (c *VMPodNodeConnection) OnUpdaterUpdated(cloudItem *cloudmodel.VMPodNodeConnection, diffBase *diffbase.VMPodNodeConnection) {
 }
 
 func (c *VMPodNodeConnection) OnUpdaterDeleted(lcuuids []string) {

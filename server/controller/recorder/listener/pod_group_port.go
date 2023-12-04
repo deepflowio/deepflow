@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type PodGroupPort struct {
@@ -37,7 +38,7 @@ func (p *PodGroupPort) OnUpdaterAdded(addedDBItems []*mysql.PodGroupPort) {
 	p.cache.AddPodGroupPorts(addedDBItems)
 }
 
-func (p *PodGroupPort) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroupPort, diffBase *cache.PodGroupPort) {
+func (p *PodGroupPort) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroupPort, diffBase *diffbase.PodGroupPort) {
 	diffBase.Update(cloudItem)
 }
 

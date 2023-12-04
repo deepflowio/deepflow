@@ -182,9 +182,11 @@ func (t *PrometheusLabelTable) RequestAllTargetIDs() {
 	}
 	newVersion := response.GetVersion()
 	if t.targetVersion != newVersion {
-		log.Infof("prometheus target version update from %d to %d", t.targetVersion, newVersion)
+		log.Infof("prometheus update target version update from %d to %d", t.targetVersion, newVersion)
 		t.targetVersion = newVersion
-		t.updatePrometheusTargets(response.GetResponseTargetIds())
+		targetIds := response.GetResponseTargetIds()
+		t.updateDroppedTargets(t.getPrometheusDroppedTargets(targetIds))
+		t.updatePrometheusTargets(targetIds)
 	}
 }
 
@@ -222,6 +224,75 @@ func (t *PrometheusLabelTable) RequestAllLabelIDs() {
 		log.Warning("request all prometheus label ids failed: %s", err)
 	}
 	log.Infof("prometheus request all label IDs end. %s", t.statsString())
+}
+
+// When the Target is deleted, the data in the corresponding table of the Target needs to be deleted
+// otherwise, if the label type of the target changes from target type to app type, it cannot be updated.
+func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, droppedTargetIdKeys []uint64) {
+	if len(droppedTargetIds) == 0 {
+		return
+	}
+
+	for _, droppedTargeIdKey := range droppedTargetIdKeys {
+		t.targetIDs.Del(droppedTargeIdKey)
+	}
+	log.Infof("prometheus update target_ids drop(%v)", droppedTargetIds)
+
+	droppedTargetMetricKeys, droppedMetriIds := []uint64{}, []uint32{}
+	t.metricTargetPair.Range(func(k uint64, v struct{}) bool {
+		for _, droppedTargetId := range droppedTargetIds {
+			if uint32(k) == droppedTargetId {
+				droppedTargetMetricKeys = append(droppedTargetMetricKeys, k)
+				droppedMetriIds = append(droppedMetriIds, uint32(k>>METRICID_OFFSET))
+				break
+			}
+		}
+		return true
+	})
+	for _, droppedTargetMetricKey := range droppedTargetMetricKeys {
+		t.metricTargetPair.Del(droppedTargetMetricKey)
+	}
+	if len(droppedTargetMetricKeys) > 0 {
+		log.Infof("prometheus update target_metrics drop metricIds(%v), drop targetMetric(%v)", droppedMetriIds, droppedTargetMetricKeys)
+	}
+
+	droppedColumnIndexKeys := []uint64{}
+	t.labelColumnIndexs.Range(func(k uint64, v uint32) bool {
+		metricId := uint32(k >> METRICID_OFFSET)
+		for _, droppedMetricId := range droppedMetriIds {
+			if metricId == droppedMetricId {
+				droppedColumnIndexKeys = append(droppedColumnIndexKeys, k)
+				break
+			}
+		}
+		return true
+	})
+
+	for _, columnIndexKey := range droppedColumnIndexKeys {
+		t.labelColumnIndexs.Del(columnIndexKey)
+	}
+	if len(droppedColumnIndexKeys) > 0 {
+		log.Infof("prometheus update drop column_indexs(%v)", droppedColumnIndexKeys)
+	}
+}
+
+// if the target_id is not in the new target list, it means that the target has been dropped.
+func (t *PrometheusLabelTable) getPrometheusDroppedTargets(targetIds []*trident.TargetResponse) (droppedTargetIds []uint32, droppedTargetIdKeys []uint64) {
+	t.targetIDs.Range(func(k uint64, v uint32) bool {
+		find := false
+		for _, target := range targetIds {
+			if v == target.GetTargetId() {
+				find = true
+				break
+			}
+		}
+		if !find {
+			droppedTargetIds = append(droppedTargetIds, v)
+			droppedTargetIdKeys = append(droppedTargetIdKeys, k)
+		}
+		return true
+	})
+	return
 }
 
 func (t *PrometheusLabelTable) updatePrometheusTargets(targetIds []*trident.TargetResponse) {
@@ -281,6 +352,7 @@ func uniqueElements(slice1, slice2 []uint32) map[uint32]bool {
 func (t *PrometheusLabelTable) updateTargetLabelIds(targetId uint32, targetLabelIDs []uint32) {
 	oldLabelIds, ok := t.targetLabelIDs.Get(targetId)
 	if !ok {
+		// if not found, it means that it is a newly added target
 		ids := make([]uint32, 0, len(targetLabelIDs))
 		ids = append(ids, targetLabelIDs...)
 		t.targetLabelIDs.Set(targetId, ids)
@@ -303,7 +375,7 @@ func (t *PrometheusLabelTable) updateTargetLabelIds(targetId uint32, targetLabel
 		}
 		return true
 	})
-	log.Infof("update target labels of target_id(%d) from %+v to %+v", targetId, oldLabelIds, targetLabelIDs)
+	log.Infof("prometheus update target labels of target_id(%d) from %+v to %+v", targetId, oldLabelIds, targetLabelIDs)
 	newLabelIds := oldLabelIds[:0]
 	newLabelIds = append(newLabelIds, targetLabelIDs...)
 	t.targetLabelIDs.Set(targetId, newLabelIds)

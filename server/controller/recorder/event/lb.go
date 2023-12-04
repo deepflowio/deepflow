@@ -20,7 +20,8 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -30,7 +31,7 @@ type LB struct {
 	deviceType int
 }
 
-func NewLB(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
+func NewLB(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LB {
 	mng := &LB{
 		EventManagerBase{
 			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN,
@@ -70,7 +71,7 @@ func (l *LB) ProduceByAdd(items []*mysql.LB) {
 	}
 }
 
-func (l *LB) ProduceByUpdate(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
+func (l *LB) ProduceByUpdate(cloudItem *cloudmodel.LB, diffBase *diffbase.LB) {
 }
 
 func (l *LB) ProduceByDelete(lcuuids []string) {

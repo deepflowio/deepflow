@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 type VIP struct {
@@ -37,7 +38,7 @@ func (p *VIP) OnUpdaterAdded(addedDBItems []*mysql.VIP) {
 	p.cache.AddVIPs(addedDBItems)
 }
 
-func (p *VIP) OnUpdaterUpdated(cloudItem *cloudmodel.VIP, diffBase *cache.VIP) {
+func (p *VIP) OnUpdaterUpdated(cloudItem *cloudmodel.VIP, diffBase *diffbase.VIP) {
 	diffBase.Update(cloudItem)
 }
 

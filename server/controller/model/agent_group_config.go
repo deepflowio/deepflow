@@ -176,7 +176,6 @@ type OnCpuProfile struct {
 
 type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
-	LogFile                 *string                            `yaml:"log-file,omitempty"`
 	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
 	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
 	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`

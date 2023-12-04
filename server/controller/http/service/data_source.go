@@ -49,7 +49,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"应用-性能剖析",       // profile.in_process
 }
 
-func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err error) {
+func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
 	var response []model.DataSource
 	var dataSources []mysql.DataSource
 	var baseDataSources []mysql.DataSource
@@ -60,11 +60,21 @@ func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err
 	}
 	if t, ok := filter["type"]; ok {
 		var collection string
-		if t == "app" {
+		switch t {
+		case "app":
 			collection = "flow_metrics.vtap_app*"
-		} else if t == "flow" {
+		case "flow":
 			collection = "flow_metrics.vtap_flow*"
+		case "deepflow_system":
+			collection = "deepflow_system.*"
+		case "ext_metrics":
+			collection = "ext_metrics.*"
+		case "prometheus":
+			collection = "prometheus.*"
+		default:
+			return nil, fmt.Errorf("not support type(%s)", t)
 		}
+
 		Db = Db.Where("data_table_collection = ?", collection)
 	}
 	if name, ok := filter["name"]; ok {
@@ -110,6 +120,17 @@ func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err
 			dataSourceResp.IsDefault = true
 		} else {
 			dataSourceResp.IsDefault = false
+		}
+		if specCfg != nil {
+			if dataSource.DataTableCollection == "deepflow_system.*" {
+				dataSourceResp.Interval = common.DATA_SOURCE_DEEPFLOW_SYSTEM_INTERVAL
+			}
+			if dataSource.DataTableCollection == "ext_metrics.*" {
+				dataSourceResp.Interval = specCfg.DataSourceExtMetricsInterval
+			}
+			if dataSource.DataTableCollection == "prometheus.*" {
+				dataSourceResp.Interval = specCfg.DataSourcePrometheusInterval
+			}
 		}
 
 		response = append(response, dataSourceResp)
@@ -223,7 +244,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 
@@ -283,7 +304,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
 	}
 
-	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 

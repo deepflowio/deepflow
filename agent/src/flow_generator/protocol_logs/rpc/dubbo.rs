@@ -225,9 +225,8 @@ impl From<DubboInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct DubboLog {
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 
@@ -791,6 +790,7 @@ mod tests {
                 rrt_count: 1,
                 rrt_sum: 4332,
                 rrt_max: 4332,
+                ..Default::default()
             },
         )];
 

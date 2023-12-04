@@ -24,25 +24,27 @@ import (
 
 // 指标量类型
 const (
-	METRICS_TYPE_UNKNOWN    int = iota // 未被定义的指标量
-	METRICS_TYPE_COUNTER               // 计数，例如字节数、请求数
-	METRICS_TYPE_GAUGE                 // 油标，例如活跃连接数、平均包长
-	METRICS_TYPE_DELAY                 // 时延，例如各类时延
-	METRICS_TYPE_PERCENTAGE            // 百分比，例如异常比例、重传比例
-	METRICS_TYPE_QUOTIENT              // 商值，例如平均包长
-	METRICS_TYPE_TAG                   // tag，例如ip
-	METRICS_TYPE_ARRAY                 // 数组类型，不支持算子，select时需展开
-	METRICS_TYPE_OTHER                 // 只支持 count(_)
+	METRICS_TYPE_UNKNOWN       int = iota // 未被定义的指标量
+	METRICS_TYPE_COUNTER                  // 计数，例如字节数、请求数
+	METRICS_TYPE_GAUGE                    // 油标，例如活跃连接数、平均包长
+	METRICS_TYPE_DELAY                    // 时延，例如各类时延
+	METRICS_TYPE_PERCENTAGE               // 百分比，例如异常比例、重传比例
+	METRICS_TYPE_QUOTIENT                 // 商值，例如平均包长
+	METRICS_TYPE_TAG                      // tag，例如ip
+	METRICS_TYPE_ARRAY                    // 数组类型，不支持算子，select时需展开
+	METRICS_TYPE_OTHER                    // 只支持 count(_)
+	METRICS_TYPE_BOUNDED_GAUGE            // direction_score
 )
 
 var METRICS_TYPE_NAME_MAP = map[string]int{
-	"counter":    METRICS_TYPE_COUNTER,
-	"gauge":      METRICS_TYPE_GAUGE,
-	"delay":      METRICS_TYPE_DELAY,
-	"percentage": METRICS_TYPE_PERCENTAGE,
-	"quotient":   METRICS_TYPE_QUOTIENT,
-	"tag":        METRICS_TYPE_TAG,
-	"other":      METRICS_TYPE_OTHER,
+	"counter":       METRICS_TYPE_COUNTER,
+	"gauge":         METRICS_TYPE_GAUGE,
+	"bounded_gauge": METRICS_TYPE_BOUNDED_GAUGE,
+	"delay":         METRICS_TYPE_DELAY,
+	"percentage":    METRICS_TYPE_PERCENTAGE,
+	"quotient":      METRICS_TYPE_QUOTIENT,
+	"tag":           METRICS_TYPE_TAG,
+	"other":         METRICS_TYPE_OTHER,
 }
 
 var METRICS_ARRAY_NAME_MAP = map[string][]string{
@@ -60,13 +62,14 @@ const (
 
 // 指标量类型支持不用拆层的算子的集合
 var METRICS_TYPE_UNLAY_FUNCTIONS = map[int][]string{
-	METRICS_TYPE_COUNTER:    []string{view.FUNCTION_SUM},
-	METRICS_TYPE_GAUGE:      []string{},
-	METRICS_TYPE_DELAY:      []string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN, view.FUNCTION_LAST},
-	METRICS_TYPE_PERCENTAGE: []string{},
-	METRICS_TYPE_QUOTIENT:   []string{},
-	METRICS_TYPE_TAG:        []string{view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT},
-	METRICS_TYPE_OTHER:      []string{view.FUNCTION_COUNT},
+	METRICS_TYPE_COUNTER:       []string{view.FUNCTION_SUM, view.FUNCTION_AVG},
+	METRICS_TYPE_GAUGE:         []string{view.FUNCTION_AVG},
+	METRICS_TYPE_BOUNDED_GAUGE: []string{view.FUNCTION_AVG, view.FUNCTION_AAVG, view.FUNCTION_MAX, view.FUNCTION_MIN, view.FUNCTION_LAST},
+	METRICS_TYPE_DELAY:         []string{view.FUNCTION_AVG, view.FUNCTION_AAVG, view.FUNCTION_MAX, view.FUNCTION_MIN, view.FUNCTION_LAST},
+	METRICS_TYPE_PERCENTAGE:    []string{view.FUNCTION_AVG},
+	METRICS_TYPE_QUOTIENT:      []string{view.FUNCTION_AVG},
+	METRICS_TYPE_TAG:           []string{view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT},
+	METRICS_TYPE_OTHER:         []string{view.FUNCTION_COUNT},
 }
 
 const (

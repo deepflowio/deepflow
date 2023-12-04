@@ -164,6 +164,7 @@ message L7PerfStats {
     uint32 rrt_count = 6;
     uint64 rrt_sum = 7;
     uint32 rrt_max = 8;
+    uint32 tls_rtt = 9;
 }
 
 message L7Request {
@@ -199,6 +200,8 @@ message ExtendedInfo {
 
     repeated string attribute_names = 16;
     repeated string attribute_values= 17;
+    repeated string metrics_names = 18;
+    repeated double metrics_values = 19;
 }
 
 message AppProtoLogsData {

@@ -26,6 +26,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
 func newCloudVPC() cloudmodel.VPC {
@@ -45,7 +46,7 @@ func (t *SuiteTest) getVPCMock(mockDB bool) (*cache.Cache, cloudmodel.VPC) {
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		t.db.Create(&mysql.VPC{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
-		cache_.VPCs[cloudItem.Lcuuid] = &cache.VPC{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
+		cache_.DiffBaseDataSet.VPCs[cloudItem.Lcuuid] = &diffbase.VPC{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
 	cache_.SetSequence(cache_.GetSequence() + 1)
@@ -55,7 +56,7 @@ func (t *SuiteTest) getVPCMock(mockDB bool) (*cache.Cache, cloudmodel.VPC) {
 
 func (t *SuiteTest) TestHandleAddVPCSucess() {
 	cache, cloudItem := t.getVPCMock(false)
-	assert.Equal(t.T(), len(cache.VPCs), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 0)
 
 	updater := NewVPC(cache, []cloudmodel.VPC{cloudItem})
 	updater.HandleAddAndUpdate()
@@ -63,7 +64,7 @@ func (t *SuiteTest) TestHandleAddVPCSucess() {
 	var addedItem *mysql.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.VPCs), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 1)
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
 }
@@ -80,7 +81,7 @@ func (t *SuiteTest) TestHandleUpdateVPCSucess() {
 	var addedItem *mysql.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
-	assert.Equal(t.T(), len(cache.VPCs), 1)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 1)
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), addedItem.CIDR, cloudItem.CIDR)
 	assert.Equal(t.T(), addedItem.TunnelID, cloudItem.TunnelID)
@@ -97,5 +98,5 @@ func (t *SuiteTest) TestHandleDeleteVPCSucess() {
 	var addedItem *mysql.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	assert.Equal(t.T(), len(cache.VPCs), 0)
+	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 0)
 }

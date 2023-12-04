@@ -158,6 +158,22 @@ func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	resource.VInterfaces = append(resource.VInterfaces, vifs...)
 	resource.IPs = append(resource.IPs, ips...)
 
+	rds, vifs, ips, err := h.getRDSInstances()
+	if err != nil {
+		return resource, err
+	}
+	resource.RDSInstances = append(resource.RDSInstances, rds...)
+	resource.VInterfaces = append(resource.VInterfaces, vifs...)
+	resource.IPs = append(resource.IPs, ips...)
+
+	redis, vifs, ips, err := h.getRedisInstances()
+	if err != nil {
+		return resource, err
+	}
+	resource.RedisInstances = append(resource.RedisInstances, redis...)
+	resource.VInterfaces = append(resource.VInterfaces, vifs...)
+	resource.IPs = append(resource.IPs, ips...)
+
 	log.Debugf("region resource num info: %v", h.toolDataSet.regionLcuuidToResourceNum)
 	log.Debugf("az resource num info: %v", h.toolDataSet.azLcuuidToResourceNum)
 	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, h.toolDataSet.regionLcuuidToResourceNum)
@@ -187,7 +203,16 @@ func (h *HuaWei) getRawData(ctx rawDataGetContext) (jsonList []*simplejson.Json,
 	statsdAPIStartTime := time.Now()
 	statsdAPIDataCount := 0
 
-	if ctx.pageQuery {
+	if ctx.pageQueryMethod == pageQueryMethodNotPage {
+		resp, err := RequestGet(ctx.url, ctx.token, time.Duration(h.httpTimeout), ctx.additionalHeaders)
+		if err != nil {
+			return []*simplejson.Json{}, err
+		}
+		jData := resp.Get(ctx.resultKey)
+		for i := range jData.MustArray() {
+			jsonList = append(jsonList, jData.GetIndex(i))
+		}
+	} else if ctx.pageQueryMethod == pageQueryMethodMarker {
 		var marker string
 		limit := 50
 		baseURL := ctx.url
@@ -218,37 +243,55 @@ func (h *HuaWei) getRawData(ctx rawDataGetContext) (jsonList []*simplejson.Json,
 				break
 			}
 		}
-	} else {
-		resp, err := RequestGet(ctx.url, ctx.token, time.Duration(h.httpTimeout), ctx.additionalHeaders)
-		if err != nil {
-			return []*simplejson.Json{}, err
-		}
-		jData := resp.Get(ctx.resultKey)
-		for i := range jData.MustArray() {
-			jsonList = append(jsonList, jData.GetIndex(i))
+	} else if ctx.pageQueryMethod == pageQueryMethodOffset {
+		offset := 0
+		limit := 50
+		baseURL := ctx.url
+		for {
+			ctx.url = fmt.Sprintf("%s?limit=%d&offset=%d", baseURL, limit, offset)
+			resp, err := RequestGet(ctx.url, ctx.token, time.Duration(h.httpTimeout), ctx.additionalHeaders)
+			if err != nil {
+				return []*simplejson.Json{}, err
+			}
+
+			jData := resp.Get(ctx.resultKey)
+			curCount := len(jData.MustArray())
+			for i := range jData.MustArray() {
+				jsonList = append(jsonList, jData.GetIndex(i))
+			}
+			statsdAPIDataCount += curCount
+			if curCount < limit {
+				break
+			}
+			offset += curCount
 		}
 	}
-
 	h.cloudStatsd.RefreshAPIMoniter(ctx.resultKey, statsdAPIDataCount, statsdAPIStartTime)
 
 	h.debugger.WriteJson(ctx.resultKey, ctx.url, jsonList)
 	return
 }
 
+const (
+	pageQueryMethodNotPage = iota
+	pageQueryMethodMarker
+	pageQueryMethodOffset
+)
+
 type rawDataGetContext struct {
 	url               string
 	token             string
-	pageQuery         bool
+	pageQueryMethod   int
 	resultKey         string
 	additionalHeaders map[string]string
 }
 
-func newRawDataGetContext(url, token, resultKey string, pageQuery bool) rawDataGetContext {
+func newRawDataGetContext(url, token, resultKey string, pageQuery int) rawDataGetContext {
 	return rawDataGetContext{
 		url:               url,
 		token:             token,
 		resultKey:         resultKey,
-		pageQuery:         pageQuery,
+		pageQueryMethod:   pageQuery,
 		additionalHeaders: make(map[string]string),
 	}
 }
