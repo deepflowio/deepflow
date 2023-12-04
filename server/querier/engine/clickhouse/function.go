@@ -304,10 +304,10 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		}
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
-		case metrics.METRICS_TYPE_DELAY:
+		case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 时延类和商值类，忽略0值
 			outFunc.SetIsGroupArray(true)
 			outFunc.SetIgnoreZero(true)
