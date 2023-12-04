@@ -76,21 +76,21 @@ type Unmarshaller struct {
 	platformData       *grpc.PlatformInfoTable
 	disableSecondWrite bool
 	unmarshallQueue    queue.QueueReader
-	dbwriter           *dbwriter.DbWriter
+	dbwriters          []dbwriter.DbWriter
 	queueBatchCache    QueueCache
 	counter            *Counter
 	tableCounter       [zerodoc.VTAP_TABLE_ID_MAX + 1]int64
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite bool, unmarshallQueue queue.QueueReader, dbwriter *dbwriter.DbWriter) *Unmarshaller {
+func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite bool, unmarshallQueue queue.QueueReader, dbwriters []dbwriter.DbWriter) *Unmarshaller {
 	return &Unmarshaller{
 		index:              index,
 		platformData:       platformData,
 		disableSecondWrite: disableSecondWrite,
 		unmarshallQueue:    unmarshallQueue,
 		counter:            &Counter{MaxDelay: -3600, MinDelay: 3600},
-		dbwriter:           dbwriter,
+		dbwriters:          dbwriters,
 	}
 }
 
@@ -152,7 +152,9 @@ func (u *Unmarshaller) putStoreQueue(doc *app.Document) {
 	queueCache.values = append(queueCache.values, doc)
 
 	if len(queueCache.values) >= QUEUE_BATCH_SIZE {
-		u.dbwriter.Put(queueCache.values...)
+		for i := 0; i < len(u.dbwriters); i++ {
+			u.dbwriters[i].Put(queueCache.values...)
+		}
 		queueCache.values = queueCache.values[:0]
 	}
 }
@@ -160,7 +162,9 @@ func (u *Unmarshaller) putStoreQueue(doc *app.Document) {
 func (u *Unmarshaller) flushStoreQueue() {
 	queueCache := &u.queueBatchCache
 	if len(queueCache.values) > 0 {
-		u.dbwriter.Put(queueCache.values...)
+		for i := 0; i < len(u.dbwriters); i++ {
+			u.dbwriters[i].Put(queueCache.values...)
+		}
 		queueCache.values = queueCache.values[:0]
 	}
 }
