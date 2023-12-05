@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-use std::net::IpAddr;
 use std::str;
 
 use hpack::Decoder;
@@ -179,7 +178,7 @@ pub struct HttpInfo {
     #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
     pub referer: Option<String>,
     #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
-    pub client_ip: Option<IpAddr>,
+    pub client_ip: Option<String>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub x_request_id_0: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -466,7 +465,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 request_id: f.stream_id,
                 x_request_id_0: Some(f.x_request_id_0),
                 x_request_id_1: Some(f.x_request_id_1),
-                client_ip: f.client_ip.map(|ip| ip.to_string()),
+                client_ip: f.client_ip,
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: service_name,
@@ -1082,7 +1081,7 @@ impl HttpLog {
             }
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
-            info.client_ip = Some(val.parse().map_err(|_| Error::HttpHeaderParseFailed)?);
+            info.client_ip = Some(val.to_owned());
         }
         Ok(())
     }
@@ -1479,7 +1478,7 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let config = L7LogDynamicConfig::new(
-            "".to_owned(),
+            "x-forwarded-for".to_owned(),
             vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
@@ -1547,6 +1546,7 @@ mod tests {
             ("h2c_ascii.pcap", "h2c_ascii.result"),
             ("httpv2-stream-id.pcap", "httpv2-stream-id.result"),
             ("istio-tcp-frag.pcap", "istio-tcp-frag.result"),
+            ("client-ip.pcap", "client-ip.result"),
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
