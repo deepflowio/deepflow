@@ -273,6 +273,12 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 		}
 		vTapIDToChangeInfo[vtap.ID] = &ChangeInfo{OldIP: vtap.AnalyzerIP, NewIP: vtap.AnalyzerIP, NewWeight: w}
 
+		// the analyzer ip in getting vtap traffic data is not in the analyzer table
+		if _, ok := analyzerIPToInfo[vtap.AnalyzerIP]; !ok {
+			allocVTaps = append(allocVTaps, VTapInfo{VtapID: vtap.ID, Traffic: p.vTapIDToTraffic[vtap.ID]})
+			log.Infof("vtap(%v) analyzer ip(%v) is not in analyzer table", vtap.Name, vtap.AnalyzerIP)
+			continue
+		}
 		analyzerIPToInfo[vtap.AnalyzerIP].SumTraffic += p.vTapIDToTraffic[vtap.ID]
 		analyzerIPToInfo[vtap.AnalyzerIP].AfterVTapNum++ // hold old vtap num
 		analyzerIPToInfo[vtap.AnalyzerIP].VTapInfos = append(analyzerIPToInfo[vtap.AnalyzerIP].VTapInfos,
