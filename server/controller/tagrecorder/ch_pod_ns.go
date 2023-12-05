@@ -48,15 +48,17 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 	for _, podNamespace := range podNamespaces {
 		if podNamespace.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
-				ID:     podNamespace.ID,
-				Name:   podNamespace.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
+				ID:           podNamespace.ID,
+				Name:         podNamespace.Name + " (deleted)",
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
+				PodClusterID: podNamespace.PodClusterID,
 			}
 		} else {
 			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
-				ID:     podNamespace.ID,
-				Name:   podNamespace.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
+				ID:           podNamespace.ID,
+				Name:         podNamespace.Name,
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
+				PodClusterID: podNamespace.PodClusterID,
 			}
 		}
 	}
@@ -74,6 +76,9 @@ func (p *ChPodNamespace) generateUpdateInfo(oldItem, newItem mysql.ChPodNamespac
 	}
 	if oldItem.IconID != newItem.IconID {
 		updateInfo["icon_id"] = newItem.IconID
+	}
+	if oldItem.PodClusterID != newItem.PodClusterID {
+		updateInfo["pod_cluster_id"] = newItem.PodClusterID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

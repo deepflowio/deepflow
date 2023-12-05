@@ -51,7 +51,7 @@ type Specification struct {
 	DataSourceMax                int `default:"25" yaml:"data_source_max"`
 	DataSourceRetentionTimeMax   int `default:"24000" yaml:"data_source_retention_time_max"`
 	DataSourceExtMetricsInterval int `default:"15" yaml:"data_source_ext_metrics_interval"`
-	DataSourcePrometheusInterval int `default:"15" yaml:"promdata_source_prometheus_intervaletheus"`
+	DataSourcePrometheusInterval int `default:"15" yaml:"data_source_prometheus_interval"`
 }
 
 type DFWebService struct {

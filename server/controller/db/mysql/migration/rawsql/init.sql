@@ -2039,6 +2039,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    pod_cluster_id          INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns;
@@ -2048,6 +2049,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_group (
     name                    VARCHAR(256),
     pod_group_type          INTEGER DEFAULT NULL,
     icon_id                 INTEGER,
+    pod_cluster_id          INTEGER,
+    pod_ns_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_group;
@@ -2056,6 +2059,11 @@ CREATE TABLE IF NOT EXISTS ch_pod (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    pod_cluster_id          INTEGER,
+    pod_ns_id               INTEGER,
+    pod_node_id             INTEGER,
+    pod_service_id          INTEGER,
+    pod_group_id            INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod;
@@ -2722,3 +2730,20 @@ CREATE TABLE IF NOT EXISTS ch_view_change (
 TRUNCATE TABLE ch_view_change;
 INSERT INTO ch_view_change () VALUES ();
 
+CREATE TABLE IF NOT EXISTS ch_pod_service (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `pod_cluster_id`  INTEGER,
+    `pod_ns_id`       INTEGER,
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_service;
+
+CREATE TABLE IF NOT EXISTS ch_chost (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `host_id`         INTEGER,
+    `vpc_id`          INTEGER,
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_chost;

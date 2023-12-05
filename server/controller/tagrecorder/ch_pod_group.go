@@ -52,6 +52,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				Name:         podGroup.Name + " (deleted)",
 				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				PodClusterID: podGroup.PodClusterID,
+				PodNsID:      podGroup.PodNamespaceID,
 			}
 		} else {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
@@ -59,6 +61,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				Name:         podGroup.Name,
 				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				PodClusterID: podGroup.PodClusterID,
+				PodNsID:      podGroup.PodNamespaceID,
 			}
 		}
 	}
@@ -79,6 +83,12 @@ func (p *ChPodGroup) generateUpdateInfo(oldItem, newItem mysql.ChPodGroup) (map[
 	}
 	if oldItem.IconID != newItem.IconID {
 		updateInfo["icon_id"] = newItem.IconID
+	}
+	if oldItem.PodClusterID != newItem.PodClusterID {
+		updateInfo["pod_cluster_id"] = newItem.PodClusterID
+	}
+	if oldItem.PodClusterID != newItem.PodClusterID {
+		updateInfo["pod_ns_id"] = newItem.PodNsID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
