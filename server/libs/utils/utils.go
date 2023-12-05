@@ -23,6 +23,7 @@ import (
 	"net"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -244,4 +245,42 @@ func Slice(s string) (b []byte) {
 	pbytes.Len = pstring.Len
 	pbytes.Cap = pstring.Len
 	return
+}
+
+func GetTraceIdIndex(traceId string, indexTypeIsIncremetalId, formatIsHex bool, incremetalIdStart, incremetalIdLength int) (uint64, error) {
+	if !indexTypeIsIncremetalId {
+		return DJBHash(17, traceId), nil
+	}
+
+	if len(traceId) < incremetalIdLength || incremetalIdLength == 0 {
+		return 0, fmt.Errorf("traceId(%s) or incremetalIdLength(%d) is invalid", traceId, incremetalIdLength)
+	}
+
+	traceIdLen := len(traceId)
+	start := incremetalIdStart
+	if incremetalIdStart < 0 {
+		start = traceIdLen + incremetalIdStart
+		if start < 0 {
+			return 0, fmt.Errorf("traceId(%s) or incremetalIdStart(%d) is invalid", traceId, incremetalIdStart)
+		}
+	}
+	end := start + incremetalIdLength
+	if end > traceIdLen {
+		return 0, fmt.Errorf("traceId(%s) incremetalIdLocation(%d-%d) is beyond traceId length", traceId, start, end)
+	}
+
+	traceIdIndex := traceId[start:end]
+	var num uint64
+	var err error
+	if formatIsHex {
+		num, err = strconv.ParseUint(traceIdIndex, 16, 64)
+	} else {
+		num, err = strconv.ParseUint(traceIdIndex, 10, 64)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("parse(%s) to uint64 failed err %s", traceIdIndex, err)
+	}
+	hash := DJBHash(17, traceId)
+	// the lowest 16 bits are set as the hash value of traceId to reduce duplication when filtering data
+	return num<<16 | (hash & 0xffff), nil
 }

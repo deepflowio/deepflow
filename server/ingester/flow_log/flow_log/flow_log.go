@@ -159,6 +159,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 			throttlers[i],
 			flowTagWriter,
 			exporters,
+			config,
 		)
 	}
 	return &Logger{
@@ -211,6 +212,7 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 			throttlers[i],
 			nil,
 			nil,
+			config,
 		)
 	}
 	return &Logger{
@@ -272,6 +274,7 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 			throttlers[i],
 			flowTagWriter,
 			exporters,
+			config,
 		)
 	}
 
