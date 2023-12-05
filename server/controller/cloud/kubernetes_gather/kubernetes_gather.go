@@ -293,11 +293,10 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		}
 	}
 
-	pods, abstractNodes, err := k.getPods()
+	pods, err := k.getPods()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
-	podNodes = append(podNodes, abstractNodes...)
 
 	nodeSubnets, podSubnets, nodeVInterfaces, podVInterfaces, nodeIPs, podIPs, err := k.getVInterfacesAndIPs()
 	if err != nil {

@@ -30,7 +30,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
+func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 	log.Debug("get pods starting")
 	podTypesMap := map[string]bool{
 		"CloneSet":              false,
@@ -41,7 +41,6 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		"StatefulSet":           false,
 		"ReplicationController": false,
 	}
-	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
 		if pErr != nil {
@@ -100,7 +99,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				abstractPGName = resourceName[:targetIndex]
 			}
 			uid := common.GetUUID(namespace+abstractPGName, uuid.Nil)
-			// 适配 serverless pod, 需要抽象出一个对应的 node
+			// 适配 serverless pod
 			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, abstractPGType)))
 		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
@@ -222,21 +221,6 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				k.podIPToLcuuid[ip] = podLcuuid
 			}
 		}
-	}
-
-	for nodeIP := range abstractNodes {
-		nodes = append(nodes, model.PodNode{
-			Lcuuid:           common.GetUUID(nodeIP+k.podClusterLcuuid, uuid.Nil),
-			Name:             nodeIP,
-			Type:             common.POD_NODE_TYPE_NODE,
-			ServerType:       common.POD_NODE_SERVER_TYPE_HOST,
-			State:            common.POD_NODE_STATE_NORMAL,
-			IP:               nodeIP,
-			VPCLcuuid:        k.VPCUuid,
-			AZLcuuid:         k.azLcuuid,
-			RegionLcuuid:     k.RegionUuid,
-			PodClusterLcuuid: k.podClusterLcuuid,
-		})
 	}
 	log.Debug("get pods complete")
 	return
