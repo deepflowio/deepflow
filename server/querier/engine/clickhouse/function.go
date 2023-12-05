@@ -25,8 +25,11 @@ import (
 	"strconv"
 	"strings"
 
+	exp_slices "golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	ch_common "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -105,7 +108,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	}
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
 	// 判断算子是否支持单层
-	if db == "flow_metrics" {
+	if db != ch_common.DB_NAME_FLOW_LOG {
 		unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 		if common.IsValueInSliceString(name, unlayFuns) {
 			levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
@@ -308,6 +311,13 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			IgnoreZero: true,
 		}
+		// When using avg, max, and min operators. The inner layer uses itself
+		if exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+			innerFunction = view.DefaultFunction{
+				Name:   f.Name,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+			}
+		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
 		innerFunction.Init()
@@ -379,12 +389,15 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		}
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
-		case metrics.METRICS_TYPE_DELAY:
+		case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 时延类和商值类，忽略0值
-			outFunc.SetIsGroupArray(true)
+			// When using avg, max, and min operators. The outer layer uses itself
+			if !exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+				outFunc.SetIsGroupArray(true)
+			}
 			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
 			outFunc.SetFillNullAsZero(true)

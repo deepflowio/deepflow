@@ -98,6 +98,8 @@ const (
 	RESOURCE_TYPE_CH_INT_ENUM       = "ch_int_enum"
 	RESOURCE_TYPE_CH_NODE_TYPE      = "ch_node_type"
 	RESOURCE_TYPE_CH_GPROCESS       = "ch_gprocess"
+	RESOURCE_TYPE_CH_POD_SERVICE    = "ch_pod_service"
+	RESOURCE_TYPE_CH_CHOST          = "ch_chost"
 
 	RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
 	RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
@@ -160,6 +162,9 @@ const (
 
 	CH_DICTIONARY_IP_RELATION = "ip_relation_map"
 	CH_DICTIONARY_IP_RESOURCE = "ip_resource_map"
+
+	CH_DICTIONARY_POD_SERVICE = "pod_service_map"
+	CH_DICTIONARY_CHOST       = "chost_map"
 
 	CH_STRING_DICTIONARY_ENUM = "string_enum_map"
 	CH_INT_DICTIONARY_ENUM    = "int_enum_map"
@@ -597,12 +602,62 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_POD_NS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `pod_cluster_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX %d)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_POD_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `pod_cluster_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `pod_node_id` UInt64,\n" +
+		"    `pod_service_id` UInt64,\n" +
+		"    `pod_group_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX %d)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_POD_SERVICE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `pod_cluster_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX %d)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_CHOST_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `host_id` UInt64,\n" +
+		"    `vpc_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX %d)\n" +
+		"LAYOUT(FLAT())"
 	CREATE_CH_POD_GROUP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `pod_group_type` UInt64,\n" +
-		"    `icon_id` Int64\n" +
+		"    `icon_id` Int64,\n" +
+		"    `pod_cluster_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -678,10 +733,10 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_VPC:                    CREATE_VPC_DICTIONARY_SQL,
 	CH_DICTIONARY_VL2:                    CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_CLUSTER:            CREATE_DICTIONARY_SQL,
-	CH_DICTIONARY_POD_NAMESPACE:          CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_NAMESPACE:          CREATE_POD_NS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NODE:               CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_GROUP:              CREATE_CH_POD_GROUP_DICTIONARY_SQL,
-	CH_DICTIONARY_POD:                    CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_POD:                    CREATE_POD_DICTIONARY_SQL,
 	CH_DICTIONARY_DEVICE:                 CREATE_DEVICE_DICTIONARY_SQL,
 	CH_DICTIONARY_VTAP_PORT:              CREATE_VTAP_PORT_DICTIONARY_SQL,
 	CH_DICTIONARY_TAP_TYPE:               CREATE_TAP_TYPE_DICTIONARY_SQL,
@@ -717,6 +772,8 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS: CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_ENV:                 CREATE_K8S_ENV_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_ENVS:                CREATE_K8S_ENVS_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_SERVICE:                 CREATE_POD_SERVICE_DICTIONARY_SQL,
+	CH_DICTIONARY_CHOST:                       CREATE_CHOST_DICTIONARY_SQL,
 
 	CH_PROMETHEUS_LABEL_NAME:              CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
 	CH_PROMETHEUS_METRIC_NAME:             CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,

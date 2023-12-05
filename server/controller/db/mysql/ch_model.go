@@ -212,9 +212,14 @@ func (ChNetwork) TableName() string {
 }
 
 type ChPod struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	PodNodeID    int    `gorm:"column:pod_node_id;type:int;not null" json:"POD_NODE_ID"`
+	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
+	PodGroupID   int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 }
 
 type ChPodCluster struct {
@@ -228,12 +233,15 @@ type ChPodGroup struct {
 	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	PodGroupType int    `gorm:"column:pod_group_type;type:int;default:null" json:"POD_GROUP_TYPE"`
 	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
 
 type ChPodNamespace struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
 }
 
 func (ChPodNamespace) TableName() string {
@@ -471,4 +479,18 @@ type ChPrometheusTargetLabelLayout struct {
 
 type ChViewChange struct {
 	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+type ChPodService struct {
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int" json:"POD_NS_ID"`
+}
+
+type ChChost struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	VPCID  int    `gorm:"column:vpc_id;type:int" json:"VPC_ID"`
+	HostID int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
 }

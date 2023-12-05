@@ -17,6 +17,7 @@
 use std::net::IpAddr;
 use std::str;
 
+use hpack::Decoder;
 use nom::AsBytes;
 use serde::Serialize;
 
@@ -44,7 +45,6 @@ use crate::{
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use cloud_platform::tingyun;
-use public::utils::net::h2pack::parser::Parser;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -490,7 +490,8 @@ pub struct HttpLog {
     proto: L7Protocol,
     is_tls: bool,
     perf_stats: Option<L7PerfStats>,
-    http2_parser: Option<Parser>,
+    http2_req_decoder: Option<Decoder<'static>>,
+    http2_resp_decoder: Option<Decoder<'static>>,
 }
 
 impl L7ProtocolParserInterface for HttpLog {
@@ -597,12 +598,20 @@ impl L7ProtocolParserInterface for HttpLog {
     fn reset(&mut self) {
         let mut new_log = match self.proto {
             L7Protocol::Http1 => Self::new_v1(),
-            L7Protocol::Http2 => Self::new_v2(false),
-            L7Protocol::Grpc => Self::new_v2(true),
+            L7Protocol::Http2 => Self {
+                proto: L7Protocol::Http2,
+                ..Default::default()
+            },
+            L7Protocol::Grpc => Self {
+                proto: L7Protocol::Grpc,
+                ..Default::default()
+            },
             _ => unreachable!(),
         };
         new_log.perf_stats = self.perf_stats.take();
-        *self = new_log
+        new_log.http2_req_decoder = self.http2_req_decoder.take();
+        new_log.http2_resp_decoder = self.http2_resp_decoder.take();
+        *self = new_log;
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -629,7 +638,8 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
-            http2_parser: Some(Parser::new()),
+            http2_req_decoder: Some(Decoder::new()),
+            http2_resp_decoder: Some(Decoder::new()),
             ..Default::default()
         }
     }
@@ -906,11 +916,17 @@ impl HttpLog {
                 let header_frame_payload =
                     &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
 
-                let parse_rst = self
-                    .http2_parser
-                    .as_mut()
-                    .unwrap()
-                    .parse(header_frame_payload);
+                let parse_rst = if param.direction == PacketDirection::ClientToServer {
+                    self.http2_req_decoder
+                        .as_mut()
+                        .unwrap()
+                        .decode(header_frame_payload)
+                } else {
+                    self.http2_resp_decoder
+                        .as_mut()
+                        .unwrap()
+                        .decode(header_frame_payload)
+                };
 
                 if let Err(_) = parse_rst {
                     return Err(Error::HttpHeaderParseFailed);
@@ -921,7 +937,7 @@ impl HttpLog {
                     self.on_header(config, key, val, direction, info)?;
                     if key == b"content-length" {
                         content_length = Some(
-                            str::from_utf8(val.as_slice())
+                            str::from_utf8(val)
                                 .unwrap_or_default()
                                 .parse::<u32>()
                                 .unwrap_or_default(),
