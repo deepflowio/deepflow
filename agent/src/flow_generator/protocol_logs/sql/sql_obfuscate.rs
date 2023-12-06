@@ -530,6 +530,7 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
             || token == Token::Keyword(Keyword::Offset)
         {
             need_masked = true;
+            already_masked = false;
             if !need_obfuscated {
                 start = iteration.peek().map(|(idx, _)| *idx).unwrap_or(length);
                 // this token and its previous contents do not need to be confused, directly intercepted
@@ -753,7 +754,7 @@ mod tests {
                 ),
                 (
                     "SELECT * FROM table WHERE id is Null;",
-                    Some("SELECT * FROM table WHERE is = ?;"),
+                    Some("SELECT * FROM table WHERE id IS ?;"),
                 ),
                 (
                     "SELECT * FROM table LIMIT 1 OFFSET 2;",
