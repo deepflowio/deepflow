@@ -40,23 +40,10 @@ const COMMON_SQL_START: [&'static str; 19] = [
     "REVOKE",
 ];
 
-pub(super) fn check_sql(first: &str, keywords: &[&'static str]) -> bool {
-    for i in COMMON_SQL_START.iter() {
-        if first.len() == i.len() {
-            for (idx, c) in first.chars().enumerate() {
-                if c.to_ascii_uppercase() as u8 == i.as_bytes()[idx] {
-                    return true;
-                }
-            }
-        }
-    }
-    for i in keywords.iter() {
-        if first.len() == i.len() {
-            for (idx, c) in first.chars().enumerate() {
-                if c.to_ascii_uppercase() as u8 == i.as_bytes()[idx] {
-                    return true;
-                }
-            }
+pub(super) fn is_valid_sql(first: &str, keywords: &[&'static str]) -> bool {
+    for i in COMMON_SQL_START.iter().chain(keywords.iter()) {
+        if first.eq_ignore_ascii_case(i) {
+            return true;
         }
     }
     false
@@ -98,7 +85,7 @@ const POSTGRESQL_START: [&'static str; 16] = [
 
 pub(super) fn is_postgresql(sql: &String) -> bool {
     if let Some(first) = trim_head_comment_and_get_first_word(sql.as_str(), 12) {
-        check_sql(first, &POSTGRESQL_START)
+        is_valid_sql(first, &POSTGRESQL_START)
     } else {
         false
     }
@@ -146,7 +133,7 @@ const MYSQL_START: [&'static str; 14] = [
 
 pub(super) fn is_mysql(sql: &String) -> bool {
     if let Some(first) = trim_head_comment_and_get_first_word(sql.as_str(), 8) {
-        check_sql(first, &MYSQL_START)
+        is_valid_sql(first, &MYSQL_START)
     } else {
         false
     }
@@ -203,29 +190,29 @@ pub(super) fn trim_head_comment_and_get_first_word(
 #[cfg(test)]
 mod test_sql_check {
     use crate::flow_generator::protocol_logs::sql::sql_check::{
-        check_sql, trim_head_comment_and_get_first_word,
+        is_valid_sql, trim_head_comment_and_get_first_word,
     };
 
     #[test]
     fn test_trim_head_comment_and_get_first_word() {
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"sEleCt 1", 6).unwrap(),
             &["SELECT"],
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"sEleCt 1", 7).unwrap(),
             &["SELECT"]
         ));
         assert_eq!(trim_head_comment_and_get_first_word(r"sEleCt 1", 5), None);
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* i am comment */SelecT 1", 6).unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* i am comment */ SelecT 1", 6).unwrap(),
             &["SELECT",]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(
                 r"/* i am comment */ /*i am comment*/ SelecT 1",
                 6
@@ -233,25 +220,25 @@ mod test_sql_check {
             .unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* i am comment */ /*i am comment*/SelecT 1", 6)
                 .unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* i am comment * /*/ SelecT 1", 6).unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* i am comment *  /**/  /**  */ SelecT 1", 6)
                 .unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* unable to parse */SelecT", 6).unwrap(),
             &["SELECT"]
         ));
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(r"/* able to parse */SelecT ", 6).unwrap(),
             &["SELECT"]
         ));
@@ -263,7 +250,7 @@ mod test_sql_check {
             trim_head_comment_and_get_first_word(r"/ * not a comment */ SelecT 1", 6),
             None
         );
-        assert!(check_sql(
+        assert!(is_valid_sql(
             trim_head_comment_and_get_first_word(
                 r"/* i am comment /* */ syntax error /* i am comment */ SelecT 1",
                 6

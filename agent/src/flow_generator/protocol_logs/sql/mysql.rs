@@ -19,7 +19,7 @@ mod comment_parser;
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
-use super::sql_check::{check_sql, is_mysql, trim_head_comment_and_get_first_word};
+use super::sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
@@ -207,7 +207,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             row_effect: if f.command == COM_QUERY {
                 trim_head_comment_and_get_first_word(&f.context, 8)
                     .map(|first| {
-                        if check_sql(first, &["INSERT", "UPDATE", "DELETE"]) {
+                        if is_valid_sql(first, &["INSERT", "UPDATE", "DELETE"]) {
                             f.affected_rows as u32
                         } else {
                             0
