@@ -188,7 +188,7 @@ var (
 		db:     "ext_metrics",
 	}, {
 		input:  "select Percentile(`metrics.xxx`, 0.9) as xxx from cpu",
-		output: "SELECT quantile(0.9)(if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')])) AS `xxx` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') LIMIT 10000",
+		output: "SELECT quantile(0.9)(`_sum_if(indexOf(metrics_float_names, xxx)=0,null,metrics_float_values[indexOf(metrics_float_names, xxx)])`) AS `xxx` FROM (SELECT SUM(if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')])) AS `_sum_if(indexOf(metrics_float_names, xxx)=0,null,metrics_float_values[indexOf(metrics_float_names, xxx)])` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu')) LIMIT 10000",
 		db:     "ext_metrics",
 	}, {
 		input:  "select Sum(packet_count) as count from l4_packet",
@@ -246,7 +246,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, AAvg(`metrics.dropped`) AS `AAvg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `AAvg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
@@ -254,7 +254,7 @@ var (
 		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, AAvg(`metrics.dropped`) AS `AAvg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `AAvg(metrics.dropped)` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_system.`deepflow_system` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
