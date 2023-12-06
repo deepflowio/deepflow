@@ -62,28 +62,29 @@ func StringInterfaceMapKeys(m map[string]interface{}) (keys []string) {
 	return
 }
 
-func StringInterfaceMapKVs(m map[string]interface{}, sep string, valueMaxLength int) (items []string) {
-	keys := []string{}
-	for key := range m {
-		value, ok := m[key].(string)
+func GenerateCustomTag(dataMap map[string]interface{}, keyRegex *regexp.Regexp, valueMaxLength int, sep string) []string {
+	var items, keys []string
+	constraintLengthMap := map[string]string{}
+	for key, v := range dataMap {
+		value, ok := v.(string)
 		if !ok {
-			value = ""
+			continue
 		}
 		if valueMaxLength != 0 && len(value) > valueMaxLength {
 			continue
 		}
+		if keyRegex != nil && !keyRegex.MatchString(key) {
+			continue
+		}
 		keys = append(keys, key)
+		constraintLengthMap[key] = value
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		v, ok := m[k].(string)
-		if !ok {
-			v = ""
-		}
-		newString := k + sep + v
+		newString := k + sep + constraintLengthMap[k]
 		items = append(items, newString)
 	}
-	return
+	return items
 }
 
 func StringSliceStringMapKeys(m map[string][]string) (keys []string) {
