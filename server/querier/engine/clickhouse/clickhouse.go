@@ -343,11 +343,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				as := sqlparser.String(item.As)
 				colName, ok := item.Expr.(*sqlparser.ColName)
 				if ok && (common.IsValueInSliceString(strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`"), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
+					colNameStr := strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`")
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)
-						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
-							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
@@ -362,13 +363,13 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
-							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, autoTagKey)
+									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
 								}
 								sort.Strings(autoTagSlice)
 								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
@@ -421,9 +422,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				} else if common.IsValueInSliceString(sqlparser.String(colName), []string{"_", "_0", "_1"}) {
 					continue
 				}
-				groupTag := sqlparser.String(colName)
+				groupTag := strings.Trim(sqlparser.String(colName), "`")
 				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, groupTag)) {
-					innerGroupBySlice = append(innerGroupBySlice, groupTag)
+					innerGroupBySlice = append(innerGroupBySlice, "`"+groupTag+"`")
 				}
 			}
 			funcName, ok := group.(*sqlparser.FuncExpr)
