@@ -72,8 +72,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				log.Infof("service (%s) selector not found", name)
 				continue
 			}
-			selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":", 0)
-			selectorStrings := strings.Join(selectorSlice, ", ")
+			selectorSlice := cloudcommon.GenerateCustomTag(selector, nil, 0, ":")
 			specTypeString := sData.Get("spec").Get("type").MustString()
 			specType, ok := serviceTypes[specTypeString]
 			if !ok {
@@ -92,19 +91,17 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					labels[cloudcommon.SVC_RULE_RESOURCE_NAME+"_servicerule"] = v
 				}
 			}
-			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
-			labelString := strings.Join(labelSlice, ", ")
 
 			annotations := metaData.Get("annotations")
-			annotationString := expand.GetAnnotation(annotations, k.customTagLenMax)
+			annotationString := expand.GetAnnotation(annotations, k.annotationRegex, k.customTagLenMax)
 
 			service := model.PodService{
 				Lcuuid:             uID,
 				Name:               name,
-				Label:              labelString,
+				Label:              k.GetLabel(labels),
 				Annotation:         annotationString,
 				Type:               specType,
-				Selector:           selectorStrings,
+				Selector:           strings.Join(selectorSlice, ", "),
 				ServiceClusterIP:   clusterIP,
 				PodNamespaceLcuuid: namespaceLcuuid,
 				VPCLcuuid:          k.VPCUuid,

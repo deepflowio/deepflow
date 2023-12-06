@@ -21,7 +21,6 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -67,9 +66,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name)
 			continue
 		}
-		labels := metaData.Get("labels").MustMap()
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
-		labelString := strings.Join(labelSlice, ", ")
+		labelString := k.GetLabel(metaData.Get("labels").MustMap())
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {
 			podGroupLcuuid = uID
 			// ReplicaSetController类型名称去掉最后的'-' + hash值

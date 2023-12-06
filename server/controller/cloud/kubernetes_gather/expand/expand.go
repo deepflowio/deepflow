@@ -1,13 +1,15 @@
 package expand
 
 import (
+	"regexp"
+
 	"github.com/bitly/go-simplejson"
 )
 
-func GetPodENV(podData *simplejson.Json, maxLen int) string {
+func GetPodENV(podData *simplejson.Json, reg *regexp.Regexp, maxLen int) string {
 	return ""
 }
 
-func GetAnnotation(annotations *simplejson.Json, maxLen int) string {
+func GetAnnotation(annotations *simplejson.Json, reg *regexp.Regexp, maxLen int) string {
 	return ""
 }
