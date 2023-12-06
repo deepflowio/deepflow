@@ -49,6 +49,7 @@ const (
 	TAG_FUNCTION_TOPK                       = "topK"
 	TAG_FUNCTION_NEW_TAG                    = "newTag"
 	TAG_FUNCTION_ENUM                       = "enum"
+	TAG_FUNCTION_COUNT                      = "count"
 )
 
 const INTERVAL_1D = 86400
@@ -57,7 +58,7 @@ var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
 	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
-	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM,
+	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM, TAG_FUNCTION_COUNT,
 }
 
 type Function interface {
@@ -721,6 +722,13 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		node := f.getViewNode()
 		// node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
+	case TAG_FUNCTION_COUNT:
+		if len(f.Args) > 0 {
+			f.Value = fmt.Sprintf("count(%s)", f.Args[0])
+		} else {
+			f.Value = "count()"
+		}
+		return f.getViewNode()
 	case TAG_FUNCTION_ENUM:
 		var tagFilter string
 		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
