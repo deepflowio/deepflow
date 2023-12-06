@@ -110,7 +110,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		hostIP := pData.Get("status").Get("hostIP").MustString()
 		nodeLcuuid, ok := k.nodeIPToLcuuid[hostIP]
 		if !ok {
-			if podGroups.GetIndex(0).Get("abstract").MustBool() {
+			if hostIP != "" && podGroups.GetIndex(0).Get("abstract").MustBool() {
 				abstractNodes[hostIP] = 0
 			} else {
 				log.Infof("pod (%s) node not found", name)
