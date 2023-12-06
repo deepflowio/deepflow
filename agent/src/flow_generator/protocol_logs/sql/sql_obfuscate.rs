@@ -145,13 +145,14 @@ pub enum Keyword {
     Inner,
     Insert,
     Into,
+    Is,
     Join,
     Left,
     Limit,
     Matched,
     Merge,
     Not,
-    Null,
+    Offset,
     On,
     Or,
     Over,
@@ -197,13 +198,14 @@ impl Keyword {
             Keyword::Inner => b"INNER",
             Keyword::Insert => b"INSERT",
             Keyword::Into => b"INTO",
+            Keyword::Is => b"IS",
             Keyword::Join => b"JOIN",
             Keyword::Left => b"LEFT",
             Keyword::Limit => b"LIMIT",
             Keyword::Matched => b"MATCHED",
             Keyword::Merge => b"MERGE",
             Keyword::Not => b"NOT",
-            Keyword::Null => b"NULL",
+            Keyword::Offset => b"OFFSET",
             Keyword::On => b"ON",
             Keyword::Or => b"OR",
             Keyword::Over => b"OVER",
@@ -263,13 +265,14 @@ impl TryFrom<&[u8]> for Keyword {
                 m.insert(Keyword::Inner.as_bytes(), Keyword::Inner);
                 m.insert(Keyword::Insert.as_bytes(), Keyword::Insert);
                 m.insert(Keyword::Into.as_bytes(), Keyword::Into);
+                m.insert(Keyword::Is.as_bytes(), Keyword::Is);
                 m.insert(Keyword::Join.as_bytes(), Keyword::Join);
                 m.insert(Keyword::Left.as_bytes(), Keyword::Left);
                 m.insert(Keyword::Limit.as_bytes(), Keyword::Limit);
                 m.insert(Keyword::Matched.as_bytes(), Keyword::Matched);
                 m.insert(Keyword::Merge.as_bytes(), Keyword::Merge);
                 m.insert(Keyword::Not.as_bytes(), Keyword::Not);
-                m.insert(Keyword::Null.as_bytes(), Keyword::Null);
+                m.insert(Keyword::Offset.as_bytes(), Keyword::Offset);
                 m.insert(Keyword::On.as_bytes(), Keyword::On);
                 m.insert(Keyword::Or.as_bytes(), Keyword::Or);
                 m.insert(Keyword::Over.as_bytes(), Keyword::Over);
@@ -522,6 +525,9 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
         if matches!(token, Token::Operator(_))
             || token == Token::Keyword(Keyword::In)
             || token == Token::Keyword(Keyword::Values)
+            || token == Token::Keyword(Keyword::Is)
+            || token == Token::Keyword(Keyword::Limit)
+            || token == Token::Keyword(Keyword::Offset)
         {
             need_masked = true;
             if !need_obfuscated {
@@ -592,7 +598,12 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
                     continue;
                 } else if *k == Keyword::Set {
                     last_keyword_is_set = true;
-                } else if *k != Keyword::Values && *k != Keyword::In {
+                } else if *k != Keyword::Values
+                    && *k != Keyword::In
+                    && *k != Keyword::Is
+                    && *k != Keyword::Limit
+                    && *k != Keyword::Offset
+                {
                     need_masked = false;
                     already_masked = false;
                     last_keyword_is_set = false;
@@ -739,6 +750,14 @@ mod tests {
                 (
                     "INSERT INTO table (column1, column2, column3) VALUES (value1, value2, value3);",
                     Some("INSERT INTO table (column?,column?,column?) VALUES (?);"),
+                ),
+                (
+                    "SELECT * FROM table WHERE id is Null;",
+                    Some("SELECT * FROM table WHERE is = ?;"),
+                ),
+                (
+                    "SELECT * FROM table LIMIT 1 OFFSET 2;",
+                    Some("SELECT * FROM table LIMIT ? OFFSET ?;"),
                 ),
                 (
                     "SELECT * FROM table123😊 WHERE id😊 = 123;",
