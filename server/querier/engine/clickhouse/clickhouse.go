@@ -422,9 +422,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				} else if common.IsValueInSliceString(sqlparser.String(colName), []string{"_", "_0", "_1"}) {
 					continue
 				}
-				groupTag := strings.Trim(sqlparser.String(colName), "`")
-				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, groupTag)) {
-					innerGroupBySlice = append(innerGroupBySlice, "`"+groupTag+"`")
+				groupTag := sqlparser.String(colName)
+				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(groupTag, "`"))) {
+					innerGroupBySlice = append(innerGroupBySlice, groupTag)
 				}
 			}
 			funcName, ok := group.(*sqlparser.FuncExpr)
