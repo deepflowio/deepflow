@@ -148,6 +148,7 @@ pub enum Keyword {
     Is,
     Join,
     Left,
+    Like,
     Limit,
     Matched,
     Merge,
@@ -201,6 +202,7 @@ impl Keyword {
             Keyword::Is => b"IS",
             Keyword::Join => b"JOIN",
             Keyword::Left => b"LEFT",
+            Keyword::Like => b"LIKE",
             Keyword::Limit => b"LIMIT",
             Keyword::Matched => b"MATCHED",
             Keyword::Merge => b"MERGE",
@@ -268,6 +270,7 @@ impl TryFrom<&[u8]> for Keyword {
                 m.insert(Keyword::Is.as_bytes(), Keyword::Is);
                 m.insert(Keyword::Join.as_bytes(), Keyword::Join);
                 m.insert(Keyword::Left.as_bytes(), Keyword::Left);
+                m.insert(Keyword::Like.as_bytes(), Keyword::Like);
                 m.insert(Keyword::Limit.as_bytes(), Keyword::Limit);
                 m.insert(Keyword::Matched.as_bytes(), Keyword::Matched);
                 m.insert(Keyword::Merge.as_bytes(), Keyword::Merge);
@@ -526,6 +529,7 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
             || token == Token::Keyword(Keyword::In)
             || token == Token::Keyword(Keyword::Values)
             || token == Token::Keyword(Keyword::Is)
+            || token == Token::Keyword(Keyword::Like)
             || token == Token::Keyword(Keyword::Limit)
             || token == Token::Keyword(Keyword::Offset)
         {
@@ -602,6 +606,7 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
                 } else if *k != Keyword::Values
                     && *k != Keyword::In
                     && *k != Keyword::Is
+                    && *k != Keyword::Like
                     && *k != Keyword::Limit
                     && *k != Keyword::Offset
                 {
@@ -751,6 +756,10 @@ mod tests {
                 (
                     "INSERT INTO table (column1, column2, column3) VALUES (value1, value2, value3);",
                     Some("INSERT INTO table (column?,column?,column?) VALUES (?);"),
+                ),
+                (
+                    "SELECT * FROM table WHERE name LIKE '%keyword%';",
+                    Some("SELECT * FROM table WHERE name LIKE ?;"),
                 ),
                 (
                     "SELECT * FROM table WHERE id is Null;",
