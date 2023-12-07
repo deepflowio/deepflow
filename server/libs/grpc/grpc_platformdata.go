@@ -1596,9 +1596,9 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 			if ip == "" {
 				ip = podNodeIp
 			}
+			info := Info{}
 			if ip != "" {
 				isIPv4, ip4, ip6 := parseIP(ip)
-				info := Info{}
 				var infoPtr *Info
 				if isIPv4 {
 					infoPtr = t.QueryIPV4Infos(epcId, ip4)
@@ -1607,15 +1607,17 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 				}
 				if infoPtr != nil {
 					info = *infoPtr
-					info.HitCount = new(uint64)
-					info.PodID = podId
-					info.PodClusterID = podClusterId
-					info.PodNSID = podNsId
-					info.PodGroupID = podGroupId
-					info.PodGroupType = podGroupType
-					podIDInfos[podId] = &info
 				}
+				info.IsIPv4, info.IP4, info.IP6 = isIPv4, ip4, ip6
 			}
+			info.HitCount = new(uint64)
+			info.PodID = podId
+			info.PodClusterID = podClusterId
+			info.PodNSID = podNsId
+			info.PodGroupID = podGroupId
+			info.PodGroupType = podGroupType
+			info.EpcID = epcId
+			podIDInfos[podId] = &info
 		}
 	}
 	t.podNameInfos = podNameInfos
