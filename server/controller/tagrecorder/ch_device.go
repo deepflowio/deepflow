@@ -203,10 +203,14 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) b
 			DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
 			DeviceID:   vrouter.ID,
 		}
+		vrouterName := vrouter.Name
+		if vrouter.DeletedAt.Valid {
+			vrouterName += " (deleted)"
+		}
 		keyToItem[key] = mysql.ChDevice{
 			DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
 			DeviceID:   vrouter.ID,
-			Name:       vrouter.Name,
+			Name:       vrouterName,
 			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VGW}],
 		}
 	}
