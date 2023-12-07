@@ -47,9 +47,13 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChNetwork)
 	for _, network := range networks {
+		networkName := network.Name
+		if network.DeletedAt.Valid {
+			networkName += " (deleted)"
+		}
 		keyToItem[IDKey{ID: network.ID}] = mysql.ChNetwork{
 			ID:     network.ID,
-			Name:   network.Name,
+			Name:   networkName,
 			IconID: n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
 		}
 	}
