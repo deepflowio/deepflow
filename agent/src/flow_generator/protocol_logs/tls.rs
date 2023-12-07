@@ -215,7 +215,9 @@ impl From<u16> for Version {
     fn from(v: u16) -> Self {
         match v {
             0x304 => Self::Named("1.3"),
-            0x303 | 0x301 => Self::Named("1.2"),
+            0x303 => Self::Named("1.2"),
+            0x302 => Self::Named("1.1"),
+            0x301 => Self::Named("1.0"),
             _ => Self::Unknown(v),
         }
     }
@@ -345,7 +347,8 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
         }
         if !f.client_cert_not_after.is_zero() {
-            let valid_days = now - f.client_cert_not_after.as_secs() as i64;
+            let valid_days =
+                (f.client_cert_not_after.as_secs() as i64 - now) as f32 / Self::SECONDS_PER_DAY;
             attributes.push(KeyVal {
                 key: "client_cert_not_after".to_string(),
                 val: NaiveDateTime::from_timestamp_opt(f.client_cert_not_after.as_secs() as i64, 0)
@@ -354,7 +357,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
             metrics.push(MetricKeyVal {
                 key: "client_cert_valid_days".to_string(),
-                val: valid_days as f32,
+                val: valid_days,
             });
         }
         if !f.server_cert_not_before.is_zero() {
@@ -369,7 +372,8 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
         }
         if !f.server_cert_not_after.is_zero() {
-            let valid_days = now - f.server_cert_not_after.as_secs() as i64;
+            let valid_days =
+                (f.server_cert_not_after.as_secs() as i64 - now) as f32 / Self::SECONDS_PER_DAY;
             attributes.push(KeyVal {
                 key: "server_cert_not_after".to_string(),
                 val: NaiveDateTime::from_timestamp_opt(f.server_cert_not_after.as_secs() as i64, 0)
@@ -378,7 +382,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
             metrics.push(MetricKeyVal {
                 key: "server_cert_valid_days".to_string(),
-                val: valid_days as f32,
+                val: valid_days,
             });
         }
         let log = L7ProtocolSendLog {
