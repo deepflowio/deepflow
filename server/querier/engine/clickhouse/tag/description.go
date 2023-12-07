@@ -740,15 +740,20 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	if len(config.Cfg.AutoCustomTags) != 0 {
 		for _, AutoCustomTag := range config.Cfg.AutoCustomTags {
 			tagName := AutoCustomTag.TagName
+			tagDisplayName := tagName
+			if AutoCustomTag.DisplayName != "" {
+				tagDisplayName = AutoCustomTag.DisplayName
+			}
 			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
+
 				response.Values = append(response.Values, []interface{}{
-					tagName, tagName, tagName, tagName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.TagFields, "",
+					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields,
 				})
 			} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 				response.Values = append(response.Values, []interface{}{
-					tagName, tagName + "_0", tagName + "_1", tagName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.TagFields, "",
+					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields,
 				})
 			}
 		}
