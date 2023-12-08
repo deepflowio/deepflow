@@ -615,15 +615,32 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 				if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(sqlparser.String(colName), "`")) {
 					autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(sqlparser.String(colName), "`")]
 					for _, selectTag := range tagSlice {
+						//check if the group tags are not duplicated with the tags in the auto custom tags
 						if slices.Contains(autoTagValues, strings.Trim(selectTag, "`")) {
 							errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", selectTag)
 							return errors.New(errStr)
+						}
+					}
+					//check if the tags in the auto group tags are not duplicated with the tags in the auto custom tags
+					for _, autoTagCheck := range autoTagValues {
+						autoTagCheckTag := strings.Trim(autoTagCheck, "_0")
+						autoTagCheckTag = strings.Trim(autoTagCheckTag, "_1")
+						if slices.Contains(tagdescription.TAG_RESOURCE_TYPE_AUTO, autoTagCheckTag) {
+							autoTagCheckValue := tagdescription.AUTO_CUSTOM_TAG_CHECK_MAP[autoTagCheckTag]
+							for _, autoTag := range autoTagValues {
+								if slices.Contains(autoTagCheckValue, autoTag) {
+									errStr := fmt.Sprintf("auto custom tags cannot add tag (%s) included in auto group tag (%s) in auto custom tags", autoTag, autoTagCheck)
+									return errors.New(errStr)
+								}
+
+							}
 						}
 					}
 					if (slices.Contains(autoTagValues, "ip") && autoTagValues[len(autoTagValues)-1] != "ip") || (slices.Contains(autoTagValues, "ip_0") && autoTagValues[len(autoTagValues)-1] != "ip_0") || (slices.Contains(autoTagValues, "ip_1") && autoTagValues[len(autoTagValues)-1] != "ip_1") {
 						errStr := "ip can only be the last tag in the auto custom tag"
 						return errors.New(errStr)
 					}
+
 				}
 
 				// pod_ingress/lb_listener is not supported by select

@@ -53,6 +53,7 @@ var TAG_STRING_ENUMS = map[string][]*TagEnum{}
 
 var AUTO_CUSTOM_TAG_NAMES = []string{}
 var AUTO_CUSTOM_TAG_MAP = map[string][]string{}
+var AUTO_CUSTOM_TAG_CHECK_MAP = map[string][]string{}
 
 var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
@@ -228,7 +229,12 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				for _, suffix := range []string{"", "_0", "_1"} {
 					tagFields := AutoCustomTag.TagFields
 					if !slices.Contains(tagFields, "ip") && tagFields[len(tagFields)-1] != "ip" {
-						tagFields = append(tagFields, "ip")
+						for _, tagValue := range tagFields {
+							if slices.Contains(TAG_RESOURCE_TYPE_AUTO, tagValue) {
+								break
+							}
+							tagFields = append(tagFields, "ip")
+						}
 					}
 					if len(tagFields) != 0 {
 						var selectPrefixTranslator string
@@ -260,6 +266,23 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap = map[string]string{}
 						for _, tagValue := range tagFields {
 							AUTO_CUSTOM_TAG_MAP[tagNameSuffix] = append(AUTO_CUSTOM_TAG_MAP[tagNameSuffix], tagValue+suffix)
+							// Used to check if the tags in the auto group tags are not duplicated with the tags in the auto custom tags
+							switch tagValue {
+							case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
+								for deviceName, _ := range AutoMap {
+									AUTO_CUSTOM_TAG_CHECK_MAP[tagValue] = append(AUTO_CUSTOM_TAG_CHECK_MAP[tagValue], deviceName+suffix)
+								}
+								autoMap := map[string]map[string]int{
+									"resource_gl0":  AutoPodMap,
+									"auto_instance": AutoPodMap,
+									"resource_gl1":  AutoServiceMap,
+									"resource_gl2":  AutoServiceMap,
+									"auto_service":  AutoServiceMap,
+								}
+								for deviceName, _ := range autoMap[tagValue] {
+									AUTO_CUSTOM_TAG_CHECK_MAP[tagNameSuffix] = append(AUTO_CUSTOM_TAG_CHECK_MAP[tagNameSuffix], deviceName+suffix)
+								}
+							}
 							if selectPrefixTranslator == "" {
 								switch tagValue {
 								case "ip":
@@ -287,7 +310,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = "autoTypeSuffix"
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = autoTypeSuffix
 									selectPrefixTranslator = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
 									iconIDPrefixTranslator := iconIDStrSuffix + "!=0"
 									nodeTypePrefixTranslator := nodeTypeStrSuffix + "!=''"
@@ -745,7 +768,6 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				tagDisplayName = AutoCustomTag.DisplayName
 			}
 			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields,
