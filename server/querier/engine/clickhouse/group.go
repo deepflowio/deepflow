@@ -36,7 +36,14 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	}
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
+		if db == chCommon.DB_NAME_PROMETHEUS {
+			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
+			if tagTranslatorStr == name {
+				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
+			} else {
+				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, Alias: name, AsTagMap: asTagMap})
+			}
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
 			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
@@ -54,7 +61,11 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS {
 			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
-			stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
+			if tagTranslatorStr == name {
+				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
+			} else {
+				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, Alias: name, AsTagMap: asTagMap})
+			}
 		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
 			tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 			if ok {
@@ -77,8 +88,25 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 
 func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 	nameNoPreffix := strings.Trim(name, "`")
+	if nameNoPreffix == "tag" {
+		tagTranslatorStr, _ := GetPrometheusAllTagTranslator(table)
+		return tagTranslatorStr
+	}
+	labelName := strings.TrimPrefix(nameNoPreffix, "tag.")
+	labelNameID, ok := Prometheus.LabelNameToID[labelName]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", labelName)
+		log.Error(errorMessage)
+		return name
+	}
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		log.Error(errorMessage)
+		return name
+	}
 	tagTranslatorStr := ""
-	_, ok := asTagMap[name]
+	_, ok = asTagMap[name]
 	if ok {
 		tagTranslatorStr = name
 	} else if strings.HasPrefix(nameNoPreffix, "tag.") {
@@ -90,13 +118,13 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 			for _, appLabel := range appLabels {
 				if appLabel.AppLabelName == nameNoPreffix {
 					isAppLabel = true
-					tagTranslatorStr = fmt.Sprintf("app_label_value_id_%d", appLabel.appLabelColumnIndex)
+					tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.appLabelColumnIndex)
 					break
 				}
 			}
 		}
 		if !isAppLabel {
-			tagTranslatorStr = "target_id"
+			tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
 		}
 	} else {
 		tagTranslatorStr = name

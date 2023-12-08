@@ -50,8 +50,10 @@ type Model struct {
 	Limit     *Limit
 	Callbacks map[string]func(*common.Result) error
 	//Havings Havings
-	MetricsLevelFlag int //Metrics是否需要拆层的标识
-	HasAggFunc       bool
+	MetricsLevelFlag  int //Metrics是否需要拆层的标识
+	HasAggFunc        bool
+	IsDerivative      bool
+	DerivativeGroupBy []string
 }
 
 func NewModel() *Model {

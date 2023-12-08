@@ -82,7 +82,7 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
+func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context, isDerivative bool, derivativeGroupBy []string) (Statement, int, string, error) {
 	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
 		return GetTopKTrans(name, args, alias, db, table, ctx)
 	}
@@ -119,11 +119,16 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	} else {
 		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
 	}
+	if isDerivative {
+		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+	}
 	return &AggFunction{
-		Metrics: metricStruct,
-		Name:    name,
-		Args:    args,
-		Alias:   alias,
+		Metrics:           metricStruct,
+		Name:              name,
+		Args:              args,
+		Alias:             alias,
+		IsDerivative:      isDerivative,
+		DerivativeGroupBy: derivativeGroupBy,
 	}, levelFlag, unit, nil
 }
 
@@ -288,9 +293,11 @@ type AggFunction struct {
 	// 指标量内容
 	Metrics *metrics.Metrics
 	// 解析获得的参数
-	Name  string
-	Args  []string
-	Alias string
+	Name              string
+	Args              []string
+	Alias             string
+	IsDerivative      bool
+	DerivativeGroupBy []string
 }
 
 func (f *AggFunction) SetAlias(alias string) {
@@ -302,9 +309,23 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
-		innerFunction := view.DefaultFunction{
-			Name:   view.FUNCTION_SUM,
-			Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+		var innerFunction view.DefaultFunction
+		// Inner layer derivative
+		if f.IsDerivative {
+			groupBy := []string{}
+			if len(f.Args) > 1 {
+				groupBy = f.Args[1:]
+			}
+			innerFunction = view.DefaultFunction{
+				Name:   view.FUNCTION_DERIVATIVE,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Args:   groupBy,
+			}
+		} else {
+			innerFunction = view.DefaultFunction{
+				Name:   view.FUNCTION_SUM,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
@@ -385,7 +406,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	} else {
 		outFunc = view.GetFunc(f.Name)
 	}
-	if len(f.Args) > 1 {
+	if len(f.Args) > 1 && !m.IsDerivative {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
@@ -572,10 +593,27 @@ func (t *Time) Format(m *view.Model) {
 	var innerTimeField string
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		innerTimeField = "_" + t.TimeField
-		withValue := fmt.Sprintf(
-			"toStartOfInterval(%s, %s(%d))",
-			t.TimeField, toDatasourceIntervalFunction, datasourceInterval,
-		)
+		withValue := ""
+		if m.IsDerivative {
+			offset := m.Time.Offset
+			if offset > 0 {
+				withValue = fmt.Sprintf(
+					"toStartOfInterval(time-%d, %s(%d)) + %s(arrayJoin([%s]) * %d) + %d",
+					offset, toIntervalFunction, interval, toIntervalFunction, windows, interval, offset,
+				)
+			} else {
+				withValue = fmt.Sprintf(
+					"toStartOfInterval(time, %s(%d)) + %s(arrayJoin([%s]) * %d)",
+					toIntervalFunction, interval, toIntervalFunction, windows, interval,
+				)
+			}
+		} else {
+			withValue = fmt.Sprintf(
+				"toStartOfInterval(%s, %s(%d))",
+				t.TimeField, toDatasourceIntervalFunction, datasourceInterval,
+			)
+		}
+
 		withAlias := "_" + t.TimeField
 		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRICS_INNER})
@@ -599,7 +637,12 @@ func (t *Time) Format(m *view.Model) {
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)
-	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
+	if m.IsDerivative {
+		tagField = fmt.Sprintf("toUnixTimestamp(`%s`)", innerTimeField)
+		m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER})
+	} else {
+		m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
+	}
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 	if m.Time.Fill != "" && m.Time.Interval > 0 {
 		m.AddCallback("time", TimeFill([]interface{}{m}))

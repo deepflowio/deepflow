@@ -47,6 +47,14 @@ func (p *Parser) ParseSQL(sql string) error {
 		}
 	}
 
+	// DerivativeGroupBy解析
+	if pStmt.GroupBy != nil {
+		groupErr := p.Engine.TransDerivativeGroupBy(pStmt.GroupBy)
+		if groupErr != nil {
+			return groupErr
+		}
+	}
+
 	// Select解析
 	var selectErr error
 	if pStmt.SelectExprs != nil {
