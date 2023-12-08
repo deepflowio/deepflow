@@ -420,6 +420,13 @@ func (p *InProcessProfile) fillInfraInfo(vtapPlatformInfo *grpc.Info) {
 	if p.PodNodeID == 0 {
 		p.PodNodeID = vtapPlatformInfo.PodNodeID
 	}
+	if p.L3DeviceID == 0 {
+		p.L3DeviceType = uint8(vtapPlatformInfo.DeviceType)
+		p.L3DeviceID = vtapPlatformInfo.DeviceID
+	}
+	if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
+		p.IsIPv4, p.IP4, p.IP6 = vtapPlatformInfo.IsIPv4, vtapPlatformInfo.IP4, vtapPlatformInfo.IP6
+	}
 }
 
 func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
