@@ -671,6 +671,8 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("tls-1-0.pcap", "tls-1-0.result"),
+            ("tls-1-3.pcap", "tls-1-3.result"),
             ("tls.pcap", "tls.result"),
             ("application.pcap", "application.result"),
             ("alert.pcap", "alert.result"),
