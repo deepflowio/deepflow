@@ -125,10 +125,6 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 	defer rows.Close()
 	columns := rows.ColumnTypes()
 	resColumns := len(columns)
-	if err != nil {
-		c.Debug.Error = fmt.Sprintf("%s", err)
-		return nil, err
-	}
 	columnNames := make([]interface{}, 0, len(columns))
 	var columnSchemas common.ColumnSchemas // FIXME: Slice growth should be avoided.
 	// 获取列名和列类型

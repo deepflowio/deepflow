@@ -53,6 +53,7 @@ const (
 	FUNCTION_LAST        = "Last"
 	FUNCTION_TOPK        = "TopK"
 	FUNCTION_ANY         = "Any"
+	FUNCTION_DERIVATIVE  = "nonNegativeDerivative"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -74,7 +75,8 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
 	FUNCTION_LAST:        "last_value",
 	FUNCTION_TOPK:        "topK",
-	FUNCTION_ANY:         "any",
+	FUNCTION_ANY:         "any", // because need to set any to topK(1), and '(1)' may be appended after 'If' in func (f *DefaultFunction) WriteTo(buf *bytes.Buffer)
+	FUNCTION_DERIVATIVE:  "nonNegativeDerivative",
 }
 
 var MATH_FUNCTIONS = []string{
@@ -104,6 +106,8 @@ func GetFunc(name string) Function {
 		return &CounterAvgFunction{DefaultFunction: DefaultFunction{Name: FUNC_NAME_MAP[FUNCTION_AAVG]}}
 	case FUNCTION_DELAY_AVG:
 		return &DelayAvgFunction{DefaultFunction: DefaultFunction{Name: FUNC_NAME_MAP[FUNCTION_AAVG]}}
+	case FUNCTION_DERIVATIVE:
+		return &NonNegativeDerivativeFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -207,12 +211,33 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	if !ok {
 		dbFuncName = f.Name
 	}
+	// derivative
+	if f.Name == FUNCTION_DERIVATIVE {
+		partitionBy := ""
+		argsNoSuffixStr := ""
+		argsNoSuffix := []string{}
+		if len(f.Args) > 0 {
+			partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.Args, ","))
+			for _, arg := range f.Args {
+				arg = strings.Trim(arg, "`")
+				argsNoSuffix = append(argsNoSuffix, arg)
+			}
+			argsNoSuffixStr = fmt.Sprintf("_%s", strings.Join(argsNoSuffix, "_"))
+		}
+		buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.Fields[0].ToString(), partitionBy))
+		if f.Alias != "" {
+			buf.WriteString(" AS ")
+			buf.WriteString("`")
+			buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s%s", f.Fields[0].ToString(), argsNoSuffixStr))
+			buf.WriteString("`")
+		}
+		return
+	}
 
 	isSingleTagTok := f.Name == FUNCTION_TOPK && len(f.Args) == 1
 	if isSingleTagTok {
 		buf.WriteString("arrayStringConcat(")
 	}
-
 	buf.WriteString(dbFuncName)
 
 	if f.IsGroupArray {
@@ -914,5 +939,30 @@ func (f *DelayAvgFunction) GetWiths() []Node {
 		return f.DefaultFunction.GetWiths()
 	} else {
 		return f.divFunction.GetWiths()
+	}
+}
+
+type NonNegativeDerivativeFunction struct {
+	DefaultFunction
+}
+
+func (f *NonNegativeDerivativeFunction) WriteTo(buf *bytes.Buffer) {
+	partitionBy := ""
+	argsNoSuffixStr := ""
+	argsNoSuffix := []string{}
+	if len(f.Args) > 0 {
+		partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.Args, ","))
+		for _, arg := range f.Args {
+			arg = strings.Trim(arg, "`")
+			argsNoSuffix = append(argsNoSuffix, arg)
+		}
+		argsNoSuffixStr = fmt.Sprintf("_%s", strings.Join(argsNoSuffix, "_"))
+	}
+	buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.Fields[0].ToString(), partitionBy))
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString("`")
+		buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s%s", f.Fields[0].ToString(), argsNoSuffixStr))
+		buf.WriteString("`")
 	}
 }
