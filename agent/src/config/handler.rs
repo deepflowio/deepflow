@@ -1295,7 +1295,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_parse_port_bitmap: Arc::new(
                     (&conf.yaml_config).get_protocol_port_parse_bitmap(),
                 ),
-                l7_protocol_ports: conf.yaml_config.l7_protocol_ports.clone(),
+                l7_protocol_ports: conf.yaml_config.get_protocol_port(),
                 ebpf: conf.yaml_config.ebpf.clone(),
             },
             metric_server: MetricServerConfig {

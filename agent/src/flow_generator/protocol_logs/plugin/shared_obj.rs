@@ -21,7 +21,6 @@ use std::{
 
 use log::error;
 use public::l7_protocol::{CustomProtocol, L7Protocol};
-use serde::Serialize;
 
 use crate::{
     common::{
@@ -45,11 +44,10 @@ use crate::{
 
 const RESULT_LEN: i32 = 8;
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct SoLog {
     proto_num: Option<u8>,
     proto_str: String,
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

@@ -15,13 +15,12 @@
  */
 
 use public::l7_protocol::L7Protocol;
-use serde::Serialize;
 
 use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface};
 
 use super::{all_plugin_log_parser, CustomLog};
 
-#[derive(Default, Debug, Serialize)]
+#[derive(Default)]
 pub struct CustomWrapLog {
     pub(super) parser: Option<CustomLog>,
 }

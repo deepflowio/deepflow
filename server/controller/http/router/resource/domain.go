@@ -18,7 +18,9 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -45,6 +47,7 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/domains/", createDomain(d.cfg))
 	e.PATCH("/v1/domains/:lcuuid/", updateDomain(d.cfg))
 	e.DELETE("/v1/domains/:name-or-uuid/", deleteDomainByNameOrUUID)
+	e.DELETE("/v1/domains/", deleteDomainByName)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
 	e.GET("/v2/sub-domains/", getSubDomains)
@@ -53,6 +56,7 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain)
 
 	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
+	e.GET("/v1/domain-additional-resources/", listDomainAddtionalResource)
 }
 
 func getDomain(c *gin.Context) {
@@ -127,6 +131,16 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 func deleteDomainByNameOrUUID(c *gin.Context) {
 	nameOrUUID := c.Param("name-or-uuid")
 	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID)
+	common.JsonResponse(c, data, err)
+}
+
+func deleteDomainByName(c *gin.Context) {
+	rawQuery := strings.Split(c.Request.URL.RawQuery, "name=")
+	if len(rawQuery) < 1 {
+		common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
+		return
+	}
+	data, err := resource.DeleteDomainByNameOrUUID(rawQuery[1])
 	common.JsonResponse(c, data, err)
 }
 
@@ -228,4 +242,23 @@ func applyDomainAddtionalResource(c *gin.Context) {
 
 	err = resource.ApplyDomainAddtionalResource(data)
 	common.JsonResponse(c, map[string]interface{}{}, err)
+}
+
+func listDomainAddtionalResource(c *gin.Context) {
+	var resourceType, resourceName string
+	t, ok := c.GetQuery("type")
+	if ok {
+		resourceType = t
+	}
+	name, ok := c.GetQuery("name")
+	if ok {
+		resourceName = name
+	}
+	if resourceName != "" && resourceType == "" {
+		common.JsonResponse(c, httpcommon.PARAMETER_ILLEGAL, fmt.Errorf("please enter resource type, resource name(%v)", resourceName))
+		return
+	}
+
+	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName)
+	common.JsonResponse(c, data, err)
 }

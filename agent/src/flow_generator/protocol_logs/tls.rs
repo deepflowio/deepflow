@@ -427,7 +427,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Default)]
 pub struct TlsLog {
     change_cipher_spec_count: u8,
     perf_stats: Option<L7PerfStats>,

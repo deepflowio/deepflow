@@ -253,8 +253,8 @@ Tag字段特殊说明
 
 clickhouse指标量及算子特殊处理：
 -------------------------------------------------
-- Delay：忽略 0 的点。认为 0 是无意义的时延值
-- Counter/Gauge/BoundedGauge/Percentage：Min算子，缺时间点时，结果置为0
+- Delay/BoundedGauge：忽略 0 的点。认为 0 是无意义的时延值
+- Counter/Gauge/Percentage：Min算子，缺时间点时，结果置为0
 - Quotient/Percentage：分子不做处理，忽略分母为 0 或 null 的点。认为分子为 0 值时有效、分子为 null 值时无效，且分母为 0 值时无意义
 
 - Counter计数类及Gauge油标类

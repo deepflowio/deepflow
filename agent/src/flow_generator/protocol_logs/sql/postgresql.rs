@@ -160,9 +160,8 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct PostgresqlLog {
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 

@@ -31,7 +31,7 @@ type MySQLChModel interface {
 		mysql.ChDevice | mysql.ChIPRelation | mysql.ChPodGroup | mysql.ChNetwork | mysql.ChPod | mysql.ChPodCluster |
 		mysql.ChPodNode | mysql.ChPodNamespace | mysql.ChTapType | mysql.ChVTap | mysql.ChPodK8sLabels | mysql.ChNodeType | mysql.ChGProcess | mysql.ChPodK8sAnnotation | mysql.ChPodK8sAnnotations |
 		mysql.ChPodServiceK8sAnnotation | mysql.ChPodServiceK8sAnnotations |
-		mysql.ChPodK8sEnv | mysql.ChPodK8sEnvs
+		mysql.ChPodK8sEnv | mysql.ChPodK8sEnvs | mysql.ChPodService | mysql.ChChost
 }
 
 // ch资源的组合key

@@ -25,8 +25,11 @@ import (
 	"strconv"
 	"strings"
 
+	exp_slices "golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	ch_common "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -105,7 +108,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	}
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
 	// 判断算子是否支持单层
-	if db == "flow_metrics" {
+	if db != ch_common.DB_NAME_FLOW_LOG {
 		unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 		if common.IsValueInSliceString(name, unlayFuns) {
 			levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
@@ -289,7 +292,7 @@ func (f *AggFunction) SetAlias(alias string) {
 
 func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	switch f.Metrics.Type {
-	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
 		innerFunction := view.DefaultFunction{
@@ -301,12 +304,19 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
-	case metrics.METRICS_TYPE_DELAY:
+	case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 		// 时延类，内层结构为groupArray，忽略0值
 		innerFunction := view.DefaultFunction{
 			Name:       view.FUNCTION_GROUP_ARRAY,
 			Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			IgnoreZero: true,
+		}
+		// When using avg, max, and min operators. The inner layer uses itself
+		if exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+			innerFunction = view.DefaultFunction{
+				Name:   f.Name,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
@@ -379,12 +389,15 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		}
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metrics.Type {
-		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE, metrics.METRICS_TYPE_BOUNDED_GAUGE:
+		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
-		case metrics.METRICS_TYPE_DELAY:
+		case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 时延类和商值类，忽略0值
-			outFunc.SetIsGroupArray(true)
+			// When using avg, max, and min operators. The outer layer uses itself
+			if !exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+				outFunc.SetIsGroupArray(true)
+			}
 			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
 			outFunc.SetFillNullAsZero(true)
@@ -490,6 +503,7 @@ type Time struct {
 	TimeField  string
 	Interval   int
 	WindowSize int
+	Offset     int
 	Fill       string
 }
 
@@ -512,12 +526,19 @@ func (t *Time) Trans(m *view.Model) error {
 	if len(t.Args) > 3 {
 		t.Fill = t.Args[3]
 	}
+	if len(t.Args) > 4 {
+		t.Offset, err = strconv.Atoi(t.Args[4])
+		if err != nil {
+			return err
+		}
+	}
 	m.Time.Interval = t.Interval
 	if m.Time.Interval > 0 && m.Time.Interval < m.Time.DatasourceInterval {
 		m.Time.Interval = m.Time.DatasourceInterval
 	}
 	m.Time.WindowSize = t.WindowSize
 	m.Time.Fill = t.Fill
+	m.Time.Offset = t.Offset
 	m.Time.Alias = t.Alias
 	return nil
 }
@@ -555,10 +576,19 @@ func (t *Time) Format(m *view.Model) {
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		innerTimeField = t.TimeField
 	}
-	withValue := fmt.Sprintf(
-		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
-		innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
-	)
+	offset := m.Time.Offset
+	withValue := ""
+	if offset > 0 {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s-%d, %s(%d)) + %s(arrayJoin([%s]) * %d) + %d",
+			innerTimeField, offset, toIntervalFunction, interval, toIntervalFunction, windows, interval, offset,
+		)
+	} else {
+		withValue = fmt.Sprintf(
+			"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
+			innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
+		)
+	}
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)

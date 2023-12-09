@@ -37,26 +37,51 @@ func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 }
 
 func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
-	var pods []mysql.Pod
+	var (
+		pods          []mysql.Pod
+		podGroupPorts []mysql.PodGroupPort
+	)
 	err := mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
+	err = mysql.Db.Unscoped().Select("pod_group_id", "pod_service_id").
+		Find(&podGroupPorts).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		return nil, false
+	}
+
+	groupToService := make(map[int]int, len(podGroupPorts))
+	for _, podGroupPort := range podGroupPorts {
+		groupToService[podGroupPort.PodGroupID] = podGroupPort.PodServiceID
+	}
 
 	keyToItem := make(map[IDKey]mysql.ChPod)
 	for _, pod := range pods {
+		podServiceID := groupToService[pod.ID]
 		if pod.DeletedAt.Valid {
 			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
-				ID:     pod.ID,
-				Name:   pod.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				ID:           pod.ID,
+				Name:         pod.Name + " (deleted)",
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				PodClusterID: pod.PodClusterID,
+				PodNsID:      pod.PodNamespaceID,
+				PodNodeID:    pod.PodNodeID,
+				PodGroupID:   pod.PodGroupID,
+				PodServiceID: podServiceID,
 			}
 		} else {
 			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
-				ID:     pod.ID,
-				Name:   pod.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				ID:           pod.ID,
+				Name:         pod.Name,
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				PodClusterID: pod.PodClusterID,
+				PodNsID:      pod.PodNamespaceID,
+				PodNodeID:    pod.PodNodeID,
+				PodGroupID:   pod.PodGroupID,
+				PodServiceID: podServiceID,
 			}
 		}
 	}
@@ -74,6 +99,21 @@ func (p *ChPod) generateUpdateInfo(oldItem, newItem mysql.ChPod) (map[string]int
 	}
 	if oldItem.IconID != newItem.IconID {
 		updateInfo["icon_id"] = newItem.IconID
+	}
+	if oldItem.PodClusterID != newItem.PodClusterID {
+		updateInfo["pod_cluster_id"] = newItem.PodClusterID
+	}
+	if oldItem.PodNsID != newItem.PodNsID {
+		updateInfo["pod_ns_id"] = newItem.PodNsID
+	}
+	if oldItem.PodNodeID != newItem.PodNodeID {
+		updateInfo["pod_node_id"] = newItem.PodNodeID
+	}
+	if oldItem.PodGroupID != newItem.PodGroupID {
+		updateInfo["pod_group_id"] = newItem.PodGroupID
+	}
+	if oldItem.PodServiceID != newItem.PodServiceID {
+		updateInfo["pod_service_id"] = newItem.PodServiceID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

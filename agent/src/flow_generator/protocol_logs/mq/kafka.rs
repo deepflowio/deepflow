@@ -72,7 +72,7 @@ pub struct KafkaInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<i32>,
+    pub status_code: Option<i16>,
 
     rrt: u64,
 }
@@ -214,14 +214,15 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             req: L7Request {
-                req_type: String::from(command_str),
+                req_type: format!("{}_v{}", command_str, f.api_version),
                 resource: f.topic_name,
                 ..Default::default()
             },
             version: Some(f.api_version.to_string()),
             resp: L7Response {
                 status: f.status,
-                code: f.status_code,
+                code: Some(f.status_code.unwrap_or(0).into()),
+                result: f.status_code.unwrap_or(0).to_string(),
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
@@ -243,9 +244,8 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Serialize, Default)]
+#[derive(Default)]
 pub struct KafkaLog {
-    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 
@@ -280,15 +280,18 @@ impl L7ProtocolParserInterface for KafkaLog {
                         if param.time < previous.time + param.rrt_timeout as u64 =>
                     {
                         if let Some(req) = previous.kafka_info.as_ref() {
+                            info.api_key = req.api_key;
+                            info.api_version = req.api_version;
                             self.set_status_code(
                                 req.api_key,
                                 req.api_version,
-                                if payload.len() >= KAFKA_STATUS_CODE_CHECKER {
-                                    read_i16_be(&payload[KAFKA_STATUS_CODE_OFFSET..])
-                                } else {
-                                    0
-                                },
+                                &payload[KAFKA_RESP_HEADER_LEN..],
                                 &mut info,
+                                if payload.len() >= KAFKA_STATUS_CODE_CHECKER {
+                                    Some(read_i16_be(&payload[KAFKA_STATUS_CODE_OFFSET..]))
+                                } else {
+                                    Some(0)
+                                },
                             )
                         }
                     }
@@ -299,8 +302,9 @@ impl L7ProtocolParserInterface for KafkaLog {
                             self.set_status_code(
                                 info.api_key,
                                 info.api_version,
-                                resp.code,
+                                &payload[KAFKA_REQ_HEADER_LEN..],
                                 &mut info,
+                                Some(resp.code),
                             )
                         }
                     }
@@ -345,45 +349,81 @@ impl L7ProtocolParserInterface for KafkaLog {
     }
 }
 
+// Kafka has different fixed offsets for different versions of each api key,
+// which returns a fixed offset here.
+// Because there are too many versions and large differences,
+// only the most common produce and fetch api keys are implemented here.
+fn kafka_apiversion_topic_fixed_offset(api_key: u16, api_version: u16) -> Option<usize> {
+    match api_key {
+        KAFKA_PRODUCE => {
+            if api_version <= 2 {
+                // Offset for API version <= 2
+                Some(10)
+            } else if api_version <= 9 {
+                // Offset for API version <= 9
+                Some(12)
+            } else {
+                // Invalid API version
+                None
+            }
+        }
+        KAFKA_FETCH => {
+            if api_version <= 2 {
+                // Offset for API version <= 2
+                Some(16)
+            } else if api_version == 3 {
+                // Offset for API version == 3
+                Some(20)
+            } else if api_version <= 6 {
+                // Offset for API version <= 6
+                Some(21)
+            } else if api_version <= 12 {
+                // Offset for API version <= 12
+                Some(29)
+            } else {
+                // Invalid API version
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn kafka_apiversion_errcode_fixed_offset(api_key: u16, api_version: u16) -> Option<usize> {
+    match api_key {
+        KAFKA_PRODUCE => {
+            if api_version <= 8 {
+                // Offset for API version <= 8
+                Some(14)
+            } else if api_version <= 9 {
+                // Offset for API version <= 9
+                Some(18)
+            } else {
+                // Invalid API version
+                None
+            }
+        }
+        KAFKA_FETCH => {
+            if api_version == 0 {
+                Some(14)
+            } else if api_version <= 6 {
+                // Offset for API version <= 6
+                Some(18)
+            } else if api_version <= 15 {
+                // Offset for API version in [7..15]
+                Some(4)
+            } else {
+                // Invalid API version
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     const MAX_TRACE_ID: usize = 255;
-
-    fn get_topics_name_offset(api_key: u16, api_version: u16) -> Option<usize> {
-        match api_key {
-            KAFKA_PRODUCE => {
-                if api_version <= 2 {
-                    // Offset for API version <= 2
-                    Some(24)
-                } else if api_version <= 9 {
-                    // Offset for API version <= 9
-                    Some(26)
-                } else {
-                    // Invalid API version
-                    None
-                }
-            }
-            KAFKA_FETCH => {
-                if api_version <= 2 {
-                    // Offset for API version <= 2
-                    Some(30)
-                } else if api_version == 3 {
-                    // Offset for API version == 3
-                    Some(34)
-                } else if api_version <= 6 {
-                    // Offset for API version <= 6
-                    Some(35)
-                } else if api_version <= 12 {
-                    // Offset for API version <= 12
-                    Some(43)
-                } else {
-                    // Invalid API version
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
 
     fn check_char_boundary(payload: &str, start: usize, end: usize) -> bool {
         let mut invalid = false;
@@ -485,18 +525,18 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
         // topic
-        if let Some(mut topic_offset) = Self::get_topics_name_offset(info.api_key, info.api_version)
+        let topic_name = match Self::get_topics_name(self, info.api_key, info.api_version, payload)
         {
-            topic_offset += client_id_len;
-            if topic_offset + 2 < payload.len() {
-                let topic_name_len = read_u16_be(&payload[topic_offset..]) as usize;
-                if topic_name_len <= payload[topic_offset + 2..].len() {
-                    info.topic_name = String::from_utf8_lossy(
-                        &payload[topic_offset + 2..topic_offset + 2 + topic_name_len],
-                    )
-                    .into_owned();
-                }
+            Some(topic_name) => topic_name,
+            None => {
+                // 处理 None 的情况，可以选择返回一个默认值或进行其他逻辑处理
+                //return Err(Error::KafkaLogParseFailed);
+                "".to_string()
             }
+        };
+        // check topic_name is empty
+        if topic_name.len() > 0 {
+            info.topic_name = topic_name;
         }
         // sw8
         let payload = String::from_utf8_lossy(&payload[14..14 + client_id_len]);
@@ -542,6 +582,103 @@ impl KafkaLog {
         Ok(())
     }
 
+    fn get_topics_name(
+        &mut self,
+        api_key: u16,
+        api_version: u16,
+        payload: &[u8],
+    ) -> Option<String> {
+        let Some(mut fixed_offset) = kafka_apiversion_topic_fixed_offset(api_key, api_version)
+        else {
+            return None;
+        };
+        if fixed_offset > payload.len() {
+            return None;
+        }
+        match api_key {
+            KAFKA_PRODUCE => {
+                match api_version {
+                    // Significant improvements since version 9
+                    9 => {
+                        let tid_len = payload[0];
+                        if tid_len > 0 {
+                            fixed_offset = fixed_offset + tid_len as usize
+                        }
+                        if fixed_offset + 1 + payload[fixed_offset] as usize > payload.len() {
+                            return None;
+                        }
+                        return Some(Self::decode_compact_string(
+                            &payload
+                                [fixed_offset..fixed_offset + 1 + payload[fixed_offset] as usize],
+                        ));
+                    }
+                    _ => {
+                        if api_version >= 3 && api_version <= 8 {
+                            let tid_len = read_i16_be(&payload[0..2]);
+                            if tid_len > 0 {
+                                fixed_offset = fixed_offset + tid_len as usize
+                            }
+                        }
+                        if fixed_offset + 2 > payload.len() {
+                            return None;
+                        }
+                        let len = read_u16_be(&payload[fixed_offset..fixed_offset + 2]);
+                        if fixed_offset + 2 + len as usize > payload.len() {
+                            return None;
+                        }
+                        return Some(
+                            String::from_utf8_lossy(
+                                &payload[fixed_offset + 2..fixed_offset + 2 + len as usize],
+                            )
+                            .into_owned(),
+                        );
+                    }
+                }
+            }
+            KAFKA_FETCH => {
+                // The 12th version is a transitional version, and the decoding protocols of the previous versions are more different.
+                if api_version == 12 {
+                    if payload.len() < fixed_offset + 1 + payload[fixed_offset] as usize {
+                        return None;
+                    }
+                    return Some(Self::decode_compact_string(
+                        &payload[fixed_offset..fixed_offset + 1 + payload[fixed_offset] as usize],
+                    ));
+                }
+                let topic_len = read_u16_be(&payload[fixed_offset..fixed_offset + 2]);
+                if fixed_offset + 2 + topic_len as usize > payload.len() {
+                    return None;
+                }
+                return Some(
+                    String::from_utf8_lossy(
+                        &payload[fixed_offset + 2..fixed_offset + 2 + topic_len as usize],
+                    )
+                    .into_owned(),
+                );
+            }
+            _ => {
+                return None;
+            }
+        }
+    }
+
+    fn decode_compact_string(bytes: &[u8]) -> String {
+        let (size, bytes) = bytes.split_at(1);
+        let size = size[0] as usize;
+
+        let content = &bytes[..size];
+        match std::str::from_utf8(content) {
+            Ok(text) => {
+                // 处理有效的UTF-8字符串
+                text.to_string()
+            }
+            Err(error) => {
+                // 处理无效的UTF-8序列
+                "".to_string()
+            }
+        }
+    }
+
     /*
         reference:  https://kafka.apache.org/protocol.html#protocol_messages
 
@@ -556,17 +693,63 @@ impl KafkaLog {
         &mut self,
         api_key: u16,
         api_version: u16,
-        code: i16,
+        payload: &[u8],
         info: &mut KafkaInfo,
+        code: Option<i16>,
     ) {
-        if api_key == KAFKA_FETCH && api_version >= 7 {
-            info.status_code = Some(code as i32);
+        if let Some(code) = code {
             if code == 0 {
                 info.status = L7ResponseStatus::Ok;
+                info.status_code = Some(code);
             } else {
                 info.status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
+            return;
+        }
+        let Some(mut fixed_offset) = kafka_apiversion_errcode_fixed_offset(api_key, api_version)
+        else {
+            return;
+        };
+        if fixed_offset > payload.len() {
+            return;
+        }
+        let topic_len: i16 = match api_key {
+            KAFKA_PRODUCE => {
+                if api_version <= 8 {
+                    read_i16_be(&payload[4..6])
+                } else if api_version == 9 {
+                    return;
+                } else {
+                    return;
+                }
+            }
+            KAFKA_FETCH => {
+                if api_version == 0 {
+                    read_i16_be(&payload[4..6])
+                } else if api_version <= 6 {
+                    read_i16_be(&payload[8..10])
+                } else if api_version >= 12 {
+                    return;
+                } else {
+                    return;
+                }
+            }
+            _ => return,
+        };
+
+        if topic_len > 0 {
+            fixed_offset = fixed_offset + topic_len as usize;
+        }
+        if fixed_offset + 2 > payload.len() {
+            return;
+        }
+        info.status_code = Some(read_i16_be(&payload[fixed_offset..fixed_offset + 2]));
+        if info.status_code == Some(0) {
+            info.status = L7ResponseStatus::Ok;
+        } else {
+            info.status = L7ResponseStatus::ServerError;
+            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
         }
     }
 }
