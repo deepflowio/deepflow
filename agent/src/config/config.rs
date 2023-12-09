@@ -443,6 +443,7 @@ pub struct HttpEndpointExtraction {
 #[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
+    pub obfuscate_enabled_protocols: Vec<String>,
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]

@@ -60,7 +60,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChPod)
 	for _, pod := range pods {
-		podServiceID := groupToService[pod.ID]
+		podServiceID := groupToService[pod.PodGroupID]
 		if pod.DeletedAt.Valid {
 			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
 				ID:           pod.ID,

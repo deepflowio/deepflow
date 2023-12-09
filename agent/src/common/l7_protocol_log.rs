@@ -36,6 +36,7 @@ use crate::flow_generator::flow_map::FlowMapCounter;
 use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
+use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
     DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, OracleLog, PostgresqlLog,
     RedisLog, SofaRpcLog, TlsLog,
@@ -255,6 +256,8 @@ pub trait L7ProtocolParserInterface {
 
     // return perf data
     fn perf_stats(&mut self) -> Option<L7PerfStats>;
+
+    fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }
 
 #[derive(Clone)]
@@ -515,7 +518,7 @@ pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L
     when bit set 0 should skip the protocol check.
     so the protocol number can not exceed 127.
 */
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct L7ProtocolBitmap(u128);
 
 impl L7ProtocolBitmap {
@@ -541,14 +544,7 @@ impl From<&Vec<String>> for L7ProtocolBitmap {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
             if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
-                let protocol = p.protocol();
-                match protocol {
-                    L7Protocol::Http1 => bitmap.set_enabled(L7Protocol::Http1),
-                    L7Protocol::Http2 => bitmap.set_enabled(L7Protocol::Http2),
-                    _ => {
-                        bitmap.set_enabled(protocol);
-                    }
-                }
+                bitmap.set_enabled(p.protocol());
             }
         }
         bitmap

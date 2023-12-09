@@ -29,8 +29,8 @@ func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, err
 	var prometheusTargets []model.PrometheusTarget
 	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.ClusterID)
 	if err != nil {
-		// TODO: 可能会因为采集器版本的问题阻塞正常对接，暂时只记录问题，后续调整为和k8s info相同的处理方式
-		log.Debug(err.Error())
+		log.Warning(err.Error())
+		return prometheusTargets, err
 	}
 	for _, p := range pTargets {
 		var otherLabelsString string

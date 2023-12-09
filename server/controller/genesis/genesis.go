@@ -544,7 +544,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		}
 	}
 	if !ok && !retFlag {
-		return k8sResp, errors.New("no vtap k8s report cluster id:" + clusterID)
+		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 	}
 	if k8sInfo.ErrorMSG != "" {
 		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
@@ -601,13 +601,12 @@ func (g *Genesis) GetPrometheusData(clusterID string) (PrometheusInfo, bool) {
 func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.PrometheusTarget, error) {
 	prometheusEntries := []cloudmodel.PrometheusTarget{}
 
-	prometheusInfo, ok := g.GetPrometheusData(clusterID)
+	prometheusInfo, _ := g.GetPrometheusData(clusterID)
 
 	serverIPs, err := g.GetServerIPs()
 	if err != nil {
 		return []cloudmodel.PrometheusTarget{}, err
 	}
-	retFlag := false
 	for _, serverIP := range serverIPs {
 		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
@@ -649,21 +648,19 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 
 		err = json.Unmarshal(entriesByte, &prometheusEntries)
 		if err != nil {
-			if err != nil {
-				log.Error("genesis api sharing prometheus unmarshal json faild:" + err.Error())
-				return []cloudmodel.PrometheusTarget{}, err
-			}
+			log.Error("genesis api sharing prometheus unmarshal json faild:" + err.Error())
+			return []cloudmodel.PrometheusTarget{}, err
 		}
 
-		retFlag = true
 		prometheusInfo = PrometheusInfo{
 			Epoch:    epoch,
 			ErrorMSG: errorMsg,
 			Entries:  prometheusEntries,
 		}
 	}
-	if !ok && !retFlag {
-		return []cloudmodel.PrometheusTarget{}, errors.New("no vtap prometheus report cluster id:" + clusterID)
+
+	if prometheusInfo.ErrorMSG != "" {
+		return prometheusInfo.Entries, errors.New(prometheusInfo.ErrorMSG)
 	}
 
 	return prometheusInfo.Entries, nil

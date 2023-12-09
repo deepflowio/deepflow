@@ -618,9 +618,9 @@ void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
 		if (strlen(p->container_id) > 0) {
 			memcpy_s_inline((void *)id, id_size, p->container_id,
 					sizeof(p->container_id));
-			return;
 		}
 
+		return;
 	}
 
 	fetch_container_id(pid, (char *)id, id_size);

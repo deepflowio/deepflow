@@ -20,10 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
@@ -31,6 +33,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
+
+var log = logging.MustGetLogger("controller.resource")
 
 type Domain struct {
 	cfg *config.ControllerConfig
@@ -140,7 +144,14 @@ func deleteDomainByName(c *gin.Context) {
 		common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
 		return
 	}
-	data, err := resource.DeleteDomainByNameOrUUID(rawQuery[1])
+	name := rawQuery[1]
+	name, err := url.QueryUnescape(name)
+	if err != nil {
+		log.Warning(err)
+		name = rawQuery[1]
+	}
+	log.Infof("delete domain by name(%v)", name)
+	data, err := resource.DeleteDomainByNameOrUUID(name)
 	common.JsonResponse(c, data, err)
 }
 

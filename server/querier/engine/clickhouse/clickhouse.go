@@ -95,7 +95,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
-	parser := parse.Parser{Engine: e}
+
 	if len(sqlList) > 0 {
 		e.DB = "flow_tag"
 		results := &common.Result{}
@@ -113,24 +113,25 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
 		for _, showSql := range sqlList {
-			err := parser.ParseSQL(showSql)
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+			showEngine.Init()
+			showParser := parse.Parser{Engine: showEngine}
+			err = showParser.ParseSQL(showSql)
 			if err != nil {
 				log.Error(err)
 				return nil, nil, err
 			}
-			for _, stmt := range e.Statements {
-				stmt.Format(e.Model)
+			for _, stmt := range showEngine.Statements {
+				stmt.Format(showEngine.Model)
 			}
-			FormatLimit(e.Model)
+			FormatModel(showEngine.Model)
 			// 使用Model生成View
-			e.View = view.NewView(e.Model)
-			e.View.NoPreWhere = e.NoPreWhere
-			chSql := e.ToSQLString()
-			callbacks := e.View.GetCallbacks()
+			showEngine.View = view.NewView(showEngine.Model)
+			chSql := showEngine.ToSQLString()
+
 			debug.Sql = chSql
 			params := &client.QueryParams{
 				Sql:             chSql,
-				Callbacks:       callbacks,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
 			}
@@ -146,6 +147,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		}
 		return results, debug.Get(), nil
 	}
+	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
 		log.Error(err)
@@ -225,6 +227,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
@@ -343,16 +346,17 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				as := sqlparser.String(item.As)
 				colName, ok := item.Expr.(*sqlparser.ColName)
 				if ok && (common.IsValueInSliceString(strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`"), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
+					colNameStr := strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`")
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)
-						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
-							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, autoTagKey)
+									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
 								}
 								sort.Strings(autoTagSlice)
 								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
@@ -362,13 +366,13 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, sqlparser.String(colName)) {
-							tag, ok := tagdescription.GetTag(sqlparser.String(colName), e.DB, table, "default")
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
 							if ok {
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, autoTagKey)
+									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
 								}
 								sort.Strings(autoTagSlice)
 								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
@@ -422,7 +426,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, groupTag)) {
+				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(groupTag, "`"))) {
 					innerGroupBySlice = append(innerGroupBySlice, groupTag)
 				}
 			}
@@ -1046,27 +1050,6 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			binFunction.SetAlias(as)
 			e.Statements = append(e.Statements, binFunction)
 			return nil
-		}
-		funcName := strings.Trim(sqlparser.String(expr.Name), "`")
-		if funcName != view.FUNCTION_COUNT && (e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM) {
-			if _, ok := metrics.METRICS_FUNCTIONS_MAP[funcName]; ok {
-				if as == "" {
-					as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
-				}
-				args := []Function{}
-				for _, arg := range expr.Exprs {
-					arg, err := e.parseSelectBinaryExpr(arg.(*sqlparser.AliasedExpr).Expr)
-					if err != nil {
-						return err
-					}
-					args = append(args, arg)
-				}
-				binFunction, _ := GetBinaryFunc(funcName, args)
-				binFunction.SetAlias(as)
-				e.Statements = append(e.Statements, binFunction)
-				e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = common.COLUMN_SCHEMA_TYPE_METRICS
-				return nil
-			}
 		}
 		name, args, err := e.parseFunction(expr)
 		if err != nil {

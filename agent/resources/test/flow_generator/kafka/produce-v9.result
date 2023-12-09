@@ -1,0 +1,1 @@
+KafkaInfo { msg_type: Request, is_tls: false, correlation_id: 5, trace_id: "", req_msg_size: Some(164), api_version: 9, api_key: 0, client_id: "console-producer", topic_name: "quickstart-events", resp_msg_size: None, status: Ok, status_code: None, rrt: 0 } is_kafka: true

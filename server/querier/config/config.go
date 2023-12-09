@@ -73,8 +73,10 @@ type Clickhouse struct {
 	MaxConnection  int    `default:"20" yaml:"max-connection"`
 }
 type AutoCustomTags struct {
-	TagName   string   `default:"" yaml:"tag-name"`
-	TagFields []string `yaml:"tag-fields" binding:"omitempty,dive"`
+	TagName     string   `default:"" yaml:"tag-name"`
+	TagFields   []string `yaml:"tag-fields" binding:"omitempty,dive"`
+	DisplayName string   `default:"" yaml:"display_name"`
+	Description string   `default:"" yaml:"description"`
 }
 
 func (c *Config) expendEnv() {

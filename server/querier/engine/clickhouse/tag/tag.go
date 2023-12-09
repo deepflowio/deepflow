@@ -40,5 +40,8 @@ func NewTag(tagTranslator, notNullFilter, whereTranslator, whereRegexpTranslator
 func GetTag(name, db, table, function string) (*Tag, bool) {
 	name = strings.Trim(name, "`")
 	tag, ok := TagResoureMap[name][function]
+	if db == "flow_tag" {
+		tag, ok = FlowTagResourceMap[name][function]
+	}
 	return tag, ok
 }

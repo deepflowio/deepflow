@@ -25,11 +25,11 @@ import (
 	"strconv"
 	"strings"
 
-	exp_slices "golang.org/x/exp/slices"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
-	ch_common "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -108,7 +108,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	}
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
 	// 判断算子是否支持单层
-	if db != ch_common.DB_NAME_FLOW_LOG {
+	if db != chCommon.DB_NAME_FLOW_LOG {
 		unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 		if common.IsValueInSliceString(name, unlayFuns) {
 			levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
@@ -170,7 +170,7 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 		}
 
 		// 判断算子是否支持单层
-		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db == "flow_metrics" {
+		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
 			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 			if !common.IsValueInSliceString(name, unlayFuns) {
 				levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
@@ -253,9 +253,6 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		return function
 	}
 	function := view.GetFunc(f.Name)
-	if f.Name == view.FUNCTION_AVG {
-		function = view.GetFunc(view.FUNCTION_COUNTER_AVG)
-	}
 	function.SetFields(fields)
 	function.SetFlag(view.METRICS_FLAG_OUTER)
 	function.SetTime(m.Time)
@@ -312,7 +309,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			IgnoreZero: true,
 		}
 		// When using avg, max, and min operators. The inner layer uses itself
-		if exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+		if slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 			innerFunction = view.DefaultFunction{
 				Name:   f.Name,
 				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
@@ -395,7 +392,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_BOUNDED_GAUGE:
 			// 时延类和商值类，忽略0值
 			// When using avg, max, and min operators. The outer layer uses itself
-			if !exp_slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+			if !slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 				outFunc.SetIsGroupArray(true)
 			}
 			outFunc.SetIgnoreZero(true)
@@ -645,12 +642,20 @@ func (f *TagFunction) Check() error {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
 	case TAG_FUNCTION_ENUM:
-		_, ok := tag.GetTag(strings.Trim(f.Args[0], "`"), f.DB, f.Table, f.Name)
-		if !ok {
-			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		if f.DB == "flow_tag" {
+			_, ok := tag.GetTag("enum_tag_name", f.DB, f.Table, f.Name)
+			if !ok {
+				return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+			}
+		} else {
+			_, ok := tag.GetTag(strings.Trim(f.Args[0], "`"), f.DB, f.Table, f.Name)
+			if !ok {
+				return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+			}
 		}
 	}
 	return nil
+
 }
 
 func (f *TagFunction) Trans(m *view.Model) view.Node {

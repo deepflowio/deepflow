@@ -241,7 +241,10 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 
 	prometheusTargets, err := k.getPrometheusTargets()
 	if err != nil {
-		return model.KubernetesGatherResource{}, err
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: err.Error(),
+		}, err
 	}
 
 	podCluster, err := k.getPodCluster()
@@ -293,11 +296,10 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		}
 	}
 
-	pods, abstractNodes, err := k.getPods()
+	pods, err := k.getPods()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
-	podNodes = append(podNodes, abstractNodes...)
 
 	nodeSubnets, podSubnets, nodeVInterfaces, podVInterfaces, nodeIPs, podIPs, err := k.getVInterfacesAndIPs()
 	if err != nil {

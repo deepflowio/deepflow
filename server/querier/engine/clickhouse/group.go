@@ -18,9 +18,10 @@ package clickhouse
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -326,7 +327,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 }
 
 func FormatInnerTime(m *view.Model) {
-	if m.DB == "flow_metrics" && m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
+	if m.DB != chCommon.DB_NAME_FLOW_LOG && m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
 		withValue := fmt.Sprintf(
 			"toStartOfInterval(time, toIntervalSecond(%d))",
 			m.Time.DatasourceInterval,

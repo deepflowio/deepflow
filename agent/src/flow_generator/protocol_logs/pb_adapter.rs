@@ -91,6 +91,8 @@ pub struct L7ProtocolSendLog {
 }
 
 impl L7ProtocolSendLog {
+    pub const SECONDS_PER_DAY: f32 = 60.0 * 60.0 * 24.0;
+
     pub fn fill_app_proto_log(self, log: &mut flow_log::AppProtoLogsData) {
         let req_len = if let Some(len) = self.req_len {
             len as i32

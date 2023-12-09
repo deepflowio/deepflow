@@ -348,15 +348,65 @@ impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     const MAX_TRACE_ID: usize = 255;
 
+    fn decode_varint(buf: &[u8]) -> (usize, usize) {
+        let mut shift = 0;
+        let mut n = 0;
+        let mut x = 0;
+        while shift < 64 {
+            if n >= buf.len() {
+                return (0, 0);
+            }
+            let b = buf[n] as usize;
+            n += 1;
+            // The following is divided into three steps:
+            // 1: b&0x7F: Get 7 bits of valid data
+            // 2: (b & 0x7F) << shift: Since shift is small-endian, it is necessary to move 7bits
+            //    to the high position for each Byte of data processed
+            // 3: Perform or operations on x with the current byte
+            // =======================================================================================
+            // 下面这个分成三步走:
+            // 1: b & 0x7F: 获取下7bits有效数据
+            // 2: (b & 0x7F) << shift: 由于是小端序, 所以每次处理一个Byte数据, 都需要向高位移动7bits
+            // 3: 将数据x和当前的这个字节数据 | 在一起
+            x |= (b & 0x7F) << shift;
+            if (b & 0x80) == 0 {
+                return (x, n);
+            }
+            shift += 7;
+        }
+        return (0, 0);
+    }
+
     fn get_topics_name_offset(api_key: u16, api_version: u16) -> Option<usize> {
         match api_key {
             KAFKA_PRODUCE => {
                 if api_version <= 2 {
                     // Offset for API version <= 2
                     Some(24)
-                } else if api_version <= 9 {
-                    // Offset for API version <= 9
+                } else if api_version <= 8 {
+                    // Offset for API version <= 8
+                    // Produce Request (Version: 8) => transactional_id acks timeout_ms [topic_data]
+                    // transactional_id => NULLABLE_STRING
+                    // acks => INT16
+                    // timeout_ms => INT32
+                    // topic_data => name [partition_data]
+                    //     name => STRING
+                    //     partition_data => index records
+                    //     index => INT32
+                    //     records => RECORDS
                     Some(26)
+                } else if api_version == 9 {
+                    // Offset for API version == 9
+                    // Produce Request (Version: 9) => transactional_id acks timeout_ms [topic_data] TAG_BUFFER
+                    // transactional_id => COMPACT_NULLABLE_STRING
+                    // acks => INT16
+                    // timeout_ms => INT32
+                    // topic_data => name [partition_data] TAG_BUFFER
+                    //     name => COMPACT_STRING
+                    //     partition_data => index records TAG_BUFFER
+                    //     index => INT32
+                    //     records => COMPACT_RECORDS
+                    Some(22)
                 } else {
                     // Invalid API version
                     None
@@ -384,15 +434,43 @@ impl KafkaLog {
         }
     }
 
-    fn check_char_boundary(payload: &str, start: usize, end: usize) -> bool {
-        let mut invalid = false;
-        for index in start..end {
-            if !payload.is_char_boundary(index) {
-                invalid = true;
-                break;
+    fn decode_topics_name(payload: &[u8], client_id_len: usize, info: &mut KafkaInfo) {
+        let Some(mut topic_offset) = Self::get_topics_name_offset(info.api_key, info.api_version)
+        else {
+            return;
+        };
+        topic_offset += client_id_len;
+        match (info.api_key, info.api_version) {
+            (KAFKA_PRODUCE, 9) if topic_offset + 1 < payload.len() => {
+                let (topic_count, offset) = Self::decode_varint(&payload[topic_offset..]);
+                if offset == 0 || topic_count <= 1 {
+                    return;
+                }
+                topic_offset += offset;
+                let (mut topic_name_len, offset) = Self::decode_varint(&payload[topic_offset..]);
+                if offset == 0 {
+                    return;
+                }
+                topic_offset += offset;
+                topic_name_len -= 1;
+                if topic_name_len <= payload[topic_offset..].len() {
+                    info.topic_name = String::from_utf8_lossy(
+                        &payload[topic_offset..topic_offset + topic_name_len],
+                    )
+                    .into_owned();
+                }
             }
+            _ if topic_offset + 2 < payload.len() => {
+                let topic_name_len = read_u16_be(&payload[topic_offset..]) as usize;
+                if topic_name_len <= payload[topic_offset + 2..].len() {
+                    info.topic_name = String::from_utf8_lossy(
+                        &payload[topic_offset + 2..topic_offset + 2 + topic_name_len],
+                    )
+                    .into_owned();
+                }
+            }
+            _ => return,
         }
-        return invalid;
     }
 
     // traceparent: 00-TRACEID-SPANID-01
@@ -484,19 +562,7 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
         // topic
-        if let Some(mut topic_offset) = Self::get_topics_name_offset(info.api_key, info.api_version)
-        {
-            topic_offset += client_id_len;
-            if topic_offset + 2 < payload.len() {
-                let topic_name_len = read_u16_be(&payload[topic_offset..]) as usize;
-                if topic_name_len <= payload[topic_offset + 2..].len() {
-                    info.topic_name = String::from_utf8_lossy(
-                        &payload[topic_offset + 2..topic_offset + 2 + topic_name_len],
-                    )
-                    .into_owned();
-                }
-            }
-        }
+        Self::decode_topics_name(payload, client_id_len, info);
         // sw8
         let payload = String::from_utf8_lossy(&payload[14..14 + client_id_len]);
         Self::decode_sw8_trace_id(&payload, info);
@@ -635,6 +701,7 @@ mod tests {
         let files = vec![
             ("kafka.pcap", "kafka.result"),
             ("produce.pcap", "produce.result"),
+            ("produce-v9.pcap", "produce-v9.result"),
         ];
 
         for item in files.iter() {

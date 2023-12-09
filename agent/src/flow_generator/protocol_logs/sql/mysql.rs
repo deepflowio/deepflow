@@ -19,7 +19,9 @@ mod comment_parser;
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
-use super::sql_check::{check_sql, is_mysql, trim_head_comment_and_get_first_word};
+use super::sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word};
+use super::sql_obfuscate::attempt_obfuscation;
+use super::ObfuscateCache;
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
@@ -176,8 +178,18 @@ impl MysqlInfo {
         }
     }
 
-    fn request_string(&mut self, payload: &[u8], trace_id: Option<&str>) {
-        self.context = mysql_string(payload);
+    fn request_string(
+        &mut self,
+        payload: &[u8],
+        obfuscate_cache: &Option<ObfuscateCache>,
+        trace_id: Option<&str>,
+    ) {
+        let payload = mysql_string(payload);
+        self.context = attempt_obfuscation(obfuscate_cache, payload)
+            .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
+                String::from_utf8_lossy(&m).to_string()
+            });
+
         if let Some(t) = trace_id {
             self.trace_id = extra_sql_trace_id(self.context.as_str(), t);
         }
@@ -205,9 +217,9 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             },
 
             row_effect: if f.command == COM_QUERY {
-                trim_head_comment_and_get_first_word(&f.context, 8)
+                trim_head_comment_and_get_first_word(f.context.as_bytes(), 8)
                     .map(|first| {
-                        if check_sql(first, &["INSERT", "UPDATE", "DELETE"]) {
+                        if is_valid_sql(first, &["INSERT", "UPDATE", "DELETE"]) {
                             f.affected_rows as u32
                         } else {
                             0
@@ -251,6 +263,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
 pub struct MysqlLog {
     pub protocol_version: u8,
     perf_stats: Option<L7PerfStats>,
+    obfuscate_cache: Option<ObfuscateCache>,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -308,15 +321,19 @@ impl L7ProtocolParserInterface for MysqlLog {
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
     }
+
+    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
+        self.obfuscate_cache = obfuscate_cache;
+    }
 }
 
-fn mysql_string(payload: &[u8]) -> String {
+fn mysql_string(payload: &[u8]) -> &[u8] {
     if payload.len() > 2 && payload[0] == 0 && payload[1] == 1 {
         // MYSQL 8.0.26返回字符串前有0x0、0x1，MYSQL 8.0.21版本没有这个问题
         // https://gitlab.yunshan.net/platform/trident/-/merge_requests/2592#note_401425
-        String::from_utf8_lossy(&payload[2..]).into_owned()
+        &payload[2..]
     } else {
-        String::from_utf8_lossy(payload).into_owned()
+        payload
     }
 }
 
@@ -355,7 +372,11 @@ impl MysqlLog {
         match info.command {
             COM_QUIT | COM_FIELD_LIST | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
-                info.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..], trace_id);
+                info.request_string(
+                    &payload[COMMAND_OFFSET + COMMAND_LEN..],
+                    &self.obfuscate_cache,
+                    trace_id,
+                );
             }
             COM_STMT_EXECUTE => {
                 info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
@@ -459,7 +480,7 @@ impl MysqlLog {
         match protocol_version_or_query_type {
             COM_QUERY | COM_STMT_PREPARE => {
                 let context = mysql_string(&payload[offset + 1..]);
-                return context.is_ascii() && is_mysql(&context);
+                return context.is_ascii() && is_mysql(context);
             }
             _ => {}
         }

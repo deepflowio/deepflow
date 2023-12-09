@@ -23,7 +23,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_log::{L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
     },
-    flow_generator::Result,
+    flow_generator::{protocol_logs::sql::ObfuscateCache, Result},
 };
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
