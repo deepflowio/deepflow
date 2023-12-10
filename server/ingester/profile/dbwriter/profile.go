@@ -319,9 +319,13 @@ func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformDat
 		// get vtap platformInfo, incase can not find Pod by container (maybe containerID is empty)
 		if vtapIP != nil {
 			if ip4 := vtapIP.To4(); ip4 != nil {
-				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, utils.IpToUint32(ip4))
+				// fill ip from Vtap first, can be overwritten by podInfo later
+				p.IsIPv4 = true
+				p.IP4 = utils.IpToUint32(ip4)
+				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, p.IP4)
 			} else {
-				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, vtapIP)
+				p.IP6 = vtapIP
+				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, p.IP6)
 			}
 		}
 	}
@@ -330,6 +334,10 @@ func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformDat
 	// 1. try to find platform info by podID first
 	if podID != 0 {
 		info = platformData.QueryPodIdInfo(podID)
+		if info != nil {
+			// rewirte ip from podInfo
+			p.IsIPv4, p.IP4, p.IP6 = info.IsIPv4, info.IP4, info.IP6
+		}
 	}
 
 	// 2. try to fix platform info by IP
@@ -408,6 +416,10 @@ func (p *InProcessProfile) fillInfraInfo(vtapPlatformInfo *grpc.Info) {
 	}
 	if p.PodNodeID == 0 {
 		p.PodNodeID = vtapPlatformInfo.PodNodeID
+	}
+	if p.L3DeviceID == 0 {
+		p.L3DeviceID = uint32(vtapPlatformInfo.DeviceID)
+		p.L3DeviceType = uint8(vtapPlatformInfo.DeviceType)
 	}
 }
 
