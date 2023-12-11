@@ -353,7 +353,7 @@ func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex)
 	if len(traceId) == 0 {
 		return lastTraceIdIndex + 1
 	}
-	index, err := utils.GetTraceIdIndex(traceId, traceIdIndexCfg.TypeIsHash, traceIdIndexCfg.FormatIsHex, traceIdIndexCfg.IncrementalIdLocation.Start, traceIdIndexCfg.IncrementalIdLocation.Length)
+	index, err := utils.GetTraceIdIndex(traceId, traceIdIndexCfg.TypeIsIncrementalId, traceIdIndexCfg.FormatIsHex, traceIdIndexCfg.IncrementalIdLocation.Start, traceIdIndexCfg.IncrementalIdLocation.Length)
 	if err != nil {
 		log.Debugf("parse traceIdIndex failed err %s", err)
 		return lastTraceIdIndex + 1
