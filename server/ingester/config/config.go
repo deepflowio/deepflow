@@ -171,7 +171,7 @@ type TraceIdWithIndex struct {
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 	FormatIsHex           bool
-	TypeIsHash            bool
+	TypeIsIncrementalId   bool
 }
 
 type BaseConfig struct {
@@ -192,8 +192,9 @@ func (c *Config) Validate() error {
 			log.Errorf("invalid 'type'(%s) of 'trace-id-with-index', must be '%s' or '%s'", c.TraceIdWithIndex.Type, IndexTypeIncremetalIdLocation, IndexTypeHash)
 			sleepAndExit()
 		}
+		c.TraceIdWithIndex.TypeIsIncrementalId = false
 		if c.TraceIdWithIndex.Type == IndexTypeIncremetalIdLocation {
-			c.TraceIdWithIndex.TypeIsHash = false
+			c.TraceIdWithIndex.TypeIsIncrementalId = true
 			location := c.TraceIdWithIndex.IncrementalIdLocation
 			if location.Format != FormatHex && location.Format != FormatDecimal {
 				log.Errorf("invalid 'format'(%s) of 'trace-id-with-index:incremetal-id-location', must be '%s' or '%s'", location.Format, FormatHex, FormatDecimal)
@@ -204,8 +205,6 @@ func (c *Config) Validate() error {
 				sleepAndExit()
 			}
 			c.TraceIdWithIndex.FormatIsHex = c.TraceIdWithIndex.IncrementalIdLocation.Format == FormatHex
-		} else {
-			c.TraceIdWithIndex.TypeIsHash = true
 		}
 	}
 
