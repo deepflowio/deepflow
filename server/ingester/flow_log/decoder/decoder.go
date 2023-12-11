@@ -245,7 +245,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
 	d.counter.Count++
-	ls := log_data.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData)
+	ls := log_data.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData, d.cfg)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {
