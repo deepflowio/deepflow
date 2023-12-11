@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	flowlogCfg "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -34,7 +35,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable) []*L7FlowLog {
+func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []*L7FlowLog {
 	ret := []*L7FlowLog{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
@@ -44,18 +45,18 @@ func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *g
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7FlowLog(vtapID, span, resAttributes, platformData))
+				ret = append(ret, spanToL7FlowLog(vtapID, span, resAttributes, platformData, cfg))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) *L7FlowLog {
+func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
 	h.VtapID = vtapID
-	h.FillOTel(span, resAttributes, platformData)
+	h.FillOTel(span, resAttributes, platformData, cfg)
 	return h
 }
 
@@ -301,7 +302,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	h.MetricsValues = metricsValues
 }
 
-func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
+func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) {
 	// OTel data net protocol always set to TCP
 	h.Protocol = uint8(layers.IPProtocolTCP)
 	h.TapType = uint8(datatype.TAP_CLOUD)
@@ -309,6 +310,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
 	h.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
 	h.TraceId = hex.EncodeToString(l.TraceId)
+	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
