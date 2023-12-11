@@ -19,7 +19,9 @@ package dbmgr
 import (
 	"context"
 	"fmt"
+	"reflect"
 
+	"github.com/op/go-logging"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -28,6 +30,8 @@ type _DBMgr[M any] struct {
 	*_BaseMgr
 	m M
 }
+
+var log = logging.MustGetLogger("trisolaris/metadata")
 
 // AnalyzerMgr open func
 func DBMgr[M any](db *gorm.DB) *_DBMgr[M] {
@@ -42,6 +46,7 @@ func DBMgr[M any](db *gorm.DB) *_DBMgr[M] {
 // Gets 获取批量结果
 func (obj *_DBMgr[M]) Gets() (results []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Find(&results).Error
+	log.Infof("weiqiang type(%v) len(%v)", reflect.TypeOf(obj.m), len(results))
 
 	return
 }
