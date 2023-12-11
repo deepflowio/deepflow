@@ -338,7 +338,6 @@ struct Stash {
     global_thread_id: u8,
     doc_flag: DocumentFlag,
     context: Context,
-    agent_mode: RunningMode,
 }
 
 impl Stash {
@@ -350,7 +349,6 @@ impl Stash {
         ctx: Context,
         sender: DebugSender<BoxedDocument>,
         counter: Arc<CollectorCounter>,
-        agent_mode: RunningMode,
     ) -> Self {
         let (slot_interval, doc_flag) = match ctx.metric_type {
             MetricsType::SECOND => (1, DocumentFlag::PER_SECOND_METRICS),
@@ -374,7 +372,6 @@ impl Stash {
             stash_init_capacity,
             doc_flag,
             context: ctx,
-            agent_mode,
         }
     }
 
@@ -528,7 +525,7 @@ impl Stash {
                     config,
                     None,
                     acc_flow.l7_protocol,
-                    self.agent_mode,
+                    self.context.agent_mode,
                 );
                 self.fill_single_l4_stats(tagger, flow_meter);
             }
@@ -541,7 +538,7 @@ impl Stash {
                 config,
                 None,
                 acc_flow.l7_protocol,
-                self.agent_mode,
+                self.context.agent_mode,
             );
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
@@ -565,7 +562,7 @@ impl Stash {
                 config,
                 None,
                 acc_flow.l7_protocol,
-                self.agent_mode,
+                self.context.agent_mode,
             );
             self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
         }
@@ -693,7 +690,7 @@ impl Stash {
                     config,
                     meter.endpoint.clone(),
                     meter.l7_protocol,
-                    self.agent_mode,
+                    self.context.agent_mode,
                 );
                 tagger.code |= Code::L7_PROTOCOL;
                 self.fill_single_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
@@ -707,7 +704,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.l7_protocol,
-                self.agent_mode,
+                self.context.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
             // edge_stats: If the direction of a certain end is known, the statistical data
@@ -732,7 +729,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.l7_protocol,
-                self.agent_mode,
+                self.context.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
             self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
@@ -1048,6 +1045,7 @@ struct Context {
     delay_seconds: u64,
     metric_type: MetricsType,
     ntp_diff: Arc<AtomicI64>,
+    agent_mode: RunningMode,
 }
 
 pub struct Collector {
@@ -1058,7 +1056,6 @@ pub struct Collector {
     sender: DebugSender<BoxedDocument>,
     config: CollectorAccess,
     context: Context,
-    agent_mode: RunningMode,
 }
 
 impl Collector {
@@ -1112,8 +1109,8 @@ impl Collector {
                 delay_seconds,
                 metric_type,
                 ntp_diff,
+                agent_mode,
             },
-            agent_mode,
         }
     }
 
@@ -1128,11 +1125,10 @@ impl Collector {
         let sender = self.sender.clone();
         let ctx = self.context.clone();
         let config = self.config.clone();
-        let agent_mode = self.agent_mode;
         let thread = thread::Builder::new()
             .name("collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter, agent_mode);
+                let mut stash = Stash::new(ctx, sender, counter);
                 let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
@@ -1191,7 +1187,6 @@ pub struct L7Collector {
     sender: DebugSender<BoxedDocument>,
     config: CollectorAccess,
     context: Context,
-    agent_mode: RunningMode,
 }
 
 impl L7Collector {
@@ -1245,8 +1240,8 @@ impl L7Collector {
                 delay_seconds,
                 metric_type,
                 ntp_diff,
+                agent_mode,
             },
-            agent_mode,
         }
     }
 
@@ -1261,11 +1256,10 @@ impl L7Collector {
         let sender = self.sender.clone();
         let ctx = self.context.clone();
         let config = self.config.clone();
-        let agent_mode = self.agent_mode;
         let thread = thread::Builder::new()
             .name("l7_collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter, agent_mode);
+                let mut stash = Stash::new(ctx, sender, counter);
                 let mut l7_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
