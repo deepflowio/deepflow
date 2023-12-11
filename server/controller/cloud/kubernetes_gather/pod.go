@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -49,7 +48,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			return
 		}
 
-		envString := expand.GetPodENV(pData, k.customTagLenMax)
+		envString := expand.GetPodENV(pData, k.envRegex, k.customTagLenMax)
 
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
@@ -164,12 +163,9 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 				labels[exK] = exV
 			}
 		}
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
-		labelString := strings.Join(labelSlice, ", ")
 
 		annotations := metaData.Get("annotations")
-
-		annotationString := expand.GetAnnotation(annotations, k.customTagLenMax)
+		annotationString := expand.GetAnnotation(annotations, k.annotationRegex, k.customTagLenMax)
 
 		containerIDs := []string{}
 		containerStatuses := pData.GetPath("status", "containerStatuses")
@@ -192,7 +188,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			State:               status,
 			VPCLcuuid:           k.VPCUuid,
 			ENV:                 envString,
-			Label:               labelString,
+			Label:               k.GetLabel(labels),
 			Annotation:          annotationString,
 			ContainerIDs:        strings.Join(containerIDs, ", "),
 			PodReplicaSetLcuuid: podRSLcuuid,
