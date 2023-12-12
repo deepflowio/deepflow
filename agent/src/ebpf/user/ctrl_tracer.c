@@ -106,6 +106,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    43:  PROTO_SOFARPC\n");
 	fprintf(stderr, "    60:  PROTO_MYSQL\n");
 	fprintf(stderr, "    61:  PROTO_POSTGRESQL\n");
+	fprintf(stderr, "    62:  PROTO_ORACLE\n");
 	fprintf(stderr, "    80:  PROTO_REDIS\n");
 	fprintf(stderr, "    100: PROTO_KAFKA\n");
 	fprintf(stderr, "    101: PROTO_MQTT\n");

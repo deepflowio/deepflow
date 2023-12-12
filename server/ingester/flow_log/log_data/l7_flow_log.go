@@ -23,13 +23,16 @@ import (
 	"net"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
+	flowlogCfg "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
@@ -212,6 +215,7 @@ type L7FlowLog struct {
 	XRequestId0     string
 	XRequestId1     string
 	TraceId         string
+	TraceIdIndex    uint64
 	SpanId          string
 	ParentSpanId    string
 	SpanKind        uint8
@@ -261,6 +265,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("x_request_id_0", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID0"),
 		ckdb.NewColumn("x_request_id_1", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID1"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("TraceID"),
+		ckdb.NewColumn("trace_id_index", ckdb.UInt64).SetIndex(ckdb.IndexMinmax).SetComment("TraceIDIndex"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
@@ -307,6 +312,7 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.XRequestId0,
 		h.XRequestId1,
 		h.TraceId,
+		h.TraceIdIndex,
 		h.SpanId,
 		h.ParentSpanId,
 		h.spanKind,
@@ -336,7 +342,27 @@ func base64ToHexString(str string) string {
 	return str
 }
 
-func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+// for empty traceId, the traceId-index is the value of the previous traceId-index + 1, not 0.
+// when the traceId-index data is stored in CK, the generated minmax index will have min non-zero, which improves the filtering performance of the minmax index
+var lastTraceIdIndex uint64
+
+func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
+	if traceIdIndexCfg.Disabled {
+		return 0
+	}
+	if len(traceId) == 0 {
+		return lastTraceIdIndex + 1
+	}
+	index, err := utils.GetTraceIdIndex(traceId, traceIdIndexCfg.TypeIsIncrementalId, traceIdIndexCfg.FormatIsHex, traceIdIndexCfg.IncrementalIdLocation.Start, traceIdIndexCfg.IncrementalIdLocation.Length)
+	if err != nil {
+		log.Debugf("parse traceIdIndex failed err %s", err)
+		return lastTraceIdIndex + 1
+	}
+	lastTraceIdIndex = index
+	return index
+}
+
+func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) {
 	h.L7Base.Fill(l, platformData)
 
 	h.Type = uint8(l.Base.Head.MsgType)
@@ -351,11 +377,11 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
-	h.fillL7FlowLog(l)
+	h.fillL7FlowLog(l, cfg)
 }
 
 // requestLength,responseLength 等于 -1 会认为是没有值. responseCode=-32768 会认为没有值
-func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
+func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config) {
 	h.Version = l.Version
 	h.requestLength = int64(l.ReqLen)
 	h.responseLength = int64(l.RespLen)
@@ -423,6 +449,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 		h.TraceId = l.TraceInfo.TraceId
 		h.ParentSpanId = l.TraceInfo.ParentSpanId
 	}
+	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 
 	// 处理内置协议特殊情况
 	switch datatype.L7Protocol(h.L7Protocol) {
@@ -592,10 +619,10 @@ func ReleaseL7FlowLog(l *L7FlowLog) {
 
 var L7FlowLogCounter uint32
 
-func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) *L7FlowLog {
+func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
 	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
-	h.Fill(l, platformData)
+	h.Fill(l, platformData, cfg)
 	return h
 }
 

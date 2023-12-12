@@ -95,7 +95,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
-	parser := parse.Parser{Engine: e}
+
 	if len(sqlList) > 0 {
 		e.DB = "flow_tag"
 		results := &common.Result{}
@@ -113,24 +113,25 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
 		for _, showSql := range sqlList {
-			err := parser.ParseSQL(showSql)
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+			showEngine.Init()
+			showParser := parse.Parser{Engine: showEngine}
+			err = showParser.ParseSQL(showSql)
 			if err != nil {
 				log.Error(err)
 				return nil, nil, err
 			}
-			for _, stmt := range e.Statements {
-				stmt.Format(e.Model)
+			for _, stmt := range showEngine.Statements {
+				stmt.Format(showEngine.Model)
 			}
-			FormatLimit(e.Model)
+			FormatModel(showEngine.Model)
 			// 使用Model生成View
-			e.View = view.NewView(e.Model)
-			e.View.NoPreWhere = e.NoPreWhere
-			chSql := e.ToSQLString()
-			callbacks := e.View.GetCallbacks()
+			showEngine.View = view.NewView(showEngine.Model)
+			chSql := showEngine.ToSQLString()
+
 			debug.Sql = chSql
 			params := &client.QueryParams{
 				Sql:             chSql,
-				Callbacks:       callbacks,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
 			}
@@ -146,6 +147,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		}
 		return results, debug.Get(), nil
 	}
+	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
 		log.Error(err)
@@ -225,6 +227,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
@@ -612,15 +615,32 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 				if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(sqlparser.String(colName), "`")) {
 					autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(sqlparser.String(colName), "`")]
 					for _, selectTag := range tagSlice {
+						//check if the group tags are not duplicated with the tags in the auto custom tags
 						if slices.Contains(autoTagValues, strings.Trim(selectTag, "`")) {
 							errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", selectTag)
 							return errors.New(errStr)
+						}
+					}
+					//check if the tags in the auto group tags are not duplicated with the tags in the auto custom tags
+					for _, autoTagCheck := range autoTagValues {
+						autoTagCheckTag := strings.Trim(autoTagCheck, "_0")
+						autoTagCheckTag = strings.Trim(autoTagCheckTag, "_1")
+						if slices.Contains(tagdescription.TAG_RESOURCE_TYPE_AUTO, autoTagCheckTag) {
+							autoTagCheckValue := tagdescription.AUTO_CUSTOM_TAG_CHECK_MAP[autoTagCheckTag]
+							for _, autoTag := range autoTagValues {
+								if slices.Contains(autoTagCheckValue, autoTag) {
+									errStr := fmt.Sprintf("auto custom tags cannot add tag (%s) included in auto group tag (%s) in auto custom tags", autoTag, autoTagCheck)
+									return errors.New(errStr)
+								}
+
+							}
 						}
 					}
 					if (slices.Contains(autoTagValues, "ip") && autoTagValues[len(autoTagValues)-1] != "ip") || (slices.Contains(autoTagValues, "ip_0") && autoTagValues[len(autoTagValues)-1] != "ip_0") || (slices.Contains(autoTagValues, "ip_1") && autoTagValues[len(autoTagValues)-1] != "ip_1") {
 						errStr := "ip can only be the last tag in the auto custom tag"
 						return errors.New(errStr)
 					}
+
 				}
 
 				// pod_ingress/lb_listener is not supported by select

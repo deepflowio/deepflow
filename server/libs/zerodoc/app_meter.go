@@ -17,6 +17,9 @@
 package zerodoc
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
@@ -315,4 +318,32 @@ func AppAnomalyColumns() []*ckdb.Column {
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
 func (a *AppAnomaly) WriteBlock(block *ckdb.Block) {
 	block.Write(uint64(a.ClientError), uint64(a.ServerError), uint64(a.Timeout), uint64(a.ClientError+a.ServerError))
+}
+
+func EncodeAppMeterToMetrics(meter *AppMeter) map[string]float64 {
+	if meter == nil {
+		return nil
+	}
+
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := meter.MarshalTo(buffer)
+	return encodeMeterToMetrics(buffer[:size])
+}
+
+func encodeMeterToMetrics(b []byte) map[string]float64 {
+	s := string(b)
+	metrics := make(map[string]float64)
+	for _, part := range strings.Split(s, ",") {
+		kv := strings.Split(part, "=")
+		if len(kv) != 2 {
+			continue
+		}
+
+		f, err := strconv.ParseFloat(strings.TrimRight(kv[1], "i"), 10)
+		if err != nil {
+			continue
+		}
+		metrics[kv[0]] = f
+	}
+	return metrics
 }

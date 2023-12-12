@@ -27,6 +27,7 @@ import (
 )
 
 var TagResoureMap = GenerateTagResoureMap()
+var FlowTagResourceMap = GenerateFlowTagTagResoureMap()
 var DEVICE_MAP = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,
 	"router":      VIF_DEVICE_TYPE_VROUTER,
@@ -996,5 +997,70 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			)}
 	}
+	return tagResourceMap
+}
+
+func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
+	tagResourceMap := make(map[string]map[string]*Tag)
+
+	tagResourceMap["value"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"value %s %s",
+			"%s(value, %s)",
+		),
+	}
+	tagResourceMap["display_name"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"display_name %s %s",
+			"%s (display_name,%s)",
+		),
+	}
+
+	tagResourceMap["other_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"%s %s %s",
+			"%s (%s, %s)",
+		),
+	}
+	tagResourceMap["other_name"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE name %s %s)",
+			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE %s(name,%s))",
+		),
+	}
+
+	//enum
+	tagResourceMap["enum_tag_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"value %s %s",
+			"%s(value, %s)",
+		),
+	}
+
+	tagResourceMap["enum_tag_name"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"name %s %s",
+			"%s (name, %s)",
+		),
+		"enum": NewTag(
+			"",
+			"",
+			"name %s %s",
+			"%s (name, %s)",
+		),
+	}
+
 	return tagResourceMap
 }

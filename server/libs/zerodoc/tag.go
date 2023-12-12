@@ -26,10 +26,10 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
-
 	"github.com/google/gopacket/layers"
 )
 
@@ -1538,4 +1538,14 @@ func parseUint(s string, base int, bitSize int) (uint64, error) {
 		return 0, nil
 	}
 	return strconv.ParseUint(s, base, bitSize)
+}
+
+// EncodeTagToPromLabels 将 Tag 编码成 prom Label
+func EncodeTagToPromLabels(tag *Tag) []prompb.Label {
+	if tag == nil {
+		return nil
+	}
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := tag.MarshalTo(buffer)
+	return encodePromLabels(buffer[:size])
 }

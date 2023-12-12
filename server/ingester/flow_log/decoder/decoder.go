@@ -28,6 +28,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
@@ -79,6 +80,7 @@ type Decoder struct {
 	throttler     *throttler.ThrottlingQueue
 	flowTagWriter *flow_tag.FlowTagWriter
 	exporters     *exporters.Exporters
+	cfg           *config.Config
 	debugEnabled  bool
 
 	fieldsBuf      []interface{}
@@ -95,6 +97,7 @@ func NewDecoder(
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
 	exporters *exporters.Exporters,
+	cfg *config.Config,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
@@ -104,6 +107,7 @@ func NewDecoder(
 		throttler:      throttler,
 		flowTagWriter:  flowTagWriter,
 		exporters:      exporters,
+		cfg:            cfg,
 		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
 		fieldsBuf:      make([]interface{}, 0, 64),
 		fieldValuesBuf: make([]interface{}, 0, 64),
@@ -241,7 +245,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
 	d.counter.Count++
-	ls := log_data.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData)
+	ls := log_data.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData, d.cfg)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {
@@ -303,7 +307,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData)
+	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData, d.cfg)
 	l.AddReferenceCount()
 	sent := d.throttler.SendWithThrottling(l)
 	if sent {

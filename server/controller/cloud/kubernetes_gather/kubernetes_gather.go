@@ -17,19 +17,19 @@
 package kubernetes_gather
 
 import (
+	"regexp"
+	"strings"
 	"time"
 
+	simplejson "github.com/bitly/go-simplejson"
+	mapset "github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
-
-	"regexp"
-
-	simplejson "github.com/bitly/go-simplejson"
-	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
 )
 
@@ -54,6 +54,9 @@ type KubernetesGather struct {
 	isSubDomain                  bool
 	azLcuuid                     string
 	podClusterLcuuid             string
+	labelRegex                   *regexp.Regexp
+	envRegex                     *regexp.Regexp
+	annotationRegex              *regexp.Regexp
 	podGroupLcuuids              mapset.Set
 	podNetworkLcuuidCIDRs        networkLcuuidCIDRs
 	nodeNetworkLcuuidCIDRs       networkLcuuidCIDRs
@@ -122,9 +125,9 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		return nil
 	}
 
-	_, regxErr := regexp.Compile(portNameRegex)
-	if regxErr != nil {
-		log.Errorf("newkubernetesgather portnameregex (%s) compile error: (%s)", portNameRegex, regxErr.Error())
+	_, err = regexp.Compile(portNameRegex)
+	if err != nil {
+		log.Errorf("port name regex compile error: (%s)", err.Error())
 		return nil
 	}
 
@@ -138,6 +141,34 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		podNetIPv6CIDRMaxMask = common.K8S_POD_IPV6_NETMASK
 	}
 
+	labelRegString := configJson.Get("label_regex").MustString()
+	if labelRegString == "" {
+		labelRegString = common.DEFAULT_ALL_MATCH_REGEX
+	}
+	labelR, err := regexp.Compile(labelRegString)
+	if err != nil {
+		log.Errorf("label regex compile error: (%s)", err.Error())
+		return nil
+	}
+	envRegString := configJson.Get("env_regex").MustString()
+	if envRegString == "" {
+		envRegString = common.DEFAULT_NOT_MATCH_REGEX
+	}
+	envR, err := regexp.Compile(envRegString)
+	if err != nil {
+		log.Errorf("env regex compile error: (%s)", err.Error())
+		return nil
+	}
+	annotationRegString := configJson.Get("annotation_regex").MustString()
+	if annotationRegString == "" {
+		annotationRegString = common.DEFAULT_NOT_MATCH_REGEX
+	}
+	annotationR, err := regexp.Compile(annotationRegString)
+	if err != nil {
+		log.Errorf("annotation regex compile error: (%s)", err.Error())
+		return nil
+	}
+
 	return &KubernetesGather{
 		// TODO: display_name后期需要修改为uuid_generate
 		Name:                  name,
@@ -149,6 +180,9 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		PodNetIPv4CIDRMaxMask: podNetIPv4CIDRMaxMask,
 		PodNetIPv6CIDRMaxMask: podNetIPv6CIDRMaxMask,
 		PortNameRegex:         portNameRegex,
+		labelRegex:            labelR,
+		envRegex:              envR,
+		annotationRegex:       annotationR,
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuid:                     "",
@@ -195,6 +229,11 @@ func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(k.cloudStatsd),
 	}
+}
+
+func (k *KubernetesGather) GetLabel(labelMap map[string]interface{}) string {
+	labelSlice := cloudcommon.GenerateCustomTag(labelMap, k.labelRegex, k.customTagLenMax, ":")
+	return strings.Join(labelSlice, ", ")
 }
 
 func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherResource, error) {

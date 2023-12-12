@@ -854,6 +854,59 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	return infer_pgsql_query_message(infer_buf, buf, count);
 }
 
+static __inline enum message_type infer_oracle_tns_message(const char *buf,
+							   size_t count,
+							   struct conn_info_t
+							   *conn_info)
+{
+#define OEACLE_INFER_BUF_SIZE 12
+#define PKT_TYPE_DATA 6
+#define RESP_DATA_ID_RET_STATUS 0x04
+#define RESP_DATA_ID_RET_PARAM 0x08
+#define RESP_DATA_ID_DESC_INFO 0x10
+
+#define REQ_DATA_ID_PIGGY_BACK_FUNC 0x11
+#define REQ_DATA_ID_USER_OCI_FUNC 0x3
+
+#define REQ_CALL_ID_USER_CURSOR_CLOSE_ALL 0x69
+#define REQ_CALL_ID_USER_BUNDLED_EXEC_CALL 0x5e
+#define REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK 0x6e
+
+	if (!protocol_port_check_2(PROTO_ORACLE, conn_info))
+		return MSG_UNKNOWN;
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < 12) {
+		return MSG_UNKNOWN;
+	}
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_ORACLE)
+			return MSG_UNKNOWN;
+	}
+
+	char pkt_type = buf[4];
+	char data_id = buf[10];
+	char call_id = buf[11];
+	if (pkt_type != PKT_TYPE_DATA) {
+		return MSG_UNKNOWN;
+	}
+
+	if (data_id == RESP_DATA_ID_RET_STATUS
+	    || data_id == RESP_DATA_ID_RET_PARAM
+	    || data_id == RESP_DATA_ID_DESC_INFO) {
+		return MSG_RESPONSE;
+	} else if ((data_id == REQ_DATA_ID_PIGGY_BACK_FUNC
+		    && call_id == REQ_CALL_ID_USER_CURSOR_CLOSE_ALL)
+		   || (data_id == REQ_DATA_ID_PIGGY_BACK_FUNC
+		       && call_id == REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK)
+		   || (data_id == REQ_DATA_ID_USER_OCI_FUNC
+		       && call_id == REQ_CALL_ID_USER_BUNDLED_EXEC_CALL)
+	    ) {
+		return MSG_REQUEST;
+	} else {
+		return MSG_UNKNOWN;
+	}
+}
+
 static __inline bool sofarpc_check_character(__u8 val)
 {
 	// 0 - 9, a - z, A - Z, '.' '_' '-' '*'
@@ -2162,6 +2215,15 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_ORACLE:
+			if ((inferred_message.type =
+			     infer_oracle_tns_message(infer_buf, count,
+						      conn_info)) !=
+			    MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_POSTGRESQL;
+				return inferred_message;
+			}
+			break;
 		case PROTO_MONGO:
 			if ((inferred_message.type =
 			     infer_mongo_message(infer_buf, count,
@@ -2334,6 +2396,15 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	     infer_postgre_message(syscall_infer_addr, syscall_infer_len,
 				   conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_POSTGRESQL;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_oracle_tns_message(infer_buf,
+					     count,
+					     conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ORACLE;
 	}
 
 	return inferred_message;
