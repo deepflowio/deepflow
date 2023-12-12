@@ -808,7 +808,7 @@ impl YamlConfig {
         if !self.l7_protocol_ports.contains_key(dns_str) {
             new.insert(dns_str.to_string(), DEFAULT_DNS_PORT.to_string());
         }
-        let tls_str = L7ProtocolParser::Tls(TlsLog::default()).as_str();
+        let tls_str = L7ProtocolParser::TLS(TlsLog::default()).as_str();
         // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
         if !self.l7_protocol_ports.contains_key(tls_str) {
             new.insert(tls_str.to_string(), DEFAULT_TLS_PORT.to_string());
