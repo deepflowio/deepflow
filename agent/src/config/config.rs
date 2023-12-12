@@ -347,7 +347,7 @@ impl Default for OnCpuProfile {
             cpu: 0,
             regex: "^deepflow-.*".to_string(),
             java_symbol_file_max_space_limit: 10,
-            java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
         }
     }
 }
@@ -730,7 +730,7 @@ impl YamlConfig {
         {
             c.ebpf
                 .on_cpu_profile
-                .java_symbol_file_refresh_defer_interval = Duration::from_secs(60)
+                .java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
         }
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)

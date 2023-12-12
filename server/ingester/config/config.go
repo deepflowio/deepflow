@@ -54,6 +54,10 @@ const (
 	DefaultStatsInterval            = 10      // s
 	DefaultFlowTagCacheFlushTimeout = 1800    // s
 	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
+	IndexTypeHash                   = "hash"
+	IndexTypeIncremetalIdLocation   = "incremental-id-location"
+	FormatHex                       = "hex"
+	FormatDecimal                   = "decimal"
 )
 
 type DatabaseTable struct {
@@ -153,12 +157,28 @@ type Config struct {
 	LogFile                  string
 	LogLevel                 string
 	MyNodeName               string
+	TraceIdWithIndex         TraceIdWithIndex
+}
+
+type Location struct {
+	Start  int    `yaml:"start"`
+	Length int    `yaml:"length"`
+	Format string `yaml:"format"`
+}
+
+type TraceIdWithIndex struct {
+	Disabled              bool     `yaml:"disabled"`
+	Type                  string   `yaml:"type"`
+	IncrementalIdLocation Location `yaml:"incremental-id-location"`
+	FormatIsHex           bool
+	TypeIsIncrementalId   bool
 }
 
 type BaseConfig struct {
-	LogFile  string `yaml:"log-file"`
-	LogLevel string `yaml:"log-level"`
-	Base     Config `yaml:"ingester"`
+	LogFile          string           `yaml:"log-file"`
+	LogLevel         string           `yaml:"log-level"`
+	TraceIdWithIndex TraceIdWithIndex `yaml:"trace-id-with-index"`
+	Base             Config           `yaml:"ingester"`
 }
 
 func sleepAndExit() {
@@ -167,6 +187,27 @@ func sleepAndExit() {
 }
 
 func (c *Config) Validate() error {
+	if !c.TraceIdWithIndex.Disabled {
+		if c.TraceIdWithIndex.Type != IndexTypeIncremetalIdLocation && c.TraceIdWithIndex.Type != IndexTypeHash {
+			log.Errorf("invalid 'type'(%s) of 'trace-id-with-index', must be '%s' or '%s'", c.TraceIdWithIndex.Type, IndexTypeIncremetalIdLocation, IndexTypeHash)
+			sleepAndExit()
+		}
+		c.TraceIdWithIndex.TypeIsIncrementalId = false
+		if c.TraceIdWithIndex.Type == IndexTypeIncremetalIdLocation {
+			c.TraceIdWithIndex.TypeIsIncrementalId = true
+			location := c.TraceIdWithIndex.IncrementalIdLocation
+			if location.Format != FormatHex && location.Format != FormatDecimal {
+				log.Errorf("invalid 'format'(%s) of 'trace-id-with-index:incremetal-id-location', must be '%s' or '%s'", location.Format, FormatHex, FormatDecimal)
+				sleepAndExit()
+			}
+			if location.Length == 0 || location.Length > 31 {
+				log.Errorf("invalid 'length'(%d) of 'trace-id-with-index:incremetal-id-location', must be > 0 and <= 32", location.Length)
+				sleepAndExit()
+			}
+			c.TraceIdWithIndex.FormatIsHex = c.TraceIdWithIndex.IncrementalIdLocation.Format == FormatHex
+		}
+	}
+
 	if len(c.ControllerIPs) == 0 {
 		log.Warning("controller-ips is empty")
 	} else {
@@ -371,6 +412,10 @@ func Load(path string) *Config {
 	config := BaseConfig{
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
+		TraceIdWithIndex: TraceIdWithIndex{
+			Disabled: false,
+			Type:     IndexTypeHash,
+		},
 		Base: Config{
 			ControllerIPs:   []string{DefaultControllerIP},
 			ControllerPort:  DefaultControllerPort,
@@ -408,6 +453,7 @@ func Load(path string) *Config {
 		sleepAndExit()
 	}
 
+	config.Base.TraceIdWithIndex = config.TraceIdWithIndex
 	if err = config.Base.Validate(); err != nil {
 		log.Error(err)
 		sleepAndExit()

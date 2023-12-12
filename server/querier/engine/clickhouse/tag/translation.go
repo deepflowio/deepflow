@@ -1032,8 +1032,8 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"",
 			"",
-			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s_map WHERE name %s %s)",
-			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s_map WHERE %s(name,%s))",
+			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE name %s %s)",
+			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE %s(name,%s))",
 		),
 	}
 
