@@ -275,7 +275,7 @@ impl L7ProtocolInfoInterface for TlsInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: L7Protocol::Tls,
+            proto: L7Protocol::TLS,
             msg_type: self.msg_type,
             rrt: self.rrt,
         })
@@ -475,7 +475,7 @@ impl L7ProtocolParserInterface for TlsLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Tls
+        L7Protocol::TLS
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -520,7 +520,12 @@ impl TlsLog {
                         if h.is_client_hello() {
                             info.session_id = Some(0xff);
                         }
-
+                        if h.is_alert() {
+                            self.perf_stats
+                                .as_mut()
+                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                            info.status = L7ResponseStatus::ServerError;
+                        }
                         if h.is_change_cipher_spec() {
                             self.change_cipher_spec_count += 1;
                             if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
