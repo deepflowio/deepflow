@@ -558,6 +558,12 @@ static __inline void save_prev_data(const char *buf,
 		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
 			       buf);
 		conn_info->socket_info_ptr->prev_data_len = count;
+		/*
+		 * This piece of data needs to be merged with subsequent data, so
+		 * the direction of the previous piece of data needs to be saved here.
+		 */
+		conn_info->socket_info_ptr->pre_direction =
+		    conn_info->socket_info_ptr->direction;
 		conn_info->socket_info_ptr->direction = conn_info->direction;
 	} else {
 		bpf_probe_read(conn_info->prev_buf, count, buf);
@@ -580,6 +586,13 @@ static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 				       conn_info->socket_info_ptr->prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
+			/*
+			 * When data is merged, that is, when two or more data with the same
+			 * direction are merged together and processed as one data, the previously
+			 * saved direction needs to be restored.
+			 */
+			conn_info->socket_info_ptr->direction =
+			    conn_info->socket_info_ptr->pre_direction;
 		}
 
 		/*
