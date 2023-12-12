@@ -976,7 +976,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if ((p->unknown_syms_found
 			     || (void *)kv.v.cache == NULL)
 			    && p->update_syms_table_time == 0) {
-				if (p->is_java) {
+				if (p->is_java && p->unknown_syms_found) {
 					p->update_syms_table_time =
 					    curr_time +
 					    get_java_syms_fetch_delay();
@@ -987,10 +987,11 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
 				 */
-				if (kv.v.cache == 0)
-					p->update_syms_table_time +=
+				if (kv.v.cache == 0) {
+					p->update_syms_table_time =
 					    generate_random_integer
 					    (PROFILER_DEFER_RANDOM_MAX);
+				}
 			}
 
 			if (p->update_syms_table_time > 0
