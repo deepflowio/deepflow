@@ -106,33 +106,35 @@ struct socket_info_t {
 	 * The serial number of the socket read and write data, used to
 	 * correct out-of-sequence.
 	 *
-	 * socket读写数据的序列号，用于纠正数据乱序。
+	 * Sequence number for reading and writing data in the socket, used
+	 * to correct data disorder.
 	 */
 	volatile __u64 seq;
 
 	/*
-	 * mysql, kafka这种类型在读取数据时，先读取4字节
-	 * 然后再读取剩下的数据，这里用于对预先读取的数据存储
-	 * 用于后续的协议分析。
+	 * When reading data of types like MySQL or Kafka, the first step
+	 * involves reading 4 bytes followed by reading the remaining data.
+	 * Here, the pre-read data is stored for subsequent protocol analysis.
 	 */
 	__u8 prev_data[EBPF_CACHE_SIZE];
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
-	__u8 msg_type: 2;	// 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 4;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
-	bool need_reconfirm;    // l7协议推断是否需要再次确认。
-	__s32 correlation_id;   // 目前用于kafka协议推断。
+	__u8 msg_type: 2;	// Store data type, values are MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 role: 4;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
+	__s32 correlation_id;   // Currently used for Kafka protocol inference.
 
-	__u32 peer_fd;		// 用于记录socket间数据转移的对端fd。
+	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
 
 	/*
-	 * 一旦有数据读/写就会更新这个时间，这个时间是从系统开机开始
-	 * 到更新时的间隔时间单位是秒。
+	 * This time is updated whenever there is data read/write. It
+	 * represents the elapsed time in seconds from the system boot
+	 * to the time of update.
 	 */
 	__u32 update_time;
 	__u32 prev_data_len;
 	__u64 trace_id;
-	__u64 uid; // socket唯一标识ID
+	__u64 uid; // Unique identifier ID for the socket.
 } __attribute__((packed));
 
 struct trace_key_t {
