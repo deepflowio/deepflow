@@ -173,7 +173,7 @@ impl_protocol_parser! {
         FastCGI(FastCGILog),
         Oracle(OracleLog),
         MQTT(MqttLog),
-        Tls(TlsLog),
+        TLS(TlsLog),
         // add protocol below
     }
 }

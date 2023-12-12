@@ -63,7 +63,7 @@ pub enum L7Protocol {
 
     // INFRA
     DNS = 120,
-    Tls = 121,
+    TLS = 121,
 
     Custom = 127,
 
@@ -90,7 +90,7 @@ impl From<String> for L7Protocol {
             "mqtt" => Self::MQTT,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
-            "tls" => Self::Tls,
+            "tls" => Self::TLS,
             _ => Self::Unknown,
         }
     }
