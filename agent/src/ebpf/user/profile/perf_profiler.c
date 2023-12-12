@@ -557,7 +557,7 @@ static inline void update_matched_process_in_total(stack_trace_msg_hash_t *
 
 	set_stack_trace_msg(msg, v, false, 0, 0, process_name, NULL);
 	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
-	msg->data_len = strlen(msg->data);
+	msg->data_len = strlen((char *)msg->data);
 	kv.msg_ptr = pointer_to_uword(msg);
 
 	if (stack_trace_msg_hash_add_del(msg_hash,
