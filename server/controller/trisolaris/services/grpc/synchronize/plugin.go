@@ -32,11 +32,12 @@ import (
 type PluginEvent struct{}
 
 type PluginData struct {
-	content  []byte
-	totalLen uint64
-	pktCount uint32
-	md5Sum   string
-	step     uint64
+	content    []byte
+	totalLen   uint64
+	pktCount   uint32
+	md5Sum     string
+	step       uint64
+	updateTime uint32
 }
 
 func NewPluginEvent() *PluginEvent {
@@ -63,11 +64,12 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest) (*PluginData, error) {
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
 	md5Sum := fmt.Sprintf("%x", md5.Sum(content))
 	return &PluginData{
-		content:  content,
-		totalLen: totalLen,
-		pktCount: pktCount,
-		md5Sum:   md5Sum,
-		step:     step,
+		content:    content,
+		totalLen:   totalLen,
+		pktCount:   pktCount,
+		md5Sum:     md5Sum,
+		step:       step,
+		updateTime: uint32(plugin.UpdatedAt.Unix()),
 	}, err
 }
 func sendPluginFailed(in api.Synchronizer_PluginServer) error {
@@ -101,11 +103,12 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 			end = pluginData.totalLen
 		}
 		response := &api.PluginResponse{
-			Status:   &STATUS_SUCCESS,
-			Content:  pluginData.content[start:end],
-			Md5:      proto.String(pluginData.md5Sum),
-			PktCount: proto.Uint32(pluginData.pktCount),
-			TotalLen: proto.Uint64(pluginData.totalLen),
+			Status:     &STATUS_SUCCESS,
+			Content:    pluginData.content[start:end],
+			Md5:        proto.String(pluginData.md5Sum),
+			PktCount:   proto.Uint32(pluginData.pktCount),
+			TotalLen:   proto.Uint64(pluginData.totalLen),
+			UpdateTime: proto.Uint32(pluginData.updateTime),
 		}
 		err = in.Send(response)
 		if err != nil {

@@ -636,11 +636,13 @@ const (
 // plugin
 const (
 	PLUGIN_TYPE_WASM = 1
+	PLUGIN_TYPE_SO   = 2
 )
 
 var (
 	PluginTypeName = map[int]string{
 		PLUGIN_TYPE_WASM: "wasm",
+		PLUGIN_TYPE_SO:   "so",
 	}
 )
 

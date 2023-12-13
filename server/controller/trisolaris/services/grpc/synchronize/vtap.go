@@ -61,6 +61,18 @@ func Int2Bool(i int) bool {
 	return true
 }
 
+func (e *VTapEvent) getPlugins(vConfig *vtap.VTapConfig) *api.PluginConfig {
+	if vConfig == nil || vConfig.PluginNewUpdateTime == 0 {
+		return &api.PluginConfig{}
+	}
+
+	return &api.PluginConfig{
+		UpdateTime:  proto.Uint32(vConfig.PluginNewUpdateTime),
+		WasmPlugins: vConfig.ConvertedWasmPlugins,
+		SoPlugins:   vConfig.ConvertedSoPlugins,
+	}
+}
+
 func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api.Config {
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	vtapConfig := c.GetVTapConfig()
@@ -157,6 +169,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		RegionId:          proto.Uint32(uint32(c.GetRegionID())),
 		// 容器采集器所在容器集群ID
 		PodClusterId: &podClusterId,
+
+		Plugins: e.getPlugins(vtapConfig),
 	}
 
 	cacheTSBIP := c.GetTSDBIP()
@@ -503,6 +517,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
 		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
 		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
+		Plugins:             e.getPlugins(vtapConfig),
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
