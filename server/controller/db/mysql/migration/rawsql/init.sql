@@ -2724,12 +2724,6 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_target_label_layout;
 
-CREATE TABLE IF NOT EXISTS ch_view_change (
-    `updated_at`          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_view_change;
-INSERT INTO ch_view_change () VALUES ();
-
 CREATE TABLE IF NOT EXISTS ch_pod_service (
     `id`              INTEGER NOT NULL PRIMARY KEY,
     `name`            VARCHAR(256),
