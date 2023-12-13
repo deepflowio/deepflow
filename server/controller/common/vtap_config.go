@@ -82,6 +82,8 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	ProxyControllerPort:           &DefaultProxyControllerPort,
 	ProxyControllerIP:             &DefaultProxyControllerIP,
 	AnalyzerIP:                    &DefaultAnalyzerIP,
+	WasmPlugins:                   &DefaultWasmPlugins,
+	SoPlugins:                     &DefaultSoPlugins,
 }
 
 var (
@@ -147,4 +149,6 @@ var (
 	DefaultProxyControllerPort           = 30035
 	DefaultProxyControllerIP             = ""
 	DefaultAnalyzerIP                    = ""
+	DefaultWasmPlugins                   = ""
+	DefaultSoPlugins                     = ""
 )
