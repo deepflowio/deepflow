@@ -279,6 +279,9 @@ message Config {
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
+    repeated string wasm_plugins = 411;
+    repeated string so_plugins = 412;
+
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size  = 502 [default = 1000];
     optional TapMode tap_mode = 503 [default = LOCAL];
