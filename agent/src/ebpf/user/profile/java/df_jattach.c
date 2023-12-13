@@ -414,6 +414,19 @@ static inline i64 get_symbol_file_size(int pid, int ns_pid, bool is_target)
 	return -1;
 }
 
+int target_symbol_file_access(int pid, int ns_pid, bool is_same_mnt)
+{
+	char path[PERF_PATH_SZ];
+	if (!is_same_mnt)
+		snprintf(path, sizeof(path), DF_AGENT_PATH_FMT ".map",
+			 pid, ns_pid);
+	else
+		snprintf(path, sizeof(path),
+			 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+
+	return access(path, F_OK);
+}
+
 i64 get_target_symbol_file_sz(int pid, int ns_pid)
 {
 	return get_symbol_file_size(pid, ns_pid, true);

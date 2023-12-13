@@ -28,4 +28,5 @@ bool is_same_mntns(int target_pid);
 i64 get_target_symbol_file_sz(int pid, int ns_pid);
 i64 get_local_symbol_file_sz(int pid, int ns_pid);
 void __unused clear_old_target_perf_files(int pid);
+int target_symbol_file_access(int pid, int ns_pid, bool is_same_mnt);
 #endif /* DF_JATTACH_H */
