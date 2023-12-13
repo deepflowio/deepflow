@@ -279,11 +279,13 @@ message Config {
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
+    optional PluginConfig plugins = 420;
+
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size  = 502 [default = 1000];
     optional TapMode tap_mode = 503 [default = LOCAL];
 
-    optional string local_config = 510;	// 全量的配置文件内容
+    optional string local_config = 510; // 全量的配置文件内容
 }
 
 message Segment { // e.g. single LAN area
@@ -568,11 +570,11 @@ message SyncResponse {
     optional AnalyzerConfig analyzer_config = 21; // Only for Analyzer
 }
 
-message UpgradeRequest  {
+message UpgradeRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 3;
 }
-message UpgradeResponse  {
+message UpgradeResponse {
     optional Status status = 1;     // 调用是否成功
     optional bytes content = 2;     // 数据
     optional string md5 = 3;        // 文件MD5
@@ -589,23 +591,30 @@ message NtpResponse {
     optional bytes response = 1; // 数据
 }
 
-enum  PluginType {
+message PluginConfig {
+    optional uint32 update_time = 1 [default = 0]; // 所有配置插件中最近的更新 epoch
+    repeated string wasm_plugins = 2;
+    repeated string so_plugins = 3;
+}
+
+enum PluginType {
     WASM = 1;
     SO = 2;
 }
 
-message  PluginRequest  {
+message PluginRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 2;
     optional PluginType  pluginType = 3;
     optional string  pluginName = 4;
 }
-message PluginResponse  {
-    optional Status status = 1;     // 调用是否成功
-    optional bytes content = 2;     // 数据
-    optional string md5 = 3;        // 文件MD5
-    optional uint64 total_len = 4;  // 数据总长
-    optional uint32 pkt_count = 5;  // 包总个数
+message PluginResponse {
+    optional Status status = 1;                    // 调用是否成功
+    optional bytes content = 2;                    // 数据
+    optional string md5 = 3;                       // 文件MD5
+    optional uint64 total_len = 4;                 // 数据总长
+    optional uint32 pkt_count = 5;                 // 包总个数
+    optional uint32 update_time = 6 [default = 0]; // 插件更新 epoch
 }
 
 message GenesisPlatformData {
@@ -958,25 +967,25 @@ message DeviceMap {
 }
 
 message IdNameMap {
-	optional uint32 id = 1;
-	optional string name = 2;
+    optional uint32 id = 1;
+    optional string name = 2;
 }
 
 message UniversalTagNameMapsRequest {}
 
 message UniversalTagNameMapsResponse {
-	optional uint32 version = 1;
-	repeated PodK8sLabelMap pod_k8s_label_map = 2;
-	repeated IdNameMap region_map = 3;
-	repeated IdNameMap az_map = 4;
-	repeated DeviceMap device_map = 5;
-	repeated IdNameMap pod_node_map = 6;
-	repeated IdNameMap pod_ns_map = 7;
-	repeated IdNameMap pod_group_map = 8;
-	repeated IdNameMap pod_map = 9;
-	repeated IdNameMap pod_cluster_map = 10;
-	repeated IdNameMap l3_epc_map = 11;
-	repeated IdNameMap subnet_map= 12;
-	repeated IdNameMap gprocess_map= 13;
-	repeated IdNameMap vtap_map= 14;
+    optional uint32 version = 1;
+    repeated PodK8sLabelMap pod_k8s_label_map = 2;
+    repeated IdNameMap region_map = 3;
+    repeated IdNameMap az_map = 4;
+    repeated DeviceMap device_map = 5;
+    repeated IdNameMap pod_node_map = 6;
+    repeated IdNameMap pod_ns_map = 7;
+    repeated IdNameMap pod_group_map = 8;
+    repeated IdNameMap pod_map = 9;
+    repeated IdNameMap pod_cluster_map = 10;
+    repeated IdNameMap l3_epc_map = 11;
+    repeated IdNameMap subnet_map= 12;
+    repeated IdNameMap gprocess_map= 13;
+    repeated IdNameMap vtap_map= 14;
 }
