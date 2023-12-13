@@ -1173,6 +1173,8 @@ impl FlowMap {
             );
             let (direction_score, need_reverse) = self.service_table.get_ebpf_tcp_score(
                 meta_packet.socket_role,
+                meta_packet.lookup_key.l2_end_0,
+                meta_packet.lookup_key.l2_end_1,
                 flow_src_key,
                 flow_dst_key,
             );
