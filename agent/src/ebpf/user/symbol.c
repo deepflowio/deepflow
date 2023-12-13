@@ -769,6 +769,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->unknown_syms_found = false;
 	p->new_java_syms_file = false;
 	p->cache_need_update = false;
+	p->gen_java_syms_file_err = false;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -975,7 +976,8 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			 */
 			if ((p->unknown_syms_found
 			     || (void *)kv.v.cache == NULL)
-			    && p->update_syms_table_time == 0) {
+			    && p->update_syms_table_time == 0
+			    && !p->gen_java_syms_file_err) {
 				if (p->is_java && p->unknown_syms_found) {
 					p->update_syms_table_time =
 					    curr_time +
