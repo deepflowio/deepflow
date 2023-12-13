@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -35,10 +34,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
-
-var CHANGE_VIEW_TIME = time.Time{}
 
 func (c *TagRecorder) UpdateChDictionary() {
 	log.Info("tagrecorder update ch dictionary")
@@ -308,6 +304,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 						for _, view := range addViews.ToSlice() {
 							viewName := view.(string)
 							createSQL := CREATE_SQL_MAP[viewName]
+							createSQL = fmt.Sprintf(createSQL, c.cfg.TagRecorderCfg.LiveViewRefreshSecond)
 							_, err = connect.Exec(createSQL)
 							if err != nil {
 								addViewError = err
@@ -334,6 +331,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 								break
 							}
 							createSQL := CREATE_SQL_MAP[viewName]
+							createSQL = fmt.Sprintf(createSQL, c.cfg.TagRecorderCfg.LiveViewRefreshSecond)
 							if createSQL == viewSQL[0] {
 								continue
 							}
@@ -359,35 +357,6 @@ func (c *TagRecorder) UpdateChDictionary() {
 							continue
 						}
 
-						// refresh live view
-						var chViewChange mysql.ChViewChange
-						err = mysql.Db.Unscoped().First(&chViewChange).Error
-						if err != nil {
-							log.Errorf(dbQueryResourceFailed("ch_view_change", err))
-						} else {
-							updatedAt := chViewChange.UpdatedAt
-							if !updatedAt.Equal(CHANGE_VIEW_TIME) {
-								log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-								appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
-								_, err = connect.Exec(appLabelSql)
-								if err != nil {
-									log.Error(err)
-									connect.Close()
-									continue
-								}
-
-								log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-								targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
-								_, err = connect.Exec(targetLabelSql)
-								if err != nil {
-									log.Error(err)
-									connect.Close()
-									continue
-								}
-								CHANGE_VIEW_TIME = time.Now()
-							}
-						}
-
 						connect.Close()
 					}
 				}
@@ -398,13 +367,4 @@ func (c *TagRecorder) UpdateChDictionary() {
 		log.Warningf("%s endpoint not found!", endpointName)
 	}
 	return
-}
-
-func UpdateChangeView() {
-	err := mysql.Db.Exec("UPDATE ch_view_change SET updated_at = NOW()").Error
-	if err != nil {
-		log.Errorf("update ch_view_change failed: %s", err)
-	} else {
-		log.Info("update ch_view_change success")
-	}
 }
