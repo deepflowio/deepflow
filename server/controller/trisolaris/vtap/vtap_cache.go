@@ -47,6 +47,9 @@ type VTapConfig struct {
 	ConvertedL7LogStoreTapTypes  []uint32
 	ConvertedDecapType           []uint32
 	ConvertedDomains             []string
+	ConvertedWasmPlugins         []string
+	ConvertedSoPlugins           []string
+	PluginNewUpdateTime          uint32
 }
 
 func (f *VTapConfig) convertData() {
@@ -76,6 +79,13 @@ func (f *VTapConfig) convertData() {
 	}
 	sort.Strings(f.ConvertedDomains)
 
+	if len(f.WasmPlugins) != 0 {
+		f.ConvertedWasmPlugins = strings.Split(f.WasmPlugins, ",")
+	}
+	if len(f.SoPlugins) != 0 {
+		f.ConvertedSoPlugins = strings.Split(f.SoPlugins, ",")
+	}
+
 	if f.HTTPLogProxyClient == SHUT_DOWN_STR {
 		f.HTTPLogProxyClient = ""
 	}
@@ -93,6 +103,24 @@ func (f *VTapConfig) convertData() {
 	}
 	if Find[uint32](f.ConvertedL7LogStoreTapTypes, SHUT_DOWN_UINT) {
 		f.ConvertedL7LogStoreTapTypes = []uint32{}
+	}
+}
+
+func (f *VTapConfig) modifyConfig(v *VTapInfo) {
+	for _, plugin := range f.ConvertedWasmPlugins {
+		if updateTime, ok := v.pluginNameToUpdateTime[plugin]; ok {
+			if f.PluginNewUpdateTime < updateTime {
+				f.PluginNewUpdateTime = updateTime
+			}
+		}
+	}
+
+	for _, plugin := range f.ConvertedSoPlugins {
+		if updateTime, ok := v.pluginNameToUpdateTime[plugin]; ok {
+			if f.PluginNewUpdateTime < updateTime {
+				f.PluginNewUpdateTime = updateTime
+			}
+		}
 	}
 }
 
@@ -915,6 +943,7 @@ func (c *VTapCache) initVTapConfig(v *VTapInfo) {
 	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
 		c.modifyVTapConfigByLicense(&realConfig)
 	}
+	realConfig.modifyConfig(v)
 	c.updateVTapConfig(&realConfig)
 }
 
@@ -939,6 +968,7 @@ func (c *VTapCache) updateVTapConfigFromDB(v *VTapInfo) {
 	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
 		c.modifyVTapConfigByLicense(&newConfig)
 	}
+	newConfig.modifyConfig(v)
 	c.updateVTapConfig(&newConfig)
 }
 

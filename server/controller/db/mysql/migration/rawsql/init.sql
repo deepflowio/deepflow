@@ -1642,6 +1642,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     analyzer_port             INTEGER DEFAULT NULL,
     proxy_controller_ip       VARCHAR(128),
     analyzer_ip               VARCHAR(128),
+    wasm_plugins              TEXT COMMENT 'wasm_plugin info, separate by ","',
+    so_plugins                TEXT COMMENT 'so_plugin info, separate by ","',
     yaml_config               TEXT,
     lcuuid                    CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
