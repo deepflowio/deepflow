@@ -228,11 +228,15 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 			if tagName != "" {
 				for _, suffix := range []string{"", "_0", "_1"} {
 					tagFields := AutoCustomTag.TagFields
-					if !slices.Contains(tagFields, "ip") && tagFields[len(tagFields)-1] != "ip" {
+					ipFlag := true
+					if !slices.Contains(tagFields, "ip") {
 						for _, tagValue := range tagFields {
 							if slices.Contains(TAG_RESOURCE_TYPE_AUTO, tagValue) {
+								ipFlag = false
 								break
 							}
+						}
+						if ipFlag {
 							tagFields = append(tagFields, "ip")
 						}
 					}
@@ -290,6 +294,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									ip4Suffix := "ip4" + suffix
 									ip6Suffix := "ip6" + suffix
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + "))"
+									ipTagTranslator := fmt.Sprintf("if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s))", ip4Suffix, ip6Suffix)
+									iconIDTranslator = fmt.Sprintf("%s, %s", ipTagTranslator+"!=''", "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))")
+									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", ipTagTranslator+"!=''", tagValue)
 								case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
 									tagAutoIDSuffix := tagValue + "_id" + suffix
 									tagAutoTypeSuffix := tagValue + "_type" + suffix
@@ -520,6 +527,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 									}
 									deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
+									if tagValue == "service" {
+										deviceType, ok = TAG_RESOURCE_TYPE_DEVICE_MAP["pod_service"]
+									}
 									if ok {
 										tagValueName := tagValue + suffix
 										tagValueID := tagValue + "_id" + suffix
