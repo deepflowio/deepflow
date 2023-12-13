@@ -69,6 +69,8 @@ struct symbolizer_proc_info {
 	bool new_java_syms_file;
 	/* Java symbol cache needs updating? */
 	bool cache_need_update;
+	/* Did the generation of the Java symbol file encounter any exceptions? */
+	bool gen_java_syms_file_err;
 	/* Unknown symbols was found, and it is currently mainly used to
 	 * obtain the match of the Java process.*/
 	bool unknown_syms_found;
