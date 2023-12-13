@@ -35,16 +35,17 @@ static pthread_mutex_t list_lock;
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-void gen_java_symbols_file(int pid, bool * need_update)
+void gen_java_symbols_file(int pid, int *ret_val)
 {
-	*need_update = false;
+	*ret_val = JAVA_SYMS_OK;
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
 		return;
 	}
 
 	char args[PERF_PATH_SZ * 2];
-	if (!is_same_mntns(pid)) {
+	bool is_same_mnt = is_same_mntns(pid);
+	if (!is_same_mnt) {
 		snprintf(args, sizeof(args), "%d %d,%s,%s", pid,
 			 g_java_syms_write_bytes_max,
 			 PERF_MAP_FILE_FMT, PERF_MAP_LOG_FILE_FMT);
@@ -57,7 +58,17 @@ void gen_java_symbols_file(int pid, bool * need_update)
 
 	exec_command(DF_JAVA_ATTACH_CMD, args);
 
-	if (!is_same_mntns(pid)) {
+	if (target_symbol_file_access(pid, target_ns_pid, is_same_mnt) != 0) {
+		ebpf_warning("Generate Java symbol files failed. PID %d\n",
+			     pid);
+		if (!is_same_mnt)
+			clear_target_ns(pid, target_ns_pid);
+
+		*ret_val = JAVA_SYMS_ERR;
+		return;
+	}
+
+	if (!is_same_mnt) {
 		i64 target_sz = get_target_symbol_file_sz(pid, target_ns_pid);
 		i64 local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
 		if (target_sz > local_sz) {
@@ -70,7 +81,7 @@ void gen_java_symbols_file(int pid, bool * need_update)
 				    ("java need update cache pid %d target file"
 				     " size %ld local file size %ld\n",
 				     pid, target_sz, local_sz);
-				*need_update = true;
+				*ret_val = JAVA_SYMS_NEED_UPDATE;
 			}
 		}
 
@@ -125,9 +136,12 @@ void java_syms_update_main(void *arg)
 			struct symbolizer_proc_info *p = task->p;
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
-				bool need_update;
-				gen_java_symbols_file(p->pid, &need_update);
-				p->cache_need_update = need_update;
+				int ret;
+				gen_java_symbols_file(p->pid, &ret);
+				if (ret == JAVA_SYMS_NEED_UPDATE)
+					p->cache_need_update = true;
+				else if (ret == JAVA_SYMS_ERR)
+					p->gen_java_syms_file_err = true;
 				AO_SET(&p->new_java_syms_file, true);
 			}
 
