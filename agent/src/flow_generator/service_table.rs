@@ -472,6 +472,8 @@ impl ServiceTable {
     pub fn get_ebpf_tcp_score(
         &mut self,
         socket_role: u8,
+        l2_end_0: bool,
+        l2_end_1: bool,
         flow_src_key: ServiceKey,
         flow_dst_key: ServiceKey,
     ) -> (u8, bool) {
@@ -481,11 +483,25 @@ impl ServiceTable {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
                 // socket_role: 0:unkonwn 1:client(connect) 2:server(accept)
                 // if socket_role > 0, indicating that socket was established by connect
-                // or accept, then the score of flow_dst_key should be the MAX_SCORE
-                if socket_role > 0 {
+                // or accept, and we can determine the direction by l2_end_0 and l2_end_1
+                if socket_role == 1 && l2_end_0 {
                     self.ipv4.put(flow_dst_key, Self::MAX_SCORE);
                     self.ipv4.pop(&flow_src_key);
                     score = Self::MAX_SCORE;
+                } else if socket_role == 1 && l2_end_1 {
+                    self.ipv4.put(flow_src_key, Self::MAX_SCORE);
+                    self.ipv4.pop(&flow_dst_key);
+                    score = Self::MAX_SCORE;
+                    need_reverse = true;
+                } else if socket_role == 2 && l2_end_1 {
+                    self.ipv4.put(flow_dst_key, Self::MAX_SCORE);
+                    self.ipv4.pop(&flow_src_key);
+                    score = Self::MAX_SCORE;
+                } else if socket_role == 2 && l2_end_0 {
+                    self.ipv4.put(flow_src_key, Self::MAX_SCORE);
+                    self.ipv4.pop(&flow_dst_key);
+                    score = Self::MAX_SCORE;
+                    need_reverse = true;
                 } else if let Some(s) = self.ipv4.get(&flow_dst_key) {
                     score = *s;
                 } else if let Some(s) = self.ipv4.get(&flow_src_key) {
@@ -495,10 +511,24 @@ impl ServiceTable {
                 }
             }
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
-                if socket_role > 0 {
+                if socket_role == 1 && l2_end_0 {
                     self.ipv6.put(flow_dst_key, Self::MAX_SCORE);
                     self.ipv6.pop(&flow_src_key);
                     score = Self::MAX_SCORE;
+                } else if socket_role == 1 && l2_end_1 {
+                    self.ipv6.put(flow_src_key, Self::MAX_SCORE);
+                    self.ipv6.pop(&flow_dst_key);
+                    score = Self::MAX_SCORE;
+                    need_reverse = true;
+                } else if socket_role == 2 && l2_end_1 {
+                    self.ipv6.put(flow_dst_key, Self::MAX_SCORE);
+                    self.ipv6.pop(&flow_src_key);
+                    score = Self::MAX_SCORE;
+                } else if socket_role == 2 && l2_end_0 {
+                    self.ipv6.put(flow_src_key, Self::MAX_SCORE);
+                    self.ipv6.pop(&flow_dst_key);
+                    score = Self::MAX_SCORE;
+                    need_reverse = true;
                 } else if let Some(s) = self.ipv6.get(&flow_dst_key) {
                     score = *s;
                 } else if let Some(s) = self.ipv6.get(&flow_src_key) {
