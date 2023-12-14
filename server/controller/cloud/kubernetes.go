@@ -17,8 +17,6 @@
 package cloud
 
 import (
-	"fmt"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
@@ -28,12 +26,8 @@ import (
 func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
-		errMSG := fmt.Sprintf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
-		log.Warning(errMSG)
-		return model.Resource{
-			ErrorMessage: errMSG,
-			ErrorState:   common.RESOURCE_STATE_CODE_EXCEPTION,
-		}, 0
+		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
+		return model.Resource{}, 0
 	}
 	kubernetesGatherResource := k8sGatherTask.GetResource()
 
