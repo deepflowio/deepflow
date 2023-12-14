@@ -35,8 +35,25 @@ static pthread_mutex_t list_lock;
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-void gen_java_symbols_file(int pid, int *ret_val)
+/** Generate Java symbol file.
+ *
+ * @pid Process ID
+ * @ret_val
+ *   Return address, used by the caller to determine subsequent processing.
+ * @error_occurred
+ *   'true' indicates that an error has occurred at some point,
+ *   'false' indicates that no error has occurred.
+ */
+void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 {
+	/*
+	 * If an error has occurred at some point, no further retries will
+	 * be attempted.
+	 */
+	if (error_occurred) {
+		goto error;
+	}
+
 	*ret_val = JAVA_SYMS_OK;
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
@@ -59,13 +76,9 @@ void gen_java_symbols_file(int pid, int *ret_val)
 	exec_command(DF_JAVA_ATTACH_CMD, args);
 
 	if (target_symbol_file_access(pid, target_ns_pid, is_same_mnt) != 0) {
-		ebpf_warning("Generate Java symbol files failed. PID %d\n",
-			     pid);
 		if (!is_same_mnt)
 			clear_target_ns(pid, target_ns_pid);
-
-		*ret_val = JAVA_SYMS_ERR;
-		return;
+		goto error;
 	}
 
 	if (!is_same_mnt) {
@@ -87,6 +100,11 @@ void gen_java_symbols_file(int pid, int *ret_val)
 
 		clear_target_ns(pid, target_ns_pid);
 	}
+
+	return;
+error:
+	*ret_val = JAVA_SYMS_ERR;
+	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
 }
 
 void clean_local_java_symbols_files(int pid)
@@ -132,16 +150,25 @@ void java_syms_update_main(void *arg)
 		pthread_mutex_unlock(&list_lock);
 
 		if (task != NULL) {
-
 			struct symbolizer_proc_info *p = task->p;
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
 				int ret;
-				gen_java_symbols_file(p->pid, &ret);
-				if (ret == JAVA_SYMS_NEED_UPDATE)
-					p->cache_need_update = true;
-				else if (ret == JAVA_SYMS_ERR)
+				gen_java_symbols_file(p->pid, &ret,
+						      p->
+						      gen_java_syms_file_err);
+				if (ret != JAVA_SYMS_ERR) {
+					if (ret == JAVA_SYMS_NEED_UPDATE)
+						p->cache_need_update = true;
+					else
+						p->cache_need_update = false;
+
+					p->gen_java_syms_file_err = false;
+				} else {
 					p->gen_java_syms_file_err = true;
+					p->cache_need_update = false;
+				}
+
 				AO_SET(&p->new_java_syms_file, true);
 			}
 
