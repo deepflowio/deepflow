@@ -482,10 +482,7 @@ pub struct YamlConfig {
     pub analyzer_queue_size: usize,
     pub analyzer_raw_packet_block_size: usize,
     pub batched_buffer_size_limit: usize,
-    #[serde(rename = "ovs-dpdk-enable")]
-    pub ovs_dpdk_enabled: bool,
-    pub dpdk_pmd_core_id: u32,
-    pub dpdk_ring_port: String,
+    pub dpdk_enabled: bool,
     pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
@@ -861,9 +858,7 @@ impl Default for YamlConfig {
             analyzer_queue_size: 131072,
             analyzer_raw_packet_block_size: 65536,
             batched_buffer_size_limit: 131072,
-            ovs_dpdk_enabled: false,
-            dpdk_pmd_core_id: 0,
-            dpdk_ring_port: "dpdkr0".into(),
+            dpdk_enabled: false,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
