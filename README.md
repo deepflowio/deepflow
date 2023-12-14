@@ -29,7 +29,7 @@ The DeepFlow open-source project aims to provide deep observability for complex 
 
 # Documentation
 
-For more information, please visit [the documentation website](https://deepflow.yunshan.net/docs/?from=github).
+For more information, please visit [the documentation website](https://deepflow.io/docs/?from=github).
 
 # Quick start
 
@@ -42,13 +42,13 @@ The DeepFlow Community Edition consists of the core components of the Enterprise
 
 ## DeepFlow Community
 
-Please refer to [the deployment documentation](https://deepflow.yunshan.net/docs/install/all-in-one/?from=github).
+Please refer to [the deployment documentation](https://deepflow.io/docs/ce-install/all-in-one/?from=github).
 
 At the same time, we have also built a complete [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github), welcome to experience it. Login account/password: deepflow/deepflow.
 
 ## DeepFlow Enterprise
 
-You can visit the [DeepFlow Enterprise Demo](https://deepflow.yunshan.net/), currently available in Chinese only.
+You can visit the [DeepFlow Enterprise Demo](https://deepflow.io/), currently available in Chinese only.
 
 # Compile DeepFlow from Source
 
@@ -62,7 +62,7 @@ DeepFlow Community Edition consists of two components, Agent and Server. An Agen
 
 # Milestones
 
-Here is our [future feature plan](https://deepflow.yunshan.net/docs/about/milestone/?from=github). Issues and Pull Requests are welcome.
+Here is our [future feature plan](https://deepflow.io/docs/about/milestone/?from=github). Issues and Pull Requests are welcome.
 
 # Contact Us
 
