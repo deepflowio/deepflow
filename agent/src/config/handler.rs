@@ -34,7 +34,7 @@ use flexi_logger::{
 };
 #[cfg(target_os = "linux")]
 use libc::{c_int, setpriority, PRIO_PROCESS};
-use log::{error, info, warn, Level};
+use log::{info, warn, Level};
 #[cfg(target_os = "linux")]
 use nix::{
     sched::{sched_setaffinity, CpuSet},
@@ -56,9 +56,6 @@ use super::{
     config::{Config, KubernetesResourceConfig, PcapConfig, PortConfig, YamlConfig},
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
-use crate::plugin::c_ffi::SoPluginFunc;
-#[cfg(target_os = "linux")]
-use crate::plugin::shared_obj::load_plugin;
 use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
@@ -381,9 +378,11 @@ pub struct FlowConfig {
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 
+    pub plugin_last_updated: u32,
+    pub plugin_names: Vec<(String, trident::PluginType)>,
     // name, data
     pub wasm_plugins: Vec<(String, Vec<u8>)>,
-    pub so_plugins: Vec<SoPluginFunc>,
+    pub so_plugins: Vec<(String, Vec<u8>)>,
 
     pub rrt_tcp_timeout: usize, //micro sec
     pub rrt_udp_timeout: usize, //micro sec
@@ -440,6 +439,27 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
+            plugin_last_updated: conf
+                .plugins
+                .as_ref()
+                .and_then(|p| p.update_time)
+                .unwrap_or_default(),
+            plugin_names: {
+                let mut plugins = vec![];
+                if let Some(p) = &conf.plugins {
+                    plugins.extend(
+                        p.wasm_plugins
+                            .iter()
+                            .map(|p| (p.clone(), trident::PluginType::Wasm)),
+                    );
+                    plugins.extend(
+                        p.so_plugins
+                            .iter()
+                            .map(|p| (p.clone(), trident::PluginType::So)),
+                    );
+                }
+                plugins
+            },
             wasm_plugins: vec![],
             so_plugins: vec![],
             rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
@@ -492,7 +512,39 @@ impl fmt::Debug for FlowConfig {
             )
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
+            .field("plugin_last_updated", &self.plugin_last_updated)
+            .field("plugin_names", &self.plugin_names)
             .finish()
+    }
+}
+
+impl FlowConfig {
+    fn fill_plugin_prog_from_server(
+        &mut self,
+        rt: &Runtime,
+        session: &Session,
+        agent_id: &AgentId,
+    ) {
+        self.wasm_plugins.clear();
+        self.so_plugins.clear();
+
+        rt.block_on(async {
+            for (name, ptype) in self.plugin_names.iter() {
+                match session.get_plugin(name, *ptype, agent_id).await {
+                    Ok(prog) => match ptype {
+                        trident::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
+                        #[cfg(target_os = "linux")]
+                        trident::PluginType::So => self.so_plugins.push((name.clone(), prog)),
+                        #[cfg(any(target_os = "windows"))]
+                        _ => (),
+                    },
+                    Err(err) => {
+                        warn!("get {:?} plugin {} fail: {}", ptype, name, err);
+                        continue;
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -1343,6 +1395,9 @@ impl ConfigHandler {
         exception_handler: &ExceptionHandler,
         mut components: Option<&mut AgentComponents>,
         #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
+        runtime: &Runtime,
+        session: &Session,
+        agent_id: &AgentId,
     ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
@@ -1896,6 +1951,12 @@ impl ConfigHandler {
                 "flow_generator config change from {:#?} to {:#?}",
                 candidate_config.flow, new_config.flow
             );
+            if candidate_config.flow.plugin_last_updated != new_config.flow.plugin_last_updated {
+                info!("plugins changed, pulling from server");
+                candidate_config
+                    .flow
+                    .fill_plugin_prog_from_server(runtime, session, agent_id);
+            }
             candidate_config.flow = new_config.flow;
         }
 
@@ -2345,13 +2406,6 @@ impl ConfigHandler {
 
         callbacks
     }
-
-    pub fn load_plugin(&mut self, rt: &Arc<Runtime>, session: &Arc<Session>, agent_id: &AgentId) {
-        self.candidate_config
-            .fill_plugin_prog_from_server(rt, session, agent_id);
-        self.current_config
-            .store(Arc::new(self.candidate_config.clone()));
-    }
 }
 
 impl ModuleConfig {
@@ -2369,57 +2423,6 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
-    }
-
-    pub fn fill_plugin_prog_from_server(
-        &mut self,
-        rt: &Arc<Runtime>,
-        session: &Arc<Session>,
-        agent_id: &AgentId,
-    ) {
-        let mut wasm = vec![];
-        #[cfg(target_os = "windows")]
-        let so = vec![];
-        #[cfg(target_os = "linux")]
-        let mut so = vec![];
-        rt.block_on(async {
-            for i in self.yaml_config.wasm_plugins.iter() {
-                match session
-                    .get_plugin(i.as_str(), trident::PluginType::Wasm, agent_id)
-                    .await
-                {
-                    Ok(prog) => wasm.push((i.clone(), prog)),
-                    Err(err) => {
-                        error!("get wasm plugin {} fail: {}", i, err);
-                        continue;
-                    }
-                }
-            }
-        });
-
-        #[cfg(target_os = "linux")]
-        rt.block_on(async {
-            for i in self.yaml_config.so_plugins.iter() {
-                match session
-                    .get_plugin(i.as_str(), trident::PluginType::So, agent_id)
-                    .await
-                {
-                    Ok(prog) => match load_plugin(prog.as_slice(), i) {
-                        Ok(p) => {
-                            so.push(p);
-                        }
-                        Err(e) => error!("load so plugin {} fail: {}", i, e),
-                    },
-                    Err(err) => {
-                        error!("get so plugin {} fail: {}", i, err);
-                        continue;
-                    }
-                }
-            }
-        });
-
-        self.flow.wasm_plugins = wasm;
-        self.flow.so_plugins = so;
     }
 }
 

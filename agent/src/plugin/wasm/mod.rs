@@ -122,8 +122,8 @@ use host::{
 use public::bytes::read_u16_be;
 use vm::{VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, VmResult};
 
-pub use host::{get_all_wasm_export_func_name, init_wasmtime, WasmVm};
-pub use metric::{get_wasm_metric_counter_map_key, WasmCounter, WasmCounterMap};
+pub use host::{WasmVm, WASM_EXPORT_FUNC_NAME};
+pub use metric::WasmCounter;
 
 #[macro_export]
 macro_rules! wasm_info {

@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
 pub mod c_ffi;
 #[cfg(target_os = "linux")]
 pub mod shared_obj;
 pub mod wasm;
 
-use public::{bytes::read_u32_be, l7_protocol::L7Protocol};
+use public::{bytes::read_u32_be, counter::Countable, l7_protocol::L7Protocol};
 use serde::Serialize;
 
 use crate::{
@@ -500,4 +501,11 @@ impl From<CustomInfo> for L7ProtocolSendLog {
             ..Default::default()
         }
     }
+}
+
+pub struct PluginCounterInfo<'a> {
+    pub plugin_name: &'a str,
+    pub plugin_type: &'static str,
+    pub function_name: &'static str,
+    pub counter: Countable,
 }
