@@ -42,9 +42,9 @@ use crate::common::{
     flow::{Flow, L7PerfStats},
     l7_protocol_log::L7ParseResult,
 };
-use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
 use crate::plugin::c_ffi::SoPluginFunc;
+use crate::plugin::wasm::WasmVm;
 use crate::rpc::get_timestamp;
 use crate::{
     common::{
