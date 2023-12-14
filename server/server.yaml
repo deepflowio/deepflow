@@ -203,6 +203,7 @@ controller:
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
+    live_view_refresh_second: 60
 
   trisolaris:
     tsdb_ip:
