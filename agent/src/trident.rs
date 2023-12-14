@@ -2024,6 +2024,8 @@ impl AgentComponents {
 
             let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
                 tap_interfaces.clone()
+            } else if candidate_config.tap_mode == TapMode::Mirror && yaml_config.dpdk_enabled {
+                vec![]
             } else {
                 #[cfg(target_os = "linux")]
                 match netns::link_by_name_in_netns(&src_interface, &netns) {
@@ -2065,6 +2067,7 @@ impl AgentComponents {
                         .candidate_config
                         .dispatcher
                         .capture_packet_size as usize,
+                    dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
                     ..Default::default()
                 })))
                 .bpf_options(bpf_options.clone())
