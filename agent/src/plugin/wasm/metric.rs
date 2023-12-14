@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::sync::atomic::AtomicU64;
 
 use public::counter::{CounterType, CounterValue, RefCountable};
 
@@ -27,6 +24,7 @@ pub struct WasmCounter {
     pub(super) exe_duration: AtomicU64,
     pub(super) fail_cnt: AtomicU64,
 }
+
 impl RefCountable for WasmCounter {
     fn get_counters(&self) -> Vec<public::counter::Counter> {
         vec![
@@ -50,13 +48,4 @@ impl RefCountable for WasmCounter {
             ),
         ]
     }
-}
-
-#[derive(Debug)]
-pub struct WasmCounterMap {
-    pub wasm_mertic: HashMap<String, Arc<WasmCounter>>,
-}
-
-pub fn get_wasm_metric_counter_map_key(name: &str, func_name: &str) -> String {
-    format!("{}:{}", name, func_name)
 }

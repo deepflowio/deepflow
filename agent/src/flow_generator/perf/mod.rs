@@ -44,7 +44,7 @@ use crate::common::{
 };
 use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
-use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
+use crate::plugin::c_ffi::SoPluginFunc;
 use crate::rpc::get_timestamp;
 use crate::{
     common::{
@@ -198,8 +198,6 @@ pub struct FlowLog {
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     #[cfg(target_os = "linux")]
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(target_os = "linux")]
-    so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
 
@@ -313,9 +311,7 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
-            {
-                param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
-            }
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
             if let Some(vm) = self.wasm_vm.as_ref() {
@@ -423,7 +419,7 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
-            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
             #[cfg(target_os = "linux")]
@@ -465,7 +461,6 @@ impl FlowLog {
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
         #[cfg(target_os = "linux")] so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-        #[cfg(target_os = "linux")] so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
         l7_protocol_inference_ttl: u64,
@@ -500,10 +495,8 @@ impl FlowLog {
             wasm_vm,
             #[cfg(target_os = "linux")]
             so_plugin,
-            #[cfg(target_os = "linux")]
-            so_plugin_counter,
-            stats_counter: stats_counter,
-            rrt_timeout: rrt_timeout,
+            stats_counter,
+            rrt_timeout,
             last_fail: last_time,
             l7_protocol_inference_ttl,
             ntp_diff,
