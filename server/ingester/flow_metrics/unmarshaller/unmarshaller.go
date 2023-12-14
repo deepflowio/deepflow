@@ -149,10 +149,14 @@ func (u *Unmarshaller) GetCounter() interface{} {
 
 func (u *Unmarshaller) putStoreQueue(doc *app.Document) {
 	queueCache := &u.queueBatchCache
+	writersCount := len(u.dbwriters)
+	if writersCount-1 > 0 {
+		doc.AddReferenceCountN(int32(writersCount) - 1)
+	}
 	queueCache.values = append(queueCache.values, doc)
 
 	if len(queueCache.values) >= QUEUE_BATCH_SIZE {
-		for i := 0; i < len(u.dbwriters); i++ {
+		for i := 0; i < writersCount; i++ {
 			u.dbwriters[i].Put(queueCache.values...)
 		}
 		queueCache.values = queueCache.values[:0]
