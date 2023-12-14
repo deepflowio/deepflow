@@ -21,7 +21,6 @@ use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr};
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -39,14 +38,10 @@ use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
     common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-    plugin::wasm::init_wasmtime,
     HttpLog,
 };
 
-use super::{
-    get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, WasmCounter, WasmCounterMap,
-    WasmVm,
-};
+use super::WasmVm;
 
 fn get_req_param<'a>(
     vm: Rc<RefCell<WasmVm>>,
@@ -76,8 +71,6 @@ fn get_req_param<'a>(
         wasm_vm: Some(vm.clone()),
         #[cfg(any(target_os = "linux", target_os = "android"))]
         so_func: None,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -114,8 +107,6 @@ fn get_resq_param<'a>(
         wasm_vm: Some(vm.clone()),
         #[cfg(any(target_os = "linux", target_os = "android"))]
         so_func: None,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -132,21 +123,7 @@ fn load_module() -> WasmVm {
     let mut prog = vec![];
     d.read_to_end(&mut prog).unwrap();
 
-    let wasm_counter_map = Arc::new(WasmCounterMap {
-        wasm_mertic: {
-            let mut h = HashMap::new();
-            for func_name in get_all_wasm_export_func_name() {
-                let counter = Arc::new(WasmCounter::default());
-                h.insert(get_wasm_metric_counter_map_key("vm0", func_name), counter);
-            }
-            h
-        },
-    });
-
-    init_wasmtime(
-        vec![("vm0".to_string(), prog.as_slice())],
-        &wasm_counter_map,
-    )
+    WasmVm::new(&[("vm0", prog)])
 }
 
 #[test]

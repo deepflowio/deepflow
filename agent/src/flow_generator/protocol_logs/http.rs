@@ -1608,8 +1608,6 @@ mod tests {
             wasm_vm: None,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: None,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_plugin_counter_map: None,
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,

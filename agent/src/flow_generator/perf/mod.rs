@@ -44,9 +44,9 @@ use crate::common::{
     flow::{Flow, L7PerfStats},
     l7_protocol_log::L7ParseResult,
 };
-use crate::plugin::wasm::WasmVm;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
+use crate::plugin::c_ffi::SoPluginFunc;
+use crate::plugin::wasm::WasmVm;
 use crate::rpc::get_timestamp;
 use crate::{
     common::{
@@ -204,8 +204,6 @@ pub struct FlowLog {
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
 
@@ -328,9 +326,7 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            {
-                param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
-            }
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
             if let Some(vm) = self.wasm_vm.as_ref() {
@@ -446,7 +442,7 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
             param.set_oracle_conf(flow_config.oracle_parse_conf);
@@ -499,9 +495,6 @@ impl FlowLog {
         #[cfg(any(target_os = "linux", target_os = "android"))] so_plugin: Option<
             Rc<Vec<SoPluginFunc>>,
         >,
-        #[cfg(any(target_os = "linux", target_os = "android"))] so_plugin_counter: Option<
-            Rc<SoPluginCounterMap>,
-        >,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
         l7_protocol_inference_ttl: u64,
@@ -538,8 +531,6 @@ impl FlowLog {
             wasm_vm,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_plugin_counter,
             stats_counter,
             rrt_timeout,
             last_fail: last_time,

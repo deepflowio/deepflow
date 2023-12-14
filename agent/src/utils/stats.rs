@@ -245,6 +245,26 @@ impl Collector {
         sources.push(source);
     }
 
+    pub fn deregister_countables<I>(&self, countables: I)
+    where
+        I: Iterator<Item = (&'static str, Vec<StatsOption>)>,
+    {
+        let mut tags = vec![];
+        let mut sources = self.sources.lock().unwrap();
+        for (module, options) in countables {
+            tags.clear();
+            for option in options {
+                match option {
+                    StatsOption::Tag(k, v) if !tags.iter().any(|(key, _)| key == &k) => {
+                        tags.push((k, v))
+                    }
+                    _ => (),
+                }
+            }
+            sources.retain(|s| !(s.module == module && s.tags == tags));
+        }
+    }
+
     pub fn register_pre_hook(&self, hook: Box<dyn FnMut() + Send>) {
         self.pre_hooks.lock().unwrap().push(hook);
     }

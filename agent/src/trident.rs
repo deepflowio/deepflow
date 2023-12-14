@@ -685,12 +685,16 @@ impl Trident {
                         c.stop();
                     }
                     if let Some(c) = config.take() {
+                        let agent_id = synchronizer.agent_id.read().clone();
                         config_handler.on_config(
                             c,
                             &exception_handler,
                             None,
                             #[cfg(target_os = "linux")]
                             &api_watcher,
+                            &runtime,
+                            &session,
+                            &agent_id,
                         );
 
                         #[cfg(target_os = "linux")]
@@ -735,6 +739,7 @@ impl Trident {
                 }
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
+            let agent_id = synchronizer.agent_id.read().clone();
             match components.as_mut() {
                 None => {
                     let callbacks = config_handler.on_config(
@@ -743,6 +748,9 @@ impl Trident {
                         None,
                         #[cfg(target_os = "linux")]
                         &api_watcher,
+                        &runtime,
+                        &session,
+                        &agent_id,
                     );
 
                     #[cfg(target_os = "linux")]
@@ -755,9 +763,6 @@ impl Trident {
                     } else {
                         api_watcher.stop();
                     }
-
-                    let agent_id = synchronizer.agent_id.read().clone();
-                    config_handler.load_plugin(&runtime, &session, &agent_id);
 
                     let mut comp = Components::new(
                         &version_info,
@@ -802,6 +807,9 @@ impl Trident {
                             Some(components),
                             #[cfg(target_os = "linux")]
                             &api_watcher,
+                            &runtime,
+                            &session,
+                            &agent_id,
                         );
 
                     #[cfg(target_os = "linux")]
@@ -840,6 +848,9 @@ impl Trident {
                         None,
                         #[cfg(target_os = "linux")]
                         &api_watcher,
+                        &runtime,
+                        &session,
+                        &agent_id,
                     );
 
                     #[cfg(target_os = "linux")]

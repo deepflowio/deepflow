@@ -210,7 +210,7 @@ impl EbpfDispatcher {
             self.time_diff.clone(),
             &self.flow_map_config.load(),
             None, // Enterprise Edition Feature: packet-sequence
-            &self.stats_collector,
+            self.stats_collector.clone(),
             true, // from_ebpf
         );
         let ebpf_config = self.config.load();

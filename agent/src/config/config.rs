@@ -546,8 +546,6 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
-    pub wasm_plugins: Vec<String>,
-    pub so_plugins: Vec<String>,
     pub memory_trim_disabled: bool,
     pub forward_capacity: usize,
     pub fast_path_disabled: bool,
@@ -942,8 +940,6 @@ impl Default for YamlConfig {
             os_proc_sync_tagged_only: false,
             guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
-            wasm_plugins: vec![],
-            so_plugins: vec![],
             memory_trim_disabled: false,
             fast_path_disabled: false,
             forward_capacity: 1 << 14,
@@ -1234,6 +1230,8 @@ pub struct RuntimeConfig {
     #[serde(skip)]
     pub tap_mode: TapMode,
     pub prometheus_http_api_addresses: Vec<String>,
+    #[serde(skip)]
+    pub plugins: Option<trident::PluginConfig>,
     // TODO: expand and remove
     #[serde(rename = "static_config")]
     pub yaml_config: YamlConfig,
@@ -1336,6 +1334,7 @@ impl RuntimeConfig {
             tap_mode: TapMode::Local,
             yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
             prometheus_http_api_addresses: vec![],
+            plugins: Default::default(),
         }
     }
 
@@ -1563,6 +1562,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             tap_mode: conf.tap_mode(),
             prometheus_http_api_addresses: conf.prometheus_http_api_addresses.to_owned(),
             yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
+            plugins: conf.plugins,
         };
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
