@@ -196,8 +196,8 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-static char *resolve_addr(struct bpf_tracer *t, pid_t pid, u64 address,
-			  bool is_create, void *info_p)
+static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
+			  u64 address, bool is_create, void *info_p)
 {
 	ASSERT(pid >= 0);
 
@@ -251,10 +251,17 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, u64 address,
 	 * If we have reached this point, it means that we have truly obtained
 	 * nothing. Perhaps this is a JIT-compiled or interpreted program?
 	 * Perhaps the stack trace has been corrupted (no frame pointers)? We
-	 * will simply return '[unknown]' string.
+	 * will simply return '[unknown] address' string.
+	 * e.g.: '[unknown] 0x0000000000000001'.
 	 */
 resolver_err:
-	snprintf(format_str, sizeof(format_str), "[unknown] 0x%016lx", address);
+	if (is_start_idx)
+		snprintf(format_str, sizeof(format_str),
+			 "[unknown start_thread?]");
+	else
+		snprintf(format_str, sizeof(format_str), "[unknown] 0x%016lx",
+			 address);
+
 	len = strlen(format_str);
 	ptr = create_symbol_str(len, format_str, "");
 
@@ -310,12 +317,17 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	if (ret != VEC_OK)
 		return NULL;
 
-	int folded_size = 0;
+	int start_idx = -1, folded_size = 0;
 	for (i = PERF_MAX_STACK_DEPTH - 1; i >= 0; i--) {
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
 
-		str = resolve_addr(t, pid, ips[i], new_cache, info_p);
+		if (start_idx == -1)
+			start_idx = i;
+
+		str =
+		    resolve_addr(t, pid, (i == start_idx), ips[i], new_cache,
+				 info_p);
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
@@ -465,10 +477,11 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		bool is_thread = (v->pid != v->tgid);
 		if (process_name) {
 			if (is_thread)
-				snprintf(trace_str, len, "[p] %s;[t] %s", process_name,
-					 v->comm);
+				snprintf(trace_str, len, "[p] %s;[t] %s",
+					 process_name, v->comm);
 			else
-				snprintf(trace_str, len, "[p] %s", process_name);
+				snprintf(trace_str, len, "[p] %s",
+					 process_name);
 		} else {
 			/* The process has already exited. */
 			if (is_thread)
