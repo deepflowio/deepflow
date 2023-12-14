@@ -73,7 +73,7 @@ impl LocalModeDispatcher {
             base.ntp_diff.clone(),
             &base.flow_map_config.load(),
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            &base.stats,
+            base.stats.clone(),
             false, // !from_ebpf
         );
 

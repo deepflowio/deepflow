@@ -42,9 +42,9 @@ use crate::flow_generator::protocol_logs::{
     RedisLog, SofaRpcLog, TlsLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
-use crate::plugin::wasm::WasmVm;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
+use crate::plugin::c_ffi::SoPluginFunc;
+use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
 use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
@@ -361,8 +361,6 @@ pub struct ParseParam<'a> {
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub so_func: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    pub so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
 
@@ -408,8 +406,6 @@ impl ParseParam<'_> {
             wasm_vm: None,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: None,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_plugin_counter_map: None,
 
             stats_counter: None,
 
@@ -453,18 +449,8 @@ impl<'a> ParseParam<'a> {
         self.so_func = Some(so_func);
     }
 
-    pub fn set_counter(
-        &mut self,
-        stat: Arc<FlowMapCounter>,
-        #[cfg(any(target_os = "linux", target_os = "android"))] so_counter: Option<
-            Rc<SoPluginCounterMap>,
-        >,
-    ) {
+    pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
         self.stats_counter = Some(stat);
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        {
-            self.so_plugin_counter_map = so_counter;
-        }
     }
 
     pub fn set_buf_size(&mut self, buf_size: usize) {

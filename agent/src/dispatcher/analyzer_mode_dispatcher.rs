@@ -288,7 +288,7 @@ impl AnalyzerModeDispatcher {
                         ntp_diff,
                         &flow_map_config.load(),
                         Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
-                        &stats,
+                        stats,
                         false, // !from_ebpf
                     );
 
