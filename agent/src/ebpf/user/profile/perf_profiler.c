@@ -628,11 +628,25 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		char name[TASK_COMM_LEN];
 		memset(name, 0, sizeof(name));
 		u64 stime, netns_id;
+		stime = netns_id = 0;
 		void *info_p = NULL;
+		char *process_name = NULL;
+		bool matched, is_match_finish;
+		matched = is_match_finish = false;
+
+		/* If it is a process, match operation will be performed immediately. */
+		if (v->pid == v->tgid) {
+			is_match_finish = true;
+			matched = (regexec(&profiler_regex, v->comm, 0, NULL, 0)
+				   == 0);
+			if (!matched) {
+				set_msg_kvp_by_comm(&kv, v, (void *)0);
+				goto skip_proc_find;
+			}
+		}
+
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
 					(char *)name, &info_p);
-		char *process_name = NULL;
-		bool matched = false;
 
 		/* 
 		 * If the data collected is from a running process, and the process
@@ -653,9 +667,11 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			else
 				process_name = name;
 
-			matched =
-			    (regexec(&profiler_regex, process_name, 0, NULL, 0)
-			     == 0);
+			if (!is_match_finish)
+				matched =
+				    (regexec
+				     (&profiler_regex, process_name, 0, NULL, 0)
+				     == 0);
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else
@@ -673,6 +689,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (matched)
 			update_matched_process_in_total(msg_hash, process_name,
 							v);
+
+	      skip_proc_find:
 		if (stack_trace_msg_hash_search
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
