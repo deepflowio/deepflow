@@ -29,7 +29,7 @@ DeepFlow 开源项目旨在为复杂的云基础设施及云原生应用提供�
 
 # 文档
 
-详细信息请访问[文档站点](https://deepflow.yunshan.net/docs/zh/?from=github)。
+详细信息请访问[文档站点](https://deepflow.io/docs/zh/?from=github)。
 
 # 快速上手
 
@@ -42,13 +42,13 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 ## 部署 DeepFlow Community
 
-请参考[文档](https://deepflow.yunshan.net/docs/zh/install/all-in-one/?from=github)部署 DeepFlow Community。
+请参考[文档](https://deepflow.io/docs/zh/ce-install/all-in-one/?from=github)部署 DeepFlow Community。
 
 同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
 ## 体验 DeepFlow Enterprise
 
-你可以访问 [DeepFlow Enterprise Demo](https://deepflow.yunshan.net/)，目前仅支持中文。
+你可以访问 [DeepFlow Enterprise Demo](https://deepflow.io/)，目前仅支持中文。
 
 # 从源码编译 DeepFlow
 
@@ -62,7 +62,7 @@ DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 
 
 # 里程碑
 
-这里有我们[未来的 Feature 规划](https://deepflow.yunshan.net/docs/zh/about/milestone/?from=github)。欢迎 Issue 和 Pull Request。
+这里有我们[未来的 Feature 规划](https://deepflow.io/docs/zh/about/milestone/?from=github)。欢迎 Issue 和 Pull Request。
 
 # 联系我们
 
