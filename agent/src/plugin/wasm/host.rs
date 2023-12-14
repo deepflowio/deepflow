@@ -136,6 +136,10 @@ impl WasmVm {
         self.instance.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.instance.len()
+    }
+
     pub fn on_check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<(u8, String)> {
         if self.instance.len() == 0 {
             return None;
