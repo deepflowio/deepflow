@@ -530,6 +530,7 @@ impl FlowConfig {
 
         rt.block_on(async {
             for (name, ptype) in self.plugin_names.iter() {
+                log::trace!("get {:?} plugin {}", ptype, name);
                 match session.get_plugin(name, *ptype, agent_id).await {
                     Ok(prog) => match ptype {
                         trident::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
@@ -545,6 +546,12 @@ impl FlowConfig {
                 }
             }
         });
+
+        info!(
+            "{} wasm and {} so plugins pulled from server",
+            self.wasm_plugins.len(),
+            self.so_plugins.len()
+        );
     }
 }
 
@@ -1952,8 +1959,11 @@ impl ConfigHandler {
                 candidate_config.flow, new_config.flow
             );
             if candidate_config.flow.plugin_last_updated != new_config.flow.plugin_last_updated {
-                info!("plugins changed, pulling from server");
-                candidate_config
+                info!(
+                    "plugins changed, pulling {} plugins from server",
+                    new_config.flow.plugin_names.len()
+                );
+                new_config
                     .flow
                     .fill_plugin_prog_from_server(runtime, session, agent_id);
             }
