@@ -25,8 +25,8 @@ BEGIN
     UPDATE data_source SET name='网络-PCAP 数据' WHERE name='flow_log.l7_packet' AND tsdb_type='flow_log.l7_packet';
     UPDATE data_source SET name='系统监控数据', tsdb_type='deepflow_system.*' WHERE name='deepflow_system' AND tsdb_type='deepflow_system';
 
-    ALTER TABLE data_source RENAME COLUMN name TO display_name;
-    ALTER TABLE data_source RENAME COLUMN tsdb_type TO data_table_collection;
+    ALTER TABLE data_source CHANGE COLUMN name display_name CHAR(64);
+    ALTER TABLE data_source CHANGE COLUMN tsdb_type data_table_collection CHAR(64);
 
     set @lcuuid = (select uuid());
     INSERT INTO data_source (display_name, data_table_collection, `interval`, retention_time, lcuuid) 
