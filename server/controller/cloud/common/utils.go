@@ -30,13 +30,12 @@ import (
 	"strconv"
 	"strings"
 
-	"inet.af/netaddr"
-
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/mikioh/ipaddr"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
+	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -700,8 +699,11 @@ func GenerateWANVInterfaceMac(mac string) string {
 	return "ff" + mac[2:]
 }
 
-func DiffMap(base, another map[string]string) bool {
-	for k, v := range another {
+func DiffMap(base, newTags map[string]string) bool {
+	if len(base) != len(newTags) {
+		return true
+	}
+	for k, v := range newTags {
 		bValue, ok := base[k]
 		if !ok {
 			return true

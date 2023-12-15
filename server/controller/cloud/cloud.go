@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
