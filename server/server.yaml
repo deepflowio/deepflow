@@ -115,9 +115,9 @@ controller:
     data_source_max: 25
     data_source_retention_time_max: 24000
     # unit: s
-    data_source_ext_metrics_interval: 15
+    data_source_ext_metrics_interval: 10
     # unit: s
-    data_source_prometheus_interval: 15
+    data_source_prometheus_interval: 10
 
   # monitor module config
   monitor:
