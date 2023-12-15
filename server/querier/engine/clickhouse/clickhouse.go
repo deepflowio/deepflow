@@ -356,10 +356,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
+									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
 								sort.Strings(autoTagSlice)
-								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
+								for _, autoTagKey := range autoTagSlice {
+									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
+								}
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, as)
@@ -372,10 +374,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 								autoTagMap := tag.TagTranslatorMap
 								autoTagSlice := []string{}
 								for autoTagKey, _ := range autoTagMap {
-									autoTagSlice = append(autoTagSlice, "`"+autoTagKey+"`")
+									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
 								sort.Strings(autoTagSlice)
-								outerWhereLeftSlice = append(outerWhereLeftSlice, autoTagSlice...)
+								for _, autoTagKey := range autoTagSlice {
+									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
+								}
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
