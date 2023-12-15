@@ -618,11 +618,7 @@ impl FirstPath {
         ) as usize;
         for item in &self.table_4.read().unwrap()[index] {
             if field & &item.field.mask == item.field.field {
-                policy.merge_npb_action(
-                    &item.policy.npb_actions,
-                    item.policy.acl_id,
-                    Some(direction),
-                );
+                policy.merge_npb_actions(&item.policy.npb_actions, item.policy.acl_id, direction);
             }
         }
     }
@@ -640,11 +636,7 @@ impl FirstPath {
         ) as usize;
         for item in &self.table_6.read().unwrap()[index] {
             if field & &item.field.mask == item.field.field {
-                policy.merge_npb_action(
-                    &item.policy.npb_actions,
-                    item.policy.acl_id,
-                    Some(direction),
-                );
+                policy.merge_npb_actions(&item.policy.npb_actions, item.policy.acl_id, direction);
             }
         }
     }
@@ -665,12 +657,12 @@ impl FirstPath {
             key.backward_matched.as_ref().unwrap(),
         ) {
             (MatchedField::V4(forward), MatchedField::V4(backward)) => {
-                self.get_policy_from_table4(forward, DirectionType::Forward, policy);
-                self.get_policy_from_table4(backward, DirectionType::Backward, policy);
+                self.get_policy_from_table4(forward, DirectionType::FORWARD, policy);
+                self.get_policy_from_table4(backward, DirectionType::BACKWARD, policy);
             }
             (MatchedField::V6(forward), MatchedField::V6(backward)) => {
-                self.get_policy_from_table6(forward, DirectionType::Forward, policy);
-                self.get_policy_from_table6(backward, DirectionType::Backward, policy);
+                self.get_policy_from_table6(forward, DirectionType::FORWARD, policy);
+                self.get_policy_from_table6(backward, DirectionType::BACKWARD, policy);
             }
             _ => panic!("LookupKey MatchedField version error."),
         }
@@ -786,6 +778,7 @@ mod tests {
                 1,
                 NpbTunnelType::VxLan,
                 TapSide::SRC,
+                DirectionType::ALL,
                 0,
             ),
         );

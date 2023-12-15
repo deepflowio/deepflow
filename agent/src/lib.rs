@@ -68,7 +68,8 @@ pub use {
         FlowPerfCounter as _FlowPerfCounter, L7FlowPerf as _L7FlowPerf,
     },
     npb_pcap_policy::{
-        NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
+        DirectionType as _DirectionType, NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType,
+        TapSide as _TapSide,
     },
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,

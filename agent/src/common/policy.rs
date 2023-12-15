@@ -28,7 +28,7 @@ use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
 use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
-use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
+use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
 
 use public::proto::trident;
 
@@ -713,6 +713,7 @@ impl TryFrom<trident::FlowAcl> for Acl {
                     n.tunnel_ip_id.unwrap_or_default() as u16,
                     NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
                     TapSide::new(n.tap_side.unwrap() as u8),
+                    DirectionType::new(n.direction.unwrap_or(1) as u8),
                     n.payload_slice() as u16,
                 )
             })
