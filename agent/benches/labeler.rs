@@ -24,6 +24,7 @@ use ipnet::IpNet;
 
 use deepflow_agent::_Acl as Acl;
 use deepflow_agent::_Cidr as Cidr;
+use deepflow_agent::_DirectionType as DirectionType;
 use deepflow_agent::_EndpointData as EndpointData;
 use deepflow_agent::_EndpointInfo as EndpointInfo;
 use deepflow_agent::_FeatureFlags as FeatureFlags;
@@ -104,6 +105,7 @@ fn bench_policy(c: &mut Criterion) {
                 1,
                 NpbTunnelType::VxLan,
                 TapSide::SRC,
+                DirectionType::FORWARD,
                 0,
             ),
         );

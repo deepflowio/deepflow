@@ -302,7 +302,7 @@ impl FastPath {
 
         let mut forward = PolicyData::default();
         if acl_id > 0 {
-            forward.merge_npb_action(&policy.npb_actions, acl_id, None);
+            forward.merge_and_dedup_npb_actions(&policy.npb_actions, acl_id, false);
             forward.format_npb_action();
         }
 
@@ -325,7 +325,7 @@ impl FastPath {
 
         let mut backward = PolicyData::default();
         if acl_id > 0 {
-            backward.merge_reverse_npb_action(&policy.npb_actions, acl_id);
+            backward.merge_and_dedup_npb_actions(&policy.npb_actions, acl_id, true);
             backward.format_npb_action();
         }
 

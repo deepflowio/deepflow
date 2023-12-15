@@ -51,7 +51,7 @@ impl PolicyMonitor {
         if self.enabled.load(Ordering::Relaxed) {
             let _ = self
                 .sender
-                .send(format!("{}\n\t{:?}\n\t{:?}", key, endpoints, policy));
+                .send(format!("{}\n\t{:?}\n\t{}", key, endpoints, policy));
         }
     }
 
