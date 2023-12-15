@@ -369,10 +369,16 @@ impl FlowMap {
             }
         };
 
+        #[cfg(target_os = "linux")]
         log::info!(
             "loaded {} wasm and {} so plugins",
             wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default(),
             so_plugins.as_ref().map(|so| so.len()).unwrap_or_default(),
+        );
+        #[cfg(target_os = "windows")]
+        log::info!(
+            "loaded {} wasm plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default()
         );
         self.wasm_vm = wasm_vm.map(|vm| Rc::new(RefCell::new(vm)));
         #[cfg(target_os = "linux")]
