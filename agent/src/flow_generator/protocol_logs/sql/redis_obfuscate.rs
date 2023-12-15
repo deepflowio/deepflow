@@ -225,8 +225,8 @@ impl RedisTokenizer<'_> {
                         self.mask_start_index = 2;
                     }
                 }
-                HSET | HSETNX | LREM | LSET | SETBIT | SETEX | PSETEX | SETRANGE | ZINCRBY
-                | SMOVE | RESTORE => {
+                HSETNX | LREM | LSET | SETBIT | SETEX | PSETEX | SETRANGE | ZINCRBY | SMOVE
+                | RESTORE => {
                     self.mask_start_index = 3;
                 }
                 LINSERT => {
@@ -240,7 +240,7 @@ impl RedisTokenizer<'_> {
                     self.mask_start_index = 4;
                     self.mask_step = 3;
                 }
-                HMSET => {
+                HSET | HMSET => {
                     self.mask_start_index = 3;
                     self.mask_step = 2;
                 }
@@ -365,7 +365,7 @@ mod tests {
                     "HSET key field value \nHSETNX key field value\nBLAH",
                     Some("HSET key field ?\nHSETNX key field ?\nBLAH"),
                 ),
-                ("HSET key field value", Some("HSET key field ?")),
+                ("HSET key field value field1 value1 field2 value2", Some("HSET key field ? field1 ? field2 ?")),
                 ("HSETNX key field value", Some("HSETNX key field ?")),
                 ("LREM key count value", Some("LREM key count ?")),
                 ("LSET key index value", Some("LSET key index ?")),

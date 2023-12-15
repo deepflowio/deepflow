@@ -1959,9 +1959,14 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
 	}
 
 check:
+	/*
+	 * Content Type: Handshake (0x16), We are only concerned about the
+	 * handshake protocol.
+	 */
 	if (handshake.content_type != 0x16)
 		return MSG_UNKNOWN;
 
+	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
 	if (!(handshake.version == 0x301 || handshake.version == 0x303))
 		return MSG_UNKNOWN;
 
@@ -1970,6 +1975,33 @@ check:
 		return MSG_PRESTORE;
 	}
 
+	/*
+	 * The following describes the read and write behavior of the
+	 * system calls:
+	 *
+	 * client send:
+	 * --------------
+	 * (1) handshake_type 0x1 (client hello)
+	 *
+	 * client recv:
+	 * --------------
+	 * (2) handshake_type 0x1 (server hello)
+	 * (3) handshake_type 0xb (certificates)
+	 * (4) handshake_type 0xc (server key exchange message)
+	 * (5) handshake_type 0xe (server hello done message)
+	 *
+	 * We want to merge (1) and (2) to obtain the desired data. 
+	 * (3), (4), and (5) are only the server's responses and are
+	 * not involved in aggregation; they are not the data we need.
+	 */
+	if (handshake.handshake_type == 0xb || handshake.handshake_type == 0xc
+	    || handshake.handshake_type == 0xe)
+		return MSG_UNKNOWN;
+
+	/*
+	 * 0x01: handshake type=Client Hello
+	 * 0x10: handshake type=client key exchange
+	 */
 	if (handshake.handshake_type == 0x1 || handshake.handshake_type == 0x10)
 		return MSG_REQUEST;
 	else
