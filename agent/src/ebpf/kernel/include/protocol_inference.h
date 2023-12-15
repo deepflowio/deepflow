@@ -1772,29 +1772,56 @@ infer_mongo_message(const char *buf, size_t count,
 	if (!is_protocol_enabled(PROTO_MONGO)) {
 		return MSG_UNKNOWN;
 	}
+
+	struct mongo_header *header = NULL;
+	if (conn_info->prev_count == sizeof(*header)) {
+		count += sizeof(*header);
+		header = (struct mongo_header *)conn_info->prev_buf;
+	}
+
 	if (count < sizeof(struct mongo_header)) {
 		return MSG_UNKNOWN;
 	}
-	struct mongo_header *header = (struct mongo_header *)buf;
-	if (header->message_length < count) {
-		return MSG_UNKNOWN;
+
+	if (header == NULL)
+		header = (struct mongo_header *)buf;
+
+	/*
+	 * The MongoDB protocol involves two reads in the receiving
+	 * direction for a single request. Initially, the first read
+	 * retrieves the first 16 bytes (length of the protocol header),
+	 * followed by a subsequent read to obtain the remaining data.
+	 * Therefore, it is necessary to pre-store the content from the
+	 * first read and merge it with the data from the second read
+	 * before sending it to the agent.
+	 */
+	if (count == sizeof(*header)
+	    && conn_info->direction == T_INGRESS) {
+		save_prev_data(buf, conn_info, sizeof(*header));
+		return MSG_PRESTORE;
 	}
+
 	if (header->request_id < 0) {
 		return MSG_UNKNOWN;
 	}
+
 	if (header->op_code == MONGO_OP_REPLY) {
 		return MSG_RESPONSE;
 	}
+
 	if (header->op_code < MONGO_OP_UPDATE) {
 		return MSG_UNKNOWN;
 	}
+
 	if (header->op_code > MONGO_OP_KILL_CURSORS
 	    && header->op_code < MONGO_OP_COMPRESSED) {
 		return MSG_UNKNOWN;
 	}
+
 	if (header->op_code > MONGO_OP_MSG) {
 		return MSG_UNKNOWN;
 	}
+
 	return MSG_REQUEST;
 }
 
@@ -2348,14 +2375,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		    infer_dns_message(infer_buf, count,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_mongo_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_MONGO;
 	}
 
 	if (inferred_message.protocol != MSG_UNKNOWN)
@@ -2450,6 +2469,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_mongo_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MONGO;
 	}
 
 	return inferred_message;
