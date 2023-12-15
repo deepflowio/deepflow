@@ -2443,7 +2443,7 @@ mod tests {
         common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
         utils::test::Capture,
     };
-    use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
+    use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
     use public::utils::net::MacAddr;
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
@@ -2646,10 +2646,11 @@ mod tests {
             1,
             NpbTunnelType::VxLan,
             TapSide::SRC,
+            DirectionType::ALL,
             123,
         );
         let mut policy_data0 = PolicyData::default();
-        policy_data0.merge_npb_action(&vec![npb_action], 10, None);
+        policy_data0.merge_npb_actions(&vec![npb_action], 10, DirectionType::FORWARD);
         let mut packet0 = _new_meta_packet();
         packet0.policy_data.replace(Arc::new(policy_data0));
 
@@ -2660,10 +2661,11 @@ mod tests {
             1,
             NpbTunnelType::VxLan,
             TapSide::SRC,
+            DirectionType::ALL,
             123,
         );
         let mut policy_data1 = PolicyData::default();
-        policy_data1.merge_npb_action(&vec![npb_action], 11, None);
+        policy_data1.merge_npb_actions(&vec![npb_action], 11, DirectionType::FORWARD);
         let mut packet1 = _new_meta_packet();
         if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
             tcp_data.flags = TcpFlags::SYN_ACK;
