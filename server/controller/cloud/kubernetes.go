@@ -27,7 +27,9 @@ func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
 		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
-		return model.Resource{}, 0
+		return model.Resource{
+			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
+		}, 0
 	}
 	kubernetesGatherResource := k8sGatherTask.GetResource()
 
