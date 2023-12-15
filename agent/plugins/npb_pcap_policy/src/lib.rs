@@ -35,6 +35,12 @@ bitflags! {
     }
 }
 
+impl From<DirectionType> for TapSide {
+    fn from(_d: DirectionType) -> Self {
+        TapSide::NONE
+    }
+}
+
 impl TapSide {
     pub fn new(_flags: u8) -> Self {
         TapSide::NONE
@@ -51,23 +57,29 @@ bitflags! {
     }
 }
 
-#[derive(TryFromPrimitive, IntoPrimitive, Clone, Copy, Debug, PartialEq)]
-#[repr(u8)]
-pub enum DirectionType {
-    NoDirection = 0,
-    Forward = 1,
-    Backward = 2,
+bitflags! {
+    pub struct DirectionType: u8 {
+        const FORWARD = 0x1;
+        const BACKWARD = 0x2;
+        const ALL = 0x3;
+    }
 }
 
-impl From<DirectionType> for TapSide {
-    fn from(_d: DirectionType) -> Self {
-        TapSide::NONE
+impl From<TapSide> for DirectionType {
+    fn from(_d: TapSide) -> Self {
+        DirectionType::ALL
     }
 }
 
 impl Default for DirectionType {
     fn default() -> Self {
-        Self::NoDirection
+        Self::ALL
+    }
+}
+
+impl DirectionType {
+    pub fn new(_: u8) -> Self {
+        Self::ALL
     }
 }
 
@@ -111,6 +123,7 @@ impl NpbAction {
         tunnel_ip_id: u16,
         _tunnel_type: NpbTunnelType,
         _tap_side: TapSide,
+        _direction_capacity: DirectionType,
         _slice: u16,
     ) -> Self {
         Self {
@@ -176,6 +189,12 @@ pub struct PolicyData {
     pub action_flags: ActionFlags,
 }
 
+impl fmt::Display for PolicyData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl PolicyData {
     pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32) -> Self {
         let mut policy = Self {
@@ -201,25 +220,30 @@ impl PolicyData {
 
     pub fn format_npb_action(&mut self) {}
 
-    pub fn merge_npb_action(
+    pub fn merge_and_dedup_npb_actions(
         &mut self,
         actions: &Vec<NpbAction>,
         acl_id: u32,
-        direction: Option<DirectionType>,
+        reverse: bool,
     ) {
         self.acl_id = acl_id;
-        if direction.is_none() {
-            actions
-                .into_iter()
-                .for_each(|x| self.npb_actions.push(x.clone()));
-            return;
-        }
+        actions.into_iter().for_each(|x| {
+            let mut action = x.clone();
+            if reverse {
+                action.reverse_tap_side();
+            }
+            self.npb_actions.push(action)
+        })
+    }
 
-        let tap_side = if direction.unwrap() == DirectionType::Forward {
-            TapSide::SRC
-        } else {
-            TapSide::DST
-        };
+    pub fn merge_npb_actions(
+        &mut self,
+        actions: &Vec<NpbAction>,
+        acl_id: u32,
+        direction: DirectionType,
+    ) {
+        self.acl_id = acl_id;
+        let tap_side = TapSide::from(direction);
         actions.into_iter().for_each(|x| {
             let mut action = x.clone();
             action.set_tap_side(tap_side);

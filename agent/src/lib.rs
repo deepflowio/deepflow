@@ -72,7 +72,8 @@ pub use {
     flow_generator::protocol_logs::LogMessageType as _LogMessageType,
     flow_generator::HttpLog,
     npb_pcap_policy::{
-        NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
+        DirectionType as _DirectionType, NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType,
+        TapSide as _TapSide,
     },
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
