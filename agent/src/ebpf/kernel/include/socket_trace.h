@@ -131,40 +131,38 @@ struct conn_info_t {
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only:1;
 	__u8 infer_reliable:1;	// Is protocol inference reliable?
-	__u8 padding:6;
-	__u8 skc_state;
 	/*
 	 * Whether the socket l7 protocol type needs
 	 * to be confirmed again.
 	 */
-	bool need_reconfirm;
+	__u8 need_reconfirm:1;
 	/*
 	 * True to keep the sequence number of the
 	 * captured data unchanged, otherwise false.
 	 */
-	bool keep_data_seq;
+	__u8 keep_data_seq:1;
+	__u8 direction:1;	// current T_INGRESS or T_EGRESS
+	__u8 prev_direction:1;	// The direction of the last saved data
+	__u8 role:2;
+	__u8 skc_state;
 	/*
 	 * Used to skip protocol checking when Linux 5.2+
 	 * kernel protocol inference.
 	 */
 	__u8 skip_proto;
-	__u32 fd;
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
-	enum traffic_protocol protocol;
+	__u8 protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	enum message_type message_type;
-
-	enum traffic_direction direction;	//T_INGRESS or T_EGRESS
-	enum endpoint_role role;
-	__s32 correlation_id;	// 目前用于kafka判断
-	enum traffic_direction prev_direction;
-	__u32 prev_count;	// Prestored data length
+	__u8 message_type;
+	void *sk;
+	struct socket_info_t *socket_info_ptr;  /* lookup __socket_info_map */
 	size_t count;		// syscall data length
+	__u32 fd;
+	__u32 syscall_infer_len;
+	__s32 correlation_id;	// Currently used for Kafka determination
+	__u32 prev_count;	// Prestored data length
 	char prev_buf[EBPF_CACHE_SIZE];
 	char *syscall_infer_addr;
-	void *sk;
-	struct socket_info_t *socket_info_ptr;	/* lookup __socket_info_map */
-	__u32 syscall_infer_len;
 
 	/*
 	   The matching logic is:
