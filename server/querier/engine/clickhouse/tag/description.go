@@ -343,8 +343,18 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = EPCIDSuffix
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.%s, 'name', toUInt64(%s))", tagValueMap, EPCIDSuffix)
 									selectPrefixTranslator = EPCIDSuffix + "!=-2"
-									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, tagValueID)
+									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, EPCIDSuffix)
 									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
+								case "service", "pod_service":
+									tagValueName := tagValue + suffix
+									tagValueID := tagValue + "_id" + suffix
+									serviceID := "service_id" + suffix
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = serviceID
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(11), toUInt64(%s)))", serviceID)
+									selectPrefixTranslator = serviceID + "!=0"
+									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
+									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
+
 								default:
 									if strings.HasPrefix(tagValue, "cloud.tag.") {
 										tagValueName := tagValue + suffix
@@ -474,6 +484,15 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									selectPrefixTranslator += " OR " + EPCIDSuffix + "!=-2"
 									iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", EPCIDSuffix+"!=-2", tagValueMap, EPCIDSuffix)
 									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", EPCIDSuffix+"!=-2", tagValue)
+								case "service", "pod_service":
+									tagValueName := tagValue + suffix
+									tagValueID := tagValue + "_id" + suffix
+									serviceID := "service_id" + suffix
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, serviceID)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(11), toUInt64(%s) )))", selectPrefixTranslator, serviceID)
+									selectPrefixTranslator += " OR " + serviceID + "!=0"
+									iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
+									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", selectPrefixTranslator, tagValue)
 								default:
 									if strings.HasPrefix(tagValue, "cloud.tag.") {
 										tagValueName := tagValue + suffix
