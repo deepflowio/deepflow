@@ -633,104 +633,95 @@ type VTapInterface struct {
 	LastSeen           string `json:"LAST_SEEN"`
 }
 
-// TODO: 因为genesis的功能还未完全迁移完，且数据库字段不相同，所以这里启用了一组新的表来支持，等待完成迁移后将表趋于统一并删除无用表。
-// 这里为了保持一致性和泛型方便添加一个参考的lcuuid，可以使用common.GetUUID(Hostname)来获得
 type GenesisHost struct {
-	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID   uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid   string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID   uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid   string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Hostname string `gorm:"column:hostname;type:varchar(256);default:null" json:"HOSTNAME"`
 	IP       string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	NodeIP   string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP   string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
 func (GenesisHost) TableName() string {
-	return "go_genesis_host"
+	return "genesis_host"
 }
 
 type GenesisIP struct {
-	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Masklen          uint32    `gorm:"column:masklen;type:int;default:null;default:0" json:"MASKLEN"`
-	VtapID           uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	VtapID           uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	IP               string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	Lcuuid           string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	VinterfaceLcuuid string    `gorm:"column:vinterface_lcuuid;type:char(64);default:null" json:"VINTERFACE_LCUUID"`
-	NodeIP           string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP           string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	LastSeen         time.Time `gorm:"column:last_seen;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"LAST_SEEN"`
 }
 
 func (GenesisIP) TableName() string {
-	return "go_genesis_ip"
+	return "genesis_ip"
 }
 
 type GenesisVIP struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	IP     string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Lcuuid string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
-	NodeIP string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	Lcuuid string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
+	NodeIP string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
 func (GenesisVIP) TableName() string {
-	return "go_genesis_vip"
+	return "genesis_vip"
 }
 
 type GenesisLldp struct {
-	ID                    int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID                uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid                string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID                uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid                string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	HostIP                string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
 	HostInterface         string    `gorm:"column:host_interface;type:char(64);default:null" json:"HOST_INTERFACE"`
 	SystemName            string    `gorm:"column:system_name;type:varchar(512);default:null" json:"SYSTEM_NAME"`
 	ManagementAddress     string    `gorm:"column:management_address;type:varchar(512);default:null" json:"MANAGEMENT_ADDRESS"`
 	VinterfaceLcuuid      string    `gorm:"column:vinterface_lcuuid;type:varchar(512);default:null" json:"VINTERFACE_LCUUID"`
 	VinterfaceDescription string    `gorm:"column:vinterface_description;type:varchar(512);default:null" json:"VINTERFACE_DESCRIPTION"`
-	NodeIP                string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP                string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	LastSeen              time.Time `gorm:"column:last_seen;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"LAST_SEEN"`
 }
 
 func (GenesisLldp) TableName() string {
-	return "go_genesis_lldp"
+	return "genesis_lldp"
 }
 
 type GenesisNetwork struct {
-	ID             int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	SegmentationID uint32 `gorm:"column:segmentation_id;type:int;default:null" json:"SEGMENTATION_ID"`
 	NetType        uint32 `gorm:"column:net_type;type:int;default:null" json:"NET_TYPE"`
-	VtapID         uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	VtapID         uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	External       bool   `gorm:"column:external;type:tinyint(1);default:null" json:"EXTERNAL"`
 	Name           string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	Lcuuid         string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	Lcuuid         string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	VPCLcuuid      string `gorm:"column:vpc_lcuuid;type:char(64);default:null" json:"VPC_LCUUID"`
-	NodeIP         string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP         string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
 func (GenesisNetwork) TableName() string {
-	return "go_genesis_network"
+	return "genesis_network"
 }
 
 type GenesisPort struct {
-	ID            int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Type          uint32 `gorm:"column:type;type:int;default:null" json:"TYPE"`
 	DeviceType    uint32 `gorm:"column:device_type;type:int;default:null" json:"DEVICETYPE"`
-	VtapID        uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid        string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID        uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid        string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Mac           string `gorm:"column:mac;type:char(32);default:null" json:"MAC"`
 	DeviceLcuuid  string `gorm:"column:device_lcuuid;type:char(64);default:null" json:"DEVICE_LCUUID"`
 	NetworkLcuuid string `gorm:"column:network_lcuuid;type:char(64);default:null" json:"NETWORK_LCUUID"`
 	VPCLcuuid     string `gorm:"column:vpc_lcuuid;type:char(64);default:null" json:"VPC_LCUUID"`
-	NodeIP        string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP        string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
 func (GenesisPort) TableName() string {
-	return "go_genesis_port"
+	return "genesis_port"
 }
 
 type GenesisVinterface struct {
-	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
-	VtapID              uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID              uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid              string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
 	IPs                 string    `gorm:"column:ips;type:text;default:null" json:"IPS"`
 	Mac                 string    `gorm:"column:mac;type:char(32);default:null" json:"MAC"`
@@ -742,61 +733,58 @@ type GenesisVinterface struct {
 	IFType              string    `gorm:"column:if_type;type:char(64);default:null" json:"IF_TYPE"`
 	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
 	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
-	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP              string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	LastSeen            time.Time `gorm:"column:last_seen;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"LAST_SEEN"`
 }
 
 func (GenesisVinterface) TableName() string {
-	return "go_genesis_vinterface"
+	return "genesis_vinterface"
 }
 
 type GenesisVM struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	State        uint32    `gorm:"column:state;type:int;default:null" json:"STATE"`
-	VtapID       uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID       uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid       string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name         string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	Label        string    `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
 	VPCLcuuid    string    `gorm:"column:vpc_lcuuid;type:char(64);default:null" json:"VPC_LCUUID"`
 	LaunchServer string    `gorm:"column:launch_server;type:char(64);default:null" json:"LAUNCH_SERVER"`
-	NodeIP       string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP       string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	CreatedAt    time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 }
 
 func (GenesisVM) TableName() string {
-	return "go_genesis_vm"
+	return "genesis_vm"
 }
 
 type GenesisVpc struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	Lcuuid string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
+	Lcuuid string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name   string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	NodeIP string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
 func (GenesisVpc) TableName() string {
-	return "go_genesis_vpc"
+	return "genesis_vpc"
 }
 
 type GenesisProcess struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	NetnsID     uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
-	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	VtapID      uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
-	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	Lcuuid      string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
 	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
 	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
-	NodeIP      string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	NodeIP      string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	StartTime   time.Time `gorm:"column:start_time;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"START_TIME"`
 }
 
 func (GenesisProcess) TableName() string {
-	return "go_genesis_process"
+	return "genesis_process"
 }
 
 type GenesisStorage struct {
@@ -806,7 +794,7 @@ type GenesisStorage struct {
 }
 
 func (GenesisStorage) TableName() string {
-	return "go_genesis_storage"
+	return "genesis_storage"
 }
 
 type Process struct {
