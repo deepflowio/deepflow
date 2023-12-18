@@ -496,6 +496,10 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 
 func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint32) []model.GenesisProcess {
 	processes := []model.GenesisProcess{}
+	if vtapID == 0 {
+		return processes
+	}
+
 	for _, p := range info.message.GetProcessData().GetProcessEntries() {
 		var osAppTagSlice []string
 		for _, tag := range p.GetOsAppTags() {

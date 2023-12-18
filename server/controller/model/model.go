@@ -408,7 +408,7 @@ type AdditionalResourceCloudTag struct {
 	ResourceType  string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
 	ResourceName  string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
 	DomainUUID    string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
-	SubDomainUUID string                  `json:"subdomain_uuid" yaml:"subdomain_uuid"`
+	SubDomainUUID string                  `json:"subdomain_uuid,omitempty" yaml:"subdomain_uuid"`
 	Tags          []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
 }
 
