@@ -398,15 +398,19 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									}
 									deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
 									if ok {
+										nameDeviceType := deviceType
+										if tagValue == "service" {
+											nameDeviceType, ok = TAG_RESOURCE_TYPE_DEVICE_MAP["pod_service"]
+										}
 										tagValueName := tagValue + suffix
 										tagValueID := tagValue + "_id" + suffix
 										deviceIDSuffix := "l3_device_id" + suffix
 										deviceTypeSuffix := "l3_device_type" + suffix
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = diviceIDTranslator
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s)))", deviceType, deviceIDSuffix)
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s)))", nameDeviceType, deviceIDSuffix)
 										selectPrefixTranslator = fmt.Sprintf("(%s!=0 AND %s=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
-										iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", selectPrefixTranslator, deviceType, deviceIDSuffix)
+										iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 									}
 								}
@@ -527,20 +531,21 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
 									}
 									deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
-									if tagValue == "service" {
-										deviceType, ok = TAG_RESOURCE_TYPE_DEVICE_MAP["pod_service"]
-									}
 									if ok {
+										nameDeviceType := deviceType
+										if tagValue == "service" {
+											nameDeviceType, ok = TAG_RESOURCE_TYPE_DEVICE_MAP["pod_service"]
+										}
 										tagValueName := tagValue + suffix
 										tagValueID := tagValue + "_id" + suffix
 										deviceIDSuffix := "l3_device_id" + suffix
 										deviceTypeSuffix := "l3_device_type" + suffix
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, diviceIDTranslator)
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s) )))", selectPrefixTranslator, deviceType, deviceIDSuffix)
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s) )))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										deviceSelectPrefixTranslator := fmt.Sprintf("%s!=0 AND %s=%d", deviceIDSuffix, deviceTypeSuffix, deviceType)
 										selectPrefixTranslator += fmt.Sprintf(" OR (%s)", deviceSelectPrefixTranslator)
-										iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", deviceSelectPrefixTranslator, deviceType, deviceIDSuffix)
+										iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", deviceSelectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", deviceSelectPrefixTranslator, tagValue)
 									}
 								}

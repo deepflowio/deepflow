@@ -277,7 +277,7 @@ impl FlowMap {
                     .collect(),
             ),
             time_key_buffer: None,
-            plugin_last_updated: config.plugin_last_updated,
+            plugin_last_updated: 0, // force initial load
             wasm_vm: None,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin: None,
@@ -309,7 +309,7 @@ impl FlowMap {
             self.stats_collector
                 .deregister_countables(vm.counters().iter().map(|info| {
                     (
-                        "flow_map",
+                        "plugin",
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
                             StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
@@ -328,7 +328,7 @@ impl FlowMap {
             self.stats_collector
                 .deregister_countables(counters.iter().map(|info| {
                     (
-                        "flow_map",
+                        "plugin",
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
                             StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
@@ -350,7 +350,7 @@ impl FlowMap {
             } else {
                 for counter in vm.counters() {
                     self.stats_collector.register_countable(
-                        "flow_map",
+                        "plugin",
                         counter.counter,
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
@@ -388,7 +388,7 @@ impl FlowMap {
                 }
                 for counter in counters {
                     self.stats_collector.register_countable(
-                        "flow_map",
+                        "plugin",
                         counter.counter,
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
@@ -402,6 +402,17 @@ impl FlowMap {
             }
         };
 
+        #[cfg(target_os = "linux")]
+        log::info!(
+            "loaded {} wasm and {} so plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default(),
+            so_plugins.as_ref().map(|so| so.len()).unwrap_or_default(),
+        );
+        #[cfg(target_os = "windows")]
+        log::info!(
+            "loaded {} wasm plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default()
+        );
         self.wasm_vm = wasm_vm.map(|vm| Rc::new(RefCell::new(vm)));
         #[cfg(any(target_os = "linux", target_os = "android"))]
         {
@@ -1579,7 +1590,12 @@ impl FlowMap {
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
-                Err(e) => debug!("{}", e),
+                Err(Error::L7ProtocolUnknown) => {
+                    self.flow_perf_counter
+                        .unknown_l7_protocol
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                Err(e) => log::trace!("unhandled log parse error: {}", e),
             }
         }
     }

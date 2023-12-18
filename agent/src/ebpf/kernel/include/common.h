@@ -93,7 +93,7 @@ struct protocol_message_t {
 #endif
 
 #ifndef EBPF_CACHE_SIZE
-#define EBPF_CACHE_SIZE 8
+#define EBPF_CACHE_SIZE 16
 #endif
 
 #endif /* DF_BPF_COMMON_H */
