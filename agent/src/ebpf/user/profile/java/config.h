@@ -19,11 +19,13 @@
 
 #define TARGET_NS_STORAGE_PATH "/proc/%d/root/deepflow"
 
-#define AGENT_LIB_NAME "df_java_agent.so"
+#if !defined(AGENT_LIB_NAME) || !defined(AGENT_MUSL_LIB_NAME)
+	#error Makefile should define "AGENT_LIB_NAME" and "AGENT_MUSL_LIB_NAME"
+#endif
+
 #define AGENT_LIB_SRC_PATH "/tmp/" AGENT_LIB_NAME
 #define AGENT_LIB_TARGET_PATH "/deepflow/" AGENT_LIB_NAME
 
-#define AGENT_MUSL_LIB_NAME "df_java_agent_musl.so"
 #define AGENT_MUSL_LIB_SRC_PATH "/tmp/" AGENT_MUSL_LIB_NAME
 #define AGENT_MUSL_LIB_TARGET_PATH "/deepflow/" AGENT_MUSL_LIB_NAME
 

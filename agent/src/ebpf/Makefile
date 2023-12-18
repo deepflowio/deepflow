@@ -94,10 +94,12 @@ OBJS := user/elf.o \
 	user/profile/java/gen_syms_file.o
 
 JAVA_TOOL := deepflow-jattach
-JAVA_AGENT_GNU_SO := df_java_agent.so
-JAVA_AGENT_MUSL_SO := df_java_agent_musl.so
+JAVA_AGENT_VERSION := 1
+JAVA_AGENT_GNU_SO := df_java_agent_v$(JAVA_AGENT_VERSION).so
+JAVA_AGENT_MUSL_SO := df_java_agent_musl_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_SO := $(JAVA_AGENT_GNU_SO) $(JAVA_AGENT_MUSL_SO)
 JAVA_AGENT_SRC := user/profile/java/agent.c
+JAVA_AGENT_MACROS := -DAGENT_LIB_NAME="\"$(JAVA_AGENT_GNU_SO)\"" -DAGENT_MUSL_LIB_NAME="\"$(JAVA_AGENT_MUSL_SO)\""
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
@@ -106,6 +108,7 @@ GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1
 ifeq ($(GCC_VER_GTE71),1)
   CFLAGS += -Wformat-truncation=0
 endif
+CFLAGS += $(JAVA_AGENT_MACROS)
 
 # -DBPF_DEBUG for parse and load ebpf probes.
 # -fsanitize=address: Enable the Address Sanitizer tool, which
@@ -158,13 +161,13 @@ $(LIBTRACE): $(STATIC_OBJS)
 	$(call msg,AR,$@)
 	$(Q)$(AR) rcs $@ $^
 
-$(JAVA_AGENT_GNU_SO): tools/bintobuffer
+$(JAVA_AGENT_GNU_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 	$(call msg,SO,$@)
 	$(Q)$(GNU_CC) $(CFLAGS) -shared -o $@ $(JAVA_AGENT_SRC)
 	@rm -rf user/profile/java_agent_so_gnu.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_gnu.c java_agent_so_gnu
 
-$(JAVA_AGENT_MUSL_SO): tools/bintobuffer
+$(JAVA_AGENT_MUSL_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 	$(call msg,SO,$@)
 	$(Q)$(MUSL_CC) $(CFLAGS) -shared -o $@ $(JAVA_AGENT_SRC)
 	@rm -rf user/profile/java_agent_so_musl.c
@@ -176,9 +179,9 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO)
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/profile/java/df_jattach.c user/log.c user/common.c
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c -ljattach -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 
