@@ -1,7 +1,5 @@
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
-DELIMITER //
-
 CREATE PROCEDURE AddColumnIfNotExists(
     IN dbName VARCHAR(255),
     IN tableName VARCHAR(255),
@@ -26,9 +24,7 @@ BEGIN
         EXECUTE stmt;
         DEALLOCATE PREPARE stmt;
     END IF;
-END //
-
-DELIMITER ;
+END;
 
 CALL AddColumnIfNotExists('deepflow', 'vtap_group_configuration', 'wasm_plugins', 'TEXT');
 CALL AddColumnIfNotExists('deepflow', 'vtap_group_configuration', 'so_plugins', 'TEXT');
