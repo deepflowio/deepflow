@@ -44,7 +44,7 @@ use crate::{
 use super::WasmVm;
 
 fn get_req_param<'a>(
-    vm: Rc<RefCell<WasmVm>>,
+    vm: Rc<RefCell<Option<WasmVm>>>,
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
@@ -68,9 +68,9 @@ fn get_req_param<'a>(
         parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: Some(vm.clone()),
+        wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        so_func: None,
+        so_func: Default::default(),
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -79,7 +79,7 @@ fn get_req_param<'a>(
 }
 
 fn get_resq_param<'a>(
-    vm: Rc<RefCell<WasmVm>>,
+    vm: Rc<RefCell<Option<WasmVm>>>,
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
@@ -104,9 +104,9 @@ fn get_resq_param<'a>(
         parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: Some(vm.clone()),
+        wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        so_func: None,
+        so_func: Default::default(),
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -128,7 +128,7 @@ fn load_module() -> WasmVm {
 
 #[test]
 fn test_wasm_http_req() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -188,7 +188,7 @@ fn test_wasm_http_req() {
 
 #[test]
 fn test_wasm_http_resp() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -246,7 +246,7 @@ fn test_wasm_http_resp() {
 
 #[test]
 fn test_check_payload() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let param = get_req_param(vm.clone(), rrt_cache.clone());
@@ -265,7 +265,7 @@ fn test_check_payload() {
 
 #[test]
 fn test_wasm_parse_payload_req() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
 
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -344,7 +344,7 @@ fn test_wasm_parse_payload_req() {
 
 #[test]
 fn test_wasm_parse_payload_resp() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let param = get_resq_param(vm.clone(), rrt_cache.clone());
