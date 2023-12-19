@@ -25,7 +25,6 @@ import (
 	"os"
 	"path"
 
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
@@ -138,7 +137,7 @@ func listPlugin(cmd *cobra.Command) {
 		d := data.GetIndex(i)
 
 		fmt.Printf(cmdFormat,
-			typeMaxSize, ctrlcommon.PluginTypeName[d.Get("TYPE").MustInt()],
+			typeMaxSize, common.PluginType(d.Get("TYPE").MustInt()),
 			nameMaxSize, d.Get("NAME").MustString(),
 			d.Get("UPDATED_AT").MustString(),
 		)
