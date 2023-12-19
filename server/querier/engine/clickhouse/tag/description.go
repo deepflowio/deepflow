@@ -620,33 +620,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
-	podK8sLabelSql := "SELECT key FROM flow_tag.pod_k8s_label_map GROUP BY key"
-	podK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podK8sLabelSql})
+	k8sLabelSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_service_k8s_label_map UNION ALL SELECT key FROM flow_tag.pod_k8s_label_map) GROUP BY key"
+	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql})
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range podK8sLabelRst.Values {
-		key := _key.([]interface{})[0]
-		labelKey := "k8s.label." + key.(string)
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey, labelKey, labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
-			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		}
-	}
-
-	podServiceK8sLabelSql := "SELECT key FROM flow_tag.pod_service_k8s_label_map GROUP BY key"
-	podServiceK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podServiceK8sLabelSql})
-	if err != nil {
-		return nil, err
-	}
-	for _, _key := range podServiceK8sLabelRst.Values {
+	for _, _key := range k8sLabelRst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
@@ -663,33 +642,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询 k8s_annotation
-	podK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: "SELECT key FROM flow_tag.pod_k8s_annotation_map GROUP BY key"})
+	k8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key"})
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range podK8sAnnotationRst.Values {
-		key := _key.([]interface{})[0]
-		annotationKey := "k8s.annotation." + key.(string)
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-			response.Values = append(response.Values, []interface{}{
-				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
-			response.Values = append(response.Values, []interface{}{
-				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		}
-	}
-
-	podServiceK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: "SELECT key FROM flow_tag.pod_service_k8s_annotation_map GROUP BY key"})
-	if err != nil {
-		return nil, err
-	}
-	for _, _key := range podServiceK8sAnnotationRst.Values {
+	for _, _key := range k8sAnnotationRst.Values {
 		key := _key.([]interface{})[0]
 		annotationKey := "k8s.annotation." + key.(string)
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
@@ -728,12 +686,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询cloud.tag
-	chostCloudTagSql := "SELECT key FROM flow_tag.chost_cloud_tag_map GROUP BY key"
-	chostCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: chostCloudTagSql})
+	cloudTagSql := "SELECT key FROM (SELECT key FROM flow_tag.chost_cloud_tag_map UNION ALL SELECT key FROM flow_tag.pod_ns_cloud_tag_map) GROUP BY key"
+	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql})
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range chostCloudTagRst.Values {
+	for _, _key := range cloudTagRst.Values {
 		key := _key.([]interface{})[0]
 		chostCloudTagKey := "cloud.tag." + key.(string)
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
@@ -744,27 +702,6 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		}
-	}
-
-	podNSCloudTagSql := "SELECT key FROM flow_tag.pod_ns_cloud_tag_map GROUP BY key"
-	podNSCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: podNSCloudTagSql})
-	if err != nil {
-		return nil, err
-	}
-	for _, _key := range podNSCloudTagRst.Values {
-		key := _key.([]interface{})[0]
-		podNSCloudTagKey := "cloud.tag." + key.(string)
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-			response.Values = append(response.Values, []interface{}{
-				podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
-			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
-			response.Values = append(response.Values, []interface{}{
-				podNSCloudTagKey, podNSCloudTagKey + "_0", podNSCloudTagKey + "_1", podNSCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
