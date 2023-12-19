@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/grafana/pyroscope-go"
+	pyroscope "github.com/grafana/pyroscope-go"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -32,6 +32,7 @@ type Config struct {
 	ContinuousProfile ContinuousProfile `yaml:"continuous-profile"`
 	Profiler          bool              `yaml:"profiler"`
 	MaxCPUs           int               `yaml:"max-cpus"`
+	MonitorPaths      []string          `yaml:"monitor-paths"`
 }
 
 type ContinuousProfile struct {
@@ -55,6 +56,7 @@ func loadConfig(path string) *Config {
 			BlockRate:     5,
 			LogEnabled:    true,
 		},
+		MonitorPaths: []string{"/", "/mnt", "/var/log"},
 	}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
