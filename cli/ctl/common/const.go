@@ -180,6 +180,15 @@ func GetVtapTapModeByName(tapModeName string) VtapTapMode {
 	return VTAP_TAP_MODE_LOCAL
 }
 
+//go:generate stringer -type=PluginType -trimprefix=PLUGIN_TYPE_ -linecomment
+type PluginType int
+
+const (
+	// attention: following line comments are used by `stringer`
+	PLUGIN_TYPE_WASM PluginType = 1 + iota
+	PLUGIN_TYPE_SO
+)
+
 var (
 	DefaultTimeout = time.Duration(time.Second * 30)
 )
