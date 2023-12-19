@@ -111,7 +111,7 @@ func main() {
 	go querier.Start(*configPath, cfg.LogFile)
 	closers := ingester.Start(*configPath, shared)
 
-	common.NewMonitor()
+	common.NewMonitor(cfg.MonitorPaths)
 
 	// TODO: loghandle提取出来，并增加log
 	// setup system signal
