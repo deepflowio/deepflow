@@ -49,12 +49,13 @@ pub struct SoLog {
 
 impl L7ProtocolParserInterface for SoLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        let Some(c_funcs) = param.so_func.as_ref() else {
+        let so_func_ref = param.so_func.borrow();
+        let Some(c_funcs) = &*so_func_ref else {
             return false;
         };
         let ctx = &ParseCtx::from((param, payload));
 
-        for c in c_funcs.as_ref() {
+        for c in c_funcs.iter() {
             let counter = &c.check_payload_counter;
 
             let start_time = SystemTime::now();
@@ -102,7 +103,8 @@ impl L7ProtocolParserInterface for SoLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        let Some(c_funcs) = param.so_func.as_ref() else {
+        let so_func_ref = param.so_func.borrow();
+        let Some(c_funcs) = &*so_func_ref else {
             return Err(Error::NoParseConfig);
         };
 
@@ -114,7 +116,7 @@ impl L7ProtocolParserInterface for SoLog {
             self.perf_stats = Some(L7PerfStats::default());
         }
 
-        for c in c_funcs.as_ref() {
+        for c in c_funcs.iter() {
             let counter = &c.parse_payload_counter;
 
             let start_time = SystemTime::now();
