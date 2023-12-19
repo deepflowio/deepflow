@@ -19,6 +19,7 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::process;
@@ -379,6 +380,7 @@ pub struct FlowConfig {
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 
     pub plugin_last_updated: u32,
+    pub plugin_digest: u64, // for change detection
     pub plugin_names: Vec<(String, trident::PluginType)>,
     // name, data
     pub wasm_plugins: Vec<(String, Vec<u8>)>,
@@ -444,6 +446,21 @@ impl From<&RuntimeConfig> for FlowConfig {
                 .as_ref()
                 .and_then(|p| p.update_time)
                 .unwrap_or_default(),
+            plugin_digest: {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                if let Some(plugins) = &conf.plugins {
+                    plugins.update_time.hash(&mut hasher);
+                    for plugin in plugins.wasm_plugins.iter() {
+                        plugin.hash(&mut hasher);
+                        trident::PluginType::Wasm.hash(&mut hasher);
+                    }
+                    for plugin in plugins.so_plugins.iter() {
+                        plugin.hash(&mut hasher);
+                        trident::PluginType::So.hash(&mut hasher);
+                    }
+                }
+                hasher.finish()
+            },
             plugin_names: {
                 let mut plugins = vec![];
                 if let Some(p) = &conf.plugins {
@@ -513,6 +530,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugin_last_updated", &self.plugin_last_updated)
+            .field("plugin_digest", &self.plugin_digest)
             .field("plugin_names", &self.plugin_names)
             .finish()
     }
@@ -1958,7 +1976,7 @@ impl ConfigHandler {
                 "flow_generator config change from {:#?} to {:#?}",
                 candidate_config.flow, new_config.flow
             );
-            if candidate_config.flow.plugin_last_updated != new_config.flow.plugin_last_updated {
+            if candidate_config.flow.plugin_digest != new_config.flow.plugin_digest {
                 info!(
                     "plugins changed, pulling {} plugins from server",
                     new_config.flow.plugin_names.len()
