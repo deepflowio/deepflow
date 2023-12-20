@@ -189,7 +189,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 	if db == "flow_tag" {
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type":
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "type":
 			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 		case "key", "table":
 			filter = fmt.Sprintf("`%s` %s %s", t.Tag, op, t.Value)
