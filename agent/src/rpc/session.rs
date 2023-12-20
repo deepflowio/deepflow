@@ -22,6 +22,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use log::{debug, error, info};
+use md5::{Digest, Md5};
 use parking_lot::RwLock;
 use tonic::transport::Channel;
 
@@ -430,6 +431,7 @@ impl Session {
         let mut data = vec![];
         let mut msg = s.into_inner();
         let mut total_len = 0u64;
+        let mut msg_md5 = String::new();
         while let Some(message) = msg.message().await? {
             if message.status.unwrap_or_default() != Status::Success as i32 {
                 return Err(anyhow!("fetch wasm prog fail, server return non success"));
@@ -438,10 +440,29 @@ impl Session {
                 data.extend(d);
             }
             total_len = message.total_len.unwrap_or_default();
+            if msg_md5.is_empty() {
+                msg_md5 = message.md5.unwrap_or_default();
+            }
         }
         if data.is_empty() || data.len() != total_len as usize {
             return Err(anyhow!("fetch wasm prog fail, length incorrect"));
         }
+        let md5_digest = Md5::new().chain_update(&data[..]).finalize();
+        match hex::decode(msg_md5.as_bytes()) {
+            Ok(bs) if &bs[..] != md5_digest.as_slice() => {
+                return Err(anyhow!("fetch wasm prog fail, md5 checksum incorrect"))
+            }
+            Err(_) => {
+                return Err(anyhow!(
+                    "fetch wasm prog fail, invalid md5 checksum in message"
+                ))
+            }
+            _ => (),
+        }
+        debug!(
+            "pulled {:?} plugin {} with len {} checksum {}",
+            plugin_type, name, total_len, msg_md5
+        );
         Ok(data)
     }
 
