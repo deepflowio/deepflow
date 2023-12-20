@@ -55,7 +55,7 @@ fn get_plugin() -> SoPluginFunc {
 
 fn get_req_param<'a>(
     rrt_cache: Rc<RefCell<L7PerfCache>>,
-    plugin: Rc<Vec<SoPluginFunc>>,
+    plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
 ) -> ParseParam<'a> {
     ParseParam {
         l4_protocol: IpProtocol::TCP,
@@ -78,8 +78,8 @@ fn get_req_param<'a>(
         parse_perf: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: None,
-        so_func: Some(plugin),
+        wasm_vm: Default::default(),
+        so_func: plugin,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
@@ -89,7 +89,7 @@ fn get_req_param<'a>(
 
 fn get_resp_param<'a>(
     rrt_cache: Rc<RefCell<L7PerfCache>>,
-    plugin: Rc<Vec<SoPluginFunc>>,
+    plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
 ) -> ParseParam<'a> {
     ParseParam {
         l4_protocol: IpProtocol::TCP,
@@ -113,8 +113,8 @@ fn get_resp_param<'a>(
         parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: None,
-        so_func: Some(plugin),
+        wasm_vm: Default::default(),
+        so_func: plugin,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 0,
@@ -136,7 +136,7 @@ static RESP_PAYLOAD: [u8; 70] = [
 #[test]
 fn test_check() {
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
-    let param = get_req_param(rrt_cache, Rc::new(vec![get_plugin()]));
+    let param = get_req_param(rrt_cache, Rc::new(RefCell::new(Some(vec![get_plugin()]))));
     let mut p = SoLog::default();
     assert!(p.check_payload(&REQ_PAYLOAD, &param));
 }
@@ -153,7 +153,7 @@ fn test_parse() {
             val: "val2".into(),
         },
     ];
-    let plugin = Rc::new(vec![get_plugin()]);
+    let plugin = Rc::new(RefCell::new(Some(vec![get_plugin()])));
 
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
     let param = get_req_param(rrt_cache.clone(), plugin.clone());

@@ -17,6 +17,7 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -370,6 +371,7 @@ pub struct FlowConfig {
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 
     pub plugin_last_updated: u32,
+    pub plugin_digest: u64, // for change detection
     pub plugin_names: Vec<(String, trident::PluginType)>,
     // name, data
     pub wasm_plugins: Vec<(String, Vec<u8>)>,
@@ -439,6 +441,21 @@ impl From<&RuntimeConfig> for FlowConfig {
                 .as_ref()
                 .and_then(|p| p.update_time)
                 .unwrap_or_default(),
+            plugin_digest: {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                if let Some(plugins) = &conf.plugins {
+                    plugins.update_time.hash(&mut hasher);
+                    for plugin in plugins.wasm_plugins.iter() {
+                        plugin.hash(&mut hasher);
+                        trident::PluginType::Wasm.hash(&mut hasher);
+                    }
+                    for plugin in plugins.so_plugins.iter() {
+                        plugin.hash(&mut hasher);
+                        trident::PluginType::So.hash(&mut hasher);
+                    }
+                }
+                hasher.finish()
+            },
             plugin_names: {
                 let mut plugins = vec![];
                 if let Some(p) = &conf.plugins {
@@ -515,6 +532,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugin_last_updated", &self.plugin_last_updated)
+            .field("plugin_digest", &self.plugin_digest)
             .field("plugin_names", &self.plugin_names)
             .finish()
     }
@@ -532,6 +550,7 @@ impl FlowConfig {
 
         rt.block_on(async {
             for (name, ptype) in self.plugin_names.iter() {
+                log::trace!("get {:?} plugin {}", ptype, name);
                 match session.get_plugin(name, *ptype, agent_id).await {
                     Ok(prog) => match ptype {
                         trident::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
@@ -547,6 +566,12 @@ impl FlowConfig {
                 }
             }
         });
+
+        info!(
+            "{} wasm and {} so plugins pulled from server",
+            self.wasm_plugins.len(),
+            self.so_plugins.len()
+        );
     }
 }
 
@@ -2084,9 +2109,12 @@ impl ConfigHandler {
                 "flow_generator config change from {:#?} to {:#?}",
                 candidate_config.flow, new_config.flow
             );
-            if candidate_config.flow.plugin_last_updated != new_config.flow.plugin_last_updated {
-                info!("plugins changed, pulling from server");
-                candidate_config
+            if candidate_config.flow.plugin_digest != new_config.flow.plugin_digest {
+                info!(
+                    "plugins changed, pulling {} plugins from server",
+                    new_config.flow.plugin_names.len()
+                );
+                new_config
                     .flow
                     .fill_plugin_prog_from_server(runtime, session, agent_id);
             }

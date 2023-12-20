@@ -76,6 +76,7 @@ type VTapInfo struct {
 	kcData                         *KubernetesCluster
 	isReady                        atomicbool.Bool // 缓存是否初始化完成
 	realDefaultConfig              *VTapConfig     // 实际默认值配置
+	pluginNameToUpdateTime         map[string]uint32
 
 	// 配置改变重新生成平台数据
 	isVTapChangedForPD atomicbool.Bool
@@ -132,6 +133,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
 		noVTapTapPortsMac:              mapset.NewSet(),
 		kvmVTapCtrlIPToTapPorts:        make(map[string]mapset.Set),
+		pluginNameToUpdateTime:         make(map[string]uint32),
 		kcData:                         newKubernetesCluster(db),
 		isReady:                        atomicbool.NewBool(false),
 		isVTapChangedForPD:             atomicbool.NewBool(false),
@@ -359,6 +361,20 @@ func (v *VTapInfo) loadTapPortsData() {
 	v.kvmVTapCtrlIPToTapPorts = kvmVTapCtrlIPToTapPorts
 }
 
+func (v *VTapInfo) loadPlugins() {
+	pluginNameToUpdateTime := make(map[string]uint32)
+	plugins, err := dbmgr.DBMgr[models.Plugin](v.db).GetFields([]string{"name", "updated_at"})
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	for _, plugin := range plugins {
+		pluginNameToUpdateTime[plugin.Name] = uint32(plugin.UpdatedAt.Unix())
+	}
+	v.pluginNameToUpdateTime = pluginNameToUpdateTime
+
+}
+
 func (v *VTapInfo) loadConfigData() {
 	deafaultConfiguration := &models.RVTapGroupConfiguration{}
 	b, err := json.Marshal(DefaultVTapGroupConfig)
@@ -375,6 +391,7 @@ func (v *VTapInfo) loadConfigData() {
 	dbDataCache := v.metaData.GetDBDataCache()
 	configs := dbDataCache.GetVTapGroupConfigurationsFromDB(v.db)
 	v.convertConfig(configs)
+	v.loadPlugins()
 }
 
 func (v *VTapInfo) loadKubernetesCluster() {

@@ -50,8 +50,8 @@ type Specification struct {
 	AZMaxPerServer               int `default:"10" yaml:"az_max_per_server"`
 	DataSourceMax                int `default:"25" yaml:"data_source_max"`
 	DataSourceRetentionTimeMax   int `default:"24000" yaml:"data_source_retention_time_max"`
-	DataSourceExtMetricsInterval int `default:"15" yaml:"data_source_ext_metrics_interval"`
-	DataSourcePrometheusInterval int `default:"15" yaml:"data_source_prometheus_interval"`
+	DataSourceExtMetricsInterval int `default:"10" yaml:"data_source_ext_metrics_interval"`
+	DataSourcePrometheusInterval int `default:"10" yaml:"data_source_prometheus_interval"`
 }
 
 type DFWebService struct {

@@ -52,6 +52,12 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 		case "lb":
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
+		case "cloud-tag":
+			cloudTags, err := getClouTags(resource.CHostCloudTags, resource.PodNamespaceCloudTags, domain, resourceName)
+			if err != nil {
+				return nil, err
+			}
+			resp.CloudTags = append(resp.CloudTags, cloudTags...)
 		case "":
 			resp.AZs = append(resp.AZs, getAZs(resource.AZs, domain, resourceName)...)
 			resp.VPCs = append(resp.VPCs, getVPCs(resource.VPCs, domain, resourceName)...)
@@ -60,6 +66,11 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 			resp.CHosts = append(resp.CHosts, getCHosts(resource.CHosts, resource.VInterfaces, resource.IPs, domain, resourceName)...)
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
+			cloudTags, err := getClouTags(resource.CHostCloudTags, resource.PodNamespaceCloudTags, domain, resourceName)
+			if err != nil {
+				return nil, err
+			}
+			resp.CloudTags = append(resp.CloudTags, cloudTags...)
 
 		default:
 			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chonst, lb")
@@ -298,4 +309,55 @@ func getVinterfaces(deviceUUID string, vifs []cloudmodel.VInterface, ips []cloud
 		resp = append(resp, addVIF)
 	}
 	return resp
+}
+
+func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags cloudmodel.UUIDToCloudTags,
+	domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
+	chostUUIDToName := make(map[string]string)
+	podNSUUIDToName := make(map[string]string)
+	podNSUUIDToSubdomain := make(map[string]string)
+
+	var vms []mysql.VM
+	if err := mysql.Db.Find(&vms).Error; err != nil {
+		return nil, err
+	}
+	for _, vm := range vms {
+		chostUUIDToName[vm.Lcuuid] = vm.Name
+	}
+	var podNamespaces []mysql.PodNamespace
+	if err := mysql.Db.Find(&podNamespaces).Error; err != nil {
+		return nil, err
+	}
+	for _, podNS := range podNamespaces {
+		podNSUUIDToName[podNS.Lcuuid] = podNS.Name
+		podNSUUIDToSubdomain[podNS.Lcuuid] = podNS.SubDomain
+	}
+
+	var resp []model.AdditionalResourceCloudTag
+	for uuid, cloudTags := range chostToCloudTags {
+		addCHost := model.AdditionalResourceCloudTag{
+			ResourceType: "chost",
+			ResourceName: chostUUIDToName[uuid],
+			DomainUUID:   domain,
+		}
+		for k, v := range cloudTags {
+			addCHost.Tags = append(addCHost.Tags, model.AdditionalResourceTag{Key: k, Value: v})
+		}
+		resp = append(resp, addCHost)
+	}
+	for uuid, cloudTags := range podNSCloudTags {
+		addPodNS := model.AdditionalResourceCloudTag{
+			ResourceType: "pod_ns",
+			ResourceName: podNSUUIDToName[uuid],
+			DomainUUID:   domain,
+		}
+		if subdomain, ok := podNSUUIDToSubdomain[uuid]; ok {
+			addPodNS.SubDomainUUID = subdomain
+		}
+		for k, v := range cloudTags {
+			addPodNS.Tags = append(addPodNS.Tags, model.AdditionalResourceTag{Key: k, Value: v})
+		}
+		resp = append(resp, addPodNS)
+	}
+	return resp, nil
 }

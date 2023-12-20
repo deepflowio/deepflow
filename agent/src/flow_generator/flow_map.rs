@@ -150,10 +150,11 @@ pub struct FlowMap {
 
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
-    plugin_last_updated: u32,
-    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    // for change detection
+    plugin_digest: u64,
+    wasm_vm: Rc<RefCell<Option<WasmVm>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+    so_plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
     flow_node_pool: MemoryPool<FlowNode>,
@@ -277,10 +278,10 @@ impl FlowMap {
                     .collect(),
             ),
             time_key_buffer: None,
-            plugin_last_updated: config.plugin_last_updated,
-            wasm_vm: None,
+            plugin_digest: 0, // force initial load
+            wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_plugin: None,
+            so_plugin: Default::default(),
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
             l7_stats_output_queue,
@@ -296,20 +297,19 @@ impl FlowMap {
     }
 
     fn load_plugins(&mut self, config: &FlowConfig) {
-        if self.plugin_last_updated == config.plugin_last_updated {
+        if self.plugin_digest == config.plugin_digest {
             return;
         }
-        self.plugin_last_updated = config.plugin_last_updated;
+        self.plugin_digest = config.plugin_digest;
 
         // although stats::Counter auto removes obsolete referenced countables
         // on counter registration and routine reports, it might be delayed because
         // FlowLog can hold these references
-        if let Some(p) = self.wasm_vm.as_ref() {
-            let vm = p.borrow();
+        if let Some(vm) = self.wasm_vm.take() {
             self.stats_collector
                 .deregister_countables(vm.counters().iter().map(|info| {
                     (
-                        "flow_map",
+                        "plugin",
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
                             StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
@@ -320,15 +320,15 @@ impl FlowMap {
                 }));
         }
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if let Some(ps) = self.so_plugin.as_ref() {
+        if let Some(ps) = self.so_plugin.take() {
             let mut counters = vec![];
-            for p in ps.as_ref() {
+            for p in ps.iter() {
                 p.counters_in(&mut counters);
             }
             self.stats_collector
                 .deregister_countables(counters.iter().map(|info| {
                     (
-                        "flow_map",
+                        "plugin",
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
                             StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
@@ -350,7 +350,7 @@ impl FlowMap {
             } else {
                 for counter in vm.counters() {
                     self.stats_collector.register_countable(
-                        "flow_map",
+                        "plugin",
                         counter.counter,
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
@@ -388,7 +388,7 @@ impl FlowMap {
                 }
                 for counter in counters {
                     self.stats_collector.register_countable(
-                        "flow_map",
+                        "plugin",
                         counter.counter,
                         vec![
                             StatsOption::Tag("id", self.id.to_string()),
@@ -402,12 +402,20 @@ impl FlowMap {
             }
         };
 
-        self.wasm_vm = wasm_vm.map(|vm| Rc::new(RefCell::new(vm)));
+        #[cfg(target_os = "linux")]
+        log::info!(
+            "loaded {} wasm and {} so plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default(),
+            so_plugins.as_ref().map(|so| so.len()).unwrap_or_default(),
+        );
+        #[cfg(target_os = "windows")]
+        log::info!(
+            "loaded {} wasm plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default()
+        );
+        self.wasm_vm.replace(wasm_vm);
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        {
-            // wrap in curly brackets to suppress error "attributes on expressions are experimental"
-            self.so_plugin = so_plugins.map(|p| Rc::new(p));
-        }
+        self.so_plugin.replace(so_plugins);
     }
 
     // sort nodes by swapping timed out nodes to right
@@ -1287,9 +1295,9 @@ impl FlowMap {
                 is_skip,
                 self.flow_perf_counter.clone(),
                 port,
-                self.wasm_vm.as_ref().map(|w| Rc::clone(w)),
+                Rc::clone(&self.wasm_vm),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
-                self.so_plugin.as_ref().map(|s| Rc::clone(s)),
+                Rc::clone(&self.so_plugin),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
                     IpProtocol::TCP => flow_config.rrt_tcp_timeout,
@@ -1579,7 +1587,12 @@ impl FlowMap {
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
-                Err(e) => debug!("{}", e),
+                Err(Error::L7ProtocolUnknown) => {
+                    self.flow_perf_counter
+                        .unknown_l7_protocol
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                Err(e) => log::trace!("unhandled log parse error: {}", e),
             }
         }
     }

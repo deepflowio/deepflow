@@ -210,9 +210,6 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 		if _, ok := vtapIDMap[uint32(vtapID)]; !ok {
 			continue
 		}
-		if tData.Type().String() == "model.GenesisProcess" && vtapID == 0 {
-			continue
-		}
 		nodeIP := tData.FieldByName("NodeIP")
 		nodeIP.SetString(nodeIPString)
 		items = append(items, data)

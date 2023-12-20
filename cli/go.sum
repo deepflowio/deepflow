@@ -74,10 +74,10 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/deepflowio/deepflow/message v0.0.0-20231125015407-3aaaa775c340 h1:EIM+VfAa3guWFAgxGnZnuZ/oMHoRwZN+2gqAIr36bxc=
-github.com/deepflowio/deepflow/message v0.0.0-20231125015407-3aaaa775c340/go.mod h1:e+1lUMMlycCvFRKvlwt/y/0vxJnF8wVss3GyR1ARXY0=
-github.com/deepflowio/deepflow/server v0.0.0-20231125015407-3aaaa775c340 h1:bHNg18NIm0c7FoZhcy15nNxW/GGwAayci/EBGP53HhE=
-github.com/deepflowio/deepflow/server v0.0.0-20231125015407-3aaaa775c340/go.mod h1:t2OIdn/JoiZExnYD6B+f4Mek+BOZhajwC76To/LKPqc=
+github.com/deepflowio/deepflow/message v0.0.0-20231214075355-f3e7437da983 h1:QSGiB06IHEX7NlDGbEh15ZHe7MaAwVjxf+K9souckAE=
+github.com/deepflowio/deepflow/message v0.0.0-20231214075355-f3e7437da983/go.mod h1:e+1lUMMlycCvFRKvlwt/y/0vxJnF8wVss3GyR1ARXY0=
+github.com/deepflowio/deepflow/server v0.0.0-20231218083743-df3493933fc0 h1:O5SVdP2oPZ29hkt5DgStoROvLSnLqzM0Qo4etgW+Tdo=
+github.com/deepflowio/deepflow/server v0.0.0-20231218083743-df3493933fc0/go.mod h1:EQQ/xZ1gv2WpaG57bZDj52gXczIdzfe7Mk+27szNL1g=
 github.com/docker/go-units v0.4.0 h1:3uh0PgVws3nIA0Q+MwDC8yjEPf9zjRfZZWXZYDct3Tw=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=

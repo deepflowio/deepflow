@@ -408,7 +408,7 @@ type AdditionalResourceCloudTag struct {
 	ResourceType  string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
 	ResourceName  string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
 	DomainUUID    string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
-	SubDomainUUID string                  `json:"subdomain_uuid" yaml:"subdomain_uuid"`
+	SubDomainUUID string                  `json:"subdomain_uuid,omitempty" yaml:"subdomain_uuid"`
 	Tags          []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
 }
 
@@ -516,6 +516,8 @@ type VTapGroupConfiguration struct {
 	ProxyControllerPort           *int          `json:"PROXY_CONTROLLER_PORT" yaml:"proxy_controller_port,omitempty"`
 	ProxyControllerIP             *string       `json:"PROXY_CONTROLLER_IP" yaml:"proxy_controller_ip,omitempty"`
 	AnalyzerIP                    *string       `json:"ANALYZER_IP" yaml:"analyzer_ip,omitempty"`
+	WasmPlugins                   []string      `json:"WASM_PLUGINS" yaml:"wasm_plugins,omitempty"`
+	SoPlugins                     []string      `json:"SO_PLUGINS" yaml:"so_plugins,omitempty"`
 	YamlConfig                    *StaticConfig `yaml:"static_config,omitempty"`
 }
 
@@ -601,6 +603,8 @@ type VTapGroupConfigurationResponse struct {
 	ProxyControllerPort           *int           `json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             *string        `json:"PROXY_CONTROLLER_IP"`
 	AnalyzerIP                    *string        `json:"ANALYZER_IP"`
+	WasmPlugins                   []string       `json:"WASM_PLUGINS"`
+	SoPlugins                     []string       `json:"SO_PLUGINS"`
 }
 
 type DetailedConfig struct {
