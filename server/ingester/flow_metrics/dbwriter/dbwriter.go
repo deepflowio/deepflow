@@ -19,6 +19,8 @@ package dbwriter
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"sync/atomic"
@@ -332,8 +334,21 @@ func (pw *PromWriter) sendRequest(wr *prompb.WriteRequest) error {
 		req.Header.Set(k, v)
 	}
 
-	_, err = http.DefaultClient.Do(req)
-	return err
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// 5xx errors are recoverable and the writer should retry?
+	// Reference for different behavior according to status code:
+	// https://github.com/prometheus/prometheus/pull/2552/files#diff-ae8db9d16d8057358e49d694522e7186
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256))
+	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+		return fmt.Errorf("remote write returned HTTP status %v; err = %w: %s", resp.Status, err, body)
+	}
+
+	return nil
 }
 
 var prompbTimeSeriesPool = pool.NewLockFreePool(func() interface{} {
