@@ -73,7 +73,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 			resp.CloudTags = append(resp.CloudTags, cloudTags...)
 
 		default:
-			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chonst, lb")
+			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chost, lb, cloud-tag")
 		}
 	}
 
