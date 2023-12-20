@@ -19,6 +19,7 @@ package tool
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
@@ -32,6 +33,9 @@ type DataSet struct {
 
 	// 仅资源变更事件所需的数据
 	EventDataSet
+
+	// process device data
+	containerIDToPodID map[string]int
 
 	azLcuuidToID map[string]int
 
@@ -99,7 +103,8 @@ type DataSet struct {
 
 func NewDataSet() *DataSet {
 	return &DataSet{
-		EventDataSet: NewEventDataSet(),
+		EventDataSet:       NewEventDataSet(),
+		containerIDToPodID: make(map[string]int),
 
 		azLcuuidToID: make(map[string]int),
 
@@ -874,6 +879,16 @@ func (t *DataSet) DeletePodReplicaSet(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
 }
 
+func (t *DataSet) updateContainerIDToPodID(containerID string, podID int) {
+	var containerIDs []string
+	if len(containerID) > 0 {
+		containerIDs = strings.Split(containerID, ", ")
+	}
+	for _, id := range containerIDs {
+		t.containerIDToPodID[id] = podID
+	}
+}
+
 func (t *DataSet) AddPod(item *mysql.Pod) {
 	t.podLcuuidToID[item.Lcuuid] = item.ID
 	t.podIDToInfo[item.ID] = &podInfo{
@@ -891,6 +906,8 @@ func (t *DataSet) AddPod(item *mysql.Pod) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.podIDToInfo[item.ID].AZID = azID
 	}
+	t.updateContainerIDToPodID(item.ContainerIDs, item.ID)
+
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_EN, item.Lcuuid))
 }
 
@@ -922,6 +939,8 @@ func (t *DataSet) UpdatePod(cloudItem *cloudmodel.Pod) {
 	if id, ok := t.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid); ok {
 		info.PodGroupID = id
 	}
+
+	t.updateContainerIDToPodID(cloudItem.ContainerIDs, id)
 }
 
 func (t *DataSet) DeletePod(lcuuid string) {
@@ -2074,6 +2093,21 @@ func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
 		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, lcuuid))
 		return nil, false
 	}
+}
+
+func (t *DataSet) GetPodIDByContainerID(containerID string) (int, bool) {
+	podID, exists := t.containerIDToPodID[containerID]
+	if exists {
+		return podID, true
+	}
+	log.Warningf("cache pod id (container id: %s) not found", containerID)
+	var pod *mysql.Pod
+	result := mysql.Db.Where("container_ids like ", "%s"+containerID+"%s").Find(&pod)
+	if result.RowsAffected == 1 {
+		t.AddPod(pod)
+		return t.containerIDToPodID[containerID], true
+	}
+	return 0, false
 }
 
 func (t *DataSet) SetPublicNetworkID(id int) {
