@@ -169,6 +169,16 @@ impl FlowNode {
         }
     }
 
+    // reset l7 parser and l7 perf stats on plugin reload to avoid inconsistency
+    pub fn reset_on_plugin_reload(&mut self) {
+        if let Some(stats) = self.tagged_flow.flow.flow_perf_stats.as_mut() {
+            stats.reset_on_plugin_reload();
+        }
+        if let Some(flow_log) = self.meta_flow_log.as_mut() {
+            flow_log.reset_on_plugin_reload();
+        }
+    }
+
     pub fn match_node(
         &self,
         meta_packet: &mut MetaPacket,

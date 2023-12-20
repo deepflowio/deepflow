@@ -612,4 +612,16 @@ impl FlowLog {
 
         (l7_perf, self.l7_protocol_enum.get_l7_protocol())
     }
+
+    pub fn reset_on_plugin_reload(&mut self) {
+        if matches!(self.l7_protocol_enum, L7ProtocolEnum::Custom(_)) {
+            self.l7_protocol_enum = Default::default();
+        }
+        let Some(parser) = self.l7_protocol_log_parser.as_ref() else {
+            return;
+        };
+        if matches!(**parser, L7ProtocolParser::Custom(_)) {
+            self.l7_protocol_log_parser = None;
+        }
+    }
 }
