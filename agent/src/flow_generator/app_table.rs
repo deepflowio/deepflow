@@ -342,6 +342,11 @@ impl AppTable {
         return false;
     }
 
+    pub fn clear(&mut self) {
+        self.ipv4.clear();
+        self.ipv6.clear();
+    }
+
     // set protocol to app_table from non ebpf packet
     pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
         let (mut ip, epc, mut port) = Self::get_ip_epc_port(
