@@ -167,8 +167,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				DeviceType:    common.VIF_DEVICE_TYPE_POD,
 				DeviceLcuuid:  podLcuuid,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-				VPCLcuuid:     k.VPCUuid,
-				RegionLcuuid:  k.RegionUuid,
+				VPCLcuuid:     k.VPCUUID,
+				RegionLcuuid:  k.RegionUUID,
 			}
 			podVInterfaces = append(podVInterfaces, vinterface)
 		}
@@ -239,7 +239,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							Name:          rangePrefix.String() + "_POD_NET",
 							CIDR:          rangePrefix.String(),
 							NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-							VPCLcuuid:     k.VPCUuid,
+							VPCLcuuid:     k.VPCUUID,
 						})
 						subnetLcuuidToCIDR[subnetLcuuid] = rangePrefix
 					}
@@ -250,7 +250,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               ip.String(),
 				SubnetLcuuid:     subnetLcuuid,
-				RegionLcuuid:     k.RegionUuid,
+				RegionLcuuid:     k.RegionUUID,
 			}
 			podIPsMap[ipLcuuid] = &modelIP
 			delete(k.podIPToLcuuid, ip.String())
@@ -278,7 +278,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Name:          k.Name + "_POD_NET",
 			CIDR:          cidr,
 			NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
+			VPCLcuuid:     k.VPCUUID,
 		})
 		subnetLcuuidToCIDR[pSubnetLcuuid] = cPrefix
 	}
@@ -376,7 +376,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Name:          ipPrefix.String() + "_POD_NET",
 			CIDR:          ipPrefix.String(),
 			NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
+			VPCLcuuid:     k.VPCUUID,
 		})
 		ipNetPrefix, _ := netaddr.ParseIPPrefix(ipPrefix.String())
 		subnetLcuuidToCIDR[subnetLcuuid] = ipNetPrefix
@@ -501,8 +501,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					DeviceLcuuid:  nodeLcuuid,
 					DeviceType:    common.VIF_DEVICE_TYPE_POD_NODE,
 					NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
-					VPCLcuuid:     k.VPCUuid,
-					RegionLcuuid:  k.RegionUuid,
+					VPCLcuuid:     k.VPCUUID,
+					RegionLcuuid:  k.RegionUUID,
 				}
 				nodeVInterfaces = append(nodeVInterfaces, vinterface)
 				nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
@@ -511,7 +511,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ipPrefix.IP().String(), uuid.Nil),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipPrefix.IP().String(),
-					RegionLcuuid:     k.RegionUuid,
+					RegionLcuuid:     k.RegionUUID,
 					SubnetLcuuid:     common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String(), uuid.Nil),
 				}
 				nodeIPs = append(nodeIPs, modelIP)
@@ -587,7 +587,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							Name:          cidr + "_NODE_NET",
 							CIDR:          cidr,
 							NetworkLcuuid: networkLcuuid,
-							VPCLcuuid:     k.VPCUuid,
+							VPCLcuuid:     k.VPCUUID,
 						})
 						nodeSubnetLcuuids.Add(nodeSubnetLcuuid)
 						subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipPrefix
@@ -610,8 +610,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						DeviceLcuuid:  k.nodeIPToLcuuid[nodeIP],
 						DeviceType:    common.VIF_DEVICE_TYPE_POD_NODE,
 						NetworkLcuuid: networkLcuuid,
-						VPCLcuuid:     k.VPCUuid,
-						RegionLcuuid:  k.RegionUuid,
+						VPCLcuuid:     k.VPCUUID,
+						RegionLcuuid:  k.RegionUUID,
 					}
 					nodeVInterfaces = append(nodeVInterfaces, vinterface)
 					nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
@@ -620,7 +620,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ipPrefix.IP().String(), uuid.Nil),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipPrefix.IP().String(),
-					RegionLcuuid:     k.RegionUuid,
+					RegionLcuuid:     k.RegionUUID,
 					SubnetLcuuid:     nodeSubnetLcuuid,
 				}
 				nodeIPs = append(nodeIPs, modelIP)
@@ -636,7 +636,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Name:          k.Name + "_NODE_NET",
 			CIDR:          nCIDR,
 			NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
+			VPCLcuuid:     k.VPCUUID,
 		})
 		ipNetPrefix, _ := netaddr.ParseIPPrefix(nCIDR)
 		subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipNetPrefix
@@ -656,8 +656,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			DeviceLcuuid:  nodeLcuuid,
 			DeviceType:    common.VIF_DEVICE_TYPE_POD_NODE,
 			NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
-			RegionLcuuid:  k.RegionUuid,
+			VPCLcuuid:     k.VPCUUID,
+			RegionLcuuid:  k.RegionUUID,
 		})
 		var nodeSubnetLcuuid string
 		nIPParse := netaddr.MustParseIP(nodeIP)
@@ -671,7 +671,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Lcuuid:           common.GetUUID(vinterfaceLcuuid+nodeIP, uuid.Nil),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               nodeIP,
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			SubnetLcuuid:     nodeSubnetLcuuid,
 		})
 	}
@@ -696,8 +696,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				DeviceType:    common.VIF_DEVICE_TYPE_POD,
 				DeviceLcuuid:  pLcuuid,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-				VPCLcuuid:     k.VPCUuid,
-				RegionLcuuid:  k.RegionUuid,
+				VPCLcuuid:     k.VPCUUID,
+				RegionLcuuid:  k.RegionUUID,
 			}
 			podVInterfaces = append(podVInterfaces, vinterface)
 			vinterfaceLcuuids.Add(vinterfaceLcuuid)
@@ -731,7 +731,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Lcuuid:           common.GetUUID(vinterfaceLcuuid+pLcuuid, uuid.Nil),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               pIP,
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			SubnetLcuuid:     podSubnetLcuuid,
 		}
 		podIPs = append(podIPs, modelIP)
@@ -748,7 +748,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				Name:          k.Name + "_POD_NET",
 				CIDR:          pV4cidr,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-				VPCLcuuid:     k.VPCUuid,
+				VPCLcuuid:     k.VPCUUID,
 			})
 		}
 	}
@@ -762,7 +762,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				Name:          k.Name + "_POD_NET",
 				CIDR:          pV6cidr,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-				VPCLcuuid:     k.VPCUuid,
+				VPCLcuuid:     k.VPCUUID,
 			})
 		}
 	}
@@ -783,7 +783,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			Lcuuid:           common.GetUUID(vinterfaceLcuuid+lcuuid, uuid.Nil),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               ip.String(),
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			SubnetLcuuid:     sLcuuid,
 		}
 		podIPs = append(podIPs, modelIP)

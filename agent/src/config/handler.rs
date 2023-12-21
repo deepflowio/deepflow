@@ -17,6 +17,7 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -333,6 +334,73 @@ pub struct LogConfig {
     pub host: String,
 }
 
+#[derive(Clone)]
+pub struct PluginConfig {
+    pub last_updated: u32,
+    pub digest: u64, // for change detection
+    pub names: Vec<(String, trident::PluginType)>,
+    // name, data
+    pub wasm_plugins: Vec<(String, Vec<u8>)>,
+    pub so_plugins: Vec<(String, Vec<u8>)>,
+}
+
+impl PartialEq for PluginConfig {
+    fn eq(&self, other: &PluginConfig) -> bool {
+        self.last_updated == other.last_updated
+            && self.digest == other.digest
+            && self.names == other.names
+    }
+}
+
+impl Eq for PluginConfig {}
+
+impl fmt::Debug for PluginConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PluginConfig")
+            .field("last_updated", &self.last_updated)
+            .field("digest", &self.digest)
+            .field("names", &self.names)
+            .finish()
+    }
+}
+
+impl PluginConfig {
+    fn fill_plugin_prog_from_server(
+        &mut self,
+        rt: &Runtime,
+        session: &Session,
+        agent_id: &AgentId,
+    ) {
+        self.wasm_plugins.clear();
+        self.so_plugins.clear();
+
+        rt.block_on(async {
+            for (name, ptype) in self.names.iter() {
+                log::trace!("get {:?} plugin {}", ptype, name);
+                match session.get_plugin(name, *ptype, agent_id).await {
+                    Ok(prog) => match ptype {
+                        trident::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
+                        #[cfg(any(target_os = "linux", target_os = "android"))]
+                        trident::PluginType::So => self.so_plugins.push((name.clone(), prog)),
+                        #[cfg(any(target_os = "windows"))]
+                        _ => (),
+                    },
+                    Err(err) => {
+                        warn!("get {:?} plugin {} fail: {}", ptype, name, err);
+                        continue;
+                    }
+                }
+            }
+        });
+
+        info!(
+            "{} wasm and {} so plugins pulled from server",
+            self.wasm_plugins.len(),
+            self.so_plugins.len()
+        );
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct FlowConfig {
     pub vtap_id: u16,
@@ -369,11 +437,7 @@ pub struct FlowConfig {
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 
-    pub plugin_last_updated: u32,
-    pub plugin_names: Vec<(String, trident::PluginType)>,
-    // name, data
-    pub wasm_plugins: Vec<(String, Vec<u8>)>,
-    pub so_plugins: Vec<(String, Vec<u8>)>,
+    pub plugins: PluginConfig,
 
     pub rrt_tcp_timeout: usize, //micro sec
     pub rrt_udp_timeout: usize, //micro sec
@@ -434,29 +498,46 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
-            plugin_last_updated: conf
-                .plugins
-                .as_ref()
-                .and_then(|p| p.update_time)
-                .unwrap_or_default(),
-            plugin_names: {
-                let mut plugins = vec![];
-                if let Some(p) = &conf.plugins {
-                    plugins.extend(
-                        p.wasm_plugins
-                            .iter()
-                            .map(|p| (p.clone(), trident::PluginType::Wasm)),
-                    );
-                    plugins.extend(
-                        p.so_plugins
-                            .iter()
-                            .map(|p| (p.clone(), trident::PluginType::So)),
-                    );
-                }
-                plugins
+            plugins: PluginConfig {
+                last_updated: conf
+                    .plugins
+                    .as_ref()
+                    .and_then(|p| p.update_time)
+                    .unwrap_or_default(),
+                digest: {
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    if let Some(plugins) = &conf.plugins {
+                        plugins.update_time.hash(&mut hasher);
+                        for plugin in plugins.wasm_plugins.iter() {
+                            plugin.hash(&mut hasher);
+                            trident::PluginType::Wasm.hash(&mut hasher);
+                        }
+                        for plugin in plugins.so_plugins.iter() {
+                            plugin.hash(&mut hasher);
+                            trident::PluginType::So.hash(&mut hasher);
+                        }
+                    }
+                    hasher.finish()
+                },
+                names: {
+                    let mut plugins = vec![];
+                    if let Some(p) = &conf.plugins {
+                        plugins.extend(
+                            p.wasm_plugins
+                                .iter()
+                                .map(|p| (p.clone(), trident::PluginType::Wasm)),
+                        );
+                        plugins.extend(
+                            p.so_plugins
+                                .iter()
+                                .map(|p| (p.clone(), trident::PluginType::So)),
+                        );
+                    }
+                    plugins
+                },
+                wasm_plugins: vec![],
+                so_plugins: vec![],
             },
-            wasm_plugins: vec![],
-            so_plugins: vec![],
             rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
             batched_buffer_size_limit: conf.yaml_config.batched_buffer_size_limit,
@@ -514,46 +595,8 @@ impl fmt::Debug for FlowConfig {
             )
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
-            .field("plugin_last_updated", &self.plugin_last_updated)
-            .field("plugin_names", &self.plugin_names)
+            .field("plugins", &self.plugins)
             .finish()
-    }
-}
-
-impl FlowConfig {
-    fn fill_plugin_prog_from_server(
-        &mut self,
-        rt: &Runtime,
-        session: &Session,
-        agent_id: &AgentId,
-    ) {
-        self.wasm_plugins.clear();
-        self.so_plugins.clear();
-
-        rt.block_on(async {
-            for (name, ptype) in self.plugin_names.iter() {
-                log::trace!("get {:?} plugin {}", ptype, name);
-                match session.get_plugin(name, *ptype, agent_id).await {
-                    Ok(prog) => match ptype {
-                        trident::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
-                        #[cfg(any(target_os = "linux", target_os = "android"))]
-                        trident::PluginType::So => self.so_plugins.push((name.clone(), prog)),
-                        #[cfg(any(target_os = "windows"))]
-                        _ => (),
-                    },
-                    Err(err) => {
-                        warn!("get {:?} plugin {} fail: {}", ptype, name, err);
-                        continue;
-                    }
-                }
-            }
-        });
-
-        info!(
-            "{} wasm and {} so plugins pulled from server",
-            self.wasm_plugins.len(),
-            self.so_plugins.len()
-        );
     }
 }
 
@@ -2091,13 +2134,14 @@ impl ConfigHandler {
                 "flow_generator config change from {:#?} to {:#?}",
                 candidate_config.flow, new_config.flow
             );
-            if candidate_config.flow.plugin_last_updated != new_config.flow.plugin_last_updated {
+            if candidate_config.flow.plugins.digest != new_config.flow.plugins.digest {
                 info!(
                     "plugins changed, pulling {} plugins from server",
-                    new_config.flow.plugin_names.len()
+                    new_config.flow.plugins.names.len()
                 );
                 new_config
                     .flow
+                    .plugins
                     .fill_plugin_prog_from_server(runtime, session, agent_id);
             }
             candidate_config.flow = new_config.flow;

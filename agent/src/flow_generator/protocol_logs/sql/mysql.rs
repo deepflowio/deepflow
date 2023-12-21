@@ -183,16 +183,19 @@ impl MysqlInfo {
         payload: &[u8],
         obfuscate_cache: &Option<ObfuscateCache>,
         trace_id: Option<&str>,
-    ) {
+    ) -> Result<()> {
         let payload = mysql_string(payload);
+        if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
+            return Err(Error::MysqlLogParseFailed);
+        };
         self.context = attempt_obfuscation(obfuscate_cache, payload)
             .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
                 String::from_utf8_lossy(&m).to_string()
             });
-
         if let Some(t) = trace_id {
             self.trace_id = extra_sql_trace_id(self.context.as_str(), t);
         }
+        Ok(())
     }
 
     fn statement_id(&mut self, payload: &[u8]) {
@@ -376,7 +379,7 @@ impl MysqlLog {
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
                     &self.obfuscate_cache,
                     trace_id,
-                );
+                )?;
             }
             COM_STMT_EXECUTE => {
                 info.statement_id(&payload[STATEMENT_ID_OFFSET..]);

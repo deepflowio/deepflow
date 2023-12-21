@@ -20,7 +20,7 @@ log-level: info
 
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
-#  disabled: false
+#  enabled: false
 #  type: hash           # hash/incremental-id
 #  #eg. traceId: 'abcdef1234',  if want to match index '1234', `start` can be set as 6 or -4 , and `length` must set: 4
 #  incremental-id-location:      # it is valid when 'type' is 'incremental-id'

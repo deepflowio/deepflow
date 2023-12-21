@@ -646,6 +646,7 @@ impl stats::RefCountable for PacketCounter {
 pub struct DispatcherBuilder {
     id: Option<usize>,
     local_dispatcher_count: usize,
+    pause: Option<bool>,
     src_interface: Option<String>,
     ctrl_mac: Option<MacAddr>,
     leaky_bucket: Option<Arc<LeakyBucket>>,
@@ -688,6 +689,11 @@ impl DispatcherBuilder {
 
     pub fn id(mut self, v: usize) -> Self {
         self.id = Some(v);
+        self
+    }
+
+    pub fn pause(mut self, pause: bool) -> Self {
+        self.pause = Some(pause);
         self
     }
 
@@ -987,7 +993,7 @@ impl DispatcherBuilder {
             #[cfg(target_os = "linux")]
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
-            pause: Arc::new(AtomicBool::new(true)),
+            pause: Arc::new(AtomicBool::new(self.pause.unwrap())),
             queue_debugger: queue_debugger.clone(),
         };
         collector.register_countable(

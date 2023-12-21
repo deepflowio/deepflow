@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -43,6 +44,8 @@ var log = logging.MustGetLogger("clickhouse")
 
 var DEFAULT_LIMIT = "10000"
 var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
+var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
+var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -73,6 +76,16 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	e.NoPreWhere = args.NoPreWhere
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
+
+	// Parse withSql
+	withResult, withDebug, err := e.ParseWithSql(sql, args)
+	if err != nil {
+		return nil, nil, err
+	}
+	if withResult != nil {
+		return withResult, withDebug, err
+	}
+
 	// Parse slimitSql
 	slimitResult, slimitDebug, err := e.ParseSlimitSql(sql, args)
 	if err != nil {
@@ -571,6 +584,73 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: ColumnSchemaMap,
+	}
+	rst, err := chClient.DoQuery(params)
+	if err != nil {
+		log.Error(err)
+		return nil, debug.Get(), err
+	}
+	return rst, debug.Get(), err
+}
+
+func (e *CHEngine) ParseWithSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
+	checks := checkWithSqlRegexp.FindAllStringSubmatch(sql, -1)
+	if len(checks) == 0 {
+		return nil, nil, nil
+	}
+	subMatches := subSqlRegexp.FindAllString(sql, -1)
+	parsedSqls := []string{}
+	var callbacks map[string]func(*common.Result) error
+	columnSchemaMap := make(map[string]*common.ColumnSchema)
+	for _, match := range subMatches {
+		match = strings.TrimPrefix(match, "(")
+		match = strings.TrimSuffix(match, ")")
+		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		matchEngine.Init()
+		matchParser := parse.Parser{Engine: matchEngine}
+		err := matchParser.ParseSQL(match)
+		if err != nil {
+			log.Error(err)
+			return nil, nil, err
+		}
+		for _, stmt := range matchEngine.Statements {
+			stmt.Format(matchEngine.Model)
+		}
+		FormatModel(matchEngine.Model)
+		// 使用Model生成View
+		matchEngine.View = view.NewView(matchEngine.Model)
+		if callbacks == nil {
+			callbacks = matchEngine.View.GetCallbacks()
+		}
+		parsedSql := matchEngine.ToSQLString()
+		for _, columnSchema := range matchEngine.ColumnSchemas {
+			columnSchemaMap[columnSchema.Name] = columnSchema
+		}
+		parsedSqls = append(parsedSqls, parsedSql)
+	}
+	for i, parseSql := range parsedSqls {
+		sql = strings.ReplaceAll(sql, subMatches[i], fmt.Sprintf("(%s)", parseSql))
+	}
+	query_uuid := args.QueryUUID
+	debug := &client.Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		QueryUUID: query_uuid,
+	}
+	debug.Sql = sql
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       e.DB,
+		Debug:    debug,
+		Context:  e.Context,
+	}
+	params := &client.QueryParams{
+		Sql:             sql,
+		Callbacks:       callbacks,
+		QueryUUID:       query_uuid,
+		ColumnSchemaMap: columnSchemaMap,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {

@@ -725,7 +725,13 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		if metricsType == "Int" {
 			metricsValue = float64(values[metricsIndex].(int))
 		} else if metricsType == "Float64" {
-			metricsValue = values[metricsIndex].(float64)
+			// metricsType == "Float64" but typeof(values[metricsIndex]) is `int` ?? for robustness add type assert
+			val, ok := values[metricsIndex].(float64)
+			if ok {
+				metricsValue = val
+			} else {
+				metricsValue = float64(values[metricsIndex].(int))
+			}
 		} else {
 			return nil, fmt.Errorf("Unknown metrics type %s, value = %v", metricsType, values[metricsIndex])
 		}

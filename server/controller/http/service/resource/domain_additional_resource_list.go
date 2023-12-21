@@ -73,7 +73,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 			resp.CloudTags = append(resp.CloudTags, cloudTags...)
 
 		default:
-			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chonst, lb")
+			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chost, lb, cloud-tag")
 		}
 	}
 
@@ -346,6 +346,9 @@ func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags clo
 		resp = append(resp, addCHost)
 	}
 	for uuid, cloudTags := range podNSCloudTags {
+		if resourceName != "" && podNSUUIDToName[uuid] != resourceName {
+			continue
+		}
 		addPodNS := model.AdditionalResourceCloudTag{
 			ResourceType: "pod_ns",
 			ResourceName: podNSUUIDToName[uuid],

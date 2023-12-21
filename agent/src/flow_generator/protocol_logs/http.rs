@@ -1187,10 +1187,10 @@ impl HttpLog {
     }
 
     fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8], info: &mut HttpInfo) {
-        let Some(vm) = param.wasm_vm.as_ref() else {
+        let mut vm_ref = param.wasm_vm.borrow_mut();
+        let Some(vm) = vm_ref.as_mut() else {
             return;
         };
-        let mut vm = vm.borrow_mut();
         match param.direction {
             PacketDirection::ClientToServer => vm.on_http_req(payload, param, info),
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
@@ -1605,9 +1605,9 @@ mod tests {
             parse_log: true,
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
-            wasm_vm: None,
+            wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_func: None,
+            so_func: Default::default(),
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
