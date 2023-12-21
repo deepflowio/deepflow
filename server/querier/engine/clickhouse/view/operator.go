@@ -36,6 +36,8 @@ const (
 	NREGEXP
 	GT
 	LT
+	IN
+	NIN
 )
 
 type Operator struct {
@@ -71,6 +73,10 @@ func (n *Operator) ToString() string {
 		return " > "
 	case LT:
 		return " < "
+	case IN:
+		return " IN "
+	case NIN:
+		return " NOT IN "
 	}
 	return ""
 }
@@ -110,6 +116,10 @@ func GetOperator(op string) (*Operator, int) {
 		opType = GT
 	case "<":
 		opType = LT
+	case "in":
+		opType = IN
+	case "not in":
+		opType = NIN
 	}
 	return &Operator{Type: opType}, opType
 }

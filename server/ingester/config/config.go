@@ -55,7 +55,7 @@ const (
 	DefaultFlowTagCacheFlushTimeout = 1800    // s
 	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
 	IndexTypeHash                   = "hash"
-	IndexTypeIncremetalIdLocation   = "incremental-id-location"
+	IndexTypeIncremetalIdLocation   = "incremental-id"
 	FormatHex                       = "hex"
 	FormatDecimal                   = "decimal"
 )
