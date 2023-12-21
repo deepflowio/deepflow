@@ -69,7 +69,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			Name:               name,
 			PodNamespaceLcuuid: namespaceLcuuid,
 			AZLcuuid:           k.azLcuuid,
-			RegionLcuuid:       k.RegionUuid,
+			RegionLcuuid:       k.RegionUUID,
 			PodClusterLcuuid:   k.podClusterLcuuid,
 		}
 		ingresses = append(ingresses, ingress)

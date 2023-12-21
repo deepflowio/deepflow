@@ -44,6 +44,7 @@ func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, err
 			ScrapeURL:        p.ScrapeURL,
 			OtherLabels:      otherLabelsString,
 			PodClusterLcuuid: k.podClusterLcuuid,
+			VPCLcuuid:        k.VPCUUID,
 		})
 	}
 	log.Debug("get prometheus target complete")

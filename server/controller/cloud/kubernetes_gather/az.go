@@ -27,7 +27,7 @@ func (k *KubernetesGather) getAZ() (model.AZ, error) {
 	az := model.AZ{
 		Lcuuid:       k.azLcuuid,
 		Name:         k.Name,
-		RegionLcuuid: k.RegionUuid,
+		RegionLcuuid: k.RegionUUID,
 	}
 	log.Debug("get az complete")
 	return az, nil

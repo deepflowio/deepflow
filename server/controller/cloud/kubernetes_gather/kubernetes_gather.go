@@ -45,8 +45,8 @@ type KubernetesGather struct {
 	Lcuuid                       string
 	UuidGenerate                 string
 	ClusterID                    string
-	RegionUuid                   string
-	VPCUuid                      string
+	RegionUUID                   string
+	VPCUUID                      string
 	PortNameRegex                string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
@@ -175,8 +175,8 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
-		RegionUuid:            configJson.Get("region_uuid").MustString(),
-		VPCUuid:               configJson.Get("vpc_uuid").MustString(),
+		RegionUUID:            configJson.Get("region_uuid").MustString(),
+		VPCUUID:               configJson.Get("vpc_uuid").MustString(),
 		PodNetIPv4CIDRMaxMask: podNetIPv4CIDRMaxMask,
 		PodNetIPv6CIDRMaxMask: podNetIPv6CIDRMaxMask,
 		PortNameRegex:         portNameRegex,
