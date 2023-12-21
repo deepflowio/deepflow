@@ -346,6 +346,9 @@ func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags clo
 		resp = append(resp, addCHost)
 	}
 	for uuid, cloudTags := range podNSCloudTags {
+		if resourceName != "" && podNSUUIDToName[uuid] != resourceName {
+			continue
+		}
 		addPodNS := model.AdditionalResourceCloudTag{
 			ResourceType: "pod_ns",
 			ResourceName: podNSUUIDToName[uuid],

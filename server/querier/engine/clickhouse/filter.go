@@ -316,27 +316,49 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 						}
 					} else {
-						tagItem, ok := tag.GetTag("other_name", db, table, "default")
-						if ok {
-							tagMap := t.Tag + "_map"
-							if t.Tag == "vpc" || t.Tag == "l2_vpc" {
-								tagMap = "l3_epc_map"
+						if t.Tag == "host" {
+							tagItem, ok := tag.GetTag("device_name", db, table, "default")
+							if ok {
+								deviceType, ok := tag.TAG_RESOURCE_TYPE_DEVICE_MAP[t.Tag]
+								if ok {
+									switch strings.ToLower(op) {
+									case "match":
+										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType)
+									case "not match":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType) + ")"
+									case "not ilike":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value, deviceType) + ")"
+									case "not in":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value, deviceType) + ")"
+									case "!=":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value, deviceType) + ")"
+									default:
+										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value, deviceType)
+									}
+								}
 							}
-							switch strings.ToLower(op) {
-							case "match":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
-							case "not match":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
+						} else {
+							tagItem, ok := tag.GetTag("other_name", db, table, "default")
+							if ok {
+								tagMap := t.Tag + "_map"
+								if t.Tag == "vpc" || t.Tag == "l2_vpc" {
+									tagMap = "l3_epc_map"
+								}
+								switch strings.ToLower(op) {
+								case "match":
+									filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
+								case "not match":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
+								case "not ilike":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
+								case "not in":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
+								case "!=":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
+								default:
+									filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
+								}
 							}
-
 						}
 					}
 				}
