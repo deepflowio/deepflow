@@ -73,22 +73,25 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 		t := ts[i]
 		ins := t.GetInstance()
 		job := t.GetJob()
+		vpcID := int(t.GetEpcId())
 		podClusterID := int(t.GetPodClusterId())
-		if id, ok := ln.keyToID.Load(cache.NewTargetKey(ins, job, podClusterID)); ok {
+		if id, ok := ln.keyToID.Load(cache.NewTargetKey(ins, job, vpcID, podClusterID)); ok {
 			resp = append(resp, &controller.PrometheusTarget{
 				Id:           proto.Uint32(uint32(id.(int))),
 				Instance:     &ins,
 				Job:          &job,
 				PodClusterId: proto.Uint32(uint32(podClusterID)),
+				EpcId:        proto.Uint32(uint32(vpcID)),
 			})
 			continue
 		}
 		di := podClusterIDToDomainInfo[podClusterID]
 		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{ // TODO  id 复用
-			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d", podClusterID) + "prometheus")},
+			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d-%d", vpcID, podClusterID) + "prometheus")},
 			CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS,
 			Instance:     ins,
 			Job:          job,
+			VPCID:        vpcID,
 			PodClusterID: podClusterID,
 			Domain:       di.domain,
 			SubDomain:    di.subDomain,
@@ -111,13 +114,14 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	}
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
-		k := cache.NewTargetKey(dbToAdd[i].Instance, dbToAdd[i].Job, dbToAdd[i].PodClusterID)
+		k := cache.NewTargetKey(dbToAdd[i].Instance, dbToAdd[i].Job, dbToAdd[i].VPCID, dbToAdd[i].PodClusterID)
 		ln.keyToID.Store(k, id)
 		resp = append(resp, &controller.PrometheusTarget{
 			Id:           proto.Uint32(uint32(id)),
 			Instance:     &k.Instance,
 			Job:          &k.Job,
 			PodClusterId: proto.Uint32(uint32(k.PodClusterID)),
+			EpcId:        proto.Uint32(uint32(k.VPCID)),
 		})
 	}
 	return resp, nil
@@ -134,7 +138,7 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 	inUseIDSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDSet.Add(item.ID)
-		ln.keyToID.Store(cache.NewTargetKey(item.Instance, item.Job, item.PodClusterID), item.ID)
+		ln.keyToID.Store(cache.NewTargetKey(item.Instance, item.Job, item.VPCID, item.PodClusterID), item.ID)
 	}
 	return inUseIDSet, nil
 }
