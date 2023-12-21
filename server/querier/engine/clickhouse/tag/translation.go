@@ -1036,6 +1036,14 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE %s(name,%s))",
 		),
 	}
+	tagResourceMap["device_name"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"toUInt64(%s_id) IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=%d)",
+			"toUInt64(%s_id) IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=%d )",
+		),
+	}
 
 	//enum
 	tagResourceMap["enum_tag_id"] = map[string]*Tag{
