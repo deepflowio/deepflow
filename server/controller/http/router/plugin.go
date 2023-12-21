@@ -23,9 +23,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 type Plugin struct{}
@@ -72,10 +74,17 @@ func createPlugin(c *gin.Context) {
 	plugin.Image = buf.Bytes()
 
 	data, err := service.CreatePlugin(plugin)
+	if err == nil {
+		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	}
 	JsonResponse(c, data, err)
 }
 
 func deletePlugin(c *gin.Context) {
 	name := c.Param("name")
-	JsonResponse(c, nil, service.DeletePlugin(name))
+	err := service.DeletePlugin(name)
+	if err == nil {
+		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	}
+	JsonResponse(c, nil, err)
 }
