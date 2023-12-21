@@ -38,7 +38,7 @@ use log::error;
 use log::{debug, info, warn};
 use packet_dedup::*;
 use public::debug::QueueDebugger;
-use special_recv_engine::Libpcap;
+use special_recv_engine::{Dpdk, Libpcap};
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -309,13 +309,6 @@ impl DispatcherListener {
     }
 }
 
-#[derive(Default)]
-pub struct DpdkRingPortConf {
-    pub enabled: bool,
-    pub core_id: u32,
-    pub port_name: String,
-}
-
 pub struct BpfOptions {
     pub capture_bpf: String,
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -537,7 +530,7 @@ pub struct Options {
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
     pub tap_mode: TapMode,
-    pub dpdk_conf: DpdkRingPortConf,
+    pub dpdk_enabled: bool,
     pub libpcap_enabled: bool,
     pub tap_mac_script: String,
     pub is_ipv6: bool,
@@ -1140,14 +1133,14 @@ impl DispatcherBuilder {
                 Ok(RecvEngine::Libpcap(Some(libpcap)))
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            TapMode::Mirror if options.dpdk_conf.enabled => {
+            TapMode::Mirror if options.dpdk_enabled => {
                 #[cfg(target_arch = "s390x")]
                 return Err(Error::ConfigInvalid(
                     "cpu arch s390x does not support DPDK!".into(),
                 ));
                 #[cfg(not(target_arch = "s390x"))]
                 {
-                    Ok(RecvEngine::Dpdk())
+                    Ok(RecvEngine::Dpdk(Dpdk::new(None, None, options.snap_len)))
                 }
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]

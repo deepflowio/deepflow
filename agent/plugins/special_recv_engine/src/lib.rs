@@ -51,3 +51,15 @@ impl Libpcap {
         unimplemented!();
     }
 }
+
+pub struct Dpdk;
+
+impl Dpdk {
+    pub fn new(_: Option<String>, _: Option<String>, _: usize) -> Self {
+        unimplemented!();
+    }
+
+    pub unsafe fn read(&mut self) -> Result<packet::Packet> {
+        unimplemented!();
+    }
+}

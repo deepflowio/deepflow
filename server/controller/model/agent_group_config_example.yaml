@@ -828,17 +828,8 @@ vtap_group_id: g-xxxxxx
   ## Enable for DPDK RecvEngine
   ## Note: The DPDK RecvEngine is only started when this configuration item is turned on.
   ##   Note that you also need to set tap_mode to 1. Please refer to
-  ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
-  #ovs-dpdk-enable: false
-
-  ## Dedicated Core for DPDK RecvEngine
-  ## Default: 0, means disabled. Range: [1, 63]
-  ## Note: Setting this value makes deepflow-agent use dedicated CPU cores to capture traffic.
-  #dpdk-pmd-core-id: 0
-
-  ## DPDK Ring Port
-  ## Note: Mirror port to capture DPDK traffic.
-  #dpdk-ring-port: "dpdkr0"
+  ##   https://doc.dpdk.org/guides/tools/dumpcap.html
+  #dpdk-enabled: false
 
   ########################
   ## Libpcap RecvEngine ##
@@ -1008,7 +999,7 @@ vtap_group_id: g-xxxxxx
         ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
         ## Default: 2
         #keep-segments: 2
-  
+
     ## List of L7 protocols that need to be obfuscated
     ## Note: For the sake of data security, the data of the protocol that needs
     ## to be desensitized is configured here and is not processed by default.
@@ -1106,7 +1097,7 @@ vtap_group_id: g-xxxxxx
       ##     ```
       ##     [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
       ##     [path: /proc/1946/root/usr/local/bin/kube-controller-manager] (version: go1.16). Not find any symbols!
-      ##     ``` 
+      ##     ```
       ##     Suppose there is a Golang process with a process ID of '1946.'
       ##   - To initially confirm whether the executable file for this process has a symbol table:
       ##     - Retrieve the executable file's path using the process ID:
@@ -1134,7 +1125,7 @@ vtap_group_id: g-xxxxxx
       ##     entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
       ##     ```
       ##     The logs indicate that the Golang program has been successfully hooked.
-      ##   
+      ##
       #golang-symbol: ""
 
       ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection

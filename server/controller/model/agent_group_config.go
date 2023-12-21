@@ -45,9 +45,7 @@ type StaticConfig struct {
 	FlowQueueSize                      *int                        `yaml:"flow-queue-size,omitempty"`
 	QuadrupleQueueSize                 *int                        `yaml:"quadruple-queue-size,omitempty"`
 	AnalyzerQueueSize                  *int                        `yaml:"analyzer-queue-size,omitempty"`
-	OvsDpdkEnable                      *bool                       `yaml:"ovs-dpdk-enable,omitempty"`
-	DpdkPmdCoreId                      *uint32                     `yaml:"dpdk-pmd-core-id,omitempty"`
-	DpdkRingPort                       *string                     `yaml:"dpdk-ring-port,omitempty"`
+	DpdkEnabled                        *bool                       `yaml:"dpdk-enabled,omitempty"`
 	LibpcapEnabled                     *bool                       `yaml:"libpcap-enabled,omitempty"`
 	XflowCollector                     *XflowCollectorConfig       `yaml:"xflow-collector,omitempty"`
 	NpbPort                            *uint16                     `yaml:"npb-port,omitempty"`

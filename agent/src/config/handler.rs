@@ -323,6 +323,7 @@ pub struct DispatcherConfig {
     pub pod_cluster_id: u32,
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
+    pub dpdk_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1128,6 +1129,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             dispatcher: DispatcherConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
+                dpdk_enabled: conf.yaml_config.dpdk_enabled,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,
@@ -1611,7 +1613,10 @@ impl ConfigHandler {
             info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
         }
 
-        if candidate_config.tap_mode != TapMode::Local && yaml_config.src_interfaces.is_empty() {
+        if candidate_config.tap_mode != TapMode::Local
+            && yaml_config.src_interfaces.is_empty()
+            && !yaml_config.dpdk_enabled
+        {
             warn!("src_interfaces should be set in Analyzer mode or Mirror mode");
         }
 
