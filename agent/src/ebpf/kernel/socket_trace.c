@@ -1263,6 +1263,22 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		conn_info->prev_count = 0;
 	}
 
+	/*
+	 * Due to differences in the data captured through the `af_packet` and
+	 * `eBPF methods` for HTTP/2, for example:
+	 * - Data captured using the af_packet method:
+	 *   `PING[0], HEADERS[86125]: 200 OK, DATA[86125]`
+	 * - Data captured using the eBPF method:
+	 *   `HEADERS[86125]: 200 OK, DATA[86125]`
+	 *
+	 * Furthermore, both sides are unaware of the differences in the captured data.
+	 * This inconsistency can lead to inconsistent `tcpseq` values, making it chal-
+	 * lenging to correlate the data. To address this issue, it is agreed that both
+	 * methods adjust the `tcpseq` to the starting position of the first `HEADER`.
+	 */
+	if (conn_info->protocol == PROTO_HTTP2)
+		v->tcp_seq += conn_info->tcpseq_offset;
+
 	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
 		bpf_probe_read(v->extra_data, sizeof(v->extra_data), conn_info->prev_buf);
