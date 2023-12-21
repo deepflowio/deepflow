@@ -186,7 +186,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			Lcuuid:              podLcuuid,
 			Name:                name,
 			State:               status,
-			VPCLcuuid:           k.VPCUuid,
+			VPCLcuuid:           k.VPCUUID,
 			ENV:                 envString,
 			Label:               k.GetLabel(labels),
 			Annotation:          annotationString,
@@ -197,7 +197,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			PodNamespaceLcuuid:  namespaceLcuuid,
 			CreatedAt:           created,
 			AZLcuuid:            k.azLcuuid,
-			RegionLcuuid:        k.RegionUuid,
+			RegionLcuuid:        k.RegionUUID,
 			PodClusterLcuuid:    k.podClusterLcuuid,
 		}
 		pods = append(pods, pod)
