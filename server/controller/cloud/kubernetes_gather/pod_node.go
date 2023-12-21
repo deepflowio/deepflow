@@ -110,9 +110,9 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			IP:               nodeIP,
 			VCPUNum:          cpuNum,
 			MemTotal:         memory,
-			VPCLcuuid:        k.VPCUuid,
+			VPCLcuuid:        k.VPCUUID,
 			AZLcuuid:         k.azLcuuid,
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			PodClusterLcuuid: k.podClusterLcuuid,
 		}
 		podNodes = append(podNodes, podNode)
@@ -151,12 +151,12 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		Lcuuid:         nodeNetworkLcuuid,
 		Name:           nodeNetworkName,
 		SegmentationID: 1,
-		VPCLcuuid:      k.VPCUuid,
+		VPCLcuuid:      k.VPCUUID,
 		Shared:         false,
 		External:       false,
 		NetType:        common.NETWORK_TYPE_WAN,
 		AZLcuuid:       k.azLcuuid,
-		RegionLcuuid:   k.RegionUuid,
+		RegionLcuuid:   k.RegionUUID,
 	}
 
 	k.nodeNetworkLcuuidCIDRs = networkLcuuidCIDRs{
@@ -189,12 +189,12 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		Lcuuid:         podNetworkLcuuid,
 		Name:           podNetworkName,
 		SegmentationID: 1,
-		VPCLcuuid:      k.VPCUuid,
+		VPCLcuuid:      k.VPCUUID,
 		Shared:         false,
 		External:       false,
 		NetType:        common.NETWORK_TYPE_LAN,
 		AZLcuuid:       k.azLcuuid,
-		RegionLcuuid:   k.RegionUuid,
+		RegionLcuuid:   k.RegionUUID,
 	}
 
 	k.podNetworkLcuuidCIDRs = networkLcuuidCIDRs{

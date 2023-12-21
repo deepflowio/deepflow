@@ -202,7 +202,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				PodNum:             replicas,
 				PodNamespaceLcuuid: namespaceLcuuid,
 				AZLcuuid:           k.azLcuuid,
-				RegionLcuuid:       k.RegionUuid,
+				RegionLcuuid:       k.RegionUUID,
 				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
 			podGroups = append(podGroups, podGroup)
@@ -295,7 +295,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			Label:              k.GetLabel(labels),
 			Type:               serviceType,
 			PodNum:             podNum,
-			RegionLcuuid:       k.RegionUuid,
+			RegionLcuuid:       k.RegionUUID,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,
 			PodClusterLcuuid:   k.podClusterLcuuid,
