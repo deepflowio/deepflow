@@ -658,6 +658,7 @@ func (c *Cloud) getSubDomainPrometheusTargets(
 			Instance:        p.Instance,
 			Job:             p.Job,
 			OtherLabels:     p.OtherLabels,
+			VPCLcuuid:       p.VPCLcuuid,
 			SubDomainLcuuid: subDomainLcuuid,
 		})
 	}

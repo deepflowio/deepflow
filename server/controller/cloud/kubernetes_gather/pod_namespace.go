@@ -54,7 +54,7 @@ func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 			Lcuuid:           uID,
 			Name:             name,
 			PodClusterLcuuid: k.podClusterLcuuid,
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			AZLcuuid:         k.azLcuuid,
 		}
 		podNamespaces = append(podNamespaces, podNamespace)
