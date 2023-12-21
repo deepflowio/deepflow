@@ -72,7 +72,7 @@ use crate::{
         Timestamp,
     },
     config::{
-        handler::{CollectorConfig, LogParserConfig},
+        handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
     metric::document::TapSide,
@@ -296,11 +296,11 @@ impl FlowMap {
         }
     }
 
-    fn load_plugins(&mut self, config: &FlowConfig) {
-        if self.plugin_digest == config.plugin_digest {
+    fn load_plugins(&mut self, config: &PluginConfig) {
+        if self.plugin_digest == config.digest {
             return;
         }
-        self.plugin_digest = config.plugin_digest;
+        self.plugin_digest = config.digest;
 
         // although stats::Counter auto removes obsolete referenced countables
         // on counter registration and routine reports, it might be delayed because
@@ -416,6 +416,17 @@ impl FlowMap {
         self.wasm_vm.replace(wasm_vm);
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.so_plugin.replace(so_plugins);
+
+        // remove all l7_stats and l7_log_parser in existing flow nodes that is of type Custom
+        if let Some((nodes, _)) = self.node_map.as_mut() {
+            for node_vecs in nodes.values_mut() {
+                for node in node_vecs.iter_mut() {
+                    node.reset_on_plugin_reload();
+                }
+            }
+        }
+        // remove protocol cache
+        self.app_table.clear();
     }
 
     // sort nodes by swapping timed out nodes to right
@@ -621,7 +632,7 @@ impl FlowMap {
 
         let flow_config = &config.flow;
 
-        self.load_plugins(flow_config);
+        self.load_plugins(&flow_config.plugins);
 
         let pkt_key = FlowMapKey::new(&meta_packet.lookup_key, meta_packet.tap_port);
 

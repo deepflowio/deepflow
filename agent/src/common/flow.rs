@@ -504,6 +504,14 @@ impl FlowPerfStats {
     pub fn reverse(&mut self) {
         self.tcp.reverse()
     }
+
+    pub fn reset_on_plugin_reload(&mut self) {
+        if matches!(self.l7_protocol, L7Protocol::Custom) {
+            self.l7 = Default::default();
+            self.l7_protocol = Default::default();
+            self.l7_failed_count = Default::default();
+        }
+    }
 }
 
 impl fmt::Display for FlowPerfStats {

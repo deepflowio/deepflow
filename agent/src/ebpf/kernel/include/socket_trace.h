@@ -187,6 +187,7 @@ struct conn_info_t {
 	// the Go DNS case. Parse DNS save record type and ignore AAAA records
 	// in call chain trace
 	__u16 dns_q_type;
+	__u32 tcpseq_offset;	// Used for adjusting TCP sequence numbers
 };
 
 struct process_data_extra {
