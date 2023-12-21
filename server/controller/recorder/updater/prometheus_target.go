@@ -57,11 +57,20 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 		))
 		return nil, false
 	}
+	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if !exists {
+		log.Errorf(resourceAForResourceBNotFound(
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.PrometheusTarget{
 		Instance:     cloudItem.Instance,
 		Job:          cloudItem.Job,
 		ScrapeURL:    cloudItem.ScrapeURL,
 		OtherLabels:  cloudItem.OtherLabels,
+		VPCID:        vpcID,
 		Domain:       p.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		PodClusterID: podClusterID,
@@ -87,7 +96,17 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarge
 	if diffBase.OtherLabels != cloudItem.OtherLabels {
 		updateInfo["other_labels"] = cloudItem.OtherLabels
 	}
-
+	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
+		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["vpc_id"] = vpcID
+	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
 	}

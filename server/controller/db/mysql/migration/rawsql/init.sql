@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS prometheus_target (
     job                 VARCHAR(255) DEFAULT '',
     scrape_url          VARCHAR(2083) DEFAULT '',
     other_labels        TEXT COMMENT 'separated by ,',
+    epc_id              INTEGER NOT NULL DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
     pod_cluster_id      INTEGER,
