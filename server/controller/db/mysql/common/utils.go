@@ -136,6 +136,8 @@ func executeScript(db *gorm.DB, nextVersion string) error {
 	switch nextVersion {
 	case script.SCRIPT_UPDATE_CLOUD_TAG:
 		err = script.ScriptUpdateCloudTags(db)
+	case script.SCRIPT_UPDATE_VM_PODNS_TAG:
+		err = script.ScriptUpdateVMPodNSTags(db)
 	}
 	return err
 }

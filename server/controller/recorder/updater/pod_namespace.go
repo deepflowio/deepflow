@@ -60,6 +60,10 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		))
 		return nil, false
 	}
+	cloudTags := map[string]string{}
+	if cloudItem.CloudTags != nil {
+		cloudTags = cloudItem.CloudTags
+	}
 	dbItem := &mysql.PodNamespace{
 		Name:         cloudItem.Name,
 		PodClusterID: podClusterID,
@@ -67,7 +71,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		Domain:       n.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
-		CloudTags:    cloudItem.CloudTags,
+		CloudTags:    cloudTags,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
