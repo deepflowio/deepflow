@@ -40,17 +40,21 @@ import (
 const (
 	METRICID_OFFSET = 32 // when generate columnIndexKey/metricTargetPairKey, high32 is metricID, low32 can be labelNameID/targetID
 
-	// when generate targetIdKey, high16 is podClusterId, mid24 is JobId, low24 is instanceId
-	POD_CLUSTER_ID_OFFSET = 48
-	JOBID_OFFSET          = 24
+	POD_CLUSTER_ID_OFFSET = 16
+	JOBID_OFFSET          = 32
 )
 
 func columnIndexKey(metricID, labelNameID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(labelNameID)
 }
 
-func targetIdKey(podClusterId uint16, jobID, instanceID uint32) uint64 {
-	return uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET | uint64(jobID)<<JOBID_OFFSET | uint64(instanceID)
+func targetIdKey(epcId, podClusterId uint16, jobID, instanceID uint32) complex128 {
+	return complex(float64(uint64(jobID)<<JOBID_OFFSET|uint64(instanceID)),
+		float64(uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET|uint64(epcId)))
+}
+
+func parseTargetIdKey(key complex128) (epcId, podClusterId uint16, jobID, instanceID uint32) {
+	return uint16(imag(key)), uint16(uint64(imag(key)) >> POD_CLUSTER_ID_OFFSET), uint32(uint64(real(key)) >> JOBID_OFFSET), uint32(real(key))
 }
 
 func nameValueKey(nameID, valueID uint32) uint64 {
@@ -82,8 +86,8 @@ func (t *PrometheusLabelTable) QueryColumnIndex(metricID, labelNameID uint32) (u
 	return t.labelColumnIndexs.Get(columnIndexKey(metricID, labelNameID))
 }
 
-func (t *PrometheusLabelTable) QueryTargetID(podClusterId uint16, jobID, instanceID uint32) (uint32, bool) {
-	return t.targetIDs.Get(targetIdKey(podClusterId, jobID, instanceID))
+func (t *PrometheusLabelTable) QueryTargetID(epcId, podClusterId uint16, jobID, instanceID uint32) (uint32, bool) {
+	return t.targetIDs.Get(targetIdKey(epcId, podClusterId, jobID, instanceID))
 }
 
 func (t *PrometheusLabelTable) QueryMetricTargetPair(metricID, targetID uint32) bool {
@@ -109,6 +113,11 @@ func (t *PrometheusLabelTable) GetCounter() interface{} {
 	return counter
 }
 
+type TargetIdKey struct {
+	jobInstanceId   uint64
+	epcPodClusterId uint32
+}
+
 type PrometheusLabelTable struct {
 	ctlIP       string
 	GrpcSession *grpc.GrpcSession
@@ -118,7 +127,7 @@ type PrometheusLabelTable struct {
 	labelValueIDs     *hashmap.Map[string, uint32]
 	labelNameValues   *hashmap.Map[uint64, struct{}]
 	labelColumnIndexs *hashmap.Map[uint64, uint32]
-	targetIDs         *hashmap.Map[uint64, uint32]
+	targetIDs         *hashmap.Map[complex128, uint32]
 	metricTargetPair  *hashmap.Map[uint64, struct{}]
 	targetLabelIDs    *hashmap.Map[uint32, []uint32]
 	targetVersion     uint32
@@ -137,14 +146,14 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 	}
 	t := &PrometheusLabelTable{
 		GrpcSession:       &grpc.GrpcSession{},
-		metricNameIDs:     hashmap.New[string, uint32](),   // metricName => metricID
-		labelNameIDs:      hashmap.New[string, uint32](),   // labelName  => labelNameID
-		labelValueIDs:     hashmap.New[string, uint32](),   // labelValue => labelValueID
-		labelNameValues:   hashmap.New[uint64, struct{}](), // labelNameValue => exists
-		labelColumnIndexs: hashmap.New[uint64, uint32](),   // metricID + LabelNameID => columnIndex
-		targetIDs:         hashmap.New[uint64, uint32](),   // jobID + instanceID => targetID
-		metricTargetPair:  hashmap.New[uint64, struct{}](), // metricID + targetID => exists
-		targetLabelIDs:    hashmap.New[uint32, []uint32](), // targetID => targetLabelIDs
+		metricNameIDs:     hashmap.New[string, uint32](),     // metricName => metricID
+		labelNameIDs:      hashmap.New[string, uint32](),     // labelName  => labelNameID
+		labelValueIDs:     hashmap.New[string, uint32](),     // labelValue => labelValueID
+		labelNameValues:   hashmap.New[uint64, struct{}](),   // labelNameValue => exists
+		labelColumnIndexs: hashmap.New[uint64, uint32](),     // metricID + LabelNameID => columnIndex
+		targetIDs:         hashmap.New[complex128, uint32](), // epcId+podClusterId+jobID + instanceID => targetID
+		metricTargetPair:  hashmap.New[uint64, struct{}](),   // metricID + targetID => exists
+		targetLabelIDs:    hashmap.New[uint32, []uint32](),   // targetID => targetLabelIDs
 		counter:           &RequestCounter{},
 	}
 	t.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, nil)
@@ -228,7 +237,7 @@ func (t *PrometheusLabelTable) RequestAllLabelIDs() {
 
 // When the Target is deleted, the data in the corresponding table of the Target needs to be deleted
 // otherwise, if the label type of the target changes from target type to app type, it cannot be updated.
-func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, droppedTargetIdKeys []uint64) {
+func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, droppedTargetIdKeys []complex128) {
 	if len(droppedTargetIds) == 0 {
 		return
 	}
@@ -277,8 +286,8 @@ func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, d
 }
 
 // if the target_id is not in the new target list, it means that the target has been dropped.
-func (t *PrometheusLabelTable) getPrometheusDroppedTargets(targetIds []*trident.TargetResponse) (droppedTargetIds []uint32, droppedTargetIdKeys []uint64) {
-	t.targetIDs.Range(func(k uint64, v uint32) bool {
+func (t *PrometheusLabelTable) getPrometheusDroppedTargets(targetIds []*trident.TargetResponse) (droppedTargetIds []uint32, droppedTargetIdKeys []complex128) {
+	t.targetIDs.Range(func(k complex128, v uint32) bool {
 		find := false
 		for _, target := range targetIds {
 			if v == target.GetTargetId() {
@@ -307,12 +316,13 @@ func (t *PrometheusLabelTable) updatePrometheusTargets(targetIds []*trident.Targ
 		jobId := target.GetJobId()
 		instanceId := target.GetInstanceId()
 		podClusterId := target.GetPodClusterId()
+		epcId := target.GetEpcId()
 		t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
 		t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
 		for _, metricId := range target.GetMetricIds() {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
-		t.targetIDs.Set(targetIdKey(uint16(podClusterId), jobId, instanceId), targetId)
+		t.targetIDs.Set(targetIdKey(uint16(epcId), uint16(podClusterId), jobId, instanceId), targetId)
 		t.updateTargetLabelIds(targetId, target.GetTargetLabelNameIds())
 	}
 }
@@ -421,10 +431,8 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 
 		// when response all metric labels at starting, pod cluster id is 0
 		podClusterId := metric.GetPodClusterId()
-		if podClusterId == 0 {
-			continue
-		}
-		targetId, ok := t.targetIDs.Get(targetIdKey(uint16(podClusterId), jobId, instanceId))
+		epcId := metric.GetEpcId()
+		targetId, ok := t.targetIDs.Get(targetIdKey(uint16(epcId), uint16(podClusterId), jobId, instanceId))
 		if !ok {
 			if t.counter.TargetIdZero == 0 {
 				log.Warningf("prometheus label response label target invalid: jobId: %d, instanceId: %d, metric: %s", jobId, instanceId, metric)
@@ -517,13 +525,11 @@ func (t *PrometheusLabelTable) columnIndexString(filter string) string {
 
 func (t *PrometheusLabelTable) targetString(filter string) string {
 	sb := &strings.Builder{}
-	sb.WriteString("\ntargetId     clusterId  job                                                              jobId    instance                             instanceId                       target_label_ids\n")
+	sb.WriteString("\ntargetId     epcId  clusterId  job                                                              jobId    instance                             instanceId                       target_label_ids\n")
 	sb.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 
-	t.targetIDs.Range(func(k uint64, v uint32) bool {
-		podClusterId := k >> POD_CLUSTER_ID_OFFSET
-		jobId := k << (64 - POD_CLUSTER_ID_OFFSET) >> (64 - POD_CLUSTER_ID_OFFSET) >> JOBID_OFFSET
-		instanceId := k << (64 - JOBID_OFFSET) >> (64 - JOBID_OFFSET)
+	t.targetIDs.Range(func(k complex128, v uint32) bool {
+		epcId, podClusterId, jobId, instanceId := parseTargetIdKey(k)
 		job, instance := "", ""
 		t.labelValueIDs.Range(func(n string, i uint32) bool {
 			if i == uint32(jobId) {
@@ -537,7 +543,7 @@ func (t *PrometheusLabelTable) targetString(filter string) string {
 			return true
 		})
 		targetLabebs, _ := t.targetLabelIDs.Get(v)
-		row := fmt.Sprintf("%-10d   %-9d  %-64s  %-5d   %-32s     %-32d %v\n", v, podClusterId, job, jobId, instance, instanceId, targetLabebs)
+		row := fmt.Sprintf("%-10d   %-5d  %-9d  %-64s  %-5d   %-32s     %-32d %v\n", v, epcId, podClusterId, job, jobId, instance, instanceId, targetLabebs)
 		if strings.Contains(row, filter) {
 			sb.WriteString(row)
 		}
@@ -569,6 +575,17 @@ func getUInt64MapMaxValue(m *hashmap.Map[uint64, uint32]) uint32 {
 	return maxId
 }
 
+func getArrayUInt64MapMaxValue(m *hashmap.Map[complex128, uint32]) uint32 {
+	maxId := uint32(0)
+	m.Range(func(_ complex128, i uint32) bool {
+		if i > maxId {
+			maxId = i
+		}
+		return true
+	})
+	return maxId
+}
+
 func (t *PrometheusLabelTable) statsString() string {
 	sb := &strings.Builder{}
 	sb.WriteString("\ntableType  total-count  max-id\n")
@@ -577,7 +594,7 @@ func (t *PrometheusLabelTable) statsString() string {
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "name", t.labelNameIDs.Len(), getStringMapMaxValue(t.labelNameIDs)))
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "value", t.labelValueIDs.Len(), getStringMapMaxValue(t.labelValueIDs)))
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "column", t.labelColumnIndexs.Len(), getUInt64MapMaxValue(t.labelColumnIndexs)))
-	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "target", t.targetIDs.Len(), getUInt64MapMaxValue(t.targetIDs)))
+	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "target", t.targetIDs.Len(), getArrayUInt64MapMaxValue(t.targetIDs)))
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d\n", "tgtMtr", t.metricTargetPair.Len()))
 	return sb.String()
 }
@@ -682,12 +699,11 @@ func (t *PrometheusLabelTable) explainString(str string) string {
 		return fmt.Sprintf("invalid target_id, %s", explainStr)
 	}
 	targetId := uint32(intValues[1])
-	t.targetIDs.Range(func(k uint64, v uint32) bool {
+	t.targetIDs.Range(func(k complex128, v uint32) bool {
 		if v != targetId {
 			return true
 		}
-		jobId := k << (64 - POD_CLUSTER_ID_OFFSET) >> (64 - POD_CLUSTER_ID_OFFSET) >> JOBID_OFFSET
-		instanceId := k << (64 - JOBID_OFFSET) >> (64 - JOBID_OFFSET)
+		_, _, jobId, instanceId := parseTargetIdKey(k)
 		t.labelValueIDs.Range(func(n string, i uint32) bool {
 			if i == uint32(jobId) {
 				job = n

@@ -91,6 +91,8 @@ vendor:
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/datetime_uint32.patch
 	# optimize the performance of hashmap when writing a large amount of data
 	patch -p1 -d vendor/github.com/cornelk/hashmap < patch/cornelk_hashmap/perf.patch
+	# hashmap support key [2]uint64
+	patch -p1 -d vendor/github.com/cornelk/hashmap < patch/cornelk_hashmap/complex128.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)
