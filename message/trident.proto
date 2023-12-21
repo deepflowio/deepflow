@@ -907,20 +907,23 @@ message LabelResponse {
 message MetricLabelRequest {
     optional string metric_name = 1;
     optional uint32 pod_cluster_id = 2;
-    repeated LabelRequest labels = 3;  // must contain instance and job label
+    optional uint32 epc_id = 3;
+    repeated LabelRequest labels = 4;  // must contain instance and job label
 }
 
 message MetricLabelResponse {
     optional string metric_name = 1;
     optional uint32 metric_id = 2;
     optional uint32 pod_cluster_id = 3;
-    repeated LabelResponse label_ids = 4;
+    optional uint32 epc_id = 4;
+    repeated LabelResponse label_ids = 5;
 }
 
 message TargetRequest {
     optional string job = 1;
     optional string instance = 2;
     optional uint32 pod_cluster_id = 3;
+    optional uint32 epc_id = 4;
 }
 
 message TargetResponse {
@@ -929,9 +932,10 @@ message TargetResponse {
     optional uint32 job_id = 3;
     optional uint32 instance_id = 4;
     optional uint32 pod_cluster_id = 5;
-    optional uint32 target_id = 6;              // when the Controller cannot determine the target_id, fill in 0
-    repeated uint32 metric_ids = 7;             // when requesting all prometheus information, you need to carry the metric list related to the target
-    repeated uint32 target_label_name_ids = 8;  // when the target labels change, it needs to be synchronized to Ingester regularly
+    optional uint32 epc_id = 6;
+    optional uint32 target_id = 7;              // when the Controller cannot determine the target_id, fill in 0
+    repeated uint32 metric_ids = 8;             // when requesting all prometheus information, you need to carry the metric list related to the target
+    repeated uint32 target_label_name_ids = 9;  // when the target labels change, it needs to be synchronized to Ingester regularly
 }
 
 // when the request content is empty, it means requesting all metric label and target information

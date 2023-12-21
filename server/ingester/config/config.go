@@ -167,7 +167,7 @@ type Location struct {
 }
 
 type TraceIdWithIndex struct {
-	Disabled              bool     `yaml:"disabled"`
+	Enabled               bool     `yaml:"enabled"`
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 	FormatIsHex           bool
@@ -187,7 +187,7 @@ func sleepAndExit() {
 }
 
 func (c *Config) Validate() error {
-	if !c.TraceIdWithIndex.Disabled {
+	if c.TraceIdWithIndex.Enabled {
 		if c.TraceIdWithIndex.Type != IndexTypeIncremetalIdLocation && c.TraceIdWithIndex.Type != IndexTypeHash {
 			log.Errorf("invalid 'type'(%s) of 'trace-id-with-index', must be '%s' or '%s'", c.TraceIdWithIndex.Type, IndexTypeIncremetalIdLocation, IndexTypeHash)
 			sleepAndExit()
@@ -412,10 +412,6 @@ func Load(path string) *Config {
 	config := BaseConfig{
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
-		TraceIdWithIndex: TraceIdWithIndex{
-			Disabled: false,
-			Type:     IndexTypeHash,
-		},
 		Base: Config{
 			ControllerIPs:   []string{DefaultControllerIP},
 			ControllerPort:  DefaultControllerPort,

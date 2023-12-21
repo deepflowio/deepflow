@@ -104,9 +104,9 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				Selector:           strings.Join(selectorSlice, ", "),
 				ServiceClusterIP:   clusterIP,
 				PodNamespaceLcuuid: namespaceLcuuid,
-				VPCLcuuid:          k.VPCUuid,
+				VPCLcuuid:          k.VPCUUID,
 				AZLcuuid:           k.azLcuuid,
-				RegionLcuuid:       k.RegionUuid,
+				RegionLcuuid:       k.RegionUUID,
 				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
 			specPorts := sData.Get("spec").Get("ports")
@@ -267,7 +267,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			Name:          serviceNetworkName,
 			CIDR:          sCIDR,
 			NetworkLcuuid: serviceNetworkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
+			VPCLcuuid:     k.VPCUUID,
 		}
 		subnets = append(subnets, nodeSubnet)
 	}
@@ -280,8 +280,8 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		External:       false,
 		NetType:        common.NETWORK_TYPE_LAN,
 		AZLcuuid:       k.azLcuuid,
-		VPCLcuuid:      k.VPCUuid,
-		RegionLcuuid:   k.RegionUuid,
+		VPCLcuuid:      k.VPCUUID,
+		RegionLcuuid:   k.RegionUUID,
 	}
 	for Lcuuid, IP := range serviceLcuuidToClusterIP {
 		vinterfaceID := common.GetUUID(Lcuuid+common.VIF_DEFAULT_MAC+IP, uuid.Nil)
@@ -292,15 +292,15 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			DeviceLcuuid:  Lcuuid,
 			DeviceType:    common.VIF_DEVICE_TYPE_POD_SERVICE,
 			NetworkLcuuid: serviceNetworkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
-			RegionLcuuid:  k.RegionUuid,
+			VPCLcuuid:     k.VPCUUID,
+			RegionLcuuid:  k.RegionUUID,
 		}
 		vinterfaces = append(vinterfaces, vinterface)
 		ip := model.IP{
 			Lcuuid:           common.GetUUID(Lcuuid+IP, uuid.Nil),
 			VInterfaceLcuuid: vinterfaceID,
 			IP:               IP,
-			RegionLcuuid:     k.RegionUuid,
+			RegionLcuuid:     k.RegionUUID,
 			SubnetLcuuid:     common.GetUUID(serviceNetworkLcuuid, uuid.Nil),
 		}
 		ips = append(ips, ip)
