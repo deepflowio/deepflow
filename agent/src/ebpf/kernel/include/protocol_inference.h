@@ -279,6 +279,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		if (offset >= count)
 			break;
 
+		conn_info->tcpseq_offset = offset;
 		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
 			HTTPV2_FRAME_PROTO_SZ;
