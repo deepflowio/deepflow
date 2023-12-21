@@ -422,9 +422,52 @@ impl KafkaLog {
                 } else if api_version <= 6 {
                     // Offset for API version <= 6
                     Some(35)
-                } else if api_version <= 12 {
-                    // Offset for API version <= 12
+                } else if api_version <= 11 {
+                    // Fetch Request (Version: 11) => replica_id max_wait_ms min_bytes max_bytes isolation_level session_id session_epoch [topics] [forgotten_topics_data] rack_id
+                    // replica_id => INT32
+                    // max_wait_ms => INT32
+                    // min_bytes => INT32
+                    // max_bytes => INT32
+                    // isolation_level => INT8
+                    // session_id => INT32
+                    // session_epoch => INT32
+                    // topics => topic [partitions]
+                    //     topic => STRING
+                    //     partitions => partition current_leader_epoch fetch_offset log_start_offset partition_max_bytes
+                    //     partition => INT32
+                    //     current_leader_epoch => INT32
+                    //     fetch_offset => INT64
+                    //     log_start_offset => INT64
+                    //     partition_max_bytes => INT32
+                    // forgotten_topics_data => topic [partitions]
+                    //     topic => STRING
+                    //     partitions => INT32
+                    // rack_id => STRING
                     Some(43)
+                } else if api_version == 12 {
+                    // Fetch Request (Version: 12) => replica_id max_wait_ms min_bytes max_bytes isolation_level session_id session_epoch [topics] [forgotten_topics_data] rack_id TAG_BUFFER
+                    // replica_id => INT32
+                    // max_wait_ms => INT32
+                    // min_bytes => INT32
+                    // max_bytes => INT32
+                    // isolation_level => INT8
+                    // session_id => INT32
+                    // session_epoch => INT32
+                    // topics => topic [partitions] TAG_BUFFER
+                    //     topic => COMPACT_STRING
+                    //     partitions => partition current_leader_epoch fetch_offset last_fetched_epoch log_start_offset partition_max_bytes TAG_BUFFER
+                    //     partition => INT32
+                    //     current_leader_epoch => INT32
+                    //    fetch_offset => INT64
+                    //     last_fetched_epoch => INT32
+                    //     log_start_offset => INT64
+                    //     partition_max_bytes => INT32
+                    // forgotten_topics_data => topic [partitions] TAG_BUFFER
+                    //     topic => COMPACT_STRING
+                    //     partitions => INT32
+                    // rack_id => COMPACT_STRING
+                    // TODO Some(39)
+                    Some(40)
                 } else {
                     // Invalid API version
                     None
@@ -441,7 +484,7 @@ impl KafkaLog {
         };
         topic_offset += client_id_len;
         match (info.api_key, info.api_version) {
-            (KAFKA_PRODUCE, 9) if topic_offset + 1 < payload.len() => {
+            (KAFKA_PRODUCE, 9) | (KAFKA_FETCH, 12) if topic_offset + 1 < payload.len() => {
                 let (topic_count, offset) = Self::decode_varint(&payload[topic_offset..]);
                 if offset == 0 || topic_count <= 1 {
                     return;
