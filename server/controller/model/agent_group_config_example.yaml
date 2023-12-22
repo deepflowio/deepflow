@@ -997,7 +997,7 @@ vtap_group_id: g-xxxxxx
     ## Extract the configuration of http endpoint
     #http-endpoint-extraction:
       ## Disable the switch to extract http endpoint
-      ## Default: false
+      ## Default: false, by default, http endpoint is extracted
       #disabled: false
 
       ## Extract endpoint according to the following rules
@@ -1006,12 +1006,13 @@ vtap_group_id: g-xxxxxx
       #- prefix: ""
 
         ## Note: Intercept the first few paragraphs in URL (the content between two / is regarded as one paragraph) as endpoint
-        ## Default: 2
+        ## Default: 2, by default, two segments are extracted from the URL. For example, the URL is /a/b/c?query=xxx", whose segment is 3, extracts "/a/b" as the endpoint
         #keep-segments: 2
   
     ## List of L7 protocols that need to be obfuscated
     ## Note: For the sake of data security, the data of the protocol that needs
     ## to be desensitized is configured here and is not processed by default.
+    ## Default: obfuscate-enabled-protocols: [], by default, neither sql statements nor redis commands are obfuscated
     #obfuscate-enabled-protocols:
     #- MySQL
     #- PostgreSQL
