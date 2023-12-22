@@ -20,7 +20,10 @@
  * into which each symbol is written.
  */
 
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,10 +38,11 @@
 #include <jvmticmlr.h>
 
 #include "../../config.h"
-#include "config.h"
 
 #define STRING_BUFFER_SIZE 2000
 #define BIG_STRING_BUFFER_SIZE 20000
+
+#define UNIX_PATH_MAX 108
 
 /*
  * HotSpot JVM does not support agent unloading. However, you
@@ -46,6 +50,9 @@
  * arguments. The library will not be loaded again, but
  * Agent_OnAttach will still be called multiple times with
  * different arguments.
+ *
+ * Be advised: Changing the protocol between jvmti agent and deepflow-jattach
+ *             will require bumping JAVA_AGENT_VERSION in Makefile.
  */
 
 pthread_mutex_t g_df_lock;
@@ -89,7 +96,7 @@ jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 	// Open the file for writing
 	file_ptr = fopen(filename, "w");
 	if (file_ptr == NULL) {
-		fprintf(stderr, "Couldn't open %s: errno(%d)", filename, errno);
+		fprintf(stderr, "Couldn't open %s: errno(%d)\n", filename, errno);
 		return JNI_ERR;
 	}
 
@@ -98,14 +105,59 @@ jint df_open_file(pid_t pid, const char *fmt, FILE ** ptr)
 	return JNI_OK;
 }
 
+jint df_open_socket_as_file(const char *path, FILE **ptr)
+{
+	int s = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (s == -1) {
+		fprintf(stderr, "Call socket() failed: errno(%d)\n", errno);
+		return JNI_ERR;
+	}
+
+	struct sockaddr_un remote = { .sun_family = AF_UNIX };
+	strncpy(remote.sun_path, path, UNIX_PATH_MAX - 1);
+	int len = sizeof(remote.sun_family) + strlen(remote.sun_path);
+	if (connect(s, (struct sockaddr*)&remote, len) == -1) {
+		fprintf(stderr, "Call connect() failed: errno(%d)\n", errno);
+		return JNI_ERR;
+	}
+
+	FILE *file_ptr = fdopen(s, "w");
+	if (file_ptr == NULL) {
+		fprintf(stderr, "Couldn't open %s: errno(%d)\n", path, errno);
+		return JNI_ERR;
+	}
+
+	*ptr = file_ptr;
+
+	return JNI_OK;
+}
+
+bool is_socket_file(const char *path)
+{
+	struct stat sb;
+	if (stat(path, &sb) == -1) {
+		return false;
+	}
+
+	return (sb.st_mode & S_IFMT) == S_IFSOCK;
+}
+
 jint open_perf_map_file(pid_t pid)
 {
-	return df_open_file(pid, perf_map_file_path, &perf_map_file_ptr);
+	if (is_socket_file(perf_map_file_path)) {
+		return df_open_socket_as_file(perf_map_file_path, &perf_map_file_ptr);
+	} else {
+		return df_open_file(pid, perf_map_file_path, &perf_map_file_ptr);
+	}
 }
 
 jint open_perf_map_log_file(pid_t pid)
 {
-	return df_open_file(pid, perf_log_file_path, &perf_map_log_file_ptr);
+	if (is_socket_file(perf_log_file_path)) {
+		return df_open_socket_as_file(perf_log_file_path, &perf_map_log_file_ptr);
+	} else {
+		return df_open_file(pid, perf_log_file_path, &perf_map_log_file_ptr);
+	}
 }
 
 jint df_agent_config(char *opts)
@@ -143,11 +195,15 @@ jint df_agent_config(char *opts)
 
 jint close_files(void)
 {
-	if (perf_map_file_ptr)
+	if (perf_map_file_ptr) {
 		fclose(perf_map_file_ptr);
+		perf_map_file_ptr = 0;
+	}
 
-	if (perf_map_log_file_ptr)
+	if (perf_map_log_file_ptr) {
 		fclose(perf_map_log_file_ptr);
+		perf_map_log_file_ptr = 0;
+	}
 
 	return JNI_OK;
 }
@@ -225,6 +281,10 @@ void deallocate(jvmtiEnv * jvmti, void *string)
 void df_write_symbol(const void *code_addr, unsigned int code_size,
 		     const char *entry)
 {
+	if (!perf_map_file_ptr) {
+		return;
+	}
+
 	char symbol_str[1024];
 	int bytes_all = 0;
 	pthread_mutex_lock(&g_df_lock);

@@ -17,7 +17,25 @@
 #ifndef DF_JATTACH_H
 #define DF_JATTACH_H
 
+#include "config.h"
+
+#define BUFSIZE 1024
+#define UNIX_PATH_MAX 108
+
 typedef uint64_t(*agent_test_t) (void);
+
+typedef struct options {
+	int perf_map_size_limit;
+	char perf_map_path[PERF_PATH_SZ];
+	char perf_log_path[PERF_PATH_SZ];
+} options_t;
+
+typedef struct receiver_args {
+	options_t *opts;
+	int map_socket;
+	int log_socket;
+	bool *done;
+} receiver_args_t;
 
 void clear_target_ns_tmp_file(const char *target_path);
 int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);

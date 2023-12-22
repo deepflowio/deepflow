@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 
+#include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #include <dlfcn.h>
 #include <dirent.h>
 
@@ -168,7 +173,7 @@ bool test_dl_open(const char *so_lib_file_path)
 	return true;
 }
 
-static void select_sitable_agent_lib(pid_t pid, bool is_same_mntns)
+static void select_suitable_agent_lib(pid_t pid, bool is_same_mntns)
 {
 	/* Enter pid & mount namespace for target pid,
 	 * and use dlopen() in that namespace.*/
@@ -287,12 +292,12 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-void clear_target_ns(int pid, int target_ns_pid)
+void clear_target_ns(int pid, int my_pid)
 {
 	/*
 	 * Delete files:
-	 *  path/df_perf-<pid>.map
-	 *  path/df_perf-<pid>.log
+	 *  path/df-perf-<pid>.map
+	 *  path/df-perf-<pid>.log
 	 *  path/df_java_agent.so
 	 *  path/df_java_agent_musl.so
 	 */
@@ -302,10 +307,10 @@ void clear_target_ns(int pid, int target_ns_pid)
 
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_MAP_PATH_FMT, pid, target_ns_pid);
+		 DF_AGENT_MAP_PATH_FMT, pid, my_pid);
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_LOG_PATH_FMT, pid, target_ns_pid);
+		 DF_AGENT_LOG_PATH_FMT, pid, my_pid);
 	clear_target_ns_tmp_file(target_path);
 
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
@@ -317,24 +322,6 @@ void clear_target_ns(int pid, int target_ns_pid)
 
 	snprintf(target_path, sizeof(target_path), TARGET_NS_STORAGE_PATH, pid);
 	rmdir(target_path);
-}
-
-void clear_target_ns_so(int pid, int target_ns_pid)
-{
-	/*
-	 * Delete files: df_java_agent.so and df_java_agent_musl.so
-	 */
-
-	if (is_same_mntns(pid))
-		return;
-
-	char target_path[MAX_PATH_LENGTH];
-	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_MUSL_LIB_TARGET_PATH);
-	clear_target_ns_tmp_file(target_path);
-	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
-		 AGENT_LIB_TARGET_PATH);
-	clear_target_ns_tmp_file(target_path);
 }
 
 static int get_target_ns_info(const char *tag, struct stat *st)
@@ -442,14 +429,216 @@ int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
 	return 0;
 }
 
-int java_attach(pid_t pid, char *opts)
+// parse comma separated arguments
+int parse_config(char *opts, options_t *parsed)
 {
-#ifdef NS_FILES_COPY_TEST
-	int net_fd, ipc_fd, mnt_fd;
-	net_fd = ipc_fd = mnt_fd = -1;
-#endif
-	int ret;
+	char line[PERF_PATH_SZ * 2];
+	strncpy(line, opts, PERF_PATH_SZ * 2);
+	line[PERF_PATH_SZ * 2 - 1] = '\0';
+
+	char *token = strtok(line, ",");
+	if (token == NULL) {
+		jattach_log("Bad argument line %s\n", opts);
+		return -1;
+	}
+	parsed->perf_map_size_limit = atoi(token);
+
+	token = strtok(NULL, ",");
+	if (token == NULL) {
+		jattach_log("Bad argument line %s\n", opts);
+		return -1;
+	}
+	strncpy(parsed->perf_map_path, token, PERF_PATH_SZ);
+	parsed->perf_map_path[PERF_PATH_SZ - 1] = '\0';
+
+	token = strtok(NULL, ",");
+	if (token == NULL) {
+		jattach_log("Bad argument line %s\n", opts);
+		return -1;
+	}
+	strncpy(parsed->perf_log_path, token, PERF_PATH_SZ);
+	parsed->perf_log_path[PERF_PATH_SZ - 1] = '\0';
+
+	return 0;
+}
+
+int java_attach_same_namespace(pid_t pid, options_t *opts)
+{
+	/*
+	 * If the agent is installed directly on the node or host,
+	 * be careful to delete the perf-pid.map and
+	 * perf-pid.log on them.
+	 */
+	clear_target_ns_tmp_file(opts->perf_map_path);
+	clear_target_ns_tmp_file(opts->perf_log_path);
+
+	/*
+	 * In containers, different libc implementations may be used to compile agent
+	 * libraries, primarily two types: glibc and musl. We must provide both vers-
+	 * ions of the agent library. So, which one should we choose? To determine t-
+	 * his, we need to enter the target process's namespace and test each library
+	 * until we find one that can be successfully loaded using dlopen.
+	 */
+	select_suitable_agent_lib(pid, true);
+
+	if (strlen(agent_lib_so_path) == 0)
+		return -1;
+
+	char buffer[PERF_PATH_SZ * 2];
+	snprintf(buffer, PERF_PATH_SZ * 2, "%d,%s,%s",
+		     opts->perf_map_size_limit,
+		     opts->perf_map_path,
+		     opts->perf_log_path);
+
+	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
+	 * library as a JVMTI agent.*/
+	return attach(pid, buffer);
+}
+
+int create_ipc_socket(const char *path)
+{
+	int sock = -1;
+	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		jattach_log("Create unix socket failed with %d\n", errno);
+		return -1;
+	}
+
+	struct sockaddr_un addr = { .sun_family = AF_UNIX };
+	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
+	int len = sizeof(addr.sun_family) + strlen(addr.sun_path);
+	if (bind(sock, (struct sockaddr *)&addr, len) < 0) {
+		jattach_log("Bind unix socket failed with %d\n", errno);
+		return -1;
+	}
+	if (listen(sock, 1) < 0) {
+		jattach_log("Listen on unix socket failed with %d\n", errno);
+		unlink(path);
+		return -1;
+	}
+
+	return sock;
+}
+
+static void *ipc_receiver_thread(void *arguments)
+{
+	receiver_args_t *args = (receiver_args_t *)arguments;
+
+	FILE *map_fp = fopen(args->opts->perf_map_path, "w");
+	if (!map_fp) {
+		// byte stream in socket needs to be consumed to avoid client stuck
+		// even if file open fails
+		jattach_log("fopen() %s failed with %d\n", args->opts->perf_map_path, errno);
+	}
+	FILE *log_fp = fopen(args->opts->perf_log_path, "w");
+	if (!log_fp) {
+		// byte stream in socket needs to be consumed to avoid client stuck
+		// even if file open fails
+		jattach_log("fopen() %s failed with %d\n", args->opts->perf_log_path, errno);
+	}
+
+	int map_sock = args->map_socket;
+	int log_sock = args->log_socket;
+	int map_client = -1;
+	int log_client = -1;
+	bool map_done = false, log_done = false;
+
+	int max_fd = map_sock > log_sock ? map_sock : log_sock;
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(map_sock, &fds);
+	FD_SET(log_sock, &fds);
+
+	struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
+
+	char rcv_buf[BUFSIZE];
+
+	while (!*args->done && !(map_done && log_done)) {
+		struct timeval tv = timeout;
+		fd_set read_fds = fds;
+		if (map_client >= 0) {
+			FD_SET(map_client, &read_fds);
+		}
+		if (log_client >= 0) {
+			FD_SET(log_client, &read_fds);
+		}
+
+		int ret = select(max_fd + 1, &read_fds, 0, 0, &tv);
+		if (ret == -1) {
+			jattach_log("select() failed with %d\n", errno);
+			continue;
+		}
+
+		if (FD_ISSET(map_sock, &read_fds)) {
+			if (map_client >= 0) {
+				jattach_log("map socket already accepted\n");
+			} else if ((map_client = accept(map_sock, NULL, NULL)) < 0) {
+				jattach_log("accept() failed with %d\n", errno);
+			} else {
+				max_fd = map_client > max_fd ? map_client : max_fd;
+			}
+		}
+
+		if (FD_ISSET(log_sock, &read_fds)) {
+			if (log_client >= 0) {
+				jattach_log("log socket already accepted\n");
+			} else if ((log_client = accept(log_sock, NULL, NULL)) < 0) {
+				jattach_log("accept() failed with %d\n", errno);
+			} else {
+				max_fd = log_client > max_fd ? log_client : max_fd;
+			}
+		}
+
+		if (FD_ISSET(map_client, &read_fds)) {
+			int n = recv(map_client, rcv_buf, sizeof(rcv_buf), 0);
+			if (n > 0) {
+				if (map_fp) {
+					fwrite(rcv_buf, sizeof(char), n, map_fp);
+				}
+			} else if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
+				if (n < 0) {
+					jattach_log("recv() failed with %d\n", errno);
+				}
+				close(map_client);
+				map_client = -1;
+				map_done = true;
+			}
+		}
+
+		if (FD_ISSET(log_client, &read_fds)) {
+			int n = recv(log_client, rcv_buf, sizeof(rcv_buf), 0);
+			if (n > 0) {
+				if (log_fp) {
+					fwrite(rcv_buf, sizeof(char), n, log_fp);
+				}
+			} else if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
+				if (n < 0) {
+					jattach_log("recv() failed with %d\n", errno);
+				}
+				close(log_client);
+				log_client = -1;
+				log_done = true;
+			}
+		}
+	}
+
+	if (map_fp) {
+		fclose(map_fp);
+		map_fp = NULL;
+	}
+	if (log_fp) {
+		fclose(log_fp);
+		log_fp = NULL;
+	}
+
+	return NULL;
+}
+
+int java_attach_different_namespace(pid_t pid, options_t *opts)
+{
+	int ret = -1;
 	int uid, gid;
+	int map_socket = -1, log_socket = -1;
+
 	if (get_target_uid_and_gid(pid, &uid, &gid)) {
 		return -1;
 	}
@@ -460,27 +649,13 @@ int java_attach(pid_t pid, char *opts)
 		return -1;
 	}
 
+	int my_pid = getpid();
+
 	/*
-	 * If the agent is installed directly on the node or host,
-	 * be careful to delete the perf-pid.map and
-	 * perf-pid.log on them.
+	 * Delete the files on the target file system if they
+	 * are not on the same mount point.
 	 */
-	bool is_same_mnt = is_same_mntns(pid);
-	if (is_same_mnt) {
-		char path[PERF_PATH_SZ];
-		snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map",
-			 pid);
-		clear_target_ns_tmp_file(path);
-		snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".log",
-			 pid);
-		clear_target_ns_tmp_file(path);
-	} else {
-		/*
-		 * Delete the files on the target file system if they
-		 * are not on the same mount point.
-		 */
-		clear_target_ns(pid, target_ns_pid);
-	}
+	clear_target_ns(pid, my_pid);
 
 	/*
 	 * Here, the original method of determination (based on whether the net
@@ -488,20 +663,19 @@ int java_attach(pid_t pid, char *opts)
 	 * thus avoiding situations where both the net namespace and pid namespace are
 	 * the same but the file system is different.
 	 */
-	if (!is_same_mnt) {
-		/*
-		 * If the target Java process is in a subordinate namespace, copy the
-		 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
-		 * (for visibility to the target process).
-		 */
-		jattach_log("[PID %d] copy agent os library ...\n", pid);
-		if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
-			jattach_log("[PID %d] copy agent os library failed.\n",
-				    pid);
-			goto failed;
-		}
-		jattach_log("[PID %d] copy agent os library success.\n", pid);
+
+	/*
+	 * If the target Java process is in a subordinate namespace, copy the
+	 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
+	 * (for visibility to the target process).
+	 */
+	jattach_log("[PID %d] copy agent os library ...\n", pid);
+	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
+		jattach_log("[PID %d] copy agent os library failed.\n",
+			    pid);
+		goto cleanup;
 	}
+	jattach_log("[PID %d] copy agent os library success.\n", pid);
 
 	/*
 	 * In containers, different libc implementations may be used to compile agent
@@ -510,65 +684,78 @@ int java_attach(pid_t pid, char *opts)
 	 * his, we need to enter the target process's namespace and test each library
 	 * until we find one that can be successfully loaded using dlopen.
 	 */
-	select_sitable_agent_lib(pid, is_same_mnt);
+	select_suitable_agent_lib(pid, false);
 
 	if (strlen(agent_lib_so_path) == 0)
-		goto failed;
+		goto cleanup;
 
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
 
-#ifdef NS_FILES_COPY_TEST
-	/* The jattach() function will switch the namespace to the target PID.
-	 * After we have called jattach(), we need to return to the root namespace.*/
+	// make the sockets accessable from unprivileged user in container
+	umask(0);
 
-	get_nsfd_and_stat("net", NULL, &net_fd);
-	get_nsfd_and_stat("ipc", NULL, &ipc_fd);
-	get_nsfd_and_stat("mnt", NULL, &mnt_fd);
-	if (net_fd < 0 || ipc_fd < 0 || mnt_fd < 0)
-		goto failed;
-#endif
-
-	ret = attach(pid, opts);
-
-#ifdef NS_FILES_COPY_TEST
-	/*
-	 * Copy target namespace 'perf-<target_ns_pid>.map' to host root namespace
-	 * '/tmp/perf-<target_ns_pid>.map'
-	 */
-	if (target_ns_pid != pid) {
-		switch_to_root_ns(net_fd);
-		switch_to_root_ns(ipc_fd);
-		switch_to_root_ns(mnt_fd);
-		if (ret == 0) {
-			copy_file_from_target_ns(pid, target_ns_pid, "map");
-			copy_file_from_target_ns(pid, target_ns_pid, "log");
-		}
-		clear_target_ns(pid, target_ns_pid);
-	} else {
-		close(net_fd);
-		close(ipc_fd);
-		close(mnt_fd);
+	char buffer[PERF_PATH_SZ * 2];
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, my_pid);
+	if ((map_socket = create_ipc_socket(buffer)) < 0) {
+		goto cleanup;
 	}
-#endif
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_PATH_FMT, pid, my_pid);
+	if ((log_socket = create_ipc_socket(buffer)) < 0) {
+		goto cleanup;
+	}
+
+	pthread_t ipc_receiver;
+	bool done = false;
+	receiver_args_t args = {
+		.opts = opts,
+		.map_socket = map_socket,
+		.log_socket = log_socket,
+		.done = &done,
+	};
+	if ((ret = pthread_create(&ipc_receiver, NULL, &ipc_receiver_thread, &args)) < 0) {
+		jattach_log("Create ipc receiver thread failed with errno(%d)\n", errno);
+		goto cleanup;
+	}
+
+	snprintf(buffer, PERF_PATH_SZ * 2,
+	         "%d," PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT,
+		     opts->perf_map_size_limit, my_pid, my_pid);
+	ret = attach(pid, buffer);
+
+	done = true;
+	pthread_join(ipc_receiver, NULL);
+
+cleanup:
+	if (map_socket >= 0) {
+		close(map_socket);
+	}
+	if (log_socket >= 0) {
+		close(log_socket);
+	}
+	// attach() may change euid/egid, restore them to remove tmp files
+	if (seteuid(getuid()) < 0) {
+		jattach_log("seteuid() failed with errno(%d)\n", errno);
+	}
+	if (setegid(getgid()) < 0) {
+		jattach_log("seteuid() failed with errno(%d)\n", errno);
+	}
+	clear_target_ns(pid, my_pid);
 	return ret;
+}
 
-failed:
-#ifdef NS_FILES_COPY_TEST
-	if (net_fd > 0)
-		close(net_fd);
+int java_attach(pid_t pid, char *opts)
+{
+	options_t parsed_opts;
+	if (parse_config(opts, &parsed_opts) != 0) {
+		return -1;
+	}
 
-	if (ipc_fd > 0)
-		close(ipc_fd);
-
-	if (mnt_fd > 0)
-		close(mnt_fd);
-
-	/* Current at root namespace */
-	if (target_ns_pid != pid)
-		clear_target_ns(pid, target_ns_pid);
-#endif
-	return -1;
+	if (is_same_mntns(pid)) {
+		return java_attach_same_namespace(pid, &parsed_opts);
+	} else {
+		return java_attach_different_namespace(pid, &parsed_opts);
+	}
 }
 
 #ifdef JAVA_AGENT_ATTACH_TOOL
@@ -583,4 +770,4 @@ int main(int argc, char **argv)
 	int pid = atoi(argv[1]);
 	return java_attach(pid, argv[2]);
 }
-#endif /* JAVA_AGENT_ATTACH_TEST */
+#endif /* JAVA_AGENT_ATTACH_TOOL */
