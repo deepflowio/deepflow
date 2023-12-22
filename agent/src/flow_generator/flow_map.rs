@@ -1197,6 +1197,25 @@ impl FlowMap {
         // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+
+        // Currently, only virtual traffic's tap_side is counted
+        node.tagged_flow
+            .flow
+            .set_tap_side(flow_config.trident_type, flow_config.cloud_gateway_traffic);
+
+        Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
+
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid = meta_packet.gpid_1;
+
+        let nat_source = meta_packet.lookup_key.get_nat_source();
+        meta_packet.tap_port.set_nat_source(nat_source);
+        node.tagged_flow
+            .flow
+            .flow_key
+            .tap_port
+            .set_nat_source(nat_source);
+
         // direction rectify
         if meta_packet.signal_source == SignalSource::EBPF {
             let (src_l3_epc_id, dst_l3_epc_id) = if let Some(ep) = node.endpoint_data_cache.as_ref()
@@ -1230,24 +1249,6 @@ impl FlowMap {
             }
             node.tagged_flow.flow.direction_score = direction_score;
         }
-
-        // Currently, only virtual traffic's tap_side is counted
-        node.tagged_flow
-            .flow
-            .set_tap_side(flow_config.trident_type, flow_config.cloud_gateway_traffic);
-
-        Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
-
-        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
-        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid = meta_packet.gpid_1;
-
-        let nat_source = meta_packet.lookup_key.get_nat_source();
-        meta_packet.tap_port.set_nat_source(nat_source);
-        node.tagged_flow
-            .flow
-            .flow_key
-            .tap_port
-            .set_nat_source(nat_source);
 
         /*
             ebpf will pass the server port to FlowPerf use for adjuest packet direction.

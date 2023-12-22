@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -49,6 +50,44 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
+	var deviceType, deviceID int
+	podID, ok := p.cache.ToolDataSet.GetPodIDByContainerID(cloudItem.ContainerID)
+	if ok {
+		deviceType = common.VIF_DEVICE_TYPE_POD
+		deviceID = podID
+
+	} else {
+		var vtap *mysql.VTap
+		if err := mysql.Db.Where("id = ?", cloudItem.VTapID).First(&vtap).Error; err != nil {
+			log.Error(err)
+		}
+		if vtap != nil {
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtap.Type]
+			deviceID = vtap.LaunchServerID
+		}
+	}
+	var podNodeID, vmID int
+	if deviceType == common.VIF_DEVICE_TYPE_POD {
+		podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
+		if err != nil {
+			log.Error(err)
+		}
+		podNodeID = podInfo.PodNodeID
+
+		if podNodeID != 0 {
+			id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
+			if ok {
+				vmID = id
+			}
+		}
+	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+		id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(deviceID)
+		if ok {
+			vmID = id
+		}
+		podNodeID = deviceID
+	}
+
 	dbItem := &mysql.Process{
 		Name:        cloudItem.Name,
 		VTapID:      cloudItem.VTapID,
@@ -61,6 +100,10 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		Domain:      p.cache.DomainLcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
 		NetnsID:     cloudItem.NetnsID,
+		DeviceType:  deviceType,
+		DeviceID:    deviceID,
+		PodNodeID:   podNodeID,
+		VMID:        vmID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 
