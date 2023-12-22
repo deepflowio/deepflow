@@ -89,6 +89,8 @@ func (n *Group) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString("`")
 		buf.WriteString(strings.Trim(n.Alias, "`"))
 		buf.WriteString("`")
+	} else if strings.Contains(n.Value, ",") {
+		buf.WriteString(n.Value)
 	} else {
 		buf.WriteString("`")
 		buf.WriteString(strings.Trim(n.Value, "`"))

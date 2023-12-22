@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -342,13 +343,44 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				as := sqlparser.String(item.As)
 				colName, ok := item.Expr.(*sqlparser.ColName)
 				if ok && (common.IsValueInSliceString(strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`"), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
+					colNameStr := strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`")
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)
-						outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
+							if ok {
+								autoTagMap := tag.TagTranslatorMap
+								autoTagSlice := []string{}
+								for autoTagKey, _ := range autoTagMap {
+									autoTagSlice = append(autoTagSlice, autoTagKey)
+								}
+								sort.Strings(autoTagSlice)
+								for _, autoTagKey := range autoTagSlice {
+									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
+								}
+							}
+						} else {
+							outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-						outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+						if len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, colNameStr) {
+							tag, ok := tagdescription.GetTag(colNameStr, e.DB, table, "default")
+							if ok {
+								autoTagMap := tag.TagTranslatorMap
+								autoTagSlice := []string{}
+								for autoTagKey, _ := range autoTagMap {
+									autoTagSlice = append(autoTagSlice, autoTagKey)
+								}
+								sort.Strings(autoTagSlice)
+								for _, autoTagKey := range autoTagSlice {
+									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
+								}
+							}
+						} else {
+							outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+						}
 					}
 					for _, suffix := range []string{"", "_0", "_1"} {
 						for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
@@ -395,7 +427,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				if slices.Contains(outerWhereLeftSlice, groupTag) {
+				if slices.Contains(outerWhereLeftSlice, groupTag) || (len(tagdescription.AUTO_CUSTOM_TAG_NAMES) != 0 && slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(groupTag, "`"))) {
 					innerGroupBySlice = append(innerGroupBySlice, groupTag)
 				}
 			}
@@ -581,6 +613,35 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
+				if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(sqlparser.String(colName), "`")) {
+					autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(sqlparser.String(colName), "`")]
+					for _, selectTag := range tagSlice {
+						//check if the group tags are not duplicated with the tags in the auto custom tags
+						if slices.Contains(autoTagValues, strings.Trim(selectTag, "`")) {
+							errStr := fmt.Sprintf("Cannot select tags that exist in auto custom tag : %s", selectTag)
+							return errors.New(errStr)
+						}
+					}
+					//check if the tags in the auto group tags are not duplicated with the tags in the auto custom tags
+					for _, autoTagCheck := range autoTagValues {
+						autoTagCheckTag := strings.Trim(autoTagCheck, "_0")
+						autoTagCheckTag = strings.Trim(autoTagCheckTag, "_1")
+						if slices.Contains(tagdescription.TAG_RESOURCE_TYPE_AUTO, autoTagCheckTag) {
+							autoTagCheckValue := tagdescription.AUTO_CUSTOM_TAG_CHECK_MAP[autoTagCheckTag]
+							for _, autoTag := range autoTagValues {
+								if slices.Contains(autoTagCheckValue, autoTag) {
+									errStr := fmt.Sprintf("auto custom tags cannot add tag (%s) included in auto group tag (%s) in auto custom tags", autoTag, autoTagCheck)
+									return errors.New(errStr)
+								}
+							}
+						}
+					}
+					if (slices.Contains(autoTagValues, "ip") && autoTagValues[len(autoTagValues)-1] != "ip") || (slices.Contains(autoTagValues, "ip_0") && autoTagValues[len(autoTagValues)-1] != "ip_0") || (slices.Contains(autoTagValues, "ip_1") && autoTagValues[len(autoTagValues)-1] != "ip_1") {
+						errStr := "ip can only be the last tag in the auto custom tag"
+						return errors.New(errStr)
+					}
+				}
+
 				// pod_ingress/lb_listener is not supported by select
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
@@ -809,6 +870,19 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		return errors.New("tap_port and tap_port_type must exist together in group")
 	}
 	for _, group := range groups {
+		colName, ok := group.(*sqlparser.ColName)
+		if ok {
+			groupTag := sqlparser.String(colName)
+			if slices.Contains(tagdescription.AUTO_CUSTOM_TAG_NAMES, strings.Trim(groupTag, "`")) {
+				autoTagValues := tagdescription.AUTO_CUSTOM_TAG_MAP[strings.Trim(groupTag, "`")]
+				for _, sliceGroup := range groupSlice {
+					if slices.Contains(autoTagValues, strings.Trim(sliceGroup, "`")) {
+						errStr := fmt.Sprintf("Cannot group by tags that exist in auto custom tag : %s", groupTag)
+						return errors.New(errStr)
+					}
+				}
+			}
+		}
 		err := e.parseGroupBy(group)
 		if err != nil {
 			return err
@@ -1164,12 +1238,12 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmt, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
+	stmts, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
-	if stmt != nil {
-		e.Statements = append(e.Statements, stmt)
+	if len(stmts) != 0 {
+		e.Statements = append(e.Statements, stmts...)
 	}
 	return nil
 }
@@ -1180,15 +1254,15 @@ func (e *CHEngine) AddTable(table string) {
 }
 
 func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
-	stmt, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+	stmts, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
 	if err != nil {
 		return labelType, err
 	}
-	if stmt != nil {
-		e.Statements = append(e.Statements, stmt)
+	if len(stmts) != 0 {
+		e.Statements = append(e.Statements, stmts...)
 		return labelType, nil
 	}
-	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
+	stmt, err := GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
 	if err != nil {
 		return labelType, err
 	}
