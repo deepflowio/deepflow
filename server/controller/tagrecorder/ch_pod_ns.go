@@ -36,7 +36,7 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 	return updater
 }
 
-func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool) {
+func (p *ChPodNamespace) getNewData() ([]mysql.ChPodNamespace, bool) {
 	var podNamespaces []mysql.PodNamespace
 	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
@@ -44,23 +44,32 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodNamespace)
-	for _, podNamespace := range podNamespaces {
-		if podNamespace.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
-				ID:           podNamespace.ID,
-				Name:         podNamespace.Name + " (deleted)",
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
-				PodClusterID: podNamespace.PodClusterID,
-			}
-		} else {
-			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
-				ID:           podNamespace.ID,
-				Name:         podNamespace.Name,
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
-				PodClusterID: podNamespace.PodClusterID,
-			}
+	items := make([]mysql.ChPodNamespace, len(podNamespaces))
+	for i, podNamespace := range podNamespaces {
+		items[i] = mysql.ChPodNamespace{
+			ID:           podNamespace.ID,
+			Name:         podNamespace.Name,
+			IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
+			PodClusterID: podNamespace.PodClusterID,
 		}
+		if podNamespace.DeletedAt.Valid {
+			items[i].Name = podNamespace.Name + " (deleted)"
+		} else {
+
+		}
+	}
+	return items, true
+}
+
+func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPodNamespace)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

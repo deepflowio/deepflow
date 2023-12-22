@@ -36,7 +36,7 @@ func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 	return updater
 }
 
-func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
+func (p *ChPodNode) getNewData() ([]mysql.ChPodNode, bool) {
 	var podNodes []mysql.PodNode
 	err := mysql.Db.Unscoped().Find(&podNodes).Error
 	if err != nil {
@@ -44,21 +44,29 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodNode)
-	for _, podNode := range podNodes {
-		if podNode.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:     podNode.ID,
-				Name:   podNode.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-			}
-		} else {
-			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:     podNode.ID,
-				Name:   podNode.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-			}
+	items := make([]mysql.ChPodNode, len(podNodes))
+	for i, podNode := range podNodes {
+		items[i] = mysql.ChPodNode{
+			ID:     podNode.ID,
+			Name:   podNode.Name,
+			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
 		}
+		if podNode.DeletedAt.Valid {
+			items[i].Name = podNode.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPodNode)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

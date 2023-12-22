@@ -37,28 +37,36 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	return updater
 }
 
-func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
+func (p *ChGProcess) getNewData() ([]mysql.ChGProcess, bool) {
 	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChGProcess)
-	for _, process := range processes {
-		if process.DeletedAt.Valid {
-			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:     process.ID,
-				Name:   process.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-			}
-		} else {
-			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:     process.ID,
-				Name:   process.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-			}
+	items := make([]mysql.ChGProcess, len(processes))
+	for i, process := range processes {
+		items[i] = mysql.ChGProcess{
+			ID:     process.ID,
+			Name:   process.Name,
+			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 		}
+		if process.DeletedAt.Valid {
+			items[i].Name = process.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChGProcess, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

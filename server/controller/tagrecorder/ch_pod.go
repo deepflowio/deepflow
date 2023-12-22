@@ -36,7 +36,7 @@ func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 	return updater
 }
 
-func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
+func (p *ChPod) getNewData() ([]mysql.ChPod, bool) {
 	var (
 		pods          []mysql.Pod
 		podGroupPorts []mysql.PodGroupPort
@@ -58,32 +58,35 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 		groupToService[podGroupPort.PodGroupID] = podGroupPort.PodServiceID
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPod)
-	for _, pod := range pods {
+	items := make([]mysql.ChPod, len(pods))
+	for i, pod := range pods {
 		podServiceID := groupToService[pod.PodGroupID]
-		if pod.DeletedAt.Valid {
-			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
-				ID:           pod.ID,
-				Name:         pod.Name + " (deleted)",
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				PodClusterID: pod.PodClusterID,
-				PodNsID:      pod.PodNamespaceID,
-				PodNodeID:    pod.PodNodeID,
-				PodGroupID:   pod.PodGroupID,
-				PodServiceID: podServiceID,
-			}
-		} else {
-			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
-				ID:           pod.ID,
-				Name:         pod.Name,
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				PodClusterID: pod.PodClusterID,
-				PodNsID:      pod.PodNamespaceID,
-				PodNodeID:    pod.PodNodeID,
-				PodGroupID:   pod.PodGroupID,
-				PodServiceID: podServiceID,
-			}
+		items[i] = mysql.ChPod{
+			ID:           pod.ID,
+			Name:         pod.Name,
+			IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+			PodClusterID: pod.PodClusterID,
+			PodNsID:      pod.PodNamespaceID,
+			PodNodeID:    pod.PodNodeID,
+			PodGroupID:   pod.PodGroupID,
+			PodServiceID: podServiceID,
 		}
+		if pod.DeletedAt.Valid {
+			items[i].Name = pod.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPod, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

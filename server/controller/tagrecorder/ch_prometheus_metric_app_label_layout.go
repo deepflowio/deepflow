@@ -35,7 +35,7 @@ func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
+func (l *ChPrometheusMetricAPPLabelLayout) getNewData() ([]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
 	var prometheusMetricAPPLabelLayout []mysql.PrometheusMetricAPPLabelLayout
 
 	err := mysql.Db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
@@ -44,14 +44,27 @@ func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.Ch
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout)
-	for _, metricAPPLabelLayout := range prometheusMetricAPPLabelLayout {
-		keyToItem[IDKey{ID: metricAPPLabelLayout.ID}] = mysql.ChPrometheusMetricAPPLabelLayout{
+	items := make([]mysql.ChPrometheusMetricAPPLabelLayout, len(prometheusMetricAPPLabelLayout))
+	for i, metricAPPLabelLayout := range prometheusMetricAPPLabelLayout {
+		items[i] = mysql.ChPrometheusMetricAPPLabelLayout{
 			ID:                  metricAPPLabelLayout.ID,
 			MetricName:          metricAPPLabelLayout.MetricName,
 			APPLabelName:        metricAPPLabelLayout.APPLabelName,
 			APPLabelColumnIndex: metricAPPLabelLayout.APPLabelColumnIndex,
 		}
+	}
+	return items, true
+}
+
+func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
+	items, ok := l.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

@@ -35,7 +35,7 @@ func NewChPrometheusMetricNames() *ChPrometheusMetricName {
 	return updater
 }
 
-func (l *ChPrometheusMetricName) generateNewData() (map[IDKey]mysql.ChPrometheusMetricName, bool) {
+func (l *ChPrometheusMetricName) getNewData() ([]mysql.ChPrometheusMetricName, bool) {
 	var prometheusMetricName []mysql.PrometheusMetricName
 
 	err := mysql.Db.Unscoped().Find(&prometheusMetricName).Error
@@ -44,12 +44,24 @@ func (l *ChPrometheusMetricName) generateNewData() (map[IDKey]mysql.ChPrometheus
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusMetricName)
-	for _, metricName := range prometheusMetricName {
-		keyToItem[IDKey{ID: metricName.ID}] = mysql.ChPrometheusMetricName{
+	items := make([]mysql.ChPrometheusMetricName, len(prometheusMetricName))
+	for i, metricName := range prometheusMetricName {
+		items[i] = mysql.ChPrometheusMetricName{
 			ID:   metricName.ID,
 			Name: metricName.Name,
 		}
+	}
+	return items, true
+}
+func (l *ChPrometheusMetricName) generateNewData() (map[IDKey]mysql.ChPrometheusMetricName, bool) {
+	items, ok := l.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPrometheusMetricName, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

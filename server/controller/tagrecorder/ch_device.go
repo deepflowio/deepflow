@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"sort"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
@@ -36,6 +38,27 @@ func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (d *ChDevice) getNewData() ([]mysql.ChDevice, bool) {
+	keyToItem, ok := d.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChDevice, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].DeviceType < items[i].DeviceType
+	})
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].DeviceID < items[i].DeviceID
+	})
+	return items, true
 }
 
 func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {

@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -35,6 +36,30 @@ func NewChTargetLabel() *ChTargetLabel {
 
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (l *ChTargetLabel) getNewData() ([]mysql.ChTargetLabel, bool) {
+	keyToItem, ok := l.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChTargetLabel, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].MetricID < items[j].MetricID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].LabelNameID < items[j].LabelNameID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].TargetID < items[j].TargetID
+	})
+	return items, true
 }
 
 func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.ChTargetLabel, bool) {

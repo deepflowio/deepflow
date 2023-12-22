@@ -36,7 +36,7 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 	return updater
 }
 
-func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSCloudTags, bool) {
+func (p *ChPodNSCloudTags) getNewData() ([]mysql.ChPodNSCloudTags, bool) {
 	var podNamespaces []mysql.PodNamespace
 	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
@@ -44,7 +44,8 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagsKey]mysql.ChPodNSCloudTags)
+	items := make([]mysql.ChPodNSCloudTags, len(podNamespaces))
+	i := 0
 	for _, podNamespace := range podNamespaces {
 		cloudTagsMap := map[string]string{}
 		for k, v := range podNamespace.CloudTags {
@@ -56,14 +57,25 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 				log.Error(err)
 				return nil, false
 			}
-			key := CloudTagsKey{
-				ID: podNamespace.ID,
-			}
-			keyToItem[key] = mysql.ChPodNSCloudTags{
+			items[i] = mysql.ChPodNSCloudTags{
 				ID:        podNamespace.ID,
 				CloudTags: string(cloudTagsStr),
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSCloudTags, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[CloudTagsKey]mysql.ChPodNSCloudTags)
+	for _, item := range items {
+		keyToItem[CloudTagsKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -34,6 +35,28 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (k *ChPodK8sLabel) getNewData() ([]mysql.ChPodK8sLabel, bool) {
+	keyToItem, ok := k.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChPodK8sLabel, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].ID < items[j].ID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].Key < items[j].Key
+	})
+	return items, true
+
 }
 
 func (k *ChPodK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodK8sLabel, bool) {

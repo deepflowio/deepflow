@@ -59,8 +59,21 @@ func (c *TagRecorder) StartChDictionaryUpdate() {
 	}()
 }
 
+var isTagRecorderCheck bool
+
 func (c *TagRecorder) Start() {
+	ch := make(chan struct{})
 	go func() {
+		if !isTagRecorderCheck {
+			log.Info("tagrecorder check data run")
+			c.checkData()
+			log.Info("tagrecorder check data end")
+			isTagRecorderCheck = true
+		}
+		ch <- struct{}{}
+	}()
+	go func() {
+		<-ch
 		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
 			c.run()
 		}
@@ -75,6 +88,14 @@ func (t *TagRecorder) Stop() {
 }
 
 func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
+	updaters := c.getUpdaters(domainLcuuidToIconID, resourceTypeToIconID)
+	for _, updater := range updaters {
+		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.Refresh()
+	}
+}
+
+func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []ChResourceUpdater{
 		NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
@@ -126,8 +147,5 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
-	for _, updater := range updaters {
-		updater.SetConfig(c.cfg.TagRecorderCfg)
-		updater.Refresh()
-	}
+	return updaters
 }

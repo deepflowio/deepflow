@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -36,6 +37,27 @@ func NewChStringEnum() *ChStringEnum {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (e *ChStringEnum) getNewData() ([]mysql.ChStringEnum, bool) {
+	keyToItem, ok := e.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChStringEnum, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].TagName < items[j].TagName
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].Value < items[j].Value
+	})
+	return items, true
 }
 
 func (e *ChStringEnum) generateNewData() (map[StringEnumTagKey]mysql.ChStringEnum, bool) {

@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -37,6 +38,27 @@ func NewChIntEnum() *ChIntEnum {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (e *ChIntEnum) getNewData() ([]mysql.ChIntEnum, bool) {
+	keyToItem, ok := e.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChIntEnum, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].TagName < items[i].TagName
+	})
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].Value < items[i].Value
+	})
+	return items, true
 }
 
 func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) {

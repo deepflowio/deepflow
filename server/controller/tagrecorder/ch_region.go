@@ -39,7 +39,7 @@ func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[I
 	return updater
 }
 
-func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
+func (r *ChRegion) getNewData() ([]mysql.ChRegion, bool) {
 	log.Infof("generate data for %s", r.resourceTypeName)
 	var regions []mysql.Region
 	var azs []mysql.AZ
@@ -79,8 +79,8 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 			regionLcuuidToDomainLcuuids[vpc.Region][vpc.Domain] = true
 		}
 	}
-	keyToItem := make(map[IDKey]mysql.ChRegion)
-	for _, region := range regions {
+	items := make([]mysql.ChRegion, len(regions))
+	for i, region := range regions {
 		domainLcuuids, _ := regionLcuuidToDomainLcuuids[region.Lcuuid]
 		domainIconIDs := []int{}
 		for domainLcuuid, _ := range domainLcuuids {
@@ -97,20 +97,28 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 		if iconID == 0 {
 			iconID = r.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REGION}]
 		}
-
-		if region.DeletedAt.Valid {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
-				ID:     region.ID,
-				Name:   region.Name + " (deleted)",
-				IconID: iconID,
-			}
-		} else {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
-				ID:     region.ID,
-				Name:   region.Name,
-				IconID: iconID,
-			}
+		items[i] = mysql.ChRegion{
+			ID:     region.ID,
+			Name:   region.Name,
+			IconID: iconID,
 		}
+		if region.DeletedAt.Valid {
+			items[i].Name = region.Name + " (deleted)"
+
+		}
+	}
+	return items, true
+}
+
+func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
+	items, ok := r.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChRegion, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

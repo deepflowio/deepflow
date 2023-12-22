@@ -38,7 +38,7 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 	return updater
 }
 
-func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
+func (a *ChAZ) getNewData() ([]mysql.ChAZ, bool) {
 	log.Infof("generate data for %s", a.resourceTypeName)
 	var azs []mysql.AZ
 	err := mysql.Db.Unscoped().Find(&azs).Error
@@ -47,9 +47,8 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChAZ)
-
-	for _, az := range azs {
+	items := make([]mysql.ChAZ, len(azs))
+	for i, az := range azs {
 		iconID := a.domainLcuuidToIconID[az.Domain]
 		if iconID == 0 {
 			key := IconKey{
@@ -57,20 +56,27 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 			}
 			iconID = a.resourceTypeToIconID[key]
 		}
-		if az.DeletedAt.Valid {
-			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
-				ID:     az.ID,
-				Name:   az.Name + " (deleted)",
-				IconID: iconID,
-			}
-		} else {
-			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
-				ID:     az.ID,
-				Name:   az.Name,
-				IconID: iconID,
-			}
+		items[i] = mysql.ChAZ{
+			ID:     az.ID,
+			Name:   az.Name,
+			IconID: iconID,
 		}
+		if az.DeletedAt.Valid {
+			items[i].Name = az.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
 
+func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
+	items, ok := a.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChAZ, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

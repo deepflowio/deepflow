@@ -37,7 +37,7 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	return updater
 }
 
-func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
+func (n *ChNetwork) getNewData() ([]mysql.ChNetwork, bool) {
 	var networks []mysql.Network
 	err := mysql.Db.Unscoped().Find(&networks).Error
 	if err != nil {
@@ -45,17 +45,30 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChNetwork)
-	for _, network := range networks {
+	items := make([]mysql.ChNetwork, len(networks))
+	for i, network := range networks {
 		networkName := network.Name
 		if network.DeletedAt.Valid {
 			networkName += " (deleted)"
 		}
-		keyToItem[IDKey{ID: network.ID}] = mysql.ChNetwork{
+		items[i] = mysql.ChNetwork{
 			ID:     network.ID,
 			Name:   networkName,
 			IconID: n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
 		}
+	}
+	return items, true
+}
+
+func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
+	items, ok := n.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChNetwork, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

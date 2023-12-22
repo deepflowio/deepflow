@@ -38,14 +38,15 @@ func NewChOSAppTags() *ChOSAppTags {
 	return updater
 }
 
-func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, bool) {
+func (o *ChOSAppTags) getNewData() ([]mysql.ChOSAppTags, bool) {
 	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
 		return nil, false
 	}
 
-	keyToItem := make(map[OSAPPTagsKey]mysql.ChOSAppTags)
+	items := make([]mysql.ChOSAppTags, len(processes))
+	i := 0
 	for _, process := range processes {
 		osAppTagsMap := map[string]string{}
 		splitOsAppTags := strings.Split(process.OSAPPTags, ", ")
@@ -61,14 +62,26 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 				log.Error(err)
 				return nil, false
 			}
-			key := OSAPPTagsKey{
-				PID: process.ID,
-			}
-			keyToItem[key] = mysql.ChOSAppTags{
+
+			items[i] = mysql.ChOSAppTags{
 				PID:       process.ID,
 				OSAPPTags: string(osAppTagsStr),
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, bool) {
+	items, ok := o.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[OSAPPTagsKey]mysql.ChOSAppTags)
+	for _, item := range items {
+		keyToItem[OSAPPTagsKey{PID: item.PID}] = item
 	}
 	return keyToItem, true
 }

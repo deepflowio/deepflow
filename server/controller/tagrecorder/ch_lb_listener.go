@@ -37,7 +37,7 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	return updater
 }
 
-func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
+func (l *ChLbListener) getNewData() ([]mysql.ChLBListener, bool) {
 	var lbListeners []mysql.LBListener
 	var lbTargetServers []mysql.LBTargetServer
 	err := mysql.Db.Unscoped().Find(&lbListeners).Error
@@ -56,22 +56,33 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 		lbTargetSertverMap[lbTargetServer.LBListenerID] += 1
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChLBListener)
+	keyToItem := make([]mysql.ChLBListener, len(lbListeners))
+	i := 0
 	for _, lbListener := range lbListeners {
 		if lbTargetSertverMap[lbListener.ID] == 0 {
 			continue
 		}
-		if lbListener.DeletedAt.Valid {
-			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name + " (deleted)",
-			}
-		} else {
-			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name,
-			}
+		keyToItem[i] = mysql.ChLBListener{
+			ID:   lbListener.ID,
+			Name: lbListener.Name,
 		}
+		if lbListener.DeletedAt.Valid {
+			keyToItem[i].Name = lbListener.Name + " (deleted)"
+		}
+		i++
+	}
+	return keyToItem, true
+}
+
+func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
+	items, ok := l.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChLBListener)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

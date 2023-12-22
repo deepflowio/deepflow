@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -36,6 +37,27 @@ func NewChIPRelation() *ChIPRelation {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (i *ChIPRelation) getNewData() ([]mysql.ChIPRelation, bool) {
+	keyToItem, ok := i.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChIPRelation, len(keyToItem))
+	index := 0
+	for _, data := range keyToItem {
+		items[index] = data
+		index++
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].VPCID < items[i].VPCID
+	})
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].IP < items[i].IP
+	})
+	return items, true
 }
 
 func (i *ChIPRelation) generateNewData() (map[IPRelationKey]mysql.ChIPRelation, bool) {

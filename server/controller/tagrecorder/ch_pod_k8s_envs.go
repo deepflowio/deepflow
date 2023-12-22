@@ -37,7 +37,7 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 	return updater
 }
 
-func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, bool) {
+func (k *ChPodK8sEnvs) getNewData() ([]mysql.ChPodK8sEnvs, bool) {
 	var pods []mysql.Pod
 	err := mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
@@ -45,7 +45,8 @@ func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, boo
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sEnvsKey]mysql.ChPodK8sEnvs)
+	items := make([]mysql.ChPodK8sEnvs, len(pods))
+	i := 0
 	for _, pod := range pods {
 		envsMap := map[string]string{}
 		envs := strings.Split(pod.ENV, ", ")
@@ -61,16 +62,28 @@ func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, boo
 				log.Error(err)
 				return nil, false
 			}
-			key := K8sEnvsKey{
-				ID: pod.ID,
-			}
-			keyToItem[key] = mysql.ChPodK8sEnvs{
+
+			items[i] = mysql.ChPodK8sEnvs{
 				ID:      pod.ID,
 				Envs:    string(envStr),
 				L3EPCID: pod.VPCID,
 				PodNsID: pod.PodNamespaceID,
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, bool) {
+	items, ok := k.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[K8sEnvsKey]mysql.ChPodK8sEnvs)
+	for _, item := range items {
+		keyToItem[K8sEnvsKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

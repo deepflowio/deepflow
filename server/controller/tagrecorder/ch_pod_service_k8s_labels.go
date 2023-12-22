@@ -37,7 +37,7 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 	return updater
 }
 
-func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodServiceK8sLabels, bool) {
+func (k *ChPodServiceK8sLabels) getNewData() ([]mysql.ChPodServiceK8sLabels, bool) {
 	var podServices []mysql.PodService
 	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
@@ -45,7 +45,8 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sLabelsKey]mysql.ChPodServiceK8sLabels)
+	items := make([]mysql.ChPodServiceK8sLabels, len(podServices))
+	i := 0
 	for _, podService := range podServices {
 		labelsMap := map[string]string{}
 		splitLabel := strings.Split(podService.Label, ", ")
@@ -61,16 +62,27 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 				log.Error(err)
 				return nil, false
 			}
-			key := K8sLabelsKey{
-				ID: podService.ID,
-			}
-			keyToItem[key] = mysql.ChPodServiceK8sLabels{
+			items[i] = mysql.ChPodServiceK8sLabels{
 				ID:      podService.ID,
 				Labels:  string(labelsStr),
 				L3EPCID: podService.VPCID,
 				PodNsID: podService.PodNamespaceID,
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodServiceK8sLabels, bool) {
+	items, ok := k.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[K8sLabelsKey]mysql.ChPodServiceK8sLabels)
+	for _, item := range items {
+		keyToItem[K8sLabelsKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

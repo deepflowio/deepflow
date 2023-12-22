@@ -37,26 +37,35 @@ func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 	return updater
 }
 
-func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
+func (p *ChPodIngress) getNewData() ([]mysql.ChPodIngress, bool) {
 	var podIngresses []mysql.PodIngress
 	err := mysql.Db.Unscoped().Find(&podIngresses).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	keyToItem := make(map[IDKey]mysql.ChPodIngress)
-	for _, podIngress := range podIngresses {
-		if podIngress.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name + " (deleted)",
-			}
-		} else {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name,
-			}
+	items := make([]mysql.ChPodIngress, len(podIngresses))
+	for i, podIngress := range podIngresses {
+		items[i] = mysql.ChPodIngress{
+			ID:   podIngress.ID,
+			Name: podIngress.Name,
 		}
+		if podIngress.DeletedAt.Valid {
+			items[i].Name = podIngress.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPodIngress)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

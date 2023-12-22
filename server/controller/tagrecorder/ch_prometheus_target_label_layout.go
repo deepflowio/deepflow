@@ -37,7 +37,7 @@ func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusTargetLabelLayout, bool) {
+func (l *ChPrometheusTargetLabelLayout) getNewData() ([]mysql.ChPrometheusTargetLabelLayout, bool) {
 	var prometheusTargets []mysql.PrometheusTarget
 
 	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
@@ -46,8 +46,8 @@ func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPro
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusTargetLabelLayout)
-	for _, prometheusTarget := range prometheusTargets {
+	items := make([]mysql.ChPrometheusTargetLabelLayout, len(prometheusTargets))
+	for i, prometheusTarget := range prometheusTargets {
 		targetLabelNames := "job, instance"
 		targetLabelValues := prometheusTarget.Job + ", " + prometheusTarget.Instance
 		otherLabels := strings.Split(prometheusTarget.OtherLabels, ", ")
@@ -60,11 +60,24 @@ func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPro
 				}
 			}
 		}
-		keyToItem[IDKey{ID: prometheusTarget.ID}] = mysql.ChPrometheusTargetLabelLayout{
+		items[i] = mysql.ChPrometheusTargetLabelLayout{
 			TargetID:          prometheusTarget.ID,
 			TargetLabelNames:  targetLabelNames,
 			TargetLabelValues: targetLabelValues,
 		}
+	}
+	return items, true
+}
+
+func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusTargetLabelLayout, bool) {
+	items, ok := l.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPrometheusTargetLabelLayout, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.TargetID}] = item
 	}
 	return keyToItem, true
 }

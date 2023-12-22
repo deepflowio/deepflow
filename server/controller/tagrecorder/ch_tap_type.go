@@ -36,7 +36,7 @@ func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	return updater
 }
 
-func (t *ChTapType) generateNewData() (map[TapTypeKey]mysql.ChTapType, bool) {
+func (t *ChTapType) getNewData() ([]mysql.ChTapType, bool) {
 	var tapTypes []mysql.TapType
 	err := mysql.Db.Unscoped().Find(&tapTypes).Error
 	if err != nil {
@@ -44,12 +44,25 @@ func (t *ChTapType) generateNewData() (map[TapTypeKey]mysql.ChTapType, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[TapTypeKey]mysql.ChTapType)
-	for _, tapType := range tapTypes {
-		keyToItem[TapTypeKey{Value: tapType.Value}] = mysql.ChTapType{
+	items := make([]mysql.ChTapType, len(tapTypes))
+	for i, tapType := range tapTypes {
+		items[i] = mysql.ChTapType{
 			Value: tapType.Value,
 			Name:  tapType.Name,
 		}
+	}
+	return items, true
+}
+
+func (t *ChTapType) generateNewData() (map[TapTypeKey]mysql.ChTapType, bool) {
+	items, ok := t.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[TapTypeKey]mysql.ChTapType, len(items))
+	for _, item := range items {
+		keyToItem[TapTypeKey{Value: item.Value}] = item
 	}
 	return keyToItem, true
 }

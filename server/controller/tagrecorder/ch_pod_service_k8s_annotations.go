@@ -37,7 +37,7 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 	return updater
 }
 
-func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations, bool) {
+func (k *ChPodServiceK8sAnnotations) getNewData() ([]mysql.ChPodServiceK8sAnnotations, bool) {
 	var podServices []mysql.PodService
 	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
@@ -45,7 +45,8 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations)
+	items := make([]mysql.ChPodServiceK8sAnnotations, len(podServices))
+	i := 0
 	for _, podService := range podServices {
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(podService.Annotation, ", ")
@@ -61,16 +62,27 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 				log.Error(err)
 				return nil, false
 			}
-			key := K8sAnnotationsKey{
-				ID: podService.ID,
-			}
-			keyToItem[key] = mysql.ChPodServiceK8sAnnotations{
+			items[i] = mysql.ChPodServiceK8sAnnotations{
 				ID:          podService.ID,
 				Annotations: string(annotationStr),
 				L3EPCID:     podService.VPCID,
 				PodNsID:     podService.PodNamespaceID,
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations, bool) {
+	items, ok := k.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations, len(items))
+	for _, item := range items {
+		keyToItem[K8sAnnotationsKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

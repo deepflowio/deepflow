@@ -36,7 +36,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	return updater
 }
 
-func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
+func (v *ChVPC) getNewData() ([]mysql.ChVPC, bool) {
 	var vpcs []mysql.VPC
 	err := mysql.Db.Unscoped().Find(&vpcs).Error
 	if err != nil {
@@ -44,23 +44,30 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChVPC)
-	for _, vpc := range vpcs {
-		if vpc.DeletedAt.Valid {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name + " (deleted)",
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
-			}
-		} else {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name,
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
-			}
+	items := make([]mysql.ChVPC, len(vpcs))
+	for i, vpc := range vpcs {
+		items[i] = mysql.ChVPC{
+			ID:     vpc.ID,
+			Name:   vpc.Name,
+			UID:    vpc.UID,
+			IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
 		}
+		if vpc.DeletedAt.Valid {
+			items[i].Name = vpc.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
+	items, ok := v.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChVPC, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

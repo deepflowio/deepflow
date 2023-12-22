@@ -36,7 +36,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 	return updater
 }
 
-func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostCloudTags, bool) {
+func (c *ChChostCloudTags) getNewData() ([]mysql.ChChostCloudTags, bool) {
 	var vms []mysql.VM
 	err := mysql.Db.Unscoped().Find(&vms).Error
 	if err != nil {
@@ -44,7 +44,8 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagsKey]mysql.ChChostCloudTags)
+	items := make([]mysql.ChChostCloudTags, len(vms))
+	i := 0
 	for _, vm := range vms {
 		cloudTagsMap := map[string]string{}
 		for k, v := range vm.CloudTags {
@@ -56,14 +57,25 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 				log.Error(err)
 				return nil, false
 			}
-			key := CloudTagsKey{
-				ID: vm.ID,
-			}
-			keyToItem[key] = mysql.ChChostCloudTags{
+			items[i] = mysql.ChChostCloudTags{
 				ID:        vm.ID,
 				CloudTags: string(cloudTagsStr),
 			}
+			i++
 		}
+	}
+	return items, true
+}
+
+func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostCloudTags, bool) {
+	items, ok := c.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[CloudTagsKey]mysql.ChChostCloudTags, len(items))
+	for _, item := range items {
+		keyToItem[CloudTagsKey{item.ID}] = item
 	}
 	return keyToItem, true
 }

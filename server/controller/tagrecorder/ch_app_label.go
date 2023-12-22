@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"sort"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -35,6 +37,27 @@ func NewChAPPLabel() *ChAPPLabel {
 
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (l *ChAPPLabel) getNewData() ([]mysql.ChAPPLabel, bool) {
+	keyToItem, ok := l.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChAPPLabel, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].LabelNameID < items[j].LabelNameID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].LabelValueID < items[j].LabelValueID
+	})
+	return items, true
 }
 
 func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLabel, bool) {

@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"sort"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -32,6 +34,27 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (p *ChPodNSCloudTag) getNewData() ([]mysql.ChPodNSCloudTag, bool) {
+	keyToItem, ok := p.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChPodNSCloudTag, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].ID < items[j].ID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].Key < items[j].Key
+	})
+	return items, true
 }
 
 func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudTag, bool) {

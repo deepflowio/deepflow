@@ -35,7 +35,7 @@ func NewChPrometheusLabelName() *ChPrometheusLabelName {
 	return updater
 }
 
-func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusLabelName, bool) {
+func (l *ChPrometheusLabelName) getNewData() ([]mysql.ChPrometheusLabelName, bool) {
 	var prometheusLabelName []mysql.PrometheusLabelName
 
 	err := mysql.Db.Unscoped().Find(&prometheusLabelName).Error
@@ -44,12 +44,25 @@ func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusL
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusLabelName)
-	for _, labelName := range prometheusLabelName {
-		keyToItem[IDKey{ID: labelName.ID}] = mysql.ChPrometheusLabelName{
+	items := make([]mysql.ChPrometheusLabelName, len(prometheusLabelName))
+	for i, labelName := range prometheusLabelName {
+		items[i] = mysql.ChPrometheusLabelName{
 			ID:   labelName.ID,
 			Name: labelName.Name,
 		}
+	}
+	return items, true
+}
+
+func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusLabelName, bool) {
+	items, ok := l.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPrometheusLabelName, len(items))
+	for _, item := range items {
+		keyToItem[IDKey{item.ID}] = item
 	}
 	return keyToItem, true
 }

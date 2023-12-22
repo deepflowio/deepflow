@@ -21,11 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -52,6 +54,28 @@ func NewChVTapPort() *ChVTapPort {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (v *ChVTapPort) getNewData() ([]mysql.ChVTapPort, bool) {
+	keyToItem, ok := v.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChVTapPort, len(keyToItem))
+	i := 0
+	for _, data := range keyToItem {
+		items[i] = data
+		i++
+	}
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].VTapID < items[j].VTapID
+	})
+	sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[i].TapPort < items[j].TapPort
+	})
+	return items, true
+
 }
 
 func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) {

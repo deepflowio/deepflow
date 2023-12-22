@@ -36,7 +36,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	return updater
 }
 
-func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
+func (p *ChPodCluster) getNewData() ([]mysql.ChPodCluster, bool) {
 	var podClusters []mysql.PodCluster
 	err := mysql.Db.Unscoped().Find(&podClusters).Error
 	if err != nil {
@@ -44,21 +44,29 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodCluster)
-	for _, podCluster := range podClusters {
-		if podCluster.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:     podCluster.ID,
-				Name:   podCluster.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-			}
-		} else {
-			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:     podCluster.ID,
-				Name:   podCluster.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-			}
+	items := make([]mysql.ChPodCluster, len(podClusters))
+	for i, podCluster := range podClusters {
+		items[i] = mysql.ChPodCluster{
+			ID:     podCluster.ID,
+			Name:   podCluster.Name,
+			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
 		}
+		if podCluster.DeletedAt.Valid {
+			items[i].Name = podCluster.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPodCluster)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

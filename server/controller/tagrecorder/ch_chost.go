@@ -34,7 +34,7 @@ func NewChChost() *ChChost {
 	return updater
 }
 
-func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
+func (p *ChChost) getNewData() ([]mysql.ChChost, bool) {
 	var (
 		chosts []mysql.VM
 		hosts  []mysql.Host
@@ -55,23 +55,30 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 		ipToHostID[host.IP] = host.ID
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChChost)
-	for _, chost := range chosts {
-		if chost.DeletedAt.Valid {
-			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:     chost.ID,
-				Name:   chost.Name + " (deleted)",
-				VPCID:  chost.VPCID,
-				HostID: ipToHostID[chost.LaunchServer],
-			}
-		} else {
-			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:     chost.ID,
-				Name:   chost.Name,
-				VPCID:  chost.VPCID,
-				HostID: ipToHostID[chost.LaunchServer],
-			}
+	items := make([]mysql.ChChost, len(chosts))
+	for i, chost := range chosts {
+		items[i] = mysql.ChChost{
+			ID:     chost.ID,
+			Name:   chost.Name,
+			VPCID:  chost.VPCID,
+			HostID: ipToHostID[chost.LaunchServer],
 		}
+		if chost.DeletedAt.Valid {
+			items[i].Name = chost.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChChost)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

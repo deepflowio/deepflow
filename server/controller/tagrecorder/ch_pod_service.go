@@ -34,7 +34,7 @@ func NewChPodService() *ChPodService {
 	return updater
 }
 
-func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
+func (p *ChPodService) getNewData() ([]mysql.ChPodService, bool) {
 	var podServices []mysql.PodService
 	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
@@ -42,23 +42,30 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodService)
-	for _, podService := range podServices {
-		if podService.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
-				ID:           podService.ID,
-				Name:         podService.Name + " (deleted)",
-				PodClusterID: podService.PodClusterID,
-				PodNsID:      podService.PodNamespaceID,
-			}
-		} else {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
-				ID:           podService.ID,
-				Name:         podService.Name,
-				PodClusterID: podService.PodClusterID,
-				PodNsID:      podService.PodNamespaceID,
-			}
+	items := make([]mysql.ChPodService, len(podServices))
+	for i, podService := range podServices {
+		items[i] = mysql.ChPodService{
+			ID:           podService.ID,
+			Name:         podService.Name,
+			PodClusterID: podService.PodClusterID,
+			PodNsID:      podService.PodNamespaceID,
 		}
+		if podService.DeletedAt.Valid {
+			items[i].Name = podService.Name + " (deleted)"
+		}
+	}
+	return items, true
+}
+
+func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
+	items, ok := p.getNewData()
+	if !ok {
+		return nil, false
+	}
+
+	keyToItem := make(map[IDKey]mysql.ChPodService)
+	for _, item := range items {
+		keyToItem[IDKey{ID: item.ID}] = item
 	}
 	return keyToItem, true
 }

@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"sort"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -32,6 +34,22 @@ func NewChNodeType() *ChNodeType {
 	}
 	updater.dataGenerator = updater
 	return updater
+}
+
+func (n *ChNodeType) getNewData() ([]mysql.ChNodeType, bool) {
+	items := make([]mysql.ChNodeType, len(RESOURCE_TYPE_TO_NODE_TYPE))
+	i := 0
+	for resourceType, nodeType := range RESOURCE_TYPE_TO_NODE_TYPE {
+		items[i] = mysql.ChNodeType{
+			ResourceType: resourceType,
+			NodeType:     nodeType,
+		}
+		i++
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].ResourceType < items[i].ResourceType
+	})
+	return items, true
 }
 
 func (n *ChNodeType) generateNewData() (map[NodeTypeKey]mysql.ChNodeType, bool) {

@@ -18,12 +18,14 @@ package tagrecorder
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 
+	json "github.com/goccy/go-json"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	json "github.com/goccy/go-json"
 )
 
 type ChIPResource struct {
@@ -124,6 +126,27 @@ func getVPCIdToUidMap() map[int]string {
 		idToUidMap[vpc.ID] = vpc.UID
 	}
 	return idToUidMap
+}
+
+func (i *ChIPResource) getNewData() ([]mysql.ChIPResource, bool) {
+	keyToItem, ok := i.generateNewData()
+	if !ok {
+		return nil, false
+	}
+
+	items := make([]mysql.ChIPResource, len(keyToItem))
+	index := 0
+	for _, data := range keyToItem {
+		items[index] = data
+		index++
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].SubnetID < items[i].SubnetID
+	})
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].IP < items[i].IP
+	})
+	return items, true
 }
 
 func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, bool) {

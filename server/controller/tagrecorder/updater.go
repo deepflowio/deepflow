@@ -17,6 +17,9 @@
 package tagrecorder
 
 import (
+	"encoding/json"
+	"hash/fnv"
+	"reflect"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -32,9 +35,11 @@ type ChResourceUpdater interface {
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	Refresh() bool
 	SetConfig(cfg config.TagRecorderConfig)
+	Check() (oldHash, newHash uint64)
 }
 
 type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
+	getNewData() ([]MT, bool)
 	// 根据db中的基础资源数据，构建最新的ch资源数据
 	generateNewData() (map[KT]MT, bool)
 	// 构建ch资源的结构体key
@@ -108,6 +113,45 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 	return false
 }
 
+func (b *UpdaterBase[MT, KT]) Check() (oldHash, newHash uint64) {
+	newItems, newOK := b.dataGenerator.getNewData()
+	oldItems, oldOK := b.getOldData()
+
+	newItemStr, err := json.Marshal(newItems)
+	if err != nil {
+		log.Error(err)
+	}
+	oldItemStr, err := json.Marshal(oldItems)
+	if err != nil {
+		log.Error(err)
+	}
+	h64 := fnv.New64()
+	h64.Write(newItemStr)
+	newHash = h64.Sum64()
+	h64 = fnv.New64()
+	h64.Write(oldItemStr)
+	oldHash = h64.Sum64()
+
+	if !newOK || !oldOK {
+		return
+	}
+	// TODO(weiqiang): delete
+	var t MT
+	if oldHash != newHash {
+		log.Infof("update %v old(%v), new(%v)", reflect.TypeOf(t), oldHash, newHash)
+		// err := mysql.Db.Transaction(func(tx *gorm.DB) error {
+		// 	if err := tx.Delete(&oldItems).Error; err != nil {
+		// 		return err
+		// 	}
+		// 	return tx.CreateInBatches(newItems, len(newItems)).Error
+		// })
+		if err != nil {
+			log.Error(err)
+		}
+	}
+	return
+}
+
 func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	var items []MT
 	var err error
@@ -125,6 +169,42 @@ func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 		idToItem[b.dataGenerator.generateKey(item)] = item
 	}
 	return idToItem, true
+}
+
+func (b *UpdaterBase[MT, KT]) getOldData() ([]MT, bool) {
+	var items []MT
+	var err error
+	switch b.resourceTypeName {
+	case RESOURCE_TYPE_CH_GPROCESS:
+		items, err = query.FindInBatchesObj[MT](mysql.Db.Unscoped())
+	case RESOURCE_TYPE_CH_APP_LABEL:
+		err = mysql.Db.Unscoped().Order("label_name_id, label_value_id asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_DEVICE:
+		err = mysql.Db.Unscoped().Order("devicetype, deviceid asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_INT_ENUM, RESOURCE_TYPE_CH_STRING_ENUM:
+		err = mysql.Db.Unscoped().Order("tag_name, value asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_IP_RELATION:
+		err = mysql.Db.Unscoped().Order("l3_epc_id, ip asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_IP_RESOURCE:
+		err = mysql.Db.Unscoped().Order("subnet_id, ip asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_NODE_TYPE:
+		err = mysql.Db.Unscoped().Order("resource_type asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_OS_APP_TAG:
+		err = mysql.Db.Unscoped().Order("pid, key asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_VM_CLOUD_TAG, RESOURCE_TYPE_CH_K8S_ANNOTATION, RESOURCE_TYPE_CH_K8S_ENV, RESOURCE_TYPE_CH_K8S_LABEL:
+		err = mysql.Db.Unscoped().Order("id, key asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_TARGET_LABEL:
+		err = mysql.Db.Unscoped().Order("metric_id, label_name_id, target_id asc").Find(&items).Error
+	case RESOURCE_TYPE_CH_VTAP_PORT:
+		err = mysql.Db.Unscoped().Order("vtap_id, tap_port asc").Find(&items).Error
+	default:
+		err = mysql.Db.Unscoped().Find(&items).Error
+	}
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		return nil, false
+	}
+	return items, true
 }
 
 func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
