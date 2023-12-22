@@ -2013,7 +2013,7 @@ check:
 	 *
 	 * client recv:
 	 * --------------
-	 * (2) handshake_type 0x1 (server hello)
+	 * (2) handshake_type 0x2 (server hello)
 	 * (3) handshake_type 0xb (certificates)
 	 * (4) handshake_type 0xc (server key exchange message)
 	 * (5) handshake_type 0xe (server hello done message)
