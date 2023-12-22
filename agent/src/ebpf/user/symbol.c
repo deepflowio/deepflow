@@ -665,6 +665,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->unknown_syms_found = false;
 	p->new_java_syms_file = false;
 	p->cache_need_update = false;
+	p->gen_java_syms_file_err = false;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -895,7 +896,17 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if ((p->unknown_syms_found
 			     || (void *)kv.v.cache == NULL)
 			    && p->update_syms_table_time == 0) {
-				if (p->is_java) {
+				/*
+				 * If an exception occurs during the process of generating
+				 * the Java symbol table, such as a failure to establish a
+				 * connection with the target JVM, the symbol file will not
+				 * be generated. In this case, no further symbol requests will
+				 * be made to this Java process.
+				 * Control with 'p->gen_java_syms_file_err'
+				 */
+				if (p->is_java
+				    && (p->unknown_syms_found
+					|| p->gen_java_syms_file_err)) {
 					p->update_syms_table_time =
 					    curr_time +
 					    get_java_syms_fetch_delay();
@@ -906,10 +917,11 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
 				 */
-				if (kv.v.cache == 0)
-					p->update_syms_table_time +=
+				if (kv.v.cache == 0 && !p->gen_java_syms_file_err) {
+					p->update_syms_table_time =
 					    generate_random_integer
 					    (PROFILER_DEFER_RANDOM_MAX);
+				}
 			}
 
 			if (p->update_syms_table_time > 0

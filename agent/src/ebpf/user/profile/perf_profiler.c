@@ -196,7 +196,6 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
  * not match.
  */
 static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
-				const char *process_name,
 				struct stack_trace_key_t *v, void *msg_value)
 {
 	strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
@@ -277,8 +276,7 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 		if (!matched) {
 			msg->pid = msg->tid = 0;
 			snprintf((char *)msg->process_name,
-				 sizeof(msg->process_name),
-				 "%s", "Total");
+				 sizeof(msg->process_name), "%s", "Total");
 		}
 	}
 
@@ -524,6 +522,54 @@ static inline void add_stack_id_to_bitmap(int stack_id, bool is_a)
 	}
 }
 
+static inline void update_matched_process_in_total(stack_trace_msg_hash_t *
+						   msg_hash,
+						   char *process_name,
+						   struct stack_trace_key_t *v)
+{
+	stack_trace_msg_kv_t kv;
+	set_msg_kvp_by_comm(&kv, v, (void *)0);
+
+	if (stack_trace_msg_hash_search
+	    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
+	     (stack_trace_msg_hash_kv *) & kv) == 0) {
+		__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
+		((stack_trace_msg_t *) kv.msg_ptr)->count++;
+		return;
+	}
+
+	/* append ';' '\0' and '[p/t]' */
+	char trace_str[(TASK_COMM_LEN * 2) + 10];
+	bool is_thread = (v->pid != v->tgid);
+	if (is_thread)
+		snprintf(trace_str, sizeof(trace_str), "[p] %s;[t] %s",
+			 process_name, v->comm);
+	else
+		snprintf(trace_str, sizeof(trace_str), "[p] %s", process_name);
+
+	/* append 2 byte for ';''\0' */
+	int len = sizeof(stack_trace_msg_t) + strlen(trace_str) + 2;
+	stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
+	if (msg == NULL) {
+		clib_mem_free(trace_str);
+		return;
+	}
+
+	set_stack_trace_msg(msg, v, false, 0, 0, process_name, NULL);
+	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
+	msg->data_len = strlen((char *)msg->data);
+	kv.msg_ptr = pointer_to_uword(msg);
+
+	if (stack_trace_msg_hash_add_del(msg_hash,
+					 (stack_trace_msg_hash_kv
+					  *) & kv, 1 /* is_add */ )) {
+		ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+		clib_mem_free(msg);
+	} else {
+		__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
+	}
+}
+
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
 				   stack_str_hash_t * stack_str_hash,
@@ -582,11 +628,25 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		char name[TASK_COMM_LEN];
 		memset(name, 0, sizeof(name));
 		u64 stime, netns_id;
+		stime = netns_id = 0;
 		void *info_p = NULL;
+		char *process_name = NULL;
+		bool matched, is_match_finish;
+		matched = is_match_finish = false;
+
+		/* If it is a process, match operation will be performed immediately. */
+		if (v->pid == v->tgid) {
+			is_match_finish = true;
+			matched = (regexec(&profiler_regex, v->comm, 0, NULL, 0)
+				   == 0);
+			if (!matched) {
+				set_msg_kvp_by_comm(&kv, v, (void *)0);
+				goto skip_proc_find;
+			}
+		}
+
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
 					(char *)name, &info_p);
-		char *process_name = NULL;
-		bool matched = false;
 
 		/* 
 		 * If the data collected is from a running process, and the process
@@ -607,19 +667,30 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			else
 				process_name = name;
 
-			matched =
-			    (regexec(&profiler_regex, process_name, 0, NULL, 0)
-			     == 0);
+			if (!is_match_finish)
+				matched =
+				    (regexec
+				     (&profiler_regex, process_name, 0, NULL, 0)
+				     == 0);
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else
-				set_msg_kvp_by_comm(&kv, process_name, v,
-						    (void *)0);
+				set_msg_kvp_by_comm(&kv, v, (void *)0);
 		} else {
 			/* Not find process in procfs. */
-			set_msg_kvp_by_comm(&kv, NULL, v, (void *)0);
+			set_msg_kvp_by_comm(&kv, v, (void *)0);
 		}
 
+		/*
+		 * Here, we duplicate the matched process data and place it into
+		 * the Total process, with the aim of showcasing the proportion
+		 * of each process in the overall sampling.
+		 */
+		if (matched)
+			update_matched_process_in_total(msg_hash, process_name,
+							v);
+
+	      skip_proc_find:
 		if (stack_trace_msg_hash_search
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
@@ -644,7 +715,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
-			 * append 2 byte for ';' '\0' '[p/t]'
+			 * append 2 byte for ';''\0'
+			 * append pre_tag '[p/t]'
 			 */
 			char pre_tag[5];
 			int str_len = strlen(trace_str) + 2;
@@ -667,13 +739,14 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 			snprintf(pre_tag, sizeof(pre_tag), "%s ",
 				 v->pid == v->tgid ? "[p]" : "[t]");
 			if (matched)
-				snprintf((char *)&msg->data[0], str_len, "%s%s;%s",
-					 pre_tag, v->comm, trace_str);
+				snprintf((char *)&msg->data[0], str_len,
+					 "%s%s;%s", pre_tag, v->comm,
+					 trace_str);
 			else
 				snprintf((char *)&msg->data[0], str_len, "%s",
 					 trace_str);
 
-			msg->data_len = strlen(msg->data);
+			msg->data_len = strlen((char *)msg->data);
 			clib_mem_free(trace_str);
 			kv.msg_ptr = pointer_to_uword(msg);
 

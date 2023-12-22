@@ -42,9 +42,9 @@ use crate::common::{
     flow::{Flow, L7PerfStats},
     l7_protocol_log::L7ParseResult,
 };
-use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
-use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
+use crate::plugin::c_ffi::SoPluginFunc;
+use crate::plugin::wasm::WasmVm;
 use crate::rpc::get_timestamp;
 use crate::{
     common::{
@@ -195,11 +195,9 @@ pub struct FlowLog {
     is_success: bool,
     is_skip: bool,
 
-    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    wasm_vm: Rc<RefCell<Option<WasmVm>>>,
     #[cfg(target_os = "linux")]
-    so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(target_os = "linux")]
-    so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
+    so_plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
 
@@ -313,18 +311,12 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
-            {
-                param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
-            }
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
-            if let Some(vm) = self.wasm_vm.as_ref() {
-                param.set_wasm_vm(vm.clone());
-            }
+            param.set_wasm_vm(Rc::clone(&self.wasm_vm));
             #[cfg(target_os = "linux")]
-            if let Some(p) = self.so_plugin.as_ref() {
-                param.set_so_func(p.clone());
-            }
+            param.set_so_func(Rc::clone(&self.so_plugin));
 
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
@@ -423,16 +415,12 @@ impl FlowLog {
             );
             param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
-            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+            param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            param.set_wasm_vm(Rc::clone(&self.wasm_vm));
             #[cfg(target_os = "linux")]
-            if let Some(p) = self.so_plugin.as_ref() {
-                param.set_so_func(p.clone());
-            }
-            if let Some(vm) = self.wasm_vm.as_ref() {
-                param.set_wasm_vm(vm.clone());
-            }
+            param.set_so_func(Rc::clone(&self.so_plugin));
             return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
         }
 
@@ -463,9 +451,8 @@ impl FlowLog {
         is_skip: bool,
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
-        wasm_vm: Option<Rc<RefCell<WasmVm>>>,
-        #[cfg(target_os = "linux")] so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-        #[cfg(target_os = "linux")] so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
+        wasm_vm: Rc<RefCell<Option<WasmVm>>>,
+        #[cfg(target_os = "linux")] so_plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
         l7_protocol_inference_ttl: u64,
@@ -500,10 +487,8 @@ impl FlowLog {
             wasm_vm,
             #[cfg(target_os = "linux")]
             so_plugin,
-            #[cfg(target_os = "linux")]
-            so_plugin_counter,
-            stats_counter: stats_counter,
-            rrt_timeout: rrt_timeout,
+            stats_counter,
+            rrt_timeout,
             last_fail: last_time,
             l7_protocol_inference_ttl,
             ntp_diff,
@@ -582,5 +567,17 @@ impl FlowLog {
             });
 
         (l7_perf, self.l7_protocol_enum.get_l7_protocol())
+    }
+
+    pub fn reset_on_plugin_reload(&mut self) {
+        if matches!(self.l7_protocol_enum, L7ProtocolEnum::Custom(_)) {
+            self.l7_protocol_enum = Default::default();
+        }
+        let Some(parser) = self.l7_protocol_log_parser.as_ref() else {
+            return;
+        };
+        if matches!(**parser, L7ProtocolParser::Custom(_)) {
+            self.l7_protocol_log_parser = None;
+        }
     }
 }

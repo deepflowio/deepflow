@@ -250,8 +250,6 @@ enum {
 /*
  * When the deepflow-agent is started, to avoid the sudden generation of Java symbol
  * tables:
- * - Delay the generation of symbol tables by 'java-symbol-file-refresh-defer-interval'
- *   seconds.
  * - Introduce an additional random value for each process's delay, on top of
  *   the configuration specified above, to prevent the abrupt generation of symbol file
  *   for a large number of processes.

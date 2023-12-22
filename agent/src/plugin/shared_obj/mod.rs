@@ -17,10 +17,9 @@
 #[cfg(test)]
 mod test;
 
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::atomic::AtomicU64;
 
 use libc::c_void;
 use md5::{Digest, Md5};
@@ -90,6 +89,8 @@ pub fn load_plugin(plugin: &[u8], name: &String) -> Result<SoPluginFunc, String>
             .into_iter()
             .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
         name: name.clone(),
+        check_payload_counter: Default::default(),
+        parse_payload_counter: Default::default(),
         check_payload: check_func,
         parse_payload: parse_func,
     })
@@ -121,15 +122,4 @@ impl RefCountable for SoPluginCounter {
     }
 }
 
-#[derive(Debug)]
-pub struct SoPluginCounterMap {
-    pub so_mertic: HashMap<String, Arc<SoPluginCounter>>,
-}
-
-pub fn get_so_plug_metric_counter_map_key(name: &str, func_name: &str) -> String {
-    format!("{}:{}", name, func_name)
-}
-
-pub fn get_all_so_func() -> [&'static str; 2] {
-    [CHECK_PAYLOAD_FUNC_SYM, PARSE_PAYLOAD_FUNC_SYM]
-}
+pub const SO_EXPORT_FUNC_NAME: [&'static str; 2] = [CHECK_PAYLOAD_FUNC_SYM, PARSE_PAYLOAD_FUNC_SYM];

@@ -25,16 +25,10 @@ import (
 	"os"
 	"path"
 
+	"github.com/spf13/cobra"
+
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
-	"github.com/spf13/cobra"
-)
-
-var (
-	// TODO(weiqiang): delete(reference server library)
-	PluginTypeIntToName = map[int]string{
-		1: "wasm",
-	}
 )
 
 func RegisterPluginCommand() *cobra.Command {
@@ -143,7 +137,7 @@ func listPlugin(cmd *cobra.Command) {
 		d := data.GetIndex(i)
 
 		fmt.Printf(cmdFormat,
-			typeMaxSize, PluginTypeIntToName[d.Get("TYPE").MustInt()],
+			typeMaxSize, common.PluginType(d.Get("TYPE").MustInt()),
 			nameMaxSize, d.Get("NAME").MustString(),
 			d.Get("UPDATED_AT").MustString(),
 		)

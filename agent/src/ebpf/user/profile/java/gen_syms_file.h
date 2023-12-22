@@ -17,6 +17,10 @@
 #ifndef GEN_SYMS_FILE_H
 #define GEN_SYMS_FILE_H
 
+#define JAVA_SYMS_OK		0
+#define JAVA_SYMS_ERR		1
+#define JAVA_SYMS_NEED_UPDATE	2
+
 #define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
 
 struct java_syms_update_task {
@@ -24,7 +28,7 @@ struct java_syms_update_task {
 	struct symbolizer_proc_info *p;
 };
 
-void gen_java_symbols_file(int pid, bool *need_update);
+void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred);
 void clean_local_java_symbols_files(int pid);
 void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
 void java_syms_update_main(void *arg);

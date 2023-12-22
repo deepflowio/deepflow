@@ -134,9 +134,15 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 	case DB_NAME_FLOW_LOG, DB_NAME_EVENT, DB_NAME_PROFILE:
 		return 1, nil
 	case DB_NAME_FLOW_METRICS:
-		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
+		if name == "" {
+			tableSlice := strings.Split(table, ".")
+			if len(tableSlice) == 2 {
+				name = tableSlice[1]
+			}
+		}
+		if strings.HasPrefix(table, "vtap_flow") {
 			tsdbType = "flow"
-		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
+		} else if strings.HasPrefix(table, "vtap_app") {
 			tsdbType = "app"
 		} else if table == "vtap_acl" {
 			return 60, nil

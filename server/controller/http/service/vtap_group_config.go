@@ -138,8 +138,9 @@ func convertDBToJson(
 	idToTapTypeName map[int]string,
 	lcuuidToDomain map[string]string) {
 
-	ignoreName := []string{"ID", "YamlConfig", "L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
-		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+	ignoreName := []string{"ID", "YamlConfig", "L4LogTapTypes", "L4LogIgnoreTapSides",
+		"L7LogIgnoreTapSides", "L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps",
+		"MaxNpbBps", "MaxTxBandwidth", "WasmPlugins", "SoPlugins"}
 	copyStruct(sData, tData, ignoreName)
 	tData.L4LogTapTypes = []*model.TypeInfo{}
 	tData.L7LogStoreTapTypes = []*model.TypeInfo{}
@@ -243,13 +244,26 @@ func convertDBToJson(
 		cMaxTxBandwidth := *sData.MaxTxBandwidth / 1000000
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
 	}
+
+	if sData.WasmPlugins != nil && len(*sData.WasmPlugins) > 0 {
+		cWasmPlugins := strings.Split(*sData.WasmPlugins, ",")
+		for _, wasmPlugin := range cWasmPlugins {
+			tData.WasmPlugins = append(tData.WasmPlugins, wasmPlugin)
+		}
+	}
+	if sData.SoPlugins != nil && len(*sData.SoPlugins) > 0 {
+		cSoPlugins := strings.Split(*sData.SoPlugins, ",")
+		for _, soPlugin := range cSoPlugins {
+			tData.SoPlugins = append(tData.SoPlugins, soPlugin)
+		}
+	}
 }
 
 func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroupConfiguration) {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
-		"PrometheusHttpAPIAddresses",
+		"PrometheusHttpAPIAddresses", "WasmPlugins", "SoPlugins",
 	}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
@@ -334,6 +348,23 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 		cMaxTxBandwidth := *sData.MaxTxBandwidth / 1000000
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
 	}
+
+	if sData.WasmPlugins != nil {
+		cWasmPlugins := strings.Split(*sData.WasmPlugins, ",")
+		for _, wasmPlugin := range cWasmPlugins {
+			if wasmPlugin != "" {
+				tData.WasmPlugins = append(tData.WasmPlugins, wasmPlugin)
+			}
+		}
+	}
+	if sData.SoPlugins != nil {
+		cSoPlugins := strings.Split(*sData.SoPlugins, ",")
+		for _, soPlugin := range cSoPlugins {
+			if soPlugin != "" {
+				tData.SoPlugins = append(tData.SoPlugins, soPlugin)
+			}
+		}
+	}
 }
 
 func convertJsonToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
@@ -360,7 +391,7 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
-		"PrometheusHttpAPIAddresses",
+		"PrometheusHttpAPIAddresses", "WasmPlugins", "SoPlugins",
 	}
 	copyStruct(sData, tData, ignoreName)
 	if len(sData.L4LogTapTypes) > 0 {
@@ -422,6 +453,18 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
 	} else {
 		tData.MaxTxBandwidth = nil
+	}
+	if len(sData.WasmPlugins) > 0 {
+		cWasmPlugins := strings.Join(sData.WasmPlugins, ",")
+		tData.WasmPlugins = &cWasmPlugins
+	} else {
+		tData.WasmPlugins = nil
+	}
+	if len(sData.SoPlugins) > 0 {
+		cSoPlugins := strings.Join(sData.SoPlugins, ",")
+		tData.SoPlugins = &cSoPlugins
+	} else {
+		tData.SoPlugins = nil
 	}
 }
 

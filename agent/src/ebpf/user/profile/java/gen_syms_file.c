@@ -35,16 +35,34 @@ static pthread_mutex_t list_lock;
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-void gen_java_symbols_file(int pid, bool * need_update)
+/** Generate Java symbol file.
+ *
+ * @pid Process ID
+ * @ret_val
+ *   Return address, used by the caller to determine subsequent processing.
+ * @error_occurred
+ *   'true' indicates that an error has occurred at some point,
+ *   'false' indicates that no error has occurred.
+ */
+void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 {
-	*need_update = false;
+	/*
+	 * If an error has occurred at some point, no further retries will
+	 * be attempted.
+	 */
+	if (error_occurred) {
+		goto error;
+	}
+
+	*ret_val = JAVA_SYMS_OK;
 	int target_ns_pid = get_nspid(pid);
 	if (target_ns_pid < 0) {
 		return;
 	}
 
 	char args[PERF_PATH_SZ * 2];
-	if (!is_same_mntns(pid)) {
+	bool is_same_mnt = is_same_mntns(pid);
+	if (!is_same_mnt) {
 		snprintf(args, sizeof(args), "%d %d,%s,%s", pid,
 			 g_java_syms_write_bytes_max,
 			 PERF_MAP_FILE_FMT, PERF_MAP_LOG_FILE_FMT);
@@ -55,12 +73,20 @@ void gen_java_symbols_file(int pid, bool * need_update)
 			 DF_AGENT_LOCAL_PATH_FMT ".log");
 	}
 
+	i64 curr_local_sz;
+	curr_local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+
 	exec_command(DF_JAVA_ATTACH_CMD, args);
 
-	if (!is_same_mntns(pid)) {
+	if (target_symbol_file_access(pid, target_ns_pid, is_same_mnt) != 0) {
+		if (!is_same_mnt)
+			clear_target_ns(pid, target_ns_pid);
+		goto error;
+	}
+
+	if (!is_same_mnt) {
 		i64 target_sz = get_target_symbol_file_sz(pid, target_ns_pid);
-		i64 local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
-		if (target_sz > local_sz) {
+		if (target_sz > curr_local_sz) {
 			if (copy_file_from_target_ns(pid, target_ns_pid, "map")
 			    || copy_file_from_target_ns(pid, target_ns_pid,
 							"log")) {
@@ -69,13 +95,22 @@ void gen_java_symbols_file(int pid, bool * need_update)
 				ebpf_info
 				    ("java need update cache pid %d target file"
 				     " size %ld local file size %ld\n",
-				     pid, target_sz, local_sz);
-				*need_update = true;
+				     pid, target_sz, curr_local_sz);
+				*ret_val = JAVA_SYMS_NEED_UPDATE;
 			}
 		}
 
 		clear_target_ns(pid, target_ns_pid);
+	} else {
+		i64 new_file_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+		if (new_file_sz > curr_local_sz)
+			*ret_val = JAVA_SYMS_NEED_UPDATE;
 	}
+
+	return;
+error:
+	*ret_val = JAVA_SYMS_ERR;
+	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
 }
 
 void clean_local_java_symbols_files(int pid)
@@ -121,13 +156,25 @@ void java_syms_update_main(void *arg)
 		pthread_mutex_unlock(&list_lock);
 
 		if (task != NULL) {
-
 			struct symbolizer_proc_info *p = task->p;
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
-				bool need_update;
-				gen_java_symbols_file(p->pid, &need_update);
-				p->cache_need_update = need_update;
+				int ret;
+				gen_java_symbols_file(p->pid, &ret,
+						      p->
+						      gen_java_syms_file_err);
+				if (ret != JAVA_SYMS_ERR) {
+					if (ret == JAVA_SYMS_NEED_UPDATE)
+						p->cache_need_update = true;
+					else
+						p->cache_need_update = false;
+
+					p->gen_java_syms_file_err = false;
+				} else {
+					p->gen_java_syms_file_err = true;
+					p->cache_need_update = false;
+				}
+
 				AO_SET(&p->new_java_syms_file, true);
 			}
 

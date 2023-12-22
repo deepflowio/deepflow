@@ -21,7 +21,6 @@ use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr};
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -38,17 +37,13 @@ use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
     common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-    plugin::wasm::init_wasmtime,
     HttpLog,
 };
 
-use super::{
-    get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, WasmCounter, WasmCounterMap,
-    WasmVm,
-};
+use super::WasmVm;
 
 fn get_req_param<'a>(
-    vm: Rc<RefCell<WasmVm>>,
+    vm: Rc<RefCell<Option<WasmVm>>>,
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
@@ -72,11 +67,9 @@ fn get_req_param<'a>(
         parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: Some(vm.clone()),
+        wasm_vm: vm,
         #[cfg(target_os = "linux")]
-        so_func: None,
-        #[cfg(target_os = "linux")]
-        so_plugin_counter_map: None,
+        so_func: Default::default(),
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -84,7 +77,7 @@ fn get_req_param<'a>(
 }
 
 fn get_resq_param<'a>(
-    vm: Rc<RefCell<WasmVm>>,
+    vm: Rc<RefCell<Option<WasmVm>>>,
     rrt_cache: Rc<RefCell<L7PerfCache>>,
 ) -> ParseParam<'a> {
     ParseParam {
@@ -109,11 +102,9 @@ fn get_resq_param<'a>(
         parse_log: true,
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
-        wasm_vm: Some(vm.clone()),
+        wasm_vm: vm,
         #[cfg(target_os = "linux")]
-        so_func: None,
-        #[cfg(target_os = "linux")]
-        so_plugin_counter_map: None,
+        so_func: Default::default(),
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
@@ -129,26 +120,12 @@ fn load_module() -> WasmVm {
     let mut prog = vec![];
     d.read_to_end(&mut prog).unwrap();
 
-    let wasm_counter_map = Arc::new(WasmCounterMap {
-        wasm_mertic: {
-            let mut h = HashMap::new();
-            for func_name in get_all_wasm_export_func_name() {
-                let counter = Arc::new(WasmCounter::default());
-                h.insert(get_wasm_metric_counter_map_key("vm0", func_name), counter);
-            }
-            h
-        },
-    });
-
-    init_wasmtime(
-        vec![("vm0".to_string(), prog.as_slice())],
-        &wasm_counter_map,
-    )
+    WasmVm::new(&[("vm0", prog)])
 }
 
 #[test]
 fn test_wasm_http_req() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -208,7 +185,7 @@ fn test_wasm_http_req() {
 
 #[test]
 fn test_wasm_http_resp() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -266,7 +243,7 @@ fn test_wasm_http_resp() {
 
 #[test]
 fn test_check_payload() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let param = get_req_param(vm.clone(), rrt_cache.clone());
@@ -285,7 +262,7 @@ fn test_check_payload() {
 
 #[test]
 fn test_wasm_parse_payload_req() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
 
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -364,7 +341,7 @@ fn test_wasm_parse_payload_req() {
 
 #[test]
 fn test_wasm_parse_payload_resp() {
-    let vm = Rc::new(RefCell::new(load_module()));
+    let vm = Rc::new(RefCell::new(Some(load_module())));
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let param = get_resq_param(vm.clone(), rrt_cache.clone());

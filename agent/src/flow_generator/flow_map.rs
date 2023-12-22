@@ -17,7 +17,7 @@
 use std::{
     boxed::Box,
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     mem,
     net::Ipv4Addr,
     rc::Rc,
@@ -30,7 +30,7 @@ use std::{
 };
 
 use ahash::AHashMap;
-use log::{debug, error, warn};
+use log::{debug, warn};
 
 use super::{
     app_table::AppTable,
@@ -66,30 +66,17 @@ use crate::{
         Timestamp,
     },
     config::{
-        handler::{CollectorConfig, LogParserConfig},
+        handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
     metric::document::TapSide,
-    plugin::wasm::{
-        get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
-        WasmCounterMap, WasmVm,
-    },
+    plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
-    wasm_error,
 };
 #[cfg(target_os = "linux")]
-use crate::{
-    config::handler::EbpfConfig,
-    plugin::{
-        c_ffi::SoPluginFunc,
-        shared_obj::{
-            get_all_so_func, get_so_plug_metric_counter_map_key, SoPluginCounter,
-            SoPluginCounterMap,
-        },
-    },
-};
+use crate::{config::handler::EbpfConfig, plugin::c_ffi::SoPluginFunc};
 use public::{
     buffer::{Allocator, BatchedBox},
     counter::{Counter, CounterType, CounterValue, RefCountable},
@@ -157,14 +144,16 @@ pub struct FlowMap {
 
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
-    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    // for change detection
+    plugin_digest: u64,
+    wasm_vm: Rc<RefCell<Option<WasmVm>>>,
     #[cfg(target_os = "linux")]
-    so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-    #[cfg(target_os = "linux")]
-    so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
+    so_plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
     flow_node_pool: MemoryPool<FlowNode>,
+
+    stats_collector: Arc<stats::Collector>,
 }
 
 impl FlowMap {
@@ -177,7 +166,7 @@ impl FlowMap {
         ntp_diff: Arc<AtomicI64>,
         config: &FlowConfig,
         packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
-        stats_collector: &stats::Collector,
+        stats_collector: Arc<stats::Collector>,
         from_ebpf: bool,
     ) -> Self {
         let flow_perf_counter = Arc::new(FlowPerfCounter::default());
@@ -187,65 +176,6 @@ impl FlowMap {
             let max_timeout = config.flow_timeout.max;
             let size = config.packet_delay.as_secs() + max_timeout.as_secs() + 1;
             size.next_power_of_two() as usize
-        };
-
-        let wasm_counter_map = Arc::new(WasmCounterMap {
-            wasm_mertic: {
-                let mut h = HashMap::new();
-                for (name, _) in config.wasm_plugins.iter() {
-                    for func_name in get_all_wasm_export_func_name() {
-                        let counter = Arc::new(WasmCounter::default());
-                        // TODO: remove source when plugin remove
-                        stats_collector.register_countable(
-                            "flow-map",
-                            Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                            vec![
-                                StatsOption::Tag("id", id.to_string()),
-                                StatsOption::Tag("plugin_name", name.clone()),
-                                StatsOption::Tag("plugin_type", "wasm".to_string()),
-                                StatsOption::Tag("export_func", func_name.to_string()),
-                            ],
-                        );
-                        h.insert(
-                            get_wasm_metric_counter_map_key(name.as_str(), func_name),
-                            counter,
-                        );
-                    }
-                }
-                h
-            },
-        });
-
-        #[cfg(target_os = "linux")]
-        let so_plugin_counter_map = if config.so_plugins.is_empty() {
-            None
-        } else {
-            Some(Rc::new(SoPluginCounterMap {
-                so_mertic: {
-                    let mut h = HashMap::new();
-                    for p in config.so_plugins.iter() {
-                        for func_name in get_all_so_func() {
-                            let counter = Arc::new(SoPluginCounter::default());
-                            // TODO: remove source when plugin remove
-                            stats_collector.register_countable(
-                                "flow-map",
-                                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                                vec![
-                                    StatsOption::Tag("id", id.to_string()),
-                                    StatsOption::Tag("plugin_name", p.name.clone()),
-                                    StatsOption::Tag("plugin_type", "so".to_string()),
-                                    StatsOption::Tag("export_func", func_name.to_string()),
-                                ],
-                            );
-                            h.insert(
-                                get_so_plug_metric_counter_map_key(p.name.as_str(), func_name),
-                                counter,
-                            );
-                        }
-                    }
-                    h
-                },
-            }))
         };
 
         stats_collector.register_countable(
@@ -322,33 +252,148 @@ impl FlowMap {
                     .collect(),
             ),
             time_key_buffer: None,
-            wasm_vm: {
-                if config.wasm_plugins.is_empty() {
-                    None
-                } else {
-                    let mut vm = init_wasmtime(vec![], &wasm_counter_map);
-                    for (name, data) in config.wasm_plugins.iter() {
-                        if let Err(err) =
-                            vm.append_prog(name.as_str(), data.as_slice(), &wasm_counter_map)
-                        {
-                            wasm_error!(name, "add wasm prog fail: {}", err);
-                        }
-                    }
-                    Some(Rc::new(RefCell::new(vm)))
-                }
-            },
+            plugin_digest: 0, // force initial load
+            wasm_vm: Default::default(),
             #[cfg(target_os = "linux")]
-            so_plugin: if config.so_plugins.is_empty() {
-                None
-            } else {
-                Some(Rc::new(config.so_plugins.clone()))
-            },
-            #[cfg(target_os = "linux")]
-            so_plugin_counter_map,
+            so_plugin: Default::default(),
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
             l7_stats_output_queue,
+            stats_collector,
         }
+    }
+
+    fn load_plugins(&mut self, config: &PluginConfig) {
+        if self.plugin_digest == config.digest {
+            return;
+        }
+        self.plugin_digest = config.digest;
+
+        // although stats::Counter auto removes obsolete referenced countables
+        // on counter registration and routine reports, it might be delayed because
+        // FlowLog can hold these references
+        if let Some(vm) = self.wasm_vm.take() {
+            self.stats_collector
+                .deregister_countables(vm.counters().iter().map(|info| {
+                    (
+                        "plugin",
+                        vec![
+                            StatsOption::Tag("id", self.id.to_string()),
+                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
+                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
+                            StatsOption::Tag("export_func", info.function_name.to_owned()),
+                        ],
+                    )
+                }));
+        }
+        #[cfg(target_os = "linux")]
+        if let Some(ps) = self.so_plugin.take() {
+            let mut counters = vec![];
+            for p in ps.iter() {
+                p.counters_in(&mut counters);
+            }
+            self.stats_collector
+                .deregister_countables(counters.iter().map(|info| {
+                    (
+                        "plugin",
+                        vec![
+                            StatsOption::Tag("id", self.id.to_string()),
+                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
+                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
+                            StatsOption::Tag("export_func", info.function_name.to_owned()),
+                        ],
+                    )
+                }));
+        }
+
+        debug!("reload plugins");
+
+        let wasm_vm = if config.wasm_plugins.is_empty() {
+            None
+        } else {
+            let vm = WasmVm::new(&config.wasm_plugins);
+            if vm.is_empty() {
+                None
+            } else {
+                for counter in vm.counters() {
+                    self.stats_collector.register_countable(
+                        "plugin",
+                        counter.counter,
+                        vec![
+                            StatsOption::Tag("id", self.id.to_string()),
+                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
+                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
+                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
+                        ],
+                    );
+                }
+                Some(vm)
+            }
+        };
+
+        #[cfg(target_os = "linux")]
+        let so_plugins = {
+            let plugins = config
+                .so_plugins
+                .iter()
+                .filter_map(|(name, prog)| {
+                    match crate::plugin::shared_obj::load_plugin(prog.as_slice(), name) {
+                        Ok(p) => Some(p),
+                        Err(e) => {
+                            warn!("load so plugin {} fail: {}", name, e);
+                            None
+                        }
+                    }
+                })
+                .collect::<Vec<SoPluginFunc>>();
+            if plugins.is_empty() {
+                None
+            } else {
+                let mut counters = vec![];
+                for p in plugins.iter() {
+                    p.counters_in(&mut counters);
+                }
+                for counter in counters {
+                    self.stats_collector.register_countable(
+                        "plugin",
+                        counter.counter,
+                        vec![
+                            StatsOption::Tag("id", self.id.to_string()),
+                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
+                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
+                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
+                        ],
+                    );
+                }
+                Some(plugins)
+            }
+        };
+
+        #[cfg(target_os = "linux")]
+        log::info!(
+            "loaded {} wasm and {} so plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default(),
+            so_plugins.as_ref().map(|so| so.len()).unwrap_or_default(),
+        );
+        #[cfg(target_os = "windows")]
+        log::info!(
+            "loaded {} wasm plugins",
+            wasm_vm.as_ref().map(|vm| vm.len()).unwrap_or_default()
+        );
+        self.wasm_vm.replace(wasm_vm);
+        #[cfg(target_os = "linux")]
+        self.so_plugin.replace(so_plugins);
+
+        // remove all l7_stats and l7_log_parser in existing flow nodes that is of type Custom
+        if let Some((nodes, _)) = self.node_map.as_mut() {
+            for node_vecs in nodes.values_mut() {
+                for node in node_vecs.iter_mut() {
+                    node.reset_on_plugin_reload();
+                }
+            }
+        }
+        // remove protocol cache
+        self.app_table.clear();
     }
 
     // sort nodes by swapping timed out nodes to right
@@ -553,6 +598,8 @@ impl FlowMap {
         }
 
         let flow_config = &config.flow;
+
+        self.load_plugins(&flow_config.plugins);
 
         let pkt_key = FlowMapKey::new(&meta_packet.lookup_key, meta_packet.tap_port);
 
@@ -1180,11 +1227,9 @@ impl FlowMap {
                 is_skip,
                 self.flow_perf_counter.clone(),
                 port,
-                self.wasm_vm.as_ref().map(|w| w.clone()),
+                Rc::clone(&self.wasm_vm),
                 #[cfg(target_os = "linux")]
-                self.so_plugin.as_ref().map(|s| s.clone()),
-                #[cfg(target_os = "linux")]
-                self.so_plugin_counter_map.as_ref().map(|p| p.clone()),
+                Rc::clone(&self.so_plugin),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
                     IpProtocol::TCP => flow_config.rrt_tcp_timeout,
@@ -1468,7 +1513,12 @@ impl FlowMap {
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
-                Err(e) => debug!("{}", e),
+                Err(Error::L7ProtocolUnknown) => {
+                    self.flow_perf_counter
+                        .unknown_l7_protocol
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                Err(e) => log::trace!("unhandled log parse error: {}", e),
             }
         }
     }
@@ -2260,7 +2310,7 @@ pub fn _new_flow_map_and_receiver(
         Arc::new(AtomicI64::new(0)),
         &config.flow,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new("", Arc::new(AtomicI64::new(0))),
+        Arc::new(stats::Collector::new("", Arc::new(AtomicI64::new(0)))),
         false,
     );
 
