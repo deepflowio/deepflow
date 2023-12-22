@@ -61,10 +61,9 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 	}
 
 	char args[PERF_PATH_SZ * 2];
-	snprintf(args, sizeof(args), "%d %d,%s,%s", pid,
-		 g_java_syms_write_bytes_max,
-		 DF_AGENT_LOCAL_PATH_FMT ".map",
-		 DF_AGENT_LOCAL_PATH_FMT ".log");
+	snprintf(args, sizeof(args),
+		"%d %d," DF_AGENT_LOCAL_PATH_FMT ".map," DF_AGENT_LOCAL_PATH_FMT ".log",
+		pid, g_java_syms_write_bytes_max, pid, pid);
 
 	i64 curr_local_sz;
 	curr_local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
