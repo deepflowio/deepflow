@@ -18,7 +18,10 @@ package clickhouse
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -26,27 +29,50 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetGroup(name string, asTagMap map[string]string, db, table string) (Statement, error) {
+func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Statement, error) {
+	var stmts []Statement
 	if asTagMap[name] == "time" {
 		return nil, nil
 	}
-	var stmt Statement
-	tag, ok := tag.GetTag(name, db, table, "default")
+	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if tag.TagTranslator != "" {
-			stmt = &GroupTag{Value: tag.TagTranslator, Alias: name, AsTagMap: asTagMap}
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
+			autoTagMap := tagItem.TagTranslatorMap
+			autoTagSlice := []string{}
+			for autoTagKey, _ := range autoTagMap {
+				autoTagSlice = append(autoTagSlice, autoTagKey)
+			}
+			sort.Strings(autoTagSlice)
+			for _, autoTagKey := range autoTagSlice {
+				stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
+			}
+		} else if tagItem.TagTranslator != "" {
+			stmts = append(stmts, &GroupTag{Value: tagItem.TagTranslator, Alias: name, AsTagMap: asTagMap})
 		} else {
-			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS {
 			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
-			stmt = &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
+			tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+			if ok {
+				autoTagMap := tagItem.TagTranslatorMap
+				autoTagSlice := []string{}
+				for autoTagKey, _ := range autoTagMap {
+					autoTagSlice = append(autoTagSlice, autoTagKey)
+				}
+				sort.Strings(autoTagSlice)
+				for _, autoTagKey := range autoTagSlice {
+					stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
+				}
+			}
 		} else {
-			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
 	}
-	return stmt, nil
+	return stmts, nil
 }
 
 func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
