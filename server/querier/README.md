@@ -310,7 +310,6 @@ clickhouse指标量及算子特殊处理：
 - Tag类
   - 仅支持 Uniq、UniqExact、TopK、Any 算子
   - 对应 clickhouse 的 uniq、uniqExact、topK
-  - Any 翻译为了 topK(1)，而非直接对应 clickhouse 的 any
   - 分层翻译时逻辑同 Delay时延类
   - 在不分层的情况下直接使用对应算子
 
