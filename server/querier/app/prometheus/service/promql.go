@@ -38,9 +38,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/deepflowio/deepflow/server/libs/lru"
-	cache "github.com/deepflowio/deepflow/server/querier/app/prometheus/cachev2"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
@@ -264,7 +265,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	var cached promql.Result
 	var cachedKey string
 	var queryRequired = true
-	if config.Cfg.Prometheus.Cache.Enabled {
+	if config.Cfg.Prometheus.Cache.ResponseCache {
 		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
 		var fixedStart, fixedEnd int64
 		if cached, fixedStart, fixedEnd, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
@@ -331,10 +332,11 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 		result.Stats = queriable.GetSQLQuery()
 	}
 
-	if config.Cfg.Prometheus.Cache.Enabled {
+	if config.Cfg.Prometheus.Cache.ResponseCache {
 		if mergeResult, err := p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
 			return &model.PromQueryResponse{
 				Data:   &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value},
+				Stats:  result.Stats,
 				Status: _SUCCESS,
 			}, err
 		} else {
@@ -392,14 +394,15 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 		Slimit: args.Slimit,
 		Start:  minStart,
 		End:    maxEnd,
-		Step:   0,
+		Step:   1 * time.Second,
 		Query:  args.Promql,
 	}
 
 	var cached promql.Result
 	var cachedKey string
 	var queryRequired = true
-	if config.Cfg.Prometheus.Cache.Enabled {
+
+	if config.Cfg.Prometheus.Cache.ResponseCache {
 		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
 		if cached, _, _, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
 			log.Debugf("cache hit for instant query: %s, start: %s, end: %s", cachedKey)
@@ -464,16 +467,10 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 		result.Stats = queriable.GetSQLQuery()
 	}
 
-	if config.Cfg.Prometheus.Cache.Enabled {
-		if mergeResult, err := p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
-			return &model.PromQueryResponse{
-				Data:   &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value},
-				Status: _SUCCESS,
-			}, err
-		} else {
-			// err != nil
+	if config.Cfg.Prometheus.Cache.ResponseCache {
+		// instant query merge failed should not influence return result
+		if _, err = p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
 			log.Errorf("cache merge error: %v", err)
-			return nil, res.Err
 		}
 	}
 
@@ -484,8 +481,68 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
 	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
 	reader.addExternalTagToCache = p.addExtraLabelsToCache
-	result, _, _, _, err := reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
-	return result, err
+	var query prompb.Query
+	var queryType model.QueryType
+	if len(req.Queries) > 0 {
+		query = *req.Queries[0]
+	}
+	if query.Hints.StepMs == 0 {
+		queryType = model.Instant
+	} else {
+		queryType = model.Range
+	}
+	selectHints := &storage.SelectHints{
+		Start:    query.Hints.GetStartMs(),
+		End:      query.Hints.GetEndMs(),
+		Step:     query.Hints.GetStepMs(),
+		Func:     query.Hints.GetFunc(),
+		Grouping: query.Hints.GetGrouping(),
+		By:       query.Hints.GetBy(),
+		Range:    query.Hints.GetRangeMs(),
+	}
+	queryReq := &prometheusHint{
+		hints:    selectHints,
+		matchers: promMatchersToMatchers(&query.Matchers),
+		query:    query.String(),
+	}
+	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
+	if querierSql != "" {
+		result, _, _, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", false)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		// use query seconds for query
+		resp, err = reader.respTransToProm(ctx, queryReq.GetMetric(), query.Hints.GetStartMs()/1e3, query.Hints.GetEndMs()/1e3, result)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		return resp, err
+	} else {
+		resp, _, _, _, err = reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
+		return resp, err
+	}
+}
+
+func promMatchersToMatchers(matchers *[]*prompb.LabelMatcher) []*labels.Matcher {
+	lm := make([]*labels.Matcher, 0, len(*matchers))
+	for i := 0; i < len(*matchers); i++ {
+		m := (*matchers)[i]
+		var matcherType labels.MatchType
+		switch m.Type {
+		case prompb.LabelMatcher_EQ:
+			matcherType = labels.MatchEqual
+		case prompb.LabelMatcher_NEQ:
+			matcherType = labels.MatchNotEqual
+		case prompb.LabelMatcher_RE:
+			matcherType = labels.MatchRegexp
+		case prompb.LabelMatcher_NRE:
+			matcherType = labels.MatchNotRegexp
+		}
+		lm = append(lm, &labels.Matcher{Type: matcherType, Name: m.Name, Value: m.Value})
+	}
+	return lm
 }
 
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
