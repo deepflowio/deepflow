@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-package clickhouse
+package trans_prometheus
 
 import (
 	"time"
 
+	logging "github.com/op/go-logging"
+
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
+
+var log = logging.MustGetLogger("clickhouse.trans_prometheus")
 
 var Prometheus = &PrometheusMap{}
 
@@ -39,7 +43,7 @@ type Label struct {
 
 type AppLabel struct {
 	AppLabelName        string
-	appLabelColumnIndex int
+	AppLabelColumnIndex int
 }
 
 func GenerateMap() {
@@ -105,7 +109,7 @@ func GenerateMap() {
 		metricName := metricNameKey.(string)
 		appLabelName := appLabelNameKey.(string)
 		appLabelColumnIndex := appLabelColumnIndexKey.(int)
-		appLabel := AppLabel{AppLabelName: appLabelName, appLabelColumnIndex: appLabelColumnIndex}
+		appLabel := AppLabel{AppLabelName: appLabelName, AppLabelColumnIndex: appLabelColumnIndex}
 		METRIC_APP_LABEL_LAYOUT[metricName] = append(METRIC_APP_LABEL_LAYOUT[metricName], appLabel)
 	}
 	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT

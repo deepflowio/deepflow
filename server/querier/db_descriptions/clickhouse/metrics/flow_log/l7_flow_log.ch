@@ -17,14 +17,4 @@ server_error_ratio   , 服务端异常比例          , %    , 服务端异常 /
 
 response_duration    , 响应时延                , 微秒 , 日志类型为会话时，响应时延 = 结束时间 - 开始时间。
 
-ip_version           , IP 类型                 ,    ,
-server_port          , 服务端口                ,    ,
-version              , 协议版本                ,    ,
-request_type         , 请求类型                ,    ,
-request_domain       , 请求域名                ,    ,
-request_resource     , 请求资源                ,    ,
-response_code        , 响应码                  ,    ,
-response_result      , 响应结果                ,    ,
-tap                  , 采集点                  ,    ,
-vtap                 , 采集器                  ,    ,
 row                  , 行数                    , 个   ,     

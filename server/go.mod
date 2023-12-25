@@ -94,6 +94,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
