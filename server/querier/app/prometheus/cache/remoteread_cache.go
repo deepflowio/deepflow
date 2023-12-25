@@ -351,7 +351,7 @@ func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*prompb.ReadRespons
 		return emptyResponse, CacheMiss, "", start, end
 	}
 
-	if !config.Cfg.Prometheus.Cache.Enabled {
+	if !config.Cfg.Prometheus.Cache.RemoteReadCache {
 		return emptyResponse, CacheMiss, "", start, end
 	}
 
