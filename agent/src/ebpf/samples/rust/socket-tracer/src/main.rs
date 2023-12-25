@@ -164,6 +164,34 @@ fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
     }
 }
 
+#[allow(dead_code)]
+extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
+    // Ensure the input data is not null
+    if _data.is_null() {
+        return;
+    }
+
+    // Convert the C string to a Rust string
+    unsafe {
+        // Create a slice of the data with the specified length
+        let data_slice = std::slice::from_raw_parts(_data as *const u8, len as usize);
+
+        // Convert the slice to a CStr
+        let c_str: &CStr = CStr::from_bytes_with_nul_unchecked(data_slice);
+
+        // Convert the CStr to a Rust string
+        if let Ok(rust_str) = c_str.to_str() {
+            println!("+ --------------------------------- +");
+            // Print the string to the standard output
+            println!("{}", rust_str);
+            println!("+ --------------------------------- +");
+        } else {
+            // Handle the case where conversion to a Rust string fails
+            eprintln!("Error: Unable to convert C string to Rust string");
+        }
+    }	
+}
+
 extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
     unsafe {
         let mut proto_tag = String::from("");
@@ -212,7 +240,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).thread_id,
                      (*sd).coroutine_id,
                      (*sd).source,
-		     (*sd).socket_role,
+                     (*sd).socket_role,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -235,7 +263,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).thread_id,
                      (*sd).coroutine_id,
                      (*sd).source,
-		     (*sd).socket_role,
+                     (*sd).socket_role,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -406,6 +434,12 @@ fn main() {
 
         // test data limit max
         set_data_limit_max(10000);
+
+        //let empty_string = CString::new("").expect("CString::new failed");
+        //if datadump_set_config(0, empty_string.as_ptr(), 0, 60, debug_callback) != 0 {
+        //    println!("datadump_set_config() error");
+        //    ::std::process::exit(1);
+        //}
 
         print!("socket_tracer_start() finish\n");
 
