@@ -19,10 +19,14 @@ package clickhouse
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"strconv"
+
+	"bou.ke/monkey"
 
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/parse"
 
 	//"github.com/deepflowio/deepflow/server/querier/querier"
@@ -59,7 +63,7 @@ var (
 		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l4_flow_log` ORDER BY `sum_log_count` desc LIMIT 1",
 	}, {
 		input:  "select Uniq(ip_0) as uniq_ip_0 from l4_flow_log limit 1",
-		output: "SELECT uniqIf([toString(ip4_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `uniq_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT uniq(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `uniq_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		input:  "select Max(byte) as max_byte, Sum(log_count) as sum_log_count from l4_flow_log having Sum(byte)>=0 limit 1",
 		output: "SELECT MAX(byte_tx+byte_rx) AS `max_byte`, SUM(1) AS `sum_log_count` FROM flow_log.`l4_flow_log` HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 1",
@@ -348,11 +352,11 @@ var (
 	}, {
 		index:  "TopK_1",
 		input:  "select TopK(ip_0, 10) from l4_flow_log limit 1",
-		output: "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT arrayStringConcat(topK(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "TopK_2",
 		input:  "select TopK(ip_0, pod_0, 10) from l4_flow_log limit 1",
-		output: "SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT topK(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:   "TopK_err",
 		input:   "select TopK(ip_0, 111) from l4_flow_log limit 1",
@@ -361,11 +365,11 @@ var (
 	}, {
 		index:  "Any_1",
 		input:  "select Any(ip_0) from l4_flow_log limit 1",
-		output: "SELECT anyIf(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT any(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "Any_2",
 		input:  "select Any(ip_0, pod_0) from l4_flow_log limit 1",
-		output: "SELECT anyIf((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT any((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
@@ -429,6 +433,11 @@ var (
 )
 
 func TestGetSql(t *testing.T) {
+	var c *client.Client
+	result := &common.Result{}
+	monkey.PatchInstanceMethod(reflect.TypeOf(c), "DoQuery", func(*client.Client, *client.QueryParams) (*common.Result, error) {
+		return result, nil
+	})
 	Load()
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -453,7 +462,7 @@ func TestGetSql(t *testing.T) {
 			if pcase.index == "" {
 				caseIndex = strconv.Itoa(i)
 			}
-			if pcase.wantErr == err.Error() {
+			if err != nil && pcase.wantErr == err.Error() {
 				continue
 			}
 			t.Errorf("\nParse [%s]\n\t%q \n get: \n\t%q \n want: \n\t%q", caseIndex, pcase.input, out, pcase.output)

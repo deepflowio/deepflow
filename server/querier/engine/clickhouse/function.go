@@ -158,31 +158,15 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 
 	fieldsLen := len(fields)
 	dbFields := make([]string, fieldsLen)
-	conditions := make([]string, 0, fieldsLen)
 
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
-		var condition string
-
 		field = strings.Trim(field, "`")
 		metricStruct, ok = metrics.GetAggMetrics(field, db, table, ctx)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
-
-		condition = metricStruct.Condition
-		tag, ok := tag.GetTag(field, db, table, "default")
-		if ok {
-			dbFields[i] = tag.TagTranslator
-			if condition == "" {
-				condition = tag.NotNullFilter
-			}
-		} else {
-			dbFields[i] = metricStruct.DBField
-		}
-		if condition != "" {
-			conditions = append(conditions, condition)
-		}
+		dbFields[i] = metricStruct.DBField
 
 		// 判断算子是否支持单层
 		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
@@ -196,10 +180,8 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	metricStructCopy := *metricStruct
 	if fieldsLen > 1 {
 		metricStructCopy.DBField = "(" + strings.Join(dbFields, ", ") + ")"
-		metricStructCopy.Condition = "(" + strings.Join(conditions, " AND ") + ")"
 	} else {
 		metricStructCopy.DBField = strings.Join(dbFields, ", ")
-		metricStructCopy.Condition = strings.Join(conditions, " AND ")
 	}
 
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)

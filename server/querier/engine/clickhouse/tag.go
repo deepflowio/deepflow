@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -191,24 +192,24 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				labelType = "app"
-				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.appLabelColumnIndex)
+				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
 				break
 			}
 		}
@@ -223,12 +224,12 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 func GetPrometheusAllTagTranslator(table string) (string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
-	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
-			if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
-				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
 		}
