@@ -97,5 +97,6 @@ func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, 
 		strings.Join(group, ","),
 		10000,
 	)
-	return queryDataExecute(ctx, sql, "flow_log", "")
+	result, _, _, err := queryDataExecute(ctx, sql, "flow_log", "", false)
+	return result, err
 }
