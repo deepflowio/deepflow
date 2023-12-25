@@ -48,15 +48,17 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 	for _, process := range processes {
 		if process.DeletedAt.Valid {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:     process.ID,
-				Name:   process.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				ID:      process.ID,
+				Name:    process.Name + " (deleted)",
+				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID: process.VMID,
 			}
 		} else {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:     process.ID,
-				Name:   process.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				ID:      process.ID,
+				Name:    process.Name,
+				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID: process.VMID,
 			}
 		}
 	}
@@ -74,6 +76,9 @@ func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysql.ChGProcess) (map[
 	}
 	if oldItem.IconID != newItem.IconID {
 		updateInfo["icon_id"] = newItem.IconID
+	}
+	if oldItem.CHostID != newItem.CHostID {
+		updateInfo["chost_id"] = newItem.CHostID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
