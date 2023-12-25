@@ -17,10 +17,12 @@ service Synchronizer {
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
-    rpc Plugin (PluginRequest) returns (stream PluginResponse) {}
-    rpc GetPrometheusLabelIDs (PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
-    rpc GetPrometheusTargets (PrometheusTargetRequest) returns (PrometheusTargetResponse) {}
-    rpc GetUniversalTagNameMaps (UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
+    rpc Plugin(PluginRequest) returns (stream PluginResponse) {}
+    rpc GetPrometheusLabelIDs(PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
+    rpc GetPrometheusTargets(PrometheusTargetRequest) returns (PrometheusTargetResponse) {}
+    rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
+    // yes it is reversed because server send CommandRequest in grpc response
+    rpc Command(stream CommandResponse) returns (stream CommandRequest) {}
 }
 
 // debug service
@@ -953,4 +955,24 @@ message UniversalTagNameMapsResponse {
 	repeated IdNameMap subnet_map= 12;
 	repeated IdNameMap gprocess_map= 13;
 	repeated IdNameMap vtap_map= 14;
+}
+
+message Command {
+    optional string name = 1;
+    repeated string arguments = 2;
+}
+
+message CommandRequest {
+    repeated Command pipeline = 1;
+}
+
+message CommandResponse {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+
+    optional Status status = 3;
+    optional bytes content = 4;
+    optional bytes md5 = 5;
+    optional uint64 total_len = 6;
+    optional uint32 pkt_count = 7;
 }
