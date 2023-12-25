@@ -71,7 +71,7 @@ type cacheHitResultOutput struct {
 
 func TestMain(m *testing.M) {
 	config.Cfg = &config.QuerierConfig{Prometheus: cfg.Prometheus{Cache: cfg.PrometheusCache{
-		Enabled:                true,
+		RemoteReadCache:        true,
 		CacheItemSize:          512,
 		CacheMaxCount:          5,
 		CacheMaxAllowDeviation: 60 * 60, // 60min
