@@ -32,6 +32,7 @@ type ChResourceUpdater interface {
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	Refresh() bool
 	SetConfig(cfg config.TagRecorderConfig)
+	Check() (oldHash, newHash uint64)
 }
 
 type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
