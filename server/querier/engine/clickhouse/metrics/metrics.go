@@ -22,9 +22,13 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	ckcommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 
 	logging "github.com/op/go-logging"
 )
@@ -133,7 +137,64 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 	if err != nil {
 		return nil, false
 	}
-	metric, ok := allMetrics[field]
+	// deep copy map
+	newAllMetrics := map[string]*Metrics{}
+	for k, v := range allMetrics {
+		newAllMetrics[k] = v
+	}
+	tagSql := fmt.Sprintf("show tags from %s", table)
+	tagData, err := tag.GetTagDescriptions(db, table, tagSql, context.Background())
+	if err != nil {
+		return nil, false
+	}
+	// tag metrics
+	for _, col := range tagData.Values {
+		tagType := col.([]interface{})[4].(string)
+		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+			continue
+		}
+		name := col.([]interface{})[0].(string)
+		clientName := col.([]interface{})[1].(string)
+		serverName := col.([]interface{})[2].(string)
+		displayName := col.([]interface{})[3].(string)
+		permissions, err := ckcommon.ParsePermission("111")
+		if err != nil {
+			return nil, false
+		}
+		nameDBField, err := GetTagDBField(name, db, table)
+		if err != nil {
+			return nil, false
+		}
+		clientNameDBField, err := GetTagDBField(clientName, db, table)
+		if err != nil {
+			return nil, false
+		}
+		serverNameDBField, err := GetTagDBField(serverName, db, table)
+		if err != nil {
+			return nil, false
+		}
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+			clientNameMetric := NewMetrics(
+				0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", permissions, "", table, "",
+			)
+			newAllMetrics[clientName] = clientNameMetric
+			if serverName != clientName {
+				serverNameMetric := NewMetrics(
+					0, serverNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "",
+				)
+				newAllMetrics[serverName] = serverNameMetric
+			}
+		} else {
+			nameMetric := NewMetrics(
+				0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", permissions, "", table, "",
+			)
+			newAllMetrics[name] = nameMetric
+		}
+	}
+	metric, ok := newAllMetrics[field]
 	return metric, ok
 }
 
@@ -179,7 +240,7 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 			return GetInProcessMetrics(), err
 		}
 	}
-	return nil, err
+	return map[string]*Metrics{}, err
 }
 
 func GetMetricsByDBTable(db string, table string, where string, ctx context.Context) (map[string]*Metrics, error) {
@@ -322,6 +383,169 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 	}, nil
 }
 
+func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+	labelType := ""
+	TagTranslatorStr := ""
+	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
+	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
+	}
+	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		return "", "", errors.New(errorMessage)
+	}
+	// Determine whether the tag is app_label or target_label
+	isAppLabel := false
+	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+		for _, appLabel := range appLabels {
+			if appLabel.AppLabelName == nameNoPreffix {
+				isAppLabel = true
+				labelType = "app"
+				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
+				break
+			}
+		}
+	}
+	if !isAppLabel {
+		labelType = "target"
+		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+	}
+	return TagTranslatorStr, labelType, nil
+}
+
+func GetPrometheusAllTagTranslator(table string) (string, error) {
+	tagTranslatorStr := ""
+	appLabelTranslatorStr := ""
+	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+		// appLabel
+		appLabelTranslatorSlice := []string{}
+		for _, appLabel := range appLabels {
+			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
+				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
+			}
+		}
+		appLabelTranslatorStr = strings.Join(appLabelTranslatorSlice, ",")
+	}
+
+	// targetLabel
+	targetLabelTranslatorStr := "CAST((splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_names', target_id)), splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_values', target_id))), 'Map(String, String)')"
+	if appLabelTranslatorStr != "" {
+		tagTranslatorStr = "toJSONString(mapUpdate(map(" + appLabelTranslatorStr + ")," + targetLabelTranslatorStr + "))"
+	} else {
+		tagTranslatorStr = "toJSONString(" + targetLabelTranslatorStr + ")"
+	}
+	return tagTranslatorStr, nil
+}
+
+func GetTagDBField(name, db, table string) (string, error) {
+	selectTag := name
+	tagTranslatorStr := name
+	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	if !ok {
+		name := strings.Trim(name, "`")
+		if strings.HasPrefix(name, "k8s.label.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+		} else if strings.HasPrefix(name, "k8s.annotation.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+		} else if strings.HasPrefix(name, "k8s.env.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+		} else if strings.HasPrefix(name, "cloud.tag.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+		} else if strings.HasPrefix(name, "os.app.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("os_app", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
+			if strings.HasPrefix(name, "tag.") {
+				if db == ckcommon.DB_NAME_PROMETHEUS {
+					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table)
+					if err != nil {
+						return tagTranslatorStr, err
+					}
+				}
+				tagItem, ok = tag.GetTag("tag.", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
+			}
+			nameNoPreffix := strings.TrimPrefix(name, "tag.")
+			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+		}
+	} else {
+		if name == "metrics" {
+			if db == "flow_log" {
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
+			} else {
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
+			}
+		} else if name == "tag" && db == ckcommon.DB_NAME_PROMETHEUS {
+			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table)
+			if err != nil {
+				return tagTranslatorStr, err
+			}
+		} else if tagItem.TagTranslator != "" {
+			if name != "packet_batch" || table != "l4_packet" {
+				tagTranslatorStr = tagItem.TagTranslator
+			}
+		} else {
+			tagTranslatorStr = selectTag
+		}
+	}
+	return tagTranslatorStr, nil
+}
+
 func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics, err error) {
 	tableDate, ok := dbDescription[db]
 	if !ok {
@@ -355,7 +579,6 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
-
 		} else {
 			return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s", db, table))
 		}
