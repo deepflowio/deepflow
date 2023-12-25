@@ -60,7 +60,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		response = item
 	}
 
-	if config.Cfg.Prometheus.Cache.Enabled && hit == cache.CacheKeyFoundNil {
+	if config.Cfg.Prometheus.Cache.RemoteReadCache && hit == cache.CacheKeyFoundNil {
 		cacheLoadingFinished := &sync.WaitGroup{}
 		cacheLoadingFinished.Add(1)
 
@@ -178,7 +178,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	// response trans to prom resp
 	resp, err = p.respTransToProm(ctx, metricName, api_query_start, api_query_end, result)
 
-	if config.Cfg.Prometheus.Cache.Enabled {
+	if config.Cfg.Prometheus.Cache.RemoteReadCache {
 		// merge result into cache
 		response = cache.PromReadResponseCache().AddOrMerge(req, resp)
 	} else {

@@ -737,7 +737,11 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 
 		switch metricsType {
 		case "Int":
-			metricsValue = float64(values[metricsIndex].(int))
+			metricsValueInt, ok := values[metricsIndex].(int)
+			if !ok {
+				continue
+			}
+			metricsValue = float64(metricsValueInt)
 		case "Float64":
 			// metricsType == "Float64" but typeof(values[metricsIndex]) is `int` ?? for robustness add type assert
 			val, ok := values[metricsIndex].(float64)
@@ -752,12 +756,18 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			}
 		// for Arrays(use topk() aggregation), it group by timestamp & tag.*, so it won't get multiple values per time & tag, get index [0] is OK
 		case "Array(Int)":
-			metricsArrayInt := values[metricsIndex].(*[]int)
+			metricsArrayInt, ok := values[metricsIndex].(*[]int)
+			if !ok {
+				continue
+			}
 			if len(*metricsArrayInt) > 0 {
 				metricsValue = float64((*metricsArrayInt)[0])
 			}
 		case "Array(Float64)":
-			metricsValueArray := values[metricsIndex].(*[]float64)
+			metricsValueArray, ok := values[metricsIndex].(*[]float64)
+			if !ok {
+				continue
+			}
 			if len(*metricsValueArray) > 0 {
 				metricsValue = (*metricsValueArray)[0]
 			}
@@ -857,7 +867,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 	if queryType == model.Range {
 		interval := queryReq.GetStep()
 		offset := queryReq.GetStart() % interval
-		selection[0] = fmt.Sprintf("time(time, %d, 1, 0, %d) AS %s", interval/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS)
+		selection[0] = fmt.Sprintf("time(time, %d, 1, '', %d) AS %s", interval/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS)
 	}
 
 	// build selection
@@ -869,7 +879,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 
 	call(metricAlias, &selection, &orderBy, &groupBy, queryReq, queryType, handleTagFunc)
 
-	if strings.HasSuffix(f0, "rate") {
+	if strings.HasSuffix(f0, "irate") {
 		if f1 == "" {
 			lastQuery := &(selection[len(selection)-1])
 			*lastQuery = fmt.Sprintf("Last(%s)", *lastQuery)
