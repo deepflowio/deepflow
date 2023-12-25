@@ -152,9 +152,11 @@ static void print_cp_tracer_status(struct bpf_tracer *t);
  */
 static atomic64_t process_lost_count;
 
-/* Continuous Profiler debug lock */
+/* Continuous Profiler debug related settings. */
 static pthread_mutex_t cpdbg_mutex;
 static bool cpdbg_enable;
+static debug_callback_t cpdbg_cb;
+static bool cpdbg_use_remote;
 static uint32_t cpdbg_start_time;
 static uint32_t cpdbg_timeout;
 
@@ -359,6 +361,7 @@ static inline bool is_cpdbg_timeout(void)
 	if (passed_sec > cpdbg_timeout) {
 		cpdbg_start_time = 0;
 		cpdbg_enable = false;
+		cpdbg_use_remote = false;
 		ebpf_info("\n\ncpdbg is finished, use time: %us.\n\n",
 			  cpdbg_timeout);
 		cpdbg_timeout = 0;
@@ -370,30 +373,35 @@ static inline bool is_cpdbg_timeout(void)
 
 static void print_cp_data(stack_trace_msg_t * msg)
 {
+	char *timestamp = gen_timestamp_str(0);
+	if (timestamp == NULL)
+		return;
+
 	char *cid;
 	if (strlen((char *)msg->container_id) == 0)
 		cid = "null";
 	else
 		cid = (char *)msg->container_id;
 
-	/*
-	 * TODO(@jiping)
-	 * We didn't use the 'ebpf_info()' interface here to send data to the
-	 * Rust log. The reason is that after 'ebpf_info()' -> 'rust_info_wrapper()',
-	 * we noticed some instability, and occasional segmentation faults occurred.
-	 * This is something that needs to be resolved in the future. 
-	 */
-	fprintf(stdout,
-		"\n-------------------------------\n"
-		"netns_id %lu container_id %s process_name %s pid %u stime %lu "
-		"u_stack_id %u k_statck_id %u cpu %u count %u comm %s tiemstamp"
-		" %lu datalen %u data %s\n",
-		msg->netns_id, cid,
-		msg->process_name, msg->pid, msg->stime, msg->u_stack_id,
-		msg->k_stack_id, msg->cpu, msg->count, msg->comm,
-		msg->time_stamp, msg->data_len, msg->data);
+	char buff[DEBUG_BUFF_SIZE];
+	snprintf(buff, sizeof(buff),
+		 "%s [cpdbg] netns_id %lu container_id %s pid %u tid %u "
+		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
+		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
+		 timestamp, msg->netns_id, cid, msg->pid, msg->tid,
+		 msg->process_name, msg->comm, msg->stime,
+		 msg->u_stack_id,
+		 msg->k_stack_id, msg->cpu, msg->count,
+		 msg->time_stamp, msg->data_len, msg->data);
 
-	fflush(stdout);
+	free(timestamp);
+
+	if (cpdbg_cb != NULL) {
+		cpdbg_cb(buff, strlen(buff));
+	} else {
+		fprintf(stdout, "%s\n", buff);
+		fflush(stdout);
+	}
 }
 
 static void cpdbg_process(stack_trace_msg_t * msg)
@@ -1625,6 +1633,43 @@ struct bpf_tracer *get_profiler_tracer(void)
 	return profiler_tracer;
 }
 
+/*
+ * Configure and enable the debugging functionality for Continuous Profiling.
+ *
+ * @timeout
+ *   Specifying the timeout duration. If the elapsed time exceeds this
+ *   duration, cpdbg will stop. The unit is in seconds.
+ * @callback
+ *   Callback interface, used to transfer data to the remote controller.
+ *
+ * @return 0 on success, and a negative value on failure.
+ */
+int cpdbg_set_config(int timeout, debug_callback_t cb)
+{
+	if (timeout < 0 || cb == NULL) {
+		ebpf_warning("Invalid parameter\n");
+		return -1;
+	}
+
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (cpdbg_enable) {
+		ebpf_warning("cpdbg is already running\n");
+		goto finish;
+	}
+
+	cpdbg_start_time = get_sys_uptime();
+	cpdbg_timeout = timeout;
+	cpdbg_enable = true;
+	cpdbg_use_remote = true;
+	cpdbg_cb = cb;
+
+	ebpf_info("cpdbg enable timeout %ds\n", cpdbg_timeout);
+
+finish:
+	pthread_mutex_unlock(&cpdbg_mutex);
+	return 0;
+}
+
 #else /* defined AARCH64_MUSL */
 #include "../tracer.h"
 #include "perf_profiler.h"
@@ -1668,6 +1713,10 @@ struct bpf_tracer *get_profiler_tracer(void)
 }
 
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
+{
+}
+
+int cpdbg_set_config(int timeout, debug_callback_t cb)
 {
 }
 
