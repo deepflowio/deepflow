@@ -17,14 +17,4 @@ server_error_ratio   , Server Error %          , %    , Server Error / Response.
 
 response_duration    , Response Delay          , us   , If the log type is Session, response_duration = end_time - start_time.
 
-ip_version           , IP Version              ,      ,
-server_port          , Server Port             ,      ,
-version              , Protocol Version        ,      ,
-request_type         , Request Type            ,      ,
-request_domain       , Request Domain          ,      ,
-request_resource     , Request Resource        ,      ,
-response_code        , Response Code           ,      ,
-response_result      , Response Result         ,      ,
-tap                  , Traffic Access Point    ,      ,
-vtap                 , DeepFlow Agent          ,      ,
 row                  , Row Count               ,      ,

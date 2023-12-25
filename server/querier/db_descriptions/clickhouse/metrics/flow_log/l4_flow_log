@@ -103,28 +103,4 @@ l7_client_error_ratio       ,                      , percentage , Application   
 l7_server_error_ratio       ,                      , percentage , Application    , 111
 l7_parse_failed             , l7_parse_failed      , counter    , Application    , 111
 
-vpc_0                       ,                      , tag        , Tag    , 111
-subnet_0                    ,                      , tag        , Tag    , 111
-ip_0                        ,                      , tag        , Tag    , 111
-pod_cluster_0               ,                      , tag        , Tag    , 111
-pod_node_0                  ,                      , tag        , Tag    , 111
-pod_ns_0                    ,                      , tag        , Tag    , 111
-pod_group_0                 ,                      , tag        , Tag    , 111
-pod_0                       ,                      , tag        , Tag    , 111
-host_0                      ,                      , tag        , Tag    , 111
-chost_0                     ,                      , tag        , Tag    , 111
-region_0                    ,                      , tag        , Tag    , 111
-az_0                        ,                      , tag        , Tag    , 111
-vpc_1                       ,                      , tag        , Tag    , 111
-subnet_1                    ,                      , tag        , Tag    , 111
-ip_1                        ,                      , tag        , Tag    , 111
-pod_cluster_1               ,                      , tag        , Tag    , 111
-pod_node_1                  ,                      , tag        , Tag    , 111
-pod_ns_1                    ,                      , tag        , Tag    , 111
-pod_group_1                 ,                      , tag        , Tag    , 111
-pod_1                       ,                      , tag        , Tag    , 111
-host_1                      ,                      , tag        , Tag    , 111
-chost_1                     ,                      , tag        , Tag    , 111
-region_1                    ,                      , tag        , Tag    , 111
-az_1                        ,                      , tag        , Tag    , 111
 row                         ,                      , other      , Other          , 111    

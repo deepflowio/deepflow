@@ -33,7 +33,7 @@ import (
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
 	"github.com/deepflowio/deepflow/server/querier/router"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
@@ -52,6 +52,10 @@ func Start(configPath, serverLogFile string) {
 	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
 	log.Infof("querier config:\n%s", string(bytes))
 
+	// statsd
+	statsd.QuerierCounter = statsd.NewCounter()
+	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
+
 	// engine加载数据库tag/metric等信息
 	err := Load()
 	if err != nil {
@@ -60,11 +64,7 @@ func Start(configPath, serverLogFile string) {
 	}
 
 	// prometheus dict cache
-	go clickhouse.GeneratePrometheusMap()
-
-	// statsd
-	statsd.QuerierCounter = statsd.NewCounter()
-	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
+	go trans_prometheus.GeneratePrometheusMap()
 
 	// init opentelemetry
 	if cfg.OtelEndpoint != "" {
