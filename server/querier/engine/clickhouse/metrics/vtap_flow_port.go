@@ -51,19 +51,6 @@ var VTAP_FLOW_PORT_METRICS_REPLACE = map[string]*Metrics{
 	"l7_error_ratio":        NewReplaceMetrics("l7_error/l7_response", ""),
 	"l7_client_error_ratio": NewReplaceMetrics("l7_client_error/l7_response", ""),
 	"l7_server_error_ratio": NewReplaceMetrics("l7_server_error/l7_response", ""),
-
-	"vpc":         NewReplaceMetrics("l3_epc_id", "NOT (l3_epc_id = -2)"),
-	"subnet":      NewReplaceMetrics("subnet_id", "NOT (subnet_id = 0)"),
-	"ip":          NewReplaceMetrics("[toString(ip4), toString(subnet_id), toString(is_ipv4), toString(ip6)]", "NOT (((is_ipv4 = 1) OR (ip6 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4 = toIPv4('0.0.0.0'))))"),
-	"pod_cluster": NewReplaceMetrics("pod_cluster_id", "NOT (pod_cluster_id = 0)"),
-	"pod_node":    NewReplaceMetrics("pod_node_id", "NOT (pod_node_id = 0)"),
-	"pod_ns":      NewReplaceMetrics("pod_ns_id", "NOT (pod_ns_id = 0)"),
-	"pod_group":   NewReplaceMetrics("pod_group_id", "NOT (pod_group_id = 0)"),
-	"pod":         NewReplaceMetrics("pod_id", "NOT (pod_id = 0)"),
-	"host":        NewReplaceMetrics("host_id", "NOT (host_id = 0)"),
-	"chost":       NewReplaceMetrics("[l3_device_id, l3_device_type]", "(NOT (l3_device_id = 0)) AND (l3_device_type = 1)"),
-	"region":      NewReplaceMetrics("region_id", "NOT (region_id = 0)"),
-	"az":          NewReplaceMetrics("az_id", "NOT (az_id = 0)"),
 }
 
 func GetVtapFlowPortMetrics() map[string]*Metrics {
