@@ -1520,7 +1520,7 @@ func (c *Cache) refreshProcesses() {
 
 func (c *Cache) AddPrometheusTargets(items []*mysql.PrometheusTarget) {
 	for _, item := range items {
-		c.DiffBaseDataSet.AddPrometheusTarget(item, c.Sequence)
+		c.DiffBaseDataSet.AddPrometheusTarget(item, c.Sequence, c.ToolDataSet)
 	}
 }
 

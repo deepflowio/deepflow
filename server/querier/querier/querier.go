@@ -46,6 +46,7 @@ func Start(configPath, serverLogFile string) {
 	ServerCfg := config.DefaultConfig()
 	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
+	config.TraceConfig = &ServerCfg.TraceIdWithIndex
 	cfg := ServerCfg.QuerierConfig
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
