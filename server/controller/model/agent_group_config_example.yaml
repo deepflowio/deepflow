@@ -417,6 +417,17 @@ vtap_group_id: g-xxxxxx
 ## Supported values: See `l4_log_ignore_tap_sides`.
 #l7_log_ignore_tap_sides: []
 
+############
+## plugin ##
+############
+## wasm plugin need to load in agent
+#wasm_plugins: []
+
+## so plugin need to load in agent
+## Note: so plugin use dlopen flag RTLD_LOCAL and RTLD_LAZY to open the so file, it mean that
+## the so must solve the link problem by itself
+#so_plugins: []
+
 ## Data Integration Socket
 ## Default: 1. Options: 0 (disabled), 1 (enabled).
 ## Note: Whether to enable receiving external data sources such as Prometheus,
@@ -912,17 +923,6 @@ vtap_group_id: g-xxxxxx
   ##   capturing full traffic. Note that this may significantly increase the resource
   ##   overhead of deepflow-agent.
   #bpf-disabled: false
-
-  ############
-  ## plugin ##
-  ############
-  ## wasm plugin need to load in agent
-  #wasm-plugins: []
-
-  ## so plugin need to load in agent
-  ## Note: so plugin use dlopen flag RTLD_LOCAL and RTLD_LAZY to open the so file, it mean that
-  ## the so must solve the link problem by itself
-  #so-plugins: []
 
   #################
   ## L7 Protocol ##
