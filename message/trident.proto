@@ -445,6 +445,12 @@ enum TunnelType {
     NPB_DROP = 3;
 }
 
+enum Direction {
+    ALL = 1;
+    FORWARD = 2;
+    BACKWARD = 3;
+}
+
 message NpbAction {
     optional TunnelType tunnel_type = 1 [default = VXLAN];
     optional uint32 tunnel_id = 2;
@@ -453,6 +459,7 @@ message NpbAction {
     optional uint32 payload_slice = 5 [default = 65535];
     optional uint32 npb_acl_group_id = 6;
     optional uint32 tunnel_ip_id = 7; // 分发点id, 限制在64000
+    optional Direction direction = 8 [default = ALL];
 }
 
 // 字段含义查看README
@@ -714,7 +721,7 @@ message GPIDSyncEntry {
     optional uint32 pid_real = 13 [default = 0];    // pid or gpid
     optional RoleType role_real = 14 [default = ROLE_NONE]; // role of real ip, ROLE_NONE means compressed
 
-    // the net nsmaspace index,  neither netns id nor netns inode 
+    // the net nsmaspace index,  neither netns id nor netns inode
     optional uint32 netns_idx = 15 [default = 0];  // u16
 }
 
@@ -809,7 +816,7 @@ message RVData {
 
 message GPIDVTapData {
     optional uint32  update_time = 1 [default = 0];
-    optional GPIDSyncRequest  sync_request = 2;    
+    optional GPIDSyncRequest  sync_request = 2;
 }
 
 message AgentCacheRequest {
