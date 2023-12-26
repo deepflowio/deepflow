@@ -172,7 +172,7 @@ type BaseConfig struct {
 }
 
 func sleepAndExit() {
-	time.Sleep(time.Second)
+	time.Sleep(time.Microsecond)
 	os.Exit(1)
 }
 
