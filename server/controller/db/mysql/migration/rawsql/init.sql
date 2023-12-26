@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS prometheus_target (
     job                 VARCHAR(255) DEFAULT '',
     scrape_url          VARCHAR(2083) DEFAULT '',
     other_labels        TEXT COMMENT 'separated by ,',
+    epc_id              INTEGER NOT NULL DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
     pod_cluster_id      INTEGER,
@@ -1111,6 +1112,7 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     name                   CHAR(64),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
     business_id            INTEGER NOT NULL,
+    direction              TINYINT(1) DEFAULT 1 COMMENT '1-all; 2-forward; 3-backward;',
     vni                    INTEGER,
     npb_tunnel_id          INTEGER,
     distribute             TINYINT(1) DEFAULT 1 COMMENT '0-drop, 1-distribute',
@@ -1685,105 +1687,16 @@ set @lcuuid = (select uuid());
 INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('虚拟网络', 3, 768, '', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS genesis_host (
-    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    hostname    VARCHAR(256),
-    ip          CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_host;
-
-CREATE TABLE IF NOT EXISTS genesis_vm (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid            CHAR(64),
-    name            VARCHAR(256),
-    label           CHAR(64),
-    vpc_uuid        CHAR(64),
-    launch_server   CHAR(64),
-    state           INTEGER
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_vm;
-
-CREATE TABLE IF NOT EXISTS genesis_vpc (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid            CHAR(64),
-    name            VARCHAR(256)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_vpc;
-
-CREATE TABLE IF NOT EXISTS genesis_network (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name            VARCHAR(256),
-    uuid            CHAR(64),
-    segmentation_id INTEGER,
-    net_type        INTEGER,
-    external        TINYINT(1),
-    vpc_uuid        CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_network;
-
-CREATE TABLE IF NOT EXISTS genesis_port (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid            CHAR(64),
-    type            INTEGER,
-    mac_address     CHAR(32),
-    device_uuid     CHAR(64),
-    network_uuid    CHAR(64),
-    vpc_uuid        CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_port;
-
-CREATE TABLE IF NOT EXISTS genesis_ip (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid            CHAR(64),
-    ip              CHAR(64),
-    port_uuid       CHAR(64),
-    last_seen       INTEGER,
-    masklen         INTEGER DEFAULT 0
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_ip;
-
-CREATE TABLE IF NOT EXISTS genesis_lldp (
-    id                 INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid               CHAR(64),
-    host_ip            CHAR(48),
-    host_interface     CHAR(64),
-    system_name        VARCHAR(512),
-    management_address VARCHAR(512),
-    port_id            VARCHAR(512),
-    port_description   VARCHAR(512),
-    last_seen          INTEGER
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_lldp;
-
-CREATE TABLE IF NOT EXISTS genesis_vinterface (
-    id                    INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    uuid                  CHAR(64),
-    name                  CHAR(64),
-    mac                   CHAR(32),
-    ips                   TEXT,
-    tap_name              CHAR(64),
-    tap_mac               CHAR(32),
-    device_uuid           CHAR(64),
-    device_name           VARCHAR(512),
-    device_type           CHAR(64),
-    host_ip               CHAR(48),
-    last_seen             INTEGER,
-    vtap_id               INTEGER,
-    kubernetes_cluster_id CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE genesis_vinterface;
-
-CREATE TABLE IF NOT EXISTS go_genesis_host (
-    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     lcuuid      CHAR(64),
     hostname    VARCHAR(256),
     ip          CHAR(64),
     vtap_id     INTEGER,
-    node_ip     CHAR(48)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_host;
+    node_ip     CHAR(48),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_host;
 
-CREATE TABLE IF NOT EXISTS go_genesis_vm (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_vm (
     lcuuid          CHAR(64),
     name            VARCHAR(256),
     label           CHAR(64),
@@ -1792,30 +1705,30 @@ CREATE TABLE IF NOT EXISTS go_genesis_vm (
     node_ip         CHAR(48),
     state           INTEGER,
     vtap_id         INTEGER,
-    created_at      DATETIME
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_vm;
+    created_at      DATETIME,
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_vm;
 
-CREATE TABLE IF NOT EXISTS go_genesis_vip (
-    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_vip (
     lcuuid      CHAR(64),
     ip          CHAR(64),
     vtap_id     INTEGER,
-    node_ip     CHAR(48)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_vip;
+    node_ip     CHAR(48),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_vip;
 
-CREATE TABLE IF NOT EXISTS go_genesis_vpc (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_vpc (
     lcuuid          CHAR(64),
     node_ip         CHAR(48),
     vtap_id         INTEGER,
-    name            VARCHAR(256)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_vpc;
+    name            VARCHAR(256),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_vpc;
 
-CREATE TABLE IF NOT EXISTS go_genesis_network (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_network (
     name            VARCHAR(256),
     lcuuid          CHAR(64),
     segmentation_id INTEGER,
@@ -1823,12 +1736,12 @@ CREATE TABLE IF NOT EXISTS go_genesis_network (
     external        TINYINT(1),
     vpc_lcuuid      CHAR(64),
     vtap_id         INTEGER,
-    node_ip         CHAR(48)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_network;
+    node_ip         CHAR(48),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_network;
 
-CREATE TABLE IF NOT EXISTS go_genesis_port (
-    id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_port (
     lcuuid          CHAR(64),
     type            INTEGER,
     device_type     INTEGER,
@@ -1837,24 +1750,24 @@ CREATE TABLE IF NOT EXISTS go_genesis_port (
     network_lcuuid  CHAR(64),
     vpc_lcuuid      CHAR(64),
     vtap_id         INTEGER,
-    node_ip         CHAR(48)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_port;
+    node_ip         CHAR(48),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_port;
 
-CREATE TABLE IF NOT EXISTS go_genesis_ip (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_ip (
     lcuuid              CHAR(64),
     ip                  CHAR(64),
     vinterface_lcuuid   CHAR(64),
     node_ip             CHAR(48),
     last_seen           DATETIME,
     vtap_id             INTEGER,
-    masklen             INTEGER DEFAULT 0
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_ip;
+    masklen             INTEGER DEFAULT 0,
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_ip;
 
-CREATE TABLE IF NOT EXISTS go_genesis_lldp (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_lldp (
     lcuuid                  CHAR(64),
     host_ip                 CHAR(48),
     host_interface          CHAR(64),
@@ -1864,12 +1777,12 @@ CREATE TABLE IF NOT EXISTS go_genesis_lldp (
     vinterface_lcuuid       VARCHAR(512),
     vinterface_description  VARCHAR(512),
     vtap_id                 INTEGER,
-    last_seen               DATETIME
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_lldp;
+    last_seen               DATETIME,
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_lldp;
 
-CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
-    id                    INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_vinterface (
     netns_id              INTEGER UNSIGNED DEFAULT 0,
     lcuuid                CHAR(64),
     name                  CHAR(64),
@@ -1885,12 +1798,12 @@ CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     node_ip               CHAR(48),
     last_seen             DATETIME,
     vtap_id               INTEGER,
-    kubernetes_cluster_id CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_vinterface;
+    kubernetes_cluster_id CHAR(64),
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+TRUNCATE TABLE genesis_vinterface;
 
-CREATE TABLE IF NOT EXISTS go_genesis_process (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS genesis_process (
     netns_id            INTEGER UNSIGNED DEFAULT 0,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
@@ -1902,16 +1815,17 @@ CREATE TABLE IF NOT EXISTS go_genesis_process (
     container_id        CHAR(64) DEFAULT '',
     os_app_tags         TEXT COMMENT 'separated by ,',
     node_ip             CHAR(48) DEFAULT '',
-    start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE go_genesis_process;
+    start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+TRUNCATE TABLE genesis_process;
 
-CREATE TABLE IF NOT EXISTS go_genesis_storage (
+CREATE TABLE IF NOT EXISTS genesis_storage (
     id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     vtap_id     INTEGER,
     node_ip     CHAR(48)
 ) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
-TRUNCATE TABLE go_genesis_storage;
+TRUNCATE TABLE genesis_storage;
 
 CREATE TABLE IF NOT EXISTS controller (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2539,6 +2453,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    TEXT,
     icon_id                 INTEGER,
+    chost_id                INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;

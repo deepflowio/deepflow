@@ -37,13 +37,15 @@ var (
 type TargetKey struct {
 	Instance     string
 	Job          string
+	VPCID        int
 	PodClusterID int
 }
 
-func NewTargetKey(instance, job string, podClusterID int) TargetKey {
+func NewTargetKey(instance, job string, vpcID, podClusterID int) TargetKey {
 	return TargetKey{
 		Instance:     instance,
 		Job:          job,
+		VPCID:        vpcID,
 		PodClusterID: podClusterID,
 	}
 }
@@ -162,7 +164,7 @@ func (t *target) GetLabelNamesByID(id int) []string {
 
 func (t *target) Add(batch []*controller.PrometheusTarget) {
 	for _, item := range batch {
-		t.keyToTargetID.Store(NewTargetKey(item.GetInstance(), item.GetJob(), int(item.GetPodClusterId())), int(item.GetId()))
+		t.keyToTargetID.Store(NewTargetKey(item.GetInstance(), item.GetJob(), int(item.GetEpcId()), int(item.GetPodClusterId())), int(item.GetId()))
 	}
 }
 
@@ -179,13 +181,13 @@ func (t *target) refresh(args ...interface{}) error {
 	keyToTargetID := make(map[TargetKey]int)
 	targetIDToLabelNames := make(map[int]mapset.Set[string])
 	for _, item := range recorderTargets {
-		keyToTargetID[NewTargetKey(item.Instance, item.Job, item.PodClusterID)] = item.ID
+		keyToTargetID[NewTargetKey(item.Instance, item.Job, item.VPCID, item.PodClusterID)] = item.ID
 		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
 	}
 
 	dupKeyIDs := make([]int, 0)
 	for _, item := range selfTargets {
-		tk := NewTargetKey(item.Instance, item.Job, item.PodClusterID)
+		tk := NewTargetKey(item.Instance, item.Job, item.VPCID, item.PodClusterID)
 		if _, ok := keyToTargetID[tk]; ok {
 			dupKeyIDs = append(dupKeyIDs, item.ID)
 			continue

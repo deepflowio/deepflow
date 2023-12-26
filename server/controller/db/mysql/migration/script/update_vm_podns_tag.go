@@ -14,9 +14,26 @@
  * limitations under the License.
  */
 
-package migration
+package script
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.4.1.13"
+import (
+	"gorm.io/gorm"
 )
+
+// associate sql issu 6.4.1.11
+const SCRIPT_UPDATE_VM_PODNS_TAG = "6.4.1.11"
+
+func ScriptUpdateVMPodNSTags(db *gorm.DB) error {
+	log.Infof("execute script (%s)", SCRIPT_UPDATE_VM_PODNS_TAG)
+	err := updateVMCloudTags(db)
+	if err != nil {
+		return err
+	}
+
+	err = updatePodNamespaceCloudTags(db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -60,6 +60,10 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		))
 		return nil, false
 	}
+	cloudTags := map[string]string{}
+	if cloudItem.CloudTags != nil {
+		cloudTags = cloudItem.CloudTags
+	}
 	dbItem := &mysql.VM{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
@@ -71,7 +75,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,
-		CloudTags:    cloudItem.CloudTags,
+		CloudTags:    cloudTags,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {

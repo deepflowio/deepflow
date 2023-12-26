@@ -277,7 +277,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map":
 				if strings.HasSuffix(t.Tag, "_id") {
 					if strings.TrimSuffix(t.Tag, "_id") == strings.TrimSuffix(table, "_map") {
 						tagItem, ok := tag.GetTag("value", db, table, "default")
@@ -1383,6 +1383,48 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 			}
 			return &view.Expr{Value: "(" + whereFilter + ")"}, nil
+		}
+	} else if function == "FastFilter(trace_id)" {
+		traceConfig := config.TraceConfig
+		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
+		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
+		if !traceConfig.Enabled {
+			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
+		}
+		switch strings.ToLower(opName) {
+		case "=", "!=":
+			traceID := strings.TrimSpace(f.Value)
+			traceID = strings.Trim(traceID, "'")
+			traceIDIndex, err := utils.GetTraceIdIndex(traceID, TypeIsIncrementalId, FormatIsHex, traceConfig.IncrementalIdLocation.Start, traceConfig.IncrementalIdLocation.Length)
+			// if err != nil or index is zero, not use trace_id_index
+			if err != nil || traceIDIndex == 0 {
+				errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
+				log.Error(errMessage)
+				filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+				return &view.Expr{Value: "(" + filter + ")"}, nil
+			}
+			filter := fmt.Sprintf("trace_id_index %s %d", opName, traceIDIndex)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
+		case "in", "not in":
+			traceIDIndexSlice := []string{}
+			traceIDs := strings.Split(strings.Trim(f.Value, "()"), ",")
+			for _, traceID := range traceIDs {
+				traceID = strings.TrimSpace(traceID)
+				traceID = strings.Trim(traceID, "'")
+				traceIDIndex, err := utils.GetTraceIdIndex(traceID, TypeIsIncrementalId, FormatIsHex, traceConfig.IncrementalIdLocation.Start, traceConfig.IncrementalIdLocation.Length)
+				// if err != nil or index is zero, not use trace_id_index
+				if err != nil || traceIDIndex == 0 {
+					errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
+					log.Error(errMessage)
+					filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+					return &view.Expr{Value: "(" + filter + ")"}, nil
+				}
+				traceIDIndexSlice = append(traceIDIndexSlice, strconv.FormatUint(traceIDIndex, 10))
+			}
+			traceIDIndexs := fmt.Sprintf("(%s)", strings.Join(traceIDIndexSlice, ","))
+			filter := fmt.Sprintf("trace_id_index %s %s", opName, traceIDIndexs)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}
 	} else {
 		right = view.Expr{Value: f.Value}

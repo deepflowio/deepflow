@@ -33,9 +33,11 @@ import (
 
 var log = logging.MustGetLogger("clickhouse")
 var Cfg *QuerierConfig
+var TraceConfig *TraceIdWithIndex
 
 type Config struct {
-	QuerierConfig QuerierConfig `yaml:"querier"`
+	QuerierConfig    QuerierConfig    `yaml:"querier"`
+	TraceIdWithIndex TraceIdWithIndex `yaml:"trace-id-with-index"`
 }
 
 type QuerierConfig struct {
@@ -61,6 +63,18 @@ type QuerierConfig struct {
 type DeepflowApp struct {
 	Host string `default:"deepflow-app" yaml:"host"`
 	Port string `default:"20418" yaml:"port"`
+}
+
+type Location struct {
+	Start  int    `yaml:"start"`
+	Length int    `yaml:"length"`
+	Format string `yaml:"format"`
+}
+
+type TraceIdWithIndex struct {
+	Enabled               bool     `yaml:"enabled"`
+	Type                  string   `yaml:"type"`
+	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 }
 
 type Clickhouse struct {
