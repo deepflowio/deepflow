@@ -1241,6 +1241,7 @@ type NpbPolicy struct {
 	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
 	State            int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"` // 0-disable; 1-enable
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
+	Direction        int       `gorm:"column:direction;type:int;default:1" json:"DIRECTION"` // 1-two way; 2-server to client; 3-client to server
 	Vni              int       `gorm:"column:vni;type:int;default:null" json:"VNI"`
 	NpbTunnelID      int       `gorm:"column:npb_tunnel_id;type:int;default:null" json:"NPB_TUNNEL_ID"`
 	Distribute       int       `gorm:"column:distribute;type:int;default:null" json:"distribute"` // 0-drop, 1-distribute
