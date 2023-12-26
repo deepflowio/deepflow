@@ -1112,6 +1112,7 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     name                   CHAR(64),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
     business_id            INTEGER NOT NULL,
+    direction              TINYINT(1) DEFAULT 1 COMMENT '1-all; 2-forward; 3-backward;',
     vni                    INTEGER,
     npb_tunnel_id          INTEGER,
     distribute             TINYINT(1) DEFAULT 1 COMMENT '0-drop, 1-distribute',
@@ -2452,6 +2453,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    TEXT,
     icon_id                 INTEGER,
+    chost_id                INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;
