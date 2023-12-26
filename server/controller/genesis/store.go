@@ -231,15 +231,19 @@ func (s *SyncStorage) storeToDatabase() {
 	s.genesisSyncInfo.Processes.Save()
 }
 
-func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
-	for {
+func (s *SyncStorage) refreshDatabase() {
+	ticker := time.NewTicker(time.Duration(s.cfg.AgingTime) * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
 		// clean genesis storage invalid data
 		vTaps := []mysql.VTap{}
 		vTapIDs := map[int]bool{}
 		storages := []model.GenesisStorage{}
 		invalidStorages := []model.GenesisStorage{}
 		mysql.Db.Find(&vTaps)
-		mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&storages)
+		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		mysql.Db.Where("node_ip = ?", nodeIP).Find(&storages)
 		for _, v := range vTaps {
 			vTapIDs[v.ID] = false
 		}
@@ -251,23 +255,19 @@ func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
 		if len(invalidStorages) > 0 {
 			err := mysql.Db.Delete(&invalidStorages).Error
 			if err != nil {
-				log.Errorf("clean genesis storage invalid data failed: %s", err)
+				log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err)
 			} else {
-				log.Info("clean genesis storage invalid data success")
+				log.Info("node (%s) clean genesis storage invalid data success", nodeIP)
 			}
 		}
 
-		time.Sleep(ageTime)
 		s.dirty = true
 	}
 }
 
 func (s *SyncStorage) run() {
 	ageTime := time.Duration(s.cfg.AgingTime) * time.Second
-	// 启动时先从数据库恢复数据
 	s.loadFromDatabase(ageTime)
-	// 每个老化周期刷新一次数据库
-	go s.refreshDatabase(ageTime)
 
 	for {
 		time.Sleep(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
@@ -294,6 +294,7 @@ func (s *SyncStorage) run() {
 }
 
 func (s *SyncStorage) Start() {
+	go s.refreshDatabase()
 	go s.run()
 }
 
@@ -331,16 +332,14 @@ func (k *KubernetesStorage) Clear() {
 	k.kubernetesData = map[string]KubernetesInfo{}
 }
 
-func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
+func (k *KubernetesStorage) Add(newInfo KubernetesInfo, isUpdate bool) {
 	k.mutex.Lock()
-	kInfo, ok := k.kubernetesData[k8sInfo.ClusterID]
-	// 上报消息中version未变化时，只更新epoch和error_msg
-	if ok && kInfo.Version == k8sInfo.Version {
-		kInfo.Epoch = time.Now()
-		kInfo.ErrorMSG = k8sInfo.ErrorMSG
-		k.kubernetesData[k8sInfo.ClusterID] = kInfo
+	if oldInfo, ok := k.kubernetesData[newInfo.ClusterID]; ok && !isUpdate {
+		oldInfo.Epoch = newInfo.Epoch
+		oldInfo.ErrorMSG = newInfo.ErrorMSG
+		k.kubernetesData[newInfo.ClusterID] = oldInfo
 	} else {
-		k.kubernetesData[k8sInfo.ClusterID] = k8sInfo
+		k.kubernetesData[newInfo.ClusterID] = newInfo
 	}
 	k.mutex.Unlock()
 
@@ -349,6 +348,22 @@ func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 
 func (k *KubernetesStorage) fetch() map[string]KubernetesInfo {
 	return k.kubernetesData
+}
+
+func (k *KubernetesStorage) refreshDatabase() {
+	timeDuration := time.Duration(k.cfg.AgingTime) * time.Second
+	ticker := time.NewTicker(timeDuration)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		err := mysql.Db.Where("node_ip = ? AND last_seen < ?", nodeIP, time.Now().Add(-timeDuration)).Delete(&model.IPPool{}).Error
+		if err != nil {
+			log.Errorf("node (%s) clean ip pool invalid data failed: %s", nodeIP, err)
+		} else {
+			log.Info("node (%s) clean ip pool invalid data success", nodeIP)
+		}
+	}
 }
 
 func (k *KubernetesStorage) run() {
@@ -369,6 +384,7 @@ func (k *KubernetesStorage) run() {
 }
 
 func (k *KubernetesStorage) Start() {
+	go k.refreshDatabase()
 	go k.run()
 }
 
@@ -406,13 +422,14 @@ func (p *PrometheusStorage) Clear() {
 	p.prometheusData = map[string]PrometheusInfo{}
 }
 
-func (p *PrometheusStorage) Add(prometheusInfo PrometheusInfo) {
+func (p *PrometheusStorage) Add(newInfo PrometheusInfo, isUpdate bool) {
 	p.mutex.Lock()
-	if pInfo, ok := p.prometheusData[prometheusInfo.ClusterID]; ok && pInfo.Version == prometheusInfo.Version {
-		prometheusInfo.Entries = pInfo.Entries
-		p.prometheusData[prometheusInfo.ClusterID] = prometheusInfo
+	if oldInfo, ok := p.prometheusData[newInfo.ClusterID]; ok && !isUpdate {
+		oldInfo.Epoch = newInfo.Epoch
+		oldInfo.ErrorMSG = newInfo.ErrorMSG
+		p.prometheusData[newInfo.ClusterID] = oldInfo
 	} else {
-		p.prometheusData[prometheusInfo.ClusterID] = prometheusInfo
+		p.prometheusData[newInfo.ClusterID] = newInfo
 	}
 	p.mutex.Unlock()
 

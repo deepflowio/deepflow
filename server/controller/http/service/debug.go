@@ -136,8 +136,7 @@ func GetGenesisSyncData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
 }
 
 func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
-	data, err := g.GetKubernetesResponse(clusterID)
-	return data, err
+	return g.GetKubernetesResponse(clusterID)
 }
 
 func GetGenesisPrometheusData(g *genesis.Genesis, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
