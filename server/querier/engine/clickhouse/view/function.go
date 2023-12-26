@@ -74,7 +74,7 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
 	FUNCTION_LAST:        "last_value",
 	FUNCTION_TOPK:        "topK",
-	FUNCTION_ANY:         "topK", // because need to set any to topK(1), and '(1)' may be appended after 'If' in func (f *DefaultFunction) WriteTo(buf *bytes.Buffer)
+	FUNCTION_ANY:         "any",
 }
 
 var MATH_FUNCTIONS = []string{
@@ -207,6 +207,12 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	if !ok {
 		dbFuncName = f.Name
 	}
+
+	isSingleTagTok := f.Name == FUNCTION_TOPK && len(f.Args) == 1
+	if isSingleTagTok {
+		buf.WriteString("arrayStringConcat(")
+	}
+
 	buf.WriteString(dbFuncName)
 
 	if f.IsGroupArray {
@@ -222,7 +228,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	if f.Name == FUNCTION_TOPK {
 		args = f.Args[len(f.Args)-1:]
 	} else if f.Name == FUNCTION_ANY {
-		args = []string{"1"}
+		args = nil
 	}
 	if len(args) > 0 {
 		buf.WriteString("(")
@@ -277,6 +283,9 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	}
 
 	buf.WriteString(")")
+	if isSingleTagTok {
+		buf.WriteString(", ',')")
+	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
@@ -284,6 +293,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(strings.Trim(f.Alias, "`"))
 		buf.WriteString("`")
 	}
+
 }
 
 func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
