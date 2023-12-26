@@ -54,6 +54,7 @@ use serde::ser::Serialize;
 use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 
 use super::crd::{
+    calico::IpPool,
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
     pingan::ServiceRule,
 };
@@ -98,6 +99,7 @@ pub enum GenericResourceWatcher {
     ServiceRule(ResourceWatcher<ServiceRule>),
     CloneSet(ResourceWatcher<CloneSet>),
     KruiseStatefulSet(ResourceWatcher<KruiseStatefulSet>),
+    IpPool(ResourceWatcher<IpPool>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -368,6 +370,15 @@ pub fn supported_resources() -> Vec<Resource> {
             group_versions: vec![GroupVersion {
                 group: "apps.kruise.io",
                 version: "v1alpha1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "ippools",
+            pb_name: "*v1.IPPool",
+            group_versions: vec![GroupVersion {
+                group: "crd.projectcalico.org",
+                version: "v1",
             }],
             selected_gv: None,
         },
@@ -1307,6 +1318,12 @@ impl ResourceWatcherFactory {
                 config,
             )),
             "clonesets" => GenericResourceWatcher::CloneSet(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "ippools" => GenericResourceWatcher::IpPool(self.new_watcher_inner(
                 resource,
                 stats_collector,
                 namespace,

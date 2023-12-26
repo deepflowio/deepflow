@@ -140,6 +140,15 @@ impl Serialize for Method {
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
+    // Offset for HTTP2 HEADERS:
+    // Example:
+    //                   0            8           ...
+    //                   |____________|___________|__
+    // HTTP2 Request:    |SETTINGS[0], HEADERS[1];
+    //
+    // tcp_seq_offset is 8
+    #[serde(skip)]
+    headers_offset: u32,
     // 流是否结束，用于 http2 ebpf uprobe 处理.
     // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
     #[serde(skip)]
@@ -305,6 +314,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
         } else {
             self.endpoint.clone()
         }
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.headers_offset
     }
 }
 
@@ -871,10 +884,12 @@ impl HttpLog {
         let mut is_httpv2 = false;
         let mut frame_payload = payload;
         let mut httpv2_header = Httpv2Headers::default();
+        let mut headers_offset = 0;
 
         while frame_payload.len() > HTTPV2_FRAME_HEADER_LENGTH {
             if Self::has_magic(frame_payload) {
                 frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+                headers_offset += HTTPV2_MAGIC_LENGTH;
                 continue;
             }
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
@@ -944,6 +959,7 @@ impl HttpLog {
                     }
                 }
                 header_frame_parsed = true;
+                info.headers_offset = headers_offset as u32;
                 if content_length.is_some() {
                     is_httpv2 = true;
                     break;
@@ -975,6 +991,7 @@ impl HttpLog {
                 break;
             }
             frame_payload = &frame_payload[httpv2_header.frame_length as usize..];
+            headers_offset += httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH;
         }
         // 流量中可能仅存在Headers帧且Headers帧中没有传输实体，“Content-Length”为0
         if header_frame_parsed && !is_httpv2 {

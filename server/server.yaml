@@ -627,3 +627,13 @@ ingester:
   #    grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
   #      key1: value1
   #      key2: value2
+
+  #metrics-prom-writer:
+  #  enabled: false
+  #  endpoint:               #eg. http://1.2.3.4:9091
+  #  headers:                # type: map[string]string, extra http request headers
+  #  batch-size: 2048        # each http request contians how many timeseries
+  #  flush-timeout: 5
+  #  queue-count: 2
+  #  queue-size:  1000000
+  #  metrics-filter: [app] # only support: 'app', means flow_metrics.'vtap_app_edgp_port.1s'/'vtap_app_port.1s'

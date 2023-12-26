@@ -277,7 +277,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map":
 				if strings.HasSuffix(t.Tag, "_id") {
 					if strings.TrimSuffix(t.Tag, "_id") == strings.TrimSuffix(table, "_map") {
 						tagItem, ok := tag.GetTag("value", db, table, "default")
