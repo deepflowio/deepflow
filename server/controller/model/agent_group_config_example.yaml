@@ -1013,10 +1013,12 @@ vtap_group_id: g-xxxxxx
     ## Note: For the sake of data security, the data of the protocol that needs
     ## to be desensitized is configured here and is not processed by default.
     ## Default: obfuscate-enabled-protocols: [], by default, neither sql statements nor redis commands are obfuscated
-    #obfuscate-enabled-protocols:
-    #- MySQL
-    #- PostgreSQL
-    #- Redis
+    ## If you want to obfuscate sql statements and redis commands, you can set it to:
+    ## obfuscate-enabled-protocols:
+    ## - MySQL
+    ## - PostgreSQL
+    ## - Redis
+    #obfuscate-enabled-protocols: []
 
 
   #oracle-parse-config:
