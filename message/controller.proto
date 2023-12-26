@@ -3,8 +3,6 @@ syntax = "proto2";
 package controller;
 option go_package = "controller";
 
-import "common.proto";
-
 service Controller {
     rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
     rpc GenesisSharingSync (GenesisSharingSyncRequest) returns (GenesisSharingSyncResponse) {}
@@ -22,7 +20,7 @@ message GenesisSharingK8SRequest {
 message GenesisSharingK8SResponse {
     optional string epoch = 1;
     optional string error_msg = 2;
-    repeated common.KubernetesAPIInfo entries = 3;
+    optional bytes entries = 3;
 }
 
 message GenesisSharingPrometheusRequest {
