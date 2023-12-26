@@ -43,10 +43,11 @@ import (
 
 var (
 	parseSQL = []struct {
-		index  string
-		input  string
-		output string
-		db     string
+		index   string
+		input   string
+		output  string
+		db      string
+		wantErr string
 	}{{
 		input:  "select byte from l4_flow_log limit 1",
 		output: "SELECT byte_tx+byte_rx AS `byte` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -335,31 +336,36 @@ var (
 		index:  "any_1",
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
-		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(1)(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, any(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
 		index:  "any_2",
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod, pod_cluster_id, service_id) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
-		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(1)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
+		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, any((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
 		input:  "SELECT is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
 		output: "SELECT if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
 	}, {
 		index:  "TopK_1",
-		input:  "select TopK(ip_0, 10) as top_10_ip_0 from l4_flow_log limit 1",
-		output: "SELECT topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `top_10_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		input:  "select TopK(ip_0, 10) from l4_flow_log limit 1",
+		output: "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "TopK_2",
-		input:  "select TopK(ip_0, pod_0, 10) as top_10_ip_pod_0 from l4_flow_log limit 1",
-		output: "SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `top_10_ip_pod_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		input:  "select TopK(ip_0, pod_0, 10) from l4_flow_log limit 1",
+		output: "SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+	}, {
+		index:   "TopK_err",
+		input:   "select TopK(ip_0, 111) from l4_flow_log limit 1",
+		output:  "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		wantErr: "function [TopK] argument [111] value range is incorrect, it should be within [1, 100]",
 	}, {
 		index:  "Any_1",
-		input:  "select Any(ip_0) as any_ip_0 from l4_flow_log limit 1",
-		output: "SELECT topKIf(1)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `any_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		input:  "select Any(ip_0) from l4_flow_log limit 1",
+		output: "SELECT anyIf(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "Any_2",
-		input:  "select Any(ip_0, pod_0) as any_ip_pod_0 from l4_flow_log limit 1",
-		output: "SELECT topKIf(1)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `any_ip_pod_0` FROM flow_log.`l4_flow_log` LIMIT 1",
+		input:  "select Any(ip_0, pod_0) from l4_flow_log limit 1",
+		output: "SELECT anyIf((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0')))) AND NOT (pod_id_0 = 0))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		index:  "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
@@ -446,6 +452,9 @@ func TestGetSql(t *testing.T) {
 			caseIndex := pcase.index
 			if pcase.index == "" {
 				caseIndex = strconv.Itoa(i)
+			}
+			if pcase.wantErr == err.Error() {
+				continue
 			}
 			t.Errorf("\nParse [%s]\n\t%q \n get: \n\t%q \n want: \n\t%q", caseIndex, pcase.input, out, pcase.output)
 			if err != nil {
