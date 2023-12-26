@@ -25,7 +25,7 @@ log-level: info
 #  #eg. traceId: 'abcdef1234',  if want to match index '1234', `start` can be set as 6 or -4 , and `length` must set: 4
 #  incremental-id-location:      # it is valid when 'type' is 'incremental-id'
 #    start: 0           # >= 0 means counting from the beginning, < 0 means counting from the end.
-#    length: 13         # eg. 1701419226688, length is 13
+#    length: 13         # length range:(0, 32] eg. 1701419226688, length is 13
 #    format: decimal    # hex/decimal
 
 ## monitor the disk usage of the paths
