@@ -64,6 +64,26 @@ func dataStringConvertToMap(data string) map[string]string {
 
 func ScriptUpdateCloudTags(db *gorm.DB) error {
 	log.Infof("execute script (%s)", SCRIPT_UPDATE_CLOUD_TAG)
+
+	err := updateAdditionalResourceCloudTags(db)
+	if err != nil {
+		return err
+	}
+
+	err = updateVMCloudTags(db)
+	if err != nil {
+		return err
+	}
+
+	err = updatePodNamespaceCloudTags(db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateAdditionalResourceCloudTags(db *gorm.DB) error {
 	rscResults := []map[string]interface{}{}
 	err := db.Model(&mysql.DomainAdditionalResource{}).Find(&rscResults).Error
 	if err != nil {
@@ -158,9 +178,12 @@ func ScriptUpdateCloudTags(db *gorm.DB) error {
 		}
 		db.Model(&mysql.DomainAdditionalResource{}).Where("id = ?", resourceID).Updates(mysql.DomainAdditionalResource{CompressedContent: compressedByte})
 	}
+	return nil
+}
 
+func updateVMCloudTags(db *gorm.DB) error {
 	vmResults := []map[string]interface{}{}
-	err = db.Model(&ScriptVM{}).Find(&vmResults).Error
+	err := db.Model(&ScriptVM{}).Find(&vmResults).Error
 	if err != nil {
 		return err
 	}
@@ -179,7 +202,7 @@ func ScriptUpdateCloudTags(db *gorm.DB) error {
 			continue
 		}
 		// compatibility cloud_tags is Null
-		if cloudTagsContent == nil {
+		if cloudTagsContent == nil || cloudTagsContent == "null" {
 			cloudTagsContent = ""
 		}
 		cloudTagsString, ok := cloudTagsContent.(string)
@@ -193,9 +216,12 @@ func ScriptUpdateCloudTags(db *gorm.DB) error {
 		}
 		db.Unscoped().Model(&mysql.VM{}).Where("id = ?", vmID).Updates(mysql.VM{CloudTags: dataStringConvertToMap(cloudTagsString)})
 	}
+	return nil
+}
 
+func updatePodNamespaceCloudTags(db *gorm.DB) error {
 	nsResults := []map[string]interface{}{}
-	err = db.Model(&ScriptPodNamespace{}).Find(&nsResults).Error
+	err := db.Model(&ScriptPodNamespace{}).Find(&nsResults).Error
 	if err != nil {
 		return err
 	}
@@ -214,7 +240,7 @@ func ScriptUpdateCloudTags(db *gorm.DB) error {
 			continue
 		}
 		// compatibility cloud_tags is Null
-		if cloudTagsContent == nil {
+		if cloudTagsContent == nil || cloudTagsContent == "null" {
 			cloudTagsContent = ""
 		}
 		cloudTagsString, ok := cloudTagsContent.(string)

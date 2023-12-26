@@ -152,6 +152,7 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 			MetricIds:          metricIDs,
 			TargetLabelNameIds: labelNIDs,
 			PodClusterId:       proto.Uint32(uint32(targetKey.PodClusterID)),
+			EpcId:              proto.Uint32(uint32(targetKey.VPCID)),
 		})
 		s.counter.SendTargetCount++
 	}

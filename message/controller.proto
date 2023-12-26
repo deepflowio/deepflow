@@ -242,6 +242,7 @@ message PrometheusMetricTargetRequest {
     optional string instance = 3;
     optional string job = 4;
     optional uint32 pod_cluster_id = 5;
+    optional uint32 epc_id = 6;
 }
 
 message PrometheusMetricTarget {
@@ -259,6 +260,7 @@ message PrometheusTargetRequest {
     optional string instance = 1;
     optional string job = 2;
     optional uint32 pod_cluster_id = 3;
+    optional uint32 epc_id = 4;
 }
 
 message PrometheusTarget {
@@ -266,6 +268,7 @@ message PrometheusTarget {
     optional string instance = 2;
     optional string job = 3;
     optional uint32 pod_cluster_id = 4;
+    optional uint32 epc_id = 5;
 }
 
 message SyncPrometheusRequest {

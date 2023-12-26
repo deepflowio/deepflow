@@ -663,6 +663,17 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(FLAT())"
+	CREATE_CH_GPROCESS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `chost_id` Int64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(FLAT())"
 )
 
 const (
@@ -762,7 +773,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_NS_CLOUD_TAGS:      CREATE_CLOUD_TAGS_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAG:             CREATE_OS_APP_TAG_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAGS:            CREATE_OS_APP_TAGS_DICTIONARY_SQL,
-	CH_DICTIONARY_GPROCESS:               CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_GPROCESS:               CREATE_CH_GPROCESS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABEL:  CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABELS: CREATE_K8S_LABELS_DICTIONARY_SQL,
 

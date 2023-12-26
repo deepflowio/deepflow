@@ -381,9 +381,10 @@ func (ChOSAppTags) TableName() string {
 }
 
 type ChGProcess struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:text;default:null" json:"NAME"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name    string `gorm:"column:name;type:text;default:null" json:"NAME"`
+	IconID  int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	CHostID int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
 }
 
 func (ChGProcess) TableName() string {
