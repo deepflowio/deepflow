@@ -632,6 +632,17 @@ type VTapInterface struct {
 	NodeIP             string `json:"NODE_IP"`
 	LastSeen           string `json:"LAST_SEEN"`
 }
+type Items []string
+type IPPool struct {
+	ClusterID string    `gorm:"primaryKey;column:cluster_id;type:char(64);default:null" json:"CLUSTER_ID"`
+	NodeIP    string    `gorm:"column:node_ip;type:char(48)" json:"NODE_IP"`
+	Items     Items     `gorm:"column:items;type:mediumtext;default:'';serializer:json" json:"ITEMS"`
+	LastSeen  time.Time `gorm:"column:last_seen;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"LAST_SEEN"`
+}
+
+func (IPPool) TableName() string {
+	return "ip_pool"
+}
 
 type GenesisHost struct {
 	VtapID   uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
