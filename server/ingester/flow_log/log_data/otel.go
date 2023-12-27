@@ -18,6 +18,7 @@ package log_data
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"net"
 	"strconv"
 	"strings"
@@ -321,6 +322,10 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.L7Base.EndTime = int64(l.EndTimeUnixNano) / int64(time.Microsecond)
 	if h.L7Base.EndTime > h.L7Base.StartTime {
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.L7Base.StartTime)
+	}
+
+	if eventsJSON, err := json.Marshal(l.Events); err == nil {
+		h.Events = string(eventsJSON)
 	}
 
 	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
