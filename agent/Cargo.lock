@@ -864,6 +864,7 @@ dependencies = [
  "hostname",
  "hpack",
  "http",
+ "http2",
  "humantime-serde",
  "hyper",
  "ipnet",
@@ -1480,8 +1481,7 @@ dependencies = [
 [[package]]
 name = "hpack"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c68f61350ad23817dd207b035b5258d91ac5eaef69e96f906628aaed8854dda"
+source = "git+https://github.com/deepflowio/hpack-rs/#230591a8255598370cf0fc8f2a86b2754baab9c5"
 dependencies = [
  "log 0.3.9",
 ]
@@ -1513,6 +1513,10 @@ name = "http-range-header"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfe8eed0a9285ef776bb792479ea3834e8b94e13d615c2f66d03dd50a435a29"
+
+[[package]]
+name = "http2"
+version = "0.1.0"
 
 [[package]]
 name = "httparse"
