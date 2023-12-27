@@ -29,6 +29,7 @@ const (
 	VALUE_TYPE_STRING  = "String"
 	VALUE_TYPE_FLOAT64 = "Float64"
 	VALUE_TYPE_TUPLE   = "Tuple"
+	VALUE_TYPE_ARRAY   = "Array"
 )
 
 var VALUE_TYPE_MAP = map[string]int{
@@ -113,6 +114,75 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		return *v, VALUE_TYPE_FLOAT64, nil
 	case *string:
 		return *v, VALUE_TYPE_STRING, nil
+	case *[]int8:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]int16:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]int32:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]int64:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]uint8:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]uint16:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]uint32:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]uint64:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]time.Time:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]net.IP:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]float64:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case *[]string:
+		return *v, VALUE_TYPE_ARRAY, nil
+	case **[]int8:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]int16:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]int32:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]int64:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]uint8:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]uint16:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]uint32:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]uint64:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
+	case **[]float64:
+		if *v == nil {
+			return nil, VALUE_TYPE_ARRAY, nil
+		}
+		return **v, VALUE_TYPE_ARRAY, nil
 	case *[]interface{}:
 		return *v, VALUE_TYPE_TUPLE, nil
 	default:
