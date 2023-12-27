@@ -1009,6 +1009,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		ColumnNames: []string{"request_domain"},
 		ColumnType:  ckdb.String,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"events"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 var IndexAdd64 = []*IndexAdds{
