@@ -17,49 +17,62 @@
 package cache
 
 import (
-	"math"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/libs/lru"
-	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
-	"github.com/op/go-logging"
 	"github.com/prometheus/prometheus/prompb"
 )
-
-var log = logging.MustGetLogger("prometheus.cache")
 
 type CacheItem struct {
 	startTime int64 // unit: ms, cache item start time
 	endTime   int64 // unit: ms, cache item end time
-	data      *common.Result
-	rwLock    *sync.RWMutex
+	data      *prompb.ReadResponse
+
+	rwLock *sync.RWMutex
 }
+
+const (
+	sampleSize    = int(unsafe.Sizeof(prompb.Sample{}))
+	samplePtrSize = int(unsafe.Sizeof(&prompb.Sample{}))
+)
 
 func (c *CacheItem) Range() int64 {
 	return c.endTime - c.startTime
 }
 
-func (c *CacheItem) Size() uint64 {
-	return unsafeSize(c.data)
+func (c *CacheItem) isZero() bool {
+	c.rwLock.RLock()
+	defer c.rwLock.RUnlock()
+
+	return c.startTime == 0 && c.endTime == 0
 }
 
-// it should called under Lock
-func (c *CacheItem) replace(d *common.Result) bool {
-	new_size := unsafeSize(d)
-	if new_size <= config.Cfg.Prometheus.Cache.CacheItemSize {
-		// if new_size < max size, replace it
-		c.data = d
-		return true
-	} else {
-		// if new_size > max size, mark overflow, do not replace it, delete key
-		log.Debugf("case size overflow when replace data, range: [%d-%d], size: %d", c.startTime, c.endTime, new_size)
-		return false
+func (c *CacheItem) Size() uint64 {
+	size := 0
+	if c.data == nil {
+		return 0
 	}
+	for i := 0; i < len(c.data.Results); i++ {
+		r := c.data.Results[i]
+		size += int(unsafe.Sizeof(*r))
+		for j := 0; j < len(r.Timeseries); j++ {
+			ts := r.Timeseries[j]
+			size += int(unsafe.Sizeof(*ts))
+			size += len(ts.Samples) * sampleSize
+			size += len(ts.Samples) * samplePtrSize
+			for k := 0; k < len(ts.Labels); k++ {
+				size += int(unsafe.Sizeof(ts.Labels[k]))
+			}
+		}
+	}
+	return uint64(size)
 }
 
 func (c *CacheItem) Hit(start int64, end int64) CacheHit {
@@ -94,7 +107,7 @@ func (c *CacheItem) Hit(start int64, end int64) CacheHit {
 	return CacheMiss
 }
 
-func (c *CacheItem) Deviation(start int64, end int64) (int64, int64) {
+func (c *CacheItem) FixupQueryTime(start int64, end int64) (int64, int64) {
 	// only cache hit part needs to re-calculate deviation
 	c.rwLock.RLock()
 	defer c.rwLock.RUnlock()
@@ -107,151 +120,161 @@ func (c *CacheItem) Deviation(start int64, end int64) (int64, int64) {
 	// if the deviation between start & c.start > maxAllowDeviation, directy query all data to replace cache
 	// add left data
 	if end <= c.endTime && end > c.startTime && start < c.startTime {
-		if math.Abs(float64(c.startTime-start)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
-			return start, end
-		} else {
-			return start, c.startTime
-		}
+		return start, c.startTime
 	}
 
 	// add right data
 	if start < c.endTime && start >= c.startTime && end > c.endTime {
-		if math.Abs(float64(c.endTime-end)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
-			return start, end
-		} else {
-			return c.endTime, end
-		}
+		return c.endTime, end
 	}
 
 	return start, end
 }
 
-func (c *CacheItem) Data() *common.Result {
-	return c.data
+func getSeriesLabels(lb *[]prompb.Label) string {
+	sort.Slice(*lb, func(i, j int) bool { return (*lb)[i].Name < (*lb)[j].Name })
+	labels := make([]string, 0, len(*lb))
+	for i := 0; i < len(*lb); i++ {
+		labels = append(labels, (*lb)[i].Name+":"+(*lb)[i].Value)
+	}
+	return strings.Join(labels, ",")
 }
 
-func (c *CacheItem) MergeCache(start, end int64, cache *common.Result, query *common.Result) (*common.Result, bool) {
+func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) *prompb.ReadResponse {
 	log.Debugf("cache merged, query range: [%d-%d], cache range: [%d-%d]", start, end, c.startTime, c.endTime)
-	if query == nil || len(query.Values) == 0 {
-		log.Debugf("cache data is nil: %v, query data is nil: %v", cache == nil, query == nil)
-		return cache, true
+	if query == nil || len(query.Results) == 0 || len(query.Results[0].Timeseries) == 0 {
+		log.Debugf("query data is nil")
+		return c.data
 	}
 
-	// re-calculate cache time, because other session may already update cache
-	c.rwLock.Lock()
-	defer c.rwLock.Unlock()
+	if c.data == nil {
+		c.startTime = start
+		c.endTime = end
+		return query
+	}
 
+	// cached: [     ]
+	// result:  [   ]
 	if start >= c.startTime && end <= c.endTime {
-		// not merge
 		log.Debugf("cache full hit, will not merge, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
-		return cache, true
+		return c.data
 	}
 
-	// why need to extern left/right here: because other session may already update cache item during sql query
-	// so we should re-calculate cache time range here
-	// but the `data` merge into cache not completely equals to `data` back to api call
-
-	// extern both side
+	// cached:  [   ]
+	// result: [     ]
 	if start < c.startTime && end > c.endTime {
 		log.Debugf("cache extern both side, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
 		c.startTime = start
 		c.endTime = end
-		return query, c.replace(query)
+		return query
 	}
 
-	mergeResult := &common.Result{Columns: query.Columns, Schemas: query.Schemas}
-	// extern left
-	// cached:   [0, N]
-	// replaced: [-X, Y] (0<Y<=N, X<0)
+	// cached: [   ]
+	// result:       [   ]
+
+	// cached:       [   ]
+	// result: [   ]
+	if end <= c.startTime || start >= c.endTime {
+		c.startTime = start
+		c.endTime = end
+		return query
+	}
+
+	// only first result contains time series
+	queryTs := query.Results[0].Timeseries
+	cachedTs := c.data.Results[0].Timeseries
+
+	// cached:   [   ]
+	// result: [   ]
 	if end <= c.endTime && end > c.startTime && start < c.startTime {
-		if math.Abs(float64(c.startTime-start)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
-			log.Debugf("cache replace due to deviation too large, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
-			c.startTime = start
-			c.endTime = end
-			// in deviation case, will query all data [-X,Y], not only extern data [-X,0]
-			// replace cache data with query data
-			mergeResult.Values = query.Values
-		} else {
-			log.Debugf("cache merge extern left, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
-			c.startTime = start
-			// in not deviation case, query data [-X,0], merge into [-X,N]
-			// note that `Values` is order by time DESC, so extern `left` should append into right
-			mergeResult.Values = append(cache.Values, query.Values...)
-		}
-
-		if len(mergeResult.Values) > 0 {
-			fv := mergeResult.Values[0].([]interface{})
-			lv := mergeResult.Values[len(mergeResult.Values)-1].([]interface{})
-			if len(fv) > 0 && len(lv) > 0 {
-				log.Debugf("merge result, data range [%v-%v]", lv[0], fv[0])
-			}
-		}
-
-		return mergeResult, c.replace(mergeResult)
+		c.startTime = start
 	}
-
-	// extern right
-	// cached:   [0, N]
-	// replaced: [X,Y] (0<=X<N, Y>N)
+	// cached: [   ]
+	// result:   [   ]
 	if start < c.endTime && start >= c.startTime && end > c.endTime {
-		if math.Abs(float64(c.endTime-end)) > config.Cfg.Prometheus.Cache.CacheMaxAllowDeviation {
-			log.Debugf("cache replace due to deviation too large, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
-			c.startTime = start
-			c.endTime = end
-			// in deviation case, will query all data [X,Y], not only extern data [N,Y]
-			// replace cache data with query data
-			mergeResult.Values = query.Values
-		} else {
-			log.Debugf("cache merge extern right, cache: [%d-%d], query: [%d-%d]", c.startTime, c.endTime, start, end)
-			c.endTime = end
-			// in not deviation case, query data [N,Y], merge into [0,Y]
-			// note that `Values` is order by time DESC, so extern `right` should append into left
-			mergeResult.Values = append(query.Values, cache.Values...)
-		}
+		c.endTime = end
+	}
 
-		if len(mergeResult.Values) > 0 {
-			fv := mergeResult.Values[0].([]interface{})
-			lv := mergeResult.Values[len(mergeResult.Values)-1].([]interface{})
-			if len(fv) > 0 && len(lv) > 0 {
-				log.Debugf("merge result, data range [%v-%v]", lv[0], fv[0])
+	for _, ts := range queryTs {
+		labels := getSeriesLabels(&ts.Labels)
+
+		for _, existsTs := range cachedTs {
+			cachedLabels := getSeriesLabels(&existsTs.Labels)
+			if labels == cachedLabels {
+				existsSamples := existsTs.Samples
+				existsSamplesStart := existsSamples[0].Timestamp
+				existsSamplesEnd := existsSamples[len(existsSamples)-1].Timestamp
+
+				if existsSamplesEnd < ts.Samples[0].Timestamp {
+					// cached: [   ]
+					// result:       [   ]
+					existsTs.Samples = append(existsSamples, ts.Samples...)
+				} else if existsSamplesStart > ts.Samples[len(ts.Samples)-1].Timestamp {
+					// cached:       [   ]
+					// result: [   ]
+					existsTs.Samples = append(ts.Samples, existsSamples...)
+				} else if existsSamplesEnd >= ts.Samples[0].Timestamp && existsSamplesEnd < ts.Samples[len(ts.Samples)-1].Timestamp {
+					// cached: [   ]
+					// result:   [   ]
+					overlapSample := sort.Search(len(ts.Samples), func(i int) bool {
+						return ts.Samples[i].Timestamp > existsSamplesEnd
+					})
+					existsTs.Samples = append(existsSamples, ts.Samples[overlapSample:]...)
+				} else if existsSamplesStart <= ts.Samples[len(ts.Samples)-1].Timestamp && existsSamplesStart > ts.Samples[0].Timestamp {
+					// cached:   [   ]
+					// result: [   ]
+					overlapSample := sort.Search(len(ts.Samples), func(i int) bool {
+						return ts.Samples[i].Timestamp >= existsSamplesStart
+					})
+					existsTs.Samples = append(ts.Samples[:overlapSample], existsSamples...)
+				}
+
+				sort.Slice(existsTs.Samples, func(i, j int) bool {
+					return existsTs.Samples[i].Timestamp < existsTs.Samples[j].Timestamp
+				})
 			}
 		}
 
-		return mergeResult, c.replace(mergeResult)
 	}
 
-	return query, true
+	output := &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}
+	output.Results[0].Timeseries = append(output.Results[0].Timeseries, cachedTs...)
+
+	return output
 }
 
 type RemoteReadQueryCache struct {
 	cache   *lru.Cache[string, *CacheItem]
 	counter *CacheCounter
+
+	lock *sync.RWMutex
 }
 
 var (
-	remoteReadQueryCache *RemoteReadQueryCache
-	once                 sync.Once
+	readResponseCache *RemoteReadQueryCache
+	syncOnce          sync.Once
 )
 
-func RemoteReadCache() *RemoteReadQueryCache {
-	once.Do(func() {
-		remoteReadQueryCache = NewRemoteReadQueryCache()
+func PromReadResponseCache() *RemoteReadQueryCache {
+	syncOnce.Do(func() {
+		readResponseCache = NewRemoteReadQueryCache()
 	})
-	return remoteReadQueryCache
+	return readResponseCache
 }
 
 func NewRemoteReadQueryCache() *RemoteReadQueryCache {
 	s := &RemoteReadQueryCache{
 		cache:   lru.NewCache[string, *CacheItem](config.Cfg.Prometheus.Cache.CacheMaxCount),
 		counter: &CacheCounter{Stats: &CacheStats{}},
+		lock:    &sync.RWMutex{},
 	}
 	statsd.RegisterCountableForIngester("prometheus_cache_counter", s.counter)
 	return s
 }
 
-func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, item *CacheItem, cache *common.Result, query *common.Result) *common.Result {
+func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, query *prompb.ReadResponse) *prompb.ReadResponse {
 	if req == nil || len(req.Queries) == 0 {
-		return cache
+		return query
 	}
 	q := req.Queries[0]
 	if q.Hints.Func == "series" {
@@ -261,59 +284,101 @@ func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, item *CacheIt
 	key, _ := promRequestToCacheKey(q)
 	start, end := GetPromRequestQueryTime(q)
 	start = timeAlign(start)
-	if item == nil {
-		// cache miss
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	item, ok := s.cache.Get(key)
+	defer func() {
+		if item.Size() > config.Cfg.Prometheus.Cache.CacheItemSize {
+			s.cache.Remove(key)
+		}
+	}()
+
+	if !ok {
 		item = &CacheItem{startTime: start, endTime: end, data: query, rwLock: &sync.RWMutex{}}
 		s.cache.Add(key, item)
-		return query
 	} else {
 		// cache hit, merge data
 		atomic.AddUint64(&s.counter.Stats.CacheMerge, 1)
 		t1 := time.Now()
-		result, ok := item.MergeCache(start, end, cache, query)
+
+		item.rwLock.Lock()
+		defer item.rwLock.Unlock()
+
+		item.data = item.mergeResponse(start, end, query)
 		d := time.Since(t1)
 		atomic.AddUint64(&s.counter.Stats.CacheMergeDuration, uint64(d.Seconds()))
-		if !ok {
-			// if cache size overflow, means this cache is expired, should delete it
-			// maybe 2 ways to resolve: in next query, rewrite cache
-			// or add more limitation of cache size
-			log.Debugf("case size overflow, cache key: [%s], range: [%d-%d]", key, start, end)
-			atomic.AddUint64(&s.counter.Stats.CacheSizeOverFlow, 1)
-			s.cache.Remove(key)
-		}
-		return result
 	}
+
+	// avoid pointer ref modify cached data
+	return copyResponse(item.data)
 }
 
-func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*CacheItem, CacheHit, string, int64, int64) {
+func copyResponse(cached *prompb.ReadResponse) *prompb.ReadResponse {
+	resp := &prompb.ReadResponse{Results: []*prompb.QueryResult{}}
+	if cached == nil {
+		resp.Results = append(resp.Results, &prompb.QueryResult{})
+		return resp
+	}
+
+	for i := 0; i < len(cached.Results); i++ {
+		r := cached.Results[i]
+		nR := &prompb.QueryResult{}
+		nR.Timeseries = make([]*prompb.TimeSeries, 0, len(r.Timeseries))
+		for j := 0; j < len(r.Timeseries); j++ {
+			nR.Timeseries = append(nR.Timeseries, &prompb.TimeSeries{
+				Labels:  r.Timeseries[j].Labels,
+				Samples: r.Timeseries[j].Samples,
+			})
+		}
+		resp.Results = append(resp.Results, nR)
+	}
+
+	return resp
+}
+
+func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*prompb.ReadResponse, CacheHit, string, int64, int64) {
+	emptyResponse := &prompb.ReadResponse{}
 	if req == nil || len(req.Queries) == 0 {
-		return nil, CacheMiss, "", 0, 0
+		return emptyResponse, CacheMiss, "", 0, 0
 	}
 	q := req.Queries[0]
 	start, end := GetPromRequestQueryTime(q)
 	if q.Hints.Func == "series" {
 		// for series api, don't use cache
 		// not count cache miss here
-		return nil, CacheMiss, "", start, end
+		return emptyResponse, CacheMiss, "", start, end
 	}
 
 	if !config.Cfg.Prometheus.Cache.Enabled {
-		return nil, CacheMiss, "", start, end
+		return emptyResponse, CacheMiss, "", start, end
 	}
 
 	// for query api, cache query samples
 	key, metric := promRequestToCacheKey(q)
 	if strings.Contains(metric, "__") {
 		// for DeepFlow Native metrics, don't use cache
-		return nil, CacheMiss, metric, start, end
+		return emptyResponse, CacheMiss, metric, start, end
 	}
 
 	start = timeAlign(start)
+
+	// lock for concurrency key reading
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	item, ok := s.cache.Get(key)
+
 	if !ok {
 		atomic.AddUint64(&s.counter.Stats.CacheMiss, 1)
 		// totally cache miss, no such key
-		return nil, CacheMiss, metric, start, end
+		emptyItem := &CacheItem{startTime: 0, endTime: 0, data: nil, rwLock: &sync.RWMutex{}}
+		s.cache.Add(key, emptyItem)
+		return emptyResponse, CacheKeyNotFound, metric, start, end
+	}
+
+	if item.isZero() {
+		return emptyResponse, CacheKeyFoundNil, metric, start, end
 	}
 
 	switch item.Hit(start, end) {
@@ -322,12 +387,12 @@ func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*CacheItem, CacheHi
 		return nil, CacheMiss, metric, start, end
 	case CacheHitFull:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
-		return item, CacheHitFull, metric, start, end
+		return item.data, CacheHitFull, metric, start, end
 	case CacheHitPart:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
-		query_start, query_end := item.Deviation(start, end)
-		return item, CacheHitPart, metric, query_start, query_end
+		query_start, query_end := item.FixupQueryTime(start, end)
+		return item.data, CacheHitPart, metric, query_start, query_end
 	default:
-		return nil, CacheMiss, metric, start, end
+		return emptyResponse, CacheMiss, metric, start, end
 	}
 }
