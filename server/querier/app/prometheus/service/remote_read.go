@@ -21,6 +21,8 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/prometheus/prompb"
@@ -33,7 +35,6 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
-	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 type prometheusReader struct {
@@ -51,129 +52,138 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	// promrequest trans to sql
 	// pp.Println(req)
 	var metricName string
-	var queryResult, result *common.Result
+	var response *prompb.ReadResponse
+	// var queryResult, result *common.Result
 	// should get cache result immediately
-	item, hit, metricName, storage_query_start, storage_query_end := cache.RemoteReadCache().Get(req)
-	if item != nil {
-		result = item.Data()
+	item, hit, metricName, storage_query_start, storage_query_end := cache.PromReadResponseCache().Get(req)
+	if item != nil && len(item.Results) > 0 {
+		response = item
 	}
+
+	if config.Cfg.Prometheus.Cache.Enabled && hit == cache.CacheKeyFoundNil {
+		cacheLoadingFinished := &sync.WaitGroup{}
+		cacheLoadingFinished.Add(1)
+
+		go func() {
+			waitCtx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
+			for {
+				select {
+				case <-waitCtx.Done():
+					cancelFunc()
+					cacheLoadingFinished.Done()
+					return
+				default:
+					if item, hit, metricName, storage_query_start, storage_query_end = cache.PromReadResponseCache().Get(req); item != nil && len(item.Results) > 0 {
+						response = item
+						cacheLoadingFinished.Done()
+						cancelFunc()
+						return
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+			}
+		}()
+
+		cacheLoadingFinished.Wait()
+	}
+
 	if hit == cache.CacheHitFull {
-		if strings.Contains(metricName, "__") {
-			metricsSplit := strings.Split(metricName, "__")
-			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
-				if metricsSplit[0] == DB_NAME_EXT_METRICS || metricsSplit[0] == chCommon.DB_NAME_PROMETHEUS {
-					ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixTag)
-				}
-			}
-		} else {
-			ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
-		}
-	} else {
-		var db, datasource string
-		var debugInfo map[string]interface{}
-		log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, storage_query_start, storage_query_end)
-		ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end)
-		// fmt.Println(sql, db)
-		if err != nil {
-			return nil, "", 0, err
-		}
-		if db == "" {
-			db = "prometheus"
-		}
-		query_uuid := uuid.New()
-		// mark query comes from promql
-		if db == "prometheus" {
-			//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
-			ctx = context.WithValue(ctx, "remote_read", true)
-		}
-		// if `api` pass `debug` or config debug, get debug info from querier
-		debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
-		args := common.QuerierParams{
-			DB:         db,
-			Sql:        sql,
-			DataSource: datasource,
-			Debug:      strconv.FormatBool(debugQuerier),
-			QueryUUID:  query_uuid.String(),
-			Context:    ctx,
-		}
-		// get parentSpan for inject others attribute below
-		parentSpan := trace.SpanFromContext(ctx)
-
-		// start span trace query time of any query uuid
-		var span trace.Span
-		if config.Cfg.Prometheus.RequestQueryWithDebug {
-			tr := otel.GetTracerProvider().Tracer("querier/prometheus/clickhouseQuery")
-			ctx, span = tr.Start(ctx, "PromReaderExecute",
-				trace.WithSpanKind(trace.SpanKindClient),
-				trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())))
-
-			defer span.End()
-		}
-
-		ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
-		ckEngine.Init()
-		queryResult, debugInfo, err = ckEngine.ExecuteQuery(&args)
-		if err != nil {
-			log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
-			return nil, "", 0, err
-		}
-
-		if debugQuerier {
-			duration = extractQueryTimeFromQueryResponse(debugInfo)
-			sql = extractQuerySQLFromQueryResponse(debugInfo)
-		}
-
-		if config.Cfg.Prometheus.RequestQueryWithDebug {
-			// inject query_time for current span
-			span.SetAttributes(attribute.Float64("query_time", duration))
-
-			// inject labels for parent span
-			targetLabels := make([]string, 0, len(queryResult.Schemas))
-			appLabels := make([]string, 0, len(queryResult.Schemas))
-			for i := 0; i < len(queryResult.Schemas); i++ {
-				labelType := queryResult.Schemas[i].LabelType
-				if labelType == "app" {
-					appLabels = append(appLabels, strings.TrimPrefix(queryResult.Columns[i].(string), "tag."))
-				} else if labelType == "target" {
-					targetLabels = append(targetLabels, strings.TrimPrefix(queryResult.Columns[i].(string), "tag."))
-				}
-			}
-			if len(targetLabels) > 0 {
-				parentSpan.SetAttributes(attribute.String("promql.query.metric.targetLabel", strings.Join(targetLabels, ",")))
-			}
-			if len(appLabels) > 0 {
-				parentSpan.SetAttributes(attribute.String("promql.query.metric.appLabel", strings.Join(appLabels, ",")))
-			}
-		}
+		return response, "", 0, nil
 	}
 
-	if config.Cfg.Prometheus.Cache.Enabled {
-		// merge result into cache
-		result = cache.RemoteReadCache().AddOrMerge(req, item, result, queryResult)
-		if len(result.Values) > 0 {
-			fv := result.Values[0].([]interface{})
-			lv := result.Values[len(result.Values)-1].([]interface{})
-			if len(fv) > 0 && len(lv) > 0 {
-				log.Debugf("metric: [%s] result merged, range: [%d-%d]", metricName, lv[0], fv[0])
+	// CacheKeyNotFound & CacheHitPart, do query
+	var result *common.Result
+	var db, datasource string
+	var debugInfo map[string]interface{}
+	log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, storage_query_start, storage_query_end)
+	ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end)
+	// fmt.Println(sql, db)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	if db == "" {
+		db = "prometheus"
+	}
+	query_uuid := uuid.New()
+	// mark query comes from promql
+	if db == "prometheus" {
+		//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
+		ctx = context.WithValue(ctx, "remote_read", true)
+	}
+	// if `api` pass `debug` or config debug, get debug info from querier
+	debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
+	args := common.QuerierParams{
+		DB:         db,
+		Sql:        sql,
+		DataSource: datasource,
+		Debug:      strconv.FormatBool(debugQuerier),
+		QueryUUID:  query_uuid.String(),
+		Context:    ctx,
+	}
+	// get parentSpan for inject others attribute below
+	parentSpan := trace.SpanFromContext(ctx)
+
+	// start span trace query time of any query uuid
+	var span trace.Span
+	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		tr := otel.GetTracerProvider().Tracer("querier/prometheus/clickhouseQuery")
+		ctx, span = tr.Start(ctx, "PromReaderExecute",
+			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())))
+
+		defer span.End()
+	}
+
+	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
+	ckEngine.Init()
+	result, debugInfo, err = ckEngine.ExecuteQuery(&args)
+	if err != nil {
+		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
+		return nil, "", 0, err
+	}
+
+	if debugQuerier {
+		duration = extractQueryTimeFromQueryResponse(debugInfo)
+		sql = extractQuerySQLFromQueryResponse(debugInfo)
+	}
+
+	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		// inject query_time for current span
+		span.SetAttributes(attribute.Float64("query_time", duration))
+
+		// inject labels for parent span
+		targetLabels := make([]string, 0, len(result.Schemas))
+		appLabels := make([]string, 0, len(result.Schemas))
+		for i := 0; i < len(result.Schemas); i++ {
+			labelType := result.Schemas[i].LabelType
+			if labelType == "app" {
+				appLabels = append(appLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+			} else if labelType == "target" {
+				targetLabels = append(targetLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
 			}
 		}
-	} else {
-		// not using cache, query result would be real result
-		result = queryResult
+		if len(targetLabels) > 0 {
+			parentSpan.SetAttributes(attribute.String("promql.query.metric.targetLabel", strings.Join(targetLabels, ",")))
+		}
+		if len(appLabels) > 0 {
+			parentSpan.SetAttributes(attribute.String("promql.query.metric.appLabel", strings.Join(appLabels, ",")))
+		}
 	}
 
 	if req == nil || len(req.Queries) == 0 {
-		return nil, "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
+		return nil, "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
 	}
+
 	api_query_start, api_query_end := cache.GetPromRequestQueryTime(req.Queries[0])
 	// response trans to prom resp
 	resp, err = p.respTransToProm(ctx, metricName, api_query_start, api_query_end, result)
-	if resp != nil && len(resp.Results) > 0 {
-		if len(resp.Results[0].Timeseries) > 0 && len(resp.Results[0].Timeseries[0].Samples) > 0 {
-			log.Debugf("%s prometheus result parsed, time range: [%d-%d]", metricName,
-				resp.Results[0].Timeseries[0].Samples[0].Timestamp,
-				resp.Results[0].Timeseries[0].Samples[len(resp.Results[0].Timeseries[0].Samples)-1].Timestamp)
-		}
+
+	if config.Cfg.Prometheus.Cache.Enabled {
+		// merge result into cache
+		response = cache.PromReadResponseCache().AddOrMerge(req, resp)
+	} else {
+		// not using cache, query result would be real result
+		response = resp
 	}
 
 	if err != nil {
@@ -181,7 +191,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		return nil, "", 0, err
 	}
 	// pp.Println(resp)
-	return resp, sql, duration, nil
+	return response, sql, duration, nil
 }
 
 // extract query_time from query debug(map[string]interface{}) infos
