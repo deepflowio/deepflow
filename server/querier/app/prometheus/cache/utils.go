@@ -22,8 +22,11 @@ import (
 	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/op/go-logging"
 	"github.com/prometheus/prometheus/prompb"
 )
+
+var log = logging.MustGetLogger("prometheus.cache")
 
 type CacheHit int
 
@@ -31,6 +34,8 @@ const (
 	CacheMiss CacheHit = iota
 	CacheHitPart
 	CacheHitFull
+	CacheKeyNotFound
+	CacheKeyFoundNil
 )
 
 // start time & end time align to 0 second
