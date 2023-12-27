@@ -33,6 +33,7 @@ use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
     Naming,
 };
+use http2::get_expected_headers;
 #[cfg(target_os = "linux")]
 use libc::{c_int, setpriority, PRIO_PROCESS};
 use log::{info, warn, Level};
@@ -877,6 +878,7 @@ pub struct L7LogDynamicConfig {
 
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
+    pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -899,19 +901,27 @@ impl L7LogDynamicConfig {
     ) -> Self {
         proxy_client.make_ascii_lowercase();
 
+        let mut expected_headers_set = get_expected_headers();
+        expected_headers_set.insert(proxy_client.as_bytes().to_vec());
         let mut x_request_id_set = HashSet::new();
         for t in x_request_id.iter() {
-            x_request_id_set.insert(t.trim().to_string());
+            let t = t.trim();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            x_request_id_set.insert(t.to_string());
         }
 
         let mut trace_set = HashSet::new();
         for t in trace_types.iter() {
-            trace_set.insert(t.to_checker_string());
+            let t = t.to_checker_string();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            trace_set.insert(t);
         }
 
         let mut span_set = HashSet::new();
         for t in span_types.iter() {
-            span_set.insert(t.to_checker_string());
+            let t = t.to_checker_string();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            span_set.insert(t);
         }
 
         Self {
@@ -921,6 +931,7 @@ impl L7LogDynamicConfig {
             span_types,
             trace_set,
             span_set,
+            expected_headers_set: Arc::new(expected_headers_set),
         }
     }
 
