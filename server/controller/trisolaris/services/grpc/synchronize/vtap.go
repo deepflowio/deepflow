@@ -17,7 +17,10 @@
 package synchronize
 
 import (
+	"bytes"
+	//"crypto/md5"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -27,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/message/common"
 	api "github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/http/router"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
@@ -734,4 +738,70 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 	}
 	log.Info("exit push", r.GetCtrlIp(), r.GetCtrlMac())
 	return err
+}
+
+func (e *VTapEvent) Command(cmdServer api.Synchronizer_CommandServer) error {
+	buff := bytes.NewBuffer(nil)
+	key := ""
+	for {
+		for {
+			log.Info("CMD start recv data from agent")
+			response, err := cmdServer.Recv()
+			if key == "" {
+				key = response.GetCtrlIp() + "-" + response.GetCtrlMac()
+			}
+			if err != nil {
+				if err == io.EOF { // 传输结束
+					log.Infof("CMD get agent(%s) response end", key)
+					if len(response.GetContent()) > 0 {
+						buff.Write(response.GetContent())
+					}
+					exData := router.NewExchangeData()
+					if buff.Len() != 0 {
+						exData.SetResponseData(buff)
+						router.SetResponseData(key, exData)
+						log.Infof("CMD send responseData to server from agent(%s)", key)
+					}
+					log.Info("CMD exit get response")
+					return nil
+				}
+				log.Errorf("CMD stream error: %v  agent(%s)", err, key)
+				return nil
+			}
+			if len(response.GetContent()) == 0 {
+				break
+			}
+			log.Infof("CMD receive response data from agent (%s)", key)
+			status := response.GetStatus()
+			if status != api.Status_SUCCESS {
+				log.Errorf("CMD get failed as agent(%s) response status %s", status.String(), key)
+				continue
+			}
+			buff.Write(response.GetContent())
+		}
+
+		// send
+		for {
+			cmdRequest := router.GetCmdRequest(key)
+			if cmdRequest != nil {
+				log.Infof("CMD get cmd info from server send to vtap(%s)", key)
+				err := cmdServer.Send(cmdRequest.GetCommandRequest())
+				if err != nil {
+					log.Errorf("CMD %s", err)
+					return nil
+				}
+				break
+			} else {
+				log.Infof("CMD send empty data to agent(%s)", key)
+				err := cmdServer.Send(&api.CommandRequest{})
+				if err != nil {
+					log.Errorf("CMD %s", err)
+					return nil
+				}
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}
+	log.Info("CMD exit Synchronizer_CommandServer")
+	return nil
 }

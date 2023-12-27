@@ -81,6 +81,10 @@ func (s *service) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error
 	return nil
 }
 
+func (s *service) Command(cmdServer api.Synchronizer_CommandServer) error {
+	return s.vTapEvent.Command(cmdServer)
+}
+
 func (s *service) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	startTime := time.Now()
 	defer func() {
