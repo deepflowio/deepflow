@@ -118,11 +118,18 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 				}
 				vifs = append(vifs, vif)
 
+				var subnetLcuuid string
+				for _, subnet := range h.toolDataSet.networkLcuuidToSubnets[networkLcuuid] {
+					if cloudcommon.IsIPInCIDR(ip, subnet.CIDR) {
+						subnetLcuuid = subnet.Lcuuid
+						break
+					}
+				}
 				ip := model.IP{
 					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ip),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               ip,
-					SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[networkLcuuid],
+					SubnetLcuuid:     subnetLcuuid,
 					RegionLcuuid:     regionLcuuid,
 				}
 				ips = append(ips, ip)
