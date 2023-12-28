@@ -28,14 +28,14 @@ import (
 )
 
 const (
-	LABEL_NAME_METRICS           = "__name__"
-	DB_NAME_EXT_METRICS          = "ext_metrics"
-	DB_NAME_DEEPFLOW_SYSTEM      = "deepflow_system"
-	DB_NAME_FLOW_METRICS         = "flow_metrics"
-	TABLE_NAME_METRICS           = "metrics"
-	TABLE_NAME_L7_FLOW_LOG       = "l7_flow_log"
-	TABLE_NAME_SAMPLES           = "samples"
-	METRICS_CATEGORY_CARDINALITY = "Cardinality"
+	LABEL_NAME_METRICS      = "__name__"
+	DB_NAME_EXT_METRICS     = "ext_metrics"
+	DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
+	DB_NAME_FLOW_METRICS    = "flow_metrics"
+	TABLE_NAME_METRICS      = "metrics"
+	TABLE_NAME_L7_FLOW_LOG  = "l7_flow_log"
+	TABLE_NAME_SAMPLES      = "samples"
+	METRICS_CATEGORY_TAG    = "Tag"
 )
 
 func (p *prometheusExecutor) getTagValues(ctx context.Context, args *model.PromMetaParams) (result *model.PromQueryResponse, err error) {
@@ -90,7 +90,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			for _, table := range tables {
 				tableMetrics, _ := metrics.GetMetricsByDBTable(db, table, where, args.Context)
 				for field, v := range tableMetrics {
-					if v.Category == METRICS_CATEGORY_CARDINALITY {
+					if v.Category == METRICS_CATEGORY_TAG {
 						continue
 					}
 					if db == DB_NAME_DEEPFLOW_SYSTEM || (table == TABLE_NAME_L7_FLOW_LOG && strings.Contains(field, "metrics.")) {
