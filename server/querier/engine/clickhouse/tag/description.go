@@ -832,9 +832,8 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, sql string) (*common.Result, []string, []string, error) {
+func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	var sqlList []string
-	var checkList []string
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
@@ -845,12 +844,12 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, []string, er
 		tag = strings.TrimSuffix(tag, "`")
 	}
 	if strings.Contains(tag, "'") || strings.Contains(tag, "`") {
-		return nil, checkList, sqlList, errors.New(fmt.Sprintf("Tags containing single quotes (') or backquote (`) or space are not supported: %s ", tag))
+		return nil, sqlList, errors.New(fmt.Sprintf("Tags containing single quotes (') or backquote (`) or space are not supported: %s ", tag))
 	}
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
 	if !sqlOk {
-		return nil, checkList, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
+		return nil, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
 	}
 	showSqlList := strings.Split(sql, " WHERE ")
 	if len(showSqlList) == 1 {
@@ -876,7 +875,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, []string, er
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		return nil, checkList, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
@@ -927,11 +926,11 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, []string, er
 	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return nil, checkList, sqlList, nil
+	return nil, sqlList, nil
 
 }
 
-func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, []string, error) {
+func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -947,7 +946,6 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 		tag = strings.TrimSuffix(tag, "`")
 	}
 	var sqlList []string
-	var checkList []string
 	var sql string
 	var whereSql string
 	var limitSql string
@@ -1007,7 +1005,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
-					return results, checkList, sqlList, err
+					return results, sqlList, err
 				}
 				results.Values = append(results.Values, rst.Values...)
 			}
@@ -1032,7 +1030,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
-			return results, checkList, sqlList, nil
+			return results, sqlList, nil
 		}
 
 		switch tag {
@@ -1040,12 +1038,10 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
-			if tag == "chost" {
-				checkSql := fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
-				checkList = append(checkList, checkSql)
-			}
+
 		case "vpc", "l2_vpc":
 			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+
 		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
@@ -1057,28 +1053,13 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				resourceName = "pod_service_name"
 			}
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
-			switch tag {
-			case "pod_service":
-				checkSql := fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
-				checkList = append(checkList, checkSql)
-			case "pod_ns", "pod_group", "pod":
-				deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
-				if ok {
-					if whereSql != "" {
-						whereSql += fmt.Sprintf("AND devicetype=%d", deviceType)
-					} else {
-						whereSql = fmt.Sprintf("WHERE devicetype=%d", deviceType)
-					}
-					checkSql := fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-					checkList = append(checkList, checkSql)
-				}
-			}
+
 		case "tap":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		case "vtap":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		case "gprocess":
-			return &common.Result{}, checkList, sqlList, nil
+			return &common.Result{}, sqlList, nil
 		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
@@ -1100,7 +1081,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 					log.Debug(sql)
 					sqlList = append(sqlList, sql)
 				}
-				return results, checkList, sqlList, nil
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "k8s.annotation.") {
 				annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
 				if whereSql != "" {
@@ -1114,7 +1095,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 					log.Debug(sql)
 					sqlList = append(sqlList, sql)
 				}
-				return results, checkList, sqlList, nil
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "k8s.env.") {
 				envTag := strings.TrimPrefix(tag, "k8s.env.")
 				if whereSql != "" {
@@ -1128,7 +1109,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 
-				return results, checkList, sqlList, nil
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "cloud.tag.") {
 				results := &common.Result{}
 				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
@@ -1142,7 +1123,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
 					sqlList = append(sqlList, sql)
 				}
-				return results, checkList, sqlList, nil
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "os.app.") {
 				osAPPTag := strings.TrimPrefix(tag, "os.app.")
 				if whereSql != "" {
@@ -1158,7 +1139,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 		results := &common.Result{}
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
-		return results, checkList, sqlList, nil
+		return results, sqlList, nil
 	} else {
 		// querier will be called later, so there is no need to display the declaration db
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
@@ -1232,7 +1213,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
-			return results, checkList, sqlList, nil
+			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "k8s.annotation.") {
 			annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
 			if whereSql != "" {
@@ -1246,7 +1227,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
-			return results, checkList, sqlList, nil
+			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "k8s.env.") {
 			envTag := strings.TrimPrefix(tag, "k8s.env.")
 			if whereSql != "" {
@@ -1260,7 +1241,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 			log.Debug(sql)
 			sqlList = append(sqlList, sql)
 
-			return results, checkList, sqlList, nil
+			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "cloud.tag.") {
 			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 			if whereSql != "" {
@@ -1274,7 +1255,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
-			return results, checkList, sqlList, nil
+			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "os.app.") {
 			osAPPTag := strings.TrimPrefix(tag, "os.app.")
 			if whereSql != "" {
@@ -1289,11 +1270,11 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, [
 		}
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
-		return nil, checkList, sqlList, nil
+		return nil, sqlList, nil
 	}
 }
 
-func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, []string, error) {
+func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, error) {
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -1304,7 +1285,6 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, [
 	tag = strings.TrimPrefix(tag, "tag.")
 	tag = strings.TrimPrefix(tag, "attribute.")
 	var sqlList []string
-	var checkList []string
 	var whereSql string
 	var orderBy = "sum(count) DESC"
 	if strings.Contains(strings.ToLower(rawSql), "like") || strings.Contains(strings.ToLower(rawSql), "regexp") {
@@ -1345,5 +1325,5 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, [
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return nil, checkList, sqlList, nil
+	return nil, sqlList, nil
 }

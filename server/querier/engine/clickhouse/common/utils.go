@@ -99,7 +99,7 @@ func GetDatasources(db string, table string) ([]string, error) {
 			tsdbType = "app"
 		}
 		client := &http.Client{}
-		url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
+		url := fmt.Sprintf("http://10.1.4.1:30417/v1/data-sources/?type=%s", tsdbType)
 		reqest, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return datasources, err
@@ -153,15 +153,17 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		return 1, nil
 	}
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
+	url := fmt.Sprintf("http://10.1.4.1:30417/v1/data-sources/?type=%s", tsdbType)
 	if name != "" {
 		url += fmt.Sprintf("&name=%s", name)
 	}
 	reqest, err := http.NewRequest("GET", url, nil)
+	fmt.Println(err)
 	if err != nil {
 		return 1, err
 	}
 	response, err := client.Do(reqest)
+	fmt.Println(err)
 	if err != nil {
 		return 1, err
 	}

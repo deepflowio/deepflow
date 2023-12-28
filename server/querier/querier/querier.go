@@ -88,7 +88,7 @@ func Start(configPath, serverLogFile string) {
 	tracing_adapter.TracingAdapterRouter(r)
 	registerRouterCounter(r.Routes())
 	// TODO: 增加router
-	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
+	if err := r.Run(fmt.Sprintf(":%d", 20666)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
 		statsd.QuerierCounter.Close()
 		os.Exit(0)
