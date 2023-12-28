@@ -258,24 +258,24 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			case "ip_resource_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
-					tagItem, ok := tag.GetTag("display_name", db, table, "default")
+					tagItem, ok := tag.GetTag("ip_resource_name", db, table, "default")
 					if strings.HasSuffix(t.Tag, "_id") {
-						tagItem, ok = tag.GetTag("value", db, table, "default")
+						tagItem, ok = tag.GetTag("other_id", db, table, "default")
 					}
 					if ok {
 						switch strings.ToLower(op) {
 						case "match":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value)
 						case "not match":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value) + ")"
 						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
 						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
 						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
 						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+							filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
 						}
 						return &view.Expr{Value: filter}, nil
 					}
