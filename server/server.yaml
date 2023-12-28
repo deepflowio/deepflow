@@ -523,6 +523,9 @@ ingester:
   ## Whether to ignore the writing of Universal Tag, the default is false, which means writing
   #prometheus-sample-ignore-universal-tag: false
 
+  ## prometheus cache expiration of label ids. uint: s
+  #prometheus-label-cache-expiration: 86400
+
   #ck-disk-monitor:
   #  check-interval: 300 # 检查时间间隔(单位: 秒)
   ## 磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space, 或磁盘占用大于used-space, 开始清理数据
