@@ -36,6 +36,7 @@ const (
 	DefaultLabelRequestMetricBatchCount = 128
 	DefaultAppLabelColumnIncrement      = 4
 	DefaultAppLabelColumnMinCount       = 8
+	DefaultLabelCacheExpiration         = 86400 // 1 day
 )
 
 type Config struct {
@@ -49,6 +50,7 @@ type Config struct {
 	AppLabelColumnIncrement      int                   `yaml:"prometheus-app-label-column-increment"`
 	AppLabelColumnMinCount       int                   `yaml:"prometheus-app-label-column-min-count"`
 	IgnoreUniversalTag           bool                  `yaml:"prometheus-sample-ignore-universal-tag"`
+	LabelCacheExpiration         int                   `yaml:"prometheus-label-cache-expiration"`
 }
 
 type PrometheusConfig struct {
@@ -74,6 +76,9 @@ func (c *Config) Validate() error {
 	if c.AppLabelColumnMinCount <= 0 {
 		c.AppLabelColumnMinCount = DefaultAppLabelColumnMinCount
 	}
+	if c.LabelCacheExpiration <= 0 {
+		c.LabelCacheExpiration = DefaultLabelCacheExpiration
+	}
 
 	return nil
 }
@@ -90,6 +95,7 @@ func Load(base *config.Config, path string) *Config {
 			LabelRequestMetricBatchCount: DefaultLabelRequestMetricBatchCount,
 			AppLabelColumnIncrement:      DefaultAppLabelColumnIncrement,
 			AppLabelColumnMinCount:       DefaultAppLabelColumnMinCount,
+			LabelCacheExpiration:         DefaultLabelCacheExpiration,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
