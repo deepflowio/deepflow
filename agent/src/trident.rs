@@ -86,7 +86,7 @@ use crate::{
     monitor::Monitor,
     platform::PlatformSynchronizer,
     policy::{Policy, PolicySetter},
-    rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
+    rpc::{Executor, Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         cgroups::{is_kernel_available_for_cgroups, Cgroups},
@@ -500,6 +500,13 @@ impl Trident {
         );
         synchronizer.start();
 
+        let executor = Arc::new(Executor::new(
+            synchronizer.agent_id.clone(),
+            runtime.clone(),
+            session.clone(),
+        ));
+        executor.start();
+
         let mut domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             session.clone(),
@@ -751,6 +758,7 @@ impl Trident {
                         sidecar_poller.clone(),
                         #[cfg(target_os = "linux")]
                         api_watcher.clone(),
+                        executor.clone(),
                         vm_mac_addrs,
                         gateway_vmac_addrs,
                         config_handler.static_config.agent_mode,
@@ -1197,6 +1205,7 @@ pub struct AgentComponents {
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
     pub remote_log_config: RemoteLogConfig,
+    pub executor: Arc<Executor>,
 
     max_memory: u64,
     tap_mode: TapMode,
@@ -1466,6 +1475,7 @@ impl AgentComponents {
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
+        executor: Arc<Executor>,
         vm_mac_addrs: Vec<MacAddr>,
         gateway_vmac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
@@ -2454,6 +2464,7 @@ impl AgentComponents {
             npb_arp_table,
             remote_log_config,
             runtime,
+            executor,
         })
     }
 
@@ -2679,6 +2690,7 @@ impl Components {
         platform_synchronizer: Arc<PlatformSynchronizer>,
         #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
+        executor: Arc<Executor>,
         vm_mac_addrs: Vec<MacAddr>,
         gateway_vmac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
@@ -2704,6 +2716,7 @@ impl Components {
             sidecar_poller,
             #[cfg(target_os = "linux")]
             api_watcher,
+            executor,
             vm_mac_addrs,
             gateway_vmac_addrs,
             agent_mode,
