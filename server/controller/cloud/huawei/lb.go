@@ -91,13 +91,20 @@ func (h *HuaWei) getLBs() (
 					RegionLcuuid:  lb.RegionLcuuid,
 				},
 			)
+			var subnetLcuuid string
+			for _, subnet := range h.toolDataSet.networkLcuuidToSubnets[networkLcuuid] {
+				if cloudcommon.IsIPInCIDR(ip, subnet.CIDR) {
+					subnetLcuuid = subnet.Lcuuid
+					break
+				}
+			}
 			ips = append(
 				ips,
 				model.IP{
 					Lcuuid:           common.GenerateUUID(vifLcuuid + ip),
 					VInterfaceLcuuid: vifLcuuid,
 					IP:               ip,
-					SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[networkLcuuid],
+					SubnetLcuuid:     subnetLcuuid,
 					RegionLcuuid:     lb.RegionLcuuid,
 				},
 			)

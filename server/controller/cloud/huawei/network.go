@@ -47,7 +47,6 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 				log.Infof("exclude network: %s, missing attr", name)
 				continue
 			}
-			cidr := jn.Get("cidr").MustString()
 			vpcID := jn.Get("vpc_id").MustString()
 			azLcuuid := h.toolDataSet.azNameToAZLcuuid[jn.Get("availability_zone").MustString()]
 			network := model.Network{
@@ -66,17 +65,33 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
 			h.toolDataSet.lcuuidToNetwork[id] = network
 
-			subnetLcuuid := common.GenerateUUID(id)
-			subnets = append(
-				subnets,
-				model.Subnet{
+			cidr := jn.Get("cidr").MustString()
+			if cidr != "" {
+				subnetLcuuid := common.GenerateUUID(id + cidr)
+				subnet := model.Subnet{
 					Lcuuid:        subnetLcuuid,
 					Name:          name,
 					CIDR:          cidr,
 					NetworkLcuuid: id,
 					VPCLcuuid:     vpcID,
-				},
-			)
+				}
+				subnets = append(subnets, subnet)
+				h.toolDataSet.networkLcuuidToSubnets[id] = append(h.toolDataSet.networkLcuuidToSubnets[id], subnet)
+			}
+			cidrV6 := jn.Get("cidr_v6").MustString()
+			if cidrV6 != "" {
+				subnetLcuuid := common.GenerateUUID(id + cidrV6)
+				subnet := model.Subnet{
+					Lcuuid:        subnetLcuuid,
+					Name:          name + "_v6",
+					CIDR:          cidrV6,
+					NetworkLcuuid: id,
+					VPCLcuuid:     vpcID,
+				}
+				subnets = append(subnets, subnet)
+				h.toolDataSet.networkLcuuidToSubnets[id] = append(h.toolDataSet.networkLcuuidToSubnets[id], subnet)
+			}
+
 			vifs = append(
 				vifs,
 				model.VInterface{
@@ -92,7 +107,6 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 			)
 			h.toolDataSet.networkLcuuidToCIDR[id] = cidr
 			h.toolDataSet.networkVPCLcuuidToAZLcuuids[vpcID] = append(h.toolDataSet.networkVPCLcuuidToAZLcuuids[vpcID], azLcuuid)
-			h.toolDataSet.networkLcuuidToSubnetLcuuid[id] = subnetLcuuid
 			neutronSubnetID, ok := jn.CheckGet("neutron_subnet_id")
 			if ok {
 				h.toolDataSet.neutronSubnetIDToNetwork[neutronSubnetID.MustString()] = network
