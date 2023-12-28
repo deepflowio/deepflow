@@ -27,7 +27,7 @@ use cgroups_rs::cgroup_builder::*;
 use cgroups_rs::*;
 use log::{info, warn};
 use nix::sys::utsname::uname;
-use public::consts::{DEFAULT_CPU_CFS_PERIOD_US, PROCESS_NAME};
+use public::consts::PROCESS_NAME;
 
 pub struct Cgroups {
     config: EnvironmentAccess,
@@ -175,7 +175,7 @@ impl Cgroups {
     }
 
     /// 更改资源限制
-    pub fn apply(cgroup: Cgroup, max_cpus: u32, max_memory: u64) -> Result<(), Error> {
+    pub fn apply(cgroup: Cgroup, _: u32, max_memory: u64) -> Result<(), Error> {
         let mut resources = Resources::default();
 
         // let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;

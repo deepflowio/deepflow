@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+mod command;
 mod ntp;
 mod session;
 mod synchronizer;
 
+pub(crate) use command::Executor;
 pub(crate) use session::{Session, DEFAULT_TIMEOUT};
 pub(crate) use synchronizer::{StaticConfig, Status, Synchronizer};
 

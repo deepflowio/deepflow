@@ -908,6 +908,7 @@ dependencies = [
  "thiserror",
  "time 0.3.21",
  "tokio",
+ "tokio-stream",
  "tonic",
  "tonic-build",
  "uluru",
