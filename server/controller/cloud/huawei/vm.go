@@ -162,13 +162,20 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 			vifs = append(vifs, vif)
 
 			ipAddr := jV["addr"].(string)
+			var subnetLcuuid string
+			for _, subnet := range h.toolDataSet.networkLcuuidToSubnets[vif.NetworkLcuuid] {
+				if cloudcommon.IsIPInCIDR(ipAddr, subnet.CIDR) {
+					subnetLcuuid = subnet.Lcuuid
+					break
+				}
+			}
 			ips = append(
 				ips,
 				model.IP{
 					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               ipAddr,
-					SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[vif.NetworkLcuuid],
+					SubnetLcuuid:     subnetLcuuid,
 					RegionLcuuid:     regionLcuuid,
 				},
 			)
