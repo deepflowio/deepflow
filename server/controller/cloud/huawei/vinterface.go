@@ -187,14 +187,19 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 			},
 		)
 		h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid] = append(h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid], ipAddr)
-		if i == 0 && floatingIP != "" {
-			natRule = model.NATRule{
-				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
-				Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
-				Protocol:         cloudcommon.PROTOCOL_ALL,
-				FloatingIP:       floatingIP,
-				FixedIP:          ipAddr,
-				VInterfaceLcuuid: vif.Lcuuid,
+		if floatingIP != "" {
+			if i == 0 {
+				natRule = model.NATRule{
+					Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
+					Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
+					Protocol:         cloudcommon.PROTOCOL_ALL,
+					FloatingIP:       floatingIP,
+					FixedIP:          ipAddr,
+					VInterfaceLcuuid: vif.Lcuuid,
+				}
+			} else {
+				natRule.FixedIP = natRule.FixedIP + "," + ipAddr
+				natRule.Lcuuid = common.GenerateUUID(floatingIP + "_" + natRule.FixedIP)
 			}
 		}
 	}
