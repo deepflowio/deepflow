@@ -139,7 +139,16 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	} else if name == view.FUNCTION_ANY {
 		fields = args
 	}
-
+	if name == view.FUNCTION_TOPK {
+		topCountStr := args[len(args)-1]
+		topCount, err := strconv.Atoi(topCountStr)
+		if err != nil {
+			return nil, 0, "", fmt.Errorf("function [%s] argument is not int [%s]", view.FUNCTION_TOPK, topCountStr)
+		}
+		if topCount < 1 || topCount > 100 {
+			return nil, 0, "", fmt.Errorf("function [%s] argument [%s] value range is incorrect, it should be within [1, 100]", view.FUNCTION_TOPK, topCountStr)
+		}
+	}
 	levelFlag := view.MODEL_METRICS_LEVEL_FLAG_UNLAY
 
 	fieldsLen := len(fields)
@@ -667,7 +676,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	fields := f.Args
 	switch f.Name {
 	case TAG_FUNCTION_ANY:
-		f.Name = "topK(1)"
+		f.Name = "any"
 	case TAG_FUNCTION_TOPK:
 		f.Name = fmt.Sprintf("topK(%s)", f.Args[len(f.Args)-1])
 		fields = fields[:len(f.Args)-1]
@@ -781,7 +790,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	if len(fields) > 1 {
 		if f.Name == "if" {
 			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
-		} else if strings.HasPrefix(f.Name, "topK") {
+		} else if strings.HasPrefix(f.Name, "topK") || strings.HasPrefix(f.Name, "any") {
 			withValue = fmt.Sprintf("%s((%s))", f.Name, strings.Join(values, ","))
 		} else {
 			withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))

@@ -62,7 +62,7 @@ impl PolicyMonitor {
     ) {
         if self.enabled.load(Ordering::Relaxed) {
             let _ = self.sender.send(format!(
-                "{}\n\t{:?}\n\t{:?}\n\tSOCKET: {:?}",
+                "{}\n\t{:?}\n\t{}\n\tSOCKET: {:?}",
                 key, endpoints, policy, gpid_entries,
             ));
         }
