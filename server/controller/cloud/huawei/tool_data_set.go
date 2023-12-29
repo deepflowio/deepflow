@@ -33,7 +33,7 @@ type ToolDataSet struct {
 	lcuuidToNetwork               map[string]model.Network
 	neutronSubnetIDToNetwork      map[string]model.Network
 	networkVPCLcuuidToAZLcuuids   map[string][]string
-	networkLcuuidToSubnetLcuuid   map[string]string
+	networkLcuuidToSubnets        map[string][]model.Subnet
 	macToFloatingIP               map[string]string
 	floatingIPToVInterface        map[string]model.VInterface
 	natGatewayLcuuidToFloatingIPs map[string][]string
@@ -60,7 +60,7 @@ func NewToolDataSet() *ToolDataSet {
 		networkLcuuidToCIDR:           make(map[string]string),
 		networkVPCLcuuidToAZLcuuids:   make(map[string][]string),
 		networkLcuuidToVPCName:        make(map[string]string),
-		networkLcuuidToSubnetLcuuid:   make(map[string]string),
+		networkLcuuidToSubnets:        make(map[string][]model.Subnet),
 		macToFloatingIP:               make(map[string]string),
 		floatingIPToVInterface:        make(map[string]model.VInterface),
 		natGatewayLcuuidToFloatingIPs: make(map[string][]string),

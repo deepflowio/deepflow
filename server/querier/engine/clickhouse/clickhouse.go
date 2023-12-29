@@ -859,6 +859,9 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// Time-first parsing
 	e.parseTimeWhere(node.Expr, &whereStmt)
 	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+	if err != nil {
+		return err
+	}
 	expr, err = e.TransPrometheusTargetIDFilter(expr)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
@@ -1159,7 +1162,16 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		name = strings.Trim(name, "`")
 		functionAs := as
 		if as == "" {
-			functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			if name == view.FUNCTION_TOPK {
+				argLength := len(args)
+				functionAs = strings.Join(
+					[]string{
+						view.FUNCTION_TOPK, "_", args[argLength-1],
+						"(", strings.Join(args[:argLength-1], ", "), ")",
+					}, "")
+			} else {
+				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			}
 		}
 		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context)
 		if err != nil {

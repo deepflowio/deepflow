@@ -335,6 +335,9 @@ func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags clo
 
 	var resp []model.AdditionalResourceCloudTag
 	for uuid, cloudTags := range chostToCloudTags {
+		if resourceName != "" && chostUUIDToName[uuid] != resourceName {
+			continue
+		}
 		addCHost := model.AdditionalResourceCloudTag{
 			ResourceType: "chost",
 			ResourceName: chostUUIDToName[uuid],

@@ -169,13 +169,20 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 			continue
 		}
 		ipAddr := jIP.Get("ip_address").MustString()
+		var subnetLcuuid string
+		for _, subnet := range h.toolDataSet.networkLcuuidToSubnets[vif.NetworkLcuuid] {
+			if cloudcommon.IsIPInCIDR(ipAddr, subnet.CIDR) {
+				subnetLcuuid = subnet.Lcuuid
+				break
+			}
+		}
 		ips = append(
 			ips,
 			model.IP{
 				Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
 				VInterfaceLcuuid: vif.Lcuuid,
 				IP:               ipAddr,
-				SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[vif.NetworkLcuuid],
+				SubnetLcuuid:     subnetLcuuid,
 				RegionLcuuid:     vif.RegionLcuuid,
 			},
 		)
