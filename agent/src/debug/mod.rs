@@ -16,12 +16,16 @@
 
 mod debugger;
 #[cfg(target_os = "linux")]
+mod ebpf;
+#[cfg(target_os = "linux")]
 mod platform;
 mod policy;
 mod rpc;
 
 use bincode::{Decode, Encode};
 pub use debugger::{Client, ConstructDebugCtx, Debugger};
+#[cfg(target_os = "linux")]
+pub use ebpf::EbpfMessage;
 #[cfg(target_os = "linux")]
 pub use platform::PlatformMessage;
 pub use policy::PolicyMessage;
@@ -47,6 +51,8 @@ pub enum Module {
     List,
     Queue,
     Policy,
+    #[cfg(target_os = "linux")]
+    Ebpf,
 }
 
 impl Default for Module {
