@@ -28,12 +28,12 @@ use clap::{ArgEnum, Parser, Subcommand};
 #[cfg(target_os = "linux")]
 use flate2::write::ZlibDecoder;
 
-#[cfg(target_os = "linux")]
-use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
     Beacon, Client, Message, Module, PolicyMessage, RpcMessage, DEBUG_QUEUE_IDLE_TIMEOUT,
     DEEPFLOW_AGENT_BEACON,
 };
+#[cfg(target_os = "linux")]
+use deepflow_agent::debug::{EbpfMessage, PlatformMessage};
 use public::{consts::DEFAULT_CONTROLLER_PORT, debug::QueueMessage};
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
@@ -65,6 +65,10 @@ enum ControllerCmd {
     Queue(QueueCmd),
     /// get information about the policy
     Policy(PolicyCmd),
+    #[cfg(target_os = "linux")]
+    /// get information about the ebpf
+    Ebpf(EbpfCmd),
+    /// get information about the deepflow-agent
     List,
 }
 
@@ -134,6 +138,52 @@ struct AnalyzingArgs {
     /// eg: deepflow-agent-ctl policy analyzing --id 10
     #[clap(long, parse(try_from_str))]
     id: Option<u32>,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Parser)]
+struct EbpfCmd {
+    #[clap(subcommand)]
+    subcmd: EbpfSubCmd,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Subcommand, Debug)]
+enum EbpfSubCmd {
+    /// monitor datadump
+    Datadump(EbpfArgs),
+    /// monitor cpdbg
+    Cpdbg(EbpfArgs),
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Parser)]
+struct EbpfArgs {
+    /// Set datadump pid
+    ///
+    /// eg: deepflow-agent-ctl ebpf datadump --pid 10001
+    #[clap(long, parse(try_from_str), default_value_t = 0)]
+    pid: u32,
+    /// Set datadump name
+    ///
+    /// eg: deepflow-agent-ctl ebpf datadump --name nginx
+    #[clap(long, parse(try_from_str), default_value = "")]
+    name: String,
+    /// Set datadump app protocol
+    ///
+    /// App Protocol: All(0), Other(1),
+    ///   HTTP1(20), HTTP2(21), Dubbo(40), SofaRPC(43),
+    ///   MySQL(60), PostGreSQL(61), Oracle(62), Redis(80),
+    ///   Kafka(100), MQTT(101), DNS(120), TLS(121),
+    ///
+    /// eg: deepflow-agent-ctl ebpf datadump --proto 20
+    #[clap(long, parse(try_from_str), default_value_t = 0)]
+    proto: u8,
+    /// Set datadump/cpdbg duration
+    ///
+    /// eg: deepflow-agent-ctl ebpf datadump --duration 10
+    #[clap(long, parse(try_from_str), default_value_t = 30)]
+    duration: u16,
 }
 
 #[cfg(target_os = "linux")]
@@ -246,6 +296,8 @@ impl Controller {
             ControllerCmd::List => self.list(),
             ControllerCmd::Queue(c) => self.queue(c),
             ControllerCmd::Policy(c) => self.policy(c),
+            #[cfg(target_os = "linux")]
+            ControllerCmd::Ebpf(c) => self.ebpf(c),
         }
     }
 
@@ -662,6 +714,44 @@ impl Controller {
                     _ => unreachable!(),
                 }
                 Ok(())
+            }
+        }
+    }
+
+    //#[cfg(target_os = "linux")]
+    fn ebpf(&self, c: EbpfCmd) -> Result<()> {
+        if self.port.is_none() {
+            return Err(anyhow!(ERR_PORT_MSG));
+        }
+
+        let mut client = self.new_client()?;
+        match c.subcmd {
+            EbpfSubCmd::Cpdbg(arg) => {
+                client.send_to(Message {
+                    module: Module::Ebpf,
+                    msg: EbpfMessage::Cpdbg(arg.duration),
+                })?;
+            }
+            EbpfSubCmd::Datadump(arg) => {
+                client.send_to(Message {
+                    module: Module::Ebpf,
+                    msg: EbpfMessage::DataDump((arg.pid, arg.name, arg.proto, arg.duration)),
+                })?;
+            }
+        }
+
+        loop {
+            let res = client.recv::<EbpfMessage>()?;
+            match res {
+                EbpfMessage::Context(c) => {
+                    println!("{}", String::from_utf8_lossy(&c))
+                }
+                EbpfMessage::Done => return Ok(()),
+                EbpfMessage::Error(e) => {
+                    println!("{}", e);
+                    return Ok(());
+                }
+                _ => unreachable!(),
             }
         }
     }
