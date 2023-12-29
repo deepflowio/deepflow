@@ -34,7 +34,10 @@ use parking_lot::RwLock;
 use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
-use super::platform::{PlatformDebugger, PlatformMessage};
+use super::{
+    ebpf::{EbpfDebugger, EbpfMessage},
+    platform::{PlatformDebugger, PlatformMessage},
+};
 use super::{
     policy::{PolicyDebugger, PolicyMessage},
     rpc::{RpcDebugger, RpcMessage},
@@ -57,6 +60,8 @@ struct ModuleDebuggers {
     pub rpc: RpcDebugger,
     pub queue: Arc<QueueDebugger>,
     pub policy: PolicyDebugger,
+    #[cfg(target_os = "linux")]
+    pub ebpf: EbpfDebugger,
 }
 
 pub struct Debugger {
@@ -480,6 +485,21 @@ impl Debugger {
                     _ => unreachable!(),
                 }
             }
+            #[cfg(target_os = "linux")]
+            Module::Ebpf => {
+                let ebpf = &debuggers.ebpf;
+                let req: Message<EbpfMessage> = decode_from_std_read(&mut payload, serialize_conf)?;
+                let req = req.into_inner();
+                match req {
+                    EbpfMessage::DataDump(_) => {
+                        ebpf.datadump(conn.0, conn.1, serialize_conf, &req);
+                    }
+                    EbpfMessage::Cpdbg(_) => {
+                        ebpf.cpdbg(conn.0, conn.1, serialize_conf, &req);
+                    }
+                    _ => unreachable!(),
+                }
+            }
             _ => warn!("invalid module or invalid request, skip it"),
         }
 
@@ -503,6 +523,8 @@ impl Debugger {
             ),
             queue: Arc::new(QueueDebugger::new()),
             policy: PolicyDebugger::new(context.policy_setter),
+            #[cfg(target_os = "linux")]
+            ebpf: EbpfDebugger::new(),
         };
 
         Self {
