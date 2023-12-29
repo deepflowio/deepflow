@@ -966,7 +966,10 @@ impl QuadrupleGenerator {
                 None => return flow_meter,
             };
 
-            if tagged_flow.flow.flow_key.proto == IpProtocol::TCP {
+            if tagged_flow.flow.flow_key.proto == IpProtocol::TCP
+                || tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV4
+                || tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV6
+            {
                 flow_meter.latency = Latency {
                     rtt_max: stats.tcp.rtt,
                     rtt_client_max: stats.tcp.rtt_client_max,

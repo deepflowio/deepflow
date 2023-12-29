@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+use std::collections::HashSet;
 use std::str;
+use std::sync::Arc;
 
 use hpack::Decoder;
 use nom::AsBytes;
@@ -524,6 +526,9 @@ impl L7ProtocolParserInterface for HttpLog {
                 let Some(config) = param.parse_config else {
                     return false;
                 };
+                if self.http2_req_decoder.is_none() {
+                    self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
+                }
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
                         if param.direction == PacketDirection::ServerToClient {
@@ -565,23 +570,33 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.wasm_hook(param, payload, &mut info);
                 }
             }
-            L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
-                EbpfType::GoHttp2Uprobe => {
-                    self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
-                    if param.parse_log {
-                        if self.proto == L7Protocol::Http2
-                            && !config.http_endpoint_disabled
-                            && info.path.len() > 0
-                        {
-                            info.endpoint = Some(handle_endpoint(config, &info.path));
-                        }
-                        return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
-                    } else {
-                        return Ok(L7ParseResult::None);
-                    }
+            L7Protocol::Http2 | L7Protocol::Grpc => {
+                if self.http2_req_decoder.is_none() {
+                    self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
-                _ => self.parse_http_v2(payload, param, &mut info)?,
-            },
+                match param.ebpf_type {
+                    EbpfType::GoHttp2Uprobe => {
+                        self.parse_http2_go_uprobe(
+                            &config.l7_log_dynamic,
+                            payload,
+                            param,
+                            &mut info,
+                        )?;
+                        if param.parse_log {
+                            if self.proto == L7Protocol::Http2
+                                && !config.http_endpoint_disabled
+                                && info.path.len() > 0
+                            {
+                                info.endpoint = Some(handle_endpoint(config, &info.path));
+                            }
+                            return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
+                        } else {
+                            return Ok(L7ParseResult::None);
+                        }
+                    }
+                    _ => self.parse_http_v2(payload, param, &mut info)?,
+                }
+            }
             _ => unreachable!(),
         }
         match self.proto {
@@ -650,10 +665,15 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
-            http2_req_decoder: Some(Decoder::new()),
-            http2_resp_decoder: Some(Decoder::new()),
             ..Default::default()
         }
+    }
+
+    fn set_header_decoder(&mut self, expected_headers_set: Arc<HashSet<Vec<u8>>>) {
+        self.http2_req_decoder = Some(Decoder::new_with_expected_headers(
+            expected_headers_set.clone(),
+        ));
+        self.http2_resp_decoder = Some(Decoder::new_with_expected_headers(expected_headers_set));
     }
 
     fn http1_check_protocol(&mut self, payload: &[u8]) -> bool {
@@ -1503,7 +1523,7 @@ mod tests {
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
             l7_log_session_aggr_timeout: Duration::from_secs(10),
-            l7_log_dynamic: config,
+            l7_log_dynamic: config.clone(),
             ..Default::default()
         };
         for packet in packets.iter_mut() {
@@ -1523,6 +1543,7 @@ mod tests {
             span_set.insert(TraceType::Sw8.to_checker_string());
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
+            http2.set_header_decoder(config.expected_headers_set.clone());
             let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
             param.set_log_parse_config(parse_config);
 
@@ -1802,6 +1823,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
 
         let config = LogParserConfig::default();
+        if http.protocol() == L7Protocol::Http2 || http.protocol() == L7Protocol::Grpc {
+            http.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
+        }
 
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {

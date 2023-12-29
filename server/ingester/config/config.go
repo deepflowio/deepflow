@@ -190,8 +190,9 @@ func (c *Config) Validate() error {
 				log.Errorf("invalid 'format'(%s) of 'trace-id-with-index:incremetal-id-location', must be '%s' or '%s'", location.Format, FormatHex, FormatDecimal)
 				sleepAndExit()
 			}
-			if location.Length == 0 || location.Length > 31 {
-				log.Errorf("invalid 'length'(%d) of 'trace-id-with-index:incremetal-id-location', must be > 0 and <= 32", location.Length)
+			if location.Length == 0 || (location.Length > 20 && location.Format == FormatDecimal) || (location.Length > 16 && location.Format == FormatHex) {
+				log.Errorf("invalid 'length'(%d) of 'trace-id-with-index:incremetal-id-location' out of range. when 'format' is '%s' range is (0, 20], 'format' is '%s' range is (0, 16]", location.Length, FormatDecimal, FormatHex)
+
 				sleepAndExit()
 			}
 			c.TraceIdWithIndex.FormatIsHex = c.TraceIdWithIndex.IncrementalIdLocation.Format == FormatHex

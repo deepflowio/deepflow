@@ -34,8 +34,9 @@ futures = "~0.3"
 grpc = { path = "plugins/grpc" }
 hex = "0.4.3"
 hostname = "0.3.1"
-hpack = "0.3.0"
+hpack = { git = "https://github.com/deepflowio/hpack-rs/" }
 http = "0.2.5"
+http2 = { path = "plugins/http2" }
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
