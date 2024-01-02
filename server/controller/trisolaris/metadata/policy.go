@@ -591,6 +591,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 			} else {
 				payloadSlice = *npbPolicy.PayloadSlice
 			}
+			direction := trident.Direction(npbPolicy.Direction)
 			npbAction := &trident.NpbAction{
 				TunnelId:      proto.Uint32(uint32(npbPolicy.Vni)),
 				TunnelIp:      proto.String(npbTunnel.IP),
@@ -599,6 +600,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 				PayloadSlice:  proto.Uint32(uint32(payloadSlice)),
 				TunnelIpId:    proto.Uint32(uint32(npbTunnel.ID)),
 				NpbAclGroupId: proto.Uint32(uint32(npbPolicy.PolicyACLGroupID)),
+				Direction:     &direction,
 			}
 			if len(npbPolicy.VtapIDs) == 0 {
 				allVTapNpbActions = append(allVTapNpbActions, npbAction)
