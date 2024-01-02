@@ -236,6 +236,7 @@ pub struct PlatformConfig {
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
+    pub agent_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -912,6 +913,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
+                agent_enabled: conf.enabled,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1666,10 +1668,8 @@ impl ConfigHandler {
                 fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                     let conf = &handler.candidate_config.platform;
 
-                    #[cfg(target_os = "linux")]
-                    if handler.candidate_config.enabled
-                        && (handler.candidate_config.tap_mode == TapMode::Local
-                            || is_tt_pod(conf.trident_type))
+                    if conf.agent_enabled
+                        && (conf.tap_mode == TapMode::Local || is_tt_pod(conf.trident_type))
                     {
                         if is_tt_pod(conf.trident_type) {
                             components.platform_synchronizer.start_kubernetes_poller();
