@@ -265,9 +265,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					if ok {
 						switch strings.ToLower(op) {
 						case "match":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value)
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value)
 						case "not match":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value) + ")"
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value) + ")"
 						case "not ilike":
 							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
 						case "not in":
