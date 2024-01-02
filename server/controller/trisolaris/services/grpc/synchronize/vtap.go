@@ -649,23 +649,23 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
-		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
+		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(),
+			ctrlIP, ctrlMac,
 			versionPlatformData, pushVersionPlatformData,
 			versionPolicy, pushVersionPolicy,
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
-		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
+		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(),
+			ctrlIP, ctrlMac,
 			versionPlatformData, pushVersionPlatformData,
 			versionPolicy, pushVersionPolicy,
 			versionGroups, pushVersionGroups,
