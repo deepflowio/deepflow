@@ -797,8 +797,8 @@ impl Trident {
                             api_watcher.stop();
                         }
 
-                        components.start();
                         components.config = config_handler.candidate_config.clone();
+                        components.start();
                         dispatcher_listener_callback(
                             &config_handler.candidate_config.dispatcher,
                             components,
