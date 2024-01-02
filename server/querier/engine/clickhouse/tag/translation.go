@@ -1034,7 +1034,7 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 			"%s_name %s %s",
-			"%s_name (%s, %s)",
+			"%s (%s_name, %s)",
 		),
 	}
 	tagResourceMap["other_name"] = map[string]*Tag{
@@ -1060,7 +1060,7 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 			"value %s %s",
-			"%s(value, %s)",
+			"%s (value, %s)",
 		),
 	}
 
