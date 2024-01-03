@@ -19,6 +19,8 @@ package cache
 import (
 	"sync"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -26,6 +28,10 @@ import (
 type LayoutKey struct {
 	MetricName string `json:"metric_name"`
 	LabelName  string `json:"label_name"`
+}
+
+func (k LayoutKey) String() string {
+	return k.MetricName + "_" + k.LabelName
 }
 
 func NewLayoutKey(metricName, labelName string) LayoutKey {
@@ -36,14 +42,27 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 }
 
 type appLabelNameToValue map[string]string
-
 type metricAndAPPLabelLayout struct {
 	layoutKeyToIndex sync.Map
+	layoutKeyToID    cmap.ConcurrentMap[LayoutKey, int]
+}
+
+func newMetricAndAPPLabelLayout() *metricAndAPPLabelLayout {
+	return &metricAndAPPLabelLayout{
+		layoutKeyToID: cmap.NewStringer[LayoutKey, int](),
+	}
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
 	if index, ok := mll.layoutKeyToIndex.Load(key); ok {
 		return index.(uint8), true
+	}
+	return 0, false
+}
+
+func (mll *metricAndAPPLabelLayout) GetIDByKey(key LayoutKey) (int, bool) {
+	if id, ok := mll.layoutKeyToID.Get(key); ok {
+		return id, true
 	}
 	return 0, false
 }
@@ -61,6 +80,7 @@ func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	}
 	for _, l := range metricAPPLabelLayouts {
 		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
+		mll.layoutKeyToID.Set(NewLayoutKey(l.MetricName, l.APPLabelName), l.ID)
 	}
 	return nil
 }

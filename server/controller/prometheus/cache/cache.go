@@ -65,7 +65,7 @@ func GetSingleton() *Cache {
 			MetricName:              mn,
 			LabelName:               new(labelName),
 			LabelValue:              new(labelValue),
-			MetricAndAPPLabelLayout: new(metricAndAPPLabelLayout),
+			MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(),
 			Target:                  t,
 			Label:                   l,
 			MetricLabel:             newMetricLabel(mn, l),
