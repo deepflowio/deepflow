@@ -50,7 +50,7 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
-	var deviceType, deviceID int
+	var deviceType, deviceID, vpcID int
 	podID, ok := p.cache.ToolDataSet.GetPodIDByContainerID(cloudItem.ContainerID)
 	if len(cloudItem.ContainerID) != 0 && ok {
 		deviceType = common.VIF_DEVICE_TYPE_POD
@@ -74,17 +74,22 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 
 		if podInfo != nil && podInfo.PodNodeID != 0 {
 			podNodeID = podInfo.PodNodeID
-			id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
-			if ok {
-				vmID = id
-			}
+
 		}
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-		id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(deviceID)
-		if ok {
-			vmID = id
-		}
 		podNodeID = deviceID
+	}
+
+	id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
+	if ok {
+		vmID = id
+	}
+	vmInfo, err := p.cache.ToolDataSet.GetVMInfoByID(id)
+	if err != nil {
+		log.Error(err)
+	}
+	if vmInfo != nil {
+		vpcID = vmInfo.VPCID
 	}
 
 	dbItem := &mysql.Process{
@@ -103,6 +108,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		DeviceID:    deviceID,
 		PodNodeID:   podNodeID,
 		VMID:        vmID,
+		VPCID:       vpcID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 

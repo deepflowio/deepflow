@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS process (
     deviceid            INTEGER,
     pod_node_id         INTEGER,
     vm_id               INTEGER,
+    epc_id              INTEGER,
     process_name        TEXT,
     command_line        TEXT,
     user_name           VARCHAR(256) DEFAULT '',
