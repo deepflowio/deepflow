@@ -151,6 +151,7 @@ pub mod calico {
     #[serde(rename_all = "camelCase")]
     pub struct IpPoolSpec {
         pub cidr: Option<String>,
+        pub disabled: Option<bool>,
     }
 
     impl Trimmable for IpPool {
