@@ -140,7 +140,9 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	prometheus := prometheus.GetSingleton()
 	prometheus.SynchronizerCache.Start(ctx, &cfg.PrometheusCfg)
 	prometheus.Encoder.Init(ctx, &cfg.PrometheusCfg)
+	prometheus.Clear.Init(ctx, &cfg.PrometheusCfg)
 	if isMasterController {
+		prometheus.Clear.Start()
 		prometheus.Encoder.Start()
 	}
 
