@@ -28,7 +28,7 @@ use public::packet;
 
 use crate::utils::stats;
 
-pub use special_recv_engine::{Libpcap, LibpcapCounter};
+pub use special_recv_engine::{Dpdk, Libpcap, LibpcapCounter};
 
 pub const DEFAULT_BLOCK_SIZE: usize = 1 << 20;
 pub const FRAME_SIZE_MAX: usize = 1 << 16; // local and mirror
@@ -38,7 +38,7 @@ pub const POLL_TIMEOUT: Duration = Duration::from_millis(100);
 pub enum RecvEngine {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     AfPacket(Tpacket),
-    Dpdk(),
+    Dpdk(Dpdk),
     Libpcap(Option<Libpcap>),
 }
 
@@ -49,7 +49,8 @@ impl RecvEngine {
         match self {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(_) => Ok(()),
-            Self::Dpdk() => todo!(),
+            #[cfg(target_os = "linux")]
+            Self::Dpdk(_) => Ok(()),
             Self::Libpcap(_) => Ok(()),
         }
     }
@@ -70,7 +71,11 @@ impl RecvEngine {
                 Some(p) => Ok(p),
                 None => Err(Error::Timeout),
             },
-            Self::Dpdk() => todo!(),
+            #[cfg(target_os = "linux")]
+            Self::Dpdk(d) => match d.read() {
+                Ok(p) => Ok(p),
+                _ => Err(Error::Timeout),
+            },
             Self::Libpcap(w) => w
                 .as_mut()
                 .ok_or(Error::LibpcapError(Self::LIBPCAP_NONE.to_string()))
@@ -87,7 +92,8 @@ impl RecvEngine {
                 .as_mut()
                 .ok_or(Error::LibpcapError(Self::LIBPCAP_NONE.to_string()))
                 .and_then(|e| e.set_bpf(syntax.to_str().unwrap())),
-            Self::Dpdk() => todo!(),
+            #[cfg(target_os = "linux")]
+            Self::Dpdk(_) => Ok(()),
         }
     }
 
@@ -95,7 +101,8 @@ impl RecvEngine {
         match self {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => Arc::new(e.get_counter_handle()),
-            Self::Dpdk() => todo!(),
+            #[cfg(target_os = "linux")]
+            Self::Dpdk(_) => Arc::new(LibpcapCounter::default()),
             Self::Libpcap(w) => match w {
                 Some(w) => w.get_counter_handle(),
                 None => Arc::new(LibpcapCounter::default()),

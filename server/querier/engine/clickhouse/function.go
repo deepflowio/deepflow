@@ -49,6 +49,7 @@ const (
 	TAG_FUNCTION_TOPK                       = "topK"
 	TAG_FUNCTION_NEW_TAG                    = "newTag"
 	TAG_FUNCTION_ENUM                       = "enum"
+	TAG_FUNCTION_FAST_FILTER                = "FastFilter"
 )
 
 const INTERVAL_1D = 86400
@@ -57,7 +58,7 @@ var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
 	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
-	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM,
+	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM, TAG_FUNCTION_FAST_FILTER,
 }
 
 type Function interface {
@@ -81,7 +82,7 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
+func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context, isDerivative bool, derivativeGroupBy []string) (Statement, int, string, error) {
 	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
 		return GetTopKTrans(name, args, alias, db, table, ctx)
 	}
@@ -118,11 +119,16 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	} else {
 		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
 	}
+	if isDerivative {
+		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+	}
 	return &AggFunction{
-		Metrics: metricStruct,
-		Name:    name,
-		Args:    args,
-		Alias:   alias,
+		Metrics:           metricStruct,
+		Name:              name,
+		Args:              args,
+		Alias:             alias,
+		IsDerivative:      isDerivative,
+		DerivativeGroupBy: derivativeGroupBy,
 	}, levelFlag, unit, nil
 }
 
@@ -138,7 +144,16 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	} else if name == view.FUNCTION_ANY {
 		fields = args
 	}
-
+	if name == view.FUNCTION_TOPK {
+		topCountStr := args[len(args)-1]
+		topCount, err := strconv.Atoi(topCountStr)
+		if err != nil {
+			return nil, 0, "", fmt.Errorf("function [%s] argument is not int [%s]", view.FUNCTION_TOPK, topCountStr)
+		}
+		if topCount < 1 || topCount > 100 {
+			return nil, 0, "", fmt.Errorf("function [%s] argument [%s] value range is incorrect, it should be within [1, 100]", view.FUNCTION_TOPK, topCountStr)
+		}
+	}
 	levelFlag := view.MODEL_METRICS_LEVEL_FLAG_UNLAY
 
 	fieldsLen := len(fields)
@@ -278,9 +293,11 @@ type AggFunction struct {
 	// 指标量内容
 	Metrics *metrics.Metrics
 	// 解析获得的参数
-	Name  string
-	Args  []string
-	Alias string
+	Name              string
+	Args              []string
+	Alias             string
+	IsDerivative      bool
+	DerivativeGroupBy []string
 }
 
 func (f *AggFunction) SetAlias(alias string) {
@@ -292,9 +309,23 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
-		innerFunction := view.DefaultFunction{
-			Name:   view.FUNCTION_SUM,
-			Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+		var innerFunction view.DefaultFunction
+		// Inner layer derivative
+		if f.IsDerivative {
+			groupBy := []string{}
+			if len(f.Args) > 1 {
+				groupBy = f.Args[1:]
+			}
+			innerFunction = view.DefaultFunction{
+				Name:   view.FUNCTION_DERIVATIVE,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Args:   groupBy,
+			}
+		} else {
+			innerFunction = view.DefaultFunction{
+				Name:   view.FUNCTION_SUM,
+				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
@@ -375,7 +406,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	} else {
 		outFunc = view.GetFunc(f.Name)
 	}
-	if len(f.Args) > 1 {
+	if len(f.Args) > 1 && !m.IsDerivative {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
@@ -562,10 +593,27 @@ func (t *Time) Format(m *view.Model) {
 	var innerTimeField string
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		innerTimeField = "_" + t.TimeField
-		withValue := fmt.Sprintf(
-			"toStartOfInterval(%s, %s(%d))",
-			t.TimeField, toDatasourceIntervalFunction, datasourceInterval,
-		)
+		withValue := ""
+		if m.IsDerivative {
+			offset := m.Time.Offset
+			if offset > 0 {
+				withValue = fmt.Sprintf(
+					"toStartOfInterval(time-%d, %s(%d)) + %s(arrayJoin([%s]) * %d) + %d",
+					offset, toIntervalFunction, interval, toIntervalFunction, windows, interval, offset,
+				)
+			} else {
+				withValue = fmt.Sprintf(
+					"toStartOfInterval(time, %s(%d)) + %s(arrayJoin([%s]) * %d)",
+					toIntervalFunction, interval, toIntervalFunction, windows, interval,
+				)
+			}
+		} else {
+			withValue = fmt.Sprintf(
+				"toStartOfInterval(%s, %s(%d))",
+				t.TimeField, toDatasourceIntervalFunction, datasourceInterval,
+			)
+		}
+
 		withAlias := "_" + t.TimeField
 		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRICS_INNER})
@@ -589,7 +637,12 @@ func (t *Time) Format(m *view.Model) {
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
 	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)
-	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
+	if m.IsDerivative {
+		tagField = fmt.Sprintf("toUnixTimestamp(`%s`)", innerTimeField)
+		m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER})
+	} else {
+		m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
+	}
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 	if m.Time.Fill != "" && m.Time.Interval > 0 {
 		m.AddCallback("time", TimeFill([]interface{}{m}))
@@ -653,6 +706,10 @@ func (f *TagFunction) Check() error {
 				return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 			}
 		}
+	case TAG_FUNCTION_FAST_FILTER:
+		if strings.Trim(f.Args[0], "`") != "trace_id" {
+			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		}
 	}
 	return nil
 
@@ -662,7 +719,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	fields := f.Args
 	switch f.Name {
 	case TAG_FUNCTION_ANY:
-		f.Name = "topK(1)"
+		f.Name = "any"
 	case TAG_FUNCTION_TOPK:
 		f.Name = fmt.Sprintf("topK(%s)", f.Args[len(f.Args)-1])
 		fields = fields[:len(f.Args)-1]
@@ -776,7 +833,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	if len(fields) > 1 {
 		if f.Name == "if" {
 			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
-		} else if strings.HasPrefix(f.Name, "topK") {
+		} else if strings.HasPrefix(f.Name, "topK") || strings.HasPrefix(f.Name, "any") {
 			withValue = fmt.Sprintf("%s((%s))", f.Name, strings.Join(values, ","))
 		} else {
 			withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))

@@ -86,21 +86,21 @@ l7_error_ratio              ,                           , percentage , Applicati
 l7_client_error_ratio       ,                           , percentage , Application   , 111
 l7_server_error_ratio       ,                           , percentage , Application   , 111
 
-vpc                         ,                           , tag        , Cardinality   , 111
-subnet                      ,                           , tag        , Cardinality   , 111
-ip                          ,                           , tag        , Cardinality   , 111
-pod_cluster                 ,                           , tag        , Cardinality   , 111
-pod_node                    ,                           , tag        , Cardinality   , 111
-pod_ns                      ,                           , tag        , Cardinality   , 111
-pod_group                   ,                           , tag        , Cardinality   , 111
-pod                         ,                           , tag        , Cardinality   , 111
-host                        ,                           , tag        , Cardinality   , 111
-chost                       ,                           , tag        , Cardinality   , 111
-region                      ,                           , tag        , Cardinality   , 111
-az                          ,                           , tag        , Cardinality   , 111
-ip_version                  , is_ipv4                   , tag        , Cardinality   , 111
-tap_type                    , tap_type                  , tag        , Cardinality   , 111
-vtap_id                     , vtap_id                   , tag        , Cardinality   , 111
-protocol                    , protocol                  , tag        , Cardinality   , 111
-server_port                 , server_port               , tag        , Cardinality   , 111
+vpc                         ,                           , tag        , Tag   , 111
+subnet                      ,                           , tag        , Tag   , 111
+ip                          ,                           , tag        , Tag   , 111
+pod_cluster                 ,                           , tag        , Tag   , 111
+pod_node                    ,                           , tag        , Tag   , 111
+pod_ns                      ,                           , tag        , Tag   , 111
+pod_group                   ,                           , tag        , Tag   , 111
+pod                         ,                           , tag        , Tag   , 111
+host                        ,                           , tag        , Tag   , 111
+chost                       ,                           , tag        , Tag   , 111
+region                      ,                           , tag        , Tag   , 111
+az                          ,                           , tag        , Tag   , 111
+ip_version                  , is_ipv4                   , tag        , Tag   , 111
+tap_type                    , tap_type                  , tag        , Tag   , 111
+vtap_id                     , vtap_id                   , tag        , Tag   , 111
+protocol                    , protocol                  , tag        , Tag   , 111
+server_port                 , server_port               , tag        , Tag   , 111
 row                         ,                           , other      , Other         , 111 

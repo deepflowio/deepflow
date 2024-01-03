@@ -55,7 +55,7 @@ const (
 	DefaultFlowTagCacheFlushTimeout = 1800    // s
 	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
 	IndexTypeHash                   = "hash"
-	IndexTypeIncremetalIdLocation   = "incremental-id-location"
+	IndexTypeIncremetalIdLocation   = "incremental-id"
 	FormatHex                       = "hex"
 	FormatDecimal                   = "decimal"
 )
@@ -110,16 +110,6 @@ type CKWriterConfig struct {
 	QueueSize    int `yaml:"queue-size"`
 	BatchSize    int `yaml:"batch-size"`
 	FlushTimeout int `yaml:"flush-timeout"`
-}
-
-type PromWriterConfig struct {
-	Enabled       bool              `yaml:"enabled"`
-	Endpoint      string            `yaml:"endpoint"`
-	Headers       map[string]string `yaml:"headers"`
-	BatchSize     int               `yaml:"batch-size"`
-	FlushTimeout  int               `yaml:"flush-timeout"`
-	Concurrency   int               `yaml:"concurrency"`
-	MetricsFilter []string          `yaml:"metrics-filter"`
 }
 
 type CKDB struct {
@@ -182,7 +172,7 @@ type BaseConfig struct {
 }
 
 func sleepAndExit() {
-	time.Sleep(time.Second)
+	time.Sleep(time.Microsecond)
 	os.Exit(1)
 }
 
@@ -200,8 +190,9 @@ func (c *Config) Validate() error {
 				log.Errorf("invalid 'format'(%s) of 'trace-id-with-index:incremetal-id-location', must be '%s' or '%s'", location.Format, FormatHex, FormatDecimal)
 				sleepAndExit()
 			}
-			if location.Length == 0 || location.Length > 31 {
-				log.Errorf("invalid 'length'(%d) of 'trace-id-with-index:incremetal-id-location', must be > 0 and <= 32", location.Length)
+			if location.Length == 0 || (location.Length > 20 && location.Format == FormatDecimal) || (location.Length > 16 && location.Format == FormatHex) {
+				log.Errorf("invalid 'length'(%d) of 'trace-id-with-index:incremetal-id-location' out of range. when 'format' is '%s' range is (0, 20], 'format' is '%s' range is (0, 16]", location.Length, FormatDecimal, FormatHex)
+
 				sleepAndExit()
 			}
 			c.TraceIdWithIndex.FormatIsHex = c.TraceIdWithIndex.IncrementalIdLocation.Format == FormatHex

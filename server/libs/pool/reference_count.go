@@ -34,6 +34,10 @@ func (r *ReferenceCount) AddReferenceCount() {
 	atomic.AddInt32((*int32)(r), 1)
 }
 
+func (r *ReferenceCount) AddReferenceCountN(n int32) {
+	atomic.AddInt32((*int32)(r), n)
+}
+
 func (r *ReferenceCount) SubReferenceCount() bool {
 	if atomic.AddInt32((*int32)(r), -1) > 0 {
 		return true

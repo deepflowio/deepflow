@@ -169,25 +169,37 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 			continue
 		}
 		ipAddr := jIP.Get("ip_address").MustString()
+		var subnetLcuuid string
+		for _, subnet := range h.toolDataSet.networkLcuuidToSubnets[vif.NetworkLcuuid] {
+			if cloudcommon.IsIPInCIDR(ipAddr, subnet.CIDR) {
+				subnetLcuuid = subnet.Lcuuid
+				break
+			}
+		}
 		ips = append(
 			ips,
 			model.IP{
 				Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
 				VInterfaceLcuuid: vif.Lcuuid,
 				IP:               ipAddr,
-				SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[vif.NetworkLcuuid],
+				SubnetLcuuid:     subnetLcuuid,
 				RegionLcuuid:     vif.RegionLcuuid,
 			},
 		)
 		h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid] = append(h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid], ipAddr)
-		if i == 0 && floatingIP != "" {
-			natRule = model.NATRule{
-				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
-				Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
-				Protocol:         cloudcommon.PROTOCOL_ALL,
-				FloatingIP:       floatingIP,
-				FixedIP:          ipAddr,
-				VInterfaceLcuuid: vif.Lcuuid,
+		if floatingIP != "" {
+			if i == 0 {
+				natRule = model.NATRule{
+					Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
+					Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
+					Protocol:         cloudcommon.PROTOCOL_ALL,
+					FloatingIP:       floatingIP,
+					FixedIP:          ipAddr,
+					VInterfaceLcuuid: vif.Lcuuid,
+				}
+			} else {
+				natRule.FixedIP = natRule.FixedIP + "," + ipAddr
+				natRule.Lcuuid = common.GenerateUUID(floatingIP + "_" + natRule.FixedIP)
 			}
 		}
 	}

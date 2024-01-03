@@ -24,6 +24,8 @@ const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
 const DB_NAME_PROMETHEUS = "prometheus"
+const IndexTypeIncremetalId = "incremental-id"
+const FormatHex = "hex"
 
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
@@ -33,4 +35,14 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EVENT:           []string{"event", "perf_event", "alarm_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
+}
+
+var SHOW_TAG_VALUE_MAP = map[string][]string{
+	"ip_resource_map": []string{"ip", "subnet", "region", "az", "host", "chost", "vpc", "router", "dhcpgw", "lb", "lb_listener", "natgw", "redis", "rds", "pod_cluster", "pod_ns", "pod_node", "pod_ingress", "pod_service", "pod_group", "pod"},
+	"pod_ns_map":      []string{"pod_ns", "pod_cluster"},
+	"pod_group_map":   []string{"pod_group", "pod_cluster", "pod_ns"},
+	"pod_service_map": []string{"pod_service", "pod_cluster", "pod_ns"},
+	"pod_map":         []string{"pod", "pod_cluster", "pod_ns", "pod_node", "pod_service", "pod_group"},
+	"chost_map":       []string{"chost", "host", "vpc"},
+	"gprocess_map":    []string{"gprocess", "chost"},
 }

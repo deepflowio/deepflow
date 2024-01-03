@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -33,13 +35,17 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("flow_metrics.dbwriter")
 
 const (
-	CACHE_SIZE = 10240
+	CACHE_SIZE       = 10240
+	QUEUE_BATCH_SIZE = 1024
 
 	metricsFilterApp = "app"
 )
@@ -114,40 +120,73 @@ func (w *CkDbWriter) Close() {
 	}
 }
 
+type PromWriterCounter struct {
+	RecvMetricsCount    int64 `statsd:"recv-metrics-count"`
+	RecvTimeSeriesCount int64 `statsd:"recv-timeseries-count"`
+
+	SendFailedCount     int64 `statsd:"send-failed-count"`
+	SendSucceedCount    int64 `statsd:"send-succeed-count"`
+	SendTimeSeriesCount int64 `statsd:"send-timeseries-count"`
+}
+
 // PromWriter 是 prom remotewrite 的 db.Writer 实现，负责将 metrics 数据推送给到服务端
 type PromWriter struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	conf   config.PromWriterConfig
-	client *http.Client
-	queue  chan []prompb.TimeSeries
-	filter map[string]struct{}
+	conf       flowmetricsconfig.PromWriterConfig
+	client     *http.Client
+	queues     queue.FixedMultiQueue
+	queueCount int
+	filter     map[string]struct{}
+	seq        int32
+	closed     bool
+	counter    *PromWriterCounter
 }
 
-func NewPromWriter(conf config.PromWriterConfig) *PromWriter {
+func (pw *PromWriter) GetCounter() interface{} {
+	var counter *PromWriterCounter
+	counter, pw.counter = pw.counter, &PromWriterCounter{}
+	return counter
+}
+
+func (pw *PromWriter) Closed() bool {
+	return pw.closed
+}
+
+func NewPromWriter(conf flowmetricsconfig.PromWriterConfig) *PromWriter {
 	ctx, cancel := context.WithCancel(context.Background())
 	filter := make(map[string]struct{})
 	for _, m := range conf.MetricsFilter {
 		filter[m] = struct{}{}
 	}
+	queues := queue.NewOverwriteQueues(
+		"prometheus_remotewrite", uint8(conf.QueueCount), conf.QueueSize,
+		queue.OptionFlushIndicator(time.Duration(conf.FlushTimeout)*time.Second),
+		queue.OptionRelease(func(p interface{}) { ReleasePrompbTimeSeries(p.(*prompb.TimeSeries)) }),
+		common.QUEUE_STATS_MODULE_INGESTER)
 	pw := &PromWriter{
-		ctx:    ctx,
-		cancel: cancel,
-		conf:   conf,
-		client: &http.Client{Timeout: time.Second * 10},
-		queue:  make(chan []prompb.TimeSeries, conf.Concurrency),
-		filter: filter,
+		ctx:        ctx,
+		cancel:     cancel,
+		conf:       conf,
+		client:     &http.Client{Timeout: time.Second * 10},
+		queues:     queues,
+		queueCount: conf.QueueCount,
+		filter:     filter,
+		counter:    &PromWriterCounter{},
 	}
+	common.RegisterCountableForIngester("prom_writer", pw, stats.OptionStatTags{"queue_count": strconv.Itoa(int(conf.QueueCount))})
 
-	for i := 0; i < conf.Concurrency; i++ {
-		go pw.loopConsume()
+	for i := 0; i < conf.QueueCount; i++ {
+		go pw.loopConsume(i)
 	}
 	return pw
 }
 
+// multi thread will call Put
 func (pw *PromWriter) Put(items ...interface{}) error {
-	var timeseries []prompb.TimeSeries
+	atomic.AddInt32(&pw.seq, 1)
+	var timeSeries []interface{}
 	for _, item := range items {
 		doc, ok := item.(*app.Document)
 		if !ok {
@@ -158,11 +197,13 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 		id, err := doc.TableID()
 		if err != nil {
 			log.Warningf("doc table id not found, %v", err)
+			doc.Release()
 			continue
 		}
 
 		// 只处理 VTAP_APP_EDGE_PORT_1S 这张表
 		if id != uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
+			doc.Release()
 			continue
 		}
 		t := int64(doc.Timestamp) * 1000 // 转换为 ms
@@ -180,6 +221,7 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 
 		// 无指标则不匹配 labels
 		if len(metrics) <= 0 {
+			doc.Release()
 			continue
 		}
 
@@ -195,75 +237,72 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 			}
 		}
 
+		pw.counter.RecvMetricsCount++
 		for metric, value := range metrics {
-			lbs := pw.copyPromLabels(labels)
-			lbs = append(lbs, prompb.Label{
+			ts := AcquirePrompbTimeSeries()
+			ts.Labels = append(ts.Labels, labels...)
+			ts.Labels = append(ts.Labels, prompb.Label{
 				Name:  "__name__",
 				Value: metric,
 			})
-
-			timeseries = append(timeseries, prompb.TimeSeries{
-				Labels:  lbs,
-				Samples: []prompb.Sample{{Value: value, Timestamp: t}},
-			})
+			ts.Samples[0].Value = value
+			ts.Samples[0].Timestamp = t
+			timeSeries = append(timeSeries, ts)
 		}
+		doc.Release()
 	}
 
-	if len(timeseries) > 0 {
-		pw.queue <- timeseries
+	if len(timeSeries) > 0 {
+		pw.counter.RecvTimeSeriesCount += int64(len(timeSeries))
+		pw.queues.Put(queue.HashKey(int(pw.seq)%pw.queueCount), timeSeries...)
 	}
 	return nil
 }
 
 func (pw *PromWriter) Close() {
+	pw.closed = true
 	pw.cancel()
 }
 
-func (pw *PromWriter) copyPromLabels(src []prompb.Label) []prompb.Label {
-	n := len(src)
-	if n <= 0 {
-		return nil
-	}
-
-	dst := make([]prompb.Label, 0, n)
-	for i := 0; i < len(src); i++ {
-		lb := src[i]
-		dst = append(dst, prompb.Label{
-			Name:  lb.Name,
-			Value: lb.Value,
-		})
-	}
-	return dst
-}
-
-func (pw *PromWriter) loopConsume() {
-	ticker := time.NewTicker(time.Duration(pw.conf.FlushTimeout) * time.Second)
-	defer ticker.Stop()
-
+func (pw *PromWriter) loopConsume(queueId int) {
 	batch := make([]prompb.TimeSeries, 0, pw.conf.BatchSize)
+	releaseCache := make([]*prompb.TimeSeries, 0, pw.conf.BatchSize)
 	doReq := func() {
-		if err := pw.sendRequest(&prompb.WriteRequest{Timeseries: batch}); err != nil {
-			log.Warningf("failed to send promrw request, err: %v", err)
+		if len(batch) == 0 {
+			return
 		}
-		batch = make([]prompb.TimeSeries, 0, pw.conf.BatchSize)
+		if err := pw.sendRequest(&prompb.WriteRequest{Timeseries: batch}); err != nil {
+			if pw.counter.SendFailedCount == 0 {
+				log.Warningf("failed to send promrw request, err: %v", err)
+			}
+			pw.counter.SendFailedCount++
+		} else {
+			pw.counter.SendSucceedCount++
+			pw.counter.SendTimeSeriesCount += int64(len(batch))
+		}
+		batch = batch[:0]
+		for _, ts := range releaseCache {
+			ReleasePrompbTimeSeries(ts)
+		}
+		releaseCache = releaseCache[:0]
 	}
 
-	for {
-		select {
-		case <-pw.ctx.Done():
-			return
-
-		case ts := <-pw.queue:
-			for _, item := range ts {
-				batch = append(batch, item)
+	queueTimeSeries := make([]interface{}, QUEUE_BATCH_SIZE)
+	for !pw.closed {
+		n := pw.queues.Gets(queue.HashKey(queueId), queueTimeSeries)
+		for _, value := range queueTimeSeries[:n] {
+			if value == nil {
+				doReq()
+				continue
+			}
+			if ts, ok := value.(*prompb.TimeSeries); ok {
+				batch = append(batch, *ts)
+				releaseCache = append(releaseCache, ts)
 				if len(batch) >= pw.conf.BatchSize {
 					doReq()
 				}
-			}
-
-		case <-ticker.C:
-			if len(batch) > 0 {
-				doReq()
+			} else {
+				log.Warningf("get prom remote write queue data type wrong")
 			}
 		}
 	}
@@ -295,4 +334,22 @@ func (pw *PromWriter) sendRequest(wr *prompb.WriteRequest) error {
 
 	_, err = http.DefaultClient.Do(req)
 	return err
+}
+
+var prompbTimeSeriesPool = pool.NewLockFreePool(func() interface{} {
+	return &prompb.TimeSeries{
+		Samples: make([]prompb.Sample, 1),
+	}
+})
+
+func AcquirePrompbTimeSeries() *prompb.TimeSeries {
+	return prompbTimeSeriesPool.Get().(*prompb.TimeSeries)
+}
+
+func ReleasePrompbTimeSeries(t *prompb.TimeSeries) {
+	if t == nil {
+		return
+	}
+	t.Labels = t.Labels[:0]
+	prompbTimeSeriesPool.Put(t)
 }

@@ -49,6 +49,7 @@ type SlowCounter struct {
 
 type SlowItem struct {
 	vtapId       uint16
+	epcId        uint16
 	podClusterId uint16
 	ts           prompb.TimeSeries
 }
@@ -57,9 +58,10 @@ var slowItemPool = pool.NewLockFreePool(func() interface{} {
 	return &SlowItem{}
 })
 
-func AcquireSlowItem(vtapId, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
+func AcquireSlowItem(vtapId, epcId, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
 	s := slowItemPool.Get().(*SlowItem)
 	s.vtapId = podClusterId
+	s.epcId = epcId
 	s.podClusterId = podClusterId
 
 	for _, l := range append(extraLabels, ts.Labels...) {
@@ -146,7 +148,7 @@ func (d *SlowDecoder) Run() {
 				continue
 			}
 			slowItems = append(slowItems, slowItem)
-			metricLabelReq, targetReq := d.TimeSeriesToLableIDRequest(&slowItem.ts, slowItem.podClusterId)
+			metricLabelReq, targetReq := d.TimeSeriesToLableIDRequest(&slowItem.ts, slowItem.epcId, slowItem.podClusterId)
 			addMetricLabelRequest(req, metricLabelReq)
 			addTargetRequest(req, targetReq)
 		}
@@ -161,7 +163,7 @@ func (d *SlowDecoder) Run() {
 		}
 
 		for _, item := range slowItems {
-			d.sendPrometheusSamples(item.vtapId, item.podClusterId, &item.ts)
+			d.sendPrometheusSamples(item.vtapId, item.epcId, item.podClusterId, &item.ts)
 			ReleaseSlowItem(item)
 		}
 		req.RequestLabels = req.RequestLabels[:0]
@@ -227,13 +229,14 @@ func addTargetRequest(req *trident.PrometheusLabelRequest, target *trident.Targe
 	req.RequestTargets = append(req.RequestTargets, target)
 }
 
-func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, podClusterId uint16) (*trident.MetricLabelRequest, *trident.TargetRequest) {
+func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, podClusterId uint16) (*trident.MetricLabelRequest, *trident.TargetRequest) {
 	labelReq := &trident.MetricLabelRequest{}
 	targetReq := &trident.TargetRequest{}
 	var metricId uint32
 	hasMetricId := false
 
 	labelReq.PodClusterId = proto.Uint32(uint32(podClusterId))
+	labelReq.EpcId = proto.Uint32(uint32(epcId))
 	// first, get metric
 	for _, l := range ts.Labels {
 		if l.Name == model.MetricNameLabel {
@@ -294,6 +297,7 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, podClust
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
 		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
+		targetReq.EpcId = proto.Uint32(uint32(epcId))
 		return labelReq, targetReq
 	}
 
@@ -302,22 +306,24 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, podClust
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
 		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
+		targetReq.EpcId = proto.Uint32(uint32(epcId))
 		return labelReq, targetReq
 	}
 
-	if _, hasTargetId := d.labelTable.QueryTargetID(podClusterId, jobId, instanceId); !hasTargetId {
+	if _, hasTargetId := d.labelTable.QueryTargetID(epcId, podClusterId, jobId, instanceId); !hasTargetId {
 		targetReq.Job = proto.String(job)
 		targetReq.Instance = proto.String(instance)
 		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
+		targetReq.EpcId = proto.Uint32(uint32(epcId))
 	}
 	return labelReq, targetReq
 }
 
-func (d *SlowDecoder) sendPrometheusSamples(vtapID, podClusterId uint16, ts *prompb.TimeSeries) {
+func (d *SlowDecoder) sendPrometheusSamples(vtapID, epcId, podClusterId uint16, ts *prompb.TimeSeries) {
 	if d.debugEnabled {
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, nil)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, epcId, podClusterId, ts, nil)
 	if !isSlowItem && err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)

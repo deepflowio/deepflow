@@ -137,3 +137,36 @@ pub mod kruise {
         }
     }
 }
+
+pub mod calico {
+    use super::*;
+
+    #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    #[kube(
+        group = "crd.projectcalico.org",
+        version = "v1",
+        kind = "IpPool",
+        namespaced
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct IpPoolSpec {
+        pub cidr: Option<String>,
+    }
+
+    impl Trimmable for IpPool {
+        fn trim(mut self) -> Self {
+            let name = if let Some(name) = self.metadata.name.as_ref() {
+                name
+            } else {
+                ""
+            };
+            let mut res = Self::new(name, self.spec);
+            res.metadata = ObjectMeta {
+                uid: self.metadata.uid.take(),
+                name: self.metadata.name.take(),
+                ..Default::default()
+            };
+            res
+        }
+    }
+}

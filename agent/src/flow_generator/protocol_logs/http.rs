@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+use std::collections::HashSet;
 use std::str;
+use std::sync::Arc;
 
 use hpack::Decoder;
 use nom::AsBytes;
@@ -140,6 +142,15 @@ impl Serialize for Method {
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
+    // Offset for HTTP2 HEADERS:
+    // Example:
+    //                   0            8           ...
+    //                   |____________|___________|__
+    // HTTP2 Request:    |SETTINGS[0], HEADERS[1];
+    //
+    // tcp_seq_offset is 8
+    #[serde(skip)]
+    headers_offset: u32,
     // 流是否结束，用于 http2 ebpf uprobe 处理.
     // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
     #[serde(skip)]
@@ -305,6 +316,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
         } else {
             self.endpoint.clone()
         }
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.headers_offset
     }
 }
 
@@ -511,6 +526,9 @@ impl L7ProtocolParserInterface for HttpLog {
                 let Some(config) = param.parse_config else {
                     return false;
                 };
+                if self.http2_req_decoder.is_none() {
+                    self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
+                }
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
                         if param.direction == PacketDirection::ServerToClient {
@@ -552,23 +570,33 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.wasm_hook(param, payload, &mut info);
                 }
             }
-            L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
-                EbpfType::GoHttp2Uprobe => {
-                    self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
-                    if param.parse_log {
-                        if self.proto == L7Protocol::Http2
-                            && !config.http_endpoint_disabled
-                            && info.path.len() > 0
-                        {
-                            info.endpoint = Some(handle_endpoint(config, &info.path));
-                        }
-                        return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
-                    } else {
-                        return Ok(L7ParseResult::None);
-                    }
+            L7Protocol::Http2 | L7Protocol::Grpc => {
+                if self.http2_req_decoder.is_none() {
+                    self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
-                _ => self.parse_http_v2(payload, param, &mut info)?,
-            },
+                match param.ebpf_type {
+                    EbpfType::GoHttp2Uprobe => {
+                        self.parse_http2_go_uprobe(
+                            &config.l7_log_dynamic,
+                            payload,
+                            param,
+                            &mut info,
+                        )?;
+                        if param.parse_log {
+                            if self.proto == L7Protocol::Http2
+                                && !config.http_endpoint_disabled
+                                && info.path.len() > 0
+                            {
+                                info.endpoint = Some(handle_endpoint(config, &info.path));
+                            }
+                            return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
+                        } else {
+                            return Ok(L7ParseResult::None);
+                        }
+                    }
+                    _ => self.parse_http_v2(payload, param, &mut info)?,
+                }
+            }
             _ => unreachable!(),
         }
         match self.proto {
@@ -637,10 +665,15 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
-            http2_req_decoder: Some(Decoder::new()),
-            http2_resp_decoder: Some(Decoder::new()),
             ..Default::default()
         }
+    }
+
+    fn set_header_decoder(&mut self, expected_headers_set: Arc<HashSet<Vec<u8>>>) {
+        self.http2_req_decoder = Some(Decoder::new_with_expected_headers(
+            expected_headers_set.clone(),
+        ));
+        self.http2_resp_decoder = Some(Decoder::new_with_expected_headers(expected_headers_set));
     }
 
     fn http1_check_protocol(&mut self, payload: &[u8]) -> bool {
@@ -871,10 +904,12 @@ impl HttpLog {
         let mut is_httpv2 = false;
         let mut frame_payload = payload;
         let mut httpv2_header = Httpv2Headers::default();
+        let mut headers_offset = 0;
 
         while frame_payload.len() > HTTPV2_FRAME_HEADER_LENGTH {
             if Self::has_magic(frame_payload) {
                 frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+                headers_offset += HTTPV2_MAGIC_LENGTH;
                 continue;
             }
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
@@ -944,6 +979,7 @@ impl HttpLog {
                     }
                 }
                 header_frame_parsed = true;
+                info.headers_offset = headers_offset as u32;
                 if content_length.is_some() {
                     is_httpv2 = true;
                     break;
@@ -975,6 +1011,7 @@ impl HttpLog {
                 break;
             }
             frame_payload = &frame_payload[httpv2_header.frame_length as usize..];
+            headers_offset += httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH;
         }
         // 流量中可能仅存在Headers帧且Headers帧中没有传输实体，“Content-Length”为0
         if header_frame_parsed && !is_httpv2 {
@@ -1486,7 +1523,7 @@ mod tests {
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
             l7_log_session_aggr_timeout: Duration::from_secs(10),
-            l7_log_dynamic: config,
+            l7_log_dynamic: config.clone(),
             ..Default::default()
         };
         for packet in packets.iter_mut() {
@@ -1506,6 +1543,7 @@ mod tests {
             span_set.insert(TraceType::Sw8.to_checker_string());
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
+            http2.set_header_decoder(config.expected_headers_set.clone());
             let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
             param.set_log_parse_config(parse_config);
 
@@ -1785,6 +1823,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
 
         let config = LogParserConfig::default();
+        if http.protocol() == L7Protocol::Http2 || http.protocol() == L7Protocol::Grpc {
+            http.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
+        }
 
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {

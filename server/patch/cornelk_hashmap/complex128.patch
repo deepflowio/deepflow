@@ -1,0 +1,35 @@
+diff --git a/defines.go b/defines.go
+index 75f0e9e..7827316 100644
+--- a/defines.go
++++ b/defines.go
+@@ -8,5 +8,5 @@ const maxFillRate = 50
+ 
+ // support all numeric and string types and aliases of those.
+ type hashable interface {
+-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | ~float32 | ~float64 | ~string
++	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | ~float32 | ~float64 | ~string | ~complex128
+ }
+diff --git a/util_hash.go b/util_hash.go
+index 5cd233e..dce0ae0 100644
+--- a/util_hash.go
++++ b/util_hash.go
+@@ -78,6 +78,8 @@ func (m *Map[Key, Value]) setDefaultHasher() {
+ 		m.hasher = *(*func(Key) uintptr)(unsafe.Pointer(&xxHashFloat64))
+ 	case reflect.String:
+ 		m.hasher = *(*func(Key) uintptr)(unsafe.Pointer(&xxHashString))
++	case reflect.Complex128:
++		m.hasher = *(*func(Key) uintptr)(unsafe.Pointer(&xxHashDFloat64))
+ 
+ 	default:
+ 		panic(fmt.Errorf("unsupported key type %T of kind %v", key, kind))
+@@ -234,6 +236,10 @@ var xxHashString = func(key string) uintptr {
+ 	return uintptr(h)
+ }
+ 
++var xxHashDFloat64 = func(key complex128) uintptr {
++    return xxHashFloat64(real(key))^xxHashFloat64(imag(key))
++}
++
+ func round(acc, input uint64) uint64 {
+ 	acc += input * prime2
+ 	acc = rol31(acc)

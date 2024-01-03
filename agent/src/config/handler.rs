@@ -29,6 +29,7 @@ use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
     Naming,
 };
+use http2::get_expected_headers;
 use log::{info, warn, Level};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
@@ -288,6 +289,7 @@ pub struct PlatformConfig {
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
     pub os_proc_scan_conf: OsProcScanConfig,
+    pub agent_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -323,6 +325,7 @@ pub struct DispatcherConfig {
     pub pod_cluster_id: u32,
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
+    pub dpdk_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -969,6 +972,7 @@ pub struct L7LogDynamicConfig {
 
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
+    pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -991,19 +995,27 @@ impl L7LogDynamicConfig {
     ) -> Self {
         proxy_client.make_ascii_lowercase();
 
+        let mut expected_headers_set = get_expected_headers();
+        expected_headers_set.insert(proxy_client.as_bytes().to_vec());
         let mut x_request_id_set = HashSet::new();
         for t in x_request_id.iter() {
-            x_request_id_set.insert(t.trim().to_string());
+            let t = t.trim();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            x_request_id_set.insert(t.to_string());
         }
 
         let mut trace_set = HashSet::new();
         for t in trace_types.iter() {
-            trace_set.insert(t.to_checker_string());
+            let t = t.to_checker_string();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            trace_set.insert(t);
         }
 
         let mut span_set = HashSet::new();
         for t in span_types.iter() {
-            span_set.insert(t.to_checker_string());
+            let t = t.to_checker_string();
+            expected_headers_set.insert(t.as_bytes().to_vec());
+            span_set.insert(t);
         }
 
         Self {
@@ -1013,6 +1025,7 @@ impl L7LogDynamicConfig {
             span_types,
             trace_set,
             span_set,
+            expected_headers_set: Arc::new(expected_headers_set),
         }
     }
 
@@ -1128,6 +1141,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             dispatcher: DispatcherConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
+                dpdk_enabled: conf.yaml_config.dpdk_enabled,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,
@@ -1275,6 +1289,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
                 prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
+                agent_enabled: conf.enabled,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1611,7 +1626,10 @@ impl ConfigHandler {
             info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
         }
 
-        if candidate_config.tap_mode != TapMode::Local && yaml_config.src_interfaces.is_empty() {
+        if candidate_config.tap_mode != TapMode::Local
+            && yaml_config.src_interfaces.is_empty()
+            && !yaml_config.dpdk_enabled
+        {
             warn!("src_interfaces should be set in Analyzer mode or Mirror mode");
         }
 
@@ -2326,9 +2344,8 @@ impl ConfigHandler {
                 fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
 
-                    if handler.candidate_config.enabled
-                        && (handler.candidate_config.tap_mode == TapMode::Local
-                            || is_tt_pod(conf.trident_type))
+                    if conf.agent_enabled
+                        && (conf.tap_mode == TapMode::Local || is_tt_pod(conf.trident_type))
                     {
                         if is_tt_pod(conf.trident_type) {
                             components.kubernetes_poller.start();

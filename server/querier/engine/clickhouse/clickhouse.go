@@ -64,6 +64,8 @@ type CHEngine struct {
 	Context            context.Context
 	TargetLabelFilters []TargetLabelFilter
 	NoPreWhere         bool
+	IsDerivative       bool
+	DerivativeGroupBy  []string
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -72,6 +74,11 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var sqlList []string
 	var err error
 	sql := args.Sql
+	if strings.Contains(sql, "Derivative") {
+		e.IsDerivative = true
+		e.Model.IsDerivative = true
+		e.Model.DerivativeGroupBy = e.DerivativeGroupBy
+	}
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
@@ -131,7 +138,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			showParser := parse.Parser{Engine: showEngine}
 			err = showParser.ParseSQL(showSql)
 			if err != nil {
-				log.Error(err)
+				errorMessage := fmt.Sprintf("sql: %s; parse error: %s", showSql, err.Error())
+				log.Error(errorMessage)
 				return nil, nil, err
 			}
 			for _, stmt := range showEngine.Statements {
@@ -163,7 +171,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
-		log.Error(err)
+		errorMessage := fmt.Sprintf("sql: %s; parse error: %s", sql, err.Error())
+		log.Error(errorMessage)
 		return nil, nil, err
 	}
 	for _, stmt := range e.Statements {
@@ -500,10 +509,16 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		}
 		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
 		innerEngine.Init()
+		if strings.Contains(innerSql, "Derivative") {
+			innerEngine.IsDerivative = true
+			innerEngine.Model.IsDerivative = true
+			innerEngine.Model.DerivativeGroupBy = innerEngine.DerivativeGroupBy
+		}
 		innerParser := parse.Parser{Engine: innerEngine}
 		err = innerParser.ParseSQL(innerSql)
 		if err != nil {
-			log.Error(err)
+			errorMessage := fmt.Sprintf("sql: %s; parse error: %s", innerSql, err.Error())
+			log.Error(errorMessage)
 			return nil, nil, err
 		}
 		for _, stmt := range innerEngine.Statements {
@@ -516,10 +531,16 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
 	outerEngine.Init()
+	if strings.Contains(newSql, "Derivative") {
+		outerEngine.IsDerivative = true
+		outerEngine.Model.IsDerivative = true
+		outerEngine.Model.DerivativeGroupBy = outerEngine.DerivativeGroupBy
+	}
 	outerParser := parse.Parser{Engine: outerEngine}
 	err = outerParser.ParseSQL(newSql)
 	if err != nil {
-		log.Error(err)
+		errorMessage := fmt.Sprintf("sql: %s; parse error: %s", newSql, err.Error())
+		log.Error(errorMessage)
 		return nil, nil, err
 	}
 	for _, stmt := range outerEngine.Statements {
@@ -859,6 +880,9 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// Time-first parsing
 	e.parseTimeWhere(node.Expr, &whereStmt)
 	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+	if err != nil {
+		return err
+	}
 	expr, err = e.TransPrometheusTargetIDFilter(expr)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
@@ -976,6 +1000,21 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (e *CHEngine) TransDerivativeGroupBy(groups sqlparser.GroupBy) error {
+	groupSlice := []string{}
+	for _, group := range groups {
+		colName, ok := group.(*sqlparser.ColName)
+		if ok {
+			groupTag := sqlparser.String(colName)
+			if !strings.Contains(groupTag, "time") {
+				groupSlice = append(groupSlice, groupTag)
+			}
+		}
+	}
+	e.DerivativeGroupBy = groupSlice
 	return nil
 }
 
@@ -1159,9 +1198,18 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		name = strings.Trim(name, "`")
 		functionAs := as
 		if as == "" {
-			functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			if name == view.FUNCTION_TOPK {
+				argLength := len(args)
+				functionAs = strings.Join(
+					[]string{
+						view.FUNCTION_TOPK, "_", args[argLength-1],
+						"(", strings.Join(args[:argLength-1], ", "), ")",
+					}, "")
+			} else {
+				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			}
 		}
-		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context)
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy)
 		if err != nil {
 			return err
 		}
@@ -1206,12 +1254,30 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	default:
 		return errors.New(fmt.Sprintf("select: %s(%T) not support", sqlparser.String(expr), expr))
 	}
-	return nil
 }
 
 func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []string, err error) {
 	for _, arg := range item.Exprs {
-		args = append(args, sqlparser.String(arg))
+		argStr := sqlparser.String(arg)
+		if e.IsDerivative {
+			argStr = strings.TrimPrefix(argStr, "Derivative(")
+			argStr = strings.TrimSuffix(argStr, ")")
+		}
+		argSlice := strings.Split(argStr, ",")
+		for i, originArg := range argSlice {
+			originArg = strings.TrimSpace(originArg)
+			if e.IsDerivative && i > 0 {
+				if !slices.Contains(e.DerivativeGroupBy, originArg) {
+					tagTranslatorStr := GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+					if tagTranslatorStr == originArg {
+						e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER})
+					} else {
+						e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER, Alias: originArg})
+					}
+				}
+			}
+			args = append(args, originArg)
+		}
 	}
 	return sqlparser.String(item.Name), args, nil
 }
@@ -1254,7 +1320,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy)
 		if err != nil {
 			return nil, err
 		}

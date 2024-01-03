@@ -1028,6 +1028,15 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 			"%s (%s, %s)",
 		),
 	}
+
+	tagResourceMap["ip_resource_name"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"%s_name %s %s",
+			"%s (%s_name, %s)",
+		),
+	}
 	tagResourceMap["other_name"] = map[string]*Tag{
 		"default": NewTag(
 			"",
@@ -1051,7 +1060,7 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 			"value %s %s",
-			"%s(value, %s)",
+			"%s (value, %s)",
 		),
 	}
 

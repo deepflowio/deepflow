@@ -64,7 +64,7 @@ type Counter struct {
 type BuilderCounter struct {
 	TimeSeriesIn      int64 `statsd:"time-series-in"`
 	TimeSeriesInvaild int64 `statsd:"time-series-invalid"`
-	PodClusterMiss    int64 `statsd:"pod-cluster-miss"`
+	EpcMiss           int64 `statsd:"epc-miss"`
 	LabelCount        int64 `statsd:"label-in"`
 	MetricMiss        int64 `statsd:"metirc-miss"`
 	NameMiss          int64 `statsd:"name-miss"`
@@ -269,7 +269,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
 
-	podClusterId, err := d.samplesBuilder.GetPodClusterId(vtapID)
+	epcId, podClusterId, err := d.samplesBuilder.GetEpcPodClusterId(vtapID)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -278,7 +278,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 		return
 	}
 
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, podClusterId, ts, extraLabels)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, epcId, podClusterId, ts, extraLabels)
 	if !isSlowItem && err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -289,7 +289,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	builder := d.samplesBuilder
 	if isSlowItem {
 		d.counter.TimeSeriesSlow++
-		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, podClusterId, ts, extraLabels))
+		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, epcId, podClusterId, ts, extraLabels))
 		return
 	}
 	d.prometheusWriter.WriteBatch(builder.samplesBuffer, builder.metricName, builder.timeSeriesBuffer, extraLabels, builder.tsLabelNameIDsBuffer, builder.tsLabelValueIDsBuffer)
@@ -297,22 +297,22 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	d.counter.TimeSeriesOut++
 }
 
-func (b *PrometheusSamplesBuilder) GetPodClusterId(vtapID uint16) (uint16, error) {
-	podClusterId := uint16(0)
+func (b *PrometheusSamplesBuilder) GetEpcPodClusterId(vtapID uint16) (uint16, uint16, error) {
+	epcId, podClusterId := int32(0), uint16(0)
 	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
-		podClusterId = uint16(vtapInfo.PodClusterId)
+		epcId, podClusterId = vtapInfo.EpcId, uint16(vtapInfo.PodClusterId)
 	}
-	if podClusterId == 0 {
-		b.counter.PodClusterMiss++
-		return 0, fmt.Errorf("can't get the pod cluster id of vtap(%d)", vtapID)
+	if epcId == 0 || epcId == datatype.EPC_FROM_INTERNET {
+		b.counter.EpcMiss++
+		return 0, 0, fmt.Errorf("can't get the epc id of vtap(%d)", vtapID)
 	}
-	return podClusterId, nil
+	return uint16(epcId), podClusterId, nil
 }
 
 // if success,return false,nil
 // if failed, return false,err
 // if isSlow, return true,slowReason
-func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
+func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
 	if len(ts.Samples) == 0 {
 		b.counter.TimeSeriesInvaild++
 		return false, fmt.Errorf("prometheum samples of time serries(%s) is empty.", ts)
@@ -419,10 +419,10 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, podClusterId uint16
 			return true, fmt.Errorf("label instance %s miss", l.Value)
 		}
 	}
-	targetID, ok := b.labelTable.QueryTargetID(podClusterId, jobID, instanceID)
+	targetID, ok := b.labelTable.QueryTargetID(epcId, podClusterId, jobID, instanceID)
 	if !ok {
 		b.counter.TargetMiss++
-		return true, fmt.Errorf("target pod cluster id(%d),jobID(%d),instanceID(%d) miss", podClusterId, jobID, instanceID)
+		return true, fmt.Errorf("target epcId(%d) pod cluster id(%d),jobID(%d),instanceID(%d) miss", epcId, podClusterId, jobID, instanceID)
 	}
 
 	if !b.labelTable.QueryMetricTargetPair(metricID, targetID) {

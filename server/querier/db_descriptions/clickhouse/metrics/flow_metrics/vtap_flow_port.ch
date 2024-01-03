@@ -86,21 +86,21 @@ l7_error_ratio              , 应用异常比例            , %    , 异常请�
 l7_client_error_ratio       , 应用客户端异常比例      , %    , 客户端异常请求的百分比，通过`客户端异常 / 响应`计算得，即 `l7_client_error / l7_response`
 l7_server_error_ratio       , 应用服务端异常比例      , %    , 客户端异常请求的百分比，通过`服务端异常 / 响应`计算得，即 `l7_server_error / l7_response`
 
-vpc                         , VPC 个数                , 个   , 统计查看的数据中 VPC 的个数
-subnet                      , 子网个数                , 个   , 统计查看的数据中子网的个数
-ip                          , IP 地址个数             , 个   , 统计查看的数据中 IP 的个数
-pod_cluster                 , 容器集群个数            , 个   , 统计查看的数据中容器集群的个数
-pod_node                    , 容器节点个数            , 个   , 统计查看的数据中容器节点的个数
-pod_ns                      , 命名空间个数            , 个   , 统计查看的数据中命名空间的个数
-pod_group                   , 工作负载个数            , 个   , 统计查看的数据中工作负载的个数
-pod                         , POD 个数                , 个   , 统计查看的数据中 POD 的个数
-host                        , 宿主机个数              , 个   , 统计查看的数据中宿主机的个数
-chost                       , 云服务器个数            , 个   , 统计查看的数据中云服务器的个数
-region                      , 区域个数                , 个   , 统计查看的数据中区域的个数
-az                          , 可用区个数              , 个   , 统计查看的数据中可用区的个数
-ip_version                  , IP 类型                 , 个   , 统计查看的数据中 IP 类型的个数
-tap_type                    , 采集点                  , 个   , 统计查看的数据中采集点的个数
-vtap_id                     , 采集器                  , 个   , 统计查看的数据中采集器的个数
-protocol                    , 网络协议                , 种   , 统计查看的数据中网络协议的个数
-server_port                 , 服务端口                , 个   , 统计查看的数据中服务端的个数
+vpc                         , VPC                ,    , 
+subnet                      , 子网                ,    , 
+ip                          , IP 地址             ,    , 
+pod_cluster                 , 容器集群            ,    , 
+pod_node                    , 容器节点            ,    , 
+pod_ns                      , 命名空间            ,    , 
+pod_group                   , 工作负载            ,    , 
+pod                         , POD                ,    , 
+host                        , 宿主机              ,    , 
+chost                       , 云服务器            ,    , 
+region                      , 区域                ,    , 
+az                          , 可用区              ,    , 
+ip_version                  , IP 类型                 ,    , 
+tap_type                    , 采集点                  ,    , 
+vtap_id                     , 采集器                  ,    , 
+protocol                    , 网络协议                ,    , 
+server_port                 , 服务端口                ,    , 
 row                         , 行数                    , 个   ,  

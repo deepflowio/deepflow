@@ -256,133 +256,145 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					return &view.Expr{Value: filter}, nil
 				}
 			case "ip_resource_map":
-				tagItem, ok := tag.GetTag("display_name", db, table, "default")
-				if strings.HasSuffix(t.Tag, "_id") {
-					tagItem, ok = tag.GetTag("value", db, table, "default")
-				}
-				if ok {
-					switch strings.ToLower(op) {
-					case "match":
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
-					case "not match":
-						filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-					case "not ilike":
-						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-					case "not in":
-						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-					case "!=":
-						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-					default:
-						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+				checkTag := strings.TrimSuffix(t.Tag, "_id")
+				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
+					tagItem, ok := tag.GetTag("ip_resource_name", db, table, "default")
+					if strings.HasSuffix(t.Tag, "_id") {
+						tagItem, ok = tag.GetTag("other_id", db, table, "default")
 					}
-					return &view.Expr{Value: filter}, nil
-				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map":
-				if strings.HasSuffix(t.Tag, "_id") {
-					if strings.TrimSuffix(t.Tag, "_id") == strings.TrimSuffix(table, "_map") {
-						tagItem, ok := tag.GetTag("value", db, table, "default")
-						if ok {
-							switch strings.ToLower(op) {
-							case "match":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
-							case "not match":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-							}
-							return &view.Expr{Value: filter}, nil
+					if ok {
+						switch strings.ToLower(op) {
+						case "match":
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value)
+						case "not match":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value) + ")"
+						case "not ilike":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
+						case "not in":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
+						case "!=":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
+						default:
+							filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
 						}
-					} else {
-						tagItem, ok := tag.GetTag("other_id", db, table, "default")
-						if ok {
-							switch strings.ToLower(op) {
-							case "match":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value)
-							case "not match":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
-							}
-
-						}
+						return &view.Expr{Value: filter}, nil
 					}
 				} else {
-					if t.Tag == strings.TrimSuffix(table, "_map") {
-						tagItem, ok := tag.GetTag("display_name", db, table, "default")
-						if ok {
-							switch strings.ToLower(op) {
-							case "match":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
-							case "not match":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+					error := errors.New(fmt.Sprintf("show tag %s values not support filter tag: %s", strings.TrimSuffix(table, "_map"), t.Tag))
+					return nil, error
+				}
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map":
+				checkTag := strings.TrimSuffix(t.Tag, "_id")
+				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
+					if strings.HasSuffix(t.Tag, "_id") {
+						if strings.TrimSuffix(t.Tag, "_id") == strings.TrimSuffix(table, "_map") {
+							tagItem, ok := tag.GetTag("value", db, table, "default")
+							if ok {
+								switch strings.ToLower(op) {
+								case "match":
+									filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+								case "not match":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+								case "not ilike":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+								case "not in":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+								case "!=":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+								default:
+									filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+								}
+								return &view.Expr{Value: filter}, nil
+							}
+						} else {
+							tagItem, ok := tag.GetTag("other_id", db, table, "default")
+							if ok {
+								switch strings.ToLower(op) {
+								case "match":
+									filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value)
+								case "not match":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value) + ")"
+								case "not ilike":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
+								case "not in":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
+								case "!=":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
+								default:
+									filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
+								}
+
 							}
 						}
 					} else {
-						if t.Tag == "host" {
-							tagItem, ok := tag.GetTag("device_name", db, table, "default")
+						if t.Tag == strings.TrimSuffix(table, "_map") {
+							tagItem, ok := tag.GetTag("display_name", db, table, "default")
 							if ok {
-								deviceType, ok := tag.TAG_RESOURCE_TYPE_DEVICE_MAP[t.Tag]
-								if ok {
-									switch strings.ToLower(op) {
-									case "match":
-										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType)
-									case "not match":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType) + ")"
-									case "not ilike":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value, deviceType) + ")"
-									case "not in":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value, deviceType) + ")"
-									case "!=":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value, deviceType) + ")"
-									default:
-										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value, deviceType)
-									}
+								switch strings.ToLower(op) {
+								case "match":
+									filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+								case "not match":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+								case "not ilike":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+								case "not in":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+								case "!=":
+									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+								default:
+									filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 								}
 							}
 						} else {
-							tagItem, ok := tag.GetTag("other_name", db, table, "default")
-							if ok {
-								tagMap := t.Tag + "_map"
-								if t.Tag == "vpc" || t.Tag == "l2_vpc" {
-									tagMap = "l3_epc_map"
+							if t.Tag == "host" {
+								tagItem, ok := tag.GetTag("device_name", db, table, "default")
+								if ok {
+									deviceType, ok := tag.TAG_RESOURCE_TYPE_DEVICE_MAP[t.Tag]
+									if ok {
+										switch strings.ToLower(op) {
+										case "match":
+											filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType)
+										case "not match":
+											filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, "match", t.Value, deviceType) + ")"
+										case "not ilike":
+											filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value, deviceType) + ")"
+										case "not in":
+											filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value, deviceType) + ")"
+										case "!=":
+											filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value, deviceType) + ")"
+										default:
+											filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value, deviceType)
+										}
+									}
 								}
-								switch strings.ToLower(op) {
-								case "match":
-									filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
-								case "not match":
-									filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
-								case "not ilike":
-									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
-								case "not in":
-									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
-								case "!=":
-									filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
-								default:
-									filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
+							} else {
+								tagItem, ok := tag.GetTag("other_name", db, table, "default")
+								if ok {
+									tagMap := t.Tag + "_map"
+									if t.Tag == "vpc" || t.Tag == "l2_vpc" {
+										tagMap = "l3_epc_map"
+									}
+									switch strings.ToLower(op) {
+									case "match":
+										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
+									case "not match":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
+									case "not ilike":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
+									case "not in":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
+									case "!=":
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
+									default:
+										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
+									}
 								}
 							}
 						}
 					}
+				} else {
+					error := errors.New(fmt.Sprintf("show tag %s values not support filter tag: %s", strings.TrimSuffix(table, "_map"), t.Tag))
+					return nil, error
 				}
 			default:
 				if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") || strings.HasPrefix(t.Tag, "k8s.label.") || strings.HasPrefix(t.Tag, "k8s.env.") || strings.HasPrefix(t.Tag, "k8s.annotation.") || strings.HasPrefix(t.Tag, "cloud.tag.") || strings.HasPrefix(t.Tag, "os.app.") {
@@ -1383,6 +1395,48 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 			}
 			return &view.Expr{Value: "(" + whereFilter + ")"}, nil
+		}
+	} else if function == "FastFilter(trace_id)" {
+		traceConfig := config.TraceConfig
+		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
+		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
+		if !traceConfig.Enabled {
+			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
+		}
+		switch strings.ToLower(opName) {
+		case "=", "!=":
+			traceID := strings.TrimSpace(f.Value)
+			traceID = strings.Trim(traceID, "'")
+			traceIDIndex, err := utils.GetTraceIdIndex(traceID, TypeIsIncrementalId, FormatIsHex, traceConfig.IncrementalIdLocation.Start, traceConfig.IncrementalIdLocation.Length)
+			// if err != nil or index is zero, not use trace_id_index
+			if err != nil || traceIDIndex == 0 {
+				errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
+				log.Error(errMessage)
+				filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+				return &view.Expr{Value: "(" + filter + ")"}, nil
+			}
+			filter := fmt.Sprintf("trace_id_index %s %d", opName, traceIDIndex)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
+		case "in", "not in":
+			traceIDIndexSlice := []string{}
+			traceIDs := strings.Split(strings.Trim(f.Value, "()"), ",")
+			for _, traceID := range traceIDs {
+				traceID = strings.TrimSpace(traceID)
+				traceID = strings.Trim(traceID, "'")
+				traceIDIndex, err := utils.GetTraceIdIndex(traceID, TypeIsIncrementalId, FormatIsHex, traceConfig.IncrementalIdLocation.Start, traceConfig.IncrementalIdLocation.Length)
+				// if err != nil or index is zero, not use trace_id_index
+				if err != nil || traceIDIndex == 0 {
+					errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
+					log.Error(errMessage)
+					filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+					return &view.Expr{Value: "(" + filter + ")"}, nil
+				}
+				traceIDIndexSlice = append(traceIDIndexSlice, strconv.FormatUint(traceIDIndex, 10))
+			}
+			traceIDIndexs := fmt.Sprintf("(%s)", strings.Join(traceIDIndexSlice, ","))
+			filter := fmt.Sprintf("trace_id_index %s %s", opName, traceIDIndexs)
+			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}
 	} else {
 		right = view.Expr{Value: f.Value}
