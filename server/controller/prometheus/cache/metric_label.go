@@ -17,18 +17,38 @@
 package cache
 
 import (
+	"fmt"
+
 	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+type metricLabelKey struct {
+	metricID int
+	labelID  int
+}
+
+func NewMetricLabelKey(metricID, labelID int) metricLabelKey {
+	return metricLabelKey{
+		metricID: metricID,
+		labelID:  labelID,
+	}
+}
+
+func (k metricLabelKey) String() string {
+	return fmt.Sprintf("%d_%d", k.metricID, k.labelID)
+}
 
 type metricLabel struct {
 	metricNameCache *metricName
 	labelCache      *label
 
 	metricNameIDToLabelIDs *hashmap.Map[int, mapset.Set[int]]
+	keyToID                cmap.ConcurrentMap[metricLabelKey, int]
 }
 
 func newMetricLabel(mn *metricName, l *label) *metricLabel {
@@ -37,6 +57,7 @@ func newMetricLabel(mn *metricName, l *label) *metricLabel {
 		labelCache:      l,
 
 		metricNameIDToLabelIDs: hashmap.New[int, mapset.Set[int]](),
+		keyToID:                cmap.NewStringer[metricLabelKey, int](),
 	}
 }
 
@@ -64,11 +85,19 @@ func (mi *metricLabel) GetMetricNameIDToLabelIDs() *hashmap.Map[int, mapset.Set[
 	return mi.metricNameIDToLabelIDs
 }
 
+func (ml *metricLabel) GetIDByKey(key metricLabelKey) (int, bool) {
+	if id, ok := ml.keyToID.Get(key); ok {
+		return id, true
+	}
+	return 0, false
+}
+
 func (ml *metricLabel) Add(batch []*controller.PrometheusMetricLabel) {
 	for _, item := range batch {
 		for _, li := range item.GetLabelIds() {
-			ml.metricNameIDToLabelIDs.GetOrInsert(int(item.GetMetricNameId()), mapset.NewSet[int]())
-			if lids, ok := ml.metricNameIDToLabelIDs.Get(int(item.GetMetricNameId())); ok {
+			mni := int(item.GetMetricNameId())
+			ml.metricNameIDToLabelIDs.GetOrInsert(mni, mapset.NewSet[int]())
+			if lids, ok := ml.metricNameIDToLabelIDs.Get(mni); ok {
 				lids.Add(int(li))
 			}
 		}
@@ -86,6 +115,7 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 			if lids, ok := ml.metricNameIDToLabelIDs.Get(mni); ok {
 				lids.Add(item.LabelID)
 			}
+			ml.keyToID.Set(NewMetricLabelKey(mni, item.LabelID), item.ID)
 		}
 	}
 	return nil

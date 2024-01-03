@@ -32,6 +32,7 @@ type PrometheusManager struct {
 	Encoder               *encoder.Encoder
 	SynchronizerCache     *cache.Cache
 	APPLabelLayoutUpdater *APPLabelLayoutUpdater
+	Clear                 *Cleaner
 }
 
 func GetSingleton() *PrometheusManager {
@@ -40,6 +41,7 @@ func GetSingleton() *PrometheusManager {
 			Encoder:               encoder.GetSingleton(),
 			SynchronizerCache:     cache.GetSingleton(),
 			APPLabelLayoutUpdater: GetAPPLabelLayoutUpdater(),
+			Clear:                 GetCleaner(),
 		}
 	})
 	return prometheusManager
