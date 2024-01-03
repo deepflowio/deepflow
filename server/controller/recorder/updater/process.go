@@ -52,10 +52,9 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
 	var deviceType, deviceID int
 	podID, ok := p.cache.ToolDataSet.GetPodIDByContainerID(cloudItem.ContainerID)
-	if ok {
+	if len(cloudItem.ContainerID) != 0 && ok {
 		deviceType = common.VIF_DEVICE_TYPE_POD
 		deviceID = podID
-
 	} else {
 		var vtap *mysql.VTap
 		if err := mysql.Db.Where("id = ?", cloudItem.VTapID).First(&vtap).Error; err != nil {
@@ -72,9 +71,9 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		if err != nil {
 			log.Error(err)
 		}
-		podNodeID = podInfo.PodNodeID
 
-		if podNodeID != 0 {
+		if podInfo != nil && podInfo.PodNodeID != 0 {
+			podNodeID = podInfo.PodNodeID
 			id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
 			if ok {
 				vmID = id
