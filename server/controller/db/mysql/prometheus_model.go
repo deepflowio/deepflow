@@ -18,52 +18,64 @@ package mysql
 
 import "time"
 
-type IDField struct {
+type PrometheusID struct {
 	ID int `gorm:"primaryKey;column:id;type:int(10);unique;not null"`
 }
 
-type CreatedAtField struct {
+type PrometheusAutoIncID struct {
+	ID int `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
+}
+
+type PrometheusOperatedTime struct {
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
+	SyncedAt  time.Time `gorm:"autoCreateTime;column:synced_at;type:datetime" json:"SYNCED_AT"`
 }
 
 type PrometheusMetricName struct {
-	IDField `gorm:"embedded"`
-	Name    string `gorm:"column:name;type:varchar(256);unique;not null"`
+	PrometheusID           `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	Name                   string `gorm:"column:name;type:varchar(256);unique;not null"`
 }
 
 type PrometheusLabelName struct {
-	IDField `gorm:"embedded"`
-	Name    string `gorm:"column:name;type:varchar(256);unique;not null"`
+	PrometheusID           `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	Name                   string `gorm:"column:name;type:varchar(256);unique;not null"`
 }
 
 type PrometheusLabelValue struct {
-	IDField `gorm:"embedded"`
-	Value   string `gorm:"column:value;type:text;unique;default:''"`
+	PrometheusID           `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	Value                  string `gorm:"column:value;type:text;unique;default:''"`
 }
 
 type PrometheusLabel struct {
-	ID    int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
-	Name  string `gorm:"column:name;type:varchar(256);not null"`
-	Value string `gorm:"column:value;type:text;default:''"`
+	PrometheusAutoIncID    `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	Name                   string `gorm:"column:name;type:varchar(256);not null"`
+	Value                  string `gorm:"column:value;type:text;default:''"`
 }
 
 type PrometheusMetricLabel struct {
-	ID         int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
-	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
-	LabelID    int    `gorm:"column:label_id;type:int(10);not null"`
+	PrometheusAutoIncID    `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	MetricName             string `gorm:"column:metric_name;type:varchar(256);not null"`
+	LabelID                int    `gorm:"column:label_id;type:int(10);not null"`
 }
 
 type PrometheusMetricTarget struct {
-	ID         int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
-	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
-	TargetID   int    `gorm:"column:target_id;type:int(10);not null"`
+	PrometheusAutoIncID    `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	MetricName             string `gorm:"column:metric_name;type:varchar(256);not null"`
+	TargetID               int    `gorm:"column:target_id;type:int(10);not null"`
 }
 
 type PrometheusMetricAPPLabelLayout struct {
-	ID                  int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null"`
-	MetricName          string `gorm:"column:metric_name;type:varchar(256);not null"`
-	APPLabelName        string `gorm:"column:app_label_name;type:varchar(256);not null"`
-	APPLabelColumnIndex uint8  `gorm:"column:app_label_column_index;type:tinyint(3) unsigned;not null"`
+	PrometheusAutoIncID    `gorm:"embedded"`
+	PrometheusOperatedTime `gorm:"embedded"`
+	MetricName             string `gorm:"column:metric_name;type:varchar(256);not null"`
+	APPLabelName           string `gorm:"column:app_label_name;type:varchar(256);not null"`
+	APPLabelColumnIndex    uint8  `gorm:"column:app_label_column_index;type:tinyint(3) unsigned;not null"`
 }
 
 func (PrometheusMetricAPPLabelLayout) TableName() string {

@@ -152,6 +152,7 @@ func checkAndStartMasterFunctions(
 
 				prometheus.Encoder.Start()
 				prometheus.APPLabelLayoutUpdater.Start()
+				prometheus.Clear.Start()
 
 				if cfg.DFWebService.Enabled {
 					httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
@@ -183,6 +184,7 @@ func checkAndStartMasterFunctions(
 
 				prometheus.Encoder.Stop()
 				prometheus.APPLabelLayoutUpdater.Stop()
+				prometheus.Clear.Stop()
 
 				if cfg.DFWebService.Enabled {
 					httpService.TaskManager.Stop()

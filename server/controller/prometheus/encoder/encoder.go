@@ -81,6 +81,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 func (e *Encoder) Start() error {
 	e.mux.Lock()
 	if e.working {
+		e.mux.Unlock()
 		return nil
 	}
 	e.working = true
