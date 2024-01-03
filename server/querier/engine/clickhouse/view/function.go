@@ -830,7 +830,7 @@ func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
 	if f.Time.Interval > 0 {
 		interval = f.Time.Interval
 	} else {
-		interval = int(f.Time.TimeEnd - f.Time.TimeStart)
+		interval = int(f.Time.TimeEnd-f.Time.TimeStart) + f.Time.DatasourceInterval
 	}
 	buf.WriteString(fmt.Sprintf("sum(%s)/(%d/%d)", f.Fields[0].ToString(), interval, f.Time.DatasourceInterval))
 	buf.WriteString(f.Math)
