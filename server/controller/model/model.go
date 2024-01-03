@@ -788,8 +788,7 @@ func (GenesisProcess) TableName() string {
 }
 
 type GenesisStorage struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID uint32 `gorm:"column:vtap_id;type:int" json:"VTAP_ID"`
+	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	NodeIP string `gorm:"column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
