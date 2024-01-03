@@ -70,7 +70,7 @@ var (
 		output: "SELECT AVG(byte_tx) AS `aavg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
 	}, {
 		input:  "select Avg(byte_tx) as avg_byte_tx from l4_flow_log where `time`>=60 and `time`<=180 having Spread(byte_tx)>=0 limit 1",
-		output: "SELECT sum(byte_tx)/(120/1) AS `avg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
+		output: "SELECT sum(byte_tx)/(121/1) AS `avg_byte_tx` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 60 AND `time` <= 180 HAVING minus(MAX(byte_tx), MIN(byte_tx)) >= 0 LIMIT 1",
 	}, {
 		input:  "select Stddev(byte_tx) as stddev_byte_tx from l4_flow_log limit 1",
 		output: "SELECT stddevPopStable(byte_tx) AS `stddev_byte_tx` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -208,7 +208,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port where `time` >= 60 AND `time` <= 180 group by region_0 limit 1",
-		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(120/1) AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` WHERE `time` >= 60 AND `time` <= 180 GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
+		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(121/1) AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` WHERE `time` >= 60 AND `time` <= 180 GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
 		input:  "select Avg(`rtt`) AS `Avg(rtt)`,Max(`byte`) AS `Max(byte)`,region_0 from vtap_flow_edge_port where `time` >= 60 AND `time` <= 180 group by region_0 limit 1",
@@ -317,7 +317,7 @@ var (
 	}, {
 		index:  "count_3",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
-		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(0/1) AS `Avg(byte_tx)`, COUNT(1) AS `c` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` HAVING c > 0 LIMIT 1",
+		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(1/1) AS `Avg(byte_tx)`, COUNT(1) AS `c` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` HAVING c > 0 LIMIT 1",
 		db:     "flow_metrics",
 	}, {
 		index:  "count_3_aavg",
@@ -327,7 +327,7 @@ var (
 	}, {
 		index:  "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
-		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(0/1) AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
+		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(1/1) AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
 		index:  "layered_0_aavg",
