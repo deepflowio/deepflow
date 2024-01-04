@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // CheckJSONParam check json parameters for redundancy.
@@ -61,6 +62,7 @@ func getAllJSONTags(typ reflect.Type, tagMap map[string]bool) {
 		if tag == "" {
 			continue
 		}
+		tag = strings.TrimSuffix(tag, ",omitempty")
 		tagMap[tag] = true
 
 		switch field.Type.Kind() {
