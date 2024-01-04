@@ -33,7 +33,6 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
@@ -1086,12 +1085,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	filter := ""
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -1104,18 +1103,18 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				if value == "''" {
-					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					return filter, nil
 				}
 				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", appLabel.AppLabelColumnIndex, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, labelNameID, op, value)
 				} else {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s)", appLabel.AppLabelColumnIndex, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, labelNameID, op, value)
 				}
 				break
 			}
@@ -1136,12 +1135,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	sql := ""
 	isAppLabel := false
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -1154,7 +1153,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	}
 	prometheusSubqueryCache := GetPrometheusSubqueryCache()
 	// Determine whether the tag is app_label or target_label
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -1167,7 +1166,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					}
 				}
 				if value == "''" {
-					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
+					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.appLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
 					return filter, nil
@@ -1201,7 +1200,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 				if valueIDFilter == "" {
 					filter = "1!=1"
 				} else {
-					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.AppLabelColumnIndex, valueIDFilter)
+					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.appLabelColumnIndex, valueIDFilter)
 				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 				prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)

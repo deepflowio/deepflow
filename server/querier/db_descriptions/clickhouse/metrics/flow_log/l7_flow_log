@@ -17,4 +17,14 @@ server_error_ratio   ,                      , percentage , Error           , 111
 
 response_duration    , response_duration    , delay      , Delay           , 111
 
+ip_version           , is_ipv4              , tag        , Tag     , 111
+server_port          , server_port          , tag        , Tag     , 111
+version              , version              , tag        , Tag     , 111
+request_type         , request_type         , tag        , Tag     , 111
+request_domain       , request_domain       , tag        , Tag     , 111
+request_resource     , request_resource     , tag        , Tag     , 111
+response_code        , response_code        , tag        , Tag     , 111
+response_result      , response_result      , tag        , Tag     , 111
+tap                  , tap_type             , tag        , Tag     , 111
+vtap                 , vtap_id              , tag        , Tag     , 111
 row                  ,                      , other      , Other           , 111 

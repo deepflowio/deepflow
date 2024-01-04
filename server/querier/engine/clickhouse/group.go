@@ -26,7 +26,6 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -94,13 +93,13 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 		return tagTranslatorStr
 	}
 	labelName := strings.TrimPrefix(nameNoPreffix, "tag.")
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[labelName]
+	labelNameID, ok := Prometheus.LabelNameToID[labelName]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", labelName)
 		log.Error(errorMessage)
 		return name
 	}
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		log.Error(errorMessage)
@@ -115,11 +114,11 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 		nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
 		// Determine whether the tag is app_label or target_label
 		isAppLabel := false
-		if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+		if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 			for _, appLabel := range appLabels {
 				if appLabel.AppLabelName == nameNoPreffix {
 					isAppLabel = true
-					tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
+					tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.appLabelColumnIndex)
 					break
 				}
 			}
@@ -141,21 +140,21 @@ func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) 
 	}
 	nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
 	filter := ""
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		return &view.Expr{}, false
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		return &view.Expr{}, false
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d)", appLabel.AppLabelColumnIndex, labelNameID)
+				filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d)", appLabel.appLabelColumnIndex, labelNameID)
 				break
 			}
 		}
