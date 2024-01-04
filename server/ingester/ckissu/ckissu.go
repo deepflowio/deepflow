@@ -1579,6 +1579,29 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 			return nil
 		}
 	}
+
+	// rename first. if it fails, then drop Index and MvTable and try again. prevent accidentally deleting the MvTable.
+	// ALTER TABLE flow_log.l4_flow_log  RENAME COLUMN retan_tx TO retran_tx
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` RENAME COLUMN IF EXISTS %s to %s",
+		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
+	log.Info("try rename column: ", sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		// 如果已经修改过，就会报错不存在column，需要跳过该错误
+		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `retan_tx` to rename.
+		if strings.Contains(err.Error(), "Cannot find column") ||
+			strings.Contains(err.Error(), "column with this name already exists") {
+			log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			return nil
+		} else if strings.Contains(err.Error(), "doesn't exist") {
+			log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
+			return nil
+		}
+		log.Infof("rename column failed, will retry rename column later. err: %s", err)
+	} else {
+		return nil
+	}
+
 	if cr.DropIndex {
 		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
 			cr.Db, cr.Table, cr.OldColumnName)
@@ -1617,11 +1640,8 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 		}
 	}
 
-	// ALTER TABLE flow_log.l4_flow_log  RENAME COLUMN retan_tx TO retran_tx
-	sql := fmt.Sprintf("ALTER TABLE %s.`%s` RENAME COLUMN IF EXISTS %s to %s",
-		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
-	log.Info("rename column: ", sql)
-	_, err := connect.Exec(sql)
+	log.Info("rename column again: ", sql)
+	_, err = connect.Exec(sql)
 	if err != nil {
 		// 如果已经修改过，就会报错不存在column，需要跳过该错误
 		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `retan_tx` to rename.
