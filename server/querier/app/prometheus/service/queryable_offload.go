@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ func (o *OffloadQuerierable) changeFunctionAfterOffloadSelected(stmt *parser.Eva
 			switch n.Op {
 			case parser.COUNT:
 				if !n.Without {
-					parseAggToSum(n, n.Op, parser.SUM)
+					o.cachedQueryExprs[n] = parseAggToSum(n, n.Op, parser.SUM)
 				}
 			}
 		case *parser.Call:
@@ -204,6 +204,8 @@ func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, mat
 			o.querierable.queryStats = append(o.querierable.queryStats, model.PromQueryStats{SQL: sql, QuerierSQL: querierSql, Duration: duration})
 		}
 		startS, endS := queryReq.GetStart()/1e3, queryReq.GetEnd()/1e3
+		// when use offloading query, it's always prometheus native metrics, with df_ prefix
+		ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
 		resp, err := o.querierable.reader.respTransToProm(ctx, queryReq.GetMetric(), startS, endS, result)
 		if err != nil {
 			log.Error(err)
