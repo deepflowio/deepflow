@@ -239,50 +239,8 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
-			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
-			if err != nil {
-				return nil, []string{}, true, err
-			}
-			// tag metrics
-			tagData, err := tagdescription.GetTagDescriptions(e.DB, table, sql, e.Context)
-			if err != nil {
-				return nil, []string{}, true, err
-			}
-			for _, col := range tagData.Values {
-				tagType := col.([]interface{})[4].(string)
-				if tagType == "auto_custom_tag" {
-					continue
-				}
-				name := col.([]interface{})[0].(string)
-				clientName := col.([]interface{})[1].(string)
-				serverName := col.([]interface{})[2].(string)
-				displayName := col.([]interface{})[3].(string)
-				permissions, err := chCommon.ParsePermission("111")
-				if err != nil {
-					return nil, []string{}, true, err
-				}
-				if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
-					clientNameMetric := []interface{}{
-						clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-						"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-					}
-					result.Values = append(result.Values, clientNameMetric)
-					if serverName != clientName {
-						serverNameMetric := []interface{}{
-							serverName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-						}
-						result.Values = append(result.Values, serverNameMetric)
-					}
-				} else {
-					nameMetric := []interface{}{
-						name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-						"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-					}
-					result.Values = append(result.Values, nameMetric)
-				}
-			}
-			return result, []string{}, true, err
+			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
+			return metrics, []string{}, true, err
 		}
 	case "tag":
 		// show tag {tag} values from table

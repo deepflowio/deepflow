@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -41,7 +40,7 @@ func GetVirtualTableFilter(db, table string) (view.Node, bool) {
 }
 
 func GetMetricIDFilter(db, table string) (view.Node, error) {
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return nil, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
