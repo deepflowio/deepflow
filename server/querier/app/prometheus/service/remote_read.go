@@ -44,10 +44,6 @@ type prometheusReader struct {
 	addExternalTagToCache   func(string, string)
 }
 
-func newPrometheusReader(slimit int) *prometheusReader {
-	return &prometheusReader{slimit: slimit}
-}
-
 func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, querierSql, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)

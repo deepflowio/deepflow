@@ -233,6 +233,10 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		}
 	}
 
+	if q.Hints.Func == "topk" || q.Hints.Func == "bottomk" {
+		p.slimit = -1
+	}
+
 	// append query field: 2. append metric name
 	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
 		// append metricName `value`
@@ -559,7 +563,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	// Scan all the results, determine the seriesID of each sample and the number of samples in each series,
 	// so that the size of the sample array in each series can be determined in advance.
 	maxPossibleSeries := len(result.Values)
-	if maxPossibleSeries > p.slimit {
+	if maxPossibleSeries > p.slimit && p.slimit > 0 {
 		maxPossibleSeries = p.slimit
 	}
 
@@ -641,7 +645,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			sampleSeriesIndex[i] = index
 			seriesSampleCount[index]++
 		} else {
-			if len(seriesIndexMap) >= p.slimit {
+			if len(seriesIndexMap) >= p.slimit && p.slimit > 0 {
 				sampleSeriesIndex[i] = -1
 				continue
 			}
