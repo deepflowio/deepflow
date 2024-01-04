@@ -385,6 +385,7 @@ type ChGProcess struct {
 	Name    string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID  int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	CHostID int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
+	VPCID   int    `gorm:"column:vpc_id;type:int" json:"VPC_ID"`
 }
 
 func (ChGProcess) TableName() string {

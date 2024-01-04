@@ -2454,6 +2454,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     name                    TEXT,
     icon_id                 INTEGER,
     chost_id                INTEGER,
+    vpc_id                  INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;

@@ -668,7 +668,8 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
-		"    `chost_id` Int64\n" +
+		"    `chost_id` Int64,\n" +
+		"    `vpc_id`   Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
