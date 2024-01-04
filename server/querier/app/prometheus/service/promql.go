@@ -128,9 +128,11 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		// record query cost in span cost time
 		defer span.End()
 	}
-	reader := newPrometheusReader(args.Slimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelsToCache
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
 	// instant query will hint default query range:
 	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
 	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
@@ -139,7 +141,7 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		log.Error(err)
 		return nil, err
 	}
-	queriable.reader.interceptPrometheusExpr = func(handleExpr func(e *parser.AggregateExpr) error) error {
+	reader.interceptPrometheusExpr = func(handleExpr func(e *parser.AggregateExpr) error) error {
 		// `handleExpr` will called in `prometheus reader`
 		return p.beforePrometheusCalculate(qry, handleExpr)
 	}
@@ -187,16 +189,18 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		)
 		defer span.End()
 	}
-	reader := newPrometheusReader(args.Slimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelsToCache
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
 	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	queriable.reader.interceptPrometheusExpr = func(f func(e *parser.AggregateExpr) error) error {
+	reader.interceptPrometheusExpr = func(f func(e *parser.AggregateExpr) error) error {
 		// `handleExpr` will called in `prometheus reader`
 		return p.beforePrometheusCalculate(qry, f)
 	}
@@ -287,9 +291,14 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	var offloadEnabled bool
 
 	for _, v := range queryRequests {
-		if analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
+		for _, f := range v.GetFunc() {
+			if ignoreSlimit(f) {
+				reader.slimit = -1
+				break
+			}
+		}
+		if !offloadEnabled && analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
 			offloadEnabled = true
-			break
 		}
 	}
 
@@ -334,11 +343,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
 		if mergeResult, err := p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
-			return &model.PromQueryResponse{
-				Data:   &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value},
-				Stats:  result.Stats,
-				Status: _SUCCESS,
-			}, err
+			result.Data = &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value}
 		} else {
 			// err != nil
 			log.Errorf("cache merge error: %v", err)
@@ -419,11 +424,17 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	var queriable model.Querierable
 	var offloadEnabled bool
 	for _, v := range queryRequests {
+		for _, f := range v.GetFunc() {
+			if ignoreSlimit(f) {
+				reader.slimit = -1
+				break
+			}
+		}
+
 		// any one of Hints can be offloaded is acceptable, when <func.Select> get nothing, use query directly
 		// 任意一个表达式可被卸载即可，当 Select 无法获取到数据时会执行直接查询
-		if analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
+		if !offloadEnabled && analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
 			offloadEnabled = true
-			break
 		}
 	}
 
@@ -478,13 +489,13 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 }
 
 func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
-	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelsToCache
-	var query prompb.Query
+	var query *prompb.Query
 	var queryType model.QueryType
 	if len(req.Queries) > 0 {
-		query = *req.Queries[0]
+		query = req.Queries[0]
+	}
+	if query == nil || query.Hints == nil {
+		return
 	}
 	if query.Hints.StepMs == 0 {
 		queryType = model.Instant
@@ -505,6 +516,11 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 		matchers: promMatchersToMatchers(&query.Matchers),
 		query:    query.String(),
 	}
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
 	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
 	if querierSql != "" {
 		result, _, _, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", false)
@@ -513,6 +529,8 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 			return nil, err
 		}
 		// use query seconds for query
+		// when use offloading query, it's always prometheus native metrics, with df_ prefix
+		ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
 		resp, err = reader.respTransToProm(ctx, queryReq.GetMetric(), query.Hints.GetStartMs()/1e3, query.Hints.GetEndMs()/1e3, result)
 		if err != nil {
 			log.Error(err)
@@ -546,9 +564,11 @@ func promMatchersToMatchers(matchers *[]*prompb.LabelMatcher) []*labels.Matcher 
 }
 
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
-	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelsToCache
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
 	result, _, _, _, err := reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
 	return result, err
 }
@@ -638,9 +658,11 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		log.Error(err)
 		return nil, err
 	}
-	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelsToCache
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
 	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
 	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
@@ -833,4 +855,8 @@ func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(displayTag stri
 
 func (p *prometheusExecutor) addExtraLabelsToCache(displayTag string, querierTag string) {
 	p.extraLabelCache.Add(displayTag, querierTag)
+}
+
+func ignoreSlimit(f string) bool {
+	return f == "topk" || f == "bottomk"
 }

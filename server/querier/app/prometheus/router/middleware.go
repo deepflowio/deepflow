@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ func Limiter(limiter *datastructure.LeakyBucket) gin.HandlerFunc {
 		// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 		if !limiter.Acquire(1000) {
 			c.AbortWithStatus(http.StatusTooManyRequests)
+			return
 		}
 		c.Next()
 	}
