@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql"
 
+	"github.com/deepflowio/deepflow/server/libs/datastructure"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -33,10 +34,15 @@ import (
 
 var log = logging.MustGetLogger("prometheus")
 
+// equals defaultLookbackDelta in prometheus engine
+const defaultLookbackDelta = 5 * time.Minute
+
 type PrometheusService struct {
 	// keep only 1 instance of prometheus engine during server lifetime
 	engine   *promql.Engine
 	executor *prometheusExecutor
+	// prometheus query rate limit
+	QPSLeakyBucket *datastructure.LeakyBucket
 }
 
 func NewPrometheusService() *PrometheusService {
@@ -45,6 +51,7 @@ func NewPrometheusService() *PrometheusService {
 		Logger:                   newPrometheusLogger(),
 		Reg:                      nil,
 		MaxSamples:               config.Cfg.Prometheus.MaxSamples,
+		LookbackDelta:            defaultLookbackDelta,
 		Timeout:                  100 * time.Second,
 		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
 		EnableAtModifier:         true,
@@ -52,21 +59,34 @@ func NewPrometheusService() *PrometheusService {
 		EnablePerStepStats:       true,
 	}
 	return &PrometheusService{
-		engine:   promql.NewEngine(opts),
-		executor: NewPrometheusExecutor(opts.LookbackDelta),
+		engine:         promql.NewEngine(opts),
+		executor:       NewPrometheusExecutor(opts.LookbackDelta),
+		QPSLeakyBucket: &datastructure.LeakyBucket{},
 	}
 }
 
-func (s *PrometheusService) PromRemoteReadService(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
-	return s.executor.promRemoteReadExecute(ctx, req)
+func (s *PrometheusService) PromRemoteReadService(req *prompb.ReadRequest, ctx context.Context, offloading bool) (resp *prompb.ReadResponse, err error) {
+	if offloading {
+		return s.executor.promRemoteReadOffloadingExecute(ctx, req)
+	} else {
+		return s.executor.promRemoteReadExecute(ctx, req)
+	}
 }
 
 func (s *PrometheusService) PromInstantQueryService(args *model.PromQueryParams, ctx context.Context) (*model.PromQueryResponse, error) {
-	return s.executor.promQueryExecute(ctx, args, s.engine)
+	if args.Offloading {
+		return s.executor.offloadInstantQueryExecute(ctx, args, s.engine)
+	} else {
+		return s.executor.promQueryExecute(ctx, args, s.engine)
+	}
 }
 
 func (s *PrometheusService) PromRangeQueryService(args *model.PromQueryParams, ctx context.Context) (*model.PromQueryResponse, error) {
-	return s.executor.promQueryRangeExecute(ctx, args, s.engine)
+	if args.Offloading {
+		return s.executor.offloadRangeQueryExecute(ctx, args, s.engine)
+	} else {
+		return s.executor.promQueryRangeExecute(ctx, args, s.engine)
+	}
 }
 
 func (s *PrometheusService) PromLabelValuesService(args *model.PromMetaParams, ctx context.Context) (*model.PromQueryResponse, error) {

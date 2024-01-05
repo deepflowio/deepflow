@@ -66,6 +66,8 @@ static uint32_t conf_max_trace_entries;
 /*
  * The datadump related Settings
  */
+static bool datadump_use_remote;
+static debug_callback_t datadump_cb;
 static bool datadump_enable;
 static int datadump_pid;	// If the value is 0, process-ID/thread-ID filtering is not performed.
 static uint32_t datadump_start_time;
@@ -494,6 +496,60 @@ static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	return 0;
 }
 
+/*
+ * Configure and enable datadump
+ *
+ * @pid
+ *   Specifying a process ID or thread ID. If set to '0', it indicates
+ *   all processes or threads.
+ * @comm
+ *   Specifying a process name or thread name. If set to an empty string(""),
+ *   it indicates all processes or threads.
+ * @proto
+ *   Specifying the L7 protocol number. If set to '0', it indicates all
+ *   L7 protocols.
+ * @timeout
+ *   Specifying the timeout duration. If the elapsed time exceeds this
+ *   duration, datadump will stop. The unit is in seconds.
+ * @callback
+ *   Callback interface, used to transfer data to the remote controller.
+ *
+ * @return 0 on success, and a negative value on failure.
+ */
+int datadump_set_config(int pid, const char *comm, int proto, int timeout,
+			debug_callback_t cb)
+{
+	if (pid < 0 || proto < 0 || proto >= PROTO_NUM || comm == NULL
+	    || timeout <= 0) {
+		ebpf_warning("Invalid parameter\n");
+		return -1;
+	}
+
+	pthread_mutex_lock(&datadump_mutex);
+	if (datadump_enable) {
+		ebpf_warning("datadump is already running in the process.\n");
+		goto finish;
+	}
+
+	datadump_enable = true;
+	datadump_use_remote = true;
+	datadump_pid = pid;
+	datadump_proto = (uint8_t) proto;
+	datadump_cb = cb;
+	datadump_comm[0] = '\0';
+	datadump_start_time = get_sys_uptime();
+	datadump_timeout = timeout;
+	if (strlen(comm) > 0)
+		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
+			      (void *)comm, strlen(comm));
+	ebpf_info("Set datadump pid %d comm '%s' proto %d\n",
+		  datadump_pid, datadump_comm, datadump_proto);
+
+finish:
+	pthread_mutex_unlock(&datadump_mutex);
+	return 0;
+}
+
 static struct tracer_sockopts datadump_sockopts = {
 	.version = SOCKOPT_VERSION,
 	.set_opt_min = SOCKOPT_SET_DATADUMP_ADD,
@@ -659,7 +715,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	/* check uprobe data(GO HTTP2) message type */
 	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE ||
-			sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
+	    sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
 		if (sd->msg_type == MSG_UNKNOWN)
 			return;
 	}
@@ -761,7 +817,8 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 					   1] = '\0';
 		get_container_id_from_procs_cache(sd->tgid,
 						  submit_data->container_id,
-						  sizeof(submit_data->container_id));
+						  sizeof
+						  (submit_data->container_id));
 		submit_data->msg_type = sd->msg_type;
 		submit_data->socket_role = sd->socket_role;
 
@@ -1036,6 +1093,7 @@ static void check_datadump_timeout(void)
 		if (passed_sec > datadump_timeout) {
 			datadump_start_time = 0;
 			datadump_enable = false;
+			datadump_use_remote = false;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
@@ -1780,6 +1838,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	 */
 	pthread_mutex_init(&datadump_mutex, NULL);
 	datadump_enable = false;
+	datadump_use_remote = false;
 	memcpy(datadump_file_path, "stdout", 7);
 	datadump_file = stdout;
 
@@ -2208,7 +2267,7 @@ int register_event_handle(uint32_t type, void (*fn) (void *))
 // 协议测试
 // -------------------------------------
 
-void print_uprobe_http2_info(const char *data, int len)
+int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 {
 	struct {
 		__u32 fd;
@@ -2217,11 +2276,20 @@ void print_uprobe_http2_info(const char *data, int len)
 		__u32 value_len;
 	} __attribute__ ((packed)) header;
 
+	int bytes = 0;
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
 	memcpy(&header, data, sizeof(header));
-	fprintf(datadump_file, "fd=[%d]\n", header.fd);
-	fprintf(datadump_file, "stream_id=[%d]\n", header.stream_id);
+	if (datadump_enable) {
+		bytes +=
+		    snprintf(buf + bytes, buf_len - bytes,
+			     "fd=[%d]\nstream_id=[%d]\n", header.fd,
+			     header.stream_id);
+
+	} else {
+		fprintf(stdout, "fd=[%d]\nstream_id=[%d]\n", header.fd,
+			header.stream_id);
+	}
 
 	const int value_start = sizeof(header) + header.header_len;
 
@@ -2231,12 +2299,19 @@ void print_uprobe_http2_info(const char *data, int len)
 	memcpy(&key, data + sizeof(header), header.header_len);
 	memcpy(&value, data + value_start, header.value_len);
 
-	fprintf(datadump_file, "header=[%s:%s]\n", key, value);
-	fflush(datadump_file);
-	return;
+	if (datadump_enable) {
+		bytes +=
+		    snprintf(buf + bytes, buf_len - bytes, "header=[%s:%s]\n",
+			     key, value);
+	} else {
+		fprintf(stdout, "header=[%s:%s]\n", key, value);
+		fflush(stdout);
+	}
+
+	return bytes;
 }
 
-void print_io_event_info(const char *data, int len)
+int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 {
 	struct {
 		__u32 bytes_count;
@@ -2245,18 +2320,30 @@ void print_io_event_info(const char *data, int len)
 		char filename[64];
 	} __attribute__ ((packed)) event;
 
+	int bytes = 0;
+
 	memcpy(&event, data, sizeof(event));
 
-	fprintf(datadump_file,
-		"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]\nfilename=[%s]\n",
-		event.bytes_count, event.operation,
-		event.latency, event.filename);
+	if (datadump_enable) {
+		bytes = snprintf(buf, buf_len,
+				 "bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
+				 "\nfilename=[%s]\n",
+				 event.bytes_count, event.operation,
+				 event.latency, event.filename);
+	} else {
+		fprintf(stdout,
+			"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]\nfilename=[%s]\n",
+			event.bytes_count, event.operation,
+			event.latency, event.filename);
 
-	fflush(stdout);
-	return;
+		fflush(stdout);
+	}
+
+	return bytes;
 }
 
-void print_uprobe_grpc_dataframe(const char *data, int len)
+int print_uprobe_grpc_dataframe(const char *data, int len, char *buf,
+				int buf_len)
 {
 	int i;
 	struct {
@@ -2265,21 +2352,36 @@ void print_uprobe_grpc_dataframe(const char *data, int len)
 		char data[1024];
 	} __attribute__ ((packed)) dataframe;
 
+	int bytes = 0;
 	memcpy(&dataframe, data, len);
 
-	fprintf(datadump_file, "stream_id=[%d]\n", dataframe.stream_id);
-	fprintf(datadump_file, "data_len=[%d]\n", dataframe.data_len);
+	if (datadump_enable) {
+		bytes +=
+		    snprintf(buf + bytes, buf_len - bytes,
+			     "stream_id=[%d]\ndata_len=[%d]\n",
+			     dataframe.stream_id, dataframe.data_len);
+	} else {
+		fprintf(stdout, "stream_id=[%d]\ndata_len=[%d]\n",
+			dataframe.stream_id, dataframe.data_len);
+	}
 
 	for (i = 0; i < dataframe.data_len; ++i) {
 		if (!isprint(dataframe.data[i])) {
 			dataframe.data[i] = '.';
 		}
 	}
+
 	dataframe.data[dataframe.data_len] = '\0';
 
-	fprintf(datadump_file, "data=[%s]\n", dataframe.data);
-	fflush(datadump_file);
-	return;
+	if (datadump_enable) {
+		bytes +=
+		    snprintf(buf + bytes, buf_len - bytes, "data=[%s]\n",
+			     dataframe.data);
+	} else {
+		fprintf(stdout, "data=[%s]\n", dataframe.data);
+		fflush(stdout);
+	}
+	return bytes;
 }
 
 // ------- print mysql --------
@@ -2368,10 +2470,8 @@ static char *flow_info(struct socket_bpf_data *sd)
 	return buf;
 }
 
-static void print_socket_data(struct socket_bpf_data *sd)
+static bool allow_datadump(struct socket_bpf_data *sd)
 {
-#define OUTPUT_DATA_SIZE 128
-
 	bool output = false;
 	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
 	    && (datadump_proto == 0)) {
@@ -2424,7 +2524,20 @@ static void print_socket_data(struct socket_bpf_data *sd)
 			output = true;
 	}
 
-	if (!output)
+	return output;
+}
+
+#define DATADUMP_FORMAT						\
+	"%s [datadump] <%s> DIR %s TYPE %s(%d) PID %u "		\
+	"THREAD_ID %u COROUTINE_ID %" PRIu64 " ROLE %s"		\
+	" CONTAINER_ID %s SOURCE %d COMM %s "			\
+	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64	\
+	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64		\
+	" DATA_SEQ %" PRIu64 " TLS %s TimeStamp %" PRIu64 "\n"
+
+static void print_socket_data(struct socket_bpf_data *sd)
+{
+	if (!allow_datadump(sd))
 		return;
 
 	char *timestamp = gen_timestamp_str(0);
@@ -2432,79 +2545,99 @@ static void print_socket_data(struct socket_bpf_data *sd)
 		return;
 
 	char *proto_tag = get_proto_name(sd->l7_protocal_hint);
-	char *type;
+	char *type, *role_str;
 	char *flow_str = flow_info(sd);
-	if (flow_str == NULL)
+	if (flow_str == NULL) {
+		free(timestamp);
 		return;
+	}
 
 	if (sd->msg_type == MSG_REQUEST)
 		type = "req";
 	else if (sd->msg_type == MSG_RESPONSE)
 		type = "res";
 	else
-		type = "unknow";
+		type = "unknown";
 
-	if (sd->l7_protocal_hint == PROTO_HTTP1) {
-		fprintf(datadump_file, "\n+-----------------------------+\n"
-			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
-			"COROUTINE_ID %" PRIu64 " CONTAINER_ID %s SOURCE %d COMM %s "
-			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64
-			" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64
-			" DATA_SEQ %" PRIu64 " " "TimeStamp %" PRIu64 "\n%s",
-			timestamp, proto_tag,
-			sd->direction == T_EGRESS ? "out" : "in", type,
-			sd->msg_type, sd->process_id, sd->thread_id,
-			sd->coroutine_id,
-			strlen((char *)sd->container_id) == 0 ? "null" :
-				(char *)sd->container_id,
-			sd->source,
-			sd->process_kname, flow_str, sd->cap_len, sd->syscall_len,
-			sd->socket_id, sd->syscall_trace_id_call, sd->tcp_seq,
-			sd->cap_seq, sd->timestamp, sd->cap_data);
+	if (sd->socket_role == ROLE_CLIENT)
+		role_str = "client";
+	else if (sd->socket_role == ROLE_SERVER)
+		role_str = "server";
+	else
+		role_str = "unknown";
+
+	char buff[DEBUG_BUFF_SIZE];
+	int len = 0;
+	len +=
+	    snprintf(buff, sizeof(buff), DATADUMP_FORMAT, timestamp,
+		     proto_tag,
+		     sd->direction == T_EGRESS ? "out" : "in", type,
+		     sd->msg_type, sd->process_id, sd->thread_id,
+		     sd->coroutine_id, role_str,
+		     strlen((char *)sd->container_id) ==
+		     0 ? "null" : (char *)sd->container_id, sd->source,
+		     sd->process_kname, flow_str, sd->cap_len,
+		     sd->syscall_len, sd->socket_id,
+		     sd->syscall_trace_id_call, sd->tcp_seq,
+		     sd->cap_seq, sd->is_tls ? "true" : "false", sd->timestamp);
+
+	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
+		len +=
+		    print_uprobe_http2_info(sd->cap_data, sd->cap_len,
+					    buff + len, sizeof(buff) - len);
+	} else if (sd->source == DATA_SOURCE_IO_EVENT) {
+		len +=
+		    print_io_event_info(sd->cap_data, sd->cap_len, buff + len,
+					sizeof(buff) - len);
+	} else if (sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
+		len +=
+		    print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len,
+						buff + len, sizeof(buff) - len);
 	} else {
-		fprintf(datadump_file, "\n+-----------------------------+\n"
-			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
-			"COROUTINE_ID %" PRIu64 " CONTAINER_ID %s SOURCE %d COMM %s "
-			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64
-			" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64
-			" DATA_SEQ %" PRIu64 " " "TimeStamp %" PRIu64 "\n",
-			timestamp, proto_tag,
-			sd->direction == T_EGRESS ? "out" : "in", type,
-			sd->msg_type, sd->process_id, sd->thread_id,
-			sd->coroutine_id,
-			strlen((char *)sd->container_id) == 0 ? "null" :
-				(char *)sd->container_id,
-			sd->source,
-			sd->process_kname, flow_str, sd->cap_len, sd->syscall_len,
-			sd->socket_id, sd->syscall_trace_id_call, sd->tcp_seq,
-			sd->cap_seq, sd->timestamp);
-
-		if (sd->source == 2) {
-			print_uprobe_http2_info(sd->cap_data, sd->cap_len);
-		} else if (sd->source == 4) {
-			print_io_event_info(sd->cap_data, sd->cap_len);
-		} else if (sd->source == 5) {
-			print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len);
-		} else {
-			int i, len = 0, __len;
-			char output_buf[OUTPUT_DATA_SIZE];
-			for (i = 0; i < sd->cap_len; i++) {
-				__len = snprintf(output_buf + len,
-						 sizeof(output_buf) - len,
-						 "%02X ",
-						 (uint8_t) sd->cap_data[i]);
-				len += __len;
-				if (__len <= 0 || len >= OUTPUT_DATA_SIZE)
-					break;
+		int i;
+		uint8_t v;
+		bool double_args;
+		const char *format;
+		for (i = 0; i < sd->cap_len; i++) {
+			double_args = false;
+			format = "%02X ";
+			v = (uint8_t) sd->cap_data[i];
+			if (sd->l7_protocal_hint == PROTO_HTTP1) {
+				/* printing character, LF(10), CR(13) */
+				if (!(v < 32 || v > 126) || v == 10 || v == 13)
+					format = "%c";
+			} else {
+				if (!(v < 32 || v > 126)) {
+					format = "%02X(%c) ";
+					double_args = true;
+				}
 			}
 
-			fprintf(datadump_file, "%s\n", output_buf);
+			if (double_args)
+				len +=
+				    snprintf(buff + len, sizeof(buff) - len,
+					     format, v, v);
+			else
+				len +=
+				    snprintf(buff + len, sizeof(buff) - len,
+					     format, v);
+
+			if (len >= sizeof(buff)) {
+				break;
+			}
 		}
 	}
 
-	fflush(datadump_file);
 	free(timestamp);
 	free(flow_str);
+
+	if (datadump_use_remote) {
+		if (datadump_cb != NULL)
+			datadump_cb((char *)buff, strlen(buff));
+	} else {
+		fprintf(datadump_file, "%s\n", buff);
+		fflush(datadump_file);
+	}
 }
 
 static void datadump_process(void *data)

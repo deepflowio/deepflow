@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,12 +50,11 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
-	var deviceType, deviceID int
+	var deviceType, deviceID, vpcID int
 	podID, ok := p.cache.ToolDataSet.GetPodIDByContainerID(cloudItem.ContainerID)
-	if ok {
+	if len(cloudItem.ContainerID) != 0 && ok {
 		deviceType = common.VIF_DEVICE_TYPE_POD
 		deviceID = podID
-
 	} else {
 		var vtap *mysql.VTap
 		if err := mysql.Db.Where("id = ?", cloudItem.VTapID).First(&vtap).Error; err != nil {
@@ -72,20 +71,25 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		if err != nil {
 			log.Error(err)
 		}
-		podNodeID = podInfo.PodNodeID
 
-		if podNodeID != 0 {
-			id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
-			if ok {
-				vmID = id
-			}
+		if podInfo != nil && podInfo.PodNodeID != 0 {
+			podNodeID = podInfo.PodNodeID
+
 		}
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-		id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(deviceID)
-		if ok {
-			vmID = id
-		}
 		podNodeID = deviceID
+	}
+
+	id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
+	if ok {
+		vmID = id
+	}
+	vmInfo, err := p.cache.ToolDataSet.GetVMInfoByID(id)
+	if err != nil {
+		log.Error(err)
+	}
+	if vmInfo != nil {
+		vpcID = vmInfo.VPCID
 	}
 
 	dbItem := &mysql.Process{
@@ -104,6 +108,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		DeviceID:    deviceID,
 		PodNodeID:   podNodeID,
 		VMID:        vmID,
+		VPCID:       vpcID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 

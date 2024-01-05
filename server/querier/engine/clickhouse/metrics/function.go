@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ var METRICS_FUNCTIONS = []string{
 	view.FUNCTION_RSPREAD, view.FUNCTION_STDDEV, view.FUNCTION_APDEX,
 	view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT, view.FUNCTION_PERCENTAG,
 	view.FUNCTION_PERSECOND, view.FUNCTION_HISTOGRAM, view.FUNCTION_LAST, view.FUNCTION_COUNT,
-	view.FUNCTION_DERIVATIVE,
+	view.FUNCTION_TOPK, view.FUNCTION_ANY,
 }
 
 var METRICS_FUNCTIONS_MAP = map[string]*Function{
@@ -67,7 +67,7 @@ var METRICS_FUNCTIONS_MAP = map[string]*Function{
 	view.FUNCTION_PERSECOND:  NewFunction(view.FUNCTION_PERSECOND, FUNCTION_TYPE_MATH, nil, "$unit/s", 0),
 	view.FUNCTION_HISTOGRAM:  NewFunction(view.FUNCTION_HISTOGRAM, FUNCTION_TYPE_MATH, nil, "", 1),
 	view.FUNCTION_LAST:       NewFunction(view.FUNCTION_LAST, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER, METRICS_TYPE_GAUGE, METRICS_TYPE_DELAY, METRICS_TYPE_PERCENTAGE, METRICS_TYPE_QUOTIENT, METRICS_TYPE_BOUNDED_GAUGE}, "", 0),
-	view.FUNCTION_TOPK:       NewFunction(view.FUNCTION_TOPK, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
+	view.FUNCTION_TOPK:       NewFunction(view.FUNCTION_TOPK, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 1),
 	view.FUNCTION_ANY:        NewFunction(view.FUNCTION_ANY, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
 	view.FUNCTION_DERIVATIVE: NewFunction(view.FUNCTION_DERIVATIVE, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER}, "$unit", 0),
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,5 +97,6 @@ func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, 
 		strings.Join(group, ","),
 		10000,
 	)
-	return queryDataExecute(ctx, sql, "flow_log", "")
+	result, _, _, err := queryDataExecute(ctx, sql, "flow_log", "", false)
+	return result, err
 }

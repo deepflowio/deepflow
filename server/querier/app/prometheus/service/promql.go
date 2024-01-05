@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,8 +38,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/deepflowio/deepflow/server/libs/lru"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
@@ -76,12 +78,20 @@ type prometheusExecutor struct {
 	extraLabelCache *lru.Cache[string, string]
 	ticker          *time.Ticker
 	lookbackDelta   time.Duration
+
+	cacher            *cache.Cacher
+	queryKeyGenerator *cache.WeakKeyGenerator
+	cacheKeyGenerator *cache.CacheKeyGenerator
 }
 
 func NewPrometheusExecutor(delta time.Duration) *prometheusExecutor {
 	executor := &prometheusExecutor{
 		extraLabelCache: lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize),
 		lookbackDelta:   delta,
+
+		cacher:            cache.NewCacher(),
+		queryKeyGenerator: &cache.WeakKeyGenerator{},
+		cacheKeyGenerator: &cache.CacheKeyGenerator{},
 	}
 	go executor.triggerLoadExternalTag()
 	return executor
@@ -96,7 +106,7 @@ func (p *prometheusExecutor) triggerLoadExternalTag() {
 		}
 	}()
 	for range p.ticker.C {
-		p.loadExternalTagCache()
+		p.loadExtraLabelsCache()
 	}
 }
 
@@ -106,7 +116,7 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 	if err != nil {
 		return nil, err
 	}
-	if config.Cfg.Prometheus.RequestQueryWithDebug {
+	if args.Debug {
 		var span trace.Span
 		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusInstantQueryRequest")
 		ctx, span = tr.Start(ctx, "PrometheusInstantQuery",
@@ -118,23 +128,20 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		// record query cost in span cost time
 		defer span.End()
 	}
-
-	slimit := config.Cfg.Prometheus.SeriesLimit
-	if slimitArgs, err := strconv.Atoi(args.Slimit); err == nil && slimitArgs < slimit {
-		slimit = slimitArgs
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
-	reader := newPrometheusReader(slimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	// instant query will hint default query range:
 	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
-	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
 	qry, err := engine.NewInstantQuery(queriable, nil, args.Promql, queryTime)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	queriable.reader.interceptPrometheusExpr = func(handleExpr func(e *parser.AggregateExpr) error) error {
+	reader.interceptPrometheusExpr = func(handleExpr func(e *parser.AggregateExpr) error) error {
 		// `handleExpr` will called in `prometheus reader`
 		return p.beforePrometheusCalculate(qry, handleExpr)
 	}
@@ -148,7 +155,7 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		Status: _SUCCESS,
 	}
 	if args.Debug {
-		result.Stats = model.PromQueryStats{SQL: queriable.sql, QueryTime: queriable.query_time}
+		result.Stats = queriable.GetSQLQuery()
 	}
 	return result, err
 }
@@ -169,7 +176,7 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		log.Error(err)
 		return nil, err
 	}
-	if config.Cfg.Prometheus.RequestQueryWithDebug {
+	if args.Debug {
 		var span trace.Span
 		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusRangeQueryRequest")
 		ctx, span = tr.Start(ctx, "PrometheusRangeQuery",
@@ -182,20 +189,18 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		)
 		defer span.End()
 	}
-	slimit := config.Cfg.Prometheus.SeriesLimit
-	if slimitArgs, err := strconv.Atoi(args.Slimit); err == nil && slimitArgs < slimit {
-		slimit = slimitArgs
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
-	reader := newPrometheusReader(slimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelConvertion
-	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	queriable.reader.interceptPrometheusExpr = func(f func(e *parser.AggregateExpr) error) error {
+	reader.interceptPrometheusExpr = func(f func(e *parser.AggregateExpr) error) error {
 		// `handleExpr` will called in `prometheus reader`
 		return p.beforePrometheusCalculate(qry, f)
 	}
@@ -210,17 +215,361 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 	}
 	if args.Debug {
 		// if query with `debug` parmas, return sql & query time
-		result.Stats = model.PromQueryStats{SQL: queriable.sql, QueryTime: queriable.query_time}
+		result.Stats = queriable.GetSQLQuery()
 	}
 	return result, err
 }
 
+func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args *model.PromQueryParams, engine *promql.Engine) (result *model.PromQueryResponse, err error) {
+	start, err := parseTime(args.StartTime)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	end, err := parseTime(args.EndTime)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	step, err := parseDuration(args.Step)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if args.Debug {
+		var span trace.Span
+		tr := otel.GetTracerProvider().Tracer("querier/app/OffloadPrometheusRangeQueryRequest")
+		ctx, span = tr.Start(ctx, "OffloadingRangeQuery",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(
+				attribute.String("promql.query", args.Promql),
+				attribute.Int64("promql.query.range", int64(end.Sub(start).Minutes())),
+				attribute.Int64("promql.query.step", int64(step.Seconds())),
+			),
+		)
+		defer span.End()
+	}
+
+	analyzer := newQueryAnalyzer(p.lookbackDelta)
+	keyGenerator := &cache.WeakKeyGenerator{}
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
+	queryRequests := analyzer.parsePromQL(args.Promql, start, end, step)
+	promRequest := &model.DeepFlowPromRequest{
+		Slimit: args.Slimit,
+		Start:  start.UnixMilli(),
+		End:    end.UnixMilli(),
+		Step:   step,
+		Query:  args.Promql,
+	}
+
+	var cached promql.Result
+	var cachedKey string
+	var queryRequired = true
+	if config.Cfg.Prometheus.Cache.ResponseCache {
+		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
+		var fixedStart, fixedEnd int64
+		if cached, fixedStart, fixedEnd, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
+			log.Debugf("cache hit for instant query: %s, start: %s, end: %s", cachedKey, fixedStart, fixedEnd)
+			start, end = time.UnixMilli(fixedStart), time.UnixMilli(fixedEnd)
+		} else {
+			log.Debugf("get cache data error: %s", cached.Err)
+		}
+	}
+
+	if !queryRequired {
+		return &model.PromQueryResponse{
+			Data:   &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value},
+			Status: _SUCCESS,
+		}, err
+	}
+
+	var queriable model.Querierable
+	var offloadEnabled bool
+
+	for _, v := range queryRequests {
+		for _, f := range v.GetFunc() {
+			if ignoreSlimit(f) {
+				reader.slimit = -1
+				break
+			}
+		}
+		if !offloadEnabled && analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
+			offloadEnabled = true
+		}
+	}
+
+	if offloadEnabled {
+		queriable = NewOffloadQueriable(args,
+			WithQueryType(model.Range),
+			WithPrometheuReader(reader),
+			WithQueryRequests(queryRequests),
+			WithKeyGenerator(keyGenerator.GenerateRequestKey))
+	} else {
+		queriable = &RemoteReadQuerierable{
+			Args:   args,
+			Ctx:    ctx,
+			reader: reader,
+		}
+	}
+
+	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
+	if qry == nil || err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if queriable != nil {
+		queriable.BindSelectedCallBack(qry)
+	}
+	res := qry.Exec(ctx)
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
+	}
+	if queriable != nil {
+		queriable.AfterQueryExec(qry)
+	}
+	data := &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value}
+	result = &model.PromQueryResponse{
+		Data:   data,
+		Status: _SUCCESS,
+	}
+	if args.Debug {
+		result.Stats = queriable.GetSQLQuery()
+	}
+
+	if config.Cfg.Prometheus.Cache.ResponseCache {
+		if mergeResult, err := p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
+			result.Data = &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value}
+		} else {
+			// err != nil
+			log.Errorf("cache merge error: %v", err)
+			return nil, res.Err
+		}
+	}
+
+	return result, err
+}
+
+/*
+offload query for instant query
+1. parse promql to get functions & find out which can be offloaded
+2. offload query for request, if one of the functions can not be offloaeded, try query with remote read query
+3. get/put cache before query/after query
+*/
+func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, args *model.PromQueryParams, engine *promql.Engine) (result *model.PromQueryResponse, err error) {
+	queryTime, err := parseTime(args.StartTime)
+	if err != nil {
+		return nil, err
+	}
+	if args.Debug {
+		var span trace.Span
+		tr := otel.GetTracerProvider().Tracer("querier/app/OffloadPrometheusInstantQueryRequest")
+		ctx, span = tr.Start(ctx, "OffloadPrometheusInstantQuery",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(attribute.String("promql.query", args.Promql)),
+		)
+		defer span.End()
+	}
+
+	analyzer := newQueryAnalyzer(p.lookbackDelta)
+	keyGenerator := &cache.WeakKeyGenerator{}
+	reader := &prometheusReader{
+		slimit:                  args.Slimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
+	queryRequests := analyzer.parsePromQL(args.Promql, queryTime, queryTime, 0)
+
+	// for matrix selector in instant query, may need a bigger time range than query
+	var minStart, maxEnd int64
+	for _, qr := range queryRequests {
+		if minStart == 0 || qr.GetStart() < minStart {
+			minStart = qr.GetStart()
+		}
+		if qr.GetEnd() > maxEnd {
+			maxEnd = qr.GetEnd()
+		}
+	}
+
+	promRequest := &model.DeepFlowPromRequest{
+		Slimit: args.Slimit,
+		Start:  minStart,
+		End:    maxEnd,
+		Step:   1 * time.Second,
+		Query:  args.Promql,
+	}
+
+	var cached promql.Result
+	var cachedKey string
+	var queryRequired = true
+
+	if config.Cfg.Prometheus.Cache.ResponseCache {
+		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
+		if cached, _, _, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
+			log.Debugf("cache hit for instant query: %s, start: %s, end: %s", cachedKey)
+		}
+	}
+
+	if !queryRequired {
+		return &model.PromQueryResponse{
+			Data:   &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value},
+			Status: _SUCCESS,
+		}, err
+	}
+
+	var queriable model.Querierable
+	var offloadEnabled bool
+	for _, v := range queryRequests {
+		for _, f := range v.GetFunc() {
+			if ignoreSlimit(f) {
+				reader.slimit = -1
+				break
+			}
+		}
+
+		// any one of Hints can be offloaded is acceptable, when <func.Select> get nothing, use query directly
+		// 任意一个表达式可被卸载即可，当 Select 无法获取到数据时会执行直接查询
+		if !offloadEnabled && analyzer.offloadEnabled(v.GetMetric(), v.GetFunc(), v.GetBy()) {
+			offloadEnabled = true
+		}
+	}
+
+	if offloadEnabled {
+		queriable = NewOffloadQueriable(args,
+			WithQueryType(model.Instant),
+			WithPrometheuReader(reader),
+			WithQueryRequests(queryRequests),
+			WithKeyGenerator(keyGenerator.GenerateRequestKey))
+	} else {
+		queriable = &RemoteReadQuerierable{
+			Args:   args,
+			Ctx:    ctx,
+			reader: reader,
+		}
+	}
+
+	qry, err := engine.NewInstantQuery(queriable, nil, args.Promql, queryTime)
+	if qry == nil || err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	if queriable != nil {
+		queriable.BindSelectedCallBack(qry)
+	}
+	res := qry.Exec(ctx)
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
+	}
+	if queriable != nil {
+		queriable.AfterQueryExec(qry)
+	}
+	data := &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value}
+	result = &model.PromQueryResponse{
+		Data:   data,
+		Status: _SUCCESS,
+	}
+	if args.Debug {
+		result.Stats = queriable.GetSQLQuery()
+	}
+
+	if config.Cfg.Prometheus.Cache.ResponseCache {
+		// instant query merge failed should not influence return result
+		if _, err = p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
+			log.Errorf("cache merge error: %v", err)
+		}
+	}
+
+	return result, err
+}
+
+func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+	var query *prompb.Query
+	var queryType model.QueryType
+	if len(req.Queries) > 0 {
+		query = req.Queries[0]
+	}
+	if query == nil || query.Hints == nil {
+		return
+	}
+	if query.Hints.StepMs == 0 {
+		queryType = model.Instant
+	} else {
+		queryType = model.Range
+	}
+	selectHints := &storage.SelectHints{
+		Start:    query.Hints.GetStartMs(),
+		End:      query.Hints.GetEndMs(),
+		Step:     query.Hints.GetStepMs(),
+		Func:     query.Hints.GetFunc(),
+		Grouping: query.Hints.GetGrouping(),
+		By:       query.Hints.GetBy(),
+		Range:    query.Hints.GetRangeMs(),
+	}
+	queryReq := &prometheusHint{
+		hints:    selectHints,
+		matchers: promMatchersToMatchers(&query.Matchers),
+		query:    query.String(),
+	}
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
+	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
+	if querierSql != "" {
+		result, _, _, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", false)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		// use query seconds for query
+		// when use offloading query, it's always prometheus native metrics, with df_ prefix
+		ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
+		resp, err = reader.respTransToProm(ctx, queryReq.GetMetric(), query.Hints.GetStartMs()/1e3, query.Hints.GetEndMs()/1e3, result)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		return resp, err
+	} else {
+		resp, _, _, _, err = reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
+		return resp, err
+	}
+}
+
+func promMatchersToMatchers(matchers *[]*prompb.LabelMatcher) []*labels.Matcher {
+	lm := make([]*labels.Matcher, 0, len(*matchers))
+	for i := 0; i < len(*matchers); i++ {
+		m := (*matchers)[i]
+		var matcherType labels.MatchType
+		switch m.Type {
+		case prompb.LabelMatcher_EQ:
+			matcherType = labels.MatchEqual
+		case prompb.LabelMatcher_NEQ:
+			matcherType = labels.MatchNotEqual
+		case prompb.LabelMatcher_RE:
+			matcherType = labels.MatchRegexp
+		case prompb.LabelMatcher_NRE:
+			matcherType = labels.MatchNotRegexp
+		}
+		lm = append(lm, &labels.Matcher{Type: matcherType, Name: m.Name, Value: m.Value})
+	}
+	return lm
+}
+
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
-	// analysis for ReadRequest
-	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelConvertion
-	result, _, _, err := reader.promReaderExecute(ctx, req, false)
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
+	result, _, _, _, err := reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
 	return result, err
 }
 
@@ -289,7 +638,7 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		return nil, err
 	}
 
-	if config.Cfg.Prometheus.RequestQueryWithDebug {
+	if args.Debug {
 		var span trace.Span
 		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusSeriesRequest")
 		ctx, span = tr.Start(ctx, "PrometheusSeriesRequest",
@@ -309,10 +658,12 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		log.Error(err)
 		return nil, err
 	}
-	reader := newPrometheusReader(config.Cfg.Prometheus.SeriesLimit)
-	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
-	reader.addExternalTagToCache = p.addExtraLabelConvertion
-	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
+	reader := &prometheusReader{
+		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
+		addExternalTagToCache:   p.addExtraLabelsToCache,
+	}
+	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, reader: reader}
 	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		log.Error(err)
@@ -446,17 +797,6 @@ func (p *prometheusExecutor) addExtraFilters(promQL string, filters map[string]s
 	return res, nil
 }
 
-func (p *prometheusExecutor) matchMetricName(matchers *[]*labels.Matcher) string {
-	var metric string
-	for _, v := range *matchers {
-		if v.Name == PROMETHEUS_METRICS_NAME {
-			metric = v.Value
-			break
-		}
-	}
-	return metric
-}
-
 // handle promql Expression before prometheus calculate
 // TODO: add more pre-calculation to avoid re-calculate in prometheus
 func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e *parser.AggregateExpr) error) error {
@@ -470,7 +810,7 @@ func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e 
 	return nil
 }
 
-func (p *prometheusExecutor) loadExternalTagCache() {
+func (p *prometheusExecutor) loadExtraLabelsCache() {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
 	showTags := fmt.Sprintf("show tags from %s", VTAP_FLOW_PORT_TABLE)
 	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, context.Background())
@@ -491,7 +831,7 @@ func (p *prometheusExecutor) loadExternalTagCache() {
 				continue
 			}
 			tag := values[0].(string)
-			p.addExtraLabelConvertion(formatTagName(tag), tag)
+			p.addExtraLabelsToCache(formatTagName(tag), tag)
 		}
 	}
 }
@@ -513,6 +853,10 @@ func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(displayTag stri
 	return ""
 }
 
-func (p *prometheusExecutor) addExtraLabelConvertion(displayTag string, querierTag string) {
+func (p *prometheusExecutor) addExtraLabelsToCache(displayTag string, querierTag string) {
 	p.extraLabelCache.Add(displayTag, querierTag)
+}
+
+func ignoreSlimit(f string) bool {
+	return f == "topk" || f == "bottomk"
 }

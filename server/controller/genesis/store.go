@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"gorm.io/gorm/clause"
 )
 
 type SyncStorage struct {
@@ -137,13 +138,14 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		// push immediately after update
 		s.fetch()
 
-		var storages []model.GenesisStorage
-		mysql.Db.Where("vtap_id = ?", vtapID).Find(&storages)
-		if len(storages) > 0 {
-			mysql.Db.Model(&model.GenesisStorage{}).Where("vtap_id = ?", vtapID).Update("node_ip", os.Getenv(common.NODE_IP_KEY))
-		} else {
-			mysql.Db.Create(&model.GenesisStorage{VtapID: vtapID, NodeIP: os.Getenv(common.NODE_IP_KEY)})
-		}
+		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		mysql.Db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "vtap_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
+		}).Create(&model.GenesisStorage{
+			VtapID: vtapID,
+			NodeIP: nodeIP,
+		})
 	}
 	s.dirty = true
 }

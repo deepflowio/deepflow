@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,6 @@ func TestParsePromQL(t *testing.T) {
 }
 
 func BenchmarkForMatchMetricName(b *testing.B) {
-	executor := &prometheusExecutor{}
 	matchers := [][]*labels.Matcher{
 		{
 			{Type: labels.MatchEqual, Name: "job", Value: "prometheus-demo-job"},
@@ -149,7 +148,7 @@ func BenchmarkForMatchMetricName(b *testing.B) {
 	for j := 0; j < len(matchers); j++ {
 		b.Run(fmt.Sprintf("BenchmarkTestFor[%d]", j), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				executor.matchMetricName(&matchers[j])
+				extractMetricName(&matchers[j])
 			}
 		})
 	}

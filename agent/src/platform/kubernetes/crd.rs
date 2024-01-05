@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,6 +151,7 @@ pub mod calico {
     #[serde(rename_all = "camelCase")]
     pub struct IpPoolSpec {
         pub cidr: Option<String>,
+        pub disabled: Option<bool>,
     }
 
     impl Trimmable for IpPool {

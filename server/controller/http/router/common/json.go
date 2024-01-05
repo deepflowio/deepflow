@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // CheckJSONParam check json parameters for redundancy.
@@ -61,6 +62,7 @@ func getAllJSONTags(typ reflect.Type, tagMap map[string]bool) {
 		if tag == "" {
 			continue
 		}
+		tag = strings.TrimSuffix(tag, ",omitempty")
 		tagMap[tag] = true
 
 		switch field.Type.Kind() {

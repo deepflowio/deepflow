@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -385,6 +385,7 @@ type ChGProcess struct {
 	Name    string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID  int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	CHostID int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
+	VPCID   int    `gorm:"column:vpc_id;type:int" json:"VPC_ID"`
 }
 
 func (ChGProcess) TableName() string {

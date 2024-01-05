@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				Name:    process.Name + " (deleted)",
 				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID: process.VMID,
+				VPCID:   process.VPCID,
 			}
 		} else {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
@@ -59,6 +60,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				Name:    process.Name,
 				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID: process.VMID,
+				VPCID:   process.VPCID,
 			}
 		}
 	}
@@ -79,6 +81,9 @@ func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysql.ChGProcess) (map[
 	}
 	if oldItem.CHostID != newItem.CHostID {
 		updateInfo["chost_id"] = newItem.CHostID
+	}
+	if oldItem.VPCID != newItem.VPCID {
+		updateInfo["vpc_id"] = newItem.VPCID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

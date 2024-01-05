@@ -80,6 +80,9 @@
 #define PERF_READER_TIMEOUT_DEF 100
 #define PERF_READER_NUM_MAX	16
 
+#define DEBUG_BUFF_SIZE 4096
+typedef void (*debug_callback_t)(char *data, int len);
+
 enum tracer_hook_type {
 	HOOK_ATTACH,
 	HOOK_DETACH

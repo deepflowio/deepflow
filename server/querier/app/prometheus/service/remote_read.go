@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,11 +44,7 @@ type prometheusReader struct {
 	addExternalTagToCache   func(string, string)
 }
 
-func newPrometheusReader(slimit int) *prometheusReader {
-	return &prometheusReader{slimit: slimit}
-}
-
-func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
+func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, querierSql, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
 	var metricName string
@@ -60,7 +56,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		response = item
 	}
 
-	if config.Cfg.Prometheus.Cache.Enabled && hit == cache.CacheKeyFoundNil {
+	if config.Cfg.Prometheus.Cache.RemoteReadCache && hit == cache.CacheKeyFoundNil {
 		cacheLoadingFinished := &sync.WaitGroup{}
 		cacheLoadingFinished.Add(1)
 
@@ -88,7 +84,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	}
 
 	if hit == cache.CacheHitFull {
-		return response, "", 0, nil
+		return response, "", "", 0, nil
 	}
 
 	// CacheKeyNotFound & CacheHitPart, do query
@@ -96,10 +92,10 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	var db, datasource string
 	var debugInfo map[string]interface{}
 	log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, storage_query_start, storage_query_end)
-	ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end)
+	ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end, debug)
 	// fmt.Println(sql, db)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, "", "", 0, err
 	}
 	if db == "" {
 		db = "prometheus"
@@ -139,7 +135,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	result, debugInfo, err = ckEngine.ExecuteQuery(&args)
 	if err != nil {
 		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
-		return nil, "", 0, err
+		return nil, "", "", 0, err
 	}
 
 	if debugQuerier {
@@ -171,14 +167,14 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	}
 
 	if req == nil || len(req.Queries) == 0 {
-		return nil, "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
+		return nil, "", "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
 	}
 
 	api_query_start, api_query_end := cache.GetPromRequestQueryTime(req.Queries[0])
 	// response trans to prom resp
 	resp, err = p.respTransToProm(ctx, metricName, api_query_start, api_query_end, result)
 
-	if config.Cfg.Prometheus.Cache.Enabled {
+	if config.Cfg.Prometheus.Cache.RemoteReadCache {
 		// merge result into cache
 		response = cache.PromReadResponseCache().AddOrMerge(req, resp)
 	} else {
@@ -188,10 +184,10 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 
 	if err != nil {
 		log.Error(err)
-		return nil, "", 0, err
+		return nil, "", "", 0, err
 	}
 	// pp.Println(resp)
-	return response, sql, duration, nil
+	return response, querierSql, sql, duration, nil
 }
 
 // extract query_time from query debug(map[string]interface{}) infos
@@ -211,22 +207,43 @@ func extractQuerySQLFromQueryResponse(debug map[string]interface{}) string {
 	return ""
 }
 
-func queryDataExecute(ctx context.Context, sql string, db string, ds string) (*common.Result, error) {
+func queryDataExecute(ctx context.Context, querierSql string, db string, ds string, debug bool) (*common.Result, string, float64, error) {
+	var sql string
+	var duration float64
 	query_uuid := uuid.New()
 	args := common.QuerierParams{
 		DB:         db,
-		Sql:        sql,
+		Sql:        querierSql,
 		DataSource: ds,
-		Debug:      strconv.FormatBool(config.Cfg.Prometheus.RequestQueryWithDebug),
+		Debug:      strconv.FormatBool(debug),
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
 	}
+	// trace clickhouse query
+	var span trace.Span
+	if debug {
+		tracer := otel.GetTracerProvider().Tracer("querier/prometheus/clickhouse/query")
+		args.Context, span = tracer.Start(ctx, "PrometheusQueryDataExecute",
+			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())),
+		)
+
+		defer span.End()
+	}
 	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
 	ckEngine.Init()
-	result, debug, err := ckEngine.ExecuteQuery(&args)
+	result, debugInfo, err := ckEngine.ExecuteQuery(&args)
 	if err != nil {
 		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debug, err)
-		return nil, err
+		return nil, "", 0, err
 	}
-	return result, err
+	if debug {
+		duration = extractQueryTimeFromQueryResponse(debugInfo)
+		sql = extractQuerySQLFromQueryResponse(debugInfo)
+
+		span.SetAttributes(attribute.Float64("duration", duration))
+		span.SetAttributes(attribute.String("querier_sql", querierSql))
+		span.SetAttributes(attribute.String("sql", sql))
+	}
+	return result, sql, duration, err
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -589,6 +589,50 @@ extern "C" {
      */
     pub fn process_stack_trace_data_for_flame_graph(_data: *mut stack_profile_data);
     pub fn release_flame_graph_hash();
+
+    /*
+     * Configure and enable datadump - Send socket data obtained by eBPF to the controller.
+     *
+     * @pid
+     *   Specifying a process ID or thread ID. If set to '0', it indicates
+     *   all processes or threads.
+     * @comm
+     *   Specifying a process name or thread name. If set to an empty string(""),
+     *   it indicates all processes or threads.
+     * @proto
+     *   Specifying the L7 protocol number. If set to '0', it indicates all
+     *   L7 protocols.
+     * @timeout
+     *   Specifying the timeout duration. If the elapsed time exceeds this
+     *   duration, datadump will stop. The unit is in seconds.
+     * @callback
+     *   Callback interface, used to transfer data to the remote controller.
+     *
+     * @return 0 on success, and a negative value on failure.
+     */
+    pub fn datadump_set_config(
+        pid: c_int,
+        comm: *const c_char,
+        proto: c_int,
+        timeout: c_int,
+        callback: extern "C" fn(data: *mut c_char, len: c_int),
+    ) -> c_int;
+
+    /*
+     * Configure and enable the debugging functionality for Continuous Profiling.
+     *
+     * @timeout
+     *   Specifying the timeout duration. If the elapsed time exceeds this
+     *   duration, cpdbg will stop. The unit is in seconds.
+     * @callback
+     *   Callback interface, used to transfer data to the remote controller.
+     *
+     * @return 0 on success, and a negative value on failure.
+     */
+    pub fn cpdbg_set_config(
+        timeout: c_int,
+        callback: extern "C" fn(data: *mut c_char, len: c_int),
+    ) -> c_int;
 }
 
 #[no_mangle]

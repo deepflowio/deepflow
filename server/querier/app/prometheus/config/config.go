@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,11 +26,13 @@ type Prometheus struct {
 	ExternalTagCacheSize    int             `default:"1024" yaml:"external-tag-cache-size"`
 	ExternalTagLoadInterval int             `default:"300" yaml:"external-tag-load-interval"`
 	ThanosReplicaLabels     []string        `yaml:"thanos-replica-labels"`
+	OperatorOffloading      bool            `default:"false" yaml:"operator-offloading"`
 	Cache                   PrometheusCache `yaml:"cache"`
 }
 
 type PrometheusCache struct {
-	Enabled                bool    `default:"false" yaml:"enabled"`
+	RemoteReadCache        bool    `default:"false" yaml:"remote-read-cache"`  // cache for database quering
+	ResponseCache          bool    `default:"false" yaml:"response-cache"`     // cache for query response (only operator offloading mode)
 	CacheItemSize          uint64  `default:"51200000" yaml:"cache-item-size"` // cache-item-size for each cache item, default: 50M
 	CacheMaxCount          int     `default:"1024" yaml:"cache-max-count"`     // cache-max-count for list of cache size
 	CacheMaxAllowDeviation float64 `default:"3600" yaml:"cache-max-allow-deviation"`

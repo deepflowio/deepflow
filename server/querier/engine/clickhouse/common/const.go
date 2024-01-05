@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,5 +44,5 @@ var SHOW_TAG_VALUE_MAP = map[string][]string{
 	"pod_service_map": []string{"pod_service", "pod_cluster", "pod_ns"},
 	"pod_map":         []string{"pod", "pod_cluster", "pod_ns", "pod_node", "pod_service", "pod_group"},
 	"chost_map":       []string{"chost", "host", "vpc"},
-	"gprocess_map":    []string{"gprocess", "chost"},
+	"gprocess_map":    []string{"gprocess", "chost", "vpc"},
 }

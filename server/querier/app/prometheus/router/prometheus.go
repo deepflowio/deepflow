@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package router
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
 
@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service"
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
 const _STATUS_FAIL = "fail"
@@ -48,29 +49,20 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
 		args.StartTime = c.Request.FormValue("time")
 		args.EndTime = c.Request.FormValue("time")
-		args.Slimit = c.Request.FormValue("slimit")
+		slimit := c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
-		args.Debug, _ = strconv.ParseBool(debug)
+		offloading := c.Request.FormValue("operator-offloading")
+		setRouterArgs(slimit, &args.Slimit, config.Cfg.Prometheus.SeriesLimit, strconv.Atoi)
+		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
+		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
 
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
-			if tErr := getInnerError(err); tErr != nil {
-				// only for `RESOURCE_NOT_FOUND` error, it means query non-existence metrics, it should return 200 with empty result
-				switch t := tErr.(type) {
-				case *common.ServiceError:
-					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{
-							Status: _STATUS_SUCCESS,
-							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
-						})
-						return
-					}
-				}
-			}
-			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
-			return
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+		} else {
+			c.JSON(200, result)
 		}
-		c.JSON(200, result)
 	})
 }
 
@@ -83,36 +75,27 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		args.StartTime = c.Request.FormValue("start")
 		args.EndTime = c.Request.FormValue("end")
 		args.Step = c.Request.FormValue("step")
-		args.Slimit = c.Request.FormValue("slimit")
+		slimit := c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
-		args.Debug, _ = strconv.ParseBool(debug)
+		offloading := c.Request.FormValue("operator-offloading")
+		setRouterArgs(slimit, &args.Slimit, config.Cfg.Prometheus.SeriesLimit, strconv.Atoi)
+		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
+		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
 
 		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
-			if tErr := getInnerError(err); tErr != nil {
-				// only for `RESOURCE_NOT_FOUND` error, it means query non-existence metrics, it should return 200 with empty result
-				switch t := tErr.(type) {
-				case *common.ServiceError:
-					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{
-							Status: _STATUS_SUCCESS,
-							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
-						})
-						return
-					}
-				}
-			}
-			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
-			return
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+		} else {
+			c.JSON(200, result)
 		}
-		c.JSON(200, result)
 	})
 }
 
 // RemoteRead API
 func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		compressed, _ := ioutil.ReadAll(c.Request.Body)
+		compressed, _ := io.ReadAll(c.Request.Body)
 		reqBuf, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			c.JSON(500, err)
@@ -123,22 +106,18 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 			c.JSON(500, err)
 			return
 		}
-
-		resp, err := svc.PromRemoteReadService(&req, c.Request.Context())
+		// configure remote read like: /api/v1/prom/read?operator-offloading=true
+		offloading := c.Request.FormValue("operator-offloading")
+		var offloadingArgs bool
+		setRouterArgs(offloading, &offloadingArgs, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
+		resp, err := svc.PromRemoteReadService(&req, c.Request.Context(), offloadingArgs)
 		if err != nil {
-			if tErr := getInnerError(err); tErr != nil {
-				switch t := tErr.(type) {
-				case *common.ServiceError:
-					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{
-							Status: _STATUS_SUCCESS,
-							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
-						})
-						return
-					}
-				}
+			code, _ := handleError(err)
+			// remote read use different response, not use `obj`, otherwise it will cause decode response error
+			if code == 200 {
+				err = nil
 			}
-			c.JSON(500, err)
+			c.JSON(code, err)
 			return
 		}
 		data, err := resp.Marshal()
@@ -176,26 +155,19 @@ func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 			Matchers:  c.Request.Form["match[]"],
 			Context:   c.Request.Context(),
 		}
+		debug := c.Request.FormValue("debug")
+		offloading := c.Request.FormValue("operator-offloading")
+		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
+		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
 		// should show tags when get `Series`
 		ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
 		result, err := svc.PromSeriesQueryService(&args, ctx)
 		if err != nil {
-			if tErr := getInnerError(err); tErr != nil {
-				switch t := tErr.(type) {
-				case *common.ServiceError:
-					if t.Status == common.RESOURCE_NOT_FOUND {
-						c.JSON(200, &model.PromQueryResponse{
-							Status: _STATUS_SUCCESS,
-							Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
-						})
-						return
-					}
-				}
-			}
-			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
-			return
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+		} else {
+			c.JSON(200, result)
 		}
-		c.JSON(200, result)
 	})
 }
 
@@ -254,6 +226,27 @@ func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
 	})
 }
 
+// handle special errors
+// only for `RESOURCE_NOT_FOUND` error, it means query non-existence metrics, it should return 200 with empty result
+// but in querier, it will still cause a `RESOURCE_NOT_FOUND` to log error
+func handleError(err error) (code int, obj any) {
+	if err == nil {
+		return 200, nil
+	}
+	if tErr := getInnerError(err); tErr != nil {
+		switch t := tErr.(type) {
+		case *common.ServiceError:
+			if t.Status == common.RESOURCE_NOT_FOUND {
+				return 200, &model.PromQueryResponse{
+					Status: _STATUS_SUCCESS,
+					Data:   &model.PromQueryData{ResultType: parser.ValueTypeVector, Result: promql.Vector{}},
+				}
+			}
+		}
+	}
+	return 500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL}
+}
+
 func getInnerError(err error) error {
 	for {
 		innerError := errors.Unwrap(err)
@@ -261,5 +254,18 @@ func getInnerError(err error) error {
 			return err
 		}
 		err = innerError
+	}
+}
+
+// set args from router query or config
+func setRouterArgs[T any](flag string, target *T, defaultValue T, parser func(string) (T, error)) {
+	var err error
+	if flag != "" && parser != nil {
+		*target, err = parser(flag)
+		if err != nil {
+			*target = defaultValue
+		}
+	} else {
+		*target = defaultValue
 	}
 }
