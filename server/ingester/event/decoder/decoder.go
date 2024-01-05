@@ -190,13 +190,34 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	if e.PodId != 0 {
 		info = d.platformData.QueryPodIdInfo(e.PodId)
 	}
+
+	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
+	if info == nil {
+		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapId))
+		if vtapInfo != nil {
+			vtapIP := net.ParseIP(vtapInfo.Ip)
+			if vtapIP != nil {
+				if ip4 := vtapIP.To4(); ip4 != nil {
+					s.IsIPv4 = true
+					s.IP4 = utils.IpToUint32(ip4)
+					info = d.platformData.QueryIPV4Infos(vtapInfo.EpcId, s.IP4)
+				} else {
+					s.IP6 = vtapIP
+					info = d.platformData.QueryIPV6Infos(vtapInfo.EpcId, s.IP6)
+				}
+			}
+		}
+	}
+
 	podGroupType := uint8(0)
 	if info != nil {
 		s.RegionID = uint16(info.RegionID)
 		s.AZID = uint16(info.AZID)
 		s.L3EpcID = info.EpcID
 		s.HostID = uint16(info.HostID)
-		s.PodID = info.PodID
+		if s.PodID == 0 {
+			s.PodID = info.PodID
+		}
 		s.PodNodeID = info.PodNodeID
 		s.PodNSID = uint16(info.PodNSID)
 		s.PodClusterID = uint16(info.PodClusterID)
