@@ -43,5 +43,9 @@ func GetTag(name, db, table, function string) (*Tag, bool) {
 	if db == "flow_tag" {
 		tag, ok = FlowTagResourceMap[name][function]
 	}
+	// Avoid return nil
+	if !ok {
+		return &Tag{}, false
+	}
 	return tag, ok
 }
