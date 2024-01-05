@@ -660,7 +660,7 @@ func (r *Receiver) logTCPReceiveInvalidData(str string) {
 		return
 	}
 	r.lastTCPLogTime = r.timeNow
-	log.Warningf(fmt.Sprintf("%s, already drop log count %d", str, r.dropLogCount))
+	log.Warningf("%s, already drop log count %d", str, r.dropLogCount)
 }
 
 func (r *Receiver) ProcessUDPServer() {
