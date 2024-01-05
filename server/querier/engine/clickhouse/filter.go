@@ -72,12 +72,15 @@ func GetWhere(name, value string) WhereStatement {
 	}
 }
 
-func TransWhereTagFunction(name string, args []string) (filter string) {
+func TransWhereTagFunction(db string, name string, args []string) (filter string) {
 	funcName := strings.ToLower(name)
 	switch funcName {
 	case "exist":
 		// Unsupported tags, filter is 1 = 1
 		filter = "1=1"
+		if db == "flow_tag" {
+			return
+		}
 		if len(args) != 1 {
 			errorMessage := fmt.Sprintf("The parameters of function %s are not 1", funcName)
 			log.Error(errorMessage)
