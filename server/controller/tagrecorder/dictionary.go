@@ -286,7 +286,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 
 						// Get the current view in the database
 						views := []string{}
-						log.Infof(fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database))
+						log.Infof("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database)
 						if err := connect.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database)); err != nil {
 							log.Error(err)
 							connect.Close()
