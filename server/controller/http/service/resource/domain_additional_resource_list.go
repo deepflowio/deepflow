@@ -53,7 +53,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
 		case "cloud-tag":
-			cloudTags, err := getClouTags(resource.CHostCloudTags, resource.PodNamespaceCloudTags, domain, resourceName)
+			cloudTags, err := getClouTags(resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +66,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 			resp.CHosts = append(resp.CHosts, getCHosts(resource.CHosts, resource.VInterfaces, resource.IPs, domain, resourceName)...)
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
-			cloudTags, err := getClouTags(resource.CHostCloudTags, resource.PodNamespaceCloudTags, domain, resourceName)
+			cloudTags, err := getClouTags(resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -311,8 +311,7 @@ func getVinterfaces(deviceUUID string, vifs []cloudmodel.VInterface, ips []cloud
 	return resp
 }
 
-func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags cloudmodel.UUIDToCloudTags,
-	domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
+func getClouTags(resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
 	chostUUIDToName := make(map[string]string)
 	podNSUUIDToName := make(map[string]string)
 	podNSUUIDToSubdomain := make(map[string]string)
@@ -330,11 +329,13 @@ func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags clo
 	}
 	for _, podNS := range podNamespaces {
 		podNSUUIDToName[podNS.Lcuuid] = podNS.Name
-		podNSUUIDToSubdomain[podNS.Lcuuid] = podNS.SubDomain
+		if podNS.SubDomain != "" {
+			podNSUUIDToSubdomain[podNS.Lcuuid] = podNS.SubDomain
+		}
 	}
 
 	var resp []model.AdditionalResourceCloudTag
-	for uuid, cloudTags := range chostToCloudTags {
+	for uuid, cloudTags := range resource.CHostCloudTags {
 		if resourceName != "" && chostUUIDToName[uuid] != resourceName {
 			continue
 		}
@@ -348,22 +349,31 @@ func getClouTags(chostToCloudTags cloudmodel.UUIDToCloudTags, podNSCloudTags clo
 		}
 		resp = append(resp, addCHost)
 	}
-	for uuid, cloudTags := range podNSCloudTags {
-		if resourceName != "" && podNSUUIDToName[uuid] != resourceName {
-			continue
+
+	genCloudTags := func(cloudTags cloudmodel.UUIDToCloudTags) []model.AdditionalResourceCloudTag {
+		var ct []model.AdditionalResourceCloudTag
+		for uuid, cloudTags := range cloudTags {
+			if resourceName != "" && podNSUUIDToName[uuid] != resourceName {
+				continue
+			}
+			addPodNS := model.AdditionalResourceCloudTag{
+				ResourceType: "pod_ns",
+				ResourceName: podNSUUIDToName[uuid],
+				DomainUUID:   domain,
+			}
+			if subdomain, ok := podNSUUIDToSubdomain[uuid]; ok {
+				addPodNS.SubDomainUUID = subdomain
+			}
+			for k, v := range cloudTags {
+				addPodNS.Tags = append(addPodNS.Tags, model.AdditionalResourceTag{Key: k, Value: v})
+			}
+			ct = append(ct, addPodNS)
 		}
-		addPodNS := model.AdditionalResourceCloudTag{
-			ResourceType: "pod_ns",
-			ResourceName: podNSUUIDToName[uuid],
-			DomainUUID:   domain,
-		}
-		if subdomain, ok := podNSUUIDToSubdomain[uuid]; ok {
-			addPodNS.SubDomainUUID = subdomain
-		}
-		for k, v := range cloudTags {
-			addPodNS.Tags = append(addPodNS.Tags, model.AdditionalResourceTag{Key: k, Value: v})
-		}
-		resp = append(resp, addPodNS)
+		return ct
+	}
+	resp = append(resp, genCloudTags(resource.PodNamespaceCloudTags)...)
+	for _, additionalResource := range resource.SubDomainResources {
+		resp = append(resp, genCloudTags(additionalResource.PodNamespaceCloudTags)...)
 	}
 	return resp, nil
 }

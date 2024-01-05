@@ -205,7 +205,8 @@ cloud_tags:{{ range .CLOUD_TAGS }}
 - resource_type: {{ .RESOURCE_TYPE }}
   resource_name: {{ .RESOURCE_NAME }}
   domain_uuid: {{ .DOMAIN_UUID }}
-  {{- if .SUBDOMAIN_UUID }}subdomain_uuid: {{ .SUBDOMAIN_UUID }}{{ end }}
+  {{- if .SUBDOMAIN_UUID }}
+  subdomain_uuid: {{ .SUBDOMAIN_UUID }}{{ end }}
   tags: {{ range .TAGS }}
   - key: {{ .KEY }}
     value: {{ .VALUE }}
