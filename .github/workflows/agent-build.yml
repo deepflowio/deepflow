@@ -1,8 +1,7 @@
 on: 
   push:
     branches:
-      - main
-      - 'feature-**'
+      - v6.4
     paths:
       - 'agent/**'
       - 'message/**'
