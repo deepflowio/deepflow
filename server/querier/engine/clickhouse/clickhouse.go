@@ -254,6 +254,9 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 				if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 					continue
 				}
+				if e.DB == "flow_tag" {
+					continue
+				}
 				name := col.([]interface{})[0].(string)
 				clientName := col.([]interface{})[1].(string)
 				serverName := col.([]interface{})[2].(string)

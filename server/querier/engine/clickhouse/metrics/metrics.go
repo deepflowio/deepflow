@@ -153,6 +153,9 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 			continue
 		}
+		if db == "flow_tag" {
+			continue
+		}
 		name := col.([]interface{})[0].(string)
 		clientName := col.([]interface{})[1].(string)
 		serverName := col.([]interface{})[2].(string)
@@ -444,6 +447,24 @@ func GetPrometheusAllTagTranslator(table string) (string, error) {
 func GetTagDBField(name, db, table string) (string, error) {
 	selectTag := name
 	tagTranslatorStr := name
+
+	// enum tag
+	tagEnum := strings.TrimSuffix(name, "_0")
+	tagEnum = strings.TrimSuffix(tagEnum, "_1")
+	tagDes, getTagOK := tag.GetTag(name, db, table, "enum")
+	tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
+		DB: db, Table: table, TagName: name,
+	}]
+	if getTagOK {
+		if tagOK {
+			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+			tagTranslatorStr = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+		} else {
+			tagTranslatorStr = fmt.Sprintf(tagDes.TagTranslator, tagEnum)
+		}
+		return tagTranslatorStr, nil
+	}
+	// other tag
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
