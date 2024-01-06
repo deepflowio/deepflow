@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	messagecommon "github.com/deepflowio/deepflow/message/common"
 	"github.com/deepflowio/deepflow/message/trident"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -56,16 +55,14 @@ type KubernetesInfo struct {
 	ClusterID string
 	ErrorMSG  string
 	Version   uint64
-	VtapID    uint32
 	Epoch     time.Time
-	Entries   []*messagecommon.KubernetesAPIInfo
+	Entries   map[string][]string
 }
 
 type PrometheusInfo struct {
 	ClusterID string
 	ErrorMSG  string
 	Version   uint64
-	VtapID    uint32
 	Epoch     time.Time
 	Entries   []cloudmodel.PrometheusTarget
 }
