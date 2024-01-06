@@ -378,10 +378,11 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 
 	if k8sData, ok := GenesisService.GetKubernetesData(clusterID); ok {
 		epochStr := k8sData.Epoch.Format(controllercommon.GO_BIRTHDAY)
+		entriesByte, _ := json.Marshal(k8sData.Entries)
 		return &controller.GenesisSharingK8SResponse{
 			Epoch:    &epochStr,
 			ErrorMsg: &k8sData.ErrorMSG,
-			Entries:  k8sData.Entries,
+			Entries:  entriesByte,
 		}, nil
 	}
 
