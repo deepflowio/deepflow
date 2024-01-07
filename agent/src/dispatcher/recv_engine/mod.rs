@@ -28,7 +28,9 @@ use public::packet;
 
 use crate::utils::stats;
 
-pub use special_recv_engine::{Dpdk, Libpcap, LibpcapCounter};
+#[cfg(target_os = "linux")]
+pub use special_recv_engine::Dpdk;
+pub use special_recv_engine::{Libpcap, LibpcapCounter};
 
 pub const DEFAULT_BLOCK_SIZE: usize = 1 << 20;
 pub const FRAME_SIZE_MAX: usize = 1 << 16; // local and mirror
@@ -38,6 +40,7 @@ pub const POLL_TIMEOUT: Duration = Duration::from_millis(100);
 pub enum RecvEngine {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     AfPacket(Tpacket),
+    #[cfg(target_os = "linux")]
     Dpdk(Dpdk),
     Libpcap(Option<Libpcap>),
 }
