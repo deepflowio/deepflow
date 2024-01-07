@@ -979,7 +979,9 @@ impl HttpLog {
                     }
                 }
                 header_frame_parsed = true;
-                info.headers_offset = headers_offset as u32;
+                if !param.is_from_ebpf() {
+                    info.headers_offset = headers_offset as u32;
+                }
                 if content_length.is_some() {
                     is_httpv2 = true;
                     break;
