@@ -718,7 +718,7 @@ impl Controller {
         }
     }
 
-    //#[cfg(target_os = "linux")]
+    #[cfg(target_os = "linux")]
     fn ebpf(&self, c: EbpfCmd) -> Result<()> {
         if self.port.is_none() {
             return Err(anyhow!(ERR_PORT_MSG));
@@ -743,8 +743,8 @@ impl Controller {
         loop {
             let res = client.recv::<EbpfMessage>()?;
             match res {
-                EbpfMessage::Context(c) => {
-                    println!("{}", String::from_utf8_lossy(&c))
+                EbpfMessage::Context((seq, c)) => {
+                    println!("SEQ {}: {}", seq, String::from_utf8_lossy(&c))
                 }
                 EbpfMessage::Done => return Ok(()),
                 EbpfMessage::Error(e) => {
