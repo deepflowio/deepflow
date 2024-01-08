@@ -401,7 +401,7 @@ func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy st
 	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is always 7 day
+	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is always 7 day
 
 	secondTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1S; i <= VTAP_FLOW_EDGE_PORT_1S; i++ {
