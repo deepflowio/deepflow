@@ -18,13 +18,16 @@ package clickhouse
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"bou.ke/monkey"
 
 	//"github.com/k0kubun/pp"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/parse"
@@ -47,11 +50,12 @@ import (
 
 var (
 	parseSQL = []struct {
-		index   string
-		input   string
-		output  string
-		db      string
-		wantErr string
+		index      string
+		input      string
+		output     string
+		db         string
+		datasource string
+		wantErr    string
 	}{{
 		input:  "select byte from l4_flow_log limit 1",
 		output: "SELECT byte_tx+byte_rx AS `byte` FROM flow_log.`l4_flow_log` LIMIT 1",
@@ -439,6 +443,12 @@ var (
 		index:  "l2_vpc_filter_trans",
 		input:  "SELECT pod from l4_flow_log WHERE exist(l2_vpc_0) AND l2_vpc!=1 GROUP BY l2_vpc_1 LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod`, dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` FROM flow_log.`l4_flow_log` PREWHERE (epc_id_0!=0) AND (toUInt64(epc_id) IN (SELECT id FROM flow_tag.l3_epc_map WHERE name != 1)) AND (epc_id_1!=0) GROUP BY dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` LIMIT 1",
+	}, {
+		index:      "with_multi_query",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "WITH query1 AS (SELECT PerSecond(Avg(`request`)) AS `请求速率`, Avg(`server_error_ratio`) AS `服务端异常比例`, Avg(`rrt`) AS `响应时延`, node_type(region_0) AS `client_node_type`, icon_id(region_0) AS `client_icon_id`, region_id_0, region_0, Enum(tap_side), tap_side, is_internet_0, node_type(region_1) AS `server_node_type`, icon_id(region_1) AS `server_icon_id`, region_id_1, region_1, is_internet_1 FROM vtap_app_edge_port WHERE time>=1704338640 AND time<=1704339600 GROUP BY region_0, tap_side, is_internet_0, region_id_0, `client_node_type`, region_1, is_internet_1, region_id_1, `server_node_type` ORDER BY `请求速率` DESC LIMIT 50 OFFSET 0), query2 AS (SELECT Avg(`packet_tx`) AS `Avg(发送包数)`, node_type(region_0) AS `client_node_type`, icon_id(region_0) AS `client_icon_id`, region_id_0, region_0, Enum(tap_side), tap_side, is_internet_0, node_type(region_1) AS `server_node_type`, icon_id(region_1) AS `server_icon_id`, region_id_1, region_1, is_internet_1 FROM vtap_flow_edge_port WHERE time>=1704338640 AND time<=1704339600 GROUP BY region_0, tap_side, is_internet_0, region_id_0, `client_node_type`, region_1, is_internet_1, region_id_1, `server_node_type` LIMIT 50) SELECT query1.`请求速率` AS `请求速率`, query1.`服务端异常比例` AS `服务端异常比例`, query1.`响应时延` AS `响应时延`, query1.`client_node_type` AS `client_node_type`, query1.`client_icon_id` AS `client_icon_id`, query1.`region_id_0` AS `region_id_0`, query1.`region_0` AS `region_0`, query1.`Enum(tap_side)` AS `Enum(tap_side)`, query1.`tap_side` AS `tap_side`, query1.`is_internet_0` AS `is_internet_0`, query1.`server_node_type` AS `server_node_type`, query1.`server_icon_id` AS `server_icon_id`, query1.`region_id_1` AS `region_id_1`, query1.`region_1` AS `region_1`, query1.`is_internet_1` AS `is_internet_1`, query2.`Avg(发送包数)` AS `Avg(发送包数)` FROM query1 LEFT JOIN query2 ON query1.`region_0` = query2.`region_0` AND query1.`tap_side` = query2.`tap_side` AND query1.`is_internet_0` = query2.`is_internet_0` AND query1.`region_id_0` = query2.`region_id_0` AND query1.`client_node_type` = query2.`client_node_type` AND query1.`region_1` = query2.`region_1` AND query1.`is_internet_1` = query2.`is_internet_1` AND query1.`region_id_1` = query2.`region_id_1` AND query1.`server_node_type` = query2.`server_node_type`",
+		output:     "WITH query1 AS (WITH dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_0))) AS `client_icon_id`, dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)`, dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_1))) AS `server_icon_id`, if(SUMIf(response, response>0)>0, divide(SUM(server_error), SUMIf(response, response>0)), null) AS `divide_0diveider_as_null_sum_server_error_sum_response`, if(SUMIf(rrt_count, rrt_count>0)>0, divide(SUM(rrt_sum), SUMIf(rrt_count, rrt_count>0)), null) AS `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count` SELECT 'region' AS `client_node_type`, `client_icon_id`, region_id_0, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `Enum(tap_side)`, tap_side, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, 'region' AS `server_node_type`, `server_icon_id`, region_id_1, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, divide(sum(request)/(1020/60), 60) AS `请求速率`, `divide_0diveider_as_null_sum_server_error_sum_response`*100 AS `服务端异常比例`, `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count` AS `响应时延` FROM flow_metrics.`vtap_app_edge_port.1m` PREWHERE `time` >= 1704338640 AND `time` <= 1704339600 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `tap_side`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, `region_id_0`, `client_node_type`, `client_icon_id`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, `region_id_1`, `server_node_type`, `server_icon_id` ORDER BY `请求速率` desc LIMIT 0, 50), query2 AS (WITH dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_0))) AS `client_icon_id`, dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)`, dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_1))) AS `server_icon_id` SELECT 'region' AS `client_node_type`, `client_icon_id`, region_id_0, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `Enum(tap_side)`, tap_side, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, 'region' AS `server_node_type`, `server_icon_id`, region_id_1, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, sum(packet_tx)/(1020/60) AS `Avg(发送包数)` FROM flow_metrics.`vtap_flow_edge_port.1m` PREWHERE `time` >= 1704338640 AND `time` <= 1704339600 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `tap_side`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, `region_id_0`, `client_node_type`, `client_icon_id`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, `region_id_1`, `server_node_type`, `server_icon_id` LIMIT 50) SELECT query1.`请求速率` AS `请求速率`, query1.`服务端异常比例` AS `服务端异常比例`, query1.`响应时延` AS `响应时延`, query1.`client_node_type` AS `client_node_type`, query1.`client_icon_id` AS `client_icon_id`, query1.`region_id_0` AS `region_id_0`, query1.`region_0` AS `region_0`, query1.`Enum(tap_side)` AS `Enum(tap_side)`, query1.`tap_side` AS `tap_side`, query1.`is_internet_0` AS `is_internet_0`, query1.`server_node_type` AS `server_node_type`, query1.`server_icon_id` AS `server_icon_id`, query1.`region_id_1` AS `region_id_1`, query1.`region_1` AS `region_1`, query1.`is_internet_1` AS `is_internet_1`, query2.`Avg(发送包数)` AS `Avg(发送包数)` FROM query1 LEFT JOIN query2 ON query1.`region_0` = query2.`region_0` AND query1.`tap_side` = query2.`tap_side` AND query1.`is_internet_0` = query2.`is_internet_0` AND query1.`region_id_0` = query2.`region_id_0` AND query1.`client_node_type` = query2.`client_node_type` AND query1.`region_1` = query2.`region_1` AND query1.`is_internet_1` = query2.`is_internet_1` AND query1.`region_id_1` = query2.`region_id_1` AND query1.`server_node_type` = query2.`server_node_type`",
 	}}
 )
 
@@ -462,11 +472,22 @@ func TestGetSql(t *testing.T) {
 			db = "flow_log"
 		}
 		e := CHEngine{DB: db}
+		if pcase.datasource != "" {
+			e.DataSource = pcase.datasource
+		}
 		e.Context = context.Background()
 		e.Init()
-		parser := parse.Parser{Engine: &e}
-		err := parser.ParseSQL(pcase.input)
-		out := parser.Engine.ToSQLString()
+		var (
+			err error
+			out string
+		)
+		if strings.HasPrefix(pcase.input, "WITH") {
+			out, _, _, err = e.ParseWithSql(pcase.input)
+		} else {
+			parser := parse.Parser{Engine: &e}
+			err = parser.ParseSQL(pcase.input)
+			out = parser.Engine.ToSQLString()
+		}
 		if out != pcase.output {
 			caseIndex := pcase.index
 			if pcase.index == "" {
@@ -512,8 +533,32 @@ func Load() error {
 func mockDatasources() {
 	httpmock.RegisterResponder(
 		"GET", "http://localhost:20417/v1/data-sources/",
-		httpmock.NewStringResponder(
-			http.StatusOK, `{"DATA":[{"NAME":"1s","INTERVAL":1}]}`,
-		),
+		func(req *http.Request) (*http.Response, error) {
+			values := req.URL.Query()
+			name := values.Get("name")
+			if name == "" {
+				name = "1s"
+			}
+
+			return httpmock.NewStringResponse(200,
+				fmt.Sprintf(`{"DATA":[{"NAME":"%s","INTERVAL":%d}]}`,
+					name, convertNameToInterval(name)),
+			), nil
+		},
 	)
+}
+
+func convertNameToInterval(name string) (interval int) {
+	switch name {
+	case "1s":
+		return 1
+	case "1m":
+		return 60
+	case "1h":
+		return 3600
+	case "1d":
+		return 86400
+	default:
+		return 0
+	}
 }
