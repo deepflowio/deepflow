@@ -432,10 +432,12 @@ ingester:
   #  batch-size: 51200   # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
 
-  ## ext metrics数据的保留的时长(单位: 小时)
+  ## ext_metrics database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #ext-metrics-ttl-hour: 168
 
   ## flow_metrics database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #flow-metrics-ttl-hour:
   #  vtap-flow-1m: 168     # vtap_flow[_edge]_port.1m
   #  vtap-flow-1s: 24     # vtap_flow[_edge]_port.1s
@@ -443,6 +445,7 @@ ingester:
   #  vtap-app-1s: 24      # vtap_app[_edge]_port.1s
 
   ## flow_metrics database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #flow-log-ttl-hour:
   #  l4-flow-log: 72
   #  l7-flow-log: 72
@@ -456,9 +459,11 @@ ingester:
   #  flush-timeout: 5   # 超时写入时间
 
   ## resource event table data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #event-ttl-hour: 720
 
   ## alarm event table data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #alarm-event-ttl-hour: 720
 
   ## perf event data write config
@@ -469,6 +474,7 @@ ingester:
   #  flush-timeout: 5    # 超时写入时间
 
   ## perf event table data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #perf-event-ttl-hour: 168
 
   ## pcap data write config
@@ -479,6 +485,7 @@ ingester:
   #  flush-timeout: 5   # 超时写入时间
 
   ## pcap database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #pcap-ttl-hour: 72
 
   ## pcap decoder queue count/size
@@ -493,6 +500,7 @@ ingester:
   #  flush-timeout: 5    # timeout of table writing
 
   ## profile process database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #profile-ttl-hour: 72
 
   ## profile compression algorithm, default is zstd, empty string for not compress
@@ -513,6 +521,7 @@ ingester:
   #prometheus-decoder-queue-size: 16384
 
   ## prometheus database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #prometheus-ttl-hour: 168
 
   ## prometheus label request/response msg max size (unit: bytes)
