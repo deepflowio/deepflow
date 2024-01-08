@@ -26,7 +26,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
-	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -220,22 +219,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				}
 			}
 			if subnetLcuuid == "" {
-				poolPrefix := expand.GetIPPool(k.isSubDomain, ip, k.k8sInfo)
-				if !poolPrefix.IsZero() {
-					subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+poolPrefix.String(), uuid.Nil)
-					if _, ok := subnetLcuuidToCIDR[subnetLcuuid]; !ok {
-						podSubnets = append(podSubnets, model.Subnet{
-							Lcuuid:        subnetLcuuid,
-							Name:          poolPrefix.String() + "_POD_NET",
-							CIDR:          poolPrefix.String(),
-							NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-							VPCLcuuid:     k.VPCUUID,
-						})
-						subnetLcuuidToCIDR[subnetLcuuid] = poolPrefix
-					}
-				}
-			}
-			if subnetLcuuid == "" {
 				if (ip.Is4() && ipMask == 32) || (ip.Is6() && ipMask == 128) {
 					switch {
 					case ip.Is4():
@@ -422,6 +405,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	// 处理nodeIP，生成port，ip，cidrs信息
 	invalidNodeIPs := mapset.NewSet()
 	nodeVinterfaceLcuuids := mapset.NewSet()
+	nodeSubnetLcuuids := mapset.NewSet()
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
 			continue
@@ -597,7 +581,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						continue
 					}
 					nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
-					if _, ok := subnetLcuuidToCIDR[nodeSubnetLcuuid]; !ok {
+					if !nodeSubnetLcuuids.Contains(nodeSubnetLcuuid) {
 						nodeSubnets = append(nodeSubnets, model.Subnet{
 							Lcuuid:        nodeSubnetLcuuid,
 							Name:          cidr + "_NODE_NET",
@@ -605,6 +589,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							NetworkLcuuid: networkLcuuid,
 							VPCLcuuid:     k.VPCUUID,
 						})
+						nodeSubnetLcuuids.Add(nodeSubnetLcuuid)
 						subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipPrefix
 					}
 				}
