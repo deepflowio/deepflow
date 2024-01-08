@@ -56,7 +56,6 @@ type KubernetesInfo struct {
 	ClusterID string
 	ErrorMSG  string
 	Version   uint64
-	VtapID    uint32
 	Epoch     time.Time
 	Entries   []*messagecommon.KubernetesAPIInfo
 }
@@ -64,8 +63,6 @@ type KubernetesInfo struct {
 type PrometheusInfo struct {
 	ClusterID string
 	ErrorMSG  string
-	Version   uint64
-	VtapID    uint32
 	Epoch     time.Time
 	Entries   []cloudmodel.PrometheusTarget
 }

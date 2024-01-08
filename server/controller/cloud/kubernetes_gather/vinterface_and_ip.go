@@ -405,7 +405,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	// 处理nodeIP，生成port，ip，cidrs信息
 	invalidNodeIPs := mapset.NewSet()
 	nodeVinterfaceLcuuids := mapset.NewSet()
-	nodeSubnetLcuuids := mapset.NewSet()
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
 			continue
@@ -581,7 +580,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						continue
 					}
 					nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
-					if !nodeSubnetLcuuids.Contains(nodeSubnetLcuuid) {
+					if _, ok := subnetLcuuidToCIDR[nodeSubnetLcuuid]; !ok {
 						nodeSubnets = append(nodeSubnets, model.Subnet{
 							Lcuuid:        nodeSubnetLcuuid,
 							Name:          cidr + "_NODE_NET",
@@ -589,7 +588,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							NetworkLcuuid: networkLcuuid,
 							VPCLcuuid:     k.VPCUUID,
 						})
-						nodeSubnetLcuuids.Add(nodeSubnetLcuuid)
 						subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipPrefix
 					}
 				}
