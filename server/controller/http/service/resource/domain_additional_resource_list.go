@@ -31,6 +31,17 @@ import (
 )
 
 func ListDomainAdditionalResource(resourceType, resourceName string) (map[string]interface{}, error) {
+	resource, err := GetDomainAdditionalResource(resourceType, resourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make(map[string]interface{})
+	convertToUpperMap(data, reflect.ValueOf(resource).Elem())
+	return data, nil
+}
+
+func GetDomainAdditionalResource(resourceType, resourceName string) (*model.AdditionalResource, error) {
 	domainToResource, err := getResourceFromDB()
 	if err != nil {
 		return nil, err
@@ -77,9 +88,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 		}
 	}
 
-	data := make(map[string]interface{})
-	convertToUpperMap(data, reflect.ValueOf(resp).Elem())
-	return data, nil
+	return resp, nil
 }
 
 func getAZs(azs []cloudmodel.AZ, domain, resourceName string) []model.AdditionalResourceAZ {

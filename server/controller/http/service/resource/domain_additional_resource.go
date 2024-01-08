@@ -1018,3 +1018,7 @@ func isTagValid(str string, isKey bool) error {
 	}
 	return nil
 }
+
+func GetDomainAdditionalResourceExample() (string, error) {
+	return string(model.YamlDomainAdditionalResourceExample), nil
+}
