@@ -441,13 +441,13 @@ type AdditionalResourceLBTargetServer struct {
 }
 
 type AdditionalResource struct {
-	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs" binding:"omitempty,dive"`
-	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs" binding:"omitempty,dive"`
-	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets" binding:"omitempty,dive"`
-	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts" binding:"omitempty,dive"`
-	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts" binding:"omitempty,dive"`
-	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags" binding:"omitempty,dive"`
-	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs" binding:"omitempty,dive"`
+	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs,omitempty" binding:"omitempty,dive"`
+	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs,omitempty" binding:"omitempty,dive"`
+	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets,omitempty" binding:"omitempty,dive"`
+	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts,omitempty" binding:"omitempty,dive"`
+	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts,omitempty" binding:"omitempty,dive"`
+	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags,omitempty" binding:"omitempty,dive"`
+	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs,omitempty" binding:"omitempty,dive"`
 }
 
 type VTapGroupConfiguration struct {

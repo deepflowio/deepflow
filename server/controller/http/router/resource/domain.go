@@ -26,6 +26,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/op/go-logging"
+	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
@@ -61,6 +62,9 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 
 	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
 	e.GET("/v1/domain-additional-resources/", listDomainAddtionalResource)
+	e.GET("/v1/domain-additional-resources/example/", GetDomainAdditionalResourceExample)
+	e.PATCH("/v1/domain-additional-resources/advanced/", updateDomainAddtionalResourceAdvanced)
+	e.GET("/v1/domain-additional-resources/advanced/", getDomainAddtionalResourceAdvanced)
 }
 
 func getDomain(c *gin.Context) {
@@ -272,4 +276,47 @@ func listDomainAddtionalResource(c *gin.Context) {
 
 	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName)
 	common.JsonResponse(c, data, err)
+}
+
+func GetDomainAdditionalResourceExample(c *gin.Context) {
+	data, err := resource.GetDomainAdditionalResourceExample()
+	common.JsonResponse(c, data, err)
+}
+
+func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
+	data := &model.AdditionalResource{}
+	err := c.ShouldBindBodyWith(&data, binding.YAML)
+	if err == nil || err == io.EOF {
+		if err = resource.ApplyDomainAddtionalResource(*data); err != nil {
+			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			return
+		}
+		d, err := resource.GetDomainAdditionalResource("", "")
+		if err != nil {
+			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			return
+		}
+		b, err := yaml.Marshal(d)
+		if err != nil {
+			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			return
+		}
+		common.JsonResponse(c, string(b), err)
+	} else {
+		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+	}
+}
+
+func getDomainAddtionalResourceAdvanced(c *gin.Context) {
+	d, err := resource.GetDomainAdditionalResource("", "")
+	if err != nil {
+		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+		return
+	}
+	b, err := yaml.Marshal(d)
+	if err != nil {
+		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+		return
+	}
+	common.JsonResponse(c, string(b), err)
 }
