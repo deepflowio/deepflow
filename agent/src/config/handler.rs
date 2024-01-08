@@ -1664,6 +1664,7 @@ impl ConfigHandler {
             );
             candidate_config.platform = new_config.platform;
 
+            #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
                 fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                     let conf = &handler.candidate_config.platform;
@@ -1682,7 +1683,6 @@ impl ConfigHandler {
                             components.api_watcher.stop();
                         }
                     }
-                    #[cfg(target_os = "linux")]
                     if conf.kubernetes_api_enabled {
                         components.api_watcher.start();
                     } else {
@@ -1690,7 +1690,6 @@ impl ConfigHandler {
                     }
                 }
                 callbacks.push(platform_callback);
-                #[cfg(target_os = "linux")]
                 if restart_api_watcher {
                     callbacks.push(|_, components| {
                         components.api_watcher.stop();
