@@ -679,14 +679,17 @@ impl FirstPath {
             self.get_policy_from_table(key, &endpoints, &mut policy);
         }
 
-        self.fast.add_policy(key, &policy, endpoints);
-
-        policy.format_npb_action();
+        let (forward_policy, forward_endpoints) = self.fast.add_policy(key, &policy, endpoints);
         if key.feature_flag.contains(FeatureFlags::DEDUP) {
+            let mut policy = PolicyData {
+                acl_id: forward_policy.acl_id,
+                action_flags: forward_policy.action_flags,
+                npb_actions: forward_policy.npb_actions.clone(),
+            };
             policy.dedup(key);
+            return Some((Arc::new(policy), forward_endpoints));
         }
-
-        return Some((Arc::new(policy), Arc::new(endpoints)));
+        return Some((forward_policy, forward_endpoints));
     }
 
     pub fn fast_get(
