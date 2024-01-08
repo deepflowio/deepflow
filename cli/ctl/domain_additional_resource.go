@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
-	"github.com/deepflowio/deepflow/cli/ctl/example"
 )
 
 func RegisterDomainAdditionalResourceCommand() *cobra.Command {
@@ -234,7 +233,20 @@ func listDomainAdditionalResource(cmd *cobra.Command, resourceType, resourceName
 }
 
 func exampleDomainAdditionalResourceConfig(cmd *cobra.Command) {
-	fmt.Printf(string(example.YamlDomainAdditionalResourceReader))
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/domain-additional-resources/example/", server.IP, server.Port)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	data, err := response.Get("DATA").Map()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	fmt.Println(data)
 }
 
 func loadBodyFromFile(filename string) (map[string]interface{}, error) {
