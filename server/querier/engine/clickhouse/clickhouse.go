@@ -85,7 +85,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 
 	// Parse withSql
-	withResult, withDebug, err := e.ParseWithSql(sql, args)
+	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -660,44 +660,16 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	return rst, debug.Get(), err
 }
 
-func (e *CHEngine) ParseWithSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
-	checks := checkWithSqlRegexp.FindAllStringSubmatch(sql, -1)
-	if len(checks) == 0 {
+func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
+	sql, callbacks, columnSchemaMap, err := e.ParseWithSql(sql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+	if sql == "" {
 		return nil, nil, nil
 	}
-	subMatches := subSqlRegexp.FindAllString(sql, -1)
-	parsedSqls := []string{}
-	var callbacks map[string]func(*common.Result) error
-	columnSchemaMap := make(map[string]*common.ColumnSchema)
-	for _, match := range subMatches {
-		match = strings.TrimPrefix(match, "(")
-		match = strings.TrimSuffix(match, ")")
-		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
-		matchEngine.Init()
-		matchParser := parse.Parser{Engine: matchEngine}
-		err := matchParser.ParseSQL(match)
-		if err != nil {
-			log.Error(err)
-			return nil, nil, err
-		}
-		for _, stmt := range matchEngine.Statements {
-			stmt.Format(matchEngine.Model)
-		}
-		FormatModel(matchEngine.Model)
-		// 使用Model生成View
-		matchEngine.View = view.NewView(matchEngine.Model)
-		if callbacks == nil {
-			callbacks = matchEngine.View.GetCallbacks()
-		}
-		parsedSql := matchEngine.ToSQLString()
-		for _, columnSchema := range matchEngine.ColumnSchemas {
-			columnSchemaMap[columnSchema.Name] = columnSchema
-		}
-		parsedSqls = append(parsedSqls, parsedSql)
-	}
-	for i, parseSql := range parsedSqls {
-		sql = strings.ReplaceAll(sql, subMatches[i], fmt.Sprintf("(%s)", parseSql))
-	}
+
 	query_uuid := args.QueryUUID
 	debug := &client.Debug{
 		IP:        config.Cfg.Clickhouse.Host,
@@ -725,6 +697,46 @@ func (e *CHEngine) ParseWithSql(sql string, args *common.QuerierParams) (*common
 		return nil, debug.Get(), err
 	}
 	return rst, debug.Get(), err
+}
+
+func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
+	checks := checkWithSqlRegexp.FindAllStringSubmatch(sql, -1)
+	if len(checks) == 0 {
+		return "", nil, nil, nil
+	}
+	subMatches := subSqlRegexp.FindAllString(sql, -1)
+	parsedSqls := []string{}
+	var callbacks map[string]func(*common.Result) error
+	columnSchemaMap := make(map[string]*common.ColumnSchema)
+	for _, match := range subMatches {
+		match = strings.TrimPrefix(match, "(")
+		match = strings.TrimSuffix(match, ")")
+		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		matchEngine.Init()
+		matchParser := parse.Parser{Engine: matchEngine}
+		err := matchParser.ParseSQL(match)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		for _, stmt := range matchEngine.Statements {
+			stmt.Format(matchEngine.Model)
+		}
+		FormatModel(matchEngine.Model)
+		// 使用Model生成View
+		matchEngine.View = view.NewView(matchEngine.Model)
+		if callbacks == nil {
+			callbacks = matchEngine.View.GetCallbacks()
+		}
+		parsedSql := matchEngine.ToSQLString()
+		for _, columnSchema := range matchEngine.ColumnSchemas {
+			columnSchemaMap[columnSchema.Name] = columnSchema
+		}
+		parsedSqls = append(parsedSqls, parsedSql)
+	}
+	for i, parseSql := range parsedSqls {
+		sql = strings.ReplaceAll(sql, subMatches[i], fmt.Sprintf("(%s)", parseSql))
+	}
+	return sql, callbacks, columnSchemaMap, nil
 }
 
 func (e *CHEngine) Init() {
