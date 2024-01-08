@@ -26,5 +26,4 @@ const (
 	DEVICE_TYPE_DOCKER_CONTAINER = "docker-container"
 	DEVICE_TYPE_PUBLIC_CLOUD     = "public-cloud"
 	DEVICE_TYPE_PHYSICAL_MACHINE = "physical-machine"
-	K8S_DATA_TYPE_IP_POOL        = "*v1.IPPool"
 )
