@@ -42,6 +42,7 @@ type Issu struct {
 	columnAdds         []*ColumnAdd
 	indexAdds          []*IndexAdd
 	columnDrops        []*ColumnDrop
+	modTTLs            []*TableModTTL
 	datasourceInfo     map[string]*DatasourceInfo
 	Connections        common.DBs
 	Addrs              []string
@@ -54,6 +55,12 @@ type TableRename struct {
 	OldTables []string
 	NewDb     string
 	NewTables []string
+}
+
+type TableModTTL struct {
+	Db     string
+	Table  string
+	NewTTL int
 }
 
 type ColumnRenames struct {
@@ -980,6 +987,14 @@ var IndexAdd63 = []*IndexAdds{
 	},
 }
 
+var TableModTTL64 = []*TableModTTL{
+	&TableModTTL{
+		Db:     "flow_metrics",
+		Table:  "vtap_acl.1m_local",
+		NewTTL: 168,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1382,6 +1397,10 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 
 	for _, v := range [][]*ColumnDrop{getColumnDrops(ColumnDrops635)} {
 		i.columnDrops = append(i.columnDrops, v...)
+	}
+
+	for _, v := range [][]*TableModTTL{TableModTTL64} {
+		i.modTTLs = append(i.modTTLs, v...)
 	}
 
 	var err error
@@ -1804,6 +1823,41 @@ func (i *Issu) dropColumns(connect *sql.DB) ([]*ColumnDrop, error) {
 	return dones, nil
 }
 
+func (i *Issu) modTableTTLs(connect *sql.DB) error {
+	for _, modTTL := range i.modTTLs {
+		version, err := i.getTableVersion(connect, modTTL.Db, modTTL.Table)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if version == common.CK_VERSION {
+			continue
+		}
+		if err := i.modTTL(connect, modTTL); err != nil {
+			log.Error(err)
+			return err
+		} else {
+			if err := i.setTableVersion(connect, modTTL.Db, modTTL.Table); err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (i *Issu) modTTL(connect *sql.DB, mt *TableModTTL) error {
+	// ALTER TABLE vtap_acl."1m_local"  MODIFY TTL time + toIntervalHour(168);
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY TTL time + toIntervalHour(%d)",
+		mt.Db, mt.Table, mt.NewTTL)
+	log.Info("modify TTL: ", sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getColumnAdds(columnAdds *ColumnAdds) []*ColumnAdd {
 	adds := []*ColumnAdd{}
 	for _, db := range columnAdds.Dbs {
@@ -1953,6 +2007,7 @@ func (i *Issu) Start() error {
 				return err
 			}
 		}
+		go i.modTableTTLs(connect)
 	}
 	return nil
 }
