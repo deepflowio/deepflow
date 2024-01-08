@@ -35,7 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
@@ -47,29 +47,27 @@ var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
 type Genesis struct {
-	mutex             sync.RWMutex
-	grpcPort          string
-	grpcMaxMSGLength  int
-	cfg               gconfig.GenesisConfig
-	genesisSyncData   atomic.Value
-	kubernetesData    sync.Map
-	prometheusData    sync.Map
-	kubernetesIPPools []string
-	genesisStatsd     statsd.GenesisStatsd
+	mutex            sync.RWMutex
+	grpcPort         string
+	grpcMaxMSGLength int
+	cfg              gconfig.GenesisConfig
+	genesisSyncData  atomic.Value
+	kubernetesData   sync.Map
+	prometheusData   sync.Map
+	genesisStatsd    statsd.GenesisStatsd
 }
 
 func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 	var sData atomic.Value
 	sData.Store(GenesisSyncData{})
 	GenesisService = &Genesis{
-		mutex:             sync.RWMutex{},
-		grpcPort:          cfg.GrpcPort,
-		grpcMaxMSGLength:  cfg.GrpcMaxMessageLength,
-		cfg:               cfg.GenesisCfg,
-		genesisSyncData:   sData,
-		kubernetesData:    sync.Map{},
-		prometheusData:    sync.Map{},
-		kubernetesIPPools: []string{},
+		mutex:            sync.RWMutex{},
+		grpcPort:         cfg.GrpcPort,
+		grpcMaxMSGLength: cfg.GrpcMaxMessageLength,
+		cfg:              cfg.GenesisCfg,
+		genesisSyncData:  sData,
+		kubernetesData:   sync.Map{},
+		prometheusData:   sync.Map{},
 		genesisStatsd: statsd.GenesisStatsd{
 			K8SInfoDelay: make(map[string][]float64),
 		},
@@ -426,7 +424,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 	return retGenesisSyncData, nil
 }
 
-func (g *Genesis) getServerIPs() ([]string, error) {
+func (g *Genesis) GetServerIPs() ([]string, error) {
 	var serverIPs []string
 	var controllers []mysql.Controller
 	var azControllerConns []mysql.AZControllerConnection
@@ -494,13 +492,13 @@ func (g *Genesis) GetKubernetesData(clusterID string) (KubernetesInfo, bool) {
 }
 
 func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
-	k8sEntries := map[string][]string{}
+	k8sResp := map[string][]string{}
 
 	k8sInfo, ok := g.GetKubernetesData(clusterID)
 
-	serverIPs, err := g.getServerIPs()
+	serverIPs, err := g.GetServerIPs()
 	if err != nil {
-		return k8sEntries, err
+		return k8sResp, err
 	}
 	retFlag := false
 	for _, serverIP := range serverIPs {
@@ -509,7 +507,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
 			log.Error(msg)
-			return k8sEntries, errors.New(msg)
+			return k8sResp, errors.New(msg)
 		}
 		defer conn.Close()
 
@@ -521,10 +519,10 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		if err != nil {
 			msg := fmt.Sprintf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
 			log.Error(msg)
-			return k8sEntries, errors.New(msg)
+			return k8sResp, errors.New(msg)
 		}
-		entriesByte := ret.GetEntries()
-		if entriesByte == nil {
+		entries := ret.GetEntries()
+		if len(entries) == 0 {
 			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
 			continue
 		}
@@ -532,48 +530,29 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
 			log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
-			return k8sEntries, err
-		}
-		errorMsg := ret.GetErrorMsg()
-		if errorMsg != "" {
-			log.Warningf("cluster id (%s) prometheus info grpc Error: %s", clusterID, errorMsg)
+			return k8sResp, err
 		}
 		if !epoch.After(k8sInfo.Epoch) {
 			continue
 		}
 
-		err = json.Unmarshal(entriesByte, &k8sEntries)
-		if err != nil {
-			log.Error("genesis api sharing prometheus unmarshal json faild:" + err.Error())
-			return map[string][]string{}, err
-		}
-
 		retFlag = true
 		k8sInfo = KubernetesInfo{
 			Epoch:    epoch,
-			ErrorMSG: errorMsg,
-			Entries:  k8sEntries,
+			Entries:  entries,
+			ErrorMSG: ret.GetErrorMsg(),
 		}
 	}
 	if len(k8sInfo.Entries) == 0 {
 		return map[string][]string{}, errors.New("k8s entries length is 0")
 	}
 	if !ok && !retFlag {
-		return map[string][]string{}, errors.New("no vtap report cluster id:" + clusterID)
+		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 	}
 	if k8sInfo.ErrorMSG != "" {
 		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
-		return map[string][]string{}, errors.New(k8sInfo.ErrorMSG)
+		return k8sResp, errors.New(k8sInfo.ErrorMSG)
 	}
-
-	// add resource *v1.IPPool
-	ipPools, err := g.getIPPoolResponse()
-	if err != nil {
-		log.Warningf("genesis get ip pool failed (%s)", err.Error())
-	} else {
-		g.kubernetesIPPools = ipPools
-	}
-	k8sInfo.Entries[gcommon.K8S_DATA_TYPE_IP_POOL] = g.kubernetesIPPools
 
 	g.mutex.Lock()
 	g.genesisStatsd.K8SInfoDelay = map[string][]float64{}
@@ -581,7 +560,20 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	statsd.MetaStatsd.RegisterStatsdTable(g)
 	g.mutex.Unlock()
 
-	return k8sInfo.Entries, nil
+	for _, e := range k8sInfo.Entries {
+		eType := e.GetType()
+		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
+		if err != nil {
+			log.Warningf("decode decompress error: %s", err.Error())
+			return k8sResp, err
+		}
+		if _, ok := k8sResp[eType]; ok {
+			k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))
+		} else {
+			k8sResp[eType] = []string{string(out.Bytes())}
+		}
+	}
+	return k8sResp, nil
 }
 
 func (g *Genesis) receivePrometheusData(pChan chan map[string]PrometheusInfo) {
@@ -614,7 +606,7 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 
 	prometheusInfo, _ := g.GetPrometheusData(clusterID)
 
-	serverIPs, err := g.getServerIPs()
+	serverIPs, err := g.GetServerIPs()
 	if err != nil {
 		return []cloudmodel.PrometheusTarget{}, err
 	}
@@ -671,21 +663,8 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 	}
 
 	if prometheusInfo.ErrorMSG != "" {
-		return []cloudmodel.PrometheusTarget{}, errors.New(prometheusInfo.ErrorMSG)
+		return prometheusInfo.Entries, errors.New(prometheusInfo.ErrorMSG)
 	}
 
 	return prometheusInfo.Entries, nil
-}
-
-func (g *Genesis) getIPPoolResponse() ([]string, error) {
-	var result []string
-	var ipPools []model.IPPool
-	err := mysql.Db.Where("last_seen > ?", time.Now().Add(-time.Second*time.Duration(g.cfg.AgingTime))).Find(&ipPools).Error
-	if err != nil {
-		return []string{}, err
-	}
-	for _, ipPool := range ipPools {
-		result = append(result, ipPool.Items...)
-	}
-	return result, nil
 }
