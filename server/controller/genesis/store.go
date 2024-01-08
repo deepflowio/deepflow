@@ -357,7 +357,7 @@ func (k *KubernetesStorage) refreshDatabase() {
 
 	for range ticker.C {
 		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		err := mysql.Db.Where("node_ip = ? AND last_seen < ?", nodeIP, time.Now().Add(-timeDuration)).Delete(&model.GenesisIPPool{}).Error
+		err := mysql.Db.Where("node_ip = ? AND last_seen < ?", nodeIP, time.Now().Add(-timeDuration)).Delete(&model.IPPool{}).Error
 		if err != nil {
 			log.Errorf("node (%s) clean ip pool invalid data failed: %s", nodeIP, err)
 		} else {

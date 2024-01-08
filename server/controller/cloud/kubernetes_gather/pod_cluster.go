@@ -17,8 +17,6 @@
 package kubernetes_gather
 
 import (
-	"errors"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 
@@ -28,24 +26,16 @@ import (
 
 func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 	log.Debug("get pod cluster starting")
-	vInfo, ok := k.k8sInfo["*version.Info"]
-	if !ok || len(vInfo) == 0 {
-		return model.PodCluster{}, errors.New("not found k8s version info")
-	}
-
-	vJson, vErr := simplejson.NewJson([]byte(vInfo[0]))
+	vInfo := k.k8sInfo["*version.Info"][0]
+	vJson, vErr := simplejson.NewJson([]byte(vInfo))
 	if vErr != nil {
 		log.Errorf("pod cluster initialization version json error: (%s)", vErr.Error())
 		return model.PodCluster{}, vErr
 	}
-	version := vJson.Get("gitVersion").MustString()
-	if version == "" {
-		return model.PodCluster{}, errors.New("not found k8s gitversion")
-	}
 	k.podClusterLcuuid = common.GetUUID(k.UuidGenerate, uuid.Nil)
 	podCluster := model.PodCluster{
 		Lcuuid:       k.podClusterLcuuid,
-		Version:      K8S_VERSION_PREFIX + " " + version,
+		Version:      K8S_VERSION_PREFIX + " " + vJson.Get("gitVersion").MustString(),
 		Name:         k.Name,
 		VPCLcuuid:    k.VPCUUID,
 		AZLcuuid:     k.azLcuuid,

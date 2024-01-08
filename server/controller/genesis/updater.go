@@ -931,7 +931,7 @@ func (k *KubernetesRpcUpdater) saveIPPool(clusterID string, items []string) erro
 	err = mysql.Db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "cluster_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{"items": itemJson, "last_seen": time.Now()}),
-	}).Create(&model.GenesisIPPool{
+	}).Create(&model.IPPool{
 		ClusterID: clusterID,
 		NodeIP:    os.Getenv(common.NODE_IP_KEY),
 		Items:     items,

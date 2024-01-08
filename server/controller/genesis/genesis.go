@@ -525,7 +525,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		}
 		entriesByte := ret.GetEntries()
 		if entriesByte == nil {
-			log.Errorf("genesis sharing k8s node (%s) entries is nil", serverIP)
+			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
 			continue
 		}
 		epochStr := ret.GetEpoch()
@@ -679,7 +679,7 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 
 func (g *Genesis) getIPPoolResponse() ([]string, error) {
 	var result []string
-	var ipPools []model.GenesisIPPool
+	var ipPools []model.IPPool
 	err := mysql.Db.Where("last_seen > ?", time.Now().Add(-time.Second*time.Duration(g.cfg.AgingTime))).Find(&ipPools).Error
 	if err != nil {
 		return []string{}, err
