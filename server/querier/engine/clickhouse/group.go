@@ -90,7 +90,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 	nameNoPreffix := strings.Trim(name, "`")
 	if nameNoPreffix == "tag" {
-		tagTranslatorStr, _ := GetPrometheusAllTagTranslator(table)
+		tagTranslatorStr, _, _ := GetPrometheusAllTagTranslator(table)
 		return tagTranslatorStr
 	}
 	labelName := strings.TrimPrefix(nameNoPreffix, "tag.")
