@@ -337,6 +337,16 @@ var (
 		input:  "select pod_ns, topK(pod, pod_cluster_id, service_id, 10) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
+		index:  "topk_enum",
+		db:     "flow_log",
+		input:  "select TopK(protocol,2) from l4_flow_log limit 2",
+		output: "SELECT arrayStringConcat(topK(2)(dictGetOrDefault(flow_tag.int_enum_map, 'name', ('protocol',toUInt64(protocol)), protocol)), ',') AS `TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2",
+	}, {
+		index:  "select_enum",
+		db:     "flow_log",
+		input:  "select protocol from l4_flow_log limit 2",
+		output: "SELECT protocol FROM flow_log.`l4_flow_log` LIMIT 2",
+	}, {
 		index:  "any_1",
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
