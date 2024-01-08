@@ -18,9 +18,6 @@ package example
 
 import _ "embed"
 
-//go:embed domain_additional_resource.yaml
-var YamlDomainAdditionalResourceReader []byte
-
 //go:embed domain_aliyun.yaml
 var YamlDomainAliYun []byte
 
