@@ -424,7 +424,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 	return retGenesisSyncData, nil
 }
 
-func (g *Genesis) GetServerIPs() ([]string, error) {
+func (g *Genesis) getServerIPs() ([]string, error) {
 	var serverIPs []string
 	var controllers []mysql.Controller
 	var azControllerConns []mysql.AZControllerConnection
@@ -496,7 +496,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 
 	k8sInfo, ok := g.GetKubernetesData(clusterID)
 
-	serverIPs, err := g.GetServerIPs()
+	serverIPs, err := g.getServerIPs()
 	if err != nil {
 		return k8sResp, err
 	}
@@ -521,11 +521,6 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			log.Error(msg)
 			return k8sResp, errors.New(msg)
 		}
-		entries := ret.GetEntries()
-		if len(entries) == 0 {
-			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
-			continue
-		}
 		epochStr := ret.GetEpoch()
 		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
@@ -539,12 +534,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		retFlag = true
 		k8sInfo = KubernetesInfo{
 			Epoch:    epoch,
-			Entries:  entries,
+			Entries:  ret.GetEntries(),
 			ErrorMSG: ret.GetErrorMsg(),
 		}
-	}
-	if len(k8sInfo.Entries) == 0 {
-		return map[string][]string{}, errors.New("k8s entries length is 0")
 	}
 	if !ok && !retFlag {
 		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
@@ -552,6 +544,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	if k8sInfo.ErrorMSG != "" {
 		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
 		return k8sResp, errors.New(k8sInfo.ErrorMSG)
+	}
+	if len(k8sInfo.Entries) == 0 {
+		return k8sResp, errors.New("not found k8s entries")
 	}
 
 	g.mutex.Lock()
@@ -565,13 +560,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
 		if err != nil {
 			log.Warningf("decode decompress error: %s", err.Error())
-			return k8sResp, err
+			return map[string][]string{}, err
 		}
-		if _, ok := k8sResp[eType]; ok {
-			k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))
-		} else {
-			k8sResp[eType] = []string{string(out.Bytes())}
-		}
+		k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))
 	}
 	return k8sResp, nil
 }
@@ -606,7 +597,7 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 
 	prometheusInfo, _ := g.GetPrometheusData(clusterID)
 
-	serverIPs, err := g.GetServerIPs()
+	serverIPs, err := g.getServerIPs()
 	if err != nil {
 		return []cloudmodel.PrometheusTarget{}, err
 	}
@@ -663,7 +654,7 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 	}
 
 	if prometheusInfo.ErrorMSG != "" {
-		return prometheusInfo.Entries, errors.New(prometheusInfo.ErrorMSG)
+		return []cloudmodel.PrometheusTarget{}, errors.New(prometheusInfo.ErrorMSG)
 	}
 
 	return prometheusInfo.Entries, nil
