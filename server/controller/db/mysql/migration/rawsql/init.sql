@@ -1687,14 +1687,6 @@ TRUNCATE TABLE tap_type;
 set @lcuuid = (select uuid());
 INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('虚拟网络', 3, 768, '', @lcuuid);
 
-CREATE TABLE IF NOT EXISTS genesis_ippool (
-    cluster_id CHAR(64) NOT NULL PRIMARY KEY,
-    node_ip    CHAR(48),
-    items      MEDIUMTEXT,
-    last_seen  DATETIME
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
-TRUNCATE TABLE genesis_ippool;
-
 CREATE TABLE IF NOT EXISTS genesis_host (
     lcuuid      CHAR(64),
     hostname    VARCHAR(256),

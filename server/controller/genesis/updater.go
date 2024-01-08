@@ -18,11 +18,9 @@ package genesis
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -35,13 +33,11 @@ import (
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	uuid "github.com/satori/go.uuid"
-	"gorm.io/gorm/clause"
 )
 
 type bridge struct {
@@ -923,89 +919,23 @@ func NewKubernetesRpcUpdater(storage *KubernetesStorage, queue queue.QueueReader
 	}
 }
 
-func (k *KubernetesRpcUpdater) saveIPPool(clusterID string, items []string) error {
-	itemJson, err := json.Marshal(items)
-	if err != nil {
-		return err
-	}
-	err = mysql.Db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "cluster_id"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{"items": itemJson, "last_seen": time.Now()}),
-	}).Create(&model.IPPool{
-		ClusterID: clusterID,
-		NodeIP:    os.Getenv(common.NODE_IP_KEY),
-		Items:     items,
-		LastSeen:  time.Now(),
-	}).Error
-	return err
-}
-
-func (k *KubernetesRpcUpdater) ParseKubernetesEntries(clusterID string, info K8SRPCMessage) (map[string][]string, error) {
-	ipPool := []string{}
-	result := map[string][]string{}
-	for _, e := range info.message.GetEntries() {
-		eType := e.GetType()
-		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
-		if err != nil {
-			log.Warningf("decode decompress error: %s", err.Error())
-			return map[string][]string{}, err
-		}
-
-		if eType == genesiscommon.K8S_DATA_TYPE_IP_POOL {
-			ipPool = append(ipPool, string(out.Bytes()))
-			continue
-		}
-
-		if _, ok := result[eType]; ok {
-			result[eType] = append(result[eType], string(out.Bytes()))
-		} else {
-			result[eType] = []string{string(out.Bytes())}
-		}
-	}
-
-	err := k.saveIPPool(clusterID, ipPool)
-	if err != nil {
-		log.Errorf("save ip pool to db error (%s)", err.Error())
-		return map[string][]string{}, err
-	}
-
-	return result, nil
-}
-
 func (k *KubernetesRpcUpdater) run() {
-	currentVersion := map[string]uint64{}
 	for {
 		info := k.outputQueue.Get().(K8SRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
 			log.Warningf("k8s from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
 			break
 		}
-
-		var err error
-		var entries map[string][]string
-		clusterID := info.message.GetClusterId()
-		version := info.message.GetVersion()
-		errMSG := info.message.GetErrorMsg()
-		cVersion := currentVersion[clusterID]
-		parseFlag := version != cVersion
-		if errMSG == "" && parseFlag {
-			entries, err = k.ParseKubernetesEntries(clusterID, info)
-			if err != nil {
-				errMSG = err.Error()
-			}
-		}
-
-		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, clusterID, version)
-
+		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
 		// 更新和保存内存数据
-		currentVersion[clusterID] = version
 		k.storage.Add(KubernetesInfo{
 			Epoch:     time.Now(),
-			ClusterID: clusterID,
-			Version:   version,
-			ErrorMSG:  errMSG,
-			Entries:   entries,
-		}, parseFlag)
+			ClusterID: info.message.GetClusterId(),
+			ErrorMSG:  info.message.GetErrorMsg(),
+			VtapID:    info.message.GetVtapId(),
+			Version:   info.message.GetVersion(),
+			Entries:   info.message.GetEntries(),
+		})
 	}
 }
 
@@ -1129,7 +1059,6 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 }
 
 func (p *PrometheusRpcUpdater) run() {
-	currentVersion := map[string]uint64{}
 	for {
 		info := p.outputQueue.Get().(PrometheusMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
@@ -1142,9 +1071,7 @@ func (p *PrometheusRpcUpdater) run() {
 		clusterID := info.message.GetClusterId()
 		version := info.message.GetVersion()
 		errMSG := info.message.GetErrorMsg()
-		cVersion := currentVersion[clusterID]
-		parseFlag := version != cVersion
-		if errMSG == "" && parseFlag {
+		if errMSG == "" {
 			entries, err = p.ParsePrometheusEntries(info)
 			if err != nil {
 				errMSG = err.Error()
@@ -1159,7 +1086,8 @@ func (p *PrometheusRpcUpdater) run() {
 			Entries:   entries,
 			Epoch:     time.Now(),
 			ErrorMSG:  errMSG,
-		}, parseFlag)
+			VtapID:    info.message.GetVtapId(),
+		})
 	}
 }
 
