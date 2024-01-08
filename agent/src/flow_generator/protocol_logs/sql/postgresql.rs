@@ -336,33 +336,38 @@ impl PostgresqlLog {
                 self.info.ignore = false;
                 self.info.resp_type = tag;
 
-                // INSERT xxx xxx0x0 where last xxx is row effect.
-                // DELETE xxx0x0
-                // UPDATE xxx0x0
-                // SELECT xxx0x0
+                // reference https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-COMMANDCOMPLETE
+                // INSERT oid rows0x0, where rows is the number of rows inserted.
+                // DELETE | UPDATE | SELECT | MERGE | MOVE | FETCH | COPY rows0x0
+                // CREATE TABLE
                 if let Some(idx) = data.iter().position(|x| *x == 0x20) {
                     let op = &data[..idx];
                     data = &data[idx + 1..];
                     if op.eq("INSERT".as_bytes()) {
                         if let Some(idx) = data.iter().position(|x| *x == 0x20) {
                             data = &data[idx + 1..];
+                            if let Some(idx) = data.iter().position(|x| *x == 0x0) {
+                                let row_eff = String::from_utf8_lossy(&data[..idx]).to_string();
+                                self.info.affected_rows = row_eff.parse().unwrap_or(0);
+                            }
                         } else {
                             return Ok(true);
                         }
-                    } else {
-                        if !(op.eq("DELETE".as_bytes())
-                            || op.eq("UPDATE".as_bytes())
-                            || op.eq("SELECT".as_bytes()))
-                        {
-                            return Ok(true);
+                    } else if op.eq("DELETE".as_bytes())
+                        || op.eq("UPDATE".as_bytes())
+                        || op.eq("SELECT".as_bytes())
+                        || op.eq("MERGE".as_bytes())
+                        || op.eq("MOVE".as_bytes())
+                        || op.eq("FETCH".as_bytes())
+                        || op.eq("COPY".as_bytes())
+                    {
+                        if let Some(idx) = data.iter().position(|x| *x == 0x0) {
+                            let row_eff = String::from_utf8_lossy(&data[..idx]).to_string();
+                            self.info.affected_rows = row_eff.parse().unwrap_or(0);
                         }
                     }
                 }
 
-                if let Some(idx) = data.iter().position(|x| *x == 0x0) {
-                    let row_eff = String::from_utf8_lossy(&data[..idx]).to_string();
-                    self.info.affected_rows = row_eff.parse().unwrap_or(0);
-                }
                 self.perf_stats.as_mut().unwrap().inc_resp();
                 Ok(true)
             }
