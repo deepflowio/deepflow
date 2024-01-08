@@ -923,7 +923,7 @@ func (k *KubernetesRpcUpdater) run() {
 	for {
 		info := k.outputQueue.Get().(K8SRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("k8s from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			log.Warningf("k8s from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType)
 			break
 		}
 		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
@@ -932,7 +932,6 @@ func (k *KubernetesRpcUpdater) run() {
 			Epoch:     time.Now(),
 			ClusterID: info.message.GetClusterId(),
 			ErrorMSG:  info.message.GetErrorMsg(),
-			VtapID:    info.message.GetVtapId(),
 			Version:   info.message.GetVersion(),
 			Entries:   info.message.GetEntries(),
 		})
@@ -1059,10 +1058,11 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 }
 
 func (p *PrometheusRpcUpdater) run() {
+	currentVersion := map[string]uint64{}
 	for {
 		info := p.outputQueue.Get().(PrometheusMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("prometheus from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			log.Warningf("prometheus from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType)
 			break
 		}
 		// 更新和保存内存数据
@@ -1071,22 +1071,23 @@ func (p *PrometheusRpcUpdater) run() {
 		clusterID := info.message.GetClusterId()
 		version := info.message.GetVersion()
 		errMSG := info.message.GetErrorMsg()
-		if errMSG == "" {
+		cVersion := currentVersion[clusterID]
+		parseFlag := version != cVersion
+		if errMSG == "" && parseFlag {
 			entries, err = p.ParsePrometheusEntries(info)
 			if err != nil {
 				errMSG = err.Error()
 			}
+			currentVersion[clusterID] = version
 		}
 
 		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %v,  error message (%s)", info.peer, info.vtapID, clusterID, version, errMSG)
 
-		p.storage.Add(PrometheusInfo{
+		p.storage.Add(parseFlag, PrometheusInfo{
 			ClusterID: clusterID,
-			Version:   version,
 			Entries:   entries,
 			Epoch:     time.Now(),
 			ErrorMSG:  errMSG,
-			VtapID:    info.message.GetVtapId(),
 		})
 	}
 }
