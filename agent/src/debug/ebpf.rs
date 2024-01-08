@@ -34,7 +34,7 @@ use public::{
 pub enum EbpfMessage {
     DataDump((u32, String, u8, u16)),
     Cpdbg(u16),
-    Context(Vec<u8>),
+    Context((u64, Vec<u8>)),
     Error(String),
     Done,
 }
@@ -80,15 +80,17 @@ impl EbpfDebugger {
         unsafe {
             cpdbg_set_config(*timeout as c_int, Self::ebpf_debug);
         }
+        let mut seq = 1;
         while now.elapsed() < duration {
             let s = match self.receiver.recv(Some(Self::QUEUE_RECV_TIMEOUT)) {
                 Ok(s) => s,
                 _ => continue,
             };
 
-            if let Err(e) = send_to(&sock, conn, EbpfMessage::Context(s), serialize_conf) {
+            if let Err(e) = send_to(&sock, conn, EbpfMessage::Context((seq, s)), serialize_conf) {
                 warn!("send ebpf item error: {}", e);
             }
+            seq += 1;
         }
         if let Err(e) = send_to(&sock, conn, EbpfMessage::Done, serialize_conf) {
             warn!("send ebpf item error: {}", e);
@@ -116,15 +118,17 @@ impl EbpfDebugger {
                 Self::ebpf_debug,
             );
         }
+        let mut seq = 1;
         while now.elapsed() < duration {
             let s = match self.receiver.recv(Some(Self::QUEUE_RECV_TIMEOUT)) {
                 Ok(s) => s,
                 _ => continue,
             };
 
-            if let Err(e) = send_to(&sock, conn, EbpfMessage::Context(s), serialize_conf) {
+            if let Err(e) = send_to(&sock, conn, EbpfMessage::Context((seq, s)), serialize_conf) {
                 warn!("send ebpf item error: {}", e);
             }
+            seq += 1;
         }
         if let Err(e) = send_to(&sock, conn, EbpfMessage::Done, serialize_conf) {
             warn!("send ebpf item error: {}", e);
