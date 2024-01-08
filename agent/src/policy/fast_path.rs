@@ -287,7 +287,7 @@ impl FastPath {
         packet: &mut LookupKey,
         policy: &PolicyData,
         endpoints: EndpointData,
-    ) {
+    ) -> (Arc<PolicyData>, Arc<EndpointData>) {
         self.table_flush_check(packet);
         self.interest_table_map(packet);
 
@@ -306,21 +306,37 @@ impl FastPath {
             forward.format_npb_action();
         }
 
-        if let Some(item) = table.get_mut(&key) {
-            item.protocol_table[proto] = Some(Arc::new(forward.clone()));
+        let (forward_policy, forward_endpoints) = if let Some(item) = table.get_mut(&key) {
+            let forward_policy = Arc::new(forward.clone());
+            item.protocol_table[proto] = Some(forward_policy.clone());
+            let forward_endpoints = item.store.get(
+                packet.l2_end_0,
+                packet.l2_end_1,
+                packet.l3_end_0,
+                packet.l3_end_1,
+            );
+            (forward_policy, forward_endpoints)
         } else {
             let mut item = PolicyTableItem {
                 store: EndpointStore::from(endpoints),
                 protocol_table: unsafe { std::mem::zeroed() },
             };
-            item.protocol_table[proto] = Some(Arc::new(forward.clone()));
+            let forward_policy = Arc::new(forward.clone());
+            let forward_endpoints = item.store.get(
+                packet.l2_end_0,
+                packet.l2_end_1,
+                packet.l3_end_0,
+                packet.l3_end_1,
+            );
+            item.protocol_table[proto] = Some(forward_policy.clone());
             table.put(key, item);
 
             self.policy_count += 1;
-        }
+            (forward_policy, forward_endpoints)
+        };
 
         if key_0 == key_1 {
-            return;
+            return (forward_policy, forward_endpoints);
         }
 
         let mut backward = PolicyData::default();
@@ -348,6 +364,7 @@ impl FastPath {
 
             self.policy_count += 1;
         }
+        return (forward_policy, forward_endpoints);
     }
 
     pub fn get_policy(
