@@ -555,15 +555,15 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			Entries:  k8sEntries,
 		}
 	}
-	if len(k8sInfo.Entries) == 0 {
-		return map[string][]string{}, errors.New("k8s entries length is 0")
-	}
 	if !ok && !retFlag {
 		return map[string][]string{}, errors.New("no vtap report cluster id:" + clusterID)
 	}
 	if k8sInfo.ErrorMSG != "" {
 		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
 		return map[string][]string{}, errors.New(k8sInfo.ErrorMSG)
+	}
+	if len(k8sInfo.Entries) == 0 {
+		return map[string][]string{}, errors.New("k8s entries length is 0")
 	}
 
 	// add resource *v1.IPPool
