@@ -595,6 +595,7 @@ type AdditionalResource struct {
 	LB                    []LB
 	LBListeners           []LBListener
 	LBTargetServers       []LBTargetServer
+	PeerConnections       []PeerConnection
 	SubDomainResources    map[string]*AdditionalSubdomainResource
 }
 

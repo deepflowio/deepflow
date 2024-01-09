@@ -441,14 +441,25 @@ type AdditionalResourceLBTargetServer struct {
 	Port int    `json:"port" yaml:"port" binding:"required"`
 }
 
+type AdditionalResourcePeerConnection struct {
+	Name             string `json:"name" yaml:"name" binding:"required"`
+	UUID             string `json:"uuid" yaml:"uuid" binding:"required"`
+	DomainUUID       string `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	LocalVPCUUID     string `json:"local_vpc_uuid" yaml:"local_vpc_uuid" binding:"required"`
+	LocalRegionUUID  string `json:"local_region_uuid" yaml:"local_region_uuid" binding:"required"`
+	RemoteVPCUUID    string `json:"remote_vpc_uuid" yaml:"remote_vpc_uuid" binding:"required"`
+	RemoteRegionUUID string `json:"remote_region_uuid" yaml:"remote_region_uuid" binding:"required"`
+}
+
 type AdditionalResource struct {
-	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs,omitempty" binding:"omitempty,dive"`
-	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs,omitempty" binding:"omitempty,dive"`
-	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets,omitempty" binding:"omitempty,dive"`
-	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts,omitempty" binding:"omitempty,dive"`
-	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts,omitempty" binding:"omitempty,dive"`
-	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags,omitempty" binding:"omitempty,dive"`
-	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs,omitempty" binding:"omitempty,dive"`
+	AZs             []AdditionalResourceAZ             `json:"azs" yaml:"azs,omitempty" binding:"omitempty,dive"`
+	VPCs            []AdditionalResourceVPC            `json:"vpcs" yaml:"vpcs,omitempty" binding:"omitempty,dive"`
+	Subnets         []AdditionalResourceSubnet         `json:"subnets" yaml:"subnets,omitempty" binding:"omitempty,dive"`
+	Hosts           []AdditionalResourceHost           `json:"hosts" yaml:"hosts,omitempty" binding:"omitempty,dive"`
+	CHosts          []AdditionalResourceChost          `json:"chosts" yaml:"chosts,omitempty" binding:"omitempty,dive"`
+	CloudTags       []AdditionalResourceCloudTag       `json:"cloud_tags" yaml:"cloud_tags,omitempty" binding:"omitempty,dive"`
+	LB              []AdditionalResourceLB             `json:"lbs" yaml:"lbs,omitempty" binding:"omitempty,dive"`
+	PeerConnections []AdditionalResourcePeerConnection `json:"peer_connections" yaml:"peer_connections,omitempty" binding:"omitempty,dive"`
 }
 
 type VTapGroupConfiguration struct {

@@ -42,21 +42,24 @@ const (
 )
 
 type addtionalResourceToolDataSet struct {
-	regionUUID             string
-	azUUIDs                []string
-	vpcUUIDs               []string
-	subnetUUIDToType       map[string]int
-	subnetToCIDRToCIDRUUID map[string]map[string]string
-	hostIPToUUID           map[string]string
-	additionalAZs          []model.AdditionalResourceAZ
-	additionalVPCs         []model.AdditionalResourceVPC
-	additionalSubnets      []model.AdditionalResourceSubnet
-	additionalHosts        []model.AdditionalResourceHost
-	additionalCHosts       []model.AdditionalResourceChost
-	cloudTagCHosts         []mysql.VM
-	cloudTagPodNamespaces  []mysql.PodNamespace
-	subdomainPodNamespaces []mysql.PodNamespace
-	additionalLBs          []model.AdditionalResourceLB
+	regionUUID                string
+	azUUIDs                   []string
+	vpcUUIDs                  []string
+	subnetUUIDToType          map[string]int
+	subnetToCIDRToCIDRUUID    map[string]map[string]string
+	hostIPToUUID              map[string]string
+	additionalAZs             []model.AdditionalResourceAZ
+	additionalVPCs            []model.AdditionalResourceVPC
+	additionalSubnets         []model.AdditionalResourceSubnet
+	additionalHosts           []model.AdditionalResourceHost
+	additionalCHosts          []model.AdditionalResourceChost
+	cloudTagCHosts            []mysql.VM
+	cloudTagPodNamespaces     []mysql.PodNamespace
+	subdomainPodNamespaces    []mysql.PodNamespace
+	additionalLBs             []model.AdditionalResourceLB
+	peerConnectionRegionUUIDs []string
+	vpcUUIDToRegionUUID       map[string]string
+	additionalPeerConnections []model.AdditionalResourcePeerConnection
 }
 
 func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDataSet {
@@ -65,6 +68,7 @@ func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDa
 		subnetUUIDToType:       make(map[string]int),
 		subnetToCIDRToCIDRUUID: make(map[string]map[string]string),
 		hostIPToUUID:           make(map[string]string),
+		vpcUUIDToRegionUUID:    make(map[string]string),
 	}
 }
 
@@ -187,6 +191,22 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 	for domainUUID, subnetToCIDRToCIDRUUID := range domainUUIDToSubnetCIDRInfoMap {
 		domainUUIDToToolDataSet[domainUUID].subnetToCIDRToCIDRUUID = subnetToCIDRToCIDRUUID
 	}
+
+	domainUUIDToRegionUUIDs, err := getPeerConnectionDomainToRegionUUIDs(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, regionUUIDs := range domainUUIDToRegionUUIDs {
+		domainUUIDToToolDataSet[domainUUID].peerConnectionRegionUUIDs = regionUUIDs
+	}
+	domainToVPCUUIDToRegionUUID, err := getVPCUUIDToRegionUUID(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, vpcUUIDToRegionUUID := range domainToVPCUUIDToRegionUUID {
+		domainUUIDToToolDataSet[domainUUID].vpcUUIDToRegionUUID = vpcUUIDToRegionUUID
+	}
+
 	for _, subnet := range additionalRsc.Subnets {
 		toolDS, ok := domainUUIDToToolDataSet[subnet.DomainUUID]
 		if !ok {
@@ -443,6 +463,73 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		}
 	}
 
+	for _, peerConn := range additionalRsc.PeerConnections {
+		toolDS, ok := domainUUIDToToolDataSet[peerConn.DomainUUID]
+		if !ok {
+			return nil, servicecommon.NewError(
+				httpcommon.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("peer_connection (name: %s) domain (uuid: %s) not found", peerConn.Name, peerConn.DomainUUID),
+			)
+		}
+		if peerConn.LocalVPCUUID == peerConn.RemoteVPCUUID {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("peer_connection (name: %s) local vpc and remote vpc cannot be equal", peerConn.Name),
+			)
+		}
+		regionUUIDs := toolDS.peerConnectionRegionUUIDs
+		if len(regionUUIDs) == 0 {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) cannot be associated region", peerConn.DomainUUID),
+			)
+		}
+		if !common.Contains[string](regionUUIDs, peerConn.LocalRegionUUID) {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) cannot be associated with local region (uuid: %s), support regions: %#v",
+					peerConn.DomainUUID, peerConn.LocalRegionUUID, regionUUIDs),
+			)
+		}
+		if !common.Contains[string](regionUUIDs, peerConn.RemoteRegionUUID) {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) cannot be associated with remote region (uuid: %s), support regions: %#v",
+					peerConn.DomainUUID, peerConn.RemoteRegionUUID, regionUUIDs),
+			)
+		}
+		regionUUID, ok := toolDS.vpcUUIDToRegionUUID[peerConn.LocalVPCUUID]
+		if !ok {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) cannot be associated local vpc (uuid: %v)", peerConn.DomainUUID, peerConn.LocalVPCUUID),
+			)
+		}
+		if peerConn.LocalRegionUUID != regionUUID {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) local vpc (uuid: %v) cannot be associated local region (uuid: %v), wanted region (uuid: %v)",
+					peerConn.DomainUUID, peerConn.LocalVPCUUID, peerConn.LocalRegionUUID, regionUUID),
+			)
+		}
+		regionUUID, ok = toolDS.vpcUUIDToRegionUUID[peerConn.RemoteVPCUUID]
+		if !ok {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) cannot be associated remote vpc (uuid: %v)", peerConn.DomainUUID, peerConn.RemoteVPCUUID),
+			)
+		}
+		if peerConn.RemoteRegionUUID != regionUUID {
+			return nil, servicecommon.NewError(
+				httpcommon.INVALID_POST_DATA,
+				fmt.Sprintf("domain (uuid: %s) remote vpc (uuid: %v) cannot be associated remote region (uuid: %v), wanted region (uuid: %v)",
+					peerConn.DomainUUID, peerConn.RemoteVPCUUID, peerConn.RemoteRegionUUID, regionUUID),
+			)
+		}
+
+		toolDS.additionalPeerConnections = append(toolDS.additionalPeerConnections, peerConn)
+	}
+
 	return domainUUIDToToolDataSet, nil
 }
 
@@ -468,6 +555,9 @@ func getDomainUUIDsUsedByAdditionalResource(additionalRsc model.AdditionalResour
 	}
 	for _, lb := range additionalRsc.LB {
 		domainUUIDs.Add(lb.DomainUUID)
+	}
+	for _, peerConn := range additionalRsc.PeerConnections {
+		domainUUIDs.Add(peerConn.DomainUUID)
 	}
 	return domainUUIDs.ToSlice()
 }
@@ -759,6 +849,20 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 			cloudMD.LB = append(cloudMD.LB, modelLB)
 		}
 
+		for _, peerConnection := range toolDS.additionalPeerConnections {
+			cloudMD.PeerConnections = append(
+				cloudMD.PeerConnections,
+				cloudmodel.PeerConnection{
+					Lcuuid:             peerConnection.UUID,
+					Name:               peerConnection.Name,
+					LocalVPCLcuuid:     peerConnection.LocalVPCUUID,
+					LocalRegionLcuuid:  peerConnection.LocalRegionUUID,
+					RemoteVPCLcuuid:    peerConnection.RemoteVPCUUID,
+					RemoteRegionLcuuid: peerConnection.RemoteRegionUUID,
+				},
+			)
+		}
+
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
 		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
 	}
@@ -1021,4 +1125,41 @@ func isTagValid(str string, isKey bool) error {
 
 func GetDomainAdditionalResourceExample() (string, error) {
 	return string(model.YamlDomainAdditionalResourceExample), nil
+}
+
+func getPeerConnectionDomainToRegionUUIDs(domainUUIDs []string) (map[string][]string, error) {
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	if err != nil {
+		return nil, servicecommon.NewError(
+			httpcommon.INVALID_POST_DATA,
+			fmt.Sprintf("db query az failed: %s", err),
+		)
+	}
+	domainToRegionUUIDs := make(map[string][]string)
+	for _, item := range azs {
+		if item.Domain != common.DEFAULT_DOMAIN && item.Domain != "" && item.Region != "" {
+			domainToRegionUUIDs[item.Domain] = append(domainToRegionUUIDs[item.Domain], item.Region)
+		}
+	}
+	return domainToRegionUUIDs, nil
+}
+
+func getVPCUUIDToRegionUUID(domainUUIDs []string) (map[string]map[string]string, error) {
+	var vpcs []mysql.VPC
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	if err != nil {
+		return nil, servicecommon.NewError(
+			httpcommon.INVALID_POST_DATA,
+			fmt.Sprintf("db query vpc failed: %s", err),
+		)
+	}
+	domainToVPCUUIDToRegionUUID := make(map[string]map[string]string)
+	for _, item := range vpcs {
+		if _, ok := domainToVPCUUIDToRegionUUID[item.Domain]; !ok {
+			domainToVPCUUIDToRegionUUID[item.Domain] = make(map[string]string)
+		}
+		domainToVPCUUIDToRegionUUID[item.Domain][item.Lcuuid] = item.Region
+	}
+	return domainToVPCUUIDToRegionUUID, nil
 }
