@@ -131,7 +131,7 @@ impl<'a> HessianObjIterator<'a> {
             return None;
         };
 
-        if self.current_field_idx > self.field_list.len() {
+        if self.current_field_idx >= self.field_list.len() {
             return None;
         }
 
