@@ -24,6 +24,7 @@ const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
 const DB_NAME_PROMETHEUS = "prometheus"
+const DB_NAME_FLOW_TAG = "flow_tag"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
 
