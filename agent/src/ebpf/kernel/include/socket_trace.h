@@ -150,20 +150,6 @@ struct conn_info_t {
 	 * kernel protocol inference.
 	 */
 	__u8 skip_proto;
-	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
-	__u8 protocol;
-	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	__u8 message_type;
-	void *sk;
-	struct socket_info_t *socket_info_ptr;  /* lookup __socket_info_map */
-	size_t count;		// syscall data length
-	__u32 fd;
-	__u32 syscall_infer_len;
-	__s32 correlation_id;	// Currently used for Kafka determination
-	__u32 prev_count;	// Prestored data length
-	char prev_buf[EBPF_CACHE_SIZE];
-	char *syscall_infer_addr;
-
 	/*
 	   The matching logic is:
 
@@ -187,7 +173,21 @@ struct conn_info_t {
 	// the Go DNS case. Parse DNS save record type and ignore AAAA records
 	// in call chain trace
 	__u16 dns_q_type;
-	__u32 tcpseq_offset;	// Used for adjusting TCP sequence numbers
+
+	__u32 fd;
+	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
+	enum traffic_protocol protocol;
+	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
+	enum message_type message_type;
+	__s32 correlation_id;	// Currently used for Kafka determination
+	__u32 prev_count;	// Prestored data length
+	__u32 syscall_infer_len;
+	__u64 count:40;
+	__u64 tcpseq_offset:24;
+	char prev_buf[EBPF_CACHE_SIZE];
+	char *syscall_infer_addr;
+	void *sk;
+	struct socket_info_t *socket_info_ptr;	/* lookup __socket_info_map */
 };
 
 struct process_data_extra {
