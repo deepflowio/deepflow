@@ -1,3 +1,7 @@
 [submodule "message/opentelemetry"]
 	path = message/opentelemetry
 	url = https://github.com/open-telemetry/opentelemetry-proto.git
+[submodule "agent/src/ebpf/libs/jattach"]
+	path = agent/src/ebpf/libs/jattach
+	url = https://github.com/jattach/jattach
+	ignore = dirty
