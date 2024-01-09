@@ -167,6 +167,21 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 			return nil, 0, "", nil
 		}
 		dbFields[i] = metricStruct.DBField
+		// enum tag
+		tagEnum := strings.TrimSuffix(field, "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
+		tagDes, getTagOK := tag.GetTag(field, db, table, "enum")
+		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
+			DB: db, Table: table, TagName: field,
+		}]
+		if getTagOK {
+			if tagOK {
+				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+			} else {
+				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, tagEnum)
+			}
+		}
 
 		// 判断算子是否支持单层
 		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
