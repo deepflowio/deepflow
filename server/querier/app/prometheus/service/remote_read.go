@@ -92,7 +92,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	var db, datasource string
 	var debugInfo map[string]interface{}
 	log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, storage_query_start, storage_query_end)
-	ctx, sql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end, debug)
+	ctx, querierSql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, storage_query_start, storage_query_end, debug)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, "", "", 0, err
@@ -110,7 +110,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
 	args := common.QuerierParams{
 		DB:         db,
-		Sql:        sql,
+		Sql:        querierSql,
 		DataSource: datasource,
 		Debug:      strconv.FormatBool(debugQuerier),
 		QueryUUID:  query_uuid.String(),
