@@ -662,13 +662,13 @@ func (t *PrometheusLabelTable) HandleSimpleCommand(op uint16, arg string) string
 	return t.statsString()
 }
 
-// request string as: metric=xxx,job=xxx,instance=xxx,label1=xxx,label2=xxx
+// request string as: metric=xxx,job=xxx,instance=xxx,pod_cluster_id=xxx,epc_id=xxx,label1=xxx,label2=xxx
 func (t *PrometheusLabelTable) testString(request string) string {
 	req := &trident.PrometheusLabelRequest{}
 	metricReq := &trident.MetricLabelRequest{}
 	targetReq := &trident.TargetRequest{}
 	keyValues := strings.Split(request, ",")
-	clusterId := 0
+	clusterId, epcId := 0, 0
 	for _, kv := range keyValues {
 		kv := strings.Split(kv, "=")
 		if len(kv) != 2 {
@@ -684,14 +684,18 @@ func (t *PrometheusLabelTable) testString(request string) string {
 			instance := kv[1]
 			targetReq.Instance = &instance
 			addLabel(metricReq, kv[0], kv[1])
-		} else if kv[0] == "clusterId" {
+		} else if kv[0] == "pod_cluster_id" {
 			clusterId, _ = strconv.Atoi(kv[1])
+		} else if kv[0] == "epc_id" {
+			epcId, _ = strconv.Atoi(kv[1])
 		} else {
 			addLabel(metricReq, kv[0], kv[1])
 		}
 	}
 	metricReq.PodClusterId = proto.Uint32(uint32(clusterId))
+	metricReq.EpcId = proto.Uint32(uint32(epcId))
 	targetReq.PodClusterId = proto.Uint32(uint32(clusterId))
+	targetReq.EpcId = proto.Uint32(uint32(epcId))
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
 	resp, err := t.RequestLabelIDs(req)
