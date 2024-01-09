@@ -50,7 +50,7 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
-	var deviceType, deviceID, vpcID int
+	var deviceType, deviceID int
 	podID, ok := p.cache.ToolDataSet.GetPodIDByContainerID(cloudItem.ContainerID)
 	if len(cloudItem.ContainerID) != 0 && ok {
 		deviceType = common.VIF_DEVICE_TYPE_POD
@@ -65,7 +65,9 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 			deviceID = vtap.LaunchServerID
 		}
 	}
-	var podNodeID, vmID int
+
+	// add pod node id
+	var podNodeID int
 	if deviceType == common.VIF_DEVICE_TYPE_POD {
 		podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
 		if err != nil {
@@ -74,20 +76,27 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 
 		if podInfo != nil && podInfo.PodNodeID != 0 {
 			podNodeID = podInfo.PodNodeID
-
 		}
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		podNodeID = deviceID
 	}
 
-	id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
-	if ok {
-		vmID = id
+	// add vm id
+	var vmID int
+	if deviceType == common.VIF_DEVICE_TYPE_POD ||
+		deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+		id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
+		if ok {
+			vmID = id
+		}
+	} else {
+		vmID = deviceID
 	}
-	vmInfo, err := p.cache.ToolDataSet.GetVMInfoByID(id)
+	vmInfo, err := p.cache.ToolDataSet.GetVMInfoByID(vmID)
 	if err != nil {
 		log.Error(err)
 	}
+	var vpcID int
 	if vmInfo != nil {
 		vpcID = vmInfo.VPCID
 	}
