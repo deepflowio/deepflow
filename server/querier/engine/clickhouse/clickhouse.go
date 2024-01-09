@@ -243,47 +243,66 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			if err != nil {
 				return nil, []string{}, true, err
 			}
+
 			// tag metrics
-			tagSql := fmt.Sprintf("show tags from %s", table)
-			tagData, err := tagdescription.GetTagDescriptions(e.DB, table, tagSql, e.Context)
-			if err != nil {
+			dbData, ok := metrics.DB_DESCRIPTIONS["clickhouse"]
+			if !ok {
 				return nil, []string{}, true, err
 			}
-			for _, col := range tagData.Values {
-				tagType := col.([]interface{})[4].(string)
-				if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
-					continue
-				}
-				if e.DB == "flow_tag" {
-					continue
-				}
-				name := col.([]interface{})[0].(string)
-				clientName := col.([]interface{})[1].(string)
-				serverName := col.([]interface{})[2].(string)
-				displayName := col.([]interface{})[3].(string)
-				permissions, err := chCommon.ParsePermission("111")
-				if err != nil {
-					return nil, []string{}, true, err
-				}
-				if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
-					clientNameMetric := []interface{}{
-						clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-						"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+			dbDataMap := dbData.(map[string]interface{})
+			if tagData, ok := dbDataMap["tag"]; ok {
+				dbTagMap := tagData.(map[string]interface{})
+				if dbTag, ok := dbTagMap[e.DB]; ok {
+					tableTagMap := dbTag.(map[string]interface{})
+					newTable := table
+					if e.DB == chCommon.DB_NAME_PROMETHEUS {
+						newTable = "samples"
+					} else if e.DB == chCommon.DB_NAME_EXT_METRICS {
+						newTable = "ext_common"
+					} else if e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+						newTable = "deepflow_system_common"
 					}
-					result.Values = append(result.Values, clientNameMetric)
-					if serverName != clientName {
-						serverNameMetric := []interface{}{
-							serverName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+					if tableTag, ok := tableTagMap[newTable]; ok {
+						tabletagSlice := tableTag.([][]interface{})
+						for i, tagSlice := range tabletagSlice {
+							tagType := tagSlice[4].(string)
+							if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+								continue
+							}
+							if e.DB == chCommon.DB_NAME_FLOW_TAG {
+								continue
+							}
+							name := tagSlice[0].(string)
+							clientName := tagSlice[1].(string)
+							serverName := tagSlice[2].(string)
+							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
+							displayName := tagLanguage[1].(string)
+							permissions, err := chCommon.ParsePermission("111")
+							if err != nil {
+								return nil, []string{}, true, err
+							}
+							if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+								clientNameMetric := []interface{}{
+									clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+									"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+								}
+								result.Values = append(result.Values, clientNameMetric)
+								if serverName != clientName {
+									serverNameMetric := []interface{}{
+										serverName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+									}
+									result.Values = append(result.Values, serverNameMetric)
+								}
+							} else {
+								nameMetric := []interface{}{
+									name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+									"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+								}
+								result.Values = append(result.Values, nameMetric)
+							}
 						}
-						result.Values = append(result.Values, serverNameMetric)
 					}
-				} else {
-					nameMetric := []interface{}{
-						name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-						"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-					}
-					result.Values = append(result.Values, nameMetric)
 				}
 			}
 			return result, []string{}, true, err
