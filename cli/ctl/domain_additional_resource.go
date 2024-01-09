@@ -70,7 +70,7 @@ func RegisterDomainAdditionalResourceCommand() *cobra.Command {
 			listDomainAdditionalResource(cmd, resourceType, resourceName)
 		},
 	}
-	list.Flags().StringVarP(&resourceType, "type", "", "", "resource type, support: az, vpc, subnet, host, chost, lb, cloud-tag")
+	list.Flags().StringVarP(&resourceType, "type", "", "", "resource type, support: az, vpc, subnet, host, chost, lb, cloud-tag, peer-connection")
 	list.Flags().StringVarP(&resourceName, "name", "", "", "resource name, need to set the type value first")
 
 	DomainAdditionalResource.AddCommand(apply)
@@ -210,6 +210,17 @@ cloud_tags:{{ range .CLOUD_TAGS }}
   - key: {{ .KEY }}
     value: {{ .VALUE }}
   {{- end }}
+{{- end }}{{ end }}
+
+{{- if .PEER_CONNECTIONS }}
+peer_connections:{{ range .PEER_CONNECTIONS }}
+- name: {{ .NAME }}
+  uuid: {{ .UUID }}
+  domain_uuid: {{ .DOMAIN_UUID }}
+  local_vpc_uuid: {{ .LOCAL_VPC_UUID }}
+  local_region_uuid: {{ .LOCAL_REGION_UUID }}
+  remote_vpc_uuid: {{ .REMOTE_VPC_UUID }}
+  remote_region_uuid: {{ .REMOTE_REGION_UUID }}
 {{- end }}{{ end }}
 `
 

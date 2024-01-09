@@ -77,3 +77,12 @@ lbs:
     lb_target_servers:     # optional, lb target servers
     - ip: x.x.x.x          # required
       port: xx             # required
+
+peer_connections:
+- name: xxx                 # required
+  uuid: xxxx                # required
+  domain_uuid: xxx               # required 
+  local_vpc_uuid: xxx       # required
+  local_region_uuid: xxx    # required
+  remote_vpc_uuid: xxx      # required
+  remote_region_uuid: xxx   # required

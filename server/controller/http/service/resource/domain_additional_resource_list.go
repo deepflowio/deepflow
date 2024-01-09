@@ -69,6 +69,8 @@ func GetDomainAdditionalResource(resourceType, resourceName string) (*model.Addi
 				return nil, err
 			}
 			resp.CloudTags = append(resp.CloudTags, cloudTags...)
+		case "peer-connection":
+			resp.PeerConnections = append(resp.PeerConnections, getPeerConnections(resource.PeerConnections, domain, resourceName)...)
 		case "":
 			resp.AZs = append(resp.AZs, getAZs(resource.AZs, domain, resourceName)...)
 			resp.VPCs = append(resp.VPCs, getVPCs(resource.VPCs, domain, resourceName)...)
@@ -82,6 +84,7 @@ func GetDomainAdditionalResource(resourceType, resourceName string) (*model.Addi
 				return nil, err
 			}
 			resp.CloudTags = append(resp.CloudTags, cloudTags...)
+			resp.PeerConnections = append(resp.PeerConnections, getPeerConnections(resource.PeerConnections, domain, resourceName)...)
 
 		default:
 			return nil, fmt.Errorf("resource type(%v) is not supported, please enter: az, vpc, subnet, host, chost, lb, cloud-tag")
@@ -385,4 +388,23 @@ func getClouTags(resource *cloudmodel.AdditionalResource, domain, resourceName s
 		resp = append(resp, genCloudTags(additionalResource.PodNamespaceCloudTags)...)
 	}
 	return resp, nil
+}
+
+func getPeerConnections(peerConns []cloudmodel.PeerConnection, domain, resourceName string) []model.AdditionalResourcePeerConnection {
+	var resp []model.AdditionalResourcePeerConnection
+	for _, item := range peerConns {
+		if resourceName != "" && item.Name != resourceName {
+			continue
+		}
+		resp = append(resp, model.AdditionalResourcePeerConnection{
+			Name:             item.Name,
+			DomainUUID:       domain,
+			UUID:             item.Lcuuid,
+			LocalVPCUUID:     item.LocalVPCLcuuid,
+			LocalRegionUUID:  item.LocalRegionLcuuid,
+			RemoteVPCUUID:    item.RemoteVPCLcuuid,
+			RemoteRegionUUID: item.RemoteRegionLcuuid,
+		})
+	}
+	return resp
 }
