@@ -1,0 +1,47 @@
+From 960440604178325ac651e9eb13db6d56275eccae Mon Sep 17 00:00:00 2001
+From: Jin Jie <jinjie@yunshan.net.cn>
+Date: Wed, 10 Jan 2024 16:53:17 +0800
+Subject: [PATCH] Add compilation for static lib
+
+---
+ Makefile | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 078bca3..88abe50 100644
+--- a/Makefile
++++ b/Makefile
+@@ -15,6 +15,8 @@ else
+   else
+     CFLAGS ?= -O3
+     JATTACH_DLL=libjattach.so
++    JATTACH_STATIC=libjattach.a
++    OBJS = build/jattach.o build/jattach_hotspot.o build/jattach_openj9.o build/psutil.o
+   endif
+ 
+   ifeq ($(UNAME_S),Linux)
+@@ -30,7 +32,7 @@ endif
+ 
+ all: build build/$(JATTACH_EXE)
+ 
+-dll: build build/$(JATTACH_DLL)
++dll: build build/$(JATTACH_DLL) $(if $(JATTACH_STATIC), build/$(JATTACH_STATIC))
+ 
+ build:
+ 	mkdir -p build
+@@ -41,6 +43,12 @@ build/jattach: src/posix/*.c src/posix/*.h
+ build/$(JATTACH_DLL): src/posix/*.c src/posix/*.h
+ 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -fPIC -shared -fvisibility=hidden -o $@ src/posix/*.c
+ 
++build/$(JATTACH_STATIC): $(OBJS)
++	$(AR) rcs $@ $^
++
++$(OBJS): build/%.o : src/posix/%.c
++	$(CC) -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -I./src/posix -c $< -o $@
++
+ build/jattach.exe: src/windows/jattach.c
+ 	$(CL) $(CFLAGS) /DJATTACH_VERSION=\"$(JATTACH_VERSION)\" /Fobuild/jattach.obj /Fe$@ $^ advapi32.lib /link /SUBSYSTEM:CONSOLE,5.02
+ 
+-- 
+2.39.1
+
