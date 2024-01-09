@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	_prometheus_tag_key = "`tag`"
+	_prometheus_tag_key = "FastTrans(tag)"
 	min_interval        = 10 * time.Second
 )
 
@@ -58,8 +58,8 @@ var QueryFuncCall = map[string]QueryFunc{
 	// Vector
 	"avg_over_time": simpleCallMatrixFunc("AAvg"),
 	"count_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		*group = append(*group, _prometheus_tag_key)
-		*query = append(*query, _prometheus_tag_key)
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*query = append(*query, "Count(row)") // change to sum in range query
 	},
 	"last_over_time": simpleCallMatrixFunc("Last"),
@@ -76,8 +76,8 @@ var QueryFuncCall = map[string]QueryFunc{
 			*query = append(*query, fmt.Sprintf("time(time, 1) AS %s", PROMETHEUS_TIME_COLUMNS))
 		}
 
-		*query = append(*query, _prometheus_tag_key)
-		*group = append(*group, _prometheus_tag_key)
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Instant {
 			*query = append(*query, fmt.Sprintf("%s(%s)", "Min", metric))
@@ -86,8 +86,8 @@ var QueryFuncCall = map[string]QueryFunc{
 		}
 	},
 	"stddev_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		*query = append(*query, _prometheus_tag_key)
-		*group = append(*group, _prometheus_tag_key)
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Instant {
 			// timeWindow := req.GetEnd() - req.GetStart()
@@ -106,13 +106,13 @@ var QueryFuncCall = map[string]QueryFunc{
 	"sum_over_time": simpleCallMatrixFunc("Sum"),
 	"present_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		// get 1
-		*group = append(*group, _prometheus_tag_key)
-		*query = append(*query, _prometheus_tag_key)
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*query = append(*query, "1")
 	},
 	"quantile_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		*group = append(*group, _prometheus_tag_key)
-		*query = append(*query, _prometheus_tag_key)
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		quantile_param := req.GetFuncParam("quantile_over_time")
 		if queryType == model.Instant {
@@ -130,9 +130,9 @@ var QueryFuncCall = map[string]QueryFunc{
 		} else {
 			*query = append(*query, fmt.Sprintf("time(time, 1) AS %s", PROMETHEUS_TIME_COLUMNS))
 		}
-
+		*query = append(*query, fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX))
 		*query = append(*query, fmt.Sprintf("%s(%s)", "Min", metric))
-		*group = append(*group, _prometheus_tag_key)
+		*group = append(*group, PROMETHEUS_LABELS_INDEX)
 		for _, tag := range req.GetGrouping("min") {
 			*group = append(*group, handleLabelsMatch(tag))
 		}
@@ -146,17 +146,18 @@ var QueryFuncCall = map[string]QueryFunc{
 
 	"topk": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		if len(*group) == 0 {
-			*group = append(*group, _prometheus_tag_key)
-			*query = append(*query, _prometheus_tag_key)
+			*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+			*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		}
 		*query = append(*query, fmt.Sprintf("Max(%s)", metric)) // use for max value, then order by value, try best to get topN
-		*order = append(*order, fmt.Sprintf("%s desc", metric))
+		// *order = append(*order, fmt.Sprintf("%s desc", metric))
 	},
 
 	"bottomk": nil, // don't use Min(%s), because min will fill zero as default value
 
 	"quantile": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		*group = append(*group, _prometheus_tag_key)
+		*group = append(*group, PROMETHEUS_LABELS_INDEX)
+		*query = append(*query, fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX))
 		quantile_param := req.GetFuncParam("quantile")
 		*query = append(*query, fmt.Sprintf("Percentile(%s, %g)", metric, quantile_param))
 		for _, tag := range req.GetGrouping("quantile") {
@@ -183,12 +184,12 @@ var QueryFuncCall = map[string]QueryFunc{
 		}
 
 		if len(*group) == 0 {
-			*group = append(*group, _prometheus_tag_key)
-			*query = append(*query, _prometheus_tag_key)
+			*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+			*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		}
 
 		// use default interval to get irate in instant query
-		*query = append(*query, fmt.Sprintf("Derivative(%s,`tag`)", metric))
+		*query = append(*query, fmt.Sprintf("Derivative(%s,%s)", metric, PROMETHEUS_NATIVE_TAG_NAME))
 	},
 
 	"rate": nil, // not implemented
@@ -235,8 +236,9 @@ var QueryFuncCall = map[string]QueryFunc{
 
 func simpleSelection(oriFunc string, aftFunc string) QueryFunc {
 	return func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
+		*query = append(*query, fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX))
 		*query = append(*query, aftFunc)
-		*group = append(*group, _prometheus_tag_key)
+		*group = append(*group, PROMETHEUS_LABELS_INDEX)
 		for _, tag := range req.GetGrouping(oriFunc) {
 			*group = append(*group, handleLabelsMatch(tag))
 		}
@@ -245,8 +247,9 @@ func simpleSelection(oriFunc string, aftFunc string) QueryFunc {
 
 func simpleCallFunc(oriFunc string, aftFunc string) QueryFunc {
 	return func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
+		*query = append(*query, fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX))
 		*query = append(*query, fmt.Sprintf("%s(%s)", aftFunc, metric))
-		*group = append(*group, _prometheus_tag_key)
+		*group = append(*group, PROMETHEUS_LABELS_INDEX)
 		for _, tag := range req.GetGrouping(oriFunc) {
 			*group = append(*group, handleLabelsMatch(tag))
 		}
@@ -255,8 +258,8 @@ func simpleCallFunc(oriFunc string, aftFunc string) QueryFunc {
 
 func simpleCallMatrixFunc(f string) QueryFunc {
 	return func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		*query = append(*query, _prometheus_tag_key)
-		*group = append(*group, _prometheus_tag_key)
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Instant {
 			*query = append(*query, fmt.Sprintf("%s(%s)", f, metric))
