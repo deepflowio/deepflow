@@ -23,21 +23,18 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"testing"
 
 	"bou.ke/monkey"
+	"github.com/jarcoal/httpmock"
 
 	//"github.com/k0kubun/pp"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
-	"github.com/deepflowio/deepflow/server/querier/parse"
-
-	//"github.com/deepflowio/deepflow/server/querier/querier"
-	"testing"
-
 	"github.com/deepflowio/deepflow/server/querier/config"
-
-	"github.com/jarcoal/httpmock"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/parse"
 )
 
 /* var (
@@ -527,6 +524,7 @@ func Load() error {
 	if err != nil {
 		return err
 	}
+	metrics.DB_DESCRIPTIONS = dbDescriptions
 	return nil
 }
 

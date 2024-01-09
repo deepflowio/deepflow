@@ -19,6 +19,7 @@ package querier
 import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 )
 
 /*
@@ -52,5 +53,6 @@ func Load() error {
 	if err != nil {
 		return err
 	}
+	metrics.DB_DESCRIPTIONS = dbDescriptions
 	return nil
 }

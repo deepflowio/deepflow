@@ -39,6 +39,7 @@ const METRICS_OPERATOR_GTE = ">="
 const METRICS_OPERATOR_LTE = "<="
 
 var METRICS_OPERATORS = []string{METRICS_OPERATOR_GTE, METRICS_OPERATOR_LTE}
+var DB_DESCRIPTIONS map[string]interface{}
 
 type Metrics struct {
 	Index       int    // 索引
@@ -112,6 +113,7 @@ func GetAggMetrics(field string, db string, table string, ctx context.Context) (
 }
 
 func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
 	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
@@ -119,82 +121,105 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 			if fieldSplit[0] == "metrics" {
 				fieldName := strings.Replace(field, "metrics.", "", 1)
 				metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
-				return NewMetrics(
+				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
 					"metrics", []bool{true, true, true}, "", table, "",
-				), true
+				)
+				newAllMetrics[field] = metric
 			}
 		}
 	} else if db == ckcommon.DB_NAME_PROMETHEUS {
-		return NewMetrics(
+		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
 			"metrics", []bool{true, true, true}, "", table, "",
-		), true
+		)
+		newAllMetrics[field] = metric
 	}
 	allMetrics, err := GetMetricsByDBTableStatic(db, table, "")
 	if err != nil {
 		return nil, false
 	}
 	// deep copy map
-	newAllMetrics := map[string]*Metrics{}
 	for k, v := range allMetrics {
 		newAllMetrics[k] = v
 	}
-	tagSql := fmt.Sprintf("show tags from %s", table)
-	tagData, err := tag.GetTagDescriptions(db, table, tagSql, context.Background())
 	if err != nil {
 		return nil, false
 	}
+
 	// tag metrics
-	for _, col := range tagData.Values {
-		tagType := col.([]interface{})[4].(string)
-		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
-			continue
-		}
-		if db == "flow_tag" {
-			continue
-		}
-		name := col.([]interface{})[0].(string)
-		clientName := col.([]interface{})[1].(string)
-		serverName := col.([]interface{})[2].(string)
-		displayName := col.([]interface{})[3].(string)
-		permissions, err := ckcommon.ParsePermission("111")
-		if err != nil {
-			return nil, false
-		}
-		nameDBField, err := GetTagDBField(name, db, table)
-		if err != nil {
-			return nil, false
-		}
-		clientNameDBField, err := GetTagDBField(clientName, db, table)
-		if err != nil {
-			return nil, false
-		}
-		serverNameDBField, err := GetTagDBField(serverName, db, table)
-		if err != nil {
-			return nil, false
-		}
-		if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
-			clientNameMetric := NewMetrics(
-				0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-				"Tag", permissions, "", table, "",
-			)
-			newAllMetrics[clientName] = clientNameMetric
-			if serverName != clientName {
-				serverNameMetric := NewMetrics(
-					0, serverNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "",
-				)
-				newAllMetrics[serverName] = serverNameMetric
+	dbData, ok := DB_DESCRIPTIONS["clickhouse"]
+	if !ok {
+		return nil, false
+	}
+	dbDataMap := dbData.(map[string]interface{})
+	if tagData, ok := dbDataMap["tag"]; ok {
+		dbTagMap := tagData.(map[string]interface{})
+		if dbTag, ok := dbTagMap[db]; ok {
+			tableTagMap := dbTag.(map[string]interface{})
+			newTable := table
+			if db == ckcommon.DB_NAME_PROMETHEUS {
+				newTable = "samples"
+			} else if db == ckcommon.DB_NAME_EXT_METRICS {
+				newTable = "ext_common"
+			} else if db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM {
+				newTable = "deepflow_system_common"
 			}
-		} else {
-			nameMetric := NewMetrics(
-				0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-				"Tag", permissions, "", table, "",
-			)
-			newAllMetrics[name] = nameMetric
+			if tableTag, ok := tableTagMap[newTable]; ok {
+				tabletagSlice := tableTag.([][]interface{})
+				for i, tagSlice := range tabletagSlice {
+					tagType := tagSlice[4].(string)
+					if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+						continue
+					}
+					if db == ckcommon.DB_NAME_FLOW_TAG {
+						continue
+					}
+					name := tagSlice[0].(string)
+					clientName := tagSlice[1].(string)
+					serverName := tagSlice[2].(string)
+					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
+					displayName := tagLanguage[1].(string)
+					permissions, err := ckcommon.ParsePermission("111")
+					if err != nil {
+						return nil, false
+					}
+					nameDBField, err := GetTagDBField(name, db, table)
+					if err != nil {
+						return nil, false
+					}
+					clientNameDBField, err := GetTagDBField(clientName, db, table)
+					if err != nil {
+						return nil, false
+					}
+					serverNameDBField, err := GetTagDBField(serverName, db, table)
+					if err != nil {
+						return nil, false
+					}
+					if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+						clientNameMetric := NewMetrics(
+							0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+							"Tag", permissions, "", table, "",
+						)
+						newAllMetrics[clientName] = clientNameMetric
+						if serverName != clientName {
+							serverNameMetric := NewMetrics(
+								0, serverNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+								"Tag", permissions, "", table, "",
+							)
+							newAllMetrics[serverName] = serverNameMetric
+						}
+					} else {
+						nameMetric := NewMetrics(
+							0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+							"Tag", permissions, "", table, "",
+						)
+						newAllMetrics[name] = nameMetric
+					}
+				}
+			}
 		}
 	}
 	metric, ok := newAllMetrics[field]
