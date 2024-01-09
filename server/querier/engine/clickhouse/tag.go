@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -152,7 +153,7 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			}
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
-			tagTranslator, err := GetPrometheusAllTagTranslator(table)
+			tagTranslator, _, err := GetPrometheusAllTagTranslator(table)
 			if err != nil {
 				return nil, "", err
 			}
@@ -219,9 +220,10 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) (string, error) {
+func GetPrometheusAllTagTranslator(table string) (string, string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
+	labelFastTranslatorSlice := []string{}
 	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
@@ -229,6 +231,7 @@ func GetPrometheusAllTagTranslator(table string) (string, error) {
 			if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
 				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
+				labelFastTranslatorSlice = append(labelFastTranslatorSlice, fmt.Sprintf("app_label_value_id_%d", appLabel.appLabelColumnIndex))
 			}
 		}
 		appLabelTranslatorStr = strings.Join(appLabelTranslatorSlice, ",")
@@ -241,7 +244,9 @@ func GetPrometheusAllTagTranslator(table string) (string, error) {
 	} else {
 		tagTranslatorStr = "toJSONString(" + targetLabelTranslatorStr + ")"
 	}
-	return tagTranslatorStr, nil
+	labelFastTranslatorSlice = append(labelFastTranslatorSlice, "target_id")
+	labelFastTranslatorStr := fmt.Sprintf("array(%s)", strings.Join(labelFastTranslatorSlice, ","))
+	return tagTranslatorStr, labelFastTranslatorStr, nil
 }
 
 func GetMetricsTag(name string, alias string, db string, table string, ctx context.Context) (Statement, error) {

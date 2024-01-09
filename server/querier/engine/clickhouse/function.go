@@ -27,6 +27,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -46,6 +47,7 @@ const (
 	TAG_FUNCTION_TOPK                       = "topK"
 	TAG_FUNCTION_NEW_TAG                    = "newTag"
 	TAG_FUNCTION_ENUM                       = "enum"
+	TAG_FUNCTION_FAST_TRANS                 = "FastTrans"
 )
 
 const INTERVAL_1D = 86400
@@ -54,7 +56,7 @@ var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
 	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
-	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM,
+	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM, TAG_FUNCTION_FAST_TRANS,
 }
 
 type Function interface {
@@ -634,6 +636,15 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		node := f.getViewNode()
 		// node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
+	case TAG_FUNCTION_FAST_TRANS:
+		if f.DB == chCommon.DB_NAME_PROMETHEUS && f.Args[0] == "tag" {
+			_, labelFastTranslatorStr, _ := GetPrometheusAllTagTranslator(f.Table)
+			f.Value = labelFastTranslatorStr
+		}
+		if f.Alias == "" {
+			f.Alias = fmt.Sprintf("fast_trans_%s", f.Args[0])
+		}
+		return f.getViewNode()
 	case TAG_FUNCTION_ENUM:
 		var tagFilter string
 		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
