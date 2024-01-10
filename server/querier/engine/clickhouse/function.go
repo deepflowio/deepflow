@@ -83,7 +83,7 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context, isDerivative bool, derivativeGroupBy []string) (Statement, int, string, error) {
+func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context, isDerivative bool, derivativeGroupBy []string, derivativeArgs []string) (Statement, int, string, error) {
 	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
 		return GetTopKTrans(name, args, alias, db, table, ctx)
 	}
@@ -129,6 +129,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 		Args:              args,
 		Alias:             alias,
 		IsDerivative:      isDerivative,
+		DerivativeArgs:    derivativeArgs,
 		DerivativeGroupBy: derivativeGroupBy,
 	}, levelFlag, unit, nil
 }
@@ -295,6 +296,7 @@ type AggFunction struct {
 	Args              []string
 	Alias             string
 	IsDerivative      bool
+	DerivativeArgs    []string
 	DerivativeGroupBy []string
 }
 
@@ -310,14 +312,10 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		var innerFunction view.DefaultFunction
 		// Inner layer derivative
 		if f.IsDerivative {
-			groupBy := []string{}
-			if len(f.Args) > 1 {
-				groupBy = f.Args[1:]
-			}
 			innerFunction = view.DefaultFunction{
-				Name:   view.FUNCTION_DERIVATIVE,
-				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
-				Args:   groupBy,
+				Name:           view.FUNCTION_DERIVATIVE,
+				Fields:         []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				DerivativeArgs: f.DerivativeArgs,
 			}
 		} else {
 			innerFunction = view.DefaultFunction{
@@ -404,7 +402,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	} else {
 		outFunc = view.GetFunc(f.Name)
 	}
-	if len(f.Args) > 1 && !m.IsDerivative {
+	if len(f.Args) > 1 {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
