@@ -382,7 +382,10 @@ impl PostgresqlLog {
                 }
                 Err(Error::L7ProtocolUnknown)
             }
-            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => Ok(()),
+            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => {
+                self.perf_inc_req(time);
+                Ok(())
+            }
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
@@ -471,7 +474,10 @@ impl PostgresqlLog {
             }
 
             'Z' | 'I' | '1' | '2' | '3' | 'S' | 'K' | 'T' | 'n' | 'N' | 't' | 'D' | 'G' | 'H'
-            | 'W' | 'd' | 'c' => Ok(()),
+            | 'W' | 'd' | 'c' => {
+                self.perf_inc_resp(time);
+                Ok(())
+            }
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
