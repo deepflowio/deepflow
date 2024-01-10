@@ -144,7 +144,6 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	prometheus.Encoder.Init(ctx, &cfg.PrometheusCfg)
 	prometheus.Clear.Init(ctx, &cfg.PrometheusCfg)
 	if isMasterController {
-		prometheus.Clear.Start()
 		prometheus.Encoder.Start()
 	}
 

@@ -23,6 +23,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
@@ -580,12 +581,31 @@ func newDataToUpdate() *dataToUpdate {
 }
 
 func (d *dataToUpdate) update() {
-	mysql.Db.Model(&mysql.PrometheusMetricName{}).Where("name IN (?)", d.metricNames.ToSlice()).Update("synced_at", time.Now())
-	mysql.Db.Model(&mysql.PrometheusLabelName{}).Where("name IN (?)", d.labelNames.ToSlice()).Update("synced_at", time.Now())
-	mysql.Db.Model(&mysql.PrometheusLabelValue{}).Where("value IN (?)", d.labelValues.ToSlice()).Update("synced_at", time.Now())
-	mysql.Db.Model(&mysql.PrometheusLabel{}).Where("id IN (?)", d.labelIDs.ToSlice()).Update("synced_at", time.Now())
-	mysql.Db.Model(&mysql.PrometheusMetricLabel{}).Where("id IN (?)", d.metricLabelIDs.ToSlice()).Update("synced_at", time.Now())
-	mysql.Db.Model(&mysql.PrometheusMetricAPPLabelLayout{}).Where("id IN (?)", d.metricAppLabelLayoutIDs.ToSlice()).Update("synced_at", time.Now())
+	err := mysql.Db.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		if err := tx.Model(&mysql.PrometheusMetricName{}).Where("name IN (?)", d.metricNames.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&mysql.PrometheusLabelName{}).Where("name IN (?)", d.labelNames.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&mysql.PrometheusLabelValue{}).Where("value IN (?)", d.labelValues.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&mysql.PrometheusLabel{}).Where("id IN (?)", d.labelIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&mysql.PrometheusMetricLabel{}).Where("id IN (?)", d.metricLabelIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&mysql.PrometheusMetricAPPLabelLayout{}).Where("id IN (?)", d.metricAppLabelLayoutIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("update error: %+v", err)
+	}
 }
 
 func (d *dataToUpdate) appendMetricName(name string) {
