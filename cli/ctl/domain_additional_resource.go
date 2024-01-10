@@ -241,7 +241,7 @@ func exampleDomainAdditionalResourceConfig(cmd *cobra.Command) {
 		return
 	}
 
-	data, err := response.Get("DATA").Map()
+	data, err := response.Get("DATA").String()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
