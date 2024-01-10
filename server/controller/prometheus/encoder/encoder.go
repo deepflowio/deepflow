@@ -114,7 +114,14 @@ func (e *Encoder) Stop() {
 	log.Info("prometheus encoder stopped")
 }
 
+func (e *Encoder) Refresh() error {
+	return e.refresh()
+}
+
 func (e *Encoder) refresh() error {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+
 	log.Info("prometheus encoder refresh started")
 	e.label.refresh()
 	eg := &errgroup.Group{}

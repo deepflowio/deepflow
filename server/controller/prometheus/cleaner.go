@@ -21,9 +21,12 @@ import (
 	"sync"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/encoder"
 )
 
 var (
@@ -31,18 +34,26 @@ var (
 	cleaner     *Cleaner
 )
 
+const (
+	labelNameInstance = "instance"
+	labelNameJob      = "job"
+)
+
 type Cleaner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	mux      sync.Mutex
-	working  bool
 	interval time.Duration
+
+	encoder *encoder.Encoder
 }
 
 func GetCleaner() *Cleaner {
 	cleanerOnce.Do(func() {
-		cleaner = &Cleaner{}
+		cleaner = &Cleaner{
+			encoder: encoder.GetSingleton(),
+		}
 	})
 	return cleaner
 }
@@ -53,16 +64,7 @@ func (c *Cleaner) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 }
 
 func (c *Cleaner) Start() error {
-	c.mux.Lock()
-	if c.working {
-		c.mux.Unlock()
-		return nil
-	}
-	c.working = true
-	c.mux.Unlock()
-
 	log.Info("prometheus data cleaner started")
-	c.clean()
 	go func() {
 		ticker := time.NewTicker(c.interval)
 		defer ticker.Stop()
@@ -82,86 +84,200 @@ func (c *Cleaner) Stop() {
 	if c.cancel != nil {
 		c.cancel()
 	}
-	c.mux.Lock()
-	c.working = false
-	c.mux.Unlock()
 	log.Info("prometheus data cleaner stopped")
 }
 
+func (c *Cleaner) Clean() {
+	c.clean()
+}
+
 func (c *Cleaner) clean() {
+	c.mux.Lock()
+	defer c.mux.Unlock()
 	log.Info("prometheus data cleaner clean started")
-	c.deleteExpired()
-	c.deleteDirty()
+	if err := c.deleteExpired(); err == nil {
+		c.encoder.Refresh()
+	}
 	log.Info("prometheus data cleaner clean stopped")
 }
 
-func (c *Cleaner) deleteExpired() {
+// total retention time is data_source retention hours (get from db) + 24 hours
+func (c *Cleaner) getExpiredTime() time.Time {
 	var dataSource *mysql.DataSource
 	mysql.Db.Where("display_name = ?", "Prometheus 数据").Find(&dataSource)
 	dataSourceRetentionHours := 7 * 24
 	if dataSource != nil {
 		dataSourceRetentionHours = dataSource.RetentionTime
 	}
-	// total retention time is data_source retention hours (get from db) + 24 hours
-	expiredAt := time.Now().Add(time.Duration(-(dataSourceRetentionHours + 24)) * time.Hour)
-	log.Infof("clean data (synced_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
-	DeleteExpired[mysql.PrometheusMetricName](expiredAt)
-	DeleteExpired[mysql.PrometheusMetricLabel](expiredAt)
-	DeleteExpired[mysql.PrometheusMetricAPPLabelLayout](expiredAt)
-	DeleteExpired[mysql.PrometheusLabel](expiredAt)
-	DeleteExpired[mysql.PrometheusLabelName](expiredAt)
-	DeleteExpired[mysql.PrometheusLabelValue](expiredAt)
-	log.Info("clean data completed")
+	return time.Now().Add(time.Duration(-(dataSourceRetentionHours + 24)) * time.Hour)
 }
 
-func DeleteExpired[MT any](expiredAt time.Time) {
-	err := mysql.Db.Where("synced_at < ?", expiredAt).Delete(new(MT)).Error
+func (c *Cleaner) getTargetInstanceJobValues() (values []string) {
+	var targets []mysql.PrometheusTarget
+	mysql.Db.Select("instance, job").Find(&targets)
+	for _, target := range targets {
+		values = append(values, target.Instance)
+		values = append(values, target.Job)
+	}
+	return
+}
+
+func (c *Cleaner) deleteExpired() error {
+	expiredAt := c.getExpiredTime()
+	log.Infof("clean expired data (synced_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
+
+	err := mysql.Db.Transaction(func(tx *gorm.DB) error {
+		if err := c.deleteExpiredMetricLabel(tx, expiredAt); err != nil {
+			return err
+		}
+		if err := c.deleteExpiredMetricAPPLabelLayout(tx, expiredAt); err != nil {
+			return err
+		}
+		if err := c.deleteExpiredMetricName(tx, expiredAt); err != nil {
+			return err
+		}
+		if err := c.deleteExpiredLabel(tx, expiredAt); err != nil {
+			return err
+		}
+		if err := c.deleteExpiredLabelName(tx, expiredAt); err != nil {
+			return err
+		}
+		if err := c.deleteExpiredLabelValue(tx, expiredAt); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		log.Errorf("mysql delete resource failed: %v", err)
+		log.Errorf("clean expired data failed: %v, delete operation will rollback", err)
+		return err
 	}
+	log.Info("clean expired data completed")
+	return nil
 }
 
-func (c *Cleaner) deleteDirty() {
-	var labelNames []*mysql.PrometheusLabelName
-	mysql.Db.Find(&labelNames)
-	lns := make([]string, 0)
-	for _, labelName := range labelNames {
-		lns = append(lns, labelName.Name)
+func (c *Cleaner) deleteExpiredMetricName(tx *gorm.DB, expiredAt time.Time) error {
+	metricNames, err := DeleteExpired[mysql.PrometheusMetricName](tx, expiredAt)
+	if err != nil {
+		return err
 	}
-	if len(lns) > 0 {
-		mysql.Db.Where("name NOT IN (?)", lns).Delete(&mysql.PrometheusLabel{})
-		mysql.Db.Where("app_label_name NOT IN (?)", lns).Delete(&mysql.PrometheusMetricAPPLabelLayout{})
-	}
-
-	var labelValues []*mysql.PrometheusLabelValue
-	mysql.Db.Find(&labelValues)
-	lvs := make([]string, 0)
-	for _, labelValue := range labelValues {
-		lvs = append(lvs, labelValue.Value)
-	}
-	if len(lvs) > 0 {
-		mysql.Db.Where("value NOT IN (?)", lvs).Delete(&mysql.PrometheusLabel{})
-	}
-
-	var labels []*mysql.PrometheusLabel
-	mysql.Db.Find(&labels)
-	lis := make([]int, 0)
-	for _, label := range labels {
-		lis = append(lis, label.ID)
-	}
-	if len(lis) > 0 {
-		mysql.Db.Where("label_id NOT IN (?)", lis).Delete(&mysql.PrometheusMetricLabel{})
-	}
-
-	var metricNames []*mysql.PrometheusMetricName
-	mysql.Db.Find(&metricNames)
 	mns := make([]string, 0)
 	for _, metricName := range metricNames {
 		mns = append(mns, metricName.Name)
 	}
 	if len(mns) > 0 {
-		mysql.Db.Where("metric_name NOT IN (?)", mns).Delete(&mysql.PrometheusMetricLabel{})
-		mysql.Db.Where("metric_name NOT IN (?)", mns).Delete(&mysql.PrometheusMetricAPPLabelLayout{})
-		mysql.Db.Where("metric_name NOT IN (?)", mns).Delete(&mysql.PrometheusMetricTarget{})
+		var metricLabels []mysql.PrometheusMetricLabel
+		var appLabels []mysql.PrometheusMetricAPPLabelLayout
+		var metricTargets []mysql.PrometheusMetricTarget
+		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&metricLabels).Error; err != nil {
+			return err
+		}
+		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&appLabels).Error; err != nil {
+			return err
+		}
+		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&metricTargets).Error; err != nil {
+			return err
+		}
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusMetricLabel), len(metricLabels))
+		log.Infof("clean data detail: %v", metricLabels) // TODO change to debug log
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusMetricAPPLabelLayout), len(appLabels))
+		log.Infof("clean data detail: %v", appLabels) // TODO change to debug log
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusMetricTarget), len(metricTargets))
+		log.Infof("clean data detail: %v", metricTargets) // TODO change to debug log
 	}
+	return nil
+}
+
+func (c *Cleaner) deleteExpiredLabel(tx *gorm.DB, expiredAt time.Time) error {
+	labels, err := DeleteExpired[mysql.PrometheusLabel](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
+	if err != nil {
+		return err
+	}
+	lis := make([]int, 0)
+	for _, label := range labels {
+		lis = append(lis, label.ID)
+	}
+	if len(lis) > 0 {
+		var metricLabels []mysql.PrometheusMetricLabel
+		if err := mysql.Db.Where("label_id IN (?)", lis).Delete(&metricLabels).Error; err != nil {
+			return err
+		}
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusMetricLabel), len(metricLabels))
+		log.Infof("clean data detail: %v", metricLabels) // TODO change to debug log
+	}
+	return nil
+}
+
+func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error {
+	labelNames, err := DeleteExpired[mysql.PrometheusLabelName](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
+	if err != nil {
+		return err
+	}
+	lns := make([]string, 0)
+	for _, labelName := range labelNames {
+		lns = append(lns, labelName.Name)
+	}
+	if len(lns) > 0 {
+		var labels []mysql.PrometheusLabel
+		var appLabels []mysql.PrometheusMetricAPPLabelLayout
+		if err := mysql.Db.Where("name IN (?)", lns).Delete(&labels).Error; err != nil {
+			return err
+		}
+		if err := mysql.Db.Where("app_label_name IN (?)", lns).Delete(&appLabels).Error; err != nil {
+			return err
+		}
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusLabel), len(labels))
+		log.Infof("clean data detail: %v", labels) // TODO change to debug log
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusMetricAPPLabelLayout), len(appLabels))
+		log.Infof("clean data detail: %v", appLabels) // TODO change to debug log
+	}
+	return nil
+}
+
+func (c *Cleaner) deleteExpiredLabelValue(tx *gorm.DB, expiredAt time.Time) error {
+	instancesJobValues := c.getTargetInstanceJobValues()
+	labelValues, err := DeleteExpired[mysql.PrometheusLabelValue](tx.Where("value NOT IN (?)", instancesJobValues), expiredAt)
+	if err != nil {
+		return err
+	}
+	lvs := make([]string, 0)
+	for _, labelValue := range labelValues {
+		lvs = append(lvs, labelValue.Value)
+	}
+	if len(lvs) > 0 {
+		var labels []mysql.PrometheusLabel
+		if err := mysql.Db.Where("value IN (?)", lvs).Delete(&labels).Error; err != nil {
+			return err
+		}
+		log.Infof("clean data %v count: %d", new(mysql.PrometheusLabel), len(labels))
+		log.Infof("clean data detail: %v", labels) // TODO change to debug log
+	}
+	return nil
+}
+
+func (c *Cleaner) deleteExpiredMetricLabel(tx *gorm.DB, expiredAt time.Time) error {
+	_, err := DeleteExpired[mysql.PrometheusMetricLabel](tx, expiredAt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Cleaner) deleteExpiredMetricAPPLabelLayout(tx *gorm.DB, expiredAt time.Time) error {
+	_, err := DeleteExpired[mysql.PrometheusMetricAPPLabelLayout](tx, expiredAt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time) ([]MT, error) {
+	var items []MT
+	err := tx.Where("synced_at < ?", expiredAt).Delete(&items).Error
+	if err != nil {
+		log.Errorf("mysql delete resource failed: %v", err)
+		return items, err
+	}
+	log.Infof("clean data %v count: %d", new(MT), len(items))
+	log.Infof("clean data detail: %v", items) // TODO change to debug log
+	return items, nil
 }
