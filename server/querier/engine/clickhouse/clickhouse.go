@@ -74,11 +74,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var sqlList []string
 	var err error
 	sql := args.Sql
-	if strings.Contains(sql, "Derivative") {
-		e.IsDerivative = true
-		e.Model.IsDerivative = true
-		e.Model.DerivativeGroupBy = e.DerivativeGroupBy
-	}
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
@@ -265,7 +260,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 					if tableTag, ok := tableTagMap[newTable]; ok {
 						tabletagSlice := tableTag.([][]interface{})
 						for i, tagSlice := range tabletagSlice {
-							tagType := tagSlice[4].(string)
+							tagType := tagSlice[3].(string)
 							if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 								continue
 							}
@@ -775,6 +770,11 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			funcName, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
 				tagSlice = append(tagSlice, sqlparser.String(funcName))
+				if strings.Contains(sqlparser.String(funcName), "Derivative") && !e.IsDerivative {
+					e.IsDerivative = true
+					e.Model.IsDerivative = true
+					e.Model.DerivativeGroupBy = e.DerivativeGroupBy
+				}
 			}
 		}
 	}
@@ -1268,7 +1268,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, binFunction)
 			return nil
 		}
-		name, args, err := e.parseFunction(expr)
+		name, args, derivativeArgs, err := e.parseFunction(expr)
 		if err != nil {
 			return err
 		}
@@ -1286,7 +1286,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 			}
 		}
-		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy)
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
 		if err != nil {
 			return err
 		}
@@ -1333,30 +1333,35 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	}
 }
 
-func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []string, err error) {
+func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []string, derivativeArgs []string, err error) {
 	for _, arg := range item.Exprs {
 		argStr := sqlparser.String(arg)
+		args = append(args, argStr)
 		if e.IsDerivative {
-			argStr = strings.TrimPrefix(argStr, "Derivative(")
-			argStr = strings.TrimSuffix(argStr, ")")
-		}
-		argSlice := strings.Split(argStr, ",")
-		for i, originArg := range argSlice {
-			originArg = strings.TrimSpace(originArg)
-			if e.IsDerivative && i > 0 {
-				if !slices.Contains(e.DerivativeGroupBy, originArg) {
-					tagTranslatorStr := GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
-					if tagTranslatorStr == originArg {
-						e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER})
-					} else {
-						e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER, Alias: originArg})
+			// Obtain derivative parameters
+			if strings.Contains(argStr, "Derivative(") {
+				derivativeArgStr := strings.TrimPrefix(argStr, "Derivative(")
+				derivativeArgStr = strings.TrimSuffix(derivativeArgStr, ")")
+				derivativeArgSlice := strings.Split(derivativeArgStr, ",")
+				for i, originArg := range derivativeArgSlice {
+					originArg = strings.TrimSpace(originArg)
+					if e.IsDerivative && i > 0 {
+						if !slices.Contains(e.DerivativeGroupBy, originArg) {
+							tagTranslatorStr := GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+							if tagTranslatorStr == originArg {
+								e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER})
+							} else {
+								e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER, Alias: originArg})
+							}
+						}
 					}
+					derivativeArgs = append(derivativeArgs, originArg)
 				}
+				args[0] = derivativeArgs[0]
 			}
-			args = append(args, originArg)
 		}
 	}
-	return sqlparser.String(item.Name), args, nil
+	return sqlparser.String(item.Name), args, derivativeArgs, nil
 }
 
 // 解析运算符
@@ -1392,12 +1397,12 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			}
 			return GetBinaryFunc(sqlparser.String(expr.Name), args)
 		}
-		name, args, err := e.parseFunction(expr)
+		name, args, derivativeArgs, err := e.parseFunction(expr)
 		name = strings.Trim(name, "`")
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
 		if err != nil {
 			return nil, err
 		}
