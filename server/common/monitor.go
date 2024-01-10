@@ -30,6 +30,7 @@ import (
 )
 
 const ENV_K8S_NODE_IP = "K8S_NODE_IP_FOR_DEEPFLOW"
+const DEFAULT_HOST = "127.0.0.1"
 
 func (m *Monitor) GetCpuPercent() float64 {
 	if percent, err := m.process.Percent(0); err == nil {
@@ -109,6 +110,10 @@ func NewMonitor(paths []string) (*Monitor, error) {
 		process: p,
 	}
 	myNodeIP, _ := os.LookupEnv(ENV_K8S_NODE_IP)
+	// If DeepFlow is not in K8S deployment mode, this environment variable may not exist, and myNodeIP is set to DEFAULT_HOST
+	if myNodeIP == "" {
+		myNodeIP = DEFAULT_HOST
+	}
 	stats.RegisterCountable("monitor", m, stats.OptionStatTags{"host_ip": myNodeIP})
 	NewDiskMonitor(paths, myNodeIP)
 

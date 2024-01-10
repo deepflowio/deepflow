@@ -189,6 +189,10 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 }
 
 func (w *PrometheusWriter) createTableOnCluster(table *ckdb.Table) error {
+	// in standalone mode, ckdbWatcher will be nil
+	if w.ckdbWatcher == nil {
+		return nil
+	}
 	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
 	if err != nil {
 		return err
@@ -205,6 +209,10 @@ func (w *PrometheusWriter) createTableOnCluster(table *ckdb.Table) error {
 }
 
 func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int) error {
+	// in standalone mode, ckdbWatcher will be nil
+	if w.ckdbWatcher == nil {
+		return nil
+	}
 	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
 	if err != nil {
 		return err

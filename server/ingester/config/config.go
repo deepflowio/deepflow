@@ -35,7 +35,7 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultControllerIP             = "127.0.0.1"
+	DefaultLocalIP                  = "127.0.0.1"
 	DefaultControllerPort           = 20035
 	DefaultCheckInterval            = 300 // clickhouse是异步删除
 	DefaultDiskUsedPercent          = 80
@@ -58,6 +58,8 @@ const (
 	IndexTypeIncremetalIdLocation   = "incremental-id"
 	FormatHex                       = "hex"
 	FormatDecimal                   = "decimal"
+	EnvRunningMode                  = "DEEPFLOW_SERVER_RUNNING_MODE"
+	RunningModeStandalone           = "STANDALONE"
 )
 
 type DatabaseTable struct {
@@ -125,6 +127,7 @@ type CKDB struct {
 }
 
 type Config struct {
+	IsRunningModeStandalone  bool
 	StorageDisabled          bool            `yaml:"storage-disabled"`
 	ListenPort               uint16          `yaml:"listen-port"`
 	CKDB                     CKDB            `yaml:"ckdb"`
@@ -177,6 +180,10 @@ func sleepAndExit() {
 }
 
 func (c *Config) Validate() error {
+	runningMode, _ := os.LookupEnv(EnvRunningMode)
+	// in standalone mode, only supports single node and does not support horizontal expansion
+	c.IsRunningModeStandalone = runningMode == RunningModeStandalone
+
 	if c.TraceIdWithIndex.Enabled {
 		if c.TraceIdWithIndex.Type != IndexTypeIncremetalIdLocation && c.TraceIdWithIndex.Type != IndexTypeHash {
 			log.Errorf("invalid 'type'(%s) of 'trace-id-with-index', must be '%s' or '%s'", c.TraceIdWithIndex.Type, IndexTypeIncremetalIdLocation, IndexTypeHash)
@@ -236,36 +243,55 @@ func (c *Config) Validate() error {
 		c.StatsInterval = DefaultStatsInterval
 	}
 
-	// should get node ip from ENV
-	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultControllerIP {
-		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
-		if !exist {
-			log.Errorf("Can't get env %s", EnvK8sNodeIP)
-			sleepAndExit()
+	var myNodeName, myPodName, myNamespace string
+	// in standalone mode, no 'EnvK8sNodeName', 'EnvK8sPodName', 'EnvK8sNamespace' environment variables
+	if c.IsRunningModeStandalone {
+		// in standalone mode, also can get NodeIP from 'EnvK8sNodeIP'
+		nodeIP, _ := os.LookupEnv(EnvK8sNodeIP)
+		if nodeIP == "" {
+			nodeIP = DefaultLocalIP
 		}
 		c.NodeIP = nodeIP
-	}
+		c.MyNodeName, _ = os.Hostname()
+		if c.CKDB.Host == "" {
+			c.CKDB.Host = DefaultLocalIP
+		}
+		if c.CKDB.Port == 0 {
+			c.CKDB.Port = DefaultCKDBServicePort
+		}
+		// in standalone mode, only supports one ClickHouse node
+		c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", c.CKDB.Host, c.CKDB.Port))
+	} else {
+		if c.NodeIP == "" && c.ControllerIPs[0] == DefaultLocalIP {
+			nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
+			if !exist {
+				log.Errorf("Can't get env %s", EnvK8sNodeIP)
+				sleepAndExit()
+			}
+			c.NodeIP = nodeIP
+		}
 
-	myNodeName, exist := os.LookupEnv(EnvK8sNodeName)
-	if !exist {
-		log.Errorf("Can't get node name env %s", EnvK8sNodeName)
-		sleepAndExit()
+		myNodeName, exist := os.LookupEnv(EnvK8sNodeName)
+		if !exist {
+			log.Errorf("Can't get node name env %s", EnvK8sNodeName)
+			sleepAndExit()
+		}
+		c.MyNodeName = myNodeName
+
+		myPodName, exist = os.LookupEnv(EnvK8sPodName)
+		if !exist {
+			log.Errorf("Can't get pod name env %s", EnvK8sPodName)
+			sleepAndExit()
+		}
+		myNamespace, exist = os.LookupEnv(EnvK8sNamespace)
+		if !exist {
+			log.Errorf("Can't get pod namespace env %s", EnvK8sNamespace)
+			sleepAndExit()
+		}
 	}
-	c.MyNodeName = myNodeName
 
 	if c.StorageDisabled {
 		return nil
-	}
-
-	myPodName, exist := os.LookupEnv(EnvK8sPodName)
-	if !exist {
-		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
-		sleepAndExit()
-	}
-	myNamespace, exist := os.LookupEnv(EnvK8sNamespace)
-	if !exist {
-		log.Errorf("Can't get pod namespace env %s", EnvK8sNamespace)
-		sleepAndExit()
 	}
 
 	if c.CKDB.Host == "" {
@@ -298,6 +324,11 @@ func (c *Config) Validate() error {
 	var watcher *Watcher
 	var err error
 	for retryTimes := 0; ; retryTimes++ {
+		if c.IsRunningModeStandalone {
+			// in standalone mode, only supports one ClickHouse endpoint. no watcher required
+			break
+		}
+
 		if retryTimes > 0 {
 			time.Sleep(time.Second * 30)
 		}
@@ -404,7 +435,7 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:   []string{DefaultControllerIP},
+			ControllerIPs:   []string{DefaultLocalIP},
 			ControllerPort:  DefaultControllerPort,
 			CKDBAuth:        Auth{"default", ""},
 			IngesterEnabled: true,
