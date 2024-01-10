@@ -158,6 +158,7 @@ type DefaultFunction struct {
 	Name           string   // 算子名称
 	Fields         []Node   // 指标量名称
 	Args           []string // 其他参数
+	DerivativeArgs []string // Derivative其他参数
 	Alias          string   // as
 	Condition      string   // 算子过滤 例：Condition："code in [1,2]" SUMIf(byte, code in [1,2])
 	Withs          []Node
@@ -216,19 +217,21 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		partitionBy := ""
 		argsNoSuffixStr := ""
 		argsNoSuffix := []string{}
-		if len(f.Args) > 0 {
-			partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.Args, ","))
-			for _, arg := range f.Args {
+		if len(f.DerivativeArgs) > 0 {
+			for _, arg := range f.DerivativeArgs {
 				arg = strings.Trim(arg, "`")
 				argsNoSuffix = append(argsNoSuffix, arg)
 			}
-			argsNoSuffixStr = fmt.Sprintf("_%s", strings.Join(argsNoSuffix, "_"))
+			argsNoSuffixStr = strings.Join(argsNoSuffix, "_")
+			if len(f.DerivativeArgs) > 1 {
+				partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.DerivativeArgs[1:], ","))
+			}
 		}
-		buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.Fields[0].ToString(), partitionBy))
+		buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.DerivativeArgs[0], partitionBy))
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
 			buf.WriteString("`")
-			buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s%s", f.Fields[0].ToString(), argsNoSuffixStr))
+			buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s", argsNoSuffixStr))
 			buf.WriteString("`")
 		}
 		return
@@ -950,19 +953,21 @@ func (f *NonNegativeDerivativeFunction) WriteTo(buf *bytes.Buffer) {
 	partitionBy := ""
 	argsNoSuffixStr := ""
 	argsNoSuffix := []string{}
-	if len(f.Args) > 0 {
-		partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.Args, ","))
-		for _, arg := range f.Args {
+	if len(f.DerivativeArgs) > 0 {
+		for _, arg := range f.DerivativeArgs {
 			arg = strings.Trim(arg, "`")
 			argsNoSuffix = append(argsNoSuffix, arg)
 		}
-		argsNoSuffixStr = fmt.Sprintf("_%s", strings.Join(argsNoSuffix, "_"))
+		argsNoSuffixStr = strings.Join(argsNoSuffix, "_")
+		if len(f.DerivativeArgs) > 1 {
+			partitionBy = fmt.Sprintf("PARTITION BY %s ", strings.Join(f.DerivativeArgs[1:], ","))
+		}
 	}
-	buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.Fields[0].ToString(), partitionBy))
+	buf.WriteString(fmt.Sprintf("nonNegativeDerivative(last_value(%s),_time) OVER (%sORDER BY _time)", f.DerivativeArgs[0], partitionBy))
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString("`")
-		buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s%s", f.Fields[0].ToString(), argsNoSuffixStr))
+		buf.WriteString(fmt.Sprintf("_nonnegativederivative_%s", argsNoSuffixStr))
 		buf.WriteString("`")
 	}
 }

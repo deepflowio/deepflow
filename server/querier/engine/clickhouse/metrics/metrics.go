@@ -172,7 +172,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 			if tableTag, ok := tableTagMap[newTable]; ok {
 				tabletagSlice := tableTag.([][]interface{})
 				for i, tagSlice := range tabletagSlice {
-					tagType := tagSlice[4].(string)
+					tagType := tagSlice[3].(string)
 					if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 						continue
 					}
