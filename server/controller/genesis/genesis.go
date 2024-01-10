@@ -521,6 +521,11 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			log.Error(msg)
 			return k8sResp, errors.New(msg)
 		}
+		entries := ret.GetEntries()
+		if len(entries) == 0 {
+			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
+			continue
+		}
 		epochStr := ret.GetEpoch()
 		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
@@ -534,7 +539,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		retFlag = true
 		k8sInfo = KubernetesInfo{
 			Epoch:    epoch,
-			Entries:  ret.GetEntries(),
+			Entries:  entries,
 			ErrorMSG: ret.GetErrorMsg(),
 		}
 	}
