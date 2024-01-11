@@ -63,6 +63,7 @@ impl RecvEngine {
             Self::Libpcap(w) => {
                 let _ = w.take();
             }
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             _ => (),
         }
     }
