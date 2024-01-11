@@ -119,7 +119,11 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		updateInfo["az"] = cloudItem.AZLcuuid
 	}
 	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
-		tagsJson, _ := json.Marshal(cloudItem.CloudTags)
+		updateTags := map[string]string{}
+		if cloudItem.CloudTags != nil {
+			updateTags = cloudItem.CloudTags
+		}
+		tagsJson, _ := json.Marshal(updateTags)
 		updateInfo["cloud_tags"] = tagsJson
 	}
 
