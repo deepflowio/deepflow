@@ -21,6 +21,7 @@ pub mod options;
 pub mod tpacket;
 
 pub use bpf::*;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use options::{OptSocketType, OptTpacketVersion, Options};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use tpacket::Tpacket;
