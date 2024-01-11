@@ -33,7 +33,10 @@ func InitEnvData() {
 		NodeName, _ = os.Hostname()
 		NodeIP = os.Getenv(NODE_IP_KEY)
 		PodName, _ = os.Hostname()
-		PodIP = NodeIP
+		PodIP = os.Getenv(POD_IP_KEY)
+		if PodIP == "" {
+			PodIP = "127.0.0.1"
+		}
 	}
 	log.Infof("ENV %s=%s; %s=%s; %s=%s; %s=%s; %s=%s, %s=%s",
 		NODE_NAME_KEY, NodeName,
