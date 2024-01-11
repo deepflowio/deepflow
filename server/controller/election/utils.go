@@ -27,6 +27,9 @@ import (
 
 // 功能：判断当前控制器是否为masterController
 func IsMasterController() (bool, error) {
+	if common.IsStandaloneRunningMode() == true {
+		return true, nil
+	}
 	// get self host_ip
 	hostIP := os.Getenv(common.POD_IP_KEY)
 	if len(hostIP) == 0 {
@@ -45,6 +48,9 @@ func IsMasterController() (bool, error) {
 }
 
 func IsMasterControllerAndReturnIP() (bool, string, error) {
+	if common.IsStandaloneRunningMode() == true {
+		return true, common.GetPodIP(), nil
+	}
 	// get self host_ip
 	hostIP := os.Getenv(common.POD_IP_KEY)
 	if len(hostIP) == 0 {

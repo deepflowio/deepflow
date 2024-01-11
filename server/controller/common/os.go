@@ -19,20 +19,29 @@ import (
 	"strings"
 )
 
-var NodeName, NodeIP, PodName, PodIP, NameSpace string
+var NodeName, NodeIP, PodName, PodIP, NameSpace, runningMode string
 
-func init() {
-	NodeName = os.Getenv(NODE_NAME_KEY)
-	NodeIP = os.Getenv(NODE_IP_KEY)
-	PodName = os.Getenv(POD_NAME_KEY)
-	PodIP = os.Getenv(POD_IP_KEY)
-	NameSpace = os.Getenv(NAME_SPACE_KEY)
-	log.Infof("ENV %s=%s; %s=%s; %s=%s; %s=%s; %s=%s",
+func InitEnvData() {
+	runningMode = os.Getenv(RUNNING_MODE_KEY)
+	if IsStandaloneRunningMode() == false {
+		NodeName = os.Getenv(NODE_NAME_KEY)
+		NodeIP = os.Getenv(NODE_IP_KEY)
+		PodName = os.Getenv(POD_NAME_KEY)
+		PodIP = os.Getenv(POD_IP_KEY)
+		NameSpace = os.Getenv(NAME_SPACE_KEY)
+	} else {
+		NodeName, _ = os.Hostname()
+		NodeIP = os.Getenv(NODE_IP_KEY)
+		PodName, _ = os.Hostname()
+		PodIP = NodeIP
+	}
+	log.Infof("ENV %s=%s; %s=%s; %s=%s; %s=%s; %s=%s, %s=%s",
 		NODE_NAME_KEY, NodeName,
 		NODE_IP_KEY, NodeIP,
 		POD_NAME_KEY, PodName,
 		POD_IP_KEY, PodIP,
-		NAME_SPACE_KEY, NameSpace)
+		NAME_SPACE_KEY, NameSpace,
+		RUNNING_MODE_KEY, runningMode)
 }
 
 func GetNodeName() string {
@@ -90,4 +99,8 @@ func GetArchType(arch string) int {
 		}
 	}
 	return 0
+}
+
+func IsStandaloneRunningMode() bool {
+	return runningMode == RUNNING_MODE_STANDALONE
 }
