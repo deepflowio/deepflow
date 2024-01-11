@@ -25,26 +25,25 @@ pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 pub(crate) mod tls;
-pub use self::http::{
-    check_http_method, get_http_request_info, get_http_request_version, get_http_resp_info,
-    is_http_v1_payload, parse_v1_headers, HttpInfo, HttpLog, Httpv2Headers,
-};
+pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
-pub use self::plugin::custom_wrap::CustomWrapLog;
-pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
+
 pub use dns::{DnsInfo, DnsLog};
-pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
+pub use mq::{KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
-    decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, DubboHeader, DubboInfo,
-    DubboLog, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
+    decode_new_rpc_trace_context_with_type, DubboInfo, DubboLog, SofaRpcInfo, SofaRpcLog,
+    SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
-    decode, MongoDBInfo, MongoDBLog, MysqlHeader, MysqlInfo, MysqlLog, OracleInfo, OracleLog,
-    PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
+    MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo, OracleLog, PostgreInfo,
+    PostgresqlLog, RedisInfo, RedisLog,
 };
 pub use tls::{TlsInfo, TlsLog};
+
+#[cfg(test)]
+pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 
 use std::{
     fmt,

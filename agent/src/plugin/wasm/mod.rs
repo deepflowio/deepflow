@@ -122,7 +122,7 @@ use host::{
 use public::bytes::read_u16_be;
 use vm::{VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, VmResult};
 
-pub use host::{WasmVm, WASM_EXPORT_FUNC_NAME};
+pub use host::WasmVm;
 pub use metric::WasmCounter;
 
 #[macro_export]
