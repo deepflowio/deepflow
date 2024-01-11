@@ -151,7 +151,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 		}
 		device, ok := rawData.typeIDToDevice[typeIDKey]
 		if ok == false {
-			log.Warningf("vif (luccid:%s, domain:%s) not found device(device_type:%d, device_id:%d)",
+			log.Warningf("vif (lcuuid:%s, domain:%s) not found device(device_type:%d, device_id:%d)",
 				vif.Lcuuid, vif.Domain, vif.DeviceType, vif.DeviceID)
 			continue
 		}
