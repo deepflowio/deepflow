@@ -46,6 +46,7 @@ var DEFAULT_LIMIT = "10000"
 var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
 var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
 var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
+var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -282,17 +283,38 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 								return nil, []string{}, true, err
 							}
 							if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
-								clientNameMetric := []interface{}{
-									clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-									"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-								}
-								result.Values = append(result.Values, clientNameMetric)
-								if serverName != clientName {
-									serverNameMetric := []interface{}{
-										serverName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+								if serverName == clientName {
+									clientNameMetric := []interface{}{
+										clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
 										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
 									}
-									result.Values = append(result.Values, serverNameMetric)
+									result.Values = append(result.Values, clientNameMetric)
+								} else {
+									var (
+										serverDisplayName = displayName
+										clientDisplayName = displayName
+									)
+									if config.Cfg.Language == "en" {
+										serverDisplayName = chCommon.TagServerEnPrefix + " " + displayName
+										clientDisplayName = chCommon.TagClientEnPrefix + " " + displayName
+									} else if config.Cfg.Language == "ch" {
+										if letterRegexp.MatchString(serverName) {
+											serverDisplayName = chCommon.TagServerChPrefix + " " + displayName
+											clientDisplayName = chCommon.TagClientChPrefix + " " + displayName
+										} else {
+											serverDisplayName = chCommon.TagServerChPrefix + displayName
+											clientDisplayName = chCommon.TagClientChPrefix + displayName
+										}
+									}
+									serverNameMetric := []interface{}{
+										serverName, true, serverDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+									}
+									clientNameMetric := []interface{}{
+										clientName, true, clientDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+									}
+									result.Values = append(result.Values, serverNameMetric, clientNameMetric)
 								}
 							} else {
 								nameMetric := []interface{}{
