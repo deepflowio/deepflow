@@ -243,6 +243,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.podNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.nodeNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.podGroupLcuuids = mapset.NewSet()
+	k.podIPToLcuuid = map[string]string{}
 	k.nodeIPToLcuuid = map[string]string{}
 	k.namespaceToLcuuid = map[string]string{}
 	k.rsLcuuidToPodGroupLcuuid = map[string]string{}
