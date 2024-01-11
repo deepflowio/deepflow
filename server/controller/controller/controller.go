@@ -75,7 +75,9 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Election init")
 	// start election
-	go election.Start(ctx, cfg)
+	if common.IsStandaloneRunningMode() == false {
+		go election.Start(ctx, cfg)
+	}
 
 	isMasterController := IsMasterController(cfg)
 	if isMasterController {

@@ -28,6 +28,7 @@ import (
 	"syscall"
 
 	"github.com/deepflowio/deepflow/server/common"
+	ctcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/controller"
 	"github.com/deepflowio/deepflow/server/controller/report"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -72,7 +73,7 @@ func main() {
 		)
 		os.Exit(0)
 	}
-
+	ctcommon.InitEnvData()
 	cfg := loadConfig(*configPath)
 	logger.EnableStdoutLog()
 	logger.EnableFileLog(cfg.LogFile)
