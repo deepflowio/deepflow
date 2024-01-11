@@ -1991,12 +1991,18 @@ check:
 	 * Content Type: Handshake (0x16), We are only concerned about the
 	 * handshake protocol.
 	 */
-	if (handshake.content_type != 0x16)
+	if (!(handshake.content_type == 0x16 || handshake.content_type == 0x14))
 		return MSG_UNKNOWN;
 
 	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
 	if (!(handshake.version == 0x301 || handshake.version == 0x303))
 		return MSG_UNKNOWN;
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		/* If it has been completed, give up collecting subsequent data. */
+		if (conn_info->socket_info_ptr->tls_end)
+			return MSG_UNKNOWN;
+	}
 
 	if (count == 5) {
 		save_prev_data(buf, conn_info, 5);
@@ -2025,6 +2031,15 @@ check:
 	if (handshake.handshake_type == 0xb || handshake.handshake_type == 0xc
 	    || handshake.handshake_type == 0xe)
 		return MSG_UNKNOWN;
+
+	/*
+	 * For the client program, it ends with 'Protocol: Change Cipher Spec'.
+	 * If all data collection has been completed, we set the flag bit.
+	 */
+	if (handshake.content_type == 0x14
+	    && is_socket_info_valid(conn_info->socket_info_ptr)) {
+		conn_info->socket_info_ptr->tls_end = 1;
+	}
 
 	/*
 	 * 0x01: handshake type=Client Hello
@@ -2361,14 +2376,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MQTT;
 #ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_DUBBO && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_dubbo_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_DUBBO;
-#ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_DNS && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -2454,12 +2461,19 @@ infer_protocol_2(const char *infer_buf, size_t count,
 
 #ifdef LINUX_VER_5_2_PLUS
 	__u8 skip_proto = conn_info->skip_proto;
-	if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
+	if (skip_proto != PROTO_DUBBO && (inferred_message.type =
 #else
 	if ((inferred_message.type =
 #endif
-	     infer_postgre_message(syscall_infer_addr, syscall_infer_len,
-				   conn_info)) != MSG_UNKNOWN) {
+	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_DUBBO;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_postgre_message(syscall_infer_addr, syscall_infer_len,
+					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_POSTGRESQL;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
