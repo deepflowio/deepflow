@@ -26,17 +26,13 @@ mod pool;
 pub mod protocol_logs;
 mod service_table;
 
-pub use app_table::AppTable;
 pub use error::{Error, Result};
-pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
+pub use flow_config::{FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
 pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
-pub use protocol_logs::{
-    AppProtoHead, AppProtoLogsBaseInfo, DnsLog, DubboLog, HttpLog, KafkaLog, L7ProtoRawDataType,
-    LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog, TlsLog,
-};
+pub use protocol_logs::{AppProtoHead, DnsLog, HttpLog, LogMessageType, MetaAppProto, TlsLog};
 
 use std::time::Duration;
 

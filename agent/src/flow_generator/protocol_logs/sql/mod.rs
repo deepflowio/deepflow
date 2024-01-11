@@ -34,10 +34,10 @@ mod sql_check;
 mod sql_obfuscate;
 
 pub use mongo::{MongoDBInfo, MongoDBLog};
-pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
+pub use mysql::{MysqlInfo, MysqlLog};
 pub use oracle::{OracleInfo, OracleLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
-pub use redis::{decode, RedisInfo, RedisLog};
+pub use redis::{RedisInfo, RedisLog};
 
 pub type ObfuscateCache = Rc<RefCell<LruCache<u64, Vec<u8>>>>;
 

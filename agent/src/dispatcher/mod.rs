@@ -38,7 +38,9 @@ use log::error;
 use log::{debug, info, warn};
 use packet_dedup::*;
 use public::debug::QueueDebugger;
-use special_recv_engine::{Dpdk, Libpcap};
+#[cfg(target_os = "linux")]
+use special_recv_engine::Dpdk;
+use special_recv_engine::Libpcap;
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};

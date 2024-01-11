@@ -22,7 +22,7 @@ pub use libc::c_uchar; // u8
 pub use libc::c_uint; // u32
 pub use libc::c_ulonglong;
 use log::info;
-pub use std::ffi::{CStr, CString};
+pub use std::ffi::CStr;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

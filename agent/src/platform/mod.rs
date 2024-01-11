@@ -23,9 +23,10 @@ mod platform_synchronizer;
 pub mod prometheus;
 
 #[cfg(target_os = "linux")]
-pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
+pub use kubernetes::{ApiWatcher, GenericPoller, Poller};
 #[cfg(target_os = "linux")]
 pub use libvirt_xml_extractor::LibvirtXmlExtractor;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use platform_synchronizer::ProcRegRewrite;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use platform_synchronizer::SocketSynchronizer;

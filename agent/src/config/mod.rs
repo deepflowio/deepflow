@@ -18,14 +18,21 @@ mod config;
 pub mod handler;
 
 pub use config::{
-    AgentIdType, Config, ConfigError, FlowGeneratorConfig, HttpEndpointExtraction,
-    KubernetesPollerType, KubernetesResourceConfig, MatchRule, OracleParseConfig, OsProcRegexp,
-    PcapConfig, PrometheusExtraConfig, RuntimeConfig, TripleMapConfig, UprobeProcRegExp,
-    XflowGeneratorConfig, YamlConfig, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
+    AgentIdType, Config, ConfigError, KubernetesPollerType, OracleParseConfig, PcapConfig,
+    PrometheusExtraConfig, RuntimeConfig, YamlConfig,
+};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use config::{
+    KubernetesResourceConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
     OS_PROC_REGEXP_MATCH_ACTION_DROP, OS_PROC_REGEXP_MATCH_TYPE_CMD,
     OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
     OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
-pub use handler::{
-    DispatcherConfig, FlowAccess, FlowConfig, HttpEndpointTrie, ModuleConfig, NpbConfig,
-};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use handler::FlowAccess;
+pub use handler::{DispatcherConfig, FlowConfig, ModuleConfig, NpbConfig};
+
+#[cfg(test)]
+pub use config::{HttpEndpointExtraction, MatchRule};
+#[cfg(test)]
+pub use handler::HttpEndpointTrie;

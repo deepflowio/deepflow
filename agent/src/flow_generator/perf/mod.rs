@@ -64,7 +64,6 @@ use crate::{
 use {icmp::IcmpPerf, tcp::TcpPerf, udp::UdpPerf};
 
 pub use stats::FlowPerfCounter;
-pub use stats::PerfStats;
 
 const ART_MAX: Timestamp = Timestamp::from_secs(30);
 
