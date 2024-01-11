@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -40,6 +41,7 @@ const METRICS_OPERATOR_LTE = "<="
 
 var METRICS_OPERATORS = []string{METRICS_OPERATOR_GTE, METRICS_OPERATOR_LTE}
 var DB_DESCRIPTIONS map[string]interface{}
+var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 
 type Metrics struct {
 	Index       int    // 索引
@@ -199,17 +201,39 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 						return nil, false
 					}
 					if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
-						clientNameMetric := NewMetrics(
-							0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", permissions, "", table, "",
-						)
-						newAllMetrics[clientName] = clientNameMetric
-						if serverName != clientName {
+						if serverName == clientName {
+							clientNameMetric := NewMetrics(
+								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+								"Tag", permissions, "", table, "",
+							)
+							newAllMetrics[clientName] = clientNameMetric
+						} else {
+							var (
+								serverDisplayName = displayName
+								clientDisplayName = displayName
+							)
+							if config.Cfg.Language == "en" {
+								serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
+								clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
+							} else if config.Cfg.Language == "ch" {
+								if letterRegexp.MatchString(serverName) {
+									serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
+									clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
+								} else {
+									serverDisplayName = ckcommon.TagServerChPrefix + displayName
+									clientDisplayName = ckcommon.TagClientChPrefix + displayName
+								}
+							}
 							serverNameMetric := NewMetrics(
-								0, serverNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+								0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
+								"Tag", permissions, "", table, "",
+							)
+							clientNameMetric := NewMetrics(
+								0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
 								"Tag", permissions, "", table, "",
 							)
 							newAllMetrics[serverName] = serverNameMetric
+							newAllMetrics[clientName] = clientNameMetric
 						}
 					} else {
 						nameMetric := NewMetrics(
