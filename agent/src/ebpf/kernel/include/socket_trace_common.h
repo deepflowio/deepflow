@@ -120,7 +120,8 @@ struct socket_info_t {
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
 	__u8 msg_type: 2;	// Store data type, values are MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 4;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
 	__s32 correlation_id;   // Currently used for Kafka protocol inference.
 
