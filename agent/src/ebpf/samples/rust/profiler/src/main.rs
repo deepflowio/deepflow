@@ -17,6 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use std::ffi::CString;
 use profiler::ebpf::*;
 use std::env::set_var;
 use std::sync::Mutex;

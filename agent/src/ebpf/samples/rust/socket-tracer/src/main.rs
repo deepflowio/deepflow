@@ -17,6 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use std::ffi::CString;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::env::set_var;
