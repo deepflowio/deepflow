@@ -142,6 +142,7 @@ type Vtap struct {
 	SyncedAnalyzerAt   string  `json:"SYNCED_ANALYZER_AT"`
 	BootTime           int     `json:"BOOT_TIME"`
 	Revision           string  `json:"REVISION"`
+	UpgradeRevision    string  `json:"UPGRADE_REVISION"`
 	CompleteRevision   string  `json:"COMPLETE_REVISION"`
 	Exceptions         []int64 `json:"EXCEPTIONS"`
 	VtapGroupLcuuid    string  `json:"VTAP_GROUP_LCUUID"`
