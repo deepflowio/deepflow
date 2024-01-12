@@ -32,7 +32,7 @@ func RegisterCloudCommand() *cobra.Command {
 		Use:   "cloud",
 		Short: "debug cloud data commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'info'.\n")
+			fmt.Printf("please run with 'info | task'.\n")
 		},
 	}
 

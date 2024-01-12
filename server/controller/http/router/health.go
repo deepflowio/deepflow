@@ -28,7 +28,7 @@ import (
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
-var log = logging.MustGetLogger("router.health")
+var log = logging.MustGetLogger("router")
 
 const OK = "ok"
 
