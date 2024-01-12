@@ -27,6 +27,7 @@ import (
 
 // 功能：判断当前控制器是否为masterController
 func IsMasterController() (bool, error) {
+	// in standalone mode, the local machine is the master node because of all in one deployment
 	if common.IsStandaloneRunningMode() == true {
 		return true, nil
 	}
@@ -48,6 +49,7 @@ func IsMasterController() (bool, error) {
 }
 
 func IsMasterControllerAndReturnIP() (bool, string, error) {
+	// in standalone mode, the local machine is the master node because of all in one deployment
 	if common.IsStandaloneRunningMode() == true {
 		return true, common.GetPodIP(), nil
 	}

@@ -77,6 +77,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("Election init")
 	// start election
 	if common.IsStandaloneRunningMode() == false {
+		// in standalone mode, We have no way to elect because there is no k8s module
 		go election.Start(ctx, cfg)
 	}
 
