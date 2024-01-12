@@ -19,27 +19,51 @@ package ctl
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 
+	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/spf13/cobra"
 )
 
-func RegisterPrometheusCacheCommand() *cobra.Command {
+func RegisterPrometheusCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "prometheus",
+		Short: "prometheus operation commands",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("please run with 'cache | cleaner'.\n")
+		},
+	}
+
 	var t string
-	prometheusCmd := &cobra.Command{
-		Use:     "prometheus-cache",
+	cacheCmd := &cobra.Command{
+		Use:     "cache",
 		Short:   "pull prometheus cache data from deepflow-server",
-		Example: "deepflow-ctl prometheus-cache -t metric-name",
+		Example: "deepflow-ctl prometheus cache -t metric-name",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := prometheusCache(cmd, t); err != nil {
 				fmt.Println(err)
 			}
 		},
 	}
-	prometheusCmd.Flags().StringVarP(&t, "type", "t", "all", "cache type, options: all, metric-name, label-name, "+
+	cacheCmd.Flags().StringVarP(&t, "type", "t", "all", "cache type, options: all, metric-name, label-name, "+
 		"label-value, metric-and-app-layout, target, label, metric-label, metric-target")
+	cmd.AddCommand(cacheCmd)
 
-	return prometheusCmd
+	var expiredAt string
+	clearCmd := &cobra.Command{
+		Use:     "clear",
+		Short:   "clear prometheus data in MySQL by deepflow-server, use with caution and not frequently!",
+		Example: "deepflow-ctl prometheus clear \"2006-01-02 15:04:05\"",
+		Run: func(cmd *cobra.Command, args []string) {
+			prometheusClear(cmd, expiredAt)
+		},
+	}
+	clearCmd.Flags().StringVarP(&expiredAt, "expired-time", "e", "", "expired-time format: 2006-01-02 15:04:05")
+	cmd.AddCommand(clearCmd)
+
+	return cmd
 }
 
 func prometheusCache(cmd *cobra.Command, t string) error {
@@ -86,4 +110,16 @@ func prometheusCache(cmd *cobra.Command, t string) error {
 
 	fmt.Printf("%s\n", resp.GetContent())
 	return nil
+}
+
+func prometheusClear(cmd *cobra.Command, expiredAt string) {
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/prometheus-cleaner-tasks/", server.IP, server.Port)
+	resp, err := common.CURLPerform(http.MethodPost, url, map[string]interface{}{"EXPIRED_AT": expiredAt}, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	fmt.Println(resp)
+	return
 }
