@@ -219,12 +219,12 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
 	mysql.Db.Create(&dataSource)
 
-	// 调用roze API配置clickhouse
+	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
 	mysql.Db.Find(&analyzers)
 
 	for _, analyzer := range analyzers {
-		if CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
+		if CallIngesterAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
 			)
@@ -268,14 +268,14 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		dataSource.DisplayName = dataSourceUpdate.DisplayName
 	}
 
-	// 调用roze API配置clickhouse
+	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
 	mysql.Db.Find(&analyzers)
 
 	var err error
 	var errAnalyzerIP string
 	for _, analyzer := range analyzers {
-		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
+		err = CallIngesterAPIModRP(analyzer.IP, dataSource, cfg.IngesterApi.Port)
 		if err != nil {
 			errAnalyzerIP = analyzer.IP
 			break
@@ -338,12 +338,12 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	log.Infof("delete data_source (%s)", dataSource.DisplayName)
 
-	// 调用roze API配置clickhouse
+	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
 	mysql.Db.Find(&analyzers)
 
 	for _, analyzer := range analyzers {
-		if CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
+		if CallIngesterAPIDelRP(analyzer.IP, dataSource, cfg.IngesterApi.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
 			)
@@ -367,7 +367,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, rozePort int) error {
+func CallIngesterAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ingesterApiPort int) error {
 	var name, baseName string
 	var err error
 	if name, err = getName(dataSource.Interval, dataSource.DataTableCollection); err != nil {
@@ -385,13 +385,13 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 		"interval":              dataSource.Interval / common.INTERVAL_1MINUTE,
 		"retention-time":        dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), rozePort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body)
 	return err
 }
 
-func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) error {
+func CallIngesterAPIModRP(ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -401,13 +401,13 @@ func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 		"db":             getTableName(dataSource.DataTableCollection),
 		"retention-time": dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body)
 	return err
 }
 
-func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) error {
+func CallIngesterAPIDelRP(ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -416,7 +416,7 @@ func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 		"name": name,
 		"db":   getTableName(dataSource.DataTableCollection),
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), rozePort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body)
 	return err
@@ -484,7 +484,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 		sort.Strings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES)
 		index := sort.SearchStrings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName)
 		if index < len(DEFAULT_DATA_SOURCE_DISPLAY_NAMES) && DEFAULT_DATA_SOURCE_DISPLAY_NAMES[index] == dataSource.DisplayName {
-			if CallRozeAPIModRP(ip, dataSource, common.ROZE_PORT) != nil {
+			if CallIngesterAPIModRP(ip, dataSource, common.INGESTER_API_PORT) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.DisplayName,
 				)
@@ -500,7 +500,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
-			if CallRozeAPIAddRP(ip, dataSource, baseDataSource, common.ROZE_PORT) != nil {
+			if CallIngesterAPIAddRP(ip, dataSource, baseDataSource, common.INGESTER_API_PORT) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.DisplayName,
 				)

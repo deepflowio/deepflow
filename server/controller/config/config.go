@@ -22,7 +22,7 @@ import (
 	"strconv"
 
 	logging "github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
@@ -39,7 +39,7 @@ import (
 
 var log = logging.MustGetLogger("config")
 
-type Roze struct {
+type IngesterApi struct {
 	Port    int `default:"20106" yaml:"port"`
 	Timeout int `default:"60" yaml:"timeout"`
 }
@@ -94,8 +94,8 @@ type ControllerConfig struct {
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
-	Roze Roze          `yaml:"roze"`
-	Spec Specification `yaml:"spec"`
+	IngesterApi IngesterApi   `yaml:"ingester-api"`
+	Spec        Specification `yaml:"spec"`
 
 	MonitorCfg     monitor.MonitorConfig         `yaml:"monitor"`
 	ManagerCfg     manager.ManagerConfig         `yaml:"manager"`
