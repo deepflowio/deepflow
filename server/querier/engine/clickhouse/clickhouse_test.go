@@ -47,7 +47,7 @@ import (
 
 var (
 	parseSQL = []struct {
-		index      string
+		name       string
 		input      string
 		output     string
 		db         string
@@ -310,50 +310,50 @@ var (
 		input:  "select Enum(pod_group_type_0) ,pod_group_type_0 from l7_flow_log where Enum(pod_group_type_0)!='Deployment' limit 10",
 		output: "WITH dictGetOrDefault(flow_tag.int_enum_map, 'name', ('pod_group_type',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) AS `Enum(pod_group_type_0)` SELECT `Enum(pod_group_type_0)`, dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0))) AS `pod_group_type_0` FROM flow_log.`l7_flow_log` PREWHERE (not(toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(pod_group_id_0)))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name = 'Deployment' and tag_name='pod_group_type') AND pod_group_id_0!=0)) LIMIT 10",
 	}, {
-		index:  "count_1",
+		name:   "count_1",
 		input:  "select Count(row) as a from l7_flow_log having a > 0 ",
 		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
 	}, {
-		index:  "count_2",
+		name:   "count_2",
 		input:  "select Count(row) from l7_flow_log having Count(row) > 0 ",
 		output: "SELECT COUNT(1) AS `Count(row)` FROM flow_log.`l7_flow_log` HAVING COUNT(1) > 0 LIMIT 10000",
 	}, {
-		index:  "count_3",
+		name:   "count_3",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
 		output: "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(1/1) AS `Avg(byte_tx)`, COUNT(1) AS `c` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` HAVING c > 0 LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "count_3_aavg",
+		name:   "count_3_aavg",
 		input:  "select AAvg(`byte_tx`) AS `AAvg(byte_tx)`,icon_id(chost_0) as `xx`, Count(row) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `AAvg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "topk_1",
+		name:   "topk_1",
 		db:     "flow_metrics",
 		input:  "select pod_ns, topK(pod, 10) from `vtap_app_port.1h` WHERE time>=1687315761 AND time<=1687316661 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1687315761 AND `time` <= 1687316661 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
-		index:  "topk_2",
+		name:   "topk_2",
 		db:     "flow_metrics",
 		input:  "select pod_ns, topK(pod, pod_cluster_id, service_id, 10) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
-		index:  "topk_enum",
+		name:   "topk_enum",
 		db:     "flow_log",
 		input:  "select TopK(protocol,2) from l4_flow_log limit 2",
 		output: "SELECT arrayStringConcat(topK(2)(dictGetOrDefault(flow_tag.int_enum_map, 'name', ('protocol',toUInt64(protocol)), protocol)), ',') AS `TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2",
 	}, {
-		index:  "select_enum",
+		name:   "select_enum",
 		db:     "flow_log",
 		input:  "select protocol from l4_flow_log limit 2",
 		output: "SELECT protocol FROM flow_log.`l4_flow_log` LIMIT 2",
 	}, {
-		index:  "any_1",
+		name:   "any_1",
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, any(dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id)))) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
 	}, {
-		index:  "any_2",
+		name:   "any_2",
 		db:     "flow_metrics",
 		input:  "select pod_ns, any(pod, pod_cluster_id, service_id) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: "SELECT dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, any((dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`vtap_app_port.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet(flow_tag.pod_ns_map, 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10",
@@ -361,91 +361,97 @@ var (
 		input:  "SELECT is_internet_0, is_internet_1 FROM l4_flow_log GROUP BY is_internet_0, is_internet_1 limit 1",
 		output: "SELECT if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` FROM flow_log.`l4_flow_log` GROUP BY if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1` LIMIT 1",
 	}, {
-		index:  "TopK_1",
+		name:   "TopK_1",
 		input:  "select TopK(ip_0, 10) from l4_flow_log limit 1",
 		output: "SELECT arrayStringConcat(topK(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
-		index:  "TopK_2",
+		name:   "TopK_2",
 		input:  "select TopK(ip_0, pod_0, 10) from l4_flow_log limit 1",
 		output: "SELECT topK(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
-		index:   "TopK_err",
+		name:    "TopK_err",
 		input:   "select TopK(ip_0, 111) from l4_flow_log limit 1",
 		output:  "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 		wantErr: "function [TopK] argument [111] value range is incorrect, it should be within [1, 100]",
 	}, {
-		index:  "Any_1",
+		name:   "Any_1",
 		input:  "select Any(ip_0) from l4_flow_log limit 1",
 		output: "SELECT any(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
-		index:  "Any_2",
+		name:   "Any_2",
 		input:  "select Any(ip_0, pod_0) from l4_flow_log limit 1",
 		output: "SELECT any((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
-		index:  "layered_0",
+		name:   "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
 		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, sum(byte_tx)/(1/1) AS `Avg(byte_tx)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "layered_0_aavg",
+		name:   "layered_0_aavg",
 		input:  "select AAvg(`byte_tx`) AS `AAvg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
 		output: "SELECT region_0, AVG(`_sum_byte_tx`) AS `AAvg(byte_tx)` FROM (SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "division>=0_l4_flow_log",
+		name:   "division>=0_l4_flow_log",
 		input:  "select Avg(`l7_error_ratio`) AS `Avg(l7_error_ratio)`, Avg(`retrans_syn_ratio`) AS `Avg(retrans_syn_ratio)`, Avg(`retrans_synack_ratio`) AS `Avg(retrans_synack_ratio)`, Avg(`l7_client_error_ratio`) AS `Avg(l7_client_error_ratio)`, Avg(`l7_server_error_ratio`) AS `Avg(l7_server_error_ratio)`, auto_service_id from l4_flow_log group by auto_service_id limit 1",
 		output: "WITH if(SUMIf(l7_response, l7_response>0)>0, divide(SUM(l7_error), SUMIf(l7_response, l7_response>0)), null) AS `divide_0diveider_as_null_sum_l7_error_sum_l7_response`, if(SUMIf(syn_count, syn_count>0)>0, divide(SUM(retrans_syn), SUMIf(syn_count, syn_count>0)), null) AS `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count`, if(SUMIf(synack_count, synack_count>0)>0, divide(SUM(retrans_synack), SUMIf(synack_count, synack_count>0)), null) AS `divide_0diveider_as_null_sum_retrans_synack_sum_synack_count`, if(SUMIf(l7_response, l7_response>0)>0, divide(SUM(l7_client_error), SUMIf(l7_response, l7_response>0)), null) AS `divide_0diveider_as_null_sum_l7_client_error_sum_l7_response`, if(SUMIf(l7_response, l7_response>0)>0, divide(SUM(l7_server_error), SUMIf(l7_response, l7_response>0)), null) AS `divide_0diveider_as_null_sum_l7_server_error_sum_l7_response` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_l7_error_sum_l7_response`*100 AS `Avg(l7_error_ratio)`, `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count`*100 AS `Avg(retrans_syn_ratio)`, `divide_0diveider_as_null_sum_retrans_synack_sum_synack_count`*100 AS `Avg(retrans_synack_ratio)`, `divide_0diveider_as_null_sum_l7_client_error_sum_l7_response`*100 AS `Avg(l7_client_error_ratio)`, `divide_0diveider_as_null_sum_l7_server_error_sum_l7_response`*100 AS `Avg(l7_server_error_ratio)` FROM flow_log.`l4_flow_log` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 	}, {
-		index:  "division>=0_l4_flow_log_aavg",
+		name:   "division>=0_l4_flow_log_aavg",
 		input:  "select AAvg(`l7_error_ratio`) AS `AAvg(l7_error_ratio)`, AAvg(`retrans_syn_ratio`) AS `AAvg(retrans_syn_ratio)`, AAvg(`retrans_synack_ratio`) AS `AAvg(retrans_synack_ratio)`, AAvg(`l7_client_error_ratio`) AS `AAvg(l7_client_error_ratio)`, AAvg(`l7_server_error_ratio`) AS `AAvg(l7_server_error_ratio)`, auto_service_id from l4_flow_log group by auto_service_id limit 1",
 		output: "SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, AVGIf(l7_error/l7_response, l7_response>0)*100 AS `AAvg(l7_error_ratio)`, AVGIf(retrans_syn/syn_count, syn_count>0)*100 AS `AAvg(retrans_syn_ratio)`, AVGIf(retrans_synack/synack_count, synack_count>0)*100 AS `AAvg(retrans_synack_ratio)`, AVGIf(l7_client_error/l7_response, l7_response>0)*100 AS `AAvg(l7_client_error_ratio)`, AVGIf(l7_server_error/l7_response, l7_response>0)*100 AS `AAvg(l7_server_error_ratio)` FROM flow_log.`l4_flow_log` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 	}, {
-		index:  "division>=0_l7_flow_log",
+		name:   "division>=0_l7_flow_log",
 		input:  "select Avg(`error_ratio`) AS `Avg(error_ratio)`, auto_service_id from l7_flow_log group by auto_service_id limit 1",
 		output: "WITH if(SUMIf(if(type IN [1, 2],1,0), if(type IN [1, 2],1,0)>0)>0, divide(SUM(if(response_status IN [4, 3],1,0)), SUMIf(if(type IN [1, 2],1,0), if(type IN [1, 2],1,0)>0)), null) AS `divide_0diveider_as_null_sum_if(response_status IN [4, 3],1,0)_sum_if(type IN [1, 2],1,0)` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_if(response_status IN [4, 3],1,0)_sum_if(type IN [1, 2],1,0)`*100 AS `Avg(error_ratio)` FROM flow_log.`l7_flow_log` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 	}, {
-		index:  "division>=0_l7_flow_log_aavg",
+		name:   "division>=0_l7_flow_log_aavg",
 		input:  "select AAvg(`error_ratio`) AS `AAvg(error_ratio)`, auto_service_id from l7_flow_log group by auto_service_id limit 1",
 		output: "SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, AVGIf(if(response_status IN [4, 3],1,0)/if(type IN [1, 2],1,0), if(type IN [1, 2],1,0)>0)*100 AS `AAvg(error_ratio)` FROM flow_log.`l7_flow_log` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 	}, {
-		index:  "division>=0_vtap_app_port",
+		name:   "division>=0_vtap_app_port",
 		input:  "select Avg(`rrt`) AS `Avg(rrt)`, Avg(`error_ratio`) AS `Avg(error_ratio)`, auto_service_id from vtap_app_port group by auto_service_id limit 1",
 		output: "WITH if(SUMIf(rrt_count, rrt_count>0)>0, divide(SUM(rrt_sum), SUMIf(rrt_count, rrt_count>0)), null) AS `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count`, if(SUMIf(response, response>0)>0, divide(SUM(error), SUMIf(response, response>0)), null) AS `divide_0diveider_as_null_sum_error_sum_response` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count` AS `Avg(rrt)`, `divide_0diveider_as_null_sum_error_sum_response`*100 AS `Avg(error_ratio)` FROM flow_metrics.`vtap_app_port` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "division>=0_vtap_app_port_aavg",
+		name:   "division>=0_vtap_app_port_aavg",
 		input:  "select AAvg(`rrt`) AS `AAvg(rrt)`, AAvg(`error_ratio`) AS `AAvg(error_ratio)`, auto_service_id from vtap_app_port group by auto_service_id limit 1",
 		output: "SELECT auto_service_id, AVGArray(arrayFilter(x -> x>0, `_grouparray_rrt_sum/rrt_count`)) AS `AAvg(rrt)`, AVG(`_div__sum_error__sum_response`)*100 AS `AAvg(error_ratio)` FROM (WITH if(SUM(response)>0, divide(SUM(error), SUM(response)), null) AS `divide_0diveider_as_null_sum_error_sum_response` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, groupArrayIf(rrt_sum/rrt_count, rrt_sum/rrt_count > 0) AS `_grouparray_rrt_sum/rrt_count`, `divide_0diveider_as_null_sum_error_sum_response` AS `_div__sum_error__sum_response` FROM flow_metrics.`vtap_app_port` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`) GROUP BY `auto_service_id` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "division>=0_vtap_flow_edge_port",
+		name:   "division>=0_vtap_flow_edge_port",
 		input:  "select Avg(`bpp`) AS `Avg(bpp)`, Avg(`retrans_syn_ratio`) AS `Avg(retrans_syn_ratio)`, auto_service_id from vtap_flow_edge_port group by auto_service_id limit 1",
 		output: "WITH if(SUMIf(packet, packet>0)>0, divide(SUM(byte), SUMIf(packet, packet>0)), null) AS `divide_0diveider_as_null_sum_byte_sum_packet`, if(SUMIf(syn_count, syn_count>0)>0, divide(SUM(retrans_syn), SUMIf(syn_count, syn_count>0)), null) AS `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_byte_sum_packet` AS `Avg(bpp)`, `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count`*100 AS `Avg(retrans_syn_ratio)` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "division>=0_vtap_flow_edge_port_aavg",
+		name:   "division>=0_vtap_flow_edge_port_aavg",
 		input:  "select AAvg(`bpp`) AS `AAvg(bpp)`, AAvg(`retrans_syn_ratio`) AS `AAvg(retrans_syn_ratio)`, auto_service_id from vtap_flow_edge_port group by auto_service_id limit 1",
 		output: "SELECT auto_service_id, AVG(`_div__sum_byte__sum_packet`) AS `AAvg(bpp)`, AVG(`_div__sum_retrans_syn__sum_syn_count`)*100 AS `AAvg(retrans_syn_ratio)` FROM (WITH if(SUM(packet)>0, divide(SUM(byte), SUM(packet)), null) AS `divide_0diveider_as_null_sum_byte_sum_packet`, if(SUM(syn_count)>0, divide(SUM(retrans_syn), SUM(syn_count)), null) AS `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count` SELECT if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`, `divide_0diveider_as_null_sum_byte_sum_packet` AS `_div__sum_byte__sum_packet`, `divide_0diveider_as_null_sum_retrans_syn_sum_syn_count` AS `_div__sum_retrans_syn__sum_syn_count` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY if(auto_service_type in (0,255),subnet_id,auto_service_id) AS `auto_service_id`) GROUP BY `auto_service_id` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "exist_trans_support_tag_0",
+		name:   "exist_trans_support_tag_0",
 		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(vpc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1",
 	}, {
-		index:  "exist_trans_support_tag_1",
+		name:   "exist_trans_support_tag_1",
 		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0_0) AND exist(resource_gl1_1) LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_app_port` WHERE (auto_instance_type_0 not in (101,102)) AND (auto_service_type_1 not in (10)) LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		index:  "l2_vpc_filter_trans",
+		name:   "l2_vpc_filter_trans",
 		input:  "SELECT pod from l4_flow_log WHERE exist(l2_vpc_0) AND l2_vpc!=1 GROUP BY l2_vpc_1 LIMIT 1",
 		output: "SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod`, dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` FROM flow_log.`l4_flow_log` PREWHERE (epc_id_0!=0) AND (toUInt64(epc_id) IN (SELECT id FROM flow_tag.l3_epc_map WHERE name != 1)) AND (epc_id_1!=0) GROUP BY dictGet(flow_tag.l3_epc_map, 'name', (toUInt64(epc_id_1))) AS `l2_vpc_1` LIMIT 1",
 	}, {
-		index:      "with_multi_query",
+		name:       "with_multi_query",
 		db:         "flow_metrics",
 		datasource: "1m",
 		input:      "WITH query1 AS (SELECT PerSecond(Avg(`request`)) AS `请求速率`, Avg(`server_error_ratio`) AS `服务端异常比例`, Avg(`rrt`) AS `响应时延`, node_type(region_0) AS `client_node_type`, icon_id(region_0) AS `client_icon_id`, region_id_0, region_0, Enum(tap_side), tap_side, is_internet_0, node_type(region_1) AS `server_node_type`, icon_id(region_1) AS `server_icon_id`, region_id_1, region_1, is_internet_1 FROM vtap_app_edge_port WHERE time>=1704338640 AND time<=1704339600 GROUP BY region_0, tap_side, is_internet_0, region_id_0, `client_node_type`, region_1, is_internet_1, region_id_1, `server_node_type` ORDER BY `请求速率` DESC LIMIT 50 OFFSET 0), query2 AS (SELECT Avg(`packet_tx`) AS `Avg(发送包数)`, node_type(region_0) AS `client_node_type`, icon_id(region_0) AS `client_icon_id`, region_id_0, region_0, Enum(tap_side), tap_side, is_internet_0, node_type(region_1) AS `server_node_type`, icon_id(region_1) AS `server_icon_id`, region_id_1, region_1, is_internet_1 FROM vtap_flow_edge_port WHERE time>=1704338640 AND time<=1704339600 GROUP BY region_0, tap_side, is_internet_0, region_id_0, `client_node_type`, region_1, is_internet_1, region_id_1, `server_node_type` LIMIT 50) SELECT query1.`请求速率` AS `请求速率`, query1.`服务端异常比例` AS `服务端异常比例`, query1.`响应时延` AS `响应时延`, query1.`client_node_type` AS `client_node_type`, query1.`client_icon_id` AS `client_icon_id`, query1.`region_id_0` AS `region_id_0`, query1.`region_0` AS `region_0`, query1.`Enum(tap_side)` AS `Enum(tap_side)`, query1.`tap_side` AS `tap_side`, query1.`is_internet_0` AS `is_internet_0`, query1.`server_node_type` AS `server_node_type`, query1.`server_icon_id` AS `server_icon_id`, query1.`region_id_1` AS `region_id_1`, query1.`region_1` AS `region_1`, query1.`is_internet_1` AS `is_internet_1`, query2.`Avg(发送包数)` AS `Avg(发送包数)` FROM query1 LEFT JOIN query2 ON query1.`region_0` = query2.`region_0` AND query1.`tap_side` = query2.`tap_side` AND query1.`is_internet_0` = query2.`is_internet_0` AND query1.`region_id_0` = query2.`region_id_0` AND query1.`client_node_type` = query2.`client_node_type` AND query1.`region_1` = query2.`region_1` AND query1.`is_internet_1` = query2.`is_internet_1` AND query1.`region_id_1` = query2.`region_id_1` AND query1.`server_node_type` = query2.`server_node_type`",
 		output:     "WITH query1 AS (WITH dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_0))) AS `client_icon_id`, dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)`, dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_1))) AS `server_icon_id`, if(SUMIf(response, response>0)>0, divide(SUM(server_error), SUMIf(response, response>0)), null) AS `divide_0diveider_as_null_sum_server_error_sum_response`, if(SUMIf(rrt_count, rrt_count>0)>0, divide(SUM(rrt_sum), SUMIf(rrt_count, rrt_count>0)), null) AS `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count` SELECT 'region' AS `client_node_type`, `client_icon_id`, region_id_0, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `Enum(tap_side)`, tap_side, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, 'region' AS `server_node_type`, `server_icon_id`, region_id_1, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, divide(sum(request)/(1020/60), 60) AS `请求速率`, `divide_0diveider_as_null_sum_server_error_sum_response`*100 AS `服务端异常比例`, `divide_0diveider_as_null_sum_rrt_sum_sum_rrt_count` AS `响应时延` FROM flow_metrics.`vtap_app_edge_port.1m` PREWHERE `time` >= 1704338640 AND `time` <= 1704339600 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `tap_side`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, `region_id_0`, `client_node_type`, `client_icon_id`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, `region_id_1`, `server_node_type`, `server_icon_id` ORDER BY `请求速率` desc LIMIT 0, 50), query2 AS (WITH dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_0))) AS `client_icon_id`, dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)`, dictGet(flow_tag.region_map, 'icon_id', (toUInt64(region_id_1))) AS `server_icon_id` SELECT 'region' AS `client_node_type`, `client_icon_id`, region_id_0, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `Enum(tap_side)`, tap_side, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, 'region' AS `server_node_type`, `server_icon_id`, region_id_1, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, sum(packet_tx)/(1020/60) AS `Avg(发送包数)` FROM flow_metrics.`vtap_flow_edge_port.1m` PREWHERE `time` >= 1704338640 AND `time` <= 1704339600 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `tap_side`, if(l3_epc_id_0=-2,1,0) AS `is_internet_0`, `region_id_0`, `client_node_type`, `client_icon_id`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_1))) AS `region_1`, if(l3_epc_id_1=-2,1,0) AS `is_internet_1`, `region_id_1`, `server_node_type`, `server_icon_id` LIMIT 50) SELECT query1.`请求速率` AS `请求速率`, query1.`服务端异常比例` AS `服务端异常比例`, query1.`响应时延` AS `响应时延`, query1.`client_node_type` AS `client_node_type`, query1.`client_icon_id` AS `client_icon_id`, query1.`region_id_0` AS `region_id_0`, query1.`region_0` AS `region_0`, query1.`Enum(tap_side)` AS `Enum(tap_side)`, query1.`tap_side` AS `tap_side`, query1.`is_internet_0` AS `is_internet_0`, query1.`server_node_type` AS `server_node_type`, query1.`server_icon_id` AS `server_icon_id`, query1.`region_id_1` AS `region_id_1`, query1.`region_1` AS `region_1`, query1.`is_internet_1` AS `is_internet_1`, query2.`Avg(发送包数)` AS `Avg(发送包数)` FROM query1 LEFT JOIN query2 ON query1.`region_0` = query2.`region_0` AND query1.`tap_side` = query2.`tap_side` AND query1.`is_internet_0` = query2.`is_internet_0` AND query1.`region_id_0` = query2.`region_id_0` AND query1.`client_node_type` = query2.`client_node_type` AND query1.`region_1` = query2.`region_1` AND query1.`is_internet_1` = query2.`is_internet_1` AND query1.`region_id_1` = query2.`region_id_1` AND query1.`server_node_type` = query2.`server_node_type`",
+	}, {
+		name:       "test_slimit",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT time(time,1,1,0) as toi, PerSecond(Avg(`byte`)) AS `流量速率`, pod as pod FROM `vtap_flow_port` WHERE time>=1705040184 AND time<=1705045184 GROUP BY toi, pod ORDER BY toi desc SLIMIT 5",
+		output:     "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod`, toUnixTimestamp(`_toi`) AS `toi`, divide(sum(byte)/(60/60), 60) AS `流量速率` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE (pod) GLOBAL IN (SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (pod_id!=0) GROUP BY dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` LIMIT 5) AND `time` >= 1705040184 AND `time` <= 1705045184 AND (pod_id!=0) GROUP BY `toi`, dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` ORDER BY `toi` desc LIMIT 10000",
 	}}
 )
 
@@ -480,20 +486,22 @@ func TestGetSql(t *testing.T) {
 		)
 		if strings.HasPrefix(pcase.input, "WITH") {
 			out, _, _, err = e.ParseWithSql(pcase.input)
+		} else if strings.Contains(pcase.input, "SLIMIT") || strings.Contains(pcase.input, "slimit") {
+			out, _, _, err = e.ParseSlimitSql(pcase.input)
 		} else {
 			parser := parse.Parser{Engine: &e}
 			err = parser.ParseSQL(pcase.input)
 			out = parser.Engine.ToSQLString()
 		}
 		if out != pcase.output {
-			caseIndex := pcase.index
-			if pcase.index == "" {
-				caseIndex = strconv.Itoa(i)
+			caseName := pcase.name
+			if pcase.name == "" {
+				caseName = strconv.Itoa(i)
 			}
 			if err != nil && pcase.wantErr == err.Error() {
 				continue
 			}
-			t.Errorf("\nParse [%s]\n\t%q \n get: \n\t%q \n want: \n\t%q", caseIndex, pcase.input, out, pcase.output)
+			t.Errorf("\nParse [%s]\n\t%q \n get: \n\t%q \n want: \n\t%q", caseName, pcase.input, out, pcase.output)
 			if err != nil {
 				t.Errorf("\nerror %v", err)
 			}
