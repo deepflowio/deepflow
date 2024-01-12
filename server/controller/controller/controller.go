@@ -58,6 +58,7 @@ var log = logging.MustGetLogger("controller")
 type Controller struct{}
 
 func Start(ctx context.Context, configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
+	common.InitEnvData()
 	flag.Parse()
 
 	serverCfg := config.DefaultConfig()
