@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-func GetCurrentController() (*mysql.Controller, error) {
+func GetSelfController() (*mysql.Controller, error) {
 	var controller *mysql.Controller
 	err := mysql.Db.Where("ip = ?", GetNodeIP()).Find(&controller).Error
 	return controller, err
@@ -34,7 +34,7 @@ func GetCurrentController() (*mysql.Controller, error) {
 
 func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err error) {
 	var host string
-	curController, err := GetCurrentController()
+	curController, err := GetSelfController()
 	if err != nil {
 		return
 	}
@@ -83,4 +83,10 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 		masterIP = resp.Get("DATA").Get("NODE_IP").MustString()
 	}
 	return
+}
+
+func CheckSelfAndGetMasterControllerHostPort() (ok bool, masterCtrlIP string, httpPort, grpcPort int, err error) {
+	curCtrlIP := GetPodIP()
+	masterCtrlIP, httpPort, grpcPort, err = GetMasterControllerHostPort()
+	return curCtrlIP == masterCtrlIP, masterCtrlIP, httpPort, grpcPort, err
 }
