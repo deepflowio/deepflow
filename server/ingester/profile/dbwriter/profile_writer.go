@@ -60,7 +60,6 @@ type ProfileWriter struct {
 	ckdbColdStorages  map[string]*ckdb.ColdStorage
 	ttl               int
 	writerConfig      baseconfig.CKWriterConfig
-	ckdbWatcher       *baseconfig.Watcher
 	ckWriter          *ckwriter.CKWriter
 	flowTagWriter     *flow_tag.FlowTagWriter
 
@@ -93,7 +92,6 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
 		ttl:               config.ProfileTTL,
-		ckdbWatcher:       config.Base.CKDB.Watcher,
 		writerConfig:      config.CKWriterConfig,
 		counter:           &Counter{},
 	}

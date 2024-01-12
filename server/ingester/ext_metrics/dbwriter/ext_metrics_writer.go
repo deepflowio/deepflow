@@ -147,6 +147,10 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 }
 
 func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
+	// in standalone mode, ckdbWatcher will be nil
+	if w.ckdbWatcher == nil {
+		return nil
+	}
 	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
 	if err != nil {
 		return err
