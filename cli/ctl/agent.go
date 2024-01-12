@@ -28,14 +28,15 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
+	agentpb "github.com/deepflowio/deepflow/message/trident"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
 	"github.com/deepflowio/deepflow/cli/ctl/common/printutil"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 	"github.com/deepflowio/deepflow/cli/ctl/example"
-	agentpb "github.com/deepflowio/deepflow/message/trident"
 )
 
 type RebalanceType string
@@ -213,21 +214,10 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		nameMaxSize, groupMaxSize := 0, 0
-		for i := range response.Get("DATA").MustArray() {
-			vtap := response.Get("DATA").GetIndex(i)
-			nameSize := len(vtap.Get("NAME").MustString())
-			if nameSize > nameMaxSize {
-				nameMaxSize = nameSize
-			}
-			groupSize := len(vtap.Get("VTAP_GROUP_NAME").MustString())
-			if groupSize > groupMaxSize {
-				groupMaxSize = groupSize
-			}
-		}
+		t := table.New()
+		t.SetHeader([]string{"ID", "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "GROUP", "EXCEPTIONS", "REVISION", "UPGRADE_REVISION"})
 
-		cmdFormat := "%-8s %-*s %-10s %-18s %-18s %-8s %-*s %s\n"
-		fmt.Printf(cmdFormat, "ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
+		tableItems := [][]string{}
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 
@@ -242,19 +232,21 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 				}
 			}
 
-			fmt.Printf(cmdFormat,
+			tableItems = append(tableItems, []string{
 				strconv.Itoa(vtap.Get("ID").MustInt()),
-				nameMaxSize,
 				vtap.Get("NAME").MustString(),
-				common.VtapType(vtap.Get("TYPE").MustInt()),
+				fmt.Sprintf("%v", common.VtapType(vtap.Get("TYPE").MustInt())),
 				vtap.Get("CTRL_IP").MustString(),
 				vtap.Get("CTRL_MAC").MustString(),
-				common.VtapState(vtap.Get("STATE").MustInt()),
-				groupMaxSize,
+				fmt.Sprintf("%v", common.VtapState(vtap.Get("STATE").MustInt())),
 				vtap.Get("VTAP_GROUP_NAME").MustString(),
 				strings.Join(exceptionStrings, ","),
-			)
+				vtap.Get("REVISION").MustString(),
+				vtap.Get("UPGRADE_REVISION").MustString(),
+			})
 		}
+		t.AppendBulk(tableItems)
+		t.Render()
 	}
 }
 
