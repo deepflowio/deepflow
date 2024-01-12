@@ -35,6 +35,8 @@ mod monitor;
 mod platform;
 mod plugin;
 mod policy;
+#[cfg(target_os = "linux")]
+pub mod profile;
 mod rpc;
 mod sender;
 pub mod trident;

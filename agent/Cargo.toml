@@ -76,11 +76,17 @@ special_recv_engine = { path = "plugins/special_recv_engine" }
 sysinfo = { version = "0.26", default-features = false }
 thiserror = "1.0"
 time = "0.3.9"
-tokio = { version = "1.20.1", features = ["full"] }
+tokio = { version = "^1.25.0", features = ["full"] }
 tonic = "0.8.1"
 envmnt = "0.10.4"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
+axum = "0.7.3"
+jemalloc_pprof = "0.1.0"
+tikv-jemalloc-ctl = "0.5.4"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.5.4", features = ["profiling", "stats", "unprefixed_malloc_on_supported_platforms"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"
@@ -128,7 +134,7 @@ uluru = "3.0.0"
 
 [build-dependencies]
 chrono = "0.4"
-dunce = "0.1.1"
+dunce = "1.0.3"
 tonic-build = "0.8.0"
 
 [features]
@@ -155,6 +161,7 @@ harness = false
 
 [profile.release]
 panic = 'abort'
+debug = true
 
 [profile.dev]
 panic = 'abort'
