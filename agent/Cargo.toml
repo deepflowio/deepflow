@@ -81,6 +81,12 @@ tonic = "0.8.1"
 envmnt = "0.10.4"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
+axum = "0.7.3"
+jemalloc-ctl = "^0"
+jemalloc_pprof = "0.1.0"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.5.4", features = ["profiling", "stats", "unprefixed_malloc_on_supported_platforms", "background_threads"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"
