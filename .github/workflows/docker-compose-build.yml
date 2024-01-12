@@ -1,0 +1,71 @@
+name: build docker_compose
+
+on: 
+  push:
+    branches:
+      - main
+      - 'feature-**'
+    paths:
+      - 'manifests/deepflow-docker-compose/**'
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+#   release:
+#     branches: 
+#       - main
+#       - release-*
+
+jobs:
+  build_docker_compose:
+    name: build docker_compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: "oss-accelerate.aliyuncs.com"
+          access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
+          access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
+
+      - name: set env
+        run: |
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|=main$|=latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+          
+      - name: upload docker-compose
+        run: |
+          cd manifests
+          tar -czvf deepflow-docker-compose.tar deepflow-docker-compose
+          ossutil cp -rf deepflow-docker-compose.tar oss://deepflow-ce/pkg/docker-compose/${{ env.IMAGE_TAG_PREFIX }}/linux/deepflow-docker-compose.tar
+
+      - name: upload docker-compose stable artifacts
+        if: "startsWith(github.ref, 'refs/tags/')"
+        run: |
+          cd manifests
+          tar -czvf deepflow-docker-compose.tar deepflow-docker-compose
+          ossutil cp -rf deepflow-docker-compose.tar oss://deepflow-ce/pkg/docker-compose/stable/linux/deepflow-docker-compose.tar
+
+      # - name: Prepare for upload package
+      #   shell: bash
+      #   run: |
+      #     sha256sum dist/* > deepflow-agent.sha256sum.txt
+
+      # - name: Release and upload packages
+      #   uses: softprops/action-gh-release@v1
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     files: |
+      #       deepflow-agent.sha256sum.txt
+      #       dist/*

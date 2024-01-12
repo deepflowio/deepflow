@@ -1,0 +1,16 @@
+app:
+  http_request_timeout: 600
+  http_response_timeout: 600
+  listen-port: 20418
+  log-file: /var/log/deepflow/app.log
+  log-level: info
+  controller:
+    host: deepflow-server
+    port: 20417
+    timeout: 60
+  querier:
+    host: deepflow-server
+    port: 20416
+    timeout: 60
+  spec:
+    l7_tracing_limit: 100
