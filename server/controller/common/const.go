@@ -27,7 +27,7 @@ const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 const (
 	REMOTE_API_TIMEOUT = 30
-	ROZE_PORT          = 30106
+	INGESTER_API_PORT  = 30106
 )
 
 const (

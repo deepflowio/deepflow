@@ -1078,7 +1078,7 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
-		// 分析器请求消息接口，用于stream, roze
+		// 分析器请求消息接口，用于ingester
 		response, err = client.AnalyzerSync(ctx, &request)
 		return err
 	})

@@ -117,8 +117,8 @@ controller:
     port: 9000
     # user-password:
 
-  # roze
-  roze:
+  # datasource-api from ingester
+  ingester-api:
     port: 30106
     timeout: 60
 

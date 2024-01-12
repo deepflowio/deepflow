@@ -258,8 +258,8 @@ type Field struct {
 	// 注意字节对齐！
 
 	// 用于区分不同的trident及其不同的pipeline，用于如下场景：
-	//   - trident和roze之间的数据传输
-	//   - roze写入influxdb，作用类似_id，序列化为_tid
+	//   - agent和ingester之间的数据传输
+	//   - ingester写入clickhouse，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 
 	IP6              net.IP // FIXME: 合并IP6和IP
