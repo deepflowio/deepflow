@@ -83,9 +83,13 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 			Db = Db.Where("`interval` = ?", interval)
 		}
 	}
-	Db.Find(&dataSources)
+	if err := Db.Find(&dataSources).Error; err != nil {
+		return nil, err
+	}
 
-	mysql.Db.Find(&baseDataSources)
+	if err := mysql.Db.Find(&baseDataSources).Error; err != nil {
+		return nil, err
+	}
 	idToDisplayName := make(map[int]string)
 	for _, baseDataSource := range baseDataSources {
 		idToDisplayName[baseDataSource.ID] = baseDataSource.DisplayName
@@ -95,6 +99,7 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 		name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 		if err != nil {
 			log.Error(err)
+			return nil, err
 		}
 
 		dataSourceResp := model.DataSource{
@@ -164,7 +169,9 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount)
+	if err := mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
+		return model.DataSource{}, err
+	}
 	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
@@ -217,11 +224,15 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	dataSource.RetentionTime = dataSourceCreate.RetentionTime
 	dataSource.SummableMetricsOperator = dataSourceCreate.SummableMetricsOperator
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
-	mysql.Db.Create(&dataSource)
+	if err := mysql.Db.Create(&dataSource).Error; err != nil {
+		return model.DataSource{}, err
+	}
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
-	mysql.Db.Find(&analyzers)
+	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+		return model.DataSource{}, err
+	}
 
 	for _, analyzer := range analyzers {
 		if CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
@@ -239,9 +250,11 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	}
 
 	if err != nil {
-		mysql.Db.Model(&dataSource).Updates(
+		if err := mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		)
+		).Error; err != nil {
+			return model.DataSource{}, err
+		}
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
@@ -270,7 +283,9 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
-	mysql.Db.Find(&analyzers)
+	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+		return model.DataSource{}, err
+	}
 
 	var err error
 	var errAnalyzerIP string
@@ -286,14 +301,18 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	if err == nil {
 		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
-		mysql.Db.Save(&dataSource)
+		if err := mysql.Db.Save(&dataSource).Error; err != nil {
+			return model.DataSource{}, err
+		}
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
 	if errors.Is(err, httpcommon.ErrorFail) {
-		mysql.Db.Model(&dataSource).Updates(
+		if err := mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		)
+		).Error; err != nil {
+			return model.DataSource{}, err
+		}
 		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.DisplayName)
 		log.Error(errMsg)
 		err = NewError(httpcommon.SERVER_ERROR, errMsg)
@@ -340,7 +359,9 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
-	mysql.Db.Find(&analyzers)
+	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+		return nil, err
+	}
 
 	for _, analyzer := range analyzers {
 		if CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
@@ -358,11 +379,15 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	}
 
 	if err != nil {
-		mysql.Db.Model(&dataSource).Updates(
+		if err := mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		)
+		).Error; err != nil {
+			return nil, err
+		}
 	}
-	mysql.Db.Delete(&dataSource)
+	if err := mysql.Db.Delete(&dataSource).Error; err != nil {
+		return nil, err
+	}
 
 	return map[string]string{"LCUUID": lcuuid}, err
 }
@@ -472,7 +497,9 @@ func ConfigAnalyzerDataSource(ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
-	mysql.Db.Find(&dataSources)
+	if err := mysql.Db.Find(&dataSources).Error; err != nil {
+		return err
+	}
 	idToDataSource := make(map[int]mysql.DataSource)
 	for _, dataSource := range dataSources {
 		idToDataSource[dataSource.ID] = dataSource
