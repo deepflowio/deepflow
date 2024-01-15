@@ -1411,7 +1411,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (!protocol_port_check_1(PROTO_DUBBO, conn_info))
+	if (!protocol_port_check_2(PROTO_DUBBO, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
@@ -1770,8 +1770,12 @@ static __inline enum message_type
 infer_mongo_message(const char *buf, size_t count,
 		    struct conn_info_t *conn_info)
 {
-	if (!is_protocol_enabled(PROTO_MONGO)) {
+	if (!protocol_port_check_2(PROTO_MONGO, conn_info))
 		return MSG_UNKNOWN;
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_MONGO)
+			return MSG_UNKNOWN;
 	}
 
 	struct mongo_header *header = NULL;
