@@ -50,6 +50,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	var vtapGroups []mysql.VTapGroup
 	var regions []mysql.Region
 	var azs []mysql.AZ
+	var vtapRepos []mysql.VTapRepo
 
 	Db := mysql.Db
 	for _, param := range []string{
@@ -65,10 +66,21 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			Db = Db.Where("name IN (?)", filter["names"].([]string))
 		}
 	}
-	Db.Find(&vtaps)
-	mysql.Db.Find(&vtapGroups)
-	mysql.Db.Find(&regions)
-	mysql.Db.Find(&azs)
+	if err := Db.Find(&vtaps).Error; err != nil {
+		return nil, err
+	}
+	if err := mysql.Db.Find(&vtapGroups).Error; err != nil {
+		return nil, err
+	}
+	if err := mysql.Db.Find(&regions).Error; err != nil {
+		return nil, err
+	}
+	if err := mysql.Db.Find(&azs).Error; err != nil {
+		return nil, err
+	}
+	if err := mysql.Db.Select("name", "branch", "rev_count").Find(&vtapRepos).Error; err != nil {
+		return nil, err
+	}
 
 	lcuuidToRegion := make(map[string]string)
 	for _, region := range regions {
@@ -85,6 +97,11 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	lcuuidToGroup := make(map[string]string)
 	for _, group := range vtapGroups {
 		lcuuidToGroup[group.Lcuuid] = group.Name
+	}
+
+	vtapRepoNameToRevision := make(map[string]string, len(vtapRepos))
+	for _, item := range vtapRepos {
+		vtapRepoNameToRevision[item.Name] = fmt.Sprintf("%s %d", item.Branch, item.RevCount)
 	}
 
 	for _, vtap := range vtaps {
@@ -130,6 +147,13 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 		}
 		vtapResp.Revision = revision
 		vtapResp.CompleteRevision = completeRevision
+		if vtap.UpgradePackage != "" {
+			if upgradeRevision, ok := vtapRepoNameToRevision[vtap.UpgradePackage]; ok {
+				vtapResp.UpgradeRevision = upgradeRevision
+			} else {
+				log.Errorf("vtap upgrade package(%v) cannot assoicated with vtap repo", vtap.UpgradePackage)
+			}
+		}
 		// exceptions
 		exceptions := vtap.Exceptions
 		bitNum := 0

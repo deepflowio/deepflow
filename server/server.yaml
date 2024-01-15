@@ -343,7 +343,7 @@ querier:
     tag-values: 
   # external-apm:
   # - name: skywalking
-  #   addr: 127.0.0.1:11800
+  #   addr: 127.0.0.1:12800
 
 ingester:
   ## whether Ingester store metrics/flow_log... to database

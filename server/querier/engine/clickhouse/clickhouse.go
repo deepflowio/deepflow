@@ -90,7 +90,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 
 	// Parse slimitSql
-	slimitResult, slimitDebug, err := e.ParseSlimitSql(sql, args)
+	slimitResult, slimitDebug, err := e.QuerySlimitSql(sql, args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -327,14 +327,14 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 	case "tag":
 		// show tag {tag} values from table
 		if len(sqlSplit) < 6 {
-			return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+			return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
 			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
-		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 	case "tags":
 		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, e.Context)
 		return data, []string{}, true, err
@@ -343,12 +343,52 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	}
-	return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+	return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 }
 
-func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
-	if !strings.Contains(sql, "SLIMIT") && !strings.Contains(sql, "slimit") {
+func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
+	sql, callbacks, columnSchemaMap, err := e.ParseSlimitSql(sql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+	if sql == "" {
 		return nil, nil, nil
+	}
+
+	query_uuid := args.QueryUUID
+	debug := &client.Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		QueryUUID: query_uuid,
+	}
+
+	debug.Sql = sql
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       e.DB,
+		Debug:    debug,
+		Context:  e.Context,
+	}
+	params := &client.QueryParams{
+		Sql:             sql,
+		Callbacks:       callbacks,
+		QueryUUID:       query_uuid,
+		ColumnSchemaMap: columnSchemaMap,
+	}
+	rst, err := chClient.DoQuery(params)
+	if err != nil {
+		log.Error(err)
+		return nil, debug.Get(), err
+	}
+	return rst, debug.Get(), err
+}
+
+func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
+	if !strings.Contains(sql, "SLIMIT") && !strings.Contains(sql, "slimit") {
+		return "", nil, nil, nil
 	}
 	newSql := strings.ReplaceAll(sql, " SLIMIT ", " slimit ")
 	newSql = strings.ReplaceAll(newSql, " SORDER BY ", " sorder by ")
@@ -404,8 +444,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 	stmt, err := sqlparser.Parse(newSql)
 	if err != nil {
-		log.Error(err)
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 	innerSelectSlice := []string{}
 	outerWhereLeftSlice := []string{}
@@ -429,11 +468,10 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	showTagsSql := "show tags from " + table
 	tags, _, _, err := e.ParseShowSql(showTagsSql)
 	if err != nil {
-		log.Error(err)
-		return nil, nil, err
+		return "", nil, nil, err
 	} else if len(tags.Values) == 0 {
 		err = errors.New("No data in show tags")
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 	tagsSlice := []string{}
 	for _, col := range tags.Values {
@@ -599,9 +637,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		innerParser := parse.Parser{Engine: innerEngine}
 		err = innerParser.ParseSQL(innerSql)
 		if err != nil {
-			errorMessage := fmt.Sprintf("sql: %s; parse error: %s", innerSql, err.Error())
-			log.Error(errorMessage)
-			return nil, nil, err
+			return "", nil, nil, fmt.Errorf("sql: %s; parse error: %s", innerSql, err.Error())
 		}
 		for _, stmt := range innerEngine.Statements {
 			stmt.Format(innerEngine.Model)
@@ -621,9 +657,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	outerParser := parse.Parser{Engine: outerEngine}
 	err = outerParser.ParseSQL(newSql)
 	if err != nil {
-		errorMessage := fmt.Sprintf("sql: %s; parse error: %s", newSql, err.Error())
-		log.Error(errorMessage)
-		return nil, nil, err
+		return "", nil, nil, fmt.Errorf("sql: %s; parse error: %s", innerSql, err.Error())
 	}
 	for _, stmt := range outerEngine.Statements {
 		stmt.Format(outerEngine.Model)
@@ -661,39 +695,16 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	} else {
 		outerSql = outerTransSql
 	}
-	query_uuid := args.QueryUUID
-	debug := &client.Debug{
-		IP:        config.Cfg.Clickhouse.Host,
-		QueryUUID: query_uuid,
-	}
 	outerSql = strings.Replace(outerSql, ") IN (", ") GLOBAL IN (", 1)
+
 	callbacks := outerEngine.View.GetCallbacks()
-	debug.Sql = outerSql
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       outerEngine.DB,
-		Debug:    debug,
-		Context:  outerEngine.Context,
-	}
-	ColumnSchemaMap := make(map[string]*common.ColumnSchema)
+
+	columnSchemaMap := make(map[string]*common.ColumnSchema)
 	for _, ColumnSchema := range outerEngine.ColumnSchemas {
-		ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
+		columnSchemaMap[ColumnSchema.Name] = ColumnSchema
 	}
-	params := &client.QueryParams{
-		Sql:             outerSql,
-		Callbacks:       callbacks,
-		QueryUUID:       query_uuid,
-		ColumnSchemaMap: ColumnSchemaMap,
-	}
-	rst, err := chClient.DoQuery(params)
-	if err != nil {
-		log.Error(err)
-		return nil, debug.Get(), err
-	}
-	return rst, debug.Get(), err
+
+	return outerSql, callbacks, columnSchemaMap, nil
 }
 
 func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {

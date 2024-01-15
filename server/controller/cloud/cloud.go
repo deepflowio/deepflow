@@ -362,6 +362,7 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 	resource.LBs = append(resource.LBs, additionalResource.LB...)
 	resource.LBListeners = append(resource.LBListeners, additionalResource.LBListeners...)
 	resource.LBTargetServers = append(resource.LBTargetServers, additionalResource.LBTargetServers...)
+	resource.PeerConnections = append(resource.PeerConnections, additionalResource.PeerConnections...)
 	return resource
 }
 

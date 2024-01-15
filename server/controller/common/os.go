@@ -23,13 +23,8 @@ var NodeName, NodeIP, PodName, PodIP, NameSpace, runningMode string
 
 func InitEnvData() {
 	runningMode = os.Getenv(RUNNING_MODE_KEY)
-	if IsStandaloneRunningMode() == false {
-		NodeName = os.Getenv(NODE_NAME_KEY)
-		NodeIP = os.Getenv(NODE_IP_KEY)
-		PodName = os.Getenv(POD_NAME_KEY)
-		PodIP = os.Getenv(POD_IP_KEY)
-		NameSpace = os.Getenv(NAME_SPACE_KEY)
-	} else {
+	if IsStandaloneRunningMode() == true {
+		// in standalone mode, currently only NodeIP can be passed through environment variables
 		NodeName, _ = os.Hostname()
 		NodeIP = os.Getenv(NODE_IP_KEY)
 		PodName, _ = os.Hostname()
@@ -37,6 +32,12 @@ func InitEnvData() {
 		if PodIP == "" {
 			PodIP = "127.0.0.1"
 		}
+	} else {
+		NodeName = os.Getenv(NODE_NAME_KEY)
+		NodeIP = os.Getenv(NODE_IP_KEY)
+		PodName = os.Getenv(POD_NAME_KEY)
+		PodIP = os.Getenv(POD_IP_KEY)
+		NameSpace = os.Getenv(NAME_SPACE_KEY)
 	}
 	log.Infof("ENV %s=%s; %s=%s; %s=%s; %s=%s; %s=%s, %s=%s",
 		NODE_NAME_KEY, NodeName,

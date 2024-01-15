@@ -270,8 +270,8 @@ func (c *Config) Validate() error {
 			}
 			c.NodeIP = nodeIP
 		}
-
-		myNodeName, exist := os.LookupEnv(EnvK8sNodeName)
+		var exist bool
+		myNodeName, exist = os.LookupEnv(EnvK8sNodeName)
 		if !exist {
 			log.Errorf("Can't get node name env %s", EnvK8sNodeName)
 			sleepAndExit()
