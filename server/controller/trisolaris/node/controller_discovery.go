@@ -45,6 +45,10 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 }
 
 func (c *ControllerDiscovery) GetControllerData() *models.Controller {
+	if c.ctrlIP == "" {
+		log.Errorf("get env(%s) data failed", NODE_IP_KEY)
+		return nil
+	}
 	envData := utils.GetRuntimeEnv()
 	name := GetNodeName()
 	if name == "" {
