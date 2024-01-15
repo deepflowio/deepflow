@@ -43,11 +43,11 @@ var DB_TABLE_MAP = map[string][]string{
 }
 
 var SHOW_TAG_VALUE_MAP = map[string][]string{
-	"ip_resource_map": []string{"ip", "subnet", "region", "az", "host", "chost", "vpc", "router", "dhcpgw", "lb", "lb_listener", "natgw", "redis", "rds", "pod_cluster", "pod_ns", "pod_node", "pod_ingress", "pod_service", "pod_group", "pod"},
+	"ip_resource_map": []string{"ip", "subnet", "region", "az", "host", "chost", "l3_epc", "router", "dhcpgw", "lb", "lb_listener", "natgw", "redis", "rds", "pod_cluster", "pod_ns", "pod_node", "pod_ingress", "pod_service", "pod_group", "pod"},
 	"pod_ns_map":      []string{"pod_ns", "pod_cluster"},
 	"pod_group_map":   []string{"pod_group", "pod_cluster", "pod_ns"},
 	"pod_service_map": []string{"pod_service", "pod_cluster", "pod_ns"},
 	"pod_map":         []string{"pod", "pod_cluster", "pod_ns", "pod_node", "pod_service", "pod_group"},
-	"chost_map":       []string{"chost", "host", "vpc"},
-	"gprocess_map":    []string{"gprocess", "chost", "vpc"},
+	"chost_map":       []string{"chost", "host", "l3_epc"},
+	"gprocess_map":    []string{"gprocess", "chost", "l3_epc"},
 }
