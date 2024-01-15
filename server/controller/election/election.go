@@ -101,6 +101,10 @@ func getID() string {
 }
 
 func GetLeader() string {
+	if common.IsStandaloneRunningMode() {
+		// in standalone mode, the local machine is the master node because of all in one deployment
+		return getID()
+	}
 	return leaderData.GetLeader()
 }
 
