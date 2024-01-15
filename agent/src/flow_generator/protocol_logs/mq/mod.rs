@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+pub mod amqp;
 mod kafka;
 pub mod mqtt;
 
+pub use amqp::{AmqpInfo, AmqpLog};
 pub use kafka::{KafkaInfo, KafkaLog};
 pub use mqtt::{MqttInfo, MqttLog};
