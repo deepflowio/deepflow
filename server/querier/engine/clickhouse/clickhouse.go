@@ -48,6 +48,19 @@ var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
 var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 
+// Perform regular checks on show SQL and support the following formats:
+// show tag {tag_name} values from {table_name} where xxx order by xxx limit xxx :{tag_name} and {table_name} can be any character
+// show tags
+// show tags from xxx
+// show language
+// show metrics
+// show metrics from xxx
+// show metrics functions
+// show metrics on db
+// show tables
+// show databases
+var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags|tags from \\w+|metrics|metrics from \\w+|metrics functions|language|metrics on db|tables|databases)$")
+
 type TargetLabelFilter struct {
 	OriginFilter string
 	TransFilter  string
@@ -208,9 +221,14 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 }
 
 func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, error) {
-	sqlSplit := strings.Split(sql, " ")
+	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
+	}
+	sql = strings.Join(sqlSplit, " ")
+	if !showSqlRegexp.MatchString(strings.ToLower(sql)) {
+		err := fmt.Errorf("not support sql: '%s', please check", sql)
+		return nil, []string{}, true, err
 	}
 	if strings.ToLower(sqlSplit[1]) == "language" {
 		result := &common.Result{}

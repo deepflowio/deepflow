@@ -837,7 +837,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
-	sqlSplit := strings.Split(sql, " ")
+	sqlSplit := strings.Fields(sql)
 	tag := sqlSplit[2]
 	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
 		tag = strings.TrimPrefix(tag, "`")
@@ -938,7 +938,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "flow_tag",
 	}
-	sqlSplit := strings.Split(rawSql, " ")
+	sqlSplit := strings.Fields(rawSql)
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
@@ -1275,7 +1275,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 }
 
 func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, error) {
-	sqlSplit := strings.Split(rawSql, " ")
+	sqlSplit := strings.Fields(rawSql)
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {

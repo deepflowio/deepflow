@@ -59,17 +59,17 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 	for _, chost := range chosts {
 		if chost.DeletedAt.Valid {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:     chost.ID,
-				Name:   chost.Name + " (deleted)",
-				VPCID:  chost.VPCID,
-				HostID: ipToHostID[chost.LaunchServer],
+				ID:      chost.ID,
+				Name:    chost.Name + " (deleted)",
+				L3EPCID: chost.VPCID,
+				HostID:  ipToHostID[chost.LaunchServer],
 			}
 		} else {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:     chost.ID,
-				Name:   chost.Name,
-				VPCID:  chost.VPCID,
-				HostID: ipToHostID[chost.LaunchServer],
+				ID:      chost.ID,
+				Name:    chost.Name,
+				L3EPCID: chost.VPCID,
+				HostID:  ipToHostID[chost.LaunchServer],
 			}
 		}
 	}
@@ -85,8 +85,8 @@ func (p *ChChost) generateUpdateInfo(oldItem, newItem mysql.ChChost) (map[string
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.VPCID != newItem.VPCID {
-		updateInfo["vpc_id"] = newItem.VPCID
+	if oldItem.L3EPCID != newItem.L3EPCID {
+		updateInfo["l3_epc_id"] = newItem.L3EPCID
 	}
 	if oldItem.HostID != newItem.HostID {
 		updateInfo["host_id"] = newItem.HostID

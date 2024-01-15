@@ -166,7 +166,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			return nil, false
 		}
 		for _, tag := range CH_IP_RESOURCE_TAGS {
-			multiIDTag := strings.ReplaceAll(tag, "vpc", "epc")
+			multiIDTag := strings.ReplaceAll(tag, "l3_epc", "epc")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "router", "vgw")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "chost", "vm")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "natgw", "nat_gateway")

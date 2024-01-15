@@ -56,8 +56,8 @@ type VtapPortKey struct {
 }
 
 type IPRelationKey struct {
-	VPCID int
-	IP    string
+	L3EPCID int
+	IP      string
 }
 
 type K8sLabelKey struct {
