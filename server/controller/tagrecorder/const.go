@@ -197,7 +197,7 @@ const (
 
 var CH_IP_RESOURCE_TAGS = []string{
 	"region_id", "region_name", "az_id", "az_name", "host_id", "host_name",
-	"chost_id", "chost_name", "vpc_id", "vpc_name", "subnet_id", "subnet_name",
+	"chost_id", "chost_name", "l3_epc_id", "l3_epc_name", "subnet_id", "subnet_name",
 	"router_id", "router_name", "dhcpgw_id", "dhcpgw_name", "lb_id", "lb_name",
 	"lb_listener_id", "lb_listener_name", "natgw_id", "natgw_name", "redis_id",
 	"redis_name", "rds_id", "rds_name", "pod_cluster_id", "pod_cluster_name",
@@ -399,8 +399,8 @@ const (
 		"    `host_name` String,\n" +
 		"    `chost_id` UInt64,\n" +
 		"    `chost_name` String,\n" +
-		"    `vpc_id` UInt64,\n" +
-		"    `vpc_name` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `l3_epc_name` String,\n" +
 		"    `router_id` UInt64,\n" +
 		"    `router_name` String,\n" +
 		"    `dhcpgw_id` UInt64,\n" +
@@ -644,7 +644,7 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `host_id` UInt64,\n" +
-		"    `vpc_id` UInt64\n" +
+		"    `l3_epc_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -669,7 +669,7 @@ const (
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
 		"    `chost_id` Int64,\n" +
-		"    `vpc_id`   Int64\n" +
+		"    `l3_epc_id`   Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
