@@ -1189,7 +1189,9 @@ static __inline bool is_include_crlf(const char *buf)
 	return true;
 }
 
-// http://redisdoc.com/topic/protocol.html
+// ref:
+//  http://redisdoc.com/topic/protocol.html
+//  https://redis.io/docs/reference/protocol-spec/
 static __inline enum message_type infer_redis_message(const char *buf,
 						      size_t count,
 						      struct conn_info_t
@@ -1208,9 +1210,30 @@ static __inline enum message_type infer_redis_message(const char *buf,
 
 	const char first_byte = buf[0];
 
-	// 第一个字节仅可能是 '+' '-' ':' '$' '*'
+	/*
+	 * The following table summarizes the RESP data types that Redis supports:
+	 *
+	 * RESP data type	Minimal protocol version	Category	First byte
+	 * Simple strings	RESP2				Simple		+
+	 * Simple Errors	RESP2				Simple		-
+	 * Integers		RESP2				Simple		:
+	 * Bulk strings		RESP2				Aggregate	$
+	 * Arrays		RESP2				Aggregate	*
+	 * Nulls		RESP3				Simple		_
+	 * Booleans		RESP3				Simple		#
+	 * Doubles		RESP3				Simple		,
+	 * Big numbers		RESP3				Simple		(
+	 * Bulk errors		RESP3				Aggregate	!
+	 * Verbatim strings	RESP3				Aggregate	=
+	 * Maps			RESP3				Aggregate	%
+	 * Sets			RESP3				Aggregate	~
+	 * Pushes		RESP3				Aggregate	>
+	 */
 	if (first_byte != '+' && first_byte != '-' && first_byte != ':' &&
-	    first_byte != '$' && first_byte != '*')
+	    first_byte != '$' && first_byte != '*' && first_byte != '_' &&
+	    first_byte != '#' && first_byte != ',' && first_byte != '(' &&
+	    first_byte != '!' && first_byte != '=' && first_byte != '%' &&
+	    first_byte != '~' && first_byte != '>')
 		return MSG_UNKNOWN;
 
 	// The redis message must contain /r/n.
