@@ -976,7 +976,7 @@ var IndexAdd63 = []*IndexAdds{
 	&IndexAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log_local"},
-		ColumnNames: []string{"trace_id", "x_request_id_0", "x_request_id_1"},
+		ColumnNames: []string{"trace_id", "x_request_id_0", "x_request_id_1", "request_resource", "request_domain", "endpoint"},
 		IndexType:   ckdb.IndexBloomfilter,
 	},
 	&IndexAdds{
