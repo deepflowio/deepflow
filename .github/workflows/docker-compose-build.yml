@@ -52,6 +52,7 @@ jobs:
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
           cd manifests
+          sed -i "s|latest|${{ env.IMAGE_TAG_PREFIX }}|g" deepflow-docker-compose/docker-compose.yaml
           tar -czvf deepflow-docker-compose.tar deepflow-docker-compose
           ossutil cp -rf deepflow-docker-compose.tar oss://deepflow-ce/pkg/docker-compose/stable/linux/deepflow-docker-compose.tar
 
