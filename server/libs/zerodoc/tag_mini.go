@@ -42,9 +42,9 @@ type MiniField struct {
 	rawIP  [net.IPv6len]byte // (16B)
 	rawIP1 [net.IPv6len]byte // (16B)
 
-	// 用于区分不同的trident及其不同的pipeline，用于如下场景：
-	//   - trident和roze之间的数据传输
-	//   - roze写入influxdb，作用类似_id，序列化为_tid
+	// 用于区分不同的agent及其不同的pipeline，用于如下场景：
+	//   - agent和ingester之间的数据传输
+	//   - ingester写入clickhouse，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 	IsIPv6         uint8 // 与IP/IP6是共生字段
 	L3EpcID        int16

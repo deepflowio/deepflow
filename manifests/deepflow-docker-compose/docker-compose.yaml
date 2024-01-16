@@ -1,0 +1,84 @@
+version: '3.2'
+services:
+  mysql:
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/mysql:8.0.31
+    container_name: deepflow-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: deepflow
+      MYSQL_DATABASE: grafana
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./common/config/mysql/my.cnf
+        target: /etc/my.cnf
+      - type: bind
+        source: ./common/config/mysql/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+      - /opt/deepflow/mysql:/var/lib/mysql:z
+    networks:
+      - deepflow
+  clickhouse:
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/clickhouse-server:22.8.6.71
+    container_name: deepflow-clickhouse
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./common/config/clickhouse/config.xml
+        target: /etc/clickhouse-server/config.xml
+      - type: bind
+        source: ./common/config/clickhouse/users.xml
+        target: /etc/clickhouse-server/users.xml
+      - /opt/deepflow/clickhouse:/var/lib/clickhouse:z
+      - /opt/deepflow/clickhouse_storage:/var/lib/clickhouse_storage:z
+    links:
+    - mysql
+    networks:
+      - deepflow
+  deepflow-server:
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:latest
+    container_name: deepflow-server
+    restart: always
+    environment:
+      DEEPFLOW_SERVER_RUNNING_MODE: STANDALONE
+      K8S_POD_IP_FOR_DEEPFLOW: 127.0.0.1
+      K8S_NODE_IP_FOR_DEEPFLOW: FIX_ME_ALLINONE_HOST_IP
+      K8S_NAMESPACE_FOR_DEEPFLOW: deepflow
+      K8S_NODE_NAME_FOR_DEEPFLOW: deepflow-host
+      K8S_POD_NAME_FOR_DEEPFLOW: deepflow-container
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./common/config/deepflow-server/server.yaml
+        target: /etc/server.yaml
+    networks:
+      - deepflow
+    links:
+    - mysql
+    - clickhouse
+    - deepflow-app
+    ports:
+      - 20416:20416
+      - 20419:20419
+      - 30417:20417
+      - 30035:20035
+      - 30033:20033
+  deepflow-app:
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:latest
+    container_name: deepflow-app
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./common/config/deepflow-app/app.yaml
+        target: /etc/deepflow/app.yaml
+    networks:
+      - deepflow
+    ports:
+      - 20418:20418
+networks:
+  deepflow:
+    external: false
