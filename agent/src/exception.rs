@@ -25,6 +25,17 @@ use public::proto::trident::Exception;
 pub struct ExceptionHandler(Arc<AtomicU64>);
 
 impl ExceptionHandler {
+    const AUTO_CLEAR_BITS: u64 = Exception::NpbNoGwArp as u64
+        | Exception::AnalyzerNoGwArp as u64
+        | Exception::NpbBpsThresholdExceeded as u64
+        | Exception::RxPpsThresholdExceeded as u64
+        | Exception::ProcessThresholdExceeded as u64
+        | Exception::ThreadThresholdExceeded as u64
+        | Exception::LogFileExceeded as u64
+        | Exception::ControllerSocketError as u64
+        | Exception::AnalyzerSocketError as u64
+        | Exception::NpbSocketError as u64;
+
     pub fn set(&self, e: Exception) {
         self.0.fetch_or(e as u64, Ordering::SeqCst);
     }
@@ -34,7 +45,7 @@ impl ExceptionHandler {
     }
 
     pub fn take(&self) -> u64 {
-        self.0.swap(0, Ordering::SeqCst)
+        self.0.fetch_and(!Self::AUTO_CLEAR_BITS, Ordering::SeqCst)
     }
 }
 
@@ -71,6 +82,7 @@ mod tests {
         assert_eq!(h.0.load(Ordering::Relaxed), expected);
 
         assert_eq!(h.take(), expected);
-        assert_eq!(h.0.load(Ordering::Relaxed), 0);
+        expected &= !(ExceptionHandler::AUTO_CLEAR_BITS);
+        assert_eq!(h.0.load(Ordering::Relaxed), expected);
     }
 }
