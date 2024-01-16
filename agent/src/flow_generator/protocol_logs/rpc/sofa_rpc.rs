@@ -184,6 +184,7 @@ pub struct SofaRpcInfo {
 
     resp_code: u16,
     status: L7ResponseStatus,
+    x_request_id: String,
 }
 
 impl SofaRpcInfo {
@@ -266,6 +267,7 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(s.target_serv),
                 request_id: Some(s.req_id),
+                x_request_id_0: Some(s.x_request_id),
                 ..Default::default()
             }),
             flags,
@@ -444,6 +446,19 @@ impl SofaRpcLog {
                 }
             }
         }
+
+        // 南京银行 H_TRACK_SEQ
+        const KEY: &[u8] = b"H_TRACK_SEQ";
+        const KEY_LENGTH: usize = 11;
+        const H_TRACK_SEQ_LENGTH: usize = 30;
+        memchr::memmem::find(payload, KEY).map(|idx| {
+            if idx + KEY_LENGTH + 1 + H_TRACK_SEQ_LENGTH < payload.len() {
+                info.trace_id = String::from_utf8_lossy(
+                    &payload[idx + KEY_LENGTH + 1..idx + KEY_LENGTH + 1 + H_TRACK_SEQ_LENGTH],
+                )
+                .to_string();
+            }
+        });
 
         if check && (info.target_serv.is_empty() || info.method.is_empty()) {
             return Err(Error::L7ProtocolUnknown);
