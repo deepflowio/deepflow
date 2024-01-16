@@ -240,6 +240,8 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	isSingleTagTok := f.Name == FUNCTION_TOPK && len(f.Args) == 1
 	if isSingleTagTok {
 		buf.WriteString("arrayStringConcat(")
+	} else if f.Name == FUNCTION_ANY {
+		buf.WriteString("toString(")
 	}
 	buf.WriteString(dbFuncName)
 
@@ -313,6 +315,8 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(")")
 	if isSingleTagTok {
 		buf.WriteString(", ',')")
+	} else if f.Name == FUNCTION_ANY {
+		buf.WriteString(")")
 	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {

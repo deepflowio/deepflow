@@ -376,11 +376,11 @@ var (
 	}, {
 		name:   "Any_1",
 		input:  "select Any(ip_0) from l4_flow_log limit 1",
-		output: "SELECT any(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT toString(any(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:   "Any_2",
 		input:  "select Any(ip_0, pod_0) from l4_flow_log limit 1",
-		output: "SELECT any((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT toString(any((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:   "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
