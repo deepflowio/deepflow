@@ -123,6 +123,6 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 
 func (ml *metricLabel) load() ([]*mysql.PrometheusMetricLabel, error) {
 	var metricLabels []*mysql.PrometheusMetricLabel
-	err := mysql.Db.Select("metric_name", "label_id").Find(&metricLabels).Error
+	err := mysql.Db.Select("metric_name", "label_id", "id").Find(&metricLabels).Error
 	return metricLabels, err
 }
