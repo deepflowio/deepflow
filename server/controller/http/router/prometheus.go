@@ -42,16 +42,13 @@ func (p *Prometheus) RegisterTo(e *gin.Engine) {
 func createPrometheusCleanTask(c *gin.Context) {
 	body := make(map[string]interface{})
 	err := c.ShouldBindBodyWith(&body, binding.JSON)
-	log.Errorf("body: %v", body)
 	if err != nil {
-		log.Errorf("body: %v", err)
 		routercommon.JsonResponse(c, body, err)
 		return
 	}
 
 	isMaster, masterCtrlIP, httpPort, _, err := common.CheckSelfAndGetMasterControllerHostPort()
 	if err != nil {
-		log.Errorf("body: %v", err)
 		routercommon.JsonResponse(c, body, err)
 		return
 	}
@@ -60,16 +57,13 @@ func createPrometheusCleanTask(c *gin.Context) {
 		if e, ok := body["EXPIRED_AT"]; ok {
 			expiredAt, err = time.Parse(common.GO_BIRTHDAY, e.(string))
 			if err != nil {
-				log.Errorf("body: %v", err)
 				routercommon.JsonResponse(c, body, err)
 				return
 			}
 		}
-		log.Errorf("body: %v", body)
 		err = prometheus.GetCleaner().Clear(expiredAt)
 	} else {
 		_, err = common.CURLPerform(http.MethodPost, fmt.Sprintf("http://%s:%d/v1/prometheus-cleaner-tasks/", masterCtrlIP, httpPort), body)
-		log.Errorf("body: %v", err)
 	}
 	routercommon.JsonResponse(c, body, err)
 }

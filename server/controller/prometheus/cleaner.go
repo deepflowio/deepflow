@@ -91,7 +91,7 @@ func (c *Cleaner) Stop() {
 }
 
 func (c *Cleaner) Clear(expiredAt time.Time) error {
-	log.Infof("prometheus data cleaner clear by hand started")
+	log.Infof("prometheus data cleaner clear by hand")
 	return c.clear(expiredAt)
 }
 
