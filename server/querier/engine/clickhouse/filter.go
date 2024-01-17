@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -184,6 +185,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			op = "not ilike"
 		}
 	} else if strings.ToLower(op) == "regexp" || strings.ToLower(op) == "not regexp" {
+		// check regexp format
+		// 检查正则表达式格式
+		_, err := regexp.Compile(strings.Trim(t.Value, "'"))
+		if err != nil {
+			error := fmt.Errorf("%s : %s", err, t.Value)
+			return nil, error
+		}
 		if strings.ToLower(op) == "regexp" {
 			op = "match"
 		} else {
@@ -191,6 +199,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 	}
 	if db == "flow_tag" {
+		if t.Tag == "vpc" || t.Tag == "vpc_id" {
+			t.Tag = strings.Replace(t.Tag, "vpc", "l3_epc", 1)
+		}
 		filter := ""
 		switch t.Tag {
 		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "type", "1":
@@ -1275,6 +1286,13 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				// check regexp format
+				// 检查正则表达式格式
+				_, err := regexp.Compile(strings.Trim(f.Value, "'"))
+				if err != nil {
+					error := fmt.Errorf("%s : %s", err, f.Value)
+					return nil, error
+				}
 				if strings.ToLower(opName) == "regexp" {
 					opName = "match"
 				} else {
@@ -1331,6 +1349,13 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				// check regexp format
+				// 检查正则表达式格式
+				_, err := regexp.Compile(strings.Trim(f.Value, "'"))
+				if err != nil {
+					error := fmt.Errorf("%s : %s", err, f.Value)
+					return nil, error
+				}
 				if strings.ToLower(opName) == "regexp" {
 					opName = "match"
 				} else {

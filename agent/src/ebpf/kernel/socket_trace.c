@@ -422,7 +422,7 @@ static __inline void infer_sock_flags(void *sk,
 
 static __inline void get_sock_flags(void *sk,
 				    struct member_fields_offset *offset,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_s *conn_info)
 {
 	struct sock_flags_t {
 		unsigned int sk_padding : 1;
@@ -474,7 +474,7 @@ do {									\
 
 static __inline int is_tcp_udp_data(void *sk,
 				    struct member_fields_offset *offset,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_s *conn_info)
 {
 	struct skc_flags_t {
 		unsigned char skc_reuse : 4;
@@ -531,7 +531,7 @@ static __inline int is_tcp_udp_data(void *sk,
 }
 
 static __inline void init_conn_info(__u32 tgid, __u32 fd,
-				    struct conn_info_t *conn_info, void *sk,
+				    struct conn_info_s *conn_info, void *sk,
 				    struct member_fields_offset *offset)
 {
 	__be16 inet_dport;
@@ -550,7 +550,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 }
 
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
-				     struct conn_info_t *conn_info)
+				     struct conn_info_s *conn_info)
 {
 	if (v == NULL || sk == NULL)
 		return false;
@@ -591,7 +591,7 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 }
 
 #ifdef PROBE_CONN_SUBMIT
-static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, int act)
+static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v, int act)
 {
 	switch (act) {
 	case CONN_ADD:
@@ -611,7 +611,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 
 static __inline int
 infer_l7_class_1(struct ctx_info_s *ctx,
-		 struct conn_info_t* conn_info,
+		 struct conn_info_s* conn_info,
 		 enum traffic_direction direction,
 		 const struct data_args_t *args,
 		 size_t count, __u8 sk_type,
@@ -636,7 +636,7 @@ infer_l7_class_1(struct ctx_info_s *ctx,
 }
 
 static __inline int infer_l7_class_2(struct tail_calls_context *ctx,
-				     struct conn_info_t *conn_info)
+				     struct conn_info_s *conn_info)
 {
 	struct infer_data_s *infer_data;
 	infer_data = (struct infer_data_s *)ctx->private_data;
@@ -868,7 +868,7 @@ do { \
 #define TRACE_MAP_ACT_DEL   2
 
 static __inline void trace_process(struct socket_info_t *socket_info_ptr,
-				   struct conn_info_t* conn_info,
+				   struct conn_info_s* conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_conf_t *trace_conf,
@@ -954,7 +954,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	    conn_info->direction == socket_info_ptr->direction) {
 		if (trace_info_ptr)
 			pre_trace_id = trace_info_ptr->thread_trace_id;
-		conn_info->keep_data_seq = true; // 同时这里确保捕获数据的序列号保持不变。
 	}
 
 	if (conn_info->direction == T_INGRESS) {
@@ -1044,7 +1043,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 }
 
 static __inline int
-__data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
+__data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	      const struct data_args_t *args, const bool vecs, __u32 syscall_len,
 	      struct member_fields_offset *offset, __u64 time_stamp,
 	      const struct process_data_extra *extra)
@@ -1057,8 +1056,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return SUBMIT_INVALID;
 	}
 
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -1110,7 +1108,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    (trace_conf->go_tracing_timeout != 0 || extra->is_go_process == false) &&
 	    !(conn_info->protocol == PROTO_DNS &&
 	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
-		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
+		trace_process(socket_info_ptr, conn_info, socket_id, bpf_get_current_pid_tgid(),
 			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
 
@@ -1211,7 +1209,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
-	v->pid = (__u32) pid_tgid;
+	v->pid = (__u32) bpf_get_current_pid_tgid();
 
 	// For blocking reads, there is a significant deviation between the
 	// entry time of the system call and the real time of the read
@@ -1293,12 +1291,12 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->source = extra->source;
 
 #ifdef LINUX_VER_5_2_PLUS
-	__u32 cache_key = (__u32) pid_tgid >> 16;
+	__u32 cache_key = ((__u32) bpf_get_current_pid_tgid()) >> 16;
 	if (cache_key < PROTO_INFER_CACHE_SIZE) {
 		struct proto_infer_cache_t *p;
 		p = proto_infer_cache_map__lookup(&cache_key);
 		if (p) {
-			__u16 idx = (__u16) pid_tgid;
+			__u16 idx = (__u16) bpf_get_current_pid_tgid();
 			p->protocols[idx] = (__u8) v->data_type;
 		}
 	}
@@ -1330,7 +1328,10 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (unlikely(args->fd < 0 || (int)bytes_count <= 0))
 		return -1;
 
-	// TODO : 此处可以根据配置对进程号进行过滤
+	/*
+	 * TODO:
+	 * Here you can filter the pid according to the configuration.
+	 */
 
 	__u32 k0 = 0, k1 = 1;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -1341,7 +1342,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
-	struct conn_info_t *conn_info, __conn_info = { 0 };
+	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
 	__u8 sock_state;
 	if (!(sk != NULL &&
@@ -1350,7 +1351,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	}
 
-	init_conn_info(id >> 32, args->fd, &__conn_info, sk, offset);
+	init_conn_info(id >> 32, args->fd, conn_info, sk, offset);
 
 	conn_info->direction = direction;
 
@@ -2142,8 +2143,8 @@ static __inline int data_submit(void *ctx)
 		return SUBMIT_ABORT;
 
 	__u64 id = bpf_get_current_pid_tgid();
-	struct conn_info_t *conn_info;
-	struct conn_info_t __conn_info = ctx_map->tail_call.conn_info;
+	struct conn_info_s *conn_info;
+	struct conn_info_s __conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
@@ -2184,7 +2185,7 @@ static __inline int __proto_infer_2(void *ctx)
 	 * similar to "R1 invalid mem access 'inv'" will appear during the eBPF
 	 * loading process.
 	 */
-	struct conn_info_t *conn_info, __conn_info;
+	struct conn_info_s *conn_info, __conn_info;
 	__conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
