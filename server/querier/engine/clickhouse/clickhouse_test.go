@@ -341,7 +341,7 @@ var (
 		name:   "topk_enum",
 		db:     "flow_log",
 		input:  "select TopK(protocol,2) from l4_flow_log limit 2",
-		output: "SELECT arrayStringConcat(topK(2)(dictGetOrDefault(flow_tag.int_enum_map, 'name', ('protocol',toUInt64(protocol)), protocol)), ',') AS `TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2",
+		output: "SELECT arrayStringConcat(topKIf(2)(dictGetOrDefault(flow_tag.int_enum_map, 'name', ('protocol',toUInt64(protocol)), protocol), dictGetOrDefault(flow_tag.int_enum_map, 'name', ('protocol',toUInt64(protocol)), protocol) != ''), ',') AS `TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2",
 	}, {
 		name:   "select_enum",
 		db:     "flow_log",
@@ -363,24 +363,29 @@ var (
 	}, {
 		name:   "TopK_1",
 		input:  "select TopK(ip_0, 10) from l4_flow_log limit 1",
-		output: "SELECT arrayStringConcat(topK(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != ''), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:   "TopK_2",
 		input:  "select TopK(ip_0, pod_0, 10) from l4_flow_log limit 1",
-		output: "SELECT topK(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '' AND dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))) != '')) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:    "TopK_err",
 		input:   "select TopK(ip_0, 111) from l4_flow_log limit 1",
-		output:  "SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 		wantErr: "function [TopK] argument [111] value range is incorrect, it should be within [1, 100]",
+	}, {
+		name:       "TopK_3",
+		input:      "SELECT TopK(`region`,3) AS `TopK_3(区域)` FROM `vtap_app_port` WHERE (time>=1705370520 AND time<=1705371300)",
+		output:     "SELECT arrayStringConcat(topKArray(3)(`_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))`), ',') AS `TopK_3(区域)` FROM (SELECT groupArrayIf(dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))), dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))) != '') AS `_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))` FROM flow_metrics.`vtap_app_port.1m` PREWHERE (`time` >= 1705370520 AND `time` <= 1705371300)) LIMIT 10000",
+		db:         "flow_metrics",
+		datasource: "1m",
 	}, {
 		name:   "Any_1",
 		input:  "select Any(ip_0) from l4_flow_log limit 1",
-		output: "SELECT any(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT anyIf(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '') AS `Any(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:   "Any_2",
 		input:  "select Any(ip_0, pod_0) from l4_flow_log limit 1",
-		output: "SELECT any((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))))) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
+		output: "SELECT anyIf((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0)))), (if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '' AND dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id_0))) != '')) AS `Any(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1",
 	}, {
 		name:   "layered_0",
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`, region_0 from vtap_flow_edge_port group by region_0 limit 1",
