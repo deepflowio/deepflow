@@ -19,7 +19,6 @@ package config
 var CONF *CloudConfig
 
 type CloudConfig struct {
-	CloudGatherInterval      uint32 `default:"30" yaml:"cloud_gather_interval"`
 	KubernetesGatherInterval uint32 `default:"30" yaml:"kubernetes_gather_interval"`
 	AliyunRegionName         string `default:"cn-beijing" yaml:"aliyun_region_name"`
 	AWSRegionName            string `default:"cn-north-1" yaml:"aws_region_name"`

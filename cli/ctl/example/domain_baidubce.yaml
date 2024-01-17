@@ -16,5 +16,5 @@ config:
   # API Endpoint
   # 对接区域的API Endpoint（服务域名）信息，不同区域会对应不同的Endpoint。可参考百度BCC产品文档，但注意去掉域名中的bcc.前缀
   endpoint: bj.baidubce.com
-  # 同步间隔，单位：秒，输入限制：最小60，最大86400
+  # 同步间隔，单位：秒，输入限制：最小1，最大86400，默认60
   sync_timer:
