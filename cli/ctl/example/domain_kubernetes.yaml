@@ -13,5 +13,5 @@ config:
   pod_net_ipv6_cidr_max_mask: 64
   # 额外对接路由接口
   node_port_name_regex: ^(cni|flannel|vxlan.calico|tunl|en[ospx])
-  # 同步间隔，单位：秒，输入限制：最小60，最大86400
+  # 同步间隔，单位：秒，输入限制：最小1，最大86400，默认60
   sync_timer:
