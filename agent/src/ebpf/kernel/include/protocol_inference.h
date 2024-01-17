@@ -94,7 +94,7 @@ static __inline bool is_set_ports_bitmap(ports_bitmap_t * ports, __u16 port)
 
 static __inline bool
 __protocol_port_check(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info, __u8 prog_num)
+		      struct conn_info_s *conn_info, __u8 prog_num)
 {
 	if (!is_protocol_enabled(proto)) {
 		return false;
@@ -127,14 +127,14 @@ __protocol_port_check(enum traffic_protocol proto,
 
 static __inline bool
 protocol_port_check_1(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_1);
 }
 
 static __inline bool
 protocol_port_check_2(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
 }
@@ -336,7 +336,7 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 // others as response.
 static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 							    size_t count,
-							    struct conn_info_t
+							    struct conn_info_s
 							    *conn_info,
 							    const bool is_first)
 {
@@ -474,7 +474,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 
 static __inline enum message_type infer_http2_message(const char *buf_src,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_HTTP2, conn_info))
@@ -520,7 +520,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 
 static __inline enum message_type infer_http_message(const char *buf,
 						     size_t count,
-						     struct conn_info_t
+						     struct conn_info_s
 						     *conn_info)
 {
 	// HTTP/1.1 200 OK\r\n (HTTP response is 17 characters)
@@ -553,7 +553,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 // compiler can optimize it into an immediate value and write it into the
 // instruction.
 static __inline void save_prev_data(const char *buf,
-				    struct conn_info_t *conn_info, size_t count)
+				    struct conn_info_s *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
@@ -573,7 +573,7 @@ static __inline void save_prev_data(const char *buf,
 }
 
 // MySQL and Kafka need the previous n bytes of data for inference
-static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
+static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
 	    conn_info->socket_info_ptr->prev_data_len > 0) {
@@ -617,7 +617,7 @@ static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 // ref : https://dev.mysql.com/doc/internals/en/com-process-kill.html
 static __inline enum message_type infer_mysql_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_MYSQL, conn_info))
@@ -826,7 +826,7 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 
 static __inline enum message_type infer_postgre_message(const char *buf,
 							size_t count,
-							struct conn_info_t
+							struct conn_info_s
 							*conn_info)
 {
 #define POSTGRE_INFER_BUF_SIZE 32
@@ -870,7 +870,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 
 static __inline enum message_type infer_oracle_tns_message(const char *buf,
 							   size_t count,
-							   struct conn_info_t
+							   struct conn_info_s
 							   *conn_info)
 {
 #define OEACLE_INFER_BUF_SIZE 12
@@ -963,7 +963,7 @@ static __inline bool sofarpc_check_character(__u8 val)
  */
 static __inline enum message_type infer_sofarpc_message(const char *buf,
 							size_t count,
-							struct conn_info_t
+							struct conn_info_s
 							*conn_info)
 {
 	static const __u8 bolt_resp_header_len = 20;
@@ -1090,7 +1090,7 @@ struct dns_header {
 
 static __inline enum message_type infer_dns_message(const char *buf,
 						    size_t count,
-						    struct conn_info_t
+						    struct conn_info_s
 						    *conn_info)
 {
 	const int dns_header_size = 12;
@@ -1194,7 +1194,7 @@ static __inline bool is_include_crlf(const char *buf)
 //  https://redis.io/docs/reference/protocol-spec/
 static __inline enum message_type infer_redis_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (count < 4)
@@ -1297,7 +1297,7 @@ static __inline bool mqtt_decoding_message_type(const __u8 * buffer,
 // http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
 static __inline enum message_type infer_mqtt_message(const char *buf,
 						     size_t count,
-						     struct conn_info_t
+						     struct conn_info_s
 						     *conn_info)
 {
 	if (count < 4)
@@ -1423,7 +1423,7 @@ struct dubbo_header {
 
 static __inline enum message_type infer_dubbo_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	/*
@@ -1503,7 +1503,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
  */
 static __inline enum message_type infer_kafka_request(const char *buf,
 						      bool is_first,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 #define RequestAPIKeyMax 67
@@ -1561,7 +1561,7 @@ static __inline enum message_type infer_kafka_request(const char *buf,
 
 static __inline bool kafka_data_check_len(size_t count,
 					  const char *buf,
-					  struct conn_info_t *conn_info,
+					  struct conn_info_s *conn_info,
 					  bool * use_prev_buf)
 {
 	*use_prev_buf = (conn_info->prev_count == 4)
@@ -1590,7 +1590,7 @@ static __inline bool kafka_data_check_len(size_t count,
 
 static __inline enum message_type infer_kafka_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_KAFKA, conn_info))
@@ -1711,7 +1711,7 @@ static bool fastcgi_header_common_check(struct fastcgi_header *header)
 // only receive the first response.
 static __inline enum message_type
 infer_fastcgi_message(const char *buf, size_t count,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	if (count < 8) {
 		return MSG_UNKNOWN;
@@ -1791,7 +1791,7 @@ struct mongo_header {
 
 static __inline enum message_type
 infer_mongo_message(const char *buf, size_t count,
-		    struct conn_info_t *conn_info)
+		    struct conn_info_s *conn_info)
 {
 	if (!protocol_port_check_2(PROTO_MONGO, conn_info))
 		return MSG_UNKNOWN;
@@ -1985,7 +1985,7 @@ typedef struct __attribute__ ((packed)) {
 } tls_handshake_t;
 
 static __inline enum message_type
-infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
+infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
 	tls_handshake_t handshake = { 0 };
 
@@ -2101,7 +2101,7 @@ static __inline struct protocol_message_t
 infer_protocol_1(struct ctx_info_s *ctx,
 		 const struct data_args_t *args,
 		 size_t count,
-		 struct conn_info_t *conn_info,
+		 struct conn_info_s *conn_info,
 		 __u8 sk_state, const struct process_data_extra *extra)
 {
 	struct protocol_message_t inferred_message;
@@ -2468,7 +2468,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 /* Will be called by proto_infer_2 eBPF program. */
 static __inline struct protocol_message_t
 infer_protocol_2(const char *infer_buf, size_t count,
-		 struct conn_info_t *conn_info)
+		 struct conn_info_s *conn_info)
 {
 	/*
 	 * Note:

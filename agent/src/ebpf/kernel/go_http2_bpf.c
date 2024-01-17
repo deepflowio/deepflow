@@ -354,7 +354,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 	struct trace_key_t trace_key = get_trace_key(timeout, true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
-	struct conn_info_t conn_info = {
+	struct conn_info_s conn_info = {
 		.direction = send_buffer->direction,
 		.message_type = send_buffer->msg_type,
 	};
