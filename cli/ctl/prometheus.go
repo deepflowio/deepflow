@@ -55,7 +55,7 @@ func RegisterPrometheusCommand() *cobra.Command {
 	clearCmd := &cobra.Command{
 		Use:     "clear",
 		Short:   "clear prometheus data in MySQL by deepflow-server, use with caution and not frequently!",
-		Example: "deepflow-ctl prometheus clear \"2006-01-02 15:04:05\"",
+		Example: "deepflow-ctl prometheus clear -e \"2006-01-02 15:04:05\"",
 		Run: func(cmd *cobra.Command, args []string) {
 			prometheusClear(cmd, expiredAt)
 		},
