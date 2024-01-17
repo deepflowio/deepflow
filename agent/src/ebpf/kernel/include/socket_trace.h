@@ -122,7 +122,7 @@ union sockaddr_t {
 	struct sockaddr_in6 in6;
 };
 
-struct conn_info_t {
+struct conn_info_s {
 #ifdef PROBE_CONN
 	__u64 id;
 #endif
@@ -221,7 +221,7 @@ struct tail_calls_context {
 	int max_size_limit;	// The maximum size of the socket data that can be transferred.
 	enum traffic_direction dir;	// Data flow direction.
 	bool vecs;		// Whether a memory vector is used ? (for specific syscall)
-	struct conn_info_t conn_info;
+	struct conn_info_s conn_info;
 	struct process_data_extra extra;
 	__u32 bytes_count;
 	struct member_fields_offset *offset;
