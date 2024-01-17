@@ -162,6 +162,9 @@ func convertDBToJson(
 		if err != nil {
 			log.Error(err)
 		} else {
+			if len(tapSides) == 0 {
+				tData.L4LogIgnoreTapSides = []*model.TapSideInfo{}
+			}
 			for _, tapSideValue := range tapSides {
 				tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides,
 					&model.TapSideInfo{
@@ -174,6 +177,9 @@ func convertDBToJson(
 	if sData.L7LogIgnoreTapSides != nil {
 		tapSides, err := convertStrToIntList(*sData.L7LogIgnoreTapSides)
 		if err == nil {
+			if len(tapSides) == 0 {
+				tData.L7LogIgnoreTapSides = []*model.TapSideInfo{}
+			}
 			for _, tapSideValue := range tapSides {
 				tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides,
 					&model.TapSideInfo{
@@ -245,12 +251,14 @@ func convertDBToJson(
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
 	}
 
+	tData.WasmPlugins = []string{}
 	if sData.WasmPlugins != nil && len(*sData.WasmPlugins) > 0 {
 		cWasmPlugins := strings.Split(*sData.WasmPlugins, ",")
 		for _, wasmPlugin := range cWasmPlugins {
 			tData.WasmPlugins = append(tData.WasmPlugins, wasmPlugin)
 		}
 	}
+	tData.SoPlugins = []string{}
 	if sData.SoPlugins != nil && len(*sData.SoPlugins) > 0 {
 		cSoPlugins := strings.Split(*sData.SoPlugins, ",")
 		for _, soPlugin := range cSoPlugins {
