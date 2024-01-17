@@ -290,7 +290,7 @@ controller:
     # encoder cache refresh interval, unit: second
     encoder_cache_refresh_interval: 3600
     # time interval for regularly clearing prometheus expired data, unit: hour
-    # time interval should be less than or equal to ingester: prometheus-label-cache-expiration configuration
+    # time interval should be greater than or equal to ingester: prometheus-label-cache-expiration configuration
     data_clean_interval: 24
 
 querier:

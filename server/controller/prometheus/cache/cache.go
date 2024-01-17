@@ -185,12 +185,17 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	getMetricAndAppLabelLayout := func() {
 		temp := map[string]interface{}{
 			"layout_key_to_index": make(map[string]interface{}),
+			"layout_key_to_id":    make(map[string]int),
 		}
 		tempCache.MetricAndAPPLabelLayout.layoutKeyToIndex.Range(func(key, value any) bool {
 			temp["layout_key_to_index"].(map[string]interface{})[marshal(key)] = value
 			return true
 		})
-		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 {
+		for iter := range tempCache.MetricAndAPPLabelLayout.layoutKeyToID.Iter() {
+			temp["layout_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
+		}
+		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 ||
+			len(temp["layout_key_to_id"].(map[string]int)) > 0 {
 			content["metric_and_app_label_layout"] = temp
 		}
 	}
@@ -237,14 +242,19 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	getMetricLabel := func() {
 		temp := map[string]interface{}{
 			"metric_name_id_to_label_ids": make(map[int][]int),
+			"metric_label_key_to_id":      make(map[string]int),
 		}
 
 		tempCache.MetricLabel.metricNameIDToLabelIDs.Range(func(i int, s mapset.Set[int]) bool {
 			temp["metric_name_id_to_label_ids"].(map[int][]int)[i] = s.ToSlice()
 			return true
 		})
+		for iter := range tempCache.MetricLabel.keyToID.Iter() {
+			temp["metric_label_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
+		}
 
-		if len(temp["metric_name_id_to_label_ids"].(map[int][]int)) > 0 {
+		if len(temp["metric_name_id_to_label_ids"].(map[int][]int)) > 0 ||
+			len(temp["metric_label_key_to_id"].(map[string]int)) > 0 {
 			content["metric_label"] = temp
 		}
 	}
