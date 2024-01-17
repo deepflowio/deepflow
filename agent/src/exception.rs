@@ -40,6 +40,11 @@ impl ExceptionHandler {
         self.0.fetch_or(e as u64, Ordering::SeqCst);
     }
 
+    pub fn has(&self, e: Exception) -> bool {
+        let e = e as u64;
+        self.0.load(Ordering::Relaxed) & e == e
+    }
+
     pub fn clear(&self, e: Exception) {
         self.0.fetch_and(!(e as u64), Ordering::SeqCst);
     }
