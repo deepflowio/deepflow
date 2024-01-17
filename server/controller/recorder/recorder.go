@@ -48,11 +48,12 @@ type Recorder struct {
 	eventQueue   *queue.OverwriteQueue
 }
 
-func NewRecorder(domainLcuuid string, cfg config.RecorderConfig, ctx context.Context, eventQueue *queue.OverwriteQueue) *Recorder {
+func NewRecorder(domainLcuuid, domainName string, cfg config.RecorderConfig, ctx context.Context, eventQueue *queue.OverwriteQueue) *Recorder {
 	return &Recorder{
 		cfg:          cfg,
 		ctx:          ctx,
 		domainLcuuid: domainLcuuid,
+		domainName:   domainName,
 		cacheMng:     cache.NewCacheManager(domainLcuuid),
 		canRefresh:   make(chan bool, 1),
 		eventQueue:   eventQueue,
