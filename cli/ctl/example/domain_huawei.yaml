@@ -26,5 +26,5 @@ config:
   #include_regions: xxxxx,xxxxxx  # optional
   # 区域黑名单，多个区域名称之间以英文逗号分隔
   #exclude_regions: xxxxx,xxxxxx  # optional
-  # 同步间隔，单位：秒，输入限制：最小60，最大86400
+  # 同步间隔，单位：秒，输入限制：最小1，最大86400，默认60
   sync_timer:
