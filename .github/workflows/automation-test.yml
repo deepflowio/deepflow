@@ -12,9 +12,9 @@ on:
         required: true
         default: 'latest'
       WORKER_NUMBER:
-        description: 'Worker number, recommend 3-6'
+        description: 'Worker number, recommend 1-12'
         required: false
-        default: '3'
+        default: '6'
       DF_ENV_NUMBER:
         description: 'Deepflow env number, recommend 1-3'
         required: false
