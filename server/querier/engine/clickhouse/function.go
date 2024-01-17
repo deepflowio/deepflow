@@ -160,15 +160,19 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 
 	fieldsLen := len(fields)
 	dbFields := make([]string, fieldsLen)
+	conditions := make([]string, 0, fieldsLen)
 
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
+
 		field = strings.Trim(field, "`")
 		metricStruct, ok = metrics.GetAggMetrics(field, db, table, ctx)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
 		dbFields[i] = metricStruct.DBField
+		condition := metricStruct.Condition
+
 		// enum tag
 		tagEnum := strings.TrimSuffix(field, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
@@ -185,6 +189,11 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 			}
 		}
 
+		if condition == "" {
+			condition = dbFields[i] + " != ''"
+			conditions = append(conditions, condition)
+		}
+
 		// 判断算子是否支持单层
 		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
 			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
@@ -195,10 +204,13 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	}
 
 	metricStructCopy := *metricStruct
+	metricStructCopy.DBField = strings.Join(dbFields, ", ")
+	metricStructCopy.Condition = strings.Join(conditions, " AND ")
 	if fieldsLen > 1 {
-		metricStructCopy.DBField = "(" + strings.Join(dbFields, ", ") + ")"
-	} else {
-		metricStructCopy.DBField = strings.Join(dbFields, ", ")
+		metricStructCopy.DBField = "(" + metricStructCopy.DBField + ")"
+		if metricStructCopy.Condition != "" {
+			metricStructCopy.Condition = "(" + strings.Join(conditions, " AND ") + ")"
+		}
 	}
 
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
