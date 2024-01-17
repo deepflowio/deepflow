@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -31,7 +33,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/test"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
-	"github.com/google/uuid"
 )
 
 // const (
@@ -40,6 +41,7 @@ import (
 
 var cloudData []cloudmodel.Resource
 var domainLcuuids []string
+var domainNames []string
 var times int
 
 func BenchmarkAdd(b *testing.B) {
@@ -50,7 +52,7 @@ func BenchmarkAdd(b *testing.B) {
 	fmt.Printf("第%d次\n", times)
 	cfg := config.RecorderConfig{CacheRefreshInterval: 3600}
 	for i := 0; i < len(cloudData); i++ {
-		recorder := NewRecorder(domainLcuuids[i], cfg, context.Background(), nil)
+		recorder := NewRecorder(domainLcuuids[i], domainName[i], cfg, context.Background(), nil)
 		recorder.Start()
 		time.Sleep(time.Second * 1)
 		recorder.Refresh(cloudData[i])
@@ -75,9 +77,10 @@ func TestMain(m *testing.M) {
 	for i := 0; i < 1; i++ {
 		domain := new(mysql.Domain)
 		domain.Lcuuid = uuid.NewString()
-		domain.Name = "性能测试"
+		domain.Name = fmt.Sprintf("第 %d 次性能测试", i)
 		mysql.Db.Create(&domain)
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
+		domainNames = append(domainNames, domain.Name)
 		cloudData = append(cloudData, test.NewCloudResource(1))
 	}
 	publicNetwork := new(mysql.Network)
