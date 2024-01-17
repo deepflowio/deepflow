@@ -1253,14 +1253,23 @@ func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, 
 		}
 		time = int64(timeValue.(float64))
 	}
+	newTime := time
 	if compareExpr.Operator == ">=" || compareExpr.Operator == ">" {
-		w.time.AddTimeStart(time)
+		// Derivative operator start time forward
+		if e.IsDerivative && w.time.Interval > 0 {
+			newTime -= int64(w.time.Interval)
+		}
+		w.time.AddTimeStart(newTime)
 		w.time.TimeStartOperator = compareExpr.Operator
 	} else if compareExpr.Operator == "<=" || compareExpr.Operator == "<" {
 		w.time.AddTimeEnd(time)
 		w.time.TimeEndOperator = compareExpr.Operator
 	}
-	return &view.Expr{Value: sqlparser.String(compareExpr)}, nil
+	newValue := sqlparser.String(compareExpr)
+	if newTime > 0 {
+		newValue = strings.Replace(newValue, strconv.FormatInt(time, 10), strconv.FormatInt(newTime, 10), 1)
+	}
+	return &view.Expr{Value: newValue}, nil
 }
 
 type WhereFunction struct {
