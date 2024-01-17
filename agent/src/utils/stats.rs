@@ -270,6 +270,7 @@ impl Collector {
     }
 
     pub fn set_hostname(&self, hostname: String) {
+        info!("set stats hostname to {:?}", hostname);
         *self.hostname.lock().unwrap() = hostname;
     }
 
