@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -701,16 +702,16 @@ func (p L7Protocol) String(isTLS bool) string {
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	L7_PROTOCOL_HTTP_1.String(false):  L7_PROTOCOL_HTTP_1,
-	L7_PROTOCOL_HTTP_2.String(false):  L7_PROTOCOL_HTTP_2,
-	L7_PROTOCOL_DNS.String(false):     L7_PROTOCOL_DNS,
-	L7_PROTOCOL_MYSQL.String(false):   L7_PROTOCOL_MYSQL,
-	L7_PROTOCOL_REDIS.String(false):   L7_PROTOCOL_REDIS,
-	L7_PROTOCOL_DUBBO.String(false):   L7_PROTOCOL_DUBBO,
-	L7_PROTOCOL_GRPC.String(false):    L7_PROTOCOL_GRPC,
-	L7_PROTOCOL_KAFKA.String(false):   L7_PROTOCOL_KAFKA,
-	L7_PROTOCOL_MQTT.String(false):    L7_PROTOCOL_MQTT,
-	L7_PROTOCOL_UNKNOWN.String(false): L7_PROTOCOL_UNKNOWN,
+	strings.ToLower(L7_PROTOCOL_HTTP_1.String(false)):  L7_PROTOCOL_HTTP_1,
+	strings.ToLower(L7_PROTOCOL_HTTP_2.String(false)):  L7_PROTOCOL_HTTP_2,
+	strings.ToLower(L7_PROTOCOL_DNS.String(false)):     L7_PROTOCOL_DNS,
+	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):   L7_PROTOCOL_MYSQL,
+	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):   L7_PROTOCOL_REDIS,
+	strings.ToLower(L7_PROTOCOL_DUBBO.String(false)):   L7_PROTOCOL_DUBBO,
+	strings.ToLower(L7_PROTOCOL_GRPC.String(false)):    L7_PROTOCOL_GRPC,
+	strings.ToLower(L7_PROTOCOL_KAFKA.String(false)):   L7_PROTOCOL_KAFKA,
+	strings.ToLower(L7_PROTOCOL_MQTT.String(false)):    L7_PROTOCOL_MQTT,
+	strings.ToLower(L7_PROTOCOL_UNKNOWN.String(false)): L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {

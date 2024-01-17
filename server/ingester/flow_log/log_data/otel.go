@@ -286,13 +286,18 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 			h.IsTLS = 1
 		}
 		for l7ProtocolStr, l7Protocol := range datatype.L7ProtocolStringMap {
-			if strings.Contains(strings.ToLower(l7ProtocolStr), l7ProtocolStrLower) {
+			if strings.Contains(l7ProtocolStr, l7ProtocolStrLower) {
 				h.L7Protocol = uint8(l7Protocol)
 				break
 			}
 		}
-		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) && strings.HasPrefix(h.Version, "2") {
-			h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
+		// If the protocol name is 'http', it may be randomly matched to 'http1' or 'http2' and needs to be corrected.
+		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) || h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_2) {
+			if strings.HasPrefix(h.Version, "2") {
+				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
+			} else {
+				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_1)
+			}
 		}
 	}
 
