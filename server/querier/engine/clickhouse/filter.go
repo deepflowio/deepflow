@@ -1266,7 +1266,7 @@ func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, 
 		w.time.TimeEndOperator = compareExpr.Operator
 	}
 	newValue := sqlparser.String(compareExpr)
-	if newTime > 0 {
+	if newTime != time {
 		newValue = strings.Replace(newValue, strconv.FormatInt(time, 10), strconv.FormatInt(newTime, 10), 1)
 	}
 	return &view.Expr{Value: newValue}, nil
