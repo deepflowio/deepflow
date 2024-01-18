@@ -235,11 +235,28 @@ impl FlowLog {
         log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
-        parse_param: &ParseParam,
+        is_parse_perf: bool,
+        is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
     ) -> Result<L7ParseResult> {
         if let Some(payload) = packet.get_l4_payload() {
+            let mut parse_param = ParseParam::new(
+                &*packet,
+                self.perf_cache.clone(),
+                Rc::clone(&self.wasm_vm),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Rc::clone(&self.so_plugin),
+                is_parse_perf,
+                is_parse_log,
+            );
+            parse_param.set_log_parse_config(log_parser_config);
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            parse_param.set_counter(self.stats_counter.clone());
+            parse_param.set_rrt_timeout(self.rrt_timeout);
+            parse_param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
+
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
 
             if log_parser_config
@@ -258,7 +275,7 @@ impl FlowLog {
                         &payload[..pkt_size]
                     }
                 },
-                parse_param,
+                &parse_param,
             );
 
             let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
@@ -320,6 +337,9 @@ impl FlowLog {
             let mut param = ParseParam::new(
                 &*packet,
                 self.perf_cache.clone(),
+                Rc::clone(&self.wasm_vm),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Rc::clone(&self.so_plugin),
                 is_parse_perf,
                 is_parse_log,
             );
@@ -328,9 +348,6 @@ impl FlowLog {
             param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
-            param.set_wasm_vm(Rc::clone(&self.wasm_vm));
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            param.set_so_func(Rc::clone(&self.so_plugin));
             param.set_oracle_conf(flow_config.oracle_parse_conf);
 
             for protocol in checker.possible_protocols(
@@ -368,7 +385,6 @@ impl FlowLog {
                         self.server_port = packet.lookup_key.dst_port;
                         packet.lookup_key.direction = PacketDirection::ClientToServer;
                     }
-                    param.direction = packet.lookup_key.direction;
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
                     return self.l7_parse_log(
@@ -376,7 +392,8 @@ impl FlowLog {
                         log_parser_config,
                         packet,
                         app_table,
-                        &param,
+                        is_parse_perf,
+                        is_parse_log,
                         local_epc,
                         remote_epc,
                     );
@@ -429,27 +446,13 @@ impl FlowLog {
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            let param = &mut ParseParam::new(
-                &*packet,
-                self.perf_cache.clone(),
-                is_parse_perf,
-                is_parse_log,
-            );
-            param.set_log_parse_config(log_parser_config);
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            param.set_counter(self.stats_counter.clone());
-            param.set_rrt_timeout(self.rrt_timeout);
-            param.set_buf_size(flow_config.l7_log_packet_size as usize);
-            param.set_oracle_conf(flow_config.oracle_parse_conf);
-            param.set_wasm_vm(Rc::clone(&self.wasm_vm));
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            param.set_so_func(Rc::clone(&self.so_plugin));
             return self.l7_parse_log(
                 flow_config,
                 log_parser_config,
                 packet,
                 app_table,
-                param,
+                is_parse_perf,
+                is_parse_log,
                 local_epc,
                 remote_epc,
             );

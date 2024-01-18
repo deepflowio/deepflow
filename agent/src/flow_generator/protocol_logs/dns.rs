@@ -531,7 +531,14 @@ mod tests {
             };
 
             let mut dns = DnsLog::default();
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
             let is_dns = dns.check_payload(payload, param);
             dns.reset();
             let info = dns.parse_payload(payload, param);
@@ -613,7 +620,14 @@ mod tests {
             }
             let _ = dns.parse_payload(
                 packet.get_l4_payload().unwrap(),
-                &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                &ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    Default::default(),
+                    true,
+                    true,
+                ),
             );
         }
         dns.perf_stats.unwrap()
