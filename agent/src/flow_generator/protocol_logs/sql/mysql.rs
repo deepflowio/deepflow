@@ -659,12 +659,26 @@ mod tests {
             };
             let is_mysql = mysql.check_payload(
                 payload,
-                &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true),
+                &ParseParam::new(
+                    packet as &MetaPacket,
+                    log_cache.clone(),
+                    Default::default(),
+                    Default::default(),
+                    true,
+                    true,
+                ),
             );
 
             let info = mysql.parse_payload(
                 payload,
-                &ParseParam::new(&*packet, log_cache.clone(), true, true),
+                &ParseParam::new(
+                    &*packet,
+                    log_cache.clone(),
+                    Default::default(),
+                    Default::default(),
+                    true,
+                    true,
+                ),
             );
 
             if let Ok(info) = info {
@@ -802,7 +816,14 @@ mod tests {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             if packet.get_l4_payload().is_some() {
-                let param = &ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+                let param = &ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    Default::default(),
+                    true,
+                    true,
+                );
                 let _ = mysql.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }

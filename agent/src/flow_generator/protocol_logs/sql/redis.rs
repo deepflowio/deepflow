@@ -660,7 +660,14 @@ mod tests {
                 None => continue,
             };
 
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
 
             let is_redis = redis.check_payload(payload, param);
 
@@ -881,7 +888,14 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = redis.parse_payload(
                     packet.get_l4_payload().unwrap(),
-                    &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                    &ParseParam::new(
+                        &*packet,
+                        rrt_cache.clone(),
+                        Default::default(),
+                        Default::default(),
+                        true,
+                        true,
+                    ),
                 );
             }
         }
