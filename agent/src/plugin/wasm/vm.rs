@@ -162,7 +162,7 @@ impl From<(&ParseParam<'_>, u8, &[u8])> for VmCtxBase {
             time: p.time,
             direction: p.direction,
             process_kname: if let Some(ebpf_param) = p.ebpf_param.as_ref() {
-                Some(ebpf_param.process_kname.clone())
+                Some(ebpf_param.process_kname.to_owned())
             } else {
                 None
             },

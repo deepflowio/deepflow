@@ -634,7 +634,14 @@ mod tests {
             };
 
             let mut mongo = MongoDBLog::default();
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
 
             let is_mongo = mongo.check_payload(payload, param);
             let info = mongo.parse_payload(payload, param);

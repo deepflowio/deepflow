@@ -838,7 +838,14 @@ mod tests {
                 None => continue,
             };
             let mut amqp = AmqpLog::default();
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
 
             if first_packet {
                 first_packet = false;

@@ -850,7 +850,14 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
 
             let infos = mqtt.parse(payload, param).unwrap();
             let is_mqtt = MqttLog::check_protocol(payload, param);
@@ -1082,7 +1089,14 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = mqtt.parse_payload(
                     packet.get_l4_payload().unwrap(),
-                    &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                    &ParseParam::new(
+                        &*packet,
+                        rrt_cache.clone(),
+                        Default::default(),
+                        Default::default(),
+                        true,
+                        true,
+                    ),
                 );
                 mqtt.reset();
             }
