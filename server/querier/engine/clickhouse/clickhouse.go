@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 	"github.com/deepflowio/deepflow/server/querier/parse"
@@ -1398,7 +1399,15 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 					originArg = strings.TrimSpace(originArg)
 					if e.IsDerivative && i > 0 {
 						if !slices.Contains(e.DerivativeGroupBy, originArg) {
-							tagTranslatorStr := GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+							tagTranslatorStr := originArg
+							if strings.Contains(originArg, "tag") {
+								tagTranslatorStr = GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+							} else {
+								tagItem, ok := tag.GetTag(name, e.DB, e.Table, "default")
+								if ok {
+									tagTranslatorStr = tagItem.TagTranslator
+								}
+							}
 							if tagTranslatorStr == originArg {
 								e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER})
 							} else {
