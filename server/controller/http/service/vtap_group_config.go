@@ -71,7 +71,13 @@ func copyStruct(from, to interface{}, ignoreName []string) {
 	toElem := toValue.Elem()
 	for i := 0; i < toElem.NumField(); i++ {
 		toField := toElem.Type().Field(i)
-		if common.Contains(ignoreName, toField.Name) == true {
+		if common.Contains(ignoreName, toField.Name) {
+			// set value to avoid return nil
+			if toField.Type.Kind() == reflect.Slice {
+				sliceType := reflect.SliceOf(toField.Type.Elem())
+				emptySlice := reflect.MakeSlice(sliceType, 0, 0)
+				toElem.Field(i).Set(emptySlice)
+			}
 			continue
 		}
 		fromFieldName, ok := fromElem.Type().FieldByName(toField.Name)
@@ -142,10 +148,6 @@ func convertDBToJson(
 		"L7LogIgnoreTapSides", "L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps",
 		"MaxNpbBps", "MaxTxBandwidth", "WasmPlugins", "SoPlugins"}
 	copyStruct(sData, tData, ignoreName)
-	tData.L4LogTapTypes = []*model.TypeInfo{}
-	tData.L7LogStoreTapTypes = []*model.TypeInfo{}
-	tData.DecapType = []*model.TypeInfo{}
-	tData.Domains = []*model.DomainInfo{}
 	if sData.L4LogTapTypes != nil {
 		cL4LogTapTypes, err := convertStrToIntList(*sData.L4LogTapTypes)
 		if err == nil {
@@ -162,9 +164,6 @@ func convertDBToJson(
 		if err != nil {
 			log.Error(err)
 		} else {
-			if len(tapSides) == 0 {
-				tData.L4LogIgnoreTapSides = []*model.TapSideInfo{}
-			}
 			for _, tapSideValue := range tapSides {
 				tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides,
 					&model.TapSideInfo{
@@ -177,9 +176,6 @@ func convertDBToJson(
 	if sData.L7LogIgnoreTapSides != nil {
 		tapSides, err := convertStrToIntList(*sData.L7LogIgnoreTapSides)
 		if err == nil {
-			if len(tapSides) == 0 {
-				tData.L7LogIgnoreTapSides = []*model.TapSideInfo{}
-			}
 			for _, tapSideValue := range tapSides {
 				tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides,
 					&model.TapSideInfo{
@@ -251,14 +247,12 @@ func convertDBToJson(
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
 	}
 
-	tData.WasmPlugins = []string{}
 	if sData.WasmPlugins != nil && len(*sData.WasmPlugins) > 0 {
 		cWasmPlugins := strings.Split(*sData.WasmPlugins, ",")
 		for _, wasmPlugin := range cWasmPlugins {
 			tData.WasmPlugins = append(tData.WasmPlugins, wasmPlugin)
 		}
 	}
-	tData.SoPlugins = []string{}
 	if sData.SoPlugins != nil && len(*sData.SoPlugins) > 0 {
 		cSoPlugins := strings.Split(*sData.SoPlugins, ",")
 		for _, soPlugin := range cSoPlugins {
