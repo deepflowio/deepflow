@@ -101,7 +101,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 
 	vtapRepoNameToRevision := make(map[string]string, len(vtapRepos))
 	for _, item := range vtapRepos {
-		vtapRepoNameToRevision[item.Name] = fmt.Sprintf("%s %d", item.Branch, item.RevCount)
+		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
 	for _, vtap := range vtaps {
