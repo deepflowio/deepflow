@@ -44,7 +44,7 @@ func newLabelName(max int) *labelName {
 	return ln
 }
 
-func (ln *labelName) refresh(args ...interface{}) error {
+func (ln *labelName) refresh() error {
 	ln.lock.Lock()
 	defer ln.lock.Unlock()
 

@@ -17,6 +17,7 @@
 package cache
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -39,6 +40,10 @@ type TargetKey struct {
 	Job          string
 	VPCID        int
 	PodClusterID int
+}
+
+func (tk TargetKey) String() string {
+	return tk.Instance + "-" + tk.Job + "-" + fmt.Sprintf("%d", tk.PodClusterID)
 }
 
 func NewTargetKey(instance, job string, vpcID, podClusterID int) TargetKey {
@@ -172,7 +177,7 @@ func (t *target) GetTargetIDToLabelNames() map[int]mapset.Set[string] {
 	return t.targetIDToLabelNames.Get()
 }
 
-func (t *target) refresh(args ...interface{}) error {
+func (t *target) refresh() error {
 	recorderTargets, selfTargets, err := t.load()
 	if err != nil {
 		return err

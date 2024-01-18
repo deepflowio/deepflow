@@ -42,7 +42,7 @@ func newMetricTarget(te *target) *metricTarget {
 	}
 }
 
-func (mt *metricTarget) refresh(args ...interface{}) error {
+func (mt *metricTarget) refresh() error {
 	var items []*mysql.PrometheusMetricTarget
 	err := mysql.Db.Find(&items).Error
 	if err != nil {

@@ -17,48 +17,58 @@
 package encoder
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
+type StringInt int
+
+func (si StringInt) String() string {
+	return fmt.Sprintf("%d", si)
+}
+
 type label struct {
 	lock         sync.Mutex
 	resourceType string
-	labelKeyToID sync.Map
-	labelIDToKey sync.Map
+	labelKeyToID cmap.ConcurrentMap[cache.LabelKey, int]
+	labelIDToKey cmap.ConcurrentMap[StringInt, cache.LabelKey]
 }
 
 func newLabel() *label {
 	return &label{
 		resourceType: "label",
+		labelKeyToID: cmap.NewStringer[cache.LabelKey, int](),
+		labelIDToKey: cmap.NewStringer[StringInt, cache.LabelKey](),
 	}
 }
 
 func (l *label) store(item *mysql.PrometheusLabel) {
-	l.labelKeyToID.Store(cache.NewLabelKey(item.Name, item.Value), item.ID)
-	l.labelIDToKey.Store(item.ID, cache.NewLabelKey(item.Name, item.Value))
+	l.labelKeyToID.Set(cache.NewLabelKey(item.Name, item.Value), item.ID)
+	l.labelIDToKey.Set(StringInt(item.ID), cache.NewLabelKey(item.Name, item.Value))
 }
 
 func (l *label) getKey(id int) (cache.LabelKey, bool) {
-	if item, ok := l.labelIDToKey.Load(id); ok {
-		return item.(cache.LabelKey), true
+	if item, ok := l.labelIDToKey.Get(StringInt(id)); ok {
+		return item, true
 	}
 	return cache.LabelKey{}, false
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
-	if item, ok := l.labelKeyToID.Load(key); ok {
-		return item.(int), true
+	if item, ok := l.labelKeyToID.Get(key); ok {
+		return item, true
 	}
 	return 0, false
 }
 
-func (l *label) refresh(args ...interface{}) error {
+func (l *label) refresh() error {
 	var items []*mysql.PrometheusLabel
 	err := mysql.Db.Find(&items).Error
 	if err != nil {
