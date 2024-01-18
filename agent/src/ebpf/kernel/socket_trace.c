@@ -1156,6 +1156,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info.uid = socket_info_ptr->uid;
 
 		/*
+		 * The kernel syscall interface determines that it is the TLS
+		 * handshake protocol, and for the uprobe program, it needs to
+		 * be re inferred to determine the upper layer protocol of TLS.
+		 */
+		if (socket_info_ptr->l7_proto == PROTO_TLS)
+			socket_info_ptr->l7_proto = conn_info->protocol;
+
+		/*
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
 		 */

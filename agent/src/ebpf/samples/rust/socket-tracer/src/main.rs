@@ -240,7 +240,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -260,11 +260,12 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).syscall_trace_id_call,
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
+                     (*sd).is_tls,
                      (*sd).timestamp,
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -284,6 +285,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).syscall_trace_id_call,
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
+                     (*sd).is_tls,
                      (*sd).timestamp);
             if (*sd).source == 2 {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
