@@ -59,7 +59,7 @@ var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 // show metrics on db
 // show tables
 // show databases
-var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags|tags from \\w+|metrics|metrics from \\w+|metrics functions|language|metrics on db|tables|databases)$")
+var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|metrics on db|tables|databases)$")
 
 type TargetLabelFilter struct {
 	OriginFilter string
