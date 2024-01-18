@@ -950,25 +950,16 @@ impl HttpLog {
                 let header_frame_payload =
                     &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
 
-                let parse_rst = if param.direction == PacketDirection::ClientToServer {
-                    self.http2_req_decoder
-                        .as_mut()
-                        .unwrap()
-                        .decode(header_frame_payload)
+                let mut decoder = if param.direction == PacketDirection::ClientToServer {
+                    self.http2_req_decoder.take().unwrap()
                 } else {
-                    self.http2_resp_decoder
-                        .as_mut()
-                        .unwrap()
-                        .decode(header_frame_payload)
+                    self.http2_resp_decoder.take().unwrap()
                 };
 
-                if let Err(_) = parse_rst {
-                    return Err(Error::HttpHeaderParseFailed);
-                }
-                let header_list = parse_rst.unwrap();
-
-                for (key, val) in header_list.iter() {
-                    self.on_header(config, key, val, direction, info)?;
+                let result = decoder.decode_with_cb(header_frame_payload, |key, val| {
+                    let key: &[u8] = &key;
+                    let val: &[u8] = &val;
+                    let _ = self.on_header(config, key, val, direction, info);
                     if key == b"content-length" {
                         content_length = Some(
                             str::from_utf8(val)
@@ -977,7 +968,17 @@ impl HttpLog {
                                 .unwrap_or_default(),
                         )
                     }
+                });
+                if param.direction == PacketDirection::ClientToServer {
+                    self.http2_req_decoder.replace(decoder);
+                } else {
+                    self.http2_resp_decoder.replace(decoder);
                 }
+
+                if result.is_err() {
+                    return Err(Error::HttpHeaderParseFailed);
+                }
+
                 header_frame_parsed = true;
                 if !param.is_from_ebpf() {
                     info.headers_offset = headers_offset as u32;
@@ -1546,7 +1547,14 @@ mod tests {
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
             http2.set_header_decoder(config.expected_headers_set.clone());
-            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(parse_config);
 
             let get_http_info = |i: L7ProtocolInfo| match i {
@@ -1637,7 +1645,7 @@ mod tests {
                 is_tls: false,
                 is_req_end: false,
                 is_resp_end: false,
-                process_kname: "".to_string(),
+                process_kname: "",
             }),
             packet_seq: 0,
             time: 0,
@@ -1836,7 +1844,14 @@ mod tests {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             if packet.get_l4_payload().is_some() {
-                let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+                let param = &mut ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    Default::default(),
+                    true,
+                    true,
+                );
                 param.set_log_parse_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }

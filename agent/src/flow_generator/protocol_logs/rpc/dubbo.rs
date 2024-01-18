@@ -733,7 +733,14 @@ mod tests {
                 ..Default::default()
             };
             let mut dubbo = DubboLog::default();
-            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 
@@ -829,7 +836,14 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                &*packet,
+                rrt_cache.clone(),
+                Default::default(),
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(&config);
             if packet.get_l4_payload().is_some() {
                 let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
