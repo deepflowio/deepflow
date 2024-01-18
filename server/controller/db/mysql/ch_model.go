@@ -132,7 +132,7 @@ type ChServerPort struct {
 }
 
 type ChIPRelation struct {
-	L3EPCID        int    `gorm:"primaryKey;column:l3_epc_id;type:int;not null" json:"VPC_ID"`
+	L3EPCID        int    `gorm:"primaryKey;column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	IP             string `gorm:"primaryKey;column:ip;type:varchar(64);not null" json:"IP"`
 	NATGWID        int    `gorm:"column:natgw_id;type:int;default:null" json:"NATGW_ID"`
 	NATGWName      string `gorm:"column:natgw_name;type:varchar(256);default:null" json:"NATGW_NAME"`
@@ -162,8 +162,8 @@ type ChIPResource struct {
 	HostName       string `gorm:"column:host_name;type:varchar(256);default:null" json:"HOST_NAME"`
 	CHostID        int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
 	CHostName      string `gorm:"column:chost_name;type:varchar(256);default:null" json:"CHOST_NAME"`
-	L3EPCID        int    `gorm:"column:l3_epc_id;type:int;not null" json:"VPC_ID"`
-	VPCName        string `gorm:"column:vpc_name;type:varchar(256);default:null" json:"VPC_NAME"`
+	L3EPCID        int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	L3EPCName      string `gorm:"column:l3_epc_name;type:varchar(256);default:null" json:"L3_EPC_NAME"`
 	RouterID       int    `gorm:"column:router_id;type:int;not null" json:"ROUTER_ID"`
 	RouterName     string `gorm:"column:router_name;type:varchar(256);default:null" json:"ROUTER_NAME"`
 	DHCPGWID       int    `gorm:"column:dhcpgw_id;type:int;not null" json:"DHCPGW_ID"`
@@ -385,7 +385,7 @@ type ChGProcess struct {
 	Name    string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID  int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	CHostID int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
-	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"VPC_ID"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 }
 
 func (ChGProcess) TableName() string {
@@ -486,6 +486,6 @@ type ChPodService struct {
 type ChChost struct {
 	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name    string `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"VPC_ID"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 	HostID  int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
 }
