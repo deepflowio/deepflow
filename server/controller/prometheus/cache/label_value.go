@@ -17,36 +17,42 @@
 package cache
 
 import (
-	"sync"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type labelValue struct {
-	valueToID sync.Map
+	valueToID cmap.ConcurrentMap[string, int]
+}
+
+func newLabelValue() *labelValue {
+	return &labelValue{
+		valueToID: cmap.New[int](),
+	}
 }
 
 func (lv *labelValue) GetIDByValue(v string) (int, bool) {
-	if id, ok := lv.valueToID.Load(v); ok {
-		return id.(int), true
+	if id, ok := lv.valueToID.Get(v); ok {
+		return id, true
 	}
 	return 0, false
 }
 
 func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 	for _, item := range batch {
-		lv.valueToID.Store(item.GetValue(), int(item.GetId()))
+		lv.valueToID.Set(item.GetValue(), int(item.GetId()))
 	}
 }
 
-func (lv *labelValue) refresh(args ...interface{}) error {
+func (lv *labelValue) refresh() error {
 	labelValues, err := lv.load()
 	if err != nil {
 		return err
 	}
 	for _, item := range labelValues {
-		lv.valueToID.Store(item.Value, item.ID)
+		lv.valueToID.Set(item.Value, item.ID)
 	}
 	return nil
 }

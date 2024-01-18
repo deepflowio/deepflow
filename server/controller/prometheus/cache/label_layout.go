@@ -17,8 +17,6 @@
 package cache
 
 import (
-	"sync"
-
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
@@ -43,19 +41,20 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 
 type appLabelNameToValue map[string]string
 type metricAndAPPLabelLayout struct {
-	layoutKeyToIndex sync.Map
 	layoutKeyToID    cmap.ConcurrentMap[LayoutKey, int]
+	layoutKeyToIndex cmap.ConcurrentMap[LayoutKey, uint8]
 }
 
 func newMetricAndAPPLabelLayout() *metricAndAPPLabelLayout {
 	return &metricAndAPPLabelLayout{
-		layoutKeyToID: cmap.NewStringer[LayoutKey, int](),
+		layoutKeyToID:    cmap.NewStringer[LayoutKey, int](),
+		layoutKeyToIndex: cmap.NewStringer[LayoutKey, uint8](),
 	}
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
-	if index, ok := mll.layoutKeyToIndex.Load(key); ok {
-		return index.(uint8), true
+	if index, ok := mll.layoutKeyToIndex.Get(key); ok {
+		return index, true
 	}
 	return 0, false
 }
@@ -69,17 +68,17 @@ func (mll *metricAndAPPLabelLayout) GetIDByKey(key LayoutKey) (int, bool) {
 
 func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	for _, m := range batch {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
+		mll.layoutKeyToIndex.Set(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
 	}
 }
 
-func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
+func (mll *metricAndAPPLabelLayout) refresh() error {
 	metricAPPLabelLayouts, err := mll.load()
 	if err != nil {
 		return err
 	}
 	for _, l := range metricAPPLabelLayouts {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
+		mll.layoutKeyToIndex.Set(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
 		mll.layoutKeyToID.Set(NewLayoutKey(l.MetricName, l.APPLabelName), l.ID)
 	}
 	return nil
