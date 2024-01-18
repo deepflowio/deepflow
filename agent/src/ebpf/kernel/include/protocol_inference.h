@@ -169,6 +169,12 @@ static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
 	return (sk_info != NULL && sk_info->uid != 0);
 }
 
+static __inline bool is_infer_socket_valid(struct socket_info_t *sk_info)
+{
+	return (sk_info != NULL && sk_info->uid != 0
+		&& sk_info->l7_proto != PROTO_TLS);
+}
+
 static __inline int is_http_response(const char *data)
 {
 	return (data[0] == 'H' && data[1] == 'T' && data[2] == 'T'
@@ -498,7 +504,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		return MSG_UNKNOWN;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 
@@ -533,7 +539,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_HTTP1, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
 	}
@@ -637,7 +643,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	static const __u8 kComStmtExecute = 0x17;
 	static const __u8 kComStmtClose = 0x19;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
 	}
@@ -841,7 +847,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	char infer_buf[POSTGRE_INFER_BUF_SIZE];
 	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
 		char tag = infer_buf[0];
@@ -892,7 +898,7 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ORACLE)
 			return MSG_UNKNOWN;
 	}
@@ -988,7 +994,7 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	__u8 ver = infer_buf[0];	//version for protocol
 	__u8 type = infer_buf[1];	// request/response/request oneway
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
 		goto out;
@@ -1109,7 +1115,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_DNS, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
 	}
@@ -1203,7 +1209,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_REDIS, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
 	}
@@ -1213,21 +1219,21 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	/*
 	 * The following table summarizes the RESP data types that Redis supports:
 	 *
-	 * RESP data type	Minimal protocol version	Category	First byte
-	 * Simple strings	RESP2				Simple		+
-	 * Simple Errors	RESP2				Simple		-
-	 * Integers		RESP2				Simple		:
-	 * Bulk strings		RESP2				Aggregate	$
-	 * Arrays		RESP2				Aggregate	*
-	 * Nulls		RESP3				Simple		_
-	 * Booleans		RESP3				Simple		#
-	 * Doubles		RESP3				Simple		,
-	 * Big numbers		RESP3				Simple		(
-	 * Bulk errors		RESP3				Aggregate	!
-	 * Verbatim strings	RESP3				Aggregate	=
-	 * Maps			RESP3				Aggregate	%
-	 * Sets			RESP3				Aggregate	~
-	 * Pushes		RESP3				Aggregate	>
+	 * RESP data type       Minimal protocol version        Category        First byte
+	 * Simple strings       RESP2                           Simple          +
+	 * Simple Errors        RESP2                           Simple          -
+	 * Integers             RESP2                           Simple          :
+	 * Bulk strings         RESP2                           Aggregate       $
+	 * Arrays               RESP2                           Aggregate       *
+	 * Nulls                RESP3                           Simple          _
+	 * Booleans             RESP3                           Simple          #
+	 * Doubles              RESP3                           Simple          ,
+	 * Big numbers          RESP3                           Simple          (
+	 * Bulk errors          RESP3                           Aggregate       !
+	 * Verbatim strings     RESP3                           Aggregate       =
+	 * Maps                 RESP3                           Aggregate       %
+	 * Sets                 RESP3                           Aggregate       ~
+	 * Pushes               RESP3                           Aggregate       >
 	 */
 	if (first_byte != '+' && first_byte != '-' && first_byte != ':' &&
 	    first_byte != '$' && first_byte != '*' && first_byte != '_' &&
@@ -1306,7 +1312,7 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr))
+	if (is_infer_socket_valid(conn_info->socket_info_ptr))
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
 			return MSG_UNKNOWN;
 
@@ -1437,7 +1443,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 	if (!protocol_port_check_2(PROTO_DUBBO, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
 	}
@@ -1605,7 +1611,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
 
@@ -1731,7 +1737,7 @@ infer_fastcgi_message(const char *buf, size_t count,
 		return MSG_PRESTORE;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
 			return MSG_UNKNOWN;
 		if (header->type == FCGI_BEGIN_REQUEST
@@ -1796,7 +1802,7 @@ infer_mongo_message(const char *buf, size_t count,
 	if (!protocol_port_check_2(PROTO_MONGO, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MONGO)
 			return MSG_UNKNOWN;
 	}
@@ -2109,10 +2115,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	inferred_message.type = MSG_UNKNOWN;
 
 	if (conn_info->sk == NULL)
-		return inferred_message;
-
-	if (conn_info->sk_type == SOCK_STREAM &&
-	    sk_state != SOCK_CHECK_TYPE_TCP_ES)
 		return inferred_message;
 
 	if (conn_info->tuple.dport == 0 || conn_info->tuple.num == 0) {
