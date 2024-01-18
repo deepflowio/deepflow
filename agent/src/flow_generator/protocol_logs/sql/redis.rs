@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-use serde::{Serialize, Serializer};
-
 use std::{fmt, str};
+
+use nom::FindSubstring;
+use serde::{Serialize, Serializer};
 
 use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
@@ -242,7 +243,7 @@ impl RedisLog {
         info.resp_status = L7ResponseStatus::Ok;
         match context[0] {
             b'+' => info.status = context,
-            b'-' if error_response => {
+            b'-' | b'!' if error_response => {
                 info.error = context;
                 info.resp_status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().map(|p| p.inc_resp_err());
@@ -399,7 +400,7 @@ fn decode_ascii_str(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
             limit,
         )
     } else {
-        (&payload[..separator_pos], separator_pos)
+        (&payload[..separator_pos], separator_pos + 2)
     };
 
     // Do not parse strings with non ascii byte
@@ -408,6 +409,152 @@ fn decode_ascii_str(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
     }
 
     Some((context, length))
+}
+
+// _\r\n
+fn decode_null(payload: &[u8]) -> Option<(Vec<u8>, usize)> {
+    if payload.len() < 3 {
+        return None;
+    }
+    if payload[1] == b'\r' && payload[2] == b'\n' {
+        return Some((b"NULL".to_vec(), 3));
+    }
+    return None;
+}
+
+// #<t|f>\r\n
+fn decode_booleans(payload: &[u8]) -> Option<(Vec<u8>, usize)> {
+    if payload.len() < 4 {
+        return None;
+    }
+    if payload[2] == b'\r' && payload[3] == b'\n' {
+        if payload[1] == b't' {
+            return Some((b"true".to_vec(), 4));
+        } else if payload[1] == b'f' {
+            return Some((b"false".to_vec(), 4));
+        }
+    }
+    return None;
+}
+
+// ,[<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]\r\n
+// ,inf\r\n
+// ,-inf\r\n
+// ,nan\r\n
+fn decode_doubles(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
+    decode_ascii_str(&payload[1..], limit).map(|(context, length)| (context, length + 1))
+}
+
+// ([+|-]<number>\r\n
+fn decode_big_number(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
+    if let Some((data, length)) = decode_ascii_str(&payload[1..], limit) {
+        for (index, d) in data.iter().enumerate() {
+            if index == 0 && (*d == b'+' || *d == b'-') {
+                continue;
+            }
+            if !d.is_ascii_digit() {
+                return None;
+            }
+        }
+        return Some((data, length + 1));
+    }
+    return None;
+}
+
+// !<length>\r\n<error>\r\n
+fn decode_bulk_errors(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
+    let mut offset = 1;
+    let (next_data_num, sub_offset) = decode_integer(&payload[offset..])?;
+    offset += sub_offset;
+    if offset > payload.len() {
+        return None;
+    }
+    let (context, sub_offset) = decode_ascii_str(&payload[offset..], limit)?;
+    if context.len() != next_data_num as usize {
+        return None;
+    }
+    return Some((context, offset + sub_offset));
+}
+
+// =<length>\r\n<encoding>:<data>\r\n
+fn decode_verbatim_strings(payload: &[u8], limit: usize) -> Option<(&[u8], usize)> {
+    let mut offset = 1;
+    let (next_data_num, sub_offset) = decode_integer(&payload[offset..])?;
+    offset += sub_offset;
+    if offset > payload.len() {
+        return None;
+    }
+    let (context, sub_offset) = decode_ascii_str(&payload[offset..], limit)?;
+    if context.len() != next_data_num as usize || context.find_substring(":").is_none() {
+        return None;
+    }
+
+    return Some((context, offset + sub_offset));
+}
+
+// %<number-of-entries>\r\n<key-1><value-1>...<key-n><value-n>
+fn decode_maps(payload: &[u8], limit: usize) -> Option<(Vec<u8>, usize)> {
+    let mut offset = 1;
+    let (next_data_num, sub_offset) = decode_integer(&payload[offset..])?;
+    let mut maps = vec![];
+
+    offset += sub_offset;
+    for _ in 0..next_data_num as usize {
+        if offset > payload.len() {
+            break;
+        }
+        let Some((key, key_offset)) = decode_ascii_str(&payload[offset..], limit) else {
+            break;
+        };
+        offset += key_offset;
+        if offset > payload.len() {
+            break;
+        }
+        let Some((value, valud_offset)) = decode_ascii_str(&payload[offset..], limit) else {
+            break;
+        };
+        offset += valud_offset;
+        maps.extend_from_slice(key);
+        maps.extend_from_slice(value);
+        maps.push(b',');
+    }
+
+    if maps.len() > 0 {
+        return Some((maps, offset));
+    }
+
+    return None;
+}
+
+// ~<number-of-elements>\r\n<element-1>...<element-n>
+fn decode_sets(payload: &[u8], limit: usize) -> Option<(Vec<u8>, usize)> {
+    let mut offset = 1;
+    let (next_data_num, sub_offset) = decode_integer(&payload[offset..])?;
+    let mut elements = vec![];
+
+    offset += sub_offset;
+    for _ in 0..next_data_num as usize {
+        if offset > payload.len() {
+            break;
+        }
+        let Some((element, element_offset)) = decode_ascii_str(&payload[offset..], limit) else {
+            break;
+        };
+        offset += element_offset;
+        elements.extend_from_slice(element);
+        elements.push(b' ');
+    }
+
+    if elements.len() > 0 {
+        return Some((elements, offset));
+    }
+
+    return None;
+}
+
+// ><number-of-elements>\r\n<element-1>...<element-n>
+fn decode_pushes(payload: &[u8], limit: usize) -> Option<(Vec<u8>, usize)> {
+    decode_sets(payload, limit)
 }
 
 // 函数在入参为"$-1"或"-1"时都返回"-1", 使用第三个参数区分是否为错误回复
@@ -425,6 +572,24 @@ pub fn decode(payload: &[u8], strict: bool) -> Option<(Vec<u8>, usize, bool)> {
         b'-' => decode_ascii_str(payload, 256).map(|(v, s)| (v.to_vec(), s, true)),
         // 批量回复
         b'$' => decode_dollor(payload, strict).map(|(v, s)| (v.to_vec(), s, false)),
+        // NULL
+        b'_' => decode_null(payload).map(|(v, s)| (v, s, false)),
+        // Booleans
+        b'#' => decode_booleans(payload).map(|(v, s)| (v, s, false)),
+        // Doubles
+        b',' => decode_doubles(payload, 32).map(|(v, s)| (v.to_vec(), s, false)),
+        // Big numbers
+        b'(' => decode_big_number(payload, 32).map(|(v, s)| (v.to_vec(), s, false)),
+        // Bulk errors
+        b'!' => decode_bulk_errors(payload, 256).map(|(v, s)| (v.to_vec(), s, true)),
+        // Verbatim strings
+        b'=' => decode_verbatim_strings(payload, 1024).map(|(v, s)| (v.to_vec(), s, false)),
+        // Maps
+        b'%' => decode_maps(payload, 64).map(|(v, s)| (v, s, false)),
+        // Sets
+        b'~' => decode_sets(payload, 64).map(|(v, s)| (v, s, false)),
+        // Pushes
+        b'>' => decode_pushes(payload, 64).map(|(v, s)| (v, s, false)),
         _ => None,
     }
 }
@@ -562,8 +727,69 @@ mod tests {
         let payload = [b'-', b'1', b'\r', b'\n'];
         let (context, n, e) = decode(payload.as_slice(), true).unwrap();
         assert_eq!(context, "-1".as_bytes());
-        assert_eq!(n, 2);
+        assert_eq!(n, 4);
         assert_eq!(e, true);
+
+        // _\r\n
+        let payload = [b'_', b'\r', b'\n'];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "NULL".as_bytes());
+        assert_eq!(n, 3);
+        // #<t|f>\r\n
+        let payload = [b'#', b't', b'\r', b'\n'];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "true".as_bytes());
+        assert_eq!(n, 4);
+        // ,[<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]\r\n
+        // ,inf\r\n
+        // ,-inf\r\n
+        // ,nan\r\n
+        let payload = [b',', b'1', b'.', b'1', b'2', b'\r', b'\n'];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "1.12".as_bytes());
+        assert_eq!(n, 7);
+        // ([+|-]<number>\r\n
+        let payload = [
+            b'(', b'1', b'1', b'1', b'2', b'1', b'1', b'1', b'2', b'1', b'1', b'1', b'2', b'1',
+            b'1', b'1', b'2', b'\r', b'\n',
+        ];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "1112111211121112".as_bytes());
+        assert_eq!(n, 19);
+        // !<length>\r\n<error>\r\n
+        let payload = [
+            b'!', b'9', b'\r', b'\n', b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h', b'i', b'\r',
+            b'\n',
+        ];
+        let (context, n, e) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "abcdefghi".as_bytes());
+        assert_eq!(n, 15);
+        assert_eq!(e, true);
+        // =<length>\r\n<encoding>:<data>\r\n
+        let payload = [
+            b'=', b'9', b'\r', b'\n', b't', b'x', b't', b':', b'a', b'b', b'c', b'd', b'e', b'\r',
+            b'\n',
+        ];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "txt:abcde".as_bytes());
+        assert_eq!(n, 15);
+        // %<number-of-entries>\r\n<key-1><value-1>...<key-n><value-n>
+        let payload = [
+            b'%', b'1', b'\r', b'\n', b'k', b'e', b'y', b'\r', b'\n', b':', b'v', b'a', b'l', b'u',
+            b'e', b'\r', b'\n',
+        ];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "key:value,".as_bytes());
+        assert_eq!(n, 17);
+        // ~<number-of-elements>\r\n<element-1>...<element-n>
+        // ><number-of-elements>\r\n<element-1>...<element-n>
+        let payload = [
+            b'~', b'2', b'\r', b'\n', b'k', b'e', b'y', b'\r', b'\n', b':', b'v', b'a', b'l', b'u',
+            b'e', b'\r', b'\n',
+        ];
+        let (context, n, _) = decode(payload.as_slice(), true).unwrap();
+        assert_eq!(context, "key :value ".as_bytes());
+        assert_eq!(n, 17);
     }
 
     #[test]
