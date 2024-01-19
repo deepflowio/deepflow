@@ -774,6 +774,9 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// Time-first parsing
 	e.parseTimeWhere(node.Expr, &whereStmt)
 	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+	if err != nil {
+		return err
+	}
 	expr, err = e.TransPrometheusTargetIDFilter(expr)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
