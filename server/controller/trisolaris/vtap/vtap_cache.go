@@ -318,6 +318,9 @@ func (c *VTapCache) convertLicenseFunctions() {
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_CALL_MONITORING) {
 		c.enabledCallMonitoring.Set()
 	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_DATABASE_MONITORING) {
+		c.enabledCallMonitoring.Set()
+	}
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_NETWORK_MONITORING) {
 		c.enabledNetworkMonitoring.Set()
 	}
