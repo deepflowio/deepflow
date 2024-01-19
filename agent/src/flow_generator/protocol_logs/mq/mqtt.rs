@@ -863,7 +863,7 @@ mod tests {
             let is_mqtt = MqttLog::check_protocol(payload, param);
             for i in infos.iter() {
                 if let L7ProtocolInfo::MqttInfo(info) = i {
-                    output.push_str(&format!("{:?} is_mqtt: {}\r\n", info, is_mqtt));
+                    output.push_str(&format!("{:?} is_mqtt: {}\n", &info, is_mqtt));
                 } else {
                     unreachable!()
                 }

@@ -648,13 +648,13 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::MongoDBInfo(i) => {
-                        output.push_str(&format!("{:?} is_mongo: {}\r\n", i, is_mongo));
+                        output.push_str(&format!("{:?} is_mongo: {}\n", i, is_mongo));
                     }
                     _ => unreachable!(),
                 }
             } else {
                 output.push_str(&format!(
-                    "{:?} is_mongo: {}\r\n",
+                    "{:?} is_mongo: {}\n",
                     MongoDBInfo::default(),
                     is_mongo
                 ));
