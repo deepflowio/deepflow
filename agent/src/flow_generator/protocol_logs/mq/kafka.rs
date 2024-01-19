@@ -731,13 +731,13 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::KafkaInfo(i) => {
-                        output.push_str(&format!("{:?} is_kafka: {}\r\n", i, is_kafka));
+                        output.push_str(&format!("{:?} is_kafka: {}\n", i, is_kafka));
                     }
                     _ => unreachable!(),
                 }
             } else {
                 output.push_str(&format!(
-                    "{:?} is_kafka: {}\r\n",
+                    "{:?} is_kafka: {}\n",
                     KafkaInfo::default(),
                     is_kafka
                 ));
