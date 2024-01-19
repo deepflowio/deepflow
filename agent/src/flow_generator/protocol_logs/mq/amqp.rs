@@ -141,8 +141,8 @@ pub enum MethodType {
     RollbackOk,
 }
 
-impl FrameType {
-    fn from_u8(v: u8) -> Self {
+impl From<u8> for FrameType {
+    fn from(v: u8) -> Self {
         match v {
             1 => Self::Method,
             2 => Self::Header,
@@ -153,8 +153,8 @@ impl FrameType {
     }
 }
 
-impl ClassType {
-    fn from_u16(v: u16) -> Self {
+impl From<u16> for ClassType {
+    fn from(v: u16) -> Self {
         match v {
             10 => Self::Connection,
             20 => Self::Channel,
@@ -168,8 +168,9 @@ impl ClassType {
     }
 }
 
-impl MethodType {
-    fn from_u16(v: u16, class_type: ClassType) -> Self {
+impl From<(ClassType, u16)> for MethodType {
+    fn from(val: (ClassType, u16)) -> Self {
+        let (class_type, v) = val;
         match (class_type, v) {
             (ClassType::Connection, 10) => Self::Start,
             (ClassType::Connection, 11) => Self::StartOk,
@@ -282,9 +283,13 @@ pub struct AmqpInfo {
     resp_len: Option<u32>,
 }
 
-fn read_short_str(buffer: &[u8]) -> Option<(&[u8], String)> {
+fn slice_to_string(slice: &[u8]) -> String {
+    String::from_utf8_lossy(slice).to_string()
+}
+
+fn read_short_str(buffer: &[u8]) -> Option<(&[u8], &[u8])> {
     let sz = *buffer.get(0)? as usize;
-    let s = String::from_utf8_lossy(buffer.get(1..=sz)?).to_string();
+    let s = buffer.get(1..=sz)?;
     let buffer = buffer.get(sz + 1..)?;
     Some((buffer, s))
 }
@@ -351,7 +356,7 @@ fn read_field_value(payload: &[u8]) -> Option<(&[u8], Value)> {
         // shortstr
         b's' => {
             let (payload_tmp, s) = read_short_str(payload.get(1..)?)?;
-            (payload_tmp, Value::String(s))
+            (payload_tmp, Value::String(slice_to_string(s)))
         }
         // longstr
         b'S' => {
@@ -394,7 +399,7 @@ fn read_table(payload: &[u8]) -> Option<(&[u8], Value)> {
         let (payload_tmp, key) = read_short_str(payload)?;
         let (payload_tmp, value) = read_field_value(payload_tmp)?;
         payload = payload_tmp;
-        map.insert(key, value);
+        map.insert(slice_to_string(key), value);
     }
     Some((payload_ret, Value::Object(map)))
 }
@@ -431,33 +436,46 @@ impl AmqpInfo {
         let (_, table) = read_table(payload)?;
         if let Value::Object(map) = table {
             if let Some(Value::String(s)) = map.get("traceparent") {
-                let parts = s.split('-').collect::<Vec<&str>>();
-                if parts.len() == 4 {
-                    return Some((parts[1].to_string(), parts[2].to_string()));
+                // 00-TRACEID-SPANID-01
+                let mut parts = s.split('-').skip(1);
+                if let (Some(trace_id), Some(span_id)) = { (parts.next(), parts.next()) } {
+                    return Some((trace_id.to_string(), span_id.to_string()));
                 }
             }
             if let Some(Value::String(s)) = map.get("sw8") {
-                let parts = s.split('-').collect::<Vec<&str>>();
-                if parts.len() > 3 {
-                    let trace_id = decode_base64_to_string(parts[1]);
-                    let span_id = format!("{}-{}", decode_base64_to_string(parts[2]), parts[3]);
-                    return Some((trace_id, span_id));
+                if let Some(ret) = || -> Option<(String, String)> {
+                    // 1-TRACEID-SEGMENTID-3-xxxxx
+                    let mut parts = s.split('-');
+                    let trace_id = decode_base64_to_string(parts.nth(1)?);
+                    let span_id = format!(
+                        "{}-{}",
+                        decode_base64_to_string(parts.next()?),
+                        parts.next()?
+                    );
+                    Some((trace_id, span_id))
+                }() {
+                    return Some(ret);
                 }
             }
             if let Some(Value::String(s)) = map.get("sw6") {
-                let parts = s.split('-').collect::<Vec<&str>>();
-                if parts.len() > 3 {
-                    let trace_id = decode_base64_to_string(parts[1]);
-                    let span_id = format!("{}-{}", decode_base64_to_string(parts[2]), parts[3]);
-                    return Some((trace_id, span_id));
+                if let Some(ret) = || -> Option<(String, String)> {
+                    // 1-TRACEID-SEGMENTID-3-xxxxx
+                    let mut parts = s.split('-');
+                    let trace_id = decode_base64_to_string(parts.nth(1)?);
+                    let span_id = format!(
+                        "{}-{}",
+                        decode_base64_to_string(parts.next()?),
+                        parts.next()?
+                    );
+                    Some((trace_id, span_id))
+                }() {
+                    return Some(ret);
                 }
             }
             if let Some(Value::String(s)) = map.get("sw3") {
-                let parts = s.split('|').collect::<Vec<&str>>();
-                if parts.len() > 2 {
-                    let trace_id = parts[0].to_string();
-                    let span_id = parts[1].to_string();
-                    return Some((trace_id, span_id));
+                let mut parts = s.split('|');
+                if let (Some(trace_id), Some(span_id)) = { (parts.next(), parts.next()) } {
+                    return Some((trace_id.to_string(), span_id.to_string()));
                 }
             }
         }
@@ -465,135 +483,110 @@ impl AmqpInfo {
     }
 
     fn parse_queue(&self, arguments: &[u8]) -> Option<String> {
-        match (self.class_id, self.method_id) {
-            (ClassType::Queue, MethodType::Declare) => {
+        let queue = match (self.class_id, self.method_id) {
+            // [reserved: short] [queue: shortstr]
+            (ClassType::Queue, MethodType::Declare)
+            | (ClassType::Queue, MethodType::Bind)
+            | (ClassType::Queue, MethodType::Unbind)
+            | (ClassType::Queue, MethodType::Purge)
+            | (ClassType::Queue, MethodType::Delete)
+            | (ClassType::Basic, MethodType::Consume)
+            | (ClassType::Basic, MethodType::Get) => {
                 let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
+                queue
             }
+            // [queue: shortstr]
             (ClassType::Queue, MethodType::DeclareOk) => {
-                let (_arguments, queue) = read_short_str(arguments.get(0..)?)?;
-                queue.into()
+                let (_arguments, queue) = read_short_str(arguments)?;
+                queue
             }
-            (ClassType::Queue, MethodType::Bind) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            (ClassType::Queue, MethodType::Unbind) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            (ClassType::Queue, MethodType::Purge) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            (ClassType::Queue, MethodType::Delete) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            (ClassType::Basic, MethodType::Consume) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            (ClassType::Basic, MethodType::Get) => {
-                let (_arguments, queue) = read_short_str(arguments.get(2..)?)?;
-                queue.into()
-            }
-            _ => None,
-        }
+            _ => return None,
+        };
+        Some(slice_to_string(queue))
     }
 
     fn parse_exchange(&self, arguments: &[u8]) -> Option<String> {
-        match (self.class_id, self.method_id) {
-            (ClassType::Exchange, MethodType::Declare) => {
+        let exchange = match (self.class_id, self.method_id) {
+            // [reserved: short] [exchange: shortstr]
+            (ClassType::Exchange, MethodType::Declare)
+            | (ClassType::Exchange, MethodType::Delete)
+            | (ClassType::Basic, MethodType::Publish) => {
                 let (_arguments, exchange) = read_short_str(arguments.get(2..)?)?;
-                exchange.into()
+                exchange
             }
-            (ClassType::Exchange, MethodType::Delete) => {
-                let (_arguments, exchange) = read_short_str(arguments.get(2..)?)?;
-                exchange.into()
-            }
-            (ClassType::Queue, MethodType::Bind) => {
+            // [reserved: short] [queue: shortstr] [exchange: shortstr]
+            (ClassType::Queue, MethodType::Bind) | (ClassType::Queue, MethodType::Unbind) => {
                 let (arguments, _queue) = read_short_str(arguments.get(2..)?)?;
                 let (_arguments, exchange) = read_short_str(arguments)?;
-                exchange.into()
+                exchange
             }
-            (ClassType::Queue, MethodType::Unbind) => {
-                let (arguments, _queue) = read_short_str(arguments.get(2..)?)?;
-                let (_arguments, exchange) = read_short_str(arguments)?;
-                exchange.into()
-            }
-            (ClassType::Basic, MethodType::Publish) => {
-                let (_arguments, exchange) = read_short_str(arguments.get(2..)?)?;
-                exchange.into()
-            }
+            // [reply-code: short] [reply-text: shortstr] [exchange: shortstr]
             (ClassType::Basic, MethodType::Return) => {
                 let (arguments, _reply_text) = read_short_str(arguments.get(2..)?)?;
                 let (_arguments, exchange) = read_short_str(arguments)?;
-                exchange.into()
+                exchange
             }
+            // [consumer-tag: shortstr] [delivery-tag: long long] [redelivered: bool] [exchange: shortstr]
             (ClassType::Basic, MethodType::Deliver) => {
-                let (arguments, _consumer_tag) = read_short_str(arguments.get(0..)?)?;
+                let (arguments, _consumer_tag) = read_short_str(arguments)?;
                 let (_arguments, exchange) = read_short_str(arguments.get(9..)?)?;
-                exchange.into()
+                exchange
             }
+            // [delivery-tag: long long] [redelivered: bool] [exchange: shortstr]
             (ClassType::Basic, MethodType::GetOk) => {
                 let (_arguments, exchange) = read_short_str(arguments.get(9..)?)?;
-                exchange.into()
+                exchange
             }
-            _ => None,
-        }
+            _ => return None,
+        };
+        Some(slice_to_string(exchange))
     }
 
     fn parse_routing_key(&self, arguments: &[u8]) -> Option<String> {
-        match (self.class_id, self.method_id) {
-            (ClassType::Exchange, MethodType::Bind) => {
+        let routing_key = match (self.class_id, self.method_id) {
+            // [reserved: short] [dst: shortstr] [src: shortstr] [routing-key: shortstr]
+            (ClassType::Exchange, MethodType::Bind) | (ClassType::Exchange, MethodType::Unbind) => {
                 let (arguments, _dst) = read_short_str(arguments.get(2..)?)?;
                 let (arguments, _src) = read_short_str(arguments)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
-            (ClassType::Exchange, MethodType::Unbind) => {
-                let (arguments, _dst) = read_short_str(arguments.get(2..)?)?;
-                let (arguments, _src) = read_short_str(arguments)?;
-                let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
-            }
-            (ClassType::Queue, MethodType::Bind) => {
+            // [reserved: short] [queue: shortstr] [exchange: shortstr] [routing-key: shortstr]
+            (ClassType::Queue, MethodType::Bind) | (ClassType::Queue, MethodType::Unbind) => {
                 let (arguments, _queue) = read_short_str(arguments.get(2..)?)?;
                 let (arguments, _exchange) = read_short_str(arguments)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
-            (ClassType::Queue, MethodType::Unbind) => {
-                let (arguments, _queue) = read_short_str(arguments.get(2..)?)?;
-                let (arguments, _exchange) = read_short_str(arguments)?;
-                let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
-            }
+            // [reserved: short] [exchange: shortstr] [routing-key: shortstr]
             (ClassType::Basic, MethodType::Publish) => {
                 let (arguments, _exchange) = read_short_str(arguments.get(2..)?)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
+            // [reply-code: short] [reply-text: shortstr] [exchange: shortstr] [routing-key: shortstr]
             (ClassType::Basic, MethodType::Return) => {
                 let (arguments, _reply_text) = read_short_str(arguments.get(2..)?)?;
                 let (arguments, _exchange) = read_short_str(arguments)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
+            // [consumer-tag: shortstr] [delivery-tag: long long] [redelivered: bool] [exchange: shortstr] [routing-key: shortstr]
             (ClassType::Basic, MethodType::Deliver) => {
-                let (arguments, _consumer_tag) = read_short_str(arguments.get(0..)?)?;
+                let (arguments, _consumer_tag) = read_short_str(arguments)?;
                 let (arguments, _exchange) = read_short_str(arguments.get(9..)?)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
+            // [delivery-tag: long long] [redelivered: bool] [exchange: shortstr] [routing-key: shortstr]
             (ClassType::Basic, MethodType::GetOk) => {
                 let (arguments, _exchange) = read_short_str(arguments.get(9..)?)?;
                 let (_arguments, routing_key) = read_short_str(arguments)?;
-                routing_key.into()
+                routing_key
             }
-            _ => None,
-        }
+            _ => return None,
+        };
+        Some(slice_to_string(routing_key))
     }
 }
 
@@ -691,7 +684,7 @@ impl L7ProtocolParserInterface for AmqpLog {
                 break;
             }
 
-            info.frame_type = FrameType::from_u8(payload[offset]);
+            info.frame_type = FrameType::from(payload[offset]);
             if info.frame_type == FrameType::Unknown {
                 break;
             }
@@ -706,15 +699,15 @@ impl L7ProtocolParserInterface for AmqpLog {
                     if info.payload_size < 4 {
                         break;
                     }
-                    info.class_id =
-                        match ClassType::from_u16(read_u16_be(&payload[offset..offset + 2])) {
-                            ClassType::Unknown => break,
-                            x => x,
-                        };
-                    info.method_id = match MethodType::from_u16(
-                        read_u16_be(&payload[offset + 2..offset + 4]),
+                    info.class_id = match ClassType::from(read_u16_be(&payload[offset..offset + 2]))
+                    {
+                        ClassType::Unknown => break,
+                        x => x,
+                    };
+                    info.method_id = match MethodType::from((
                         info.class_id,
-                    ) {
+                        read_u16_be(&payload[offset + 2..offset + 4]),
+                    )) {
                         MethodType::Unknown => break,
                         x => x,
                     };
@@ -726,11 +719,11 @@ impl L7ProtocolParserInterface for AmqpLog {
                     if info.payload_size < 14 {
                         break;
                     }
-                    info.class_id =
-                        match ClassType::from_u16(read_u16_be(&payload[offset..offset + 2])) {
-                            ClassType::Unknown => break,
-                            x => x,
-                        };
+                    info.class_id = match ClassType::from(read_u16_be(&payload[offset..offset + 2]))
+                    {
+                        ClassType::Unknown => break,
+                        x => x,
+                    };
                     match read_u16_be(&payload[offset + 2..offset + 4]) {
                         0 => {}
                         _ => break,
