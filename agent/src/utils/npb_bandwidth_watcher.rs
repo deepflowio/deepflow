@@ -142,7 +142,7 @@ impl Watcher {
 
     fn npb_start(&self, tx_bps: u64) -> bool {
         self.npb_leaky_bucket
-            .set_rate(Some(self.npb_bps_threshold.load(Relaxed) / 8));
+            .set_rate(Some(self.npb_bps_threshold.load(Relaxed)));
         self.exception_handler.clear(Exception::NpbFuse);
         info!("Npb reopen, tx bandwidth is {} bps.", tx_bps);
 
