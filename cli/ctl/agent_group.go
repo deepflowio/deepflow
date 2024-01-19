@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 )
 
 func RegisterAgentGroupCommand() *cobra.Command {
@@ -95,12 +96,18 @@ func listAgentGroup(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		cmdFormat := "%-48s%s\n"
-		fmt.Printf(cmdFormat, "NAME", "ID")
+		t := table.New()
+		t.SetHeader([]string{"NAME", "ID"})
+		tableItems := [][]string{}
 		for i := range response.Get("DATA").MustArray() {
 			group := response.Get("DATA").GetIndex(i)
-			fmt.Printf(cmdFormat, group.Get("NAME").MustString(), group.Get("SHORT_UUID").MustString())
+			tableItems = append(tableItems, []string{
+				group.Get("NAME").MustString(),
+				group.Get("SHORT_UUID").MustString(),
+			})
 		}
+		t.AppendBulk(tableItems)
+		t.Render()
 	}
 }
 
