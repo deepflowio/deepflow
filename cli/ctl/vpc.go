@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
-	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 )
 
 func RegisterVPCCommend() *cobra.Command {
@@ -70,7 +70,7 @@ func RegisterVPCCommend() *cobra.Command {
 
 func listVPC(cmd *cobra.Command, args []string, output string) error {
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v2/vpcs/", server.IP, server.Port)
+	url := fmt.Sprintf("http://%s:%d/v2/epcs/", server.IP, server.Port)
 	var name string
 	if len(args) > 0 {
 		name = args[0]
@@ -90,12 +90,17 @@ func listVPC(cmd *cobra.Command, args []string, output string) error {
 		fmt.Printf(string(dataYaml))
 		return nil
 	}
-	nameMaxSize := jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "NAME")
-	cmdFormat := "%-*s %-20s\n"
-	fmt.Printf(cmdFormat, nameMaxSize, "NAME", "LCUUID")
+	t := table.New()
+	t.SetHeader([]string{"NAME", "LCUUID"})
+	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		vpc := response.Get("DATA").GetIndex(i)
-		fmt.Printf(cmdFormat, nameMaxSize, vpc.Get("NAME").MustString(), vpc.Get("LCUUID").MustString())
+		tableItems = append(tableItems, []string{
+			vpc.Get("NAME").MustString(),
+			vpc.Get("LCUUID").MustString(),
+		})
 	}
+	t.AppendBulk(tableItems)
+	t.Render()
 	return nil
 }

@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
-	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 	"github.com/deepflowio/deepflow/cli/ctl/example"
 )
 
@@ -153,16 +153,9 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 		fmt.Printf(string(yData))
 		return nil
 	}
-	var (
-		nameMaxSize       = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "NAME")
-		lcuuidMaxSize     = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "LCUUID")
-		domainMaxSize     = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "DOMAIN")
-		domainNameMaxSize = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "DOMAIN_NAME")
-		clusterIDMaxSize  = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "CLUSTER_ID")
-	)
-	cmdFormat := "%-*s %-*s %-*s %-*s %-*s\n"
-	fmt.Printf(cmdFormat, nameMaxSize, "NAME", clusterIDMaxSize, "CLUSTER_ID", lcuuidMaxSize, "LCUUID",
-		domainNameMaxSize, "DOMAIN_NAME", domainMaxSize, "DOMAIN")
+	t := table.New()
+	t.SetHeader([]string{"NAME", "CLUSTER_ID", "LCUUID", "DOMAIN_NAME", "DOMAIN"})
+	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		sb := response.Get("DATA").GetIndex(i)
 		name := sb.Get("NAME").MustString()
@@ -179,13 +172,16 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 				dNameChineseCount += 1
 			}
 		}
-		fmt.Printf(cmdFormat,
-			nameMaxSize-nameChineseCount, name,
-			clusterIDMaxSize, sb.Get("CLUSTER_ID").MustString(),
-			lcuuidMaxSize, sb.Get("LCUUID").MustString(),
-			domainNameMaxSize-dNameChineseCount, dName,
-			domainMaxSize, sb.Get("DOMAIN").MustString())
+		tableItems = append(tableItems, []string{
+			name,
+			sb.Get("CLUSTER_ID").MustString(),
+			sb.Get("LCUUID").MustString(),
+			dName,
+			sb.Get("DOMAIN").MustString(),
+		})
 	}
+	t.AppendBulk(tableItems)
+	t.Render()
 	return nil
 }
 
