@@ -134,20 +134,20 @@ func (c *Cloud) getCloudGatherInterval() int {
 	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Warningf("get cloud gather interval failed: (%s)", err.Error())
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	domainConfig, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Warningf("parse domain (%s) config failed: (%s)", c.basicInfo.Name, err.Error())
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	domainSyncTimer := domainConfig.Get("sync_timer").MustInt()
 	if domainSyncTimer == 0 {
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	if domainSyncTimer < cloudcommon.CLOUD_SYNC_TIMER_MIN || domainSyncTimer > cloudcommon.CLOUD_SYNC_TIMER_MAX {
 		log.Warningf("cloud sync timer invalid: (%d)", domainSyncTimer)
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	return domainSyncTimer
 }

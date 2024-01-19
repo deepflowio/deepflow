@@ -43,6 +43,10 @@ use crate::{
 };
 use public::bytes::read_u32_le;
 
+const SERVER_STATUS_CODE_MIN: u16 = 1000;
+const CLIENT_STATUS_CODE_MIN: u16 = 2000;
+const CLIENT_STATUS_CODE_MAX: u16 = 2999;
+
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
     msg_type: LogMessageType,
@@ -414,7 +418,7 @@ impl MysqlLog {
 
     fn set_status(&mut self, status_code: u16, info: &mut MysqlInfo) {
         if status_code != 0 {
-            if status_code >= 2000 && status_code <= 2999 {
+            if status_code >= CLIENT_STATUS_CODE_MIN && status_code <= CLIENT_STATUS_CODE_MAX {
                 info.status = L7ResponseStatus::ClientError;
             } else {
                 info.status = L7ResponseStatus::ServerError;
@@ -435,6 +439,9 @@ impl MysqlLog {
             MYSQL_RESPONSE_CODE_ERR => {
                 if remain > ERROR_CODE_LEN {
                     let code = bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..]);
+                    if code < SERVER_STATUS_CODE_MIN || code > CLIENT_STATUS_CODE_MAX {
+                        return Err(Error::MysqlLogParseFailed);
+                    }
                     info.error_code = Some(code as i32);
                     self.set_status(code, info);
                     remain -= ERROR_CODE_LEN;
@@ -446,8 +453,11 @@ impl MysqlLog {
                         SQL_STATE_OFFSET
                     };
                 if error_message_offset < payload.len() {
-                    info.error_message =
-                        String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
+                    let context = mysql_string(&payload[error_message_offset..]);
+                    if !context.is_ascii() {
+                        return Err(Error::MysqlLogParseFailed);
+                    }
+                    info.error_message = String::from_utf8_lossy(context).into_owned();
                 }
                 self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }

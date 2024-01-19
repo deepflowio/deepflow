@@ -172,8 +172,6 @@ controller:
       # recorder更新数据库的时间间隔，单位：秒
       resource_recorder_interval: 60
       cloud:
-        # cloud定时获取数据的时间间隔，单位：秒
-        cloud_gather_interval: 30
         # Kubernetes数据获取的时间间隔，单位：秒
         kubernetes_gather_interval: 30
         # 阿里公有云API获取区域列表时，需要指定一个区域
