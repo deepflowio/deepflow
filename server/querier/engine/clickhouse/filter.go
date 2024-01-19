@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -180,6 +181,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			op = "not ilike"
 		}
 	} else if strings.ToLower(op) == "regexp" || strings.ToLower(op) == "not regexp" {
+		// check regexp format
+		// 检查正则表达式格式
+		_, err := regexp.Compile(strings.Trim(t.Value, "'"))
+		if err != nil {
+			error := fmt.Errorf("%s : %s", err, t.Value)
+			return nil, error
+		}
 		if strings.ToLower(op) == "regexp" {
 			op = "match"
 		} else {
@@ -1031,6 +1039,13 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				// check regexp format
+				// 检查正则表达式格式
+				_, err := regexp.Compile(strings.Trim(f.Value, "'"))
+				if err != nil {
+					error := fmt.Errorf("%s : %s", err, f.Value)
+					return nil, error
+				}
 				if strings.ToLower(opName) == "regexp" {
 					opName = "match"
 				} else {
