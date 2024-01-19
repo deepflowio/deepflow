@@ -172,8 +172,9 @@ func listAgentUpgrade(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	cmdFormat := "%-40s%-48s%-48s%-50s\n"
-	fmt.Printf(cmdFormat, "NAME", "REVISION", "EXPECTED_REVISION", "UPGRADE_PACKAGE")
+	t := table.New()
+	t.SetHeader([]string{"NAME", "REVISION", "EXPECTED_REVISION", "UPGRADE_PACKAGE"})
+	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		vtap := response.Get("DATA").GetIndex(i)
 		revision := vtap.Get("REVISION").MustString()
@@ -181,12 +182,16 @@ func listAgentUpgrade(cmd *cobra.Command, args []string) {
 		oldRevision := revision + "-" + completeRevision
 		expectedRevision := vtap.Get("EXPECTED_REVISION").MustString()
 		if expectedRevision != "" {
-			fmt.Printf(
-				cmdFormat, vtap.Get("NAME").MustString(), oldRevision,
-				expectedRevision, vtap.Get("UPGRADE_PACKAGE").MustString(),
-			)
+			tableItems = append(tableItems, []string{
+				vtap.Get("NAME").MustString(),
+				oldRevision,
+				expectedRevision,
+				vtap.Get("UPGRADE_PACKAGE").MustString(),
+			})
 		}
 	}
+	t.AppendBulk(tableItems)
+	t.Render()
 }
 
 func listAgent(cmd *cobra.Command, args []string, output string) {
