@@ -956,6 +956,7 @@ vtap_group_id: g-xxxxxx
   #- MongoDB
   #- Kafka
   #- MQTT
+  #- AMQP
   #- OpenWire
   #- DNS
   #- TLS

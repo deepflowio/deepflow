@@ -206,6 +206,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "Kafka";
 	case PROTO_MQTT:
 		return "MQTT";
+	case PROTO_AMQP:
+		return "AMQP";
 	case PROTO_DUBBO:
 		return "Dubbo";
 	case PROTO_SOFARPC:
