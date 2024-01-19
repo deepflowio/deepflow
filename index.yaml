@@ -484,7 +484,7 @@ entries:
     version: 6.3.010
   - apiVersion: v2
     appVersion: 6.3.9
-    created: "2024-01-19T08:27:53.425288042Z"
+    created: "2024-01-19T08:36:37.58511361Z"
     dependencies:
     - condition: clickhouse.enabled
       name: clickhouse
@@ -503,7 +503,7 @@ entries:
       repository: https://grafana.github.io/helm-charts
       version: 7.*.*
     description: An automated observability platform for cloud-native developers.
-    digest: f81213fe1e721bf08f1ef23589659e907d5add22682058e5f3710ee0db5b2b15
+    digest: 728ad27a7eb7fa14a73fbff8579670124c0d85cca544b1982748ebef8d633545
     home: https://github.com/deepflowio/deepflow
     icon: https://raw.githubusercontent.com/deepflowio/deepflow-charts/main/deepflow.svg
     keywords:
@@ -4332,9 +4332,9 @@ entries:
     version: 6.3.010
   - apiVersion: v2
     appVersion: 6.3.9
-    created: "2024-01-19T08:27:53.522985714Z"
+    created: "2024-01-19T08:36:37.683476844Z"
     description: An automated observability platform for cloud-native developers.
-    digest: 4103ae888f2a992344c64b7febd4240b534c31f470d3eea3ff17aed9417c36d3
+    digest: 3cab2318062a9c3a2046af35ad494bc1d6e6c756c9265d65c99ebe5aa5cea309
     home: https://github.com/deepflowio/deepflow
     icon: https://raw.githubusercontent.com/deepflowio/deepflow-charts/main/deepflow.svg
     keywords:
@@ -6267,4 +6267,4 @@ entries:
     urls:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-0.1.030/deepflow-agent-0.1.030.tgz
     version: 0.1.030
-generated: "2024-01-19T08:36:00.754854421Z"
+generated: "2024-01-19T08:36:37.682728883Z"
