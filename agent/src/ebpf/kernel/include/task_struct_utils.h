@@ -138,6 +138,9 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		0xbd0, 0xbd8, 0xbe0, 0xbe8, 0xbf0, 0xbf8, 0xc00, 0xc08, 0xc10, 0xc18,
 		0xcc8, 0xa48, 0xc60
 	};
+#elif defined LINUX_VER_3_10_0
+	// 0x758 for 3.10.0-957, 3.10.0-1160 
+	int files_offset_array[] = { 0x758 };
 #else
 	// 0xd08 for kernel-devel-4.19.91-26.6.al7, 4.19.91-27.1.al7.x86_64
 	// 0x740 for 4.19.113-300.el7.x86_64
