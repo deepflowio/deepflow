@@ -390,6 +390,9 @@ static __inline void infer_sock_flags(void *sk,
 	// 0x238 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
 #ifdef LINUX_VER_KYLIN
 	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x220};
+#elif defined LINUX_VER_3_10_0
+	// 0x150 for 3.10.0-957, 3.10.0-1160
+	int sock_flags_offset_array[] = { 0x150 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x230 for OEL7.9 Linux 5.4.17
 	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x230, 0x238};
@@ -697,6 +700,20 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	 *     u32      snd_nxt;	    +8
 	 *     ...
 	 * }
+	 *
+	 * But linux 3.10.0 :
+	 * struct tcp_sock {
+	 *     ...
+	 *     u16	tcp_header_len;     -24
+	 *     ...
+	 *     u64	bytes_received;     -16
+	 *     ...
+	 *     u32	rcv_nxt;            -4
+	 *     u32	copied_seq;         0
+	 *     u32	rcv_wup;            +4
+	 *     u32      snd_nxt;	    +8
+	 *     ...
+	 * }
 	 */
 	__u32 rcv_nxt, rcv_wup, copied_seq;
 	__u16 tcp_header_len;
@@ -704,8 +721,11 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	bpf_probe_read(&copied_seq, sizeof(copied_seq), (void *)sk + offset);
 	bpf_probe_read(&rcv_nxt, sizeof(rcv_nxt), (void *)sk + offset - 4);
 	bpf_probe_read(&rcv_wup, sizeof(rcv_wup), (void *)sk + offset + 4);
+#ifdef LINUX_VER_3_10_0
+	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 24);
+#else
 	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 28);
-
+#endif
 	if (!(tcp_header_len >= 20 && tcp_header_len <= 60 && copied_seq != 0))
 		return 0;
 
@@ -729,6 +749,9 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				    0x544, 0x54c, 0x554, 0x55c, 0x564,
 				    0x56c, 0x574, 0x57c, 0x584, 0x58c,
 				    0x594, 0x59c, 0x5dc, 0x644, 0x65c};
+#elif defined LINUX_VER_3_10_0
+	// 0x560 for 3.10.0-957, 3.10.0-1160
+	int copied_seq_offsets[] = { 0x560 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x63c for OEL7.9 Linux 5.4.17
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
@@ -761,6 +784,9 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				   0x6ac, 0x6b4, 0x6bc, 0x6c4, 0x6cc, 0x6d4,
 				   0x6dc, 0x6ec, 0x6f4, 0x6fc, 0x704, 0x70c,
 				   0x714, 0x71c, 0x74c, 0x7b4, 0x7cc};
+#elif defined LINUX_VER_3_10_0
+	// 0x698 for 3.10.0-957, 3.10.0-1160
+	int write_seq_offsets[] = { 0x698 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x7bc for OEL7.9 Linux 5.4.17
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
@@ -1794,7 +1820,11 @@ TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 //static ssize_t do_writev(unsigned long fd, const struct iovec __user *vec,
 //			 unsigned long vlen, rwf_t flags)
 // ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+#ifdef LINUX_VER_3_10_0
+KPROG(sys_writev) (struct pt_regs* ctx) {
+#else
 KPROG(do_writev) (struct pt_regs* ctx) {
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
@@ -1829,7 +1859,11 @@ TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
+#ifdef LINUX_VER_3_10_0
+KPROG(sys_readv) (struct pt_regs* ctx) {
+#else
 KPROG(do_readv) (struct pt_regs* ctx) {
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
