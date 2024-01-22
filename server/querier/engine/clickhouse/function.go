@@ -324,10 +324,15 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		var innerFunction view.DefaultFunction
 		// Inner layer derivative
 		if f.IsDerivative {
+			args := []string{}
+			if len(f.DerivativeArgs) > 1 {
+				args = append(args, f.DerivativeArgs[1:]...)
+			}
 			innerFunction = view.DefaultFunction{
 				Name:           view.FUNCTION_DERIVATIVE,
 				Fields:         []view.Node{&view.Field{Value: f.Metrics.DBField}},
 				DerivativeArgs: f.DerivativeArgs,
+				Args:           args,
 			}
 		} else {
 			innerFunction = view.DefaultFunction{
