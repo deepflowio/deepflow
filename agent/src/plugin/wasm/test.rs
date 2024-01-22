@@ -166,9 +166,8 @@ fn test_wasm_http_req() {
         );
 
         assert_eq!(i.req.domain.as_str(), "rewrite domain");
-        assert_eq!(i.req.req_type.as_str(), "rewrite req type");
         assert_eq!(i.req.resource.as_str(), "rewrite resource");
-        assert_eq!(i.req.endpoint.as_str(), "rewrite endpoint");
+        assert_eq!(i.req.endpoint.as_str(), "/rewrite endpoint");
 
         let attr = i.ext_info.unwrap().attributes.unwrap();
 
