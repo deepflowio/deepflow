@@ -28,6 +28,7 @@ func (b *DataSet) AddSubDomain(dbItem *mysql.SubDomain, seq int) {
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
+		Name: dbItem.Name,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
 }
