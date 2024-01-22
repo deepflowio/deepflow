@@ -1820,6 +1820,7 @@ impl ConfigHandler {
             if candidate_config.tap_mode == TapMode::Local
                 && candidate_config.dispatcher.tap_interface_regex
                     != new_config.dispatcher.tap_interface_regex
+                && components.is_some()
             {
                 fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
                     for dispatcher in comp.dispatchers.iter() {

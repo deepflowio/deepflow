@@ -123,10 +123,12 @@ impl DispatcherFlavor {
     }
 
     fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
-        match self {
+        let e = match self {
             DispatcherFlavor::Local(d) => d.switch_recv_engine(config),
             _ => todo!(),
-        }
+        };
+        warn!("switch_recv_engine xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        return e;
     }
 }
 
@@ -148,11 +150,18 @@ impl Dispatcher {
     }
 
     pub fn start(&self) {
+        warn!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
+        warn!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
         self.terminated.store(false, Ordering::Relaxed);
+        warn!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
         let mut flavor = self.flavor.lock().unwrap().take().unwrap();
+        warn!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
         self.handle.lock().unwrap().replace(
             thread::Builder::new()
                 .name("dispatcher".to_owned())
@@ -162,6 +171,7 @@ impl Dispatcher {
                 })
                 .unwrap(),
         );
+        warn!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     }
 
     pub fn stop(&self) {
@@ -181,14 +191,31 @@ impl Dispatcher {
 
 impl Dispatcher {
     pub fn switch_recv_engine(&self, config: &DispatcherConfig) -> Result<()> {
+        warn!("switch_recv_engine .......................");
         self.stop();
-        self.flavor
-            .lock()
-            .unwrap()
-            .as_mut()
-            .ok_or(Error::DispatcherFlavorEmpty)?
-            .switch_recv_engine(config)?;
+        warn!("switch_recv_engine .......................");
+
+        let mut w_flavor = self.flavor.lock().unwrap();
+        warn!("switch_recv_engine .......................");
+
+        let o_flavor = w_flavor.as_mut().ok_or(Error::DispatcherFlavorEmpty)?;
+        warn!("switch_recv_engine .......................");
+
+        if let Err(e) = o_flavor.switch_recv_engine(config) {
+            warn!("switch_recv_engine ....................... {:?}", e);
+            return Err(e);
+        }
+        warn!("switch_recv_engine .......................");
+
+        // self.flavor
+        //     .lock()
+        //     .unwrap()
+        //     .as_mut()
+        //     .ok_or(Error::DispatcherFlavorEmpty)?
+        //     .switch_recv_engine(config)?;
         self.start();
+        warn!("switch_recv_engine .......................");
+
         Ok(())
     }
 }

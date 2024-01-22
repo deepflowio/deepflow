@@ -21,6 +21,7 @@ use std::str;
 use std::sync::atomic::Ordering;
 #[cfg(target_os = "linux")]
 use std::sync::Arc;
+use std::thread::sleep;
 use std::time::Duration;
 
 use arc_swap::access::Access;
@@ -89,6 +90,8 @@ impl LocalModeDispatcher {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
+            sleep(Duration::from_millis(100));
+            continue;
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
@@ -285,7 +288,9 @@ impl LocalModeDispatcher {
 
 impl LocalModeDispatcher {
     pub(super) fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
-        self.base.switch_recv_engine(config)
+        let e = self.base.switch_recv_engine(config);
+        warn!("switch_recv_engine xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        return e;
     }
 }
 
