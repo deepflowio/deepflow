@@ -288,6 +288,9 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 								continue
 							}
 							name := tagSlice[0].(string)
+							if name == "lb_listener" || name == "pod_ingress" {
+								continue
+							}
 							clientName := tagSlice[1].(string)
 							serverName := tagSlice[2].(string)
 							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]

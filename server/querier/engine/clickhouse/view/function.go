@@ -356,6 +356,10 @@ func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
 		buf.WriteString("_")
 		buf.WriteString(FormatField(arg))
 	}
+	if f.Condition != "" {
+		buf.WriteString("_")
+		buf.WriteString(FormatField(f.Condition))
+	}
 	return buf.String()
 }
 
