@@ -643,6 +643,7 @@ mod test {
             &p[0],
             log_cache.clone(),
             Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
             true,
             true,
@@ -658,6 +659,7 @@ mod test {
             &p[1],
             log_cache.clone(),
             Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
             true,
             true,
