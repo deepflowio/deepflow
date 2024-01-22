@@ -535,6 +535,7 @@ mod tests {
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
                 true,
                 true,
@@ -624,6 +625,7 @@ mod tests {
                     &*packet,
                     rrt_cache.clone(),
                     Default::default(),
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
                     true,
                     true,

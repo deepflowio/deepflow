@@ -89,6 +89,7 @@ pub(super) fn bench(c: &mut Criterion) {
                 &packets[0],
                 rrt_cache.clone(),
                 Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
                 true,
                 true,
@@ -97,6 +98,7 @@ pub(super) fn bench(c: &mut Criterion) {
                 &packets[1],
                 rrt_cache.clone(),
                 Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
                 true,
                 true,
