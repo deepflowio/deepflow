@@ -60,6 +60,7 @@ fn main() {
                 &packets[0],
                 log_cache.clone(),
                 Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
                 true,
                 true,
@@ -71,6 +72,7 @@ fn main() {
                 &packets[1],
                 log_cache.clone(),
                 Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
                 true,
                 true,
