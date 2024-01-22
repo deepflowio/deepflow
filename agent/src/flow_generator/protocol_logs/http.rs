@@ -582,32 +582,24 @@ impl L7ProtocolParserInterface for HttpLog {
                             param,
                             &mut info,
                         )?;
-                        if param.parse_log {
-                            if self.proto == L7Protocol::Http2
-                                && !config.http_endpoint_disabled
-                                && info.path.len() > 0
-                            {
-                                info.endpoint = Some(handle_endpoint(config, &info.path));
-                            }
-                            return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
-                        } else {
-                            return Ok(L7ParseResult::None);
-                        }
                     }
                     _ => self.parse_http_v2(payload, param, &mut info)?,
                 }
             }
             _ => unreachable!(),
         }
-        match self.proto {
-            L7Protocol::Http1 | L7Protocol::Http2 => {
-                if !config.http_endpoint_disabled && info.path.len() > 0 {
-                    info.endpoint = Some(handle_endpoint(config, &info.path));
-                }
-            }
-            _ => {}
-        }
         if param.parse_log {
+            if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
+                && !config.http_endpoint_disabled
+                && info.path.len() > 0
+            {
+                // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
+                let path = match info.endpoint.as_ref() {
+                    Some(p) if !p.is_empty() => p,
+                    _ => &info.path,
+                };
+                info.endpoint = Some(handle_endpoint(config, path));
+            }
             Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
         } else {
             Ok(L7ParseResult::None)
