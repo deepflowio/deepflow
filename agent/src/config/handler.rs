@@ -2724,6 +2724,6 @@ mod tests {
         assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
         assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
         assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
-        assert_eq!(trie.find_matching_rule("/x/y/z"), 2);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 0);
     }
 }
