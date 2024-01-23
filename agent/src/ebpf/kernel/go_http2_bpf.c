@@ -233,6 +233,7 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 	__u64 id = bpf_get_current_pid_tgid();
 	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
+	send_buffer->is_tls = is_http2_tls();
 	send_buffer->timestamp = bpf_ktime_get_ns();
 	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 
@@ -964,6 +965,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE;
+	send_buffer->is_tls = is_http2_tls();
 	send_buffer->direction = direction;
 	int tgid = pid_tgid >> 32;
 
@@ -973,7 +975,6 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 	send_buffer->tcp_seq = 0;
 	send_buffer->data_type = PROTO_HTTP2;
-
 	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(fd, offset);
 
