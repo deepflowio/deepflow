@@ -1503,13 +1503,7 @@ impl RuntimeEnvironment {
                 sys.name().unwrap_or_default(),
                 sys.os_version().unwrap_or_default()
             ),
-            kernel_version: sys
-                .kernel_version()
-                .unwrap_or_default()
-                .split('-')
-                .next()
-                .unwrap_or_default()
-                .into(),
+            kernel_version: sys.kernel_version().unwrap_or_default(),
         }
     }
 }
