@@ -6,14 +6,7 @@ Provides the Rust language interface.
 
 Currently support `x86_64` and `arm64` architectures.
 
-**Kernel version support:**
-- x86_64
-  - Linux 4.14+ (Recommend Linux 5.2+)
-- aarch64
-  - Linux 5.8+
-  - Centos8 Linux 4.18 
-  - EulerOS Linux5.10+
-  - KylinOS V10 SP3+ 4.19.90-52.25
+[Kernel version and feature support](https://github.com/deepflowio/docs/blob/main/docs/zh/02-ce-install/01-overview.md#%E8%BF%90%E8%A1%8C%E6%9D%83%E9%99%90%E5%8F%8A%E5%86%85%E6%A0%B8%E8%A6%81%E6%B1%82)
 
 # Protocol Tracing
 
@@ -32,6 +25,10 @@ The following protocols are currently probed:
 - KAFKA
 - MQTT
 - DNS
+- TLS(handshake)
+- MONGO
+- ORACLE
+- FASTCGI
 
 ## TLS/SSL Tracing
 

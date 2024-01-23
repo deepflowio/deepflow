@@ -32,11 +32,11 @@ else
 endif
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 
-ifeq ($(LINUX_VER_5_2_PLUS),1)
+ifeq ($(LINUX_VER_3_10_0),1)
+	EXTRA_EBPF_CLAGS = -DLINUX_VER_3_10_0
+else ifeq ($(LINUX_VER_5_2_PLUS),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_5_2_PLUS
-endif
-
-ifeq ($(LINUX_VER_KYLIN),1)
+else ifeq ($(LINUX_VER_KYLIN),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_KYLIN
 endif
 
