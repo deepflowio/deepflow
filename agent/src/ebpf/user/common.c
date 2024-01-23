@@ -564,7 +564,7 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
-int fetch_kernel_version(int *major, int *minor, int *patch)
+int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 {
 	struct utsname sys_info;
 
@@ -573,10 +573,10 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	if (access("/proc/version_signature", R_OK) == 0) {
 		FILE *f = fopen("/proc/version_signature", "r");
 		if (f) {
-			if (fscanf(f, "%*s %*s %d.%d.%d\n", major, minor, patch)
+			if (fscanf(f, "%*s %*s %d.%d.%d\n", major, minor, rev)
 			    != 3) {
 				fclose(f);
-				*major = *minor = *patch = 0;
+				*major = *minor = *rev = 0;
 				return ETR_INVAL;
 			}
 			fclose(f);
@@ -585,20 +585,21 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	}
 
 	uname(&sys_info);
-	if (sscanf(sys_info.release, "%u.%u.%u", major, minor, patch) != 3)
+
+	// e.g.: 3.10.0-940.el7.centos.x86_64, 4.19.17-1.el7.x86_64
+	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) != 4)
 		return ETR_INVAL;
 
 	// Get the real version of Debian
 	//#1 SMP Debian 4.19.289-2 (2023-08-08)
 	// # uname -v (4.19.117.bsk.business.1 SMP Debian 4.19.117.business.1 Wed)
 	if (strstr(sys_info.version, "Debian")) {
-		int num;
 		if ((sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
-			    major, minor, patch, &num) != 4) &&
+			    major, minor, rev, num) != 4) &&
 		    (sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u.%*s %*s",
-			    major, minor, patch) != 3) &&
+			    major, minor, rev) != 3) &&
 		    (sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
-			    major, minor, patch, &num) != 4)
+			    major, minor, rev, num) != 4)
 		    )
 			return ETR_INVAL;
 	}
@@ -647,8 +648,8 @@ void fetch_linux_release(const char *buf, int buf_len)
 unsigned int fetch_kernel_version_code(void)
 {
 	int ret;
-	int major, minor, patch;
-	ret = fetch_kernel_version(&major, &minor, &patch);
+	int major, minor, rev, num;
+	ret = fetch_kernel_version(&major, &minor, &rev, &num);
 	if (ret != ETR_OK) {
 		printf("fetch_kernel_version error\n");
 		return 0;
@@ -666,11 +667,11 @@ unsigned int fetch_kernel_version_code(void)
 	 * The solution is to determine the value of patch
 	 * and set it to 255 if it exceeds 255.
 	 */
-	if (patch > 255) {
-		patch = 255;
+	if (rev > 255) {
+		rev = 255;
 	}
 
-	return KERNEL_VERSION(major, minor, patch);
+	return KERNEL_VERSION(major, minor, rev);
 }
 
 static bool __is_process(int pid, bool is_user)
