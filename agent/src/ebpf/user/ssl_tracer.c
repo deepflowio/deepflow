@@ -30,6 +30,8 @@
 #include <string.h>
 #include <ctype.h>
 
+extern uint32_t k_version;
+
 struct ssl_process_create_event {
 	struct list_head list;
 	int pid;
@@ -87,12 +89,22 @@ struct bcc_elf_foreach_sym_payload {
 };
 
 // Lower version kernels do not support hooking so files in containers
-static int can_hook_openssl(void)
+static inline bool openssl_kern_check(void)
 {
-	static unsigned int kernel_version = 0;
-	if (!kernel_version)
-		kernel_version = fetch_kernel_version_code();
-	return kernel_version >= KERNEL_VERSION(4, 17, 0);
+	return ((k_version == KERNEL_VERSION(3, 10, 0))
+	    || (k_version >= KERNEL_VERSION(4, 17, 0)));
+}
+
+static inline bool openssl_process_check(int pid)
+{
+	char c_id[65];
+	memset(c_id, 0, sizeof(c_id));
+	// Linux 3.10.0 kernel does not support probing files in containers.
+	if ((k_version == KERNEL_VERSION(3, 10, 0)) &&
+	    (fetch_container_id(pid, c_id, sizeof(c_id)) == 0))
+		return false;
+
+	return true;
 }
 
 static int bcc_elf_foreach_sym_callback(const char *name, uint64_t addr,
@@ -320,11 +332,14 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	DIR *fddir = NULL;
 	int pid = 0;
 	char *path = NULL;
-	if (!can_hook_openssl())
-		return ETR_OK;
 
 	if (!is_feature_enabled(FEATURE_UPROBE_OPENSSL))
 		return ETR_OK;
+
+	if (!openssl_kern_check()) {
+		ebpf_warning("Uprobe openssl requires Linux version 4.17+ or Linux 3.10.0\n");
+		return ETR_OK;
+	}
 
 	init_list_head(&proc_events_list);
 	pthread_mutex_init(&proc_events_list_mutex, NULL);
@@ -338,8 +353,9 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	while ((entry = readdir(fddir))) {
 		if (entry->d_type != DT_DIR)
 			continue;
-
 		pid = atoi(entry->d_name);
+		if (!openssl_process_check(pid))
+			continue;
 		path = get_elf_path_by_pid(pid);
 		if (is_feature_matched(FEATURE_UPROBE_OPENSSL, path)) {
 			openssl_parse_and_register(pid, conf);
@@ -356,15 +372,12 @@ void ssl_process_exec(int pid)
 	struct bpf_tracer *tracer = NULL;
 	char *path = NULL;
 	int matched = false;
-	
+	if (!openssl_kern_check())
+		return;
 	path = get_elf_path_by_pid(pid);
 	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, path);
 	free(path);
-
 	if (!matched)
-		return;
-
-	if (!can_hook_openssl())
 		return;
 
 	tracer = find_bpf_tracer(SK_TRACER_NAME);
@@ -390,7 +403,7 @@ void ssl_process_exit(int pid)
 	if (!is_feature_enabled(FEATURE_UPROBE_OPENSSL))
 		return;
 
-	if (!can_hook_openssl())
+	if (!openssl_kern_check())
 		return;
 
 	tracer = find_bpf_tracer(SK_TRACER_NAME);
