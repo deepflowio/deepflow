@@ -2337,7 +2337,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_oracle_tns_message(infer_buf, count,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_POSTGRESQL;
+				inferred_message.protocol = PROTO_ORACLE;
 				return inferred_message;
 			}
 			break;
