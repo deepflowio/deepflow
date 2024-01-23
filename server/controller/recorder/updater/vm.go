@@ -67,6 +67,8 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	dbItem := &mysql.VM{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
+		IP:           cloudItem.IP,
+		Hostname:     cloudItem.Hostname,
 		UID:          cloudItem.Label,
 		State:        cloudItem.State,
 		HType:        cloudItem.HType,
@@ -102,6 +104,12 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	}
 	if diffBase.Label != cloudItem.Label {
 		updateInfo["label"] = cloudItem.Label
+	}
+	if diffBase.IP != cloudItem.IP {
+		updateInfo["ip"] = cloudItem.IP
+	}
+	if diffBase.Hostname != cloudItem.Hostname {
+		updateInfo["hostname"] = cloudItem.Hostname
 	}
 	if diffBase.State != cloudItem.State {
 		updateInfo["state"] = cloudItem.State

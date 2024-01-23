@@ -37,6 +37,7 @@ type Host struct {
 	Lcuuid       string `json:"lcuuid" binding:"required"`
 	Name         string `json:"name" binding:"required"`
 	IP           string `json:"ip" binding:"required"`
+	Hostname     string `json:"hostname"`
 	Type         int    `json:"type" binding:"required"`
 	HType        int    `json:"htype" binding:"required"`
 	VCPUNum      int    `json:"vcpu_num"`
@@ -50,6 +51,8 @@ type VM struct {
 	Lcuuid       string            `json:"lcuuid" binding:"required"`
 	Name         string            `json:"name" binding:"required"`
 	Label        string            `json:"label"`
+	IP           string            `json:"ip"`
+	Hostname     string            `json:"hostname"`
 	HType        int               `json:"htype" binding:"required"`
 	State        int               `json:"state" binding:"required"`
 	LaunchServer string            `json:"launch_server" binding:"required"`
@@ -343,6 +346,7 @@ type PodNode struct {
 	ServerType       int    `json:"server_type" binding:"required"`
 	State            int    `json:"state" binding:"required"`
 	IP               string `json:"ip" binding:"required"`
+	Hostname         string `json:"hostname"`
 	VCPUNum          int    `json:"vcpu_num"`
 	MemTotal         int    `json:"memory_total"`
 	PodClusterLcuuid string `json:"pod_cluster_lcuuid" binding:"required"`

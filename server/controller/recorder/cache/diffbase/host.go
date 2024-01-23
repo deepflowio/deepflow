@@ -32,6 +32,7 @@ func (b *DataSet) AddHost(dbItem *mysql.Host, seq int) {
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 		IP:           dbItem.IP,
+		Hostname:     dbItem.Hostname,
 		HType:        dbItem.HType,
 		VCPUNum:      dbItem.VCPUNum,
 		MemTotal:     dbItem.MemTotal,
@@ -49,6 +50,7 @@ type Host struct {
 	DiffBase
 	Name         string `json:"name"`
 	IP           string `json:"ip"`
+	Hostname     string `json:"hostname"`
 	HType        int    `json:"htype"`
 	VCPUNum      int    `json:"vcpu_num"`
 	MemTotal     int    `json:"mem_total"`
@@ -60,6 +62,7 @@ type Host struct {
 func (h *Host) Update(cloudItem *cloudmodel.Host) {
 	h.Name = cloudItem.Name
 	h.IP = cloudItem.IP
+	h.Hostname = cloudItem.Hostname
 	h.HType = cloudItem.HType
 	h.VCPUNum = cloudItem.VCPUNum
 	h.MemTotal = cloudItem.MemTotal

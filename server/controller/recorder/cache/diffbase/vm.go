@@ -32,6 +32,8 @@ func (b *DataSet) AddVM(dbItem *mysql.VM, seq int, toolDataSet *tool.DataSet) {
 		},
 		Name:         dbItem.Name,
 		Label:        dbItem.Label,
+		IP:           dbItem.IP,
+		Hostname:     dbItem.Hostname,
 		VPCLcuuid:    vpcLcuuid,
 		State:        dbItem.State,
 		HType:        dbItem.HType,
@@ -53,6 +55,8 @@ type VM struct {
 	DiffBase
 	Name         string            `json:"name"`
 	Label        string            `json:"label"`
+	IP           string            `json:"ip"`
+	Hostname     string            `json:"hostname"`
 	State        int               `json:"state"`
 	HType        int               `json:"htype"`
 	LaunchServer string            `json:"launch_server"`
@@ -65,6 +69,8 @@ type VM struct {
 func (v *VM) Update(cloudItem *cloudmodel.VM) {
 	v.Name = cloudItem.Name
 	v.Label = cloudItem.Label
+	v.IP = cloudItem.IP
+	v.Hostname = cloudItem.Hostname
 	v.State = cloudItem.State
 	v.HType = cloudItem.HType
 	v.LaunchServer = cloudItem.LaunchServer
