@@ -1823,10 +1823,6 @@ int running_socket_tracer(tracer_callback_t handle,
 	int buffer_sz;
 
 	if (check_kernel_version(4, 14) != 0) {
-		ebpf_warning
-		    ("[eBPF Kernel Adapt] Current linux %d.%d, not support, require Linux 4.14+\n",
-		     major, minor);
-
 		return -EINVAL;
 	}
 

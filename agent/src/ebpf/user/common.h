@@ -252,7 +252,7 @@ uint32_t get_sys_uptime(void);
 u64 get_sys_btime_msecs(void);
 u64 get_process_starttime(pid_t pid);
 int max_rlim_open_files_set(int num);
-int fetch_kernel_version(int *major, int *minor, int *patch);
+int fetch_kernel_version(int *major, int *minor, int *rev, int *num);
 unsigned int fetch_kernel_version_code(void);
 int get_num_possible_cpus(void);
 
