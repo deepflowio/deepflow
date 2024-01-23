@@ -155,6 +155,7 @@ type Host struct {
 	Alias          string    `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Description    string    `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION" mapstructure:"DESCRIPTION"`
 	IP             string    `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Hostname       string    `gorm:"column:hostname;type:char(64);default:''" json:"HOSTNAME" mapstructure:"HOSTNAME"`
 	HType          int       `gorm:"column:htype;type:int" json:"HTYPE" mapstructure:"HTYPE"`                                   // 1. Xen host 2. VMware host 3. KVM host 4. Public cloud host 5. Hyper-V
 	CreateMethod   int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	UserName       string    `gorm:"column:user_name;type:varchar(64);default:''" json:"USER_NAME" mapstructure:"USER_NAME"`
@@ -179,6 +180,8 @@ type VM struct {
 	Name           string            `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Alias          string            `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Label          string            `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
+	IP             string            `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Hostname       string            `gorm:"column:hostname;type:char(64);default:''" json:"HOSTNAME" mapstructure:"HOSTNAME"`
 	CreateMethod   int               `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int               `gorm:"column:htype;type:int;default:1" json:"HTYPE" mapstructure:"HTYPE"`                         // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string            `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER" mapstructure:"LAUNCH_SERVER"`
@@ -673,6 +676,7 @@ type PodNode struct {
 	ServerType     int    `gorm:"column:server_type;type:int;default:null" json:"SERVER_TYPE" mapstructure:"SERVER_TYPE"` // 1: Host 2: VM
 	State          int    `gorm:"column:state;type:int;default:1" json:"STATE" mapstructure:"STATE"`                      // 0: Exception 1: Normal
 	IP             string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Hostname       string `gorm:"column:hostname;type:char(64);default:''" json:"HOSTNAME" mapstructure:"HOSTNAME"`
 	VCPUNum        int    `gorm:"column:vcpu_num;type:int;default:0" json:"VCPU_NUM" mapstructure:"VCPU_NUM"`
 	MemTotal       int    `gorm:"column:mem_total;type:int;default:0" json:"MEM_TOTAL" mapstructure:"MEM_TOTAL"` // unit: M
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
