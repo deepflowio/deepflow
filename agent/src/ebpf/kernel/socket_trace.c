@@ -1243,6 +1243,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
+	v->is_tls = false;
 	v->pid = (__u32) bpf_get_current_pid_tgid();
 
 	// For blocking reads, there is a significant deviation between the
