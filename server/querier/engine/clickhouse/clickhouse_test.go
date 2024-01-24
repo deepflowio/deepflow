@@ -218,7 +218,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "select Avg(`rtt`) AS `Avg(rtt)`,Max(`byte`) AS `Max(byte)`,region_0 from vtap_flow_edge_port where `time` >= 60 AND `time` <= 180 group by region_0 limit 1",
-		output: "SELECT region_0, AVGIf(`_avg_rtt_sum/rtt_count`, `_avg_rtt_sum/rtt_count` > 0) AS `Avg(rtt)`, MAX(`_sum_byte`) AS `Max(byte)` FROM (SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, Avg(rtt_sum/rtt_count) AS `_avg_rtt_sum/rtt_count`, SUM(byte) AS `_sum_byte` FROM flow_metrics.`vtap_flow_edge_port` WHERE `time` >= 60 AND `time` <= 180 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `region_0` LIMIT 1",
+		output: "SELECT region_0, AVGIf(`_avg_rtt_sum/rtt_count`, `_avg_rtt_sum/rtt_count` > 0) AS `Avg(rtt)`, MAX(`_sum_byte`) AS `Max(byte)` FROM (SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, AvgIf(rtt_sum/rtt_count, rtt_sum/rtt_count > 0) AS `_avg_rtt_sum/rtt_count`, SUM(byte) AS `_sum_byte` FROM flow_metrics.`vtap_flow_edge_port` WHERE `time` >= 60 AND `time` <= 180 GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
 		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
