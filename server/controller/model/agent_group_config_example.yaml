@@ -956,6 +956,7 @@ vtap_group_id: g-xxxxxx
   #- MongoDB
   #- Kafka
   #- MQTT
+  #- OpenWire
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin
@@ -979,6 +980,7 @@ vtap_group_id: g-xxxxxx
     #"MongoDB": "1-65535"
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
+    #"OpenWire": "1-65535"
     #"DNS": "53,5353"
     #"TLS": "443"
 

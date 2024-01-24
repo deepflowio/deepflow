@@ -29,7 +29,9 @@ pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
 
 pub use dns::{DnsInfo, DnsLog};
-pub use mq::{AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
+pub use mq::{
+    AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog, OpenWireInfo, OpenWireLog,
+};
 use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
