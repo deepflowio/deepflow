@@ -21,20 +21,20 @@ import (
 )
 
 type ChAZ struct {
-	UpdaterBase[mysql.ChAZ, IDKey]
+	UpdaterComponent[mysql.ChAZ, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	updater := &ChAZ{
-		UpdaterBase[mysql.ChAZ, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_AZ,
-		},
+		newUpdaterComponent[mysql.ChAZ, IDKey](
+			RESOURCE_TYPE_CH_AZ,
+		),
 		domainLcuuidToIconID,
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

@@ -21,17 +21,17 @@ import (
 )
 
 type ChPrometheusMetricAPPLabelLayout struct {
-	UpdaterBase[mysql.ChPrometheusMetricAPPLabelLayout, IDKey]
+	UpdaterComponent[mysql.ChPrometheusMetricAPPLabelLayout, IDKey]
 }
 
 func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 	updater := &ChPrometheusMetricAPPLabelLayout{
-		UpdaterBase[mysql.ChPrometheusMetricAPPLabelLayout, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
-		},
+		newUpdaterComponent[mysql.ChPrometheusMetricAPPLabelLayout, IDKey](
+			RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
+		),
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

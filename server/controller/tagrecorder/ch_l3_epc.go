@@ -21,18 +21,18 @@ import (
 )
 
 type ChVPC struct {
-	UpdaterBase[mysql.ChVPC, IDKey]
+	UpdaterComponent[mysql.ChVPC, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	updater := &ChVPC{
-		UpdaterBase[mysql.ChVPC, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_VPC,
-		},
+		newUpdaterComponent[mysql.ChVPC, IDKey](
+			RESOURCE_TYPE_CH_VPC,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
