@@ -534,7 +534,7 @@ impl L7ProtocolParserInterface for HttpLog {
                         if param.direction == PacketDirection::ServerToClient {
                             return false;
                         }
-                        self.parse_http2_go_uprobe(
+                        self.check_http2_go_uprobe(
                             &config.l7_log_dynamic,
                             payload,
                             param,
@@ -542,7 +542,7 @@ impl L7ProtocolParserInterface for HttpLog {
                         )
                         .is_ok()
                     }
-                    _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
+                    _ => self.check_http_v2(payload, param, &mut info).is_ok(),
                 }
             }
             _ => unreachable!(),
@@ -710,7 +710,7 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
-    pub fn parse_http2_go_uprobe(
+    pub fn check_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
@@ -755,6 +755,19 @@ impl HttpLog {
                     .unwrap_or_default(),
             );
         }
+        info.version = Version::V2;
+        info.stream_id = Some(stream_id);
+        Ok(())
+    }
+
+    pub fn parse_http2_go_uprobe(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        param: &ParseParam,
+        info: &mut HttpInfo,
+    ) -> Result<()> {
+        self.check_http2_go_uprobe(config, payload, param, info)?;
 
         if info.is_req_end {
             self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -763,9 +776,6 @@ impl HttpLog {
             self.perf_stats.as_mut().map(|p| p.inc_resp());
         }
 
-        info.version = Version::V2;
-        info.stream_id = Some(stream_id);
-
         info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
             info.rrt = rrt;
         });
@@ -773,7 +783,7 @@ impl HttpLog {
         if info.is_req_end || info.is_resp_end {
             self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn parse_http_v1(
@@ -881,7 +891,7 @@ impl HttpLog {
         &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
-    fn parse_http_v2(
+    fn check_http_v2(
         &mut self,
         payload: &[u8],
         param: &ParseParam,
@@ -1017,11 +1027,14 @@ impl HttpLog {
         }
 
         if is_httpv2 {
+            info.version = Version::V2;
+            if info.stream_id.is_none() {
+                info.stream_id = Some(httpv2_header.stream_id);
+            }
             if direction == PacketDirection::ClientToServer {
                 if info.method.is_none() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_req());
                 info.req_content_length = content_length;
             } else {
                 if info.status_code == 0
@@ -1029,20 +1042,31 @@ impl HttpLog {
                 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
                 info.resp_content_length = content_length;
             }
-            info.version = Version::V2;
-            if info.stream_id.is_none() {
-                info.stream_id = Some(httpv2_header.stream_id);
-            }
-            info.cal_rrt(param, None).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
+    }
+
+    fn parse_http_v2(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        info: &mut HttpInfo,
+    ) -> Result<()> {
+        self.check_http_v2(payload, param, info)?;
+
+        if param.direction == PacketDirection::ClientToServer {
+            self.perf_stats.as_mut().map(|p| p.inc_req());
+        } else {
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
+        }
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+        });
+        Ok(())
     }
 
     fn on_header(
