@@ -905,7 +905,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 	selection := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS)}
 	if queryType == model.Range {
 		interval := queryReq.GetStep()
-		offset := queryReq.GetStart() % interval
+		offset := queryReq.GetStart()%interval + min_interval.Milliseconds()
 		selection[0] = fmt.Sprintf("time(time, %d, 1, '', %d) AS %s", interval/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS)
 	}
 
