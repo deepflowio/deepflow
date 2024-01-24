@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PodNamespace struct {
@@ -77,13 +78,16 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	return dbItem, true
 }
 
-func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.PodNamespaceFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
@@ -91,11 +95,9 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 			updateTags = cloudItem.CloudTags
 		}
 		tagsJson, _ := json.Marshal(updateTags)
-		updateInfo["cloud_tags"] = tagsJson
+		mapInfo["cloud_tags"] = tagsJson
+		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

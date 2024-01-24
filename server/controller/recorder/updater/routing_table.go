@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type RoutingTable struct {
@@ -67,20 +68,21 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
-func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.RoutingTableFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Destination != cloudItem.Destination {
-		updateInfo["destination"] = cloudItem.Destination
+		mapInfo["destination"] = cloudItem.Destination
+		structInfo.Destination.Set(diffBase.Destination, cloudItem.Destination)
 	}
 	if diffBase.NexthopType != cloudItem.NexthopType {
-		updateInfo["nexthop_type"] = cloudItem.NexthopType
+		mapInfo["nexthop_type"] = cloudItem.NexthopType
+		structInfo.NexthopType.Set(diffBase.NexthopType, cloudItem.NexthopType)
 	}
 	if diffBase.Nexthop != cloudItem.Nexthop {
-		updateInfo["nexthop"] = cloudItem.Nexthop
+		mapInfo["nexthop"] = cloudItem.Nexthop
+		structInfo.Nexthop.Set(diffBase.Nexthop, cloudItem.Nexthop)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

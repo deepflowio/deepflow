@@ -76,6 +76,6 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
-func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (map[string]interface{}, bool) {
-	return nil, false
+func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (interface{}, map[string]interface{}, bool) {
+	return nil, nil, false
 }

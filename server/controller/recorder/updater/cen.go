@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type CEN struct {
@@ -72,10 +73,12 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.CENFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if !rcommon.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
 		vpcIDs := []int{}
@@ -90,11 +93,10 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 			}
 			vpcIDs = append(vpcIDs, vpcID)
 		}
-		updateInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
+		mapInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
+		structInfo.VPCIDs.SetNew(vpcIDs)
+		structInfo.VPCLcuuids.Set(diffBase.VPCLcuuids, cloudItem.VPCLcuuids)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

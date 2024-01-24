@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type RedisInstance struct {
@@ -74,26 +75,29 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 	return dbItem, true
 }
 
-func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.RedisInstanceFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.State != cloudItem.State {
-		updateInfo["state"] = cloudItem.State
+		mapInfo["state"] = cloudItem.State
+		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
 	if diffBase.PublicHost != cloudItem.PublicHost {
-		updateInfo["public_host"] = cloudItem.PublicHost
+		mapInfo["public_host"] = cloudItem.PublicHost
+		structInfo.PublicHost.Set(diffBase.PublicHost, cloudItem.PublicHost)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }
