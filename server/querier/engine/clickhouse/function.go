@@ -355,8 +355,9 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		// When using avg, max, and min operators. The inner layer uses itself
 		if slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 			innerFunction = view.DefaultFunction{
-				Name:   f.Name,
-				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Name:       f.Name,
+				Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				IgnoreZero: true,
 			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
