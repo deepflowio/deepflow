@@ -371,6 +371,16 @@ func extractSubFunctionFromPath(p []parser.Node) []functionCall {
 		case *parser.Call:
 			// Call: rate/delta/increase/x_over_time...
 			f := functionCall{Name: n.Func.Name, Range: evalRange}
+			if n.Args != nil {
+				// for quantile_over_time
+				for _, subE := range n.Args {
+					val := extractValFromSubNode(subE)
+					if val > 0 {
+						f.Param = val
+						break
+					}
+				}
+			}
 			evalRange = 0
 			funcs = append(funcs, f)
 		case *parser.MatrixSelector:
@@ -381,6 +391,19 @@ func extractSubFunctionFromPath(p []parser.Node) []functionCall {
 		}
 	}
 	return funcs
+}
+
+func extractValFromSubNode(expr parser.Expr) float64 {
+	switch n := expr.(type) {
+	case *parser.UnaryExpr:
+		return extractValFromSubNode(n.Expr)
+	case *parser.StepInvariantExpr:
+		return extractValFromSubNode(n.Expr)
+	case *parser.NumberLiteral:
+		return n.Val
+	default:
+		return 0
+	}
 }
 
 // get the inner function of <VectorSelector>
