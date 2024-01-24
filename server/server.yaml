@@ -560,7 +560,7 @@ ingester:
   ## export to OTLP collector, now only support protocol 'grpc'
 #  exporters:
 #    - name: default otlp exporter
-#      type: otlp-exporter
+#      exporter_type: otlp-exporter
 #      otlp-exporter:
 #        enabled: false
 #        addr: 127.0.0.1:4317 # grpc protobuf addr
