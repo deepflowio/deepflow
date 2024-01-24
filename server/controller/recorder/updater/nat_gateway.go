@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type NATGateway struct {
@@ -71,20 +72,21 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.NATGatewayFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.FloatingIPs != cloudItem.FloatingIPs {
-		updateInfo["floating_ips"] = cloudItem.FloatingIPs
+		mapInfo["floating_ips"] = cloudItem.FloatingIPs
+		structInfo.FloatingIPs.Set(diffBase.FloatingIPs, cloudItem.FloatingIPs)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

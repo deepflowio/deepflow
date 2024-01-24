@@ -17,6 +17,8 @@
 package message
 
 import (
+	"time"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
@@ -202,6 +204,7 @@ type HostFieldsUpdate struct {
 	VCPUNum      fieldDetail[int]
 	MemTotal     fieldDetail[int]
 	ExtraInfo    fieldDetail[string]
+	Hostname     fieldDetail[string]
 	AZLcuuid     fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
 }
@@ -216,11 +219,13 @@ type HostUpdate struct {
 type VMFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	IP           fieldDetail[string]
 	Label        fieldDetail[string]
 	State        fieldDetail[int]
 	HType        fieldDetail[int]
 	LaunchServer fieldDetail[string]
 	CloudTags    fieldDetail[map[string]string]
+	Hostname     fieldDetail[string]
 	VPCID        fieldDetail[int]
 	VPCLcuuid    fieldDetail[string]
 	AZLcuuid     fieldDetail[string]
@@ -519,4 +524,278 @@ type LBTargetServerUpdate struct {
 	CloudItem[cloudmodel.LBTargetServer]
 	DiffBase[*diffbase.LBTargetServer]
 	MySQLData[mysql.LBTargetServer]
+}
+
+type LBVMConnectionFieldsUpdate struct {
+	Key
+}
+type LBVMConnectionUpdate struct {
+	Fields[LBVMConnectionFieldsUpdate]
+	CloudItem[cloudmodel.LBVMConnection]
+	DiffBase[*diffbase.LBVMConnection]
+	MySQLData[mysql.LBVMConnection]
+}
+
+type PeerConnectionFieldsUpdate struct {
+	Key
+	Name               fieldDetail[string]
+	RemoteRegionID     fieldDetail[int]
+	RemoteRegionLcuuid fieldDetail[string]
+	LocalRegionID      fieldDetail[int]
+	LocalRegionLcuuid  fieldDetail[string]
+}
+type PeerConnectionUpdate struct {
+	Fields[PeerConnectionFieldsUpdate]
+	CloudItem[cloudmodel.PeerConnection]
+	DiffBase[*diffbase.PeerConnection]
+	MySQLData[mysql.PeerConnection]
+}
+
+type CENFieldsUpdate struct {
+	Key
+	Name       fieldDetail[string]
+	VPCIDs     fieldDetail[[]int]
+	VPCLcuuids fieldDetail[[]string]
+}
+type CENUpdate struct {
+	Fields[CENFieldsUpdate]
+	CloudItem[cloudmodel.CEN]
+	DiffBase[*diffbase.CEN]
+	MySQLData[mysql.CEN]
+}
+
+type RDSInstanceFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	State        fieldDetail[int]
+	Series       fieldDetail[int]
+	Model        fieldDetail[int]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type RDSInstanceUpdate struct {
+	Fields[RDSInstanceFieldsUpdate]
+	CloudItem[cloudmodel.RDSInstance]
+	DiffBase[*diffbase.RDSInstance]
+	MySQLData[mysql.RDSInstance]
+}
+
+type RedisInstanceFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	State        fieldDetail[int]
+	PublicHost   fieldDetail[string]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type RedisInstanceUpdate struct {
+	Fields[RedisInstanceFieldsUpdate]
+	CloudItem[cloudmodel.RedisInstance]
+	DiffBase[*diffbase.RedisInstance]
+	MySQLData[mysql.RedisInstance]
+}
+
+type PodClusterFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	ClusterName  fieldDetail[string]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodClusterUpdate struct {
+	Fields[PodClusterFieldsUpdate]
+	CloudItem[cloudmodel.PodCluster]
+	DiffBase[*diffbase.PodCluster]
+	MySQLData[mysql.PodCluster]
+}
+
+type PodNamespaceFieldsUpdate struct {
+	Key
+	CloudTags    fieldDetail[map[string]string]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodNamespaceUpdate struct {
+	Fields[PodNamespaceFieldsUpdate]
+	CloudItem[cloudmodel.PodNamespace]
+	DiffBase[*diffbase.PodNamespace]
+	MySQLData[mysql.PodNamespace]
+}
+
+type PodNodeFieldsUpdate struct {
+	Key
+	Type         fieldDetail[int]
+	State        fieldDetail[int]
+	Hostname     fieldDetail[string]
+	VCPUNum      fieldDetail[int]
+	MemTotal     fieldDetail[int]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodNodeUpdate struct {
+	Fields[PodNodeFieldsUpdate]
+	CloudItem[cloudmodel.PodNode]
+	DiffBase[*diffbase.PodNode]
+	MySQLData[mysql.PodNode]
+}
+
+type PodIngressFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodIngressUpdate struct {
+	Fields[PodIngressFieldsUpdate]
+	CloudItem[cloudmodel.PodIngress]
+	DiffBase[*diffbase.PodIngress]
+	MySQLData[mysql.PodIngress]
+}
+
+type PodIngressRuleFieldsUpdate struct {
+	Key
+}
+type PodIngressRuleUpdate struct {
+	Fields[PodIngressRuleFieldsUpdate]
+	CloudItem[cloudmodel.PodIngressRule]
+	DiffBase[*diffbase.PodIngressRule]
+	MySQLData[mysql.PodIngressRule]
+}
+
+type PodIngressRuleBackendFieldsUpdate struct {
+	Key
+}
+type PodIngressRuleBackendUpdate struct {
+	Fields[PodIngressRuleBackendFieldsUpdate]
+	CloudItem[cloudmodel.PodIngressRuleBackend]
+	DiffBase[*diffbase.PodIngressRuleBackend]
+	MySQLData[mysql.PodIngressRuleBackend]
+}
+
+type PodServiceFieldsUpdate struct {
+	Key
+	Name             fieldDetail[string]
+	Label            fieldDetail[string]
+	Annotation       fieldDetail[string]
+	Selector         fieldDetail[string]
+	ServiceClusterIP fieldDetail[string]
+	PodIngressID     fieldDetail[int]
+	PodIngressLcuuid fieldDetail[string]
+	AZLcuuid         fieldDetail[string]
+	RegionLcuuid     fieldDetail[string]
+}
+type PodServiceUpdate struct {
+	Fields[PodServiceFieldsUpdate]
+	CloudItem[cloudmodel.PodService]
+	DiffBase[*diffbase.PodService]
+	MySQLData[mysql.PodService]
+}
+
+type PodServicePortFieldsUpdate struct {
+	Key
+	Name fieldDetail[string]
+}
+type PodServicePortUpdate struct {
+	Fields[PodServicePortFieldsUpdate]
+	CloudItem[cloudmodel.PodServicePort]
+	DiffBase[*diffbase.PodServicePort]
+	MySQLData[mysql.PodServicePort]
+}
+
+type PodGroupFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	Label        fieldDetail[string]
+	Type         fieldDetail[int]
+	PodNum       fieldDetail[int]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodGroupUpdate struct {
+	Fields[PodGroupFieldsUpdate]
+	CloudItem[cloudmodel.PodGroup]
+	DiffBase[*diffbase.PodGroup]
+	MySQLData[mysql.PodGroup]
+}
+
+type PodGroupPortFieldsUpdate struct {
+	Key
+	Name fieldDetail[string]
+}
+type PodGroupPortUpdate struct {
+	Fields[PodGroupPortFieldsUpdate]
+	CloudItem[cloudmodel.PodGroupPort]
+	DiffBase[*diffbase.PodGroupPort]
+	MySQLData[mysql.PodGroupPort]
+}
+
+type PodReplicaSetFieldsUpdate struct {
+	Key
+	Name         fieldDetail[string]
+	Label        fieldDetail[string]
+	PodNum       fieldDetail[int]
+	AZLcuuid     fieldDetail[string]
+	RegionLcuuid fieldDetail[string]
+}
+type PodReplicaSetUpdate struct {
+	Fields[PodReplicaSetFieldsUpdate]
+	CloudItem[cloudmodel.PodReplicaSet]
+	DiffBase[*diffbase.PodReplicaSet]
+	MySQLData[mysql.PodReplicaSet]
+}
+
+type PodFieldsUpdate struct {
+	Key
+	Name                fieldDetail[string]
+	Label               fieldDetail[string]
+	State               fieldDetail[int]
+	Annotation          fieldDetail[string]
+	ENV                 fieldDetail[string]
+	ContainerIDs        fieldDetail[string]
+	CreatedAt           fieldDetail[time.Time]
+	PodGroupID          fieldDetail[int]
+	PodGroupLcuuid      fieldDetail[string]
+	PodReplicaSetID     fieldDetail[int]
+	PodReplicaSetLcuuid fieldDetail[string]
+	PodNodeID           fieldDetail[int]
+	PodNodeLcuuid       fieldDetail[string]
+	VPCID               fieldDetail[int]
+	VPCLcuuid           fieldDetail[string]
+	AZLcuuid            fieldDetail[string]
+	RegionLcuuid        fieldDetail[string]
+}
+type PodUpdate struct {
+	Fields[PodFieldsUpdate]
+	CloudItem[cloudmodel.Pod]
+	DiffBase[*diffbase.Pod]
+	MySQLData[mysql.Pod]
+}
+
+type ProcessFieldsUpdate struct {
+	Key
+	Name        fieldDetail[string]
+	ContainerID fieldDetail[string]
+	OSAPPTags   fieldDetail[string]
+}
+type ProcessUpdate struct {
+	Fields[ProcessFieldsUpdate]
+	CloudItem[cloudmodel.Process]
+	DiffBase[*diffbase.Process]
+	MySQLData[mysql.Process]
+}
+
+type PrometheusTargetFieldsUpdate struct {
+	Key
+	Name        fieldDetail[string]
+	Job         fieldDetail[string]
+	ScrapeURL   fieldDetail[string]
+	OtherLabels fieldDetail[string]
+	VPCID       fieldDetail[int]
+	VPCLcuuid   fieldDetail[string]
+}
+type PrometheusTargetUpdate struct {
+	Fields[PrometheusTargetFieldsUpdate]
+	CloudItem[cloudmodel.PrometheusTarget]
+	DiffBase[*diffbase.PrometheusTarget]
+	MySQLData[mysql.PrometheusTarget]
 }

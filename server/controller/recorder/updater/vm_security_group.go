@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VMSecurityGroup struct {
@@ -75,14 +76,13 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 	return dbItem, true
 }
 
-func (v *VMSecurityGroup) generateUpdateInfo(diffBase *diffbase.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (v *VMSecurityGroup) generateUpdateInfo(diffBase *diffbase.VMSecurityGroup, cloudItem *cloudmodel.VMSecurityGroup) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.VMSecurityGroupFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {
-		updateInfo["priority"] = cloudItem.Priority
+		mapInfo["priority"] = cloudItem.Priority
+		structInfo.Priority.Set(diffBase.Priority, cloudItem.Priority)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }
