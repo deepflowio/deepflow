@@ -360,7 +360,7 @@ impl L7ProtocolParserInterface for HttpLog {
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe => {
                         self.parsed = self
-                            .parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param)
+                            .check_http2_go_uprobe(&config.l7_log_dynamic, payload, param)
                             .is_ok();
                         self.parsed
                     }
@@ -497,7 +497,7 @@ impl HttpLog {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
-        self.parsed = self.parse_http_v2(payload, param).is_ok();
+        self.parsed = self.check_http_v2(payload, param).is_ok();
         self.parsed
     }
 
@@ -533,7 +533,7 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
-    pub fn parse_http2_go_uprobe(
+    pub fn check_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
@@ -577,6 +577,19 @@ impl HttpLog {
                     .unwrap_or_default(),
             );
         }
+        self.info.version = String::from("2");
+        self.info.stream_id = Some(stream_id);
+
+        Ok(())
+    }
+
+    pub fn parse_http2_go_uprobe(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<()> {
+        self.check_http2_go_uprobe(config, payload, param)?;
 
         if self.info.is_req_end {
             self.perf_stats.as_mut().unwrap().inc_req();
@@ -592,9 +605,7 @@ impl HttpLog {
             });
         }
 
-        self.info.version = String::from("2");
-        self.info.stream_id = Some(stream_id);
-        return Ok(());
+        Ok(())
     }
 
     pub fn parse_http_v1(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
@@ -686,7 +697,7 @@ impl HttpLog {
         &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
-    fn parse_http_v2(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
+    fn check_http_v2(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
         let (direction, config) = (
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
@@ -805,7 +816,6 @@ impl HttpLog {
                 if check_http_method(&self.info.method).is_err() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().unwrap().inc_req();
                 self.info.req_content_length = content_length;
             } else {
                 if let Some(code) = self.info.status_code {
@@ -816,20 +826,31 @@ impl HttpLog {
                 } else {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().unwrap().inc_resp();
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
             if self.info.stream_id.is_none() {
                 self.info.stream_id = Some(httpv2_header.stream_id);
             }
-            self.info.cal_rrt(param, None).map(|rrt| {
-                self.info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-            });
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
+    }
+
+    fn parse_http_v2(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
+        self.check_http_v2(payload, param)?;
+
+        if param.direction == PacketDirection::ClientToServer {
+            self.perf_stats.as_mut().unwrap().inc_req();
+        } else {
+            self.perf_stats.as_mut().unwrap().inc_resp();
+        }
+
+        self.info.cal_rrt(param, None).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
+        Ok(())
     }
 
     fn on_header(
