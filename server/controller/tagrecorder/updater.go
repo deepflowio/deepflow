@@ -34,7 +34,7 @@ type ChResourceUpdater interface {
 	SetConfig(cfg config.TagRecorderConfig)
 }
 
-type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
+type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 	// 根据db中的基础资源数据，构建最新的ch资源数据
 	generateNewData() (map[KT]MT, bool)
 	// 构建ch资源的结构体key
@@ -43,18 +43,32 @@ type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 	generateUpdateInfo(MT, MT) (map[string]interface{}, bool)
 }
 
-type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
+type UpdaterComponent[MT MySQLChModel, KT ChModelKey] struct {
 	cfg              config.TagRecorderConfig
 	resourceTypeName string
-	dataGenerator    DataGenerator[MT, KT]
+	updaterDG        updaterDataGenerator[MT, KT]
+	dbOperator       operator[MT, KT]
 }
 
-func (b *UpdaterBase[MT, KT]) SetConfig(cfg config.TagRecorderConfig) {
+func newUpdaterComponent[MT MySQLChModel, KT ChModelKey](resourceTypeName string) UpdaterComponent[MT, KT] {
+	u := UpdaterComponent[MT, KT]{
+		resourceTypeName: resourceTypeName,
+	}
+	u.initDBOperator()
+	return u
+}
+
+func (b *UpdaterComponent[MT, KT]) SetConfig(cfg config.TagRecorderConfig) {
 	b.cfg = cfg
+	b.dbOperator.setConfig(cfg)
 }
 
-func (b *UpdaterBase[MT, KT]) Refresh() bool {
-	newKeyToDBItem, newOK := b.dataGenerator.generateNewData()
+func (b *UpdaterComponent[MT, KT]) initDBOperator() {
+	b.dbOperator = newOperator[MT, KT](b.resourceTypeName)
+}
+
+func (b *UpdaterComponent[MT, KT]) Refresh() bool {
+	newKeyToDBItem, newOK := b.updaterDG.generateNewData()
 	oldKeyToDBItem, oldOK := b.generateOldData()
 	keysToAdd := []KT{}
 	itemsToAdd := []MT{}
@@ -68,15 +82,15 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 				keysToAdd = append(keysToAdd, key)
 				itemsToAdd = append(itemsToAdd, newDBItem)
 			} else {
-				updateInfo, ok := b.dataGenerator.generateUpdateInfo(oldDBItem, newDBItem)
+				updateInfo, ok := b.updaterDG.generateUpdateInfo(oldDBItem, newDBItem)
 				if ok {
-					b.update(oldDBItem, updateInfo, key)
+					b.dbOperator.update(oldDBItem, updateInfo, key)
 					isUpdate = true
 				}
 			}
 		}
 		if len(itemsToAdd) > 0 {
-			b.operateBatch(keysToAdd, itemsToAdd, b.add)
+			b.dbOperator.batchPage(keysToAdd, itemsToAdd, b.dbOperator.add)
 		}
 
 		for key, oldDBItem := range oldKeyToDBItem {
@@ -87,7 +101,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 			}
 		}
 		if len(itemsToDelete) > 0 {
-			b.operateBatch(keysToDelete, itemsToDelete, b.delete)
+			b.dbOperator.batchPage(keysToDelete, itemsToDelete, b.dbOperator.delete)
 		}
 
 		if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 && !isUpdate {
@@ -97,7 +111,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 					updateTimeInfo := make(map[string]interface{})
 					now := time.Now()
 					updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
-					b.update(updateDBItem, updateTimeInfo, key)
+					b.dbOperator.update(updateDBItem, updateTimeInfo, key)
 				}
 			}
 		}
@@ -108,7 +122,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 	return false
 }
 
-func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
+func (b *UpdaterComponent[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	var items []MT
 	var err error
 	if b.resourceTypeName == RESOURCE_TYPE_CH_GPROCESS {
@@ -122,12 +136,12 @@ func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	}
 	idToItem := make(map[KT]MT)
 	for _, item := range items {
-		idToItem[b.dataGenerator.generateKey(item)] = item
+		idToItem[b.updaterDG.generateKey(item)] = item
 	}
 	return idToItem, true
 }
 
-func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
+func (b *UpdaterComponent[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	var items []MT
 	err := mysql.Db.Unscoped().First(&items).Error
 	if err != nil {
@@ -136,61 +150,7 @@ func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	}
 	idToItem := make(map[KT]MT)
 	for _, item := range items {
-		idToItem[b.dataGenerator.generateKey(item)] = item
+		idToItem[b.updaterDG.generateKey(item)] = item
 	}
 	return idToItem, true
-}
-
-func (b *UpdaterBase[MT, KT]) operateBatch(keys []KT, items []MT, operateFunc func([]KT, []MT)) {
-	count := len(items)
-	offset := b.cfg.MySQLBatchSize
-	var pages int
-	if count%offset == 0 {
-		pages = count / offset
-	} else {
-		pages = count/offset + 1
-	}
-	for i := 0; i < pages; i++ {
-		start := i * offset
-		end := (i + 1) * offset
-		if end > count {
-			end = count
-		}
-		operateFunc(keys[start:end], items[start:end])
-	}
-}
-
-func (b *UpdaterBase[MT, KT]) add(keys []KT, dbItems []MT) {
-	err := mysql.Db.Create(&dbItems).Error
-	if err != nil {
-		for i := range keys {
-			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
-		return
-	}
-	for i := range keys {
-		log.Infof("add %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
-}
-
-func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
-	err := mysql.Db.Model(&oldDBItem).Updates(updateInfo).Error
-	if err != nil {
-		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error())
-		return
-	}
-	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
-}
-
-func (b *UpdaterBase[MT, KT]) delete(keys []KT, dbItems []MT) {
-	err := mysql.Db.Delete(&dbItems).Error
-	if err != nil {
-		for i := range keys {
-			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
-		return
-	}
-	for i := range keys {
-		log.Infof("delete %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
 }
