@@ -453,8 +453,8 @@ func (q *Query) GetAgentDispatcher(domainPrefix string, dataDuration int) (map[s
 	db := "deepflow_system"
 	now := time.Now()
 	before := now.UTC().Add(time.Second * -1 * time.Duration(dataDuration))
-	sql := fmt.Sprintf("select `tag.host`, Sum(`metrics.rx_bytes`) AS `Sum(metrics.rx_bytes)` from deepflow_agent_dispatcher"+
-		" where `time`>%d and `time`<%d group by tag.host", before.Unix(), now.Unix())
+	sql := fmt.Sprintf("SELECT `tag.host`, Sum(`metrics.tx-bytes`) AS `tx-bps` FROM deepflow_agent_collect_sender"+
+		" WHERE `time`>%d AND `time`<%d GROUP BY tag.host", before.Unix(), now.Unix())
 	values.Add("db", db)
 	values.Add("sql", sql)
 	t := time.Now()
@@ -483,7 +483,7 @@ func (q *Query) GetAgentDispatcher(domainPrefix string, dataDuration int) (map[s
 // column name
 const (
 	tagHost = "tag.host"
-	rxBytes = "Sum(metrics.rx_bytes)"
+	txBPS   = "tx-bps"
 )
 
 // parseBody parse query api response body to vtapNameToTraffic(map[string]int64).
