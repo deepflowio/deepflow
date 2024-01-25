@@ -203,15 +203,15 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TunnelIPID), 10))
 	}
 	if t.Code&TAPPort != 0 {
-		offset += copy(b[offset:], ",tap_port=")
+		offset += copy(b[offset:], ",capture_nic=")
 		offset += putTAPPort(b[offset:], uint64(t.TAPPort))
 	}
 	if t.Code&TAPType != 0 {
-		offset += copy(b[offset:], ",tap_type=")
+		offset += copy(b[offset:], ",capture_network_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
 	}
 	if t.Code&VTAPID != 0 {
-		offset += copy(b[offset:], ",vtap_id=")
+		offset += copy(b[offset:], ",agent_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VTAPID), 10))
 	}
 

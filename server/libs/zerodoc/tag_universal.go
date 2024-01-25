@@ -78,7 +78,7 @@ func GenUniversalTagColumns(columns []*ckdb.Column) []*ckdb.Column {
 	//columns = append(columns, ckdb.NewColumnWithGroupBy("signal_source", ckdb.UInt16).SetComment("信号源"))
 	columns = append(columns, ckdb.NewColumnWithGroupBy("service_id", ckdb.UInt32).SetComment("ip对应的服务ID"))
 	columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID(0: 未找到)"))
-	columns = append(columns, ckdb.NewColumnWithGroupBy("vtap_id", ckdb.UInt16).SetComment("采集器的ID"))
+	columns = append(columns, ckdb.NewColumnWithGroupBy("agent_id", ckdb.UInt16).SetComment("采集器的ID"))
 
 	return columns
 }

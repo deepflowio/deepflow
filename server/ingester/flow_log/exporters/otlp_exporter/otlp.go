@@ -208,11 +208,11 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	if dataTypeBits&config.CAPTURE_INFO != 0 {
 		putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
-		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
-		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_type", tapPortTypeToString(l7.TapPortType))
-		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_name", tags0.TapPortName)
-		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", tapSideToName(l7.TapSide))
-		putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
+		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic", datatype.TapPort(l7.TapPort).String())
+		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_type", tapPortTypeToString(l7.TapPortType))
+		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_name", tags0.TapPortName)
+		putStrWithoutEmpty(resAttrs, "df.capture_info.observation_point", tapSideToName(l7.TapSide))
+		putStrWithoutEmpty(resAttrs, "df.capture_info.agent", tags0.Vtap)
 	}
 
 	if dataTypeBits&config.NETWORK_LAYER != 0 {

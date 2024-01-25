@@ -177,7 +177,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetComment("采集器ID"),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("采集器ID"),
 		ckdb.NewColumn("subnet_id", ckdb.UInt16),
 		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
 		ckdb.NewColumn("ip4", ckdb.IPv4),

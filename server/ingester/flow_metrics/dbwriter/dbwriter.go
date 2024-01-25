@@ -67,11 +67,11 @@ func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, t
 	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
 		counterName := "metrics_1m"
-		if table.ID >= uint8(zerodoc.VTAP_FLOW_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
+		if table.ID >= uint8(zerodoc.NETWORK_1S) && table.ID <= uint8(zerodoc.NETWORK_MAP_1S) {
 			counterName = "metrics_1s"
-		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
+		} else if table.ID >= uint8(zerodoc.APPLICATION_1S) && table.ID <= uint8(zerodoc.APPLICATION_MAP_1S) {
 			counterName = "app_1s"
-		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1M) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1M) {
+		} else if table.ID >= uint8(zerodoc.APPLICATION_1M) && table.ID <= uint8(zerodoc.APPLICATION_MAP_1M) {
 			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(addrs, user, password, counterName, timeZone, table,
@@ -90,7 +90,7 @@ func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, t
 }
 
 func (w *CkDbWriter) Put(items ...interface{}) error {
-	caches := [zerodoc.VTAP_TABLE_ID_MAX][]interface{}{}
+	caches := [zerodoc.METRICS_TABLE_ID_MAX][]interface{}{}
 	for i := range caches {
 		caches[i] = make([]interface{}, 0, CACHE_SIZE)
 	}
@@ -203,8 +203,8 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 			continue
 		}
 
-		// 只处理 VTAP_APP_EDGE_PORT_1S 这张表
-		if id != uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
+		// 只处理 APPLICATION_MAP_1S 这张表
+		if id != uint8(zerodoc.APPLICATION_MAP_1S) {
 			doc.Release()
 			continue
 		}

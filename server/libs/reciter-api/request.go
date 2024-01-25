@@ -298,11 +298,11 @@ const (
 	TAG_ACL_GID     TagName = "acl_gid"
 	TAG_PROTOCOL    TagName = "protocol"
 	TAG_SERVER_PORT TagName = "server_port"
-	TAG_TAP_PORT    TagName = "tap_port"
-	TAG_TAP_TYPE    TagName = "tap_type"
+	TAG_TAP_PORT    TagName = "capture_nic"
+	TAG_TAP_TYPE    TagName = "capture_network_type"
 	TAG_TAG_TYPE    TagName = "tag_type"
 	TAG_TAG_VALUE   TagName = "tag_value"
-	TAG_VTAP_ID     TagName = "vtap_id"
+	TAG_VTAP_ID     TagName = "agent_id"
 )
 
 const (

@@ -59,14 +59,14 @@ type L7Base struct {
 
 	// 流信息
 	FlowID       uint64 `json:"flow_id"`
-	TapType      uint8  `json:"tap_type"`
+	TapType      uint8  `json:"capture_network_type"`
 	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"tap_port_type"`
+	TapPortType  uint8  `json:"capture_nic_type"`
 	SignalSource uint16 `json:"signal_source"`
 	TunnelType   uint8  `json:"tunnel_type"`
-	TapPort      uint32 `json:"tap_port"`
-	TapSide      string `json:"tap_side"`
-	VtapID       uint16 `json:"vtap_id"`
+	TapPort      uint32 `json:"capture_nic"`
+	TapSide      string `json:"observation_point"`
+	VtapID       uint16 `json:"agent_id"`
 	ReqTcpSeq    uint32 `json:"req_tcp_seq"`
 	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
 	StartTime    int64  `json:"start_time"` // us
@@ -108,14 +108,14 @@ func L7BaseColumns() []*ckdb.Column {
 
 		// 流信息
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-		ckdb.NewColumn("tap_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("capture_network_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("nat_source", ckdb.UInt8).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("capture_nic_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("signal_source", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("capture_nic", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("observation_point", ckdb.LowCardinalityString),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("req_tcp_seq", ckdb.UInt32),
 		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),

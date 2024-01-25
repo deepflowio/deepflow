@@ -30,9 +30,9 @@ import (
 const (
 	ORIGIN_TABLE_1M = "1m"
 	ORIGIN_TABLE_1S = "1s"
-	FLOW_METRICS    = "vtap_flow"
-	APP_METRICS     = "vtap_app"
-	VTAP_ACL        = "vtap_acl"
+	NETWORK         = "network"
+	APPLICATION     = "application"
+	TRAFFIC_POLICY  = "traffic_policy"
 
 	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
@@ -59,17 +59,17 @@ const (
 )
 
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
-	DEEPFLOW_SYSTEM:   {int(zerodoc.VTAP_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
-	L4_FLOW_LOG:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
-	L7_FLOW_LOG:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
-	L4_PACKET:         {int(zerodoc.VTAP_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
-	L7_PACKET:         {int(zerodoc.VTAP_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
-	EXT_METRICS:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
-	PROMETHEUS:        {int(zerodoc.VTAP_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
-	EVENT_EVENT:       {int(zerodoc.VTAP_TABLE_ID_MAX) + 8, "event", []string{"event"}},
-	EVENT_PERF_EVENT:  {int(zerodoc.VTAP_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
-	EVENT_ALARM_EVENT: {int(zerodoc.VTAP_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
-	PROFILE:           {int(zerodoc.VTAP_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
+	DEEPFLOW_SYSTEM:   {int(zerodoc.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
+	L4_FLOW_LOG:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
+	L7_FLOW_LOG:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
+	L4_PACKET:         {int(zerodoc.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
+	L7_PACKET:         {int(zerodoc.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
+	EXT_METRICS:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
+	PROMETHEUS:        {int(zerodoc.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
+	EVENT_EVENT:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}},
+	EVENT_PERF_EVENT:  {int(zerodoc.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
+	EVENT_ALARM_EVENT: {int(zerodoc.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
+	PROFILE:           {int(zerodoc.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
@@ -82,29 +82,29 @@ func IsModifiedOnlyDatasource(datasource string) bool {
 }
 
 var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
-	zerodoc.VTAP_FLOW_PORT_1M: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1M, zerodoc.VTAP_FLOW_PORT_1M},
-	zerodoc.VTAP_FLOW_PORT_1S: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1S, zerodoc.VTAP_FLOW_PORT_1S},
-	zerodoc.VTAP_APP_PORT_1M:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1M, zerodoc.VTAP_APP_PORT_1M},
-	zerodoc.VTAP_APP_PORT_1S:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1S, zerodoc.VTAP_APP_PORT_1S},
-	zerodoc.VTAP_ACL_1M:       []zerodoc.MetricsTableID{zerodoc.VTAP_ACL_1M},
+	zerodoc.NETWORK_1M:        {zerodoc.NETWORK_MAP_1M, zerodoc.NETWORK_1M},
+	zerodoc.NETWORK_1S:        {zerodoc.NETWORK_MAP_1S, zerodoc.NETWORK_1S},
+	zerodoc.APPLICATION_1M:    {zerodoc.APPLICATION_MAP_1M, zerodoc.APPLICATION_1M},
+	zerodoc.APPLICATION_1S:    {zerodoc.APPLICATION_MAP_1S, zerodoc.APPLICATION_1S},
+	zerodoc.TRAFFIC_POLICY_1M: {zerodoc.TRAFFIC_POLICY_1M},
 }
 
 func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
 	switch tableGroup {
-	case FLOW_METRICS:
+	case NETWORK:
 		if baseTable == ORIGIN_TABLE_1S {
-			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1S], nil
+			return metricsGroupTableIDs[zerodoc.NETWORK_1S], nil
 		} else {
-			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1M], nil
+			return metricsGroupTableIDs[zerodoc.NETWORK_1M], nil
 		}
-	case APP_METRICS:
+	case APPLICATION:
 		if baseTable == ORIGIN_TABLE_1S {
-			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1S], nil
+			return metricsGroupTableIDs[zerodoc.APPLICATION_1S], nil
 		} else {
-			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1M], nil
+			return metricsGroupTableIDs[zerodoc.APPLICATION_1M], nil
 		}
-	case VTAP_ACL:
-		return metricsGroupTableIDs[zerodoc.VTAP_ACL_1M], nil
+	case TRAFFIC_POLICY:
+		return metricsGroupTableIDs[zerodoc.TRAFFIC_POLICY_1M], nil
 	default:
 		return nil, fmt.Errorf("unknown table group(%s)", tableGroup)
 	}
@@ -553,10 +553,10 @@ func isFlowLogGroup(name string) bool {
 func getFlowLogDatasoureID(name string) (common.FlowLogID, uint8) {
 	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
 		if name == id.DataourceString() {
-			return id, uint8(id) + uint8(zerodoc.VTAP_TABLE_ID_MAX)
+			return id, uint8(id) + uint8(zerodoc.METRICS_TABLE_ID_MAX)
 		}
 	}
-	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.VTAP_TABLE_ID_MAX)
+	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.METRICS_TABLE_ID_MAX)
 }
 
 func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {

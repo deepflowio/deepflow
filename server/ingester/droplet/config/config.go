@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
@@ -149,9 +148,6 @@ func (c *Config) Validate() error {
 	}
 	if c.PCap.DiskFreeSpaceMarginGB <= 0 {
 		c.PCap.DiskFreeSpaceMarginGB = 10
-	}
-	if c.PCap.FileDirectory == "" {
-		c.PCap.FileDirectory = common.DEFAULT_PCAP_DATA_PATH
 	}
 
 	if c.SyslogDirectory == "" {

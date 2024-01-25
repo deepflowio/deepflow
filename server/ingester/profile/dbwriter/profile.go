@@ -146,7 +146,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Process"),
 
 		// universal tag
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
 		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID"),
