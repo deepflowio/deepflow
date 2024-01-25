@@ -88,7 +88,12 @@ var QueryFuncCall = map[string]QueryFunc{
 			}
 			*query = append(*query, fmt.Sprintf("%s(%s)", "Stddev", metric))
 		} else if queryType == model.Range {
-			resetQueryInterval(query, 1, 0)
+			// stddev is special calculation, it calculs all points in specific time range
+			if len(*query) > 0 {
+				(*query)[0] = fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS)
+			} else {
+				*query = append(*query, fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS))
+			}
 			*query = append(*query, fmt.Sprintf("%s(%s)", "Last", metric))
 		}
 	},
