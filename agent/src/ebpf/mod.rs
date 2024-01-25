@@ -118,6 +118,10 @@ pub const DATA_SOURCE_GO_HTTP2_UPROBE: u8 = 2;
 pub const DATA_SOURCE_OPENSSL_UPROBE: u8 = 3;
 #[allow(dead_code)]
 pub const DATA_SOURCE_IO_EVENT: u8 = 4;
+#[allow(dead_code)]
+pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
+#[allow(dead_code)]
+pub const DATA_SOURCE_CLOSE: u8 = 6;
 
 // 消息类型
 // 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
