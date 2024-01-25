@@ -37,7 +37,8 @@
 #include "mem.h"
 
 uint32_t k_version;
-int major, minor;		// Linux kernel主版本，次版本
+// Linux kernel major version, minor version, revision version, and revision number.
+int major, minor, revision, rev_num;
 char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint32_t *tracers_lock;
@@ -108,23 +109,28 @@ int check_kernel_version(int maj_limit, int min_limit)
 		return ETR_INVAL;
 	}
 
-	int patch;
-	if (fetch_kernel_version(&major, &minor, &patch) != ETR_OK) {
+	if (fetch_kernel_version(&major, &minor, &revision, &rev_num) != ETR_OK) {
 		return ETR_INVAL;
 	}
 
-	ebpf_info("%s Linux %d.%d.%d\n", __func__, major, minor, patch);
+	ebpf_info("%s Linux %d.%d.%d-%d\n", __func__, major, minor, revision, rev_num);
 
 	/*
-	 * Linux 3.10 kernel support for Redhat7 and Centos7
+	 * Redhat/CentOS 7 introduced support for eBPF tracing features starting
+	 * from version 7.6 (3.10.0-940.el7.x86_64).
 	 */
-	if (major == 3 && minor == 10 && patch == 0)
+	if (major == 3 && minor == 10 && revision == 0 &&
+	    rev_num >= LINUX_3_10_MIN_REV_NUM)
 		return ETR_OK;
 
 	if (major < maj_limit || (major == maj_limit && minor < min_limit)) {
-		ebpf_info
-		    ("Current kernel version is %s, but need > %d.%d, eBPF not support.\n",
-		     uts.release, maj_limit, min_limit);
+		ebpf_warning
+		    ("[eBPF Kernel Adapt] The current kernel version (%s) does not support"
+		     " eBPF. It requires  kernel version of %d.%d+ or 3.10.0-%d+ (for "
+		     "linux 3.10.0 kernel, the revision number must be greater than or "
+		     "equal to %d).\n",
+		     uts.release, maj_limit, min_limit, LINUX_3_10_MIN_REV_NUM,
+		     LINUX_3_10_MIN_REV_NUM);
 		return ETR_INVAL;
 	}
 

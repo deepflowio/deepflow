@@ -324,10 +324,15 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		var innerFunction view.DefaultFunction
 		// Inner layer derivative
 		if f.IsDerivative {
+			args := []string{}
+			if len(f.DerivativeArgs) > 1 {
+				args = append(args, f.DerivativeArgs[1:]...)
+			}
 			innerFunction = view.DefaultFunction{
 				Name:           view.FUNCTION_DERIVATIVE,
 				Fields:         []view.Node{&view.Field{Value: f.Metrics.DBField}},
 				DerivativeArgs: f.DerivativeArgs,
+				Args:           args,
 			}
 		} else {
 			innerFunction = view.DefaultFunction{
@@ -350,8 +355,9 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		// When using avg, max, and min operators. The inner layer uses itself
 		if slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 			innerFunction = view.DefaultFunction{
-				Name:   f.Name,
-				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Name:       f.Name,
+				Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				IgnoreZero: true,
 			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
