@@ -251,8 +251,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet(flow_tag.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), '')",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
