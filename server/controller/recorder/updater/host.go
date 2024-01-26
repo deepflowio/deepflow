@@ -52,6 +52,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 	dbItem := &mysql.Host{
 		Name:       cloudItem.Name,
 		IP:         cloudItem.IP,
+		Hostname:   cloudItem.Hostname,
 		Type:       cloudItem.Type,
 		HType:      cloudItem.HType,
 		VCPUNum:    cloudItem.VCPUNum,
@@ -75,6 +76,9 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 	}
 	if diffBase.IP != cloudItem.IP {
 		updateInfo["ip"] = cloudItem.IP
+	}
+	if diffBase.Hostname != cloudItem.Hostname {
+		updateInfo["hostname"] = cloudItem.Hostname
 	}
 	if diffBase.HType != cloudItem.HType {
 		updateInfo["htype"] = cloudItem.HType
