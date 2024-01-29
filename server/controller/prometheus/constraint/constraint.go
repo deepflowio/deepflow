@@ -22,5 +22,5 @@ import (
 
 type OperateBatchModel interface {
 	mysql.PrometheusMetricName | mysql.PrometheusLabelName | mysql.PrometheusLabelValue | mysql.PrometheusMetricAPPLabelLayout |
-		mysql.PrometheusLabel | mysql.PrometheusMetricLabel | mysql.PrometheusMetricTarget | mysql.PrometheusTarget
+		mysql.PrometheusLabel | mysql.PrometheusMetricLabelName | mysql.PrometheusMetricTarget | mysql.PrometheusTarget
 }

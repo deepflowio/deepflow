@@ -51,24 +51,23 @@ type Cache struct {
 	MetricAndAPPLabelLayout *metricAndAPPLabelLayout
 	Target                  *target
 	Label                   *label
-	MetricLabel             *metricLabel
+	MetricLabelName         *metricLabelName
 	MetricTarget            *metricTarget
 }
 
 func GetSingleton() *Cache {
 	cacheOnce.Do(func() {
 		mn := new(metricName)
-		l := newLabel()
 		t := newTarget()
 		cacheIns = &Cache{
 			canRefresh:              make(chan bool, 1),
 			MetricName:              mn,
-			LabelName:               new(labelName),
-			LabelValue:              new(labelValue),
+			LabelName:               newLabelName(),
+			LabelValue:              newLabelValue(),
 			MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(),
 			Target:                  t,
-			Label:                   l,
-			MetricLabel:             newMetricLabel(mn, l),
+			Label:                   newLabel(),
+			MetricLabelName:         newMetricLabelName(mn),
 			MetricTarget:            newMetricTarget(mn, t),
 		}
 	})
@@ -127,7 +126,7 @@ func (c *Cache) refresh() error {
 	AppendErrGroup(eg, c.LabelName.refresh)
 	AppendErrGroup(eg, c.LabelValue.refresh)
 	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
-	AppendErrGroup(eg, c.MetricLabel.refresh)
+	AppendErrGroup(eg, c.MetricLabelName.refresh)
 	AppendErrGroup(eg, c.MetricTarget.refresh)
 	err := eg.Wait()
 	log.Info("refresh cache completed")
@@ -174,10 +173,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"value_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelValue.valueToID.Range(func(key, value any) bool {
-			temp["value_to_id"].(map[string]interface{})[key.(string)] = value
+		tempCache.LabelValue.GetValueToID().Range(func(key string, value int) bool {
+			temp["value_to_id"].(map[string]interface{})[key] = value
 			return true
 		})
+
 		if len(temp["value_to_id"].(map[string]interface{})) > 0 {
 			content["label_value"] = temp
 		}
@@ -245,11 +245,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			"metric_label_key_to_id":      make(map[string]int),
 		}
 
-		tempCache.MetricLabel.metricNameIDToLabelIDs.Range(func(i int, s mapset.Set[int]) bool {
+		tempCache.MetricLabelName.metricNameIDToLabelNameIDs.Range(func(i int, s mapset.Set[int]) bool {
 			temp["metric_name_id_to_label_ids"].(map[int][]int)[i] = s.ToSlice()
 			return true
 		})
-		for iter := range tempCache.MetricLabel.keyToID.Iter() {
+		for iter := range tempCache.MetricLabelName.keyToID.Iter() {
 			temp["metric_label_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
 		}
 
