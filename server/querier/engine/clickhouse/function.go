@@ -352,13 +352,37 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			IgnoreZero: true,
 		}
-		// When using avg, max, and min operators. The inner layer uses itself
-		if slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+		// When using max, and min operators. The inner layer uses itself
+		if slices.Contains([]string{view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 			innerFunction = view.DefaultFunction{
 				Name:       f.Name,
 				Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
 				IgnoreZero: true,
 			}
+		}
+		if f.Name == view.FUNCTION_AVG {
+			// delay class, inner structure is sum (x)/sum (y)
+			divFields := strings.Split(f.Metrics.DBField, "/")
+			divField_0 := view.DefaultFunction{
+				Name:   view.FUNCTION_SUM,
+				Fields: []view.Node{&view.Field{Value: divFields[0]}},
+			}
+			divField_1 := view.DefaultFunction{
+				Name:   view.FUNCTION_SUM,
+				Fields: []view.Node{&view.Field{Value: divFields[1]}},
+			}
+			innerFunction := view.DivFunction{
+				DefaultFunction: view.DefaultFunction{
+					Name:   view.FUNCTION_DIV,
+					Fields: []view.Node{&divField_0, &divField_1},
+				},
+				DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+			}
+			innerAlias = innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+			return innerAlias
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
