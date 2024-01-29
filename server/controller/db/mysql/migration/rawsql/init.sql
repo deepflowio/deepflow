@@ -2567,15 +2567,15 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_app_label_layout;
 
-CREATE TABLE IF NOT EXISTS prometheus_metric_label (
-    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`   VARCHAR(256) NOT NULL,
-    `label_id`      INT NOT NULL,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX metric_label_index(metric_name, label_id)
+CREATE TABLE IF NOT EXISTS prometheus_metric_label_name (
+    `id`                INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`       VARCHAR(256) NOT NULL,
+    `label_name_id`     INT NOT NULL,
+    `synced_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_label_name_index(metric_name, label_name_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE prometheus_metric_label;
+TRUNCATE TABLE prometheus_metric_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     `id`            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
