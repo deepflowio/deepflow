@@ -38,17 +38,14 @@ func NewChAPPLabel() *ChAPPLabel {
 }
 
 func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLabel, bool) {
-	var prometheusMetricLabels []mysql.PrometheusMetricLabel
+	var prometheusLabels []mysql.PrometheusLabel
+	err := mysql.Db.Unscoped().Find(&prometheusLabels).Error
 
-	err := mysql.Db.Unscoped().Find(&prometheusMetricLabels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
 	}
-	metricLabelIDNameValueMap, ok := l.generateLabelIDNameValueData()
-	if !ok {
-		return nil, false
-	}
+
 	appLabelSlice, ok := l.generateAPPLabelData()
 
 	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData()
@@ -57,13 +54,11 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 	}
 
 	keyToItem := make(map[PrometheusAPPLabelKey]mysql.ChAPPLabel)
-	for _, prometheusMetricLabel := range prometheusMetricLabels {
-		labelID := prometheusMetricLabel.LabelID
-		labelNameValueData := metricLabelIDNameValueMap[labelID]
-		labelName := labelNameValueData["label_name"]
+	for _, prometheusLabel := range prometheusLabels {
+		labelName := prometheusLabel.Name
 		if slices.Contains(appLabelSlice, labelName) {
 			labelNameID := labelNameIDMap[labelName]
-			labelValue := labelNameValueData["label_value"]
+			labelValue := prometheusLabel.Value
 			labelValueID := valueNameIDMap[labelValue]
 			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
 				LabelNameID:  labelNameID,
@@ -89,22 +84,6 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (l *ChAPPLabel) generateLabelIDNameValueData() (map[int]map[string]string, bool) {
-	metricLabelIDNameValueMap := make(map[int]map[string]string)
-	var prometheusLabels []mysql.PrometheusLabel
-	err := mysql.Db.Unscoped().Find(&prometheusLabels).Error
-
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, false
-	}
-
-	for _, prometheusLabel := range prometheusLabels {
-		metricLabelIDNameValueMap[prometheusLabel.ID] = map[string]string{"label_name": prometheusLabel.Name, "label_value": prometheusLabel.Value}
-	}
-	return metricLabelIDNameValueMap, true
 }
 
 func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
