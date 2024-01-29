@@ -391,7 +391,7 @@ type KubernetesCluster struct {
 	Value       string    `gorm:"column:value;type:varchar(256);" json:"VALUE"`
 	CreatedAt   time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	SyncedAt    time.Time `gorm:"column:synced_at;type:datetime" json:"SYNCED_AT"`
-	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime" json:"UPDATED_TIME"`
+	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime;default:null" json:"UPDATED_TIME"`
 }
 
 type ACL struct {

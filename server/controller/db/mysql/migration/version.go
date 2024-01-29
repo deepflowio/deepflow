@@ -18,5 +18,5 @@ package migration
 
 const (
 	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.4.1.26"
+	DB_VERSION_EXPECTED = "6.4.1.27"
 )
