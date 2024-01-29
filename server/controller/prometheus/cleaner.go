@@ -139,7 +139,7 @@ func (c *Cleaner) deleteExpired(expiredAt time.Time) error {
 	log.Infof("clear expired data (synced_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
 
 	err := mysql.Db.Transaction(func(tx *gorm.DB) error {
-		if err := c.deleteExpiredMetricLabel(tx, expiredAt); err != nil {
+		if err := c.deleteExpiredMetricLabelName(tx, expiredAt); err != nil {
 			return err
 		}
 		if err := c.deleteExpiredMetricAPPLabelLayout(tx, expiredAt); err != nil {
@@ -177,10 +177,10 @@ func (c *Cleaner) deleteExpiredMetricName(tx *gorm.DB, expiredAt time.Time) erro
 		mns = append(mns, metricName.Name)
 	}
 	if len(mns) > 0 {
-		var metricLabels []mysql.PrometheusMetricLabel
+		var metricLabelNames []mysql.PrometheusMetricLabelName
 		var appLabels []mysql.PrometheusMetricAPPLabelLayout
 		var metricTargets []mysql.PrometheusMetricTarget
-		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&metricLabels).Error; err != nil {
+		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&metricLabelNames).Error; err != nil {
 			return err
 		}
 		if err := mysql.Db.Where("metric_name IN (?)", mns).Delete(&appLabels).Error; err != nil {
@@ -194,21 +194,8 @@ func (c *Cleaner) deleteExpiredMetricName(tx *gorm.DB, expiredAt time.Time) erro
 }
 
 func (c *Cleaner) deleteExpiredLabel(tx *gorm.DB, expiredAt time.Time) error {
-	labels, err := DeleteExpired[mysql.PrometheusLabel](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
-	if err != nil {
-		return err
-	}
-	lis := make([]int, 0)
-	for _, label := range labels {
-		lis = append(lis, label.ID)
-	}
-	if len(lis) > 0 {
-		var metricLabels []mysql.PrometheusMetricLabel
-		if err := mysql.Db.Where("label_id IN (?)", lis).Delete(&metricLabels).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := DeleteExpired[mysql.PrometheusLabel](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
+	return err
 }
 
 func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error {
@@ -217,8 +204,10 @@ func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error
 		return err
 	}
 	lns := make([]string, 0)
+	lnIDs := make([]int, 0)
 	for _, labelName := range labelNames {
 		lns = append(lns, labelName.Name)
+		lnIDs = append(lnIDs, labelName.ID)
 	}
 	if len(lns) > 0 {
 		var labels []mysql.PrometheusLabel
@@ -227,6 +216,11 @@ func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error
 			return err
 		}
 		if err := mysql.Db.Where("app_label_name IN (?)", lns).Delete(&appLabels).Error; err != nil {
+			return err
+		}
+
+		var metricLabelNames []mysql.PrometheusMetricLabelName
+		if err := mysql.Db.Where("label_name_id IN (?)", lnIDs).Delete(&metricLabelNames).Error; err != nil {
 			return err
 		}
 	}
@@ -252,8 +246,8 @@ func (c *Cleaner) deleteExpiredLabelValue(tx *gorm.DB, expiredAt time.Time) erro
 	return nil
 }
 
-func (c *Cleaner) deleteExpiredMetricLabel(tx *gorm.DB, expiredAt time.Time) error {
-	_, err := DeleteExpired[mysql.PrometheusMetricLabel](tx, expiredAt)
+func (c *Cleaner) deleteExpiredMetricLabelName(tx *gorm.DB, expiredAt time.Time) error {
+	_, err := DeleteExpired[mysql.PrometheusMetricLabelName](tx, expiredAt)
 	if err != nil {
 		return err
 	}
