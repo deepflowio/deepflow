@@ -24,48 +24,47 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
-type metricLabelKey struct {
+type metricLabelNameKey struct {
 	MetricNameID int
-	LabelID      int
+	LabelNameID  int
 }
 
-func newMetricLabelKey(metricNameID, labelID int) metricLabelKey {
-	return metricLabelKey{
+func newMetricLabelNameKey(metricNameID, labelNameID int) metricLabelNameKey {
+	return metricLabelNameKey{
 		MetricNameID: metricNameID,
-		LabelID:      labelID,
+		LabelNameID:  labelNameID,
 	}
 }
 
-type metricLabel struct {
+type metricLabelName struct {
 	lock         sync.Mutex
 	resourceType string
 
 	metricNameEncoder *metricName
-	labelEncoder      *label
+	labelNameEncoder  *labelName
 
-	metricLabelKeys mapset.Set[metricLabelKey]
+	keys mapset.Set[metricLabelNameKey]
 }
 
-func newMetricLabel(mn *metricName, l *label) *metricLabel {
-	return &metricLabel{
+func newMetricLabelName(mn *metricName, l *labelName) *metricLabelName {
+	return &metricLabelName{
 		resourceType:      "metric_label",
 		metricNameEncoder: mn,
-		labelEncoder:      l,
-		metricLabelKeys:   mapset.NewSet[metricLabelKey](),
+		labelNameEncoder:  l,
+		keys:              mapset.NewSet[metricLabelNameKey](),
 	}
 }
 
-func (ml *metricLabel) store(item *mysql.PrometheusMetricLabel) {
+func (ml *metricLabelName) store(item *mysql.PrometheusMetricLabelName) {
 	if mni, ok := ml.metricNameEncoder.getID(item.MetricName); ok {
-		ml.metricLabelKeys.Add(newMetricLabelKey(mni, item.LabelID))
+		ml.keys.Add(newMetricLabelNameKey(mni, item.LabelNameID))
 	}
 }
 
-func (ml *metricLabel) refresh(args ...interface{}) error {
-	var items []*mysql.PrometheusMetricLabel
+func (ml *metricLabelName) refresh(args ...interface{}) error {
+	var items []*mysql.PrometheusMetricLabelName
 	err := mysql.Db.Find(&items).Error
 	if err != nil {
 		return err
@@ -76,13 +75,13 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (ml *metricLabel) encode(rMLs []*controller.PrometheusMetricLabelRequest) ([]*controller.PrometheusMetricLabel, error) {
+func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRequest) ([]*controller.PrometheusMetricLabelName, error) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	resp := make([]*controller.PrometheusMetricLabel, 0)
-	var dbToAdd []*mysql.PrometheusMetricLabel
-	respToAdd := make([]*controller.PrometheusMetricLabel, 0)
+	resp := make([]*controller.PrometheusMetricLabelName, 0)
+	var dbToAdd []*mysql.PrometheusMetricLabelName
+	respToAdd := make([]*controller.PrometheusMetricLabelName, 0)
 	for _, rML := range rMLs {
 		mn := rML.GetMetricName()
 		mni, ok := ml.metricNameEncoder.getID(mn)
@@ -92,34 +91,32 @@ func (ml *metricLabel) encode(rMLs []*controller.PrometheusMetricLabelRequest) (
 		}
 		lis := make([]uint32, 0)
 		lisToAdd := make([]uint32, 0)
-		for _, l := range rML.GetLabels() {
-			ln := l.GetName()
-			lv := l.GetValue()
-			li, ok := ml.labelEncoder.getID(cache.NewLabelKey(ln, lv))
+		for _, ln := range rML.GetLabelNames() {
+			lni, ok := ml.labelNameEncoder.getID(ln)
 			if !ok {
-				log.Warningf("%s label (name: %s, value: %s) id not found", ml.resourceType, ln, lv)
+				log.Warningf("%s label (name: %s) id not found", ml.resourceType, ln)
 				continue
 			}
-			if ok := ml.metricLabelKeys.Contains(newMetricLabelKey(mni, li)); ok {
-				lis = append(lis, uint32(li))
+			if ok := ml.keys.Contains(newMetricLabelNameKey(mni, lni)); ok {
+				lis = append(lis, uint32(lni))
 				continue
 			}
-			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricLabel{
-				MetricName: mn,
-				LabelID:    li,
+			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricLabelName{
+				MetricName:  mn,
+				LabelNameID: lni,
 			})
-			lisToAdd = append(lisToAdd, uint32(li))
+			lisToAdd = append(lisToAdd, uint32(lni))
 		}
 		if len(lis) != 0 {
-			resp = append(resp, &controller.PrometheusMetricLabel{
+			resp = append(resp, &controller.PrometheusMetricLabelName{
 				MetricNameId: proto.Uint32(uint32(mni)),
-				LabelIds:     lis,
+				LabelNameIds: lis,
 			})
 		}
 		if len(lisToAdd) != 0 {
-			respToAdd = append(respToAdd, &controller.PrometheusMetricLabel{
+			respToAdd = append(respToAdd, &controller.PrometheusMetricLabelName{
 				MetricNameId: proto.Uint32(uint32(mni)),
-				LabelIds:     lisToAdd,
+				LabelNameIds: lisToAdd,
 			})
 		}
 	}

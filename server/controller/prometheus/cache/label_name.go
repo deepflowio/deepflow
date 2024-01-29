@@ -19,12 +19,21 @@ package cache
 import (
 	"sync"
 
+	"github.com/cornelk/hashmap"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type labelName struct {
 	nameToID sync.Map
+	idToName *hashmap.Map[int, string]
+}
+
+func newLabelName() *labelName {
+	return &labelName{
+		idToName: hashmap.New[int, string](),
+	}
 }
 
 func (ln *labelName) GetIDByName(n string) (int, bool) {
@@ -34,9 +43,17 @@ func (ln *labelName) GetIDByName(n string) (int, bool) {
 	return 0, false
 }
 
+func (ln *labelName) GetNameByID(id int) (string, bool) {
+	if name, ok := ln.idToName.Get(id); ok {
+		return name, true
+	}
+	return "", false
+}
+
 func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
 	for _, item := range batch {
 		ln.nameToID.Store(item.GetName(), int(item.GetId()))
+		ln.idToName.Set(int(item.GetId()), item.GetName())
 	}
 }
 
@@ -47,6 +64,7 @@ func (ln *labelName) refresh(args ...interface{}) error {
 	}
 	for _, item := range labelNames {
 		ln.nameToID.Store(item.Name, item.ID)
+		ln.idToName.Set(item.ID, item.Name)
 	}
 	return nil
 }

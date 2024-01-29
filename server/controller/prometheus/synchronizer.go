@@ -58,33 +58,21 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 		var labels []*trident.LabelResponse
 		metricName := k.(string)
 		metricID := v.(int)
-		labelIDs := s.cache.MetricLabel.GetLabelsByMetricName(metricName)
-		for i := range labelIDs {
-			li := labelIDs[i]
-			lk, ok := s.cache.Label.GetKeyByID(li)
+		labelNameIDs := s.cache.MetricLabelName.GetLabelNameIDsByMetricName(metricName)
+		for i := range labelNameIDs {
+			li := labelNameIDs[i]
+			ln, ok := s.cache.LabelName.GetNameByID(li)
 			if !ok {
 				nonLabelIDs.Add(li)
 				continue
 			}
-			if slices.Contains([]string{TargetLabelInstance, TargetLabelJob}, lk.Name) {
+			if slices.Contains([]string{TargetLabelInstance, TargetLabelJob}, ln) {
 				continue
 			}
-			labelNameID, ok := s.cache.LabelName.GetIDByName(lk.Name)
-			if !ok {
-				nonLabelNames.Add(lk.Name)
-				continue
-			}
-			labelValueID, ok := s.cache.LabelValue.GetIDByValue(lk.Value)
-			if !ok {
-				nonLabelValues.Add(lk.Value)
-				continue
-			}
-			idx, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(metricName, lk.Name))
+			idx, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(metricName, ln))
 			label := &trident.LabelResponse{
-				Name:                &lk.Name,
-				Value:               &lk.Value,
-				NameId:              proto.Uint32(uint32(labelNameID)),
-				ValueId:             proto.Uint32(uint32(labelValueID)),
+				Name:                &ln,
+				NameId:              proto.Uint32(uint32(li)),
 				AppLabelColumnIndex: proto.Uint32(uint32(idx)),
 			}
 			labels = append(labels, label)
@@ -108,6 +96,19 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 		log.Warningf("label id not found, ids: %v", nonLabelIDs.ToSlice())
 	}
 	return mLabels, err
+}
+
+func (s *Synchronizer) assembleLabelValueFully() ([]*trident.LabelValueResponse, error) {
+	lValues := make([]*trident.LabelValueResponse, 0)
+	s.cache.LabelValue.GetValueToID().Range(func(k string, v int) bool {
+		value := &k
+		lValues = append(lValues, &trident.LabelValueResponse{
+			Value:   value,
+			ValueId: proto.Uint32(uint32(v)),
+		})
+		return true
+	})
+	return lValues, nil
 }
 
 func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) {

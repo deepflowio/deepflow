@@ -44,14 +44,14 @@ type Encoder struct {
 	working         bool
 	refreshInterval time.Duration
 
-	metricName   *metricName
-	labelName    *labelName
-	labelValue   *labelValue
-	LabelLayout  *labelLayout
-	label        *label
-	metricLabel  *metricLabel
-	metricTarget *metricTarget
-	target       *target
+	metricName      *metricName
+	labelName       *labelName
+	labelValue      *labelValue
+	LabelLayout     *labelLayout
+	label           *label
+	metricLabelName *metricLabelName
+	metricTarget    *metricTarget
+	target          *target
 }
 
 func GetSingleton() *Encoder {
@@ -71,7 +71,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.labelValue = newLabelValue()
 	e.label = newLabel()
 	e.LabelLayout = newLabelLayout(cfg)
-	e.metricLabel = newMetricLabel(e.metricName, e.label)
+	e.metricLabelName = newMetricLabelName(e.metricName, e.labelName)
 	e.target = newTarget(cfg.ResourceMaxID1)
 	e.metricTarget = newMetricTarget(e.target)
 	e.refreshInterval = time.Duration(cfg.EncoderCacheRefreshInterval) * time.Second
@@ -129,7 +129,7 @@ func (e *Encoder) refresh() error {
 	AppendErrGroup(eg, e.labelName.refresh)
 	AppendErrGroup(eg, e.labelValue.refresh)
 	AppendErrGroup(eg, e.LabelLayout.refresh)
-	AppendErrGroup(eg, e.metricLabel.refresh)
+	AppendErrGroup(eg, e.metricLabelName.refresh)
 	AppendErrGroup(eg, e.metricTarget.refresh)
 	AppendErrGroup(eg, e.target.refresh)
 	err := eg.Wait()
@@ -156,7 +156,7 @@ func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.Syn
 		return resp, err
 	}
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, e.encodeMetricLabel, resp, req.GetMetricLabels())
+	AppendErrGroup(eg, e.encodeMetricLabelName, resp, req.GetMetricLabelNames())
 	AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
 	err = eg.Wait()
 	return resp, err
@@ -217,14 +217,14 @@ func (e *Encoder) encodeLabel(args ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) encodeMetricLabel(args ...interface{}) error {
+func (e *Encoder) encodeMetricLabelName(args ...interface{}) error {
 	resp := args[0].(*controller.SyncPrometheusResponse)
-	metricLabels := args[1].([]*controller.PrometheusMetricLabelRequest)
-	mls, err := e.metricLabel.encode(metricLabels)
+	metricLabelNames := args[1].([]*controller.PrometheusMetricLabelNameRequest)
+	encodedData, err := e.metricLabelName.encode(metricLabelNames)
 	if err != nil {
 		return err
 	}
-	resp.MetricLabels = mls
+	resp.MetricLabelNames = encodedData
 	return nil
 }
 
