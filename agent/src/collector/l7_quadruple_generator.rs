@@ -64,6 +64,7 @@ pub struct QgCounter {
 struct AppMeterWithL7Protocol {
     app_meter: AppMeter,
     endpoint: Option<String>,
+    endpoint_hash: u32,
     l7_protocol: L7Protocol,
 }
 
@@ -251,6 +252,7 @@ impl SubQuadGen {
                     app_meter: *app_meter,
                     l7_protocol: l7_stats.l7_protocol,
                     endpoint: l7_stats.endpoint.clone(),
+                    endpoint_hash,
                 };
                 meters.push(meter);
             }
@@ -265,7 +267,7 @@ impl SubQuadGen {
                         app_meter: meter.app_meter,
                         flow: flow.clone(),
                         l7_protocol: meter.l7_protocol,
-                        endpoint_hash,
+                        endpoint_hash: meter.endpoint_hash,
                         endpoint: meter.endpoint,
                         is_active_host0,
                         is_active_host1,
@@ -300,6 +302,7 @@ impl SubQuadGen {
                     app_meter: *app_meter,
                     l7_protocol: l7_stats.l7_protocol,
                     endpoint: l7_stats.endpoint.clone(),
+                    endpoint_hash,
                 };
                 let _ = stash.l7_stats.insert(l7_stats.flow_id, vec![meter]);
             }
