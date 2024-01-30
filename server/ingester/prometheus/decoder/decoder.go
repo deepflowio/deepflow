@@ -369,12 +369,6 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			return true, fmt.Errorf("label value %s miss", l.Value)
 		}
 
-		// the Controller needs to get all the Value lists contained in the Name for filtering when querying
-		if !b.labelTable.QueryLabelNameValue(nameID, valueID) {
-			b.counter.NameValueMiss++
-			return true, fmt.Errorf("label name(%s) id(%d) value(%s) id(%d) miss", l.Name, nameID, l.Value, valueID)
-		}
-
 		if podName == "" && l.Name == PROMETHEUS_POD {
 			podName = l.Value
 			podNameID = valueID
