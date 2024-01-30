@@ -57,6 +57,8 @@ pub enum Error {
     #[error("redis log parse failed")]
     RedisLogParseFailed,
     #[error("redis perf parse failed")]
+    RedisLogParsePartial,
+    #[error("redis perf parse partial result")]
     RedisPerfParseFailed,
     #[error("mysql log parse failed")]
     MysqlLogParseFailed,
