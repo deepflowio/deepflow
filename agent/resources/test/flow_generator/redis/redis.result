@@ -1,23 +1,23 @@
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET user_conf_config_1", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "GET 1 1 http://127.0.0.1:20013/v2/pod-groups", request_type: "GET", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
+RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
 RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: false
