@@ -29,7 +29,6 @@ mod oracle;
 mod postgre_convert;
 mod postgresql;
 mod redis;
-mod redis_obfuscate;
 mod sql_check;
 mod sql_obfuscate;
 
