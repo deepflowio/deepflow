@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/cornelk/hashmap"
 	"github.com/golang/protobuf/proto"
@@ -44,17 +45,25 @@ const (
 	JOBID_OFFSET          = 32
 )
 
+func uint64ToFloat64(i uint64) float64 {
+	return *(*float64)(unsafe.Pointer(&i))
+}
+
+func float64ToUint64(f float64) uint64 {
+	return *(*uint64)(unsafe.Pointer(&f))
+}
+
 func columnIndexKey(metricID, labelNameID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(labelNameID)
 }
 
 func targetIdKey(epcId, podClusterId uint16, jobID, instanceID uint32) complex128 {
-	return complex(float64(uint64(jobID)<<JOBID_OFFSET|uint64(instanceID)),
-		float64(uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET|uint64(epcId)))
+	return complex(uint64ToFloat64(uint64(jobID)<<JOBID_OFFSET|uint64(instanceID)),
+		uint64ToFloat64(uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET|uint64(epcId)))
 }
 
 func parseTargetIdKey(key complex128) (epcId, podClusterId uint16, jobID, instanceID uint32) {
-	return uint16(imag(key)), uint16(uint64(imag(key)) >> POD_CLUSTER_ID_OFFSET), uint32(uint64(real(key)) >> JOBID_OFFSET), uint32(real(key))
+	return uint16(float64ToUint64(imag(key))), uint16(uint64(float64ToUint64(imag(key))) >> POD_CLUSTER_ID_OFFSET), uint32(uint64(float64ToUint64(real(key))) >> JOBID_OFFSET), uint32(float64ToUint64(real(key)))
 }
 
 func nameValueKey(nameID, valueID uint32) uint64 {
