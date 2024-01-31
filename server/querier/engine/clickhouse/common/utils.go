@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -198,7 +199,12 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
+	log.Infof("query_sql: %s" , sql)
+	queryStartTime := time.Now().Format("2006-01-02 15:04:05")
+	log.Infof("query_start_time: %s" , queryStartTime)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	queryEndTime := time.Now().Format("2006-01-02 15:04:05")
+	log.Infof("query_end_time: %s" , queryEndTime)
 	if err != nil {
 		log.Error(err)
 		return nil

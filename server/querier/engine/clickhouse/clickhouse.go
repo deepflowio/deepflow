@@ -254,7 +254,11 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
+			queryStartTime := time.Now().Format("2006-01-02 15:04:05")
+			log.Infof("GetMetricsDescriptions_start_time: %s" , queryStartTime)
 			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
+			queryEndTime := time.Now().Format("2006-01-02 15:04:05")
+			log.Infof("GetMetricsDescriptions_end_time: %s" , queryEndTime)
 			if err != nil {
 				return nil, []string{}, true, err
 			}
@@ -277,6 +281,8 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 					} else if e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 						newTable = "deepflow_system_common"
 					}
+					queryStartTime := time.Now().Format("2006-01-02 15:04:05")
+					log.Infof("tagMetrics_start_time: %s" , queryStartTime)
 					if tableTag, ok := tableTagMap[newTable]; ok {
 						tabletagSlice := tableTag.([][]interface{})
 						for i, tagSlice := range tabletagSlice {
@@ -342,6 +348,8 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 							}
 						}
 					}
+					queryEndTime := time.Now().Format("2006-01-02 15:04:05")
+					log.Infof("tagMetrics_end_time: %s" , queryEndTime)
 				}
 			}
 			return result, []string{}, true, err

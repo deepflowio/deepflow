@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -403,6 +404,8 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if db == "deepflow_system" {
+			queryStartTime := time.Now().Format("2006-01-02 15:04:05")
+			log.Infof("GetExtTables_start_time: %s" , queryStartTime)
 			for _, extTables := range ckcommon.GetExtTables(db, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
@@ -410,11 +413,15 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 					}
 				}
 			}
+			queryEndTime := time.Now().Format("2006-01-02 15:04:05")
+			log.Infof("GetExtTables_end_time: %s" , queryEndTime)
 		} else {
 			for _, dbTable := range ckcommon.DB_TABLE_MAP[db] {
 				tables = append(tables, dbTable)
 			}
 		}
+		queryStartTime := time.Now().Format("2006-01-02 15:04:05")
+		log.Infof("GetMetricsDescriptionsByDBTable_start_time: %s" , queryStartTime)
 		for _, dbTable := range tables {
 			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, ctx)
 			if err != nil {
@@ -422,6 +429,8 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 			}
 			values = append(values, metrics...)
 		}
+		queryEndTime := time.Now().Format("2006-01-02 15:04:05")
+		log.Infof("GetMetricsDescriptionsByDBTable_end_time: %s" , queryEndTime)
 	} else {
 		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, ctx)
 		if err != nil {
