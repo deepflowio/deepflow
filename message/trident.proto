@@ -945,11 +945,6 @@ message TargetResponse {
     repeated uint32 target_label_name_ids = 9;  // when the target labels change, it needs to be synchronized to Ingester regularly
 }
 
-message LabelValueResponse {  // TODO remove later
-    optional string value = 1;
-    optional uint32 value_id = 2;
-}
-
 // when the request content is empty, it means requesting all metric label and target information
 message PrometheusLabelRequest {
     repeated MetricLabelRequest request_labels = 1;
@@ -960,7 +955,6 @@ message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
     repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
-    repeated LabelValueResponse response_label_values = 4;  // TODO remove later
 }
 
 message PrometheusTargetRequest {
