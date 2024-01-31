@@ -73,15 +73,15 @@ func (s *LabelSynchronizer) assembleFully() (*trident.PrometheusLabelResponse, e
 	resp := new(trident.PrometheusLabelResponse)
 	mls, err := s.assembleMetricLabelFully()
 	if err != nil {
-		return nil, errors.Wrap(err, "assembleLabelFully")
+		return nil, errors.Wrap(err, "assembleMetricLabelFully")
 	}
 	resp.ResponseLabelIds = mls
 
-	lvs, err := s.assembleLabelValueFully()
+	ls, err := s.assembleLabelFully()
 	if err != nil {
-		return nil, errors.Wrap(err, "assembleLabelValueFully")
+		return nil, errors.Wrap(err, "assembleLabelFully")
 	}
-	resp.ResponseLabelValues = lvs
+	resp.ResponseLabels = ls
 
 	ts, err := s.assembleTargetFully()
 	if err != nil {
