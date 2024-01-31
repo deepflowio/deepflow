@@ -95,6 +95,11 @@ func (t *PrometheusLabelTable) QueryLabelValueID(labelValue string) (uint32, boo
 	return 0, false
 }
 
+func (t *PrometheusLabelTable) QueryLabelNameValue(nameId, valueId uint32) bool {
+	_, exists := t.labelNameValues.Get(nameValueKey(nameId, valueId))
+	return exists
+}
+
 func (t *PrometheusLabelTable) QueryColumnIndex(metricID, labelNameID uint32) (uint32, bool) {
 	return t.labelColumnIndexs.Get(columnIndexKey(metricID, labelNameID))
 }
@@ -139,6 +144,7 @@ type PrometheusLabelTable struct {
 	metricNameIDs     *hashmap.Map[string, uint64]
 	labelNameIDs      *hashmap.Map[string, uint64]
 	labelValueIDs     *hashmap.Map[string, uint64]
+	labelNameValues   *hashmap.Map[uint64, struct{}]
 	labelColumnIndexs *hashmap.Map[uint64, uint32]
 	targetIDs         *hashmap.Map[complex128, uint32]
 	metricTargetPair  *hashmap.Map[uint64, struct{}]
@@ -164,6 +170,7 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 		metricNameIDs:     hashmap.New[string, uint64](),     // metricName => metricID
 		labelNameIDs:      hashmap.New[string, uint64](),     // labelName  => labelNameID
 		labelValueIDs:     hashmap.New[string, uint64](),     // labelValue => labelValueID
+		labelNameValues:   hashmap.New[uint64, struct{}](),   // labelNameValue => exists
 		labelColumnIndexs: hashmap.New[uint64, uint32](),     // metricID + LabelNameID => columnIndex
 		targetIDs:         hashmap.New[complex128, uint32](), // epcId+podClusterId+jobID + instanceID => targetID
 		metricTargetPair:  hashmap.New[uint64, struct{}](),   // metricID + targetID => exists
@@ -437,14 +444,22 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 	t.updatePrometheusTargets(resp.GetResponseTargetIds())
 
 	if isAll {
-		for _, valueInfo := range resp.GetResponseLabelValues() {
-			value := valueInfo.GetValue()
-			valueId := valueInfo.GetValueId()
+		for _, labelInfo := range resp.GetResponseLabels() {
+			name := labelInfo.GetName()
+			nameId := labelInfo.GetNameId()
+			if name != "" && nameId != 0 {
+				t.labelNameIDs.Set(strings.Clone(name), t.genId(isAll, nameId))
+			} else {
+				t.counter.LabelNameUnknown++
+			}
+			value := labelInfo.GetValue()
+			valueId := labelInfo.GetValueId()
 			if valueId != 0 {
 				t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
 			} else {
 				t.counter.LabelValueUnknown++
 			}
+			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 		}
 	}
 
