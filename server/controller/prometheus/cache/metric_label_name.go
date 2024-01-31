@@ -40,7 +40,7 @@ func NewMetricLabelNameKey(metricID, labelNameID int) metricLabelNameKey {
 }
 
 func (k metricLabelNameKey) String() string {
-	return fmt.Sprintf("%d_%d", k.metricID, k.labelNameID)
+	return fmt.Sprintf("%d-%d", k.metricID, k.labelNameID)
 }
 
 type metricLabelName struct {

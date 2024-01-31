@@ -74,7 +74,6 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 				AppLabelColumnIndex: proto.Uint32(uint32(idx)),
 			}
 			labels = append(labels, label)
-			s.counter.SendLabelCount++
 		}
 		mLabels = append(mLabels, &trident.MetricLabelResponse{
 			MetricName: &metricName,
@@ -112,6 +111,7 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 			NameId:  proto.Uint32(uint32(ni)),
 			ValueId: proto.Uint32(uint32(vi)),
 		})
+		s.counter.SendLabelCount++
 	}
 	if nonLabelNames.Cardinality() > 0 {
 		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice())

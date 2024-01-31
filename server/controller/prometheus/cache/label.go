@@ -29,7 +29,7 @@ type LabelKey struct {
 }
 
 func (k LabelKey) String() string {
-	return k.Name + "_" + k.Value
+	return k.Name + "-" + k.Value
 }
 
 func NewLabelKey(name, value string) LabelKey {
