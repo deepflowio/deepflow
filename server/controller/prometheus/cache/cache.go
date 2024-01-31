@@ -223,19 +223,12 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	getLabel := func() {
 		temp := map[string]interface{}{
 			"key_to_id": make(map[string]interface{}),
-			"id_to_key": make(map[int]interface{}),
 		}
-		tempCache.Label.keyToID.Range(func(key, value any) bool {
-			temp["key_to_id"].(map[string]interface{})[marshal(key)] = value
-			return true
-		})
-		tempCache.Label.idToKey.Range(func(key, value any) bool {
-			temp["id_to_key"].(map[int]interface{})[key.(int)] = value
-			return true
-		})
+		for iter := range tempCache.Label.keyToID.Iter() {
+			temp["key_to_id"].(map[string]interface{})[iter.Key.String()] = iter.Val
+		}
 
-		if len(temp["key_to_id"].(map[string]interface{})) > 0 ||
-			len(temp["id_to_key"].(map[int]interface{})) > 0 {
+		if len(temp["key_to_id"].(map[string]interface{})) > 0 {
 			content["label"] = temp
 		}
 	}
