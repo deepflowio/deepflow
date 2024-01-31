@@ -362,27 +362,40 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		}
 		if f.Name == view.FUNCTION_AVG {
 			// delay class, inner structure is sum (x)/sum (y)
-			divFields := strings.Split(f.Metrics.DBField, "/")
-			divField_0 := view.DefaultFunction{
-				Name:   view.FUNCTION_SUM,
-				Fields: []view.Node{&view.Field{Value: divFields[0]}},
+			if strings.Contains(f.Metrics.DBField, "/") {
+				divFields := strings.Split(f.Metrics.DBField, "/")
+				divField_0 := view.DefaultFunction{
+					Name:   view.FUNCTION_SUM,
+					Fields: []view.Node{&view.Field{Value: divFields[0]}},
+				}
+				divField_1 := view.DefaultFunction{
+					Name:   view.FUNCTION_SUM,
+					Fields: []view.Node{&view.Field{Value: divFields[1]}},
+				}
+				innerFunction := view.DivFunction{
+					DefaultFunction: view.DefaultFunction{
+						Name:   view.FUNCTION_DIV,
+						Fields: []view.Node{&divField_0, &divField_1},
+					},
+					DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+				}
+				innerAlias = innerFunction.SetAlias("", true)
+				innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+				innerFunction.Init()
+				m.AddTag(&innerFunction)
+				return innerAlias
+			} else {
+				innerFunction := view.DefaultFunction{
+					Name:       f.Name,
+					Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+					IgnoreZero: true,
+				}
+				innerAlias = innerFunction.SetAlias("", true)
+				innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+				innerFunction.Init()
+				m.AddTag(&innerFunction)
+				return innerAlias
 			}
-			divField_1 := view.DefaultFunction{
-				Name:   view.FUNCTION_SUM,
-				Fields: []view.Node{&view.Field{Value: divFields[1]}},
-			}
-			innerFunction := view.DivFunction{
-				DefaultFunction: view.DefaultFunction{
-					Name:   view.FUNCTION_DIV,
-					Fields: []view.Node{&divField_0, &divField_1},
-				},
-				DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
-			}
-			innerAlias = innerFunction.SetAlias("", true)
-			innerFunction.SetFlag(view.METRICS_FLAG_INNER)
-			innerFunction.Init()
-			m.AddTag(&innerFunction)
-			return innerAlias
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
