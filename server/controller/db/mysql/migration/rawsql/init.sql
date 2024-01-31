@@ -1998,6 +1998,8 @@ CREATE TABLE IF NOT EXISTS ch_device (
     name                    TEXT,
     uid                     CHAR(64),
     icon_id                 INTEGER,
+    ip                      CHAR(64),
+    hostname                VARCHAR(256),
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (devicetype, deviceid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
