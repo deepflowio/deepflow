@@ -52,6 +52,8 @@ pub struct KafkaInfo {
     pub correlation_id: u32,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub span_id: String,
 
     // request
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
@@ -215,7 +217,8 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             resp_len: f.resp_msg_size,
             req: L7Request {
                 req_type: String::from(command_str),
-                resource: f.topic_name,
+                resource: f.topic_name.clone(),
+                endpoint: f.topic_name,
                 ..Default::default()
             },
             version: Some(f.api_version.to_string()),
@@ -226,6 +229,8 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             },
             ext_info: Some(ExtendedInfo {
                 request_id: Some(f.correlation_id),
+                x_request_id_0: Some(f.correlation_id.to_string()),
+                x_request_id_1: Some(f.correlation_id.to_string()),
                 ..Default::default()
             }),
             trace_info: Some(TraceInfo {
@@ -233,6 +238,11 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
                     None
                 } else {
                     Some(f.trace_id)
+                },
+                span_id: if f.span_id.is_empty() {
+                    None
+                } else {
+                    Some(f.span_id)
                 },
                 ..Default::default()
             }),
@@ -517,7 +527,7 @@ impl KafkaLog {
     }
 
     // traceparent: 00-TRACEID-SPANID-01
-    fn decode_traceparent_trace_id(payload: &str, info: &mut KafkaInfo) {
+    fn decode_traceparent(payload: &str, info: &mut KafkaInfo) {
         let tag = TraceType::TraceParent.to_string();
         let mut start = 0;
         let mut trace_id = "";
@@ -542,14 +552,18 @@ impl KafkaLog {
         }
 
         if trace_id.len() > 0 {
-            if let Some(end_index) = trace_id.find("-") {
-                info.trace_id = decode_base64_to_string(&trace_id[..end_index]);
+            let mut segs = trace_id.split('-');
+            if let Some(seg) = segs.next() {
+                info.trace_id = seg.to_string();
+            }
+            if let Some(seg) = segs.next() {
+                info.span_id = seg.to_string();
             }
         }
     }
 
     // Example: 'sw8  1-{trace-id}-{other}'
-    fn decode_sw8_trace_id(payload: &str, info: &mut KafkaInfo) {
+    fn decode_sw8(payload: &str, info: &mut KafkaInfo) {
         let tag = TraceType::Sw8.to_string();
         let mut start = 0;
         let mut trace_id = "";
@@ -574,8 +588,19 @@ impl KafkaLog {
         }
 
         if trace_id.len() > 0 {
-            if let Some(end_index) = trace_id.find("-") {
-                info.trace_id = decode_base64_to_string(&trace_id[..end_index]);
+            let mut segs = trace_id.split('-');
+            if let Some(seg) = segs.next() {
+                info.trace_id = decode_base64_to_string(seg);
+            }
+
+            if let (Some(parent_trace_segment_id), Some(parent_span_id)) =
+                (segs.next(), segs.next())
+            {
+                info.span_id = format!(
+                    "{}-{}",
+                    decode_base64_to_string(parent_trace_segment_id),
+                    parent_span_id
+                );
             }
         }
     }
@@ -607,9 +632,9 @@ impl KafkaLog {
         // topic
         Self::decode_topics_name(payload, client_id_len, info);
         // sw8
-        let payload = String::from_utf8_lossy(&payload[14..14 + client_id_len]);
-        Self::decode_sw8_trace_id(&payload, info);
-        Self::decode_traceparent_trace_id(&payload, info);
+        let payload = String::from_utf8_lossy(&payload[14 + client_id_len..]);
+        Self::decode_sw8(&payload, info);
+        Self::decode_traceparent(&payload, info);
         Ok(())
     }
 
@@ -753,6 +778,7 @@ mod tests {
             ("kafka.pcap", "kafka.result"),
             ("produce.pcap", "produce.result"),
             ("produce-v9.pcap", "produce-v9.result"),
+            ("kafka-sw8.pcap", "kafka-sw8.result"),
         ];
 
         for item in files.iter() {
@@ -846,23 +872,33 @@ mod tests {
     #[test]
     fn trace_id() {
         let payload =
-            "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf traceparent: 00-123456789-01".as_bytes();
+            "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf-1-jaifjei traceparent: 00-123456789-abcdefg-01".as_bytes();
         let payload = String::from_utf8_lossy(payload);
 
         let mut info = KafkaInfo::default();
 
-        KafkaLog::decode_sw8_trace_id(&payload, &mut info);
+        KafkaLog::decode_sw8(&payload, &mut info);
         assert_eq!(
             info.trace_id, "abcdefghi",
             "parse trace id {} unexcepted",
             info.trace_id
         );
+        assert_eq!(
+            info.span_id, "jjaiejfeajf-1",
+            "parse span id {} unexcepted",
+            info.span_id
+        );
 
-        KafkaLog::decode_traceparent_trace_id(&payload, &mut info);
+        KafkaLog::decode_traceparent(&payload, &mut info);
         assert_eq!(
             info.trace_id, "123456789",
             "parse trace id {} unexcepted",
             info.trace_id
+        );
+        assert_eq!(
+            info.span_id, "abcdefg",
+            "parse span id {} unexcepted",
+            info.span_id
         );
     }
 }

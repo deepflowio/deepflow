@@ -420,15 +420,27 @@ impl SessionQueue {
     //   - 收到响应，根据报文时间-RRT时间，找到对应的时间窗口，查找是否有匹配的请求
     //      - 若有， 则合并请求和响应(将响应的数据填入请求中，并修改请求的类型为会话)，释放当前响应，发送会话
     //      - 若没有, 则直接发送当前响应
-    fn aggregate_session_and_send(&mut self, item: Box<MetaAppProto>) {
+    fn aggregate_session_and_send(&mut self, mut item: Box<MetaAppProto>) {
         self.counter.receive.fetch_add(1, Ordering::Relaxed);
 
-        let slot_time = if item.base_info.head.msg_type == LogMessageType::Response {
+        let slot_time = match item.base_info.head.msg_type {
             // request = response - RRT
-            (item.base_info.start_time - Duration::from_micros(item.base_info.head.rrt)).as_secs()
-        } else {
+            LogMessageType::Response => (item.base_info.start_time
+                - Duration::from_micros(item.base_info.head.rrt))
+            .as_secs(),
+            LogMessageType::Session => {
+                if item.base_info.start_time.is_zero() {
+                    item.base_info.start_time = item.base_info.end_time;
+                }
+                if item.base_info.end_time.is_zero() {
+                    item.base_info.end_time = item.base_info.start_time;
+                }
+                self.send(item);
+                return;
+            }
             // if req and rrt not 0, maybe ebpf disorder, the slot time is resp time and req should add the rrt.
-            (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt)).as_secs()
+            _ => (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt))
+                .as_secs(),
         };
         if slot_time < self.aggregate_start_time.as_secs() {
             if self
