@@ -371,13 +371,15 @@ impl MysqlLog {
         payload: &[u8],
         trace_id: Option<&str>,
         info: &mut MysqlInfo,
-    ) -> Result<()> {
+    ) -> Result<LogMessageType> {
         if payload.len() < COMMAND_LEN {
             return Err(Error::MysqlLogParseFailed);
         }
         info.command = payload[COMMAND_OFFSET];
+        let mut msg_type = LogMessageType::Request;
         match info.command {
-            COM_QUIT | COM_FIELD_LIST | COM_STMT_CLOSE | COM_STMT_FETCH => (),
+            COM_QUIT | COM_STMT_CLOSE => msg_type = LogMessageType::Session,
+            COM_FIELD_LIST | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 info.request_string(
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
@@ -392,7 +394,7 @@ impl MysqlLog {
             _ => return Err(Error::MysqlLogParseFailed),
         }
         self.perf_stats.as_mut().map(|p| p.inc_req());
-        Ok(())
+        Ok(msg_type)
     }
 
     fn decode_compress_int(payload: &[u8]) -> u64 {
@@ -519,12 +521,14 @@ impl MysqlLog {
             return Err(Error::MysqlLogParseFailed);
         }
         let offset = offset as usize;
-        let msg_type = header
+        let mut msg_type = header
             .check(direction, offset, payload)
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => self.request(&payload[offset..], trace_id, info)?,
+            LogMessageType::Request => {
+                msg_type = self.request(&payload[offset..], trace_id, info)?
+            }
             LogMessageType::Response => self.response(&payload[offset..], info)?,
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
