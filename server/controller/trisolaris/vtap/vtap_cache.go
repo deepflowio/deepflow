@@ -134,6 +134,7 @@ func NewVTapConfig(config *models.RVTapGroupConfiguration) *VTapConfig {
 type VTapCache struct {
 	id                 int
 	name               *string
+	rawHostname        *string
 	state              int
 	enable             int
 	vTapType           int
@@ -209,6 +210,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache := &VTapCache{}
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
+	vTapCache.rawHostname = proto.String(vtap.RawHostname)
 	vTapCache.state = vtap.State
 	vTapCache.enable = vtap.Enable
 	vTapCache.vTapType = vtap.Type
@@ -519,6 +521,20 @@ func (c *VTapCache) GetVTapHost() string {
 		return *c.name
 	}
 	return ""
+}
+
+func (c *VTapCache) GetVTapRawHostname() string {
+	if c.rawHostname != nil {
+		return *c.rawHostname
+	}
+	return ""
+
+}
+
+func (c *VTapCache) UpdateVTapRawHostname(name string) {
+	if name != "" {
+		c.rawHostname = &name
+	}
 }
 
 func (c *VTapCache) GetConfigSyncInterval() int {

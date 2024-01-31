@@ -162,6 +162,7 @@ func (AZAnalyzerConnection) TableName() string {
 type VTap struct {
 	ID                 int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name               string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	RawHostname        string    `gorm:"column:raw_hostname;type:varchar(256);" json:"RAW_HOSTNAME"`
 	State              int       `gorm:"column:state;type:int;default:1" json:"STATE"`   // 0.not-connected 1.normal
 	Enable             int       `gorm:"column:enable;type:int;default:1" json:"ENABLE"` // 0: stop 1: running
 	Type               int       `gorm:"column:type;type:int;default:0" json:"TYPE"`     // 1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod
