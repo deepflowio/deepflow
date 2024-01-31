@@ -905,10 +905,10 @@ message LabelRequest {
 
 message LabelResponse {
     optional string name = 1;
-    optional string value = 2;  // when requesting all, response will not carry value and value_id
+    optional string value = 2;
     optional uint32 name_id = 3;
     optional uint32 value_id = 4;
-    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label
+    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label. When requesting all, response will not carry index
 }
 
 message MetricLabelRequest {
@@ -945,7 +945,7 @@ message TargetResponse {
     repeated uint32 target_label_name_ids = 9;  // when the target labels change, it needs to be synchronized to Ingester regularly
 }
 
-message LabelValueResponse {
+message LabelValueResponse {  // TODO remove later
     optional string value = 1;
     optional uint32 value_id = 2;
 }
@@ -959,7 +959,8 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
-    repeated LabelValueResponse response_label_values = 3;  // when requesting all, you need to carry the label value list
+    repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
+    repeated LabelValueResponse response_label_values = 4;  // TODO remove later
 }
 
 message PrometheusTargetRequest {
