@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -111,6 +112,8 @@ var aggFunctions = map[string]string{
 	"count_values": view.FUNCTION_COUNT, // equals count() group by value in ck
 	"quantile":     "",                  // not supported, FIXME: should support histogram in querier, and calcul Pxx by histogram
 }
+
+var _match_fullmatch_reg = regexp.MustCompile(`^[\w\|]+$`)
 
 var _relabelFunctions = []string{"sum", "avg", "count", "min", "max", "group", "stddev", "stdvar", "count_values", "quantile"}
 
@@ -312,13 +315,23 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		}
 
 		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
+
+		// for normal query & DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
+		tagMatcher := tagName
 		if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
 			// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, value))
+			tagMatcher = tagAlias
+		}
+
+		if len(value) > 1 {
+			tmpFilters := make([]string, 0, len(value))
+			for _, v := range value {
+				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, v))
+			}
+			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
-			// for normal query
-			// for DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, value))
+			// () with only ONE condition in it will cause error
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, value[0]))
 		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
@@ -954,12 +967,19 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 			continue
 		}
 
-		// TODO: confirm Enum here
 		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixDeepFlow, chCommon.DB_NAME_PROMETHEUS, matcher.Name)
+		tagMatcher := tagName
 		if isDeepFlowTag && tagAlias != "" {
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, value))
+			tagMatcher = tagAlias
+		}
+		if len(value) > 1 {
+			tmpFilters := make([]string, 0, len(value))
+			for _, v := range value {
+				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, v))
+			}
+			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, value))
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, value[0]))
 		}
 
 		if isDeepFlowTag && cap(groupBy) == 0 {
@@ -1068,18 +1088,28 @@ func parseMatcherType(t labels.MatchType) prompb.LabelMatcher_Type {
 }
 
 // match prometheus lable matcher type
-func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, string) {
+func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
 	switch t {
 	case prompb.LabelMatcher_EQ:
-		return "=", v
+		return "=", []string{v}
 	case prompb.LabelMatcher_NEQ:
-		return "!=", v
+		return "!=", []string{v}
 	case prompb.LabelMatcher_RE:
-		return "REGEXP", appendRegexRules(v)
+		// for regex like 'a|b', convert to 'tag=a OR tag=b'
+		if _match_fullmatch_reg.MatchString(v) {
+			return "=", strings.Split(v, "|")
+		} else {
+			return "REGEXP", []string{appendRegexRules(v)}
+		}
 	case prompb.LabelMatcher_NRE:
-		return "NOT REGEXP", appendRegexRules(v)
+		// for regex like 'a|b', convert to 'tag!=a OR tag!=b'
+		if _match_fullmatch_reg.MatchString(v) {
+			return "!=", strings.Split(v, "|")
+		} else {
+			return "NOT REGEXP", []string{appendRegexRules(v)}
+		}
 	default:
-		return "", v
+		return "", []string{v}
 	}
 }
 
