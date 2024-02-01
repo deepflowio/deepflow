@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +104,14 @@ var aggFunctions = map[string]string{
 	"count_values": view.FUNCTION_COUNT, // equals count() group by value in ck
 	"quantile":     "",                  // not supported, FIXME: should support histogram in querier, and calcul Pxx by histogram
 }
+
+var _match_fullmatch_reg = regexp.MustCompile(`^[\w\|]+$`)
+
+var _relabelFunctions = []string{"sum", "avg", "count", "min", "max", "group", "stddev", "stdvar", "count_values", "quantile"}
+
+var _matrixCallFunctions = []string{"topk", "bottomk",
+	"avg_over_time", "count_over_time", "last_over_time", "max_over_time", "min_over_time", "stddev_over_time", "sum_over_time", "present_over_time", "quantile_over_time",
+	"idelta", "delta", "increase", "irate", "rate"}
 
 // define `showtag` flag, it passed when and only [api/v1/series] been called
 type CtxKeyShowTag struct{}
@@ -253,7 +263,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		// append metricName `value`
 		metricsArray = append(metricsArray, metricAlias)
 		// append `tag` only for prometheus & ext_metrics & deepflow_system
-		if q.Hints.Func == "" || q.Hints.Func == "series" || q.Hints.Func == FUNCTION_TOPK || q.Hints.Func == FUNCTION_BOTTOMK || filterMatrixArgTypes(q.Hints.Func) {
+		if !common.IsValueInSliceString(q.Hints.Func, _relabelFunctions) {
 			// `tag` should be append into `Select` with:
 			// 1. not any aggregations, try get all `tag`
 			// 2. topk(n)/bottomk(n) get all `tag`
@@ -299,13 +309,22 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		}
 
 		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
+		// for normal query & DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
+		tagMatcher := tagName
 		if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
 			// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, value))
+			tagMatcher = tagAlias
+		}
+
+		if len(value) > 1 {
+			tmpFilters := make([]string, 0, len(value))
+			for _, v := range value {
+				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, v))
+			}
+			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
-			// for normal query
-			// for DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, value))
+			// () with only ONE condition in it will cause error
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, value[0]))
 		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
@@ -604,8 +623,11 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	sampleSeriesIndex := make([]int32, len(result.Values))          // the index in seriesArray, for each sample
 	seriesSampleCount := make([]int32, maxPossibleSeries)           // number of samples of each series
 	initialSeriesIndex := int32(0)
-
+	promJsonMap := make(map[string]map[string]string)
 	tagsStrList := make([]string, 0, len(allDeepFlowNativeTags))
+	promTagStrList := make([]string, 0)
+	promTagWriter := strings.Builder{}
+
 	for i, v := range result.Values {
 		values := v.([]interface{})
 		// don't append series if it's outside query time range
@@ -620,21 +642,36 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		// merge prometheus tags
 		if tagIndex > -1 {
 			promTagJson = values[tagIndex].(string)
-			tagMap := make(map[string]string)
-			json.Unmarshal([]byte(promTagJson), &tagMap)
-			filterTagMap = make(map[string]string, len(tagMap))
-			for k, v := range tagMap {
+			var ok bool
+			if filterTagMap, ok = promJsonMap[promTagJson]; !ok {
+				filterTagMap = make(map[string]string)
+				json.Unmarshal([]byte(promTagJson), &filterTagMap)
+			}
+			if cap(promTagStrList) < len(filterTagMap) {
+				promTagStrList = make([]string, 0, len(filterTagMap))
+			}
+			for k, v := range filterTagMap {
 				if k == "" || v == "" {
 					continue
 				}
 				// ignore replica labels if passed
 				if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(k, config.Cfg.Prometheus.ThanosReplicaLabels) {
+					filterTagMap[k] = ""
 					continue
 				}
 				filterTagMap[k] = v
+				promTagStrList = append(promTagStrList, k)
 			}
-			promFilterTagJson, _ := json.Marshal(filterTagMap)
-			deepflowNativeTagString = string(promFilterTagJson)
+			promJsonMap[promTagJson] = filterTagMap
+			sort.Strings(promTagStrList)
+			for i := 0; i < len(promTagStrList); i++ {
+				promTagWriter.WriteString(promTagStrList[i])
+				promTagWriter.WriteByte(':')
+				promTagWriter.WriteString(filterTagMap[promTagStrList[i]])
+			}
+			deepflowNativeTagString = promTagWriter.String()
+			promTagWriter.Reset()
+			promTagStrList = promTagStrList[:0]
 		} else if labelsIndex > -1 {
 			labelsArray, ok := values[labelsIndex].([]uint32)
 			if !ok {
@@ -642,37 +679,40 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 				continue
 			}
 			labelString := strings.Builder{}
-			for j, labelidx := range labelsArray {
+			for j := 0; j < len(labelsArray); j++ {
 				labelString.WriteString(strconv.Itoa(j))
-				labelString.WriteString(strconv.Itoa(int(labelidx)))
+				labelString.WriteString(strconv.Itoa(int(labelsArray[j])))
 			}
 			deepflowNativeTagString = labelString.String()
 			filterTagMap = make(map[string]string, len(tagsFieldIndex)+1)
 			filterTagMap[PROMETHEUS_LABELS_INDEX] = deepflowNativeTagString
 
-			if len(tagsFieldIndex) > 0 {
-				// agg prometheus query, directly get tag.x
-				for idx := range tagsFieldIndex {
-					name := strings.Replace(result.Columns[idx].(string), "tag.", "", 1)
-					val := values[idx].(string)
+			// agg prometheus query, directly get tag.x
+			for idx := range tagsFieldIndex {
+				name := strings.Replace(result.Columns[idx].(string), "tag.", "", 1)
+				val := values[idx].(string)
 
-					if name == "" || val == "" {
-						continue
-					}
-					// ignore replica labels if passed
-					if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(name, config.Cfg.Prometheus.ThanosReplicaLabels) {
-						continue
-					}
-					filterTagMap[name] = val
+				if name == "" || val == "" {
+					continue
 				}
+				// ignore replica labels if passed
+				if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(name, config.Cfg.Prometheus.ThanosReplicaLabels) {
+					continue
+				}
+				filterTagMap[name] = val
 			}
+		}
+
+		if deepflowNativeTagString == "" {
+			deepflowNativeTagString = fmt.Sprintf("%s:%s", PROMETHEUS_METRICS_NAME, metricsName)
+			filterTagMap[PROMETHEUS_METRICS_NAME] = metricsName
 		}
 
 		// merge deepflow autotagging tags
 		if len(allDeepFlowNativeTags) > 0 {
-			for _, idx := range allDeepFlowNativeTags {
-				tagsStrList = append(tagsStrList, strconv.Itoa(idx))
-				tagsStrList = append(tagsStrList, getValue(values[idx]))
+			for i := 0; i < len(allDeepFlowNativeTags); i++ {
+				tagsStrList = append(tagsStrList, strconv.Itoa(allDeepFlowNativeTags[i]))
+				tagsStrList = append(tagsStrList, getValue(values[allDeepFlowNativeTags[i]]))
 			}
 			deepflowNativeTagString += strings.Join(tagsStrList, "-")
 			tagsStrList = tagsStrList[:0]
@@ -695,18 +735,15 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			if len(filterTagMap) > 0 {
 				pairs = make([]prompb.Label, 0, 1+len(filterTagMap)+len(allDeepFlowNativeTags))
 				for k, v := range filterTagMap {
+					if v == "" {
+						continue
+					}
 					if prefix == prefixTag {
 						// prometheus tag for deepflow metrics
-						pairs = append(pairs, prompb.Label{
-							Name:  appendPrometheusPrefix(k),
-							Value: v,
-						})
+						pairs = append(pairs, prompb.Label{Name: appendPrometheusPrefix(k), Value: v})
 					} else {
 						// no prefix, use prometheus native tag
-						pairs = append(pairs, prompb.Label{
-							Name:  k,
-							Value: v,
-						})
+						pairs = append(pairs, prompb.Label{Name: k, Value: v})
 					}
 				}
 
@@ -721,21 +758,14 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 				if isZero(values[idx]) {
 					continue
 				}
+				formatTag := formatTagName(result.Columns[idx].(string))
+				p.addExternalTagCache(formatTag, result.Columns[idx].(string))
+
 				if len(filterTagMap) > 0 && prefix == prefixDeepFlow {
 					// deepflow tag for prometheus metrics
-					formatTag := formatTagName(result.Columns[idx].(string))
-					pairs = append(pairs, prompb.Label{
-						Name:  appendDeepFlowPrefix(extractEnumTag(formatTag)),
-						Value: getValue(values[idx]),
-					})
-					p.addExternalTagCache(formatTag, result.Columns[idx].(string))
+					pairs = append(pairs, prompb.Label{Name: appendDeepFlowPrefix(extractEnumTag(formatTag)), Value: getValue(values[idx])})
 				} else {
-					formatTag := formatTagName(result.Columns[idx].(string))
-					pairs = append(pairs, prompb.Label{
-						Name:  extractEnumTag(formatTag),
-						Value: getValue(values[idx]),
-					})
-					p.addExternalTagCache(formatTag, result.Columns[idx].(string))
+					pairs = append(pairs, prompb.Label{Name: extractEnumTag(formatTag), Value: getValue(values[idx])})
 				}
 			}
 
@@ -770,23 +800,18 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		if currentTimestamp < start || currentTimestamp > end {
 			continue
 		}
-		var metricsValue float64
+
 		if values[metricsIndex] == nil {
-			metricsValue = 0
 			continue
 		}
-		if metricsType == "Int" {
-			metricsValue = float64(values[metricsIndex].(int))
-		} else if metricsType == "Float64" {
-			// metricsType == "Float64" but typeof(values[metricsIndex]) is `int` ?? for robustness add type assert
-			val, ok := values[metricsIndex].(float64)
-			if ok {
-				metricsValue = val
-			} else {
-				metricsValue = float64(values[metricsIndex].(int))
-			}
-		} else {
-			return nil, fmt.Errorf("Unknown metrics type %s, value = %v", metricsType, values[metricsIndex])
+
+		if metricsType != "Int" && metricsType != "Float64" {
+			return nil, fmt.Errorf("unknown metrics type %s, value = %v ", metricsType, values[metricsIndex])
+		}
+
+		metricsValue, ok := parseValue(metricsType, values[metricsIndex])
+		if !ok {
+			continue
 		}
 
 		// add a sample for the TimeSeries
@@ -816,30 +841,52 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	return resp, nil
 }
 
-func filterMatrixArgTypes(f string) bool {
-	if fc, ok := parser.Functions[f]; ok {
-		for _, t := range fc.ArgTypes {
-			if t == parser.ValueTypeMatrix {
-				return true
-			}
+func convertTo[T int | float64](val interface{}) (v T, b bool) {
+	v, b = val.(T)
+	return
+}
+
+func parseValue(valueType string, val interface{}) (v float64, b bool) {
+	switch valueType {
+	case "Int":
+		metricsValueInt, ok := convertTo[int](val)
+		return float64(metricsValueInt), ok
+	case "Float64":
+		// metricsType == "Float64" but typeof(values[metricsIndex]) is `int` ?? for robustness add type assert
+		metricsValueFloat, ok := convertTo[float64](val)
+		if !ok {
+			metricsValueInt, ok := convertTo[int](val)
+			return float64(metricsValueInt), ok
 		}
+		return metricsValueFloat, ok
+	default:
+		return 0, false
 	}
-	return false
 }
 
 // match prometheus lable matcher type
-func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, string) {
+func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
 	switch t {
 	case prompb.LabelMatcher_EQ:
-		return "=", v
+		return "=", []string{v}
 	case prompb.LabelMatcher_NEQ:
-		return "!=", v
+		return "!=", []string{v}
 	case prompb.LabelMatcher_RE:
-		return "REGEXP", appendRegexRules(v)
+		// for regex like 'a|b', convert to 'tag=a OR tag=b'
+		if _match_fullmatch_reg.MatchString(v) {
+			return "=", strings.Split(v, "|")
+		} else {
+			return "REGEXP", []string{appendRegexRules(v)}
+		}
 	case prompb.LabelMatcher_NRE:
-		return "NOT REGEXP", appendRegexRules(v)
+		// for regex like 'a|b', convert to 'tag!=a OR tag!=b'
+		if _match_fullmatch_reg.MatchString(v) {
+			return "!=", strings.Split(v, "|")
+		} else {
+			return "NOT REGEXP", []string{appendRegexRules(v)}
+		}
 	default:
-		return "", v
+		return "", []string{v}
 	}
 }
 
