@@ -334,7 +334,8 @@ querier:
       response-cache: false
       cache-item-size: 512000 # max size of cache item, unit: byte
       cache-max-count: 1024 # max capacity of cache list
-      cache-max-allow-deviation: 3600 # unit:s 
+      cache-first-timeout: 10000 # time out for first cache item load, uint: ms
+      cache-clean-interval: 3600 # clean interval for cache, unit: s
 
   auto-custom-tag:
     tag-name: 
