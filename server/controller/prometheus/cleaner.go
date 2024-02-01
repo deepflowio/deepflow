@@ -286,7 +286,7 @@ func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time, resourceType string
 	}
 
 	count := len(items)
-	offset := 5000
+	offset := 1000
 	pages := count/offset + 1
 	if count%offset == 0 {
 		pages = count / offset
@@ -299,10 +299,10 @@ func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time, resourceType string
 		}
 		toDel := items[start:end]
 		if err := tx.Delete(&toDel).Error; err != nil {
-			log.Errorf("mysql delete resource failed: %v", err)
+			log.Errorf("mysql delete %s failed: %v", resourceType, err)
 			return items, err
 		}
-		log.Infof("clear %s data count: %d", resourceType, len(items))
+		log.Infof("clear %s data count: %d", resourceType, len(toDel))
 		log.Debugf("clear %s data detail: %v", resourceType, items)
 	}
 
