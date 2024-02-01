@@ -494,6 +494,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 				} else if instanceId == 0 && name == model.InstanceLabel {
 					instanceId = valueId
 				}
+				t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 			}
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
@@ -729,6 +730,9 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	targetReq.EpcId = proto.Uint32(uint32(epcId))
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
+	if request == "all" {
+		req = &trident.PrometheusLabelRequest{}
+	}
 	resp, err := t.RequestLabelIDs(req)
 	if err != nil {
 		return fmt.Sprintf("request: %s\nresponse failed: %s", req, err)

@@ -293,6 +293,7 @@ impl L7ProtocolParserInterface for MysqlLog {
             param.l4_protocol,
             param.direction,
             param.parse_config.and_then(|c| {
+                // FIXME: all custom trace id label should be effective
                 for i in c.l7_log_dynamic.trace_types.iter() {
                     match i {
                         crate::config::handler::TraceType::Customize(c) => return Some(c.as_str()),

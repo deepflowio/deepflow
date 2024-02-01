@@ -31,7 +31,7 @@ type LayoutKey struct {
 }
 
 func (k LayoutKey) String() string {
-	return k.MetricName + "_" + k.LabelName
+	return k.MetricName + "-" + k.LabelName
 }
 
 func NewLayoutKey(metricName, labelName string) LayoutKey {

@@ -45,6 +45,8 @@ type ChDevice struct {
 	Name       string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID     int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	UID        string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	Hostname   string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP         string `gorm:"column:ip;type:varchar(64)" json:"IP"`
 }
 
 type ChVTapPort struct {

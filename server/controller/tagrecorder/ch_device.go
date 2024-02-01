@@ -116,6 +116,12 @@ func (d *ChDevice) generateUpdateInfo(oldItem, newItem mysql.ChDevice) (map[stri
 	if oldItem.UID != newItem.UID {
 		updateInfo["uid"] = newItem.UID
 	}
+	if oldItem.Hostname != newItem.Hostname {
+		updateInfo["hostname"] = newItem.Hostname
+	}
+	if oldItem.IP != newItem.IP {
+		updateInfo["ip"] = newItem.IP
+	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
 	}
@@ -141,6 +147,8 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 				DeviceID:   host.ID,
 				Name:       host.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
+				Hostname:   host.Hostname,
+				IP:         host.IP,
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -148,6 +156,8 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 				DeviceID:   host.ID,
 				Name:       host.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
+				Hostname:   host.Hostname,
+				IP:         host.IP,
 			}
 		}
 
@@ -176,6 +186,8 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				Name:       vm.Name + " (deleted)",
 				UID:        vm.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
+				Hostname:   vm.Hostname,
+				IP:         vm.IP,
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -184,6 +196,8 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				Name:       vm.Name,
 				UID:        vm.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
+				Hostname:   vm.Hostname,
+				IP:         vm.IP,
 			}
 		}
 	}
@@ -535,6 +549,8 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				DeviceID:   podNode.ID,
 				Name:       podNode.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:   podNode.Hostname,
+				IP:         podNode.IP,
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -542,6 +558,8 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				DeviceID:   podNode.ID,
 				Name:       podNode.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:   podNode.Hostname,
+				IP:         podNode.IP,
 			}
 		}
 	}
