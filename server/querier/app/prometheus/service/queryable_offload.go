@@ -192,6 +192,9 @@ func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, mat
 
 	//lint:ignore SA1029 use string as context key, ensure no type reference to app/prometheus
 	ctx := context.WithValue(o.ctx, "remote_read", true)
+	// if use multiple query functions, it will affect query sql building
+	// so we should restore before query, then call back it after query
+	o.querierable.restoreFunctionAfterQueryFinished()
 	querierSql := o.querierable.reader.parseQueryRequestToSQL(ctx, queryReq, o.querierable.queryType)
 	if querierSql != "" {
 		result, sql, duration, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", o.debug)

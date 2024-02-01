@@ -75,7 +75,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 			loadCompleted := cacheItem.GetLoadCompleteSignal()
 
 			select {
-			case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Millisecond):
+			case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
 				log.Infof("req [%s:%d-%d] wait 10 seconds to get cache result", metricName, start, end)
 				return response, "", "", 0, errors.New("query timeout, retry to get response! ")
 			case <-loadCompleted:
