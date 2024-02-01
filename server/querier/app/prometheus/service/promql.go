@@ -41,7 +41,6 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
@@ -268,23 +267,20 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 
 	var cached promql.Result
 	var cachedKey string
-	var queryRequired = true
 	if config.Cfg.Prometheus.Cache.ResponseCache {
 		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
 		var fixedStart, fixedEnd int64
+		queryRequired := true
 		if cached, fixedStart, fixedEnd, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
 			log.Debugf("cache hit for instant query: %s, start: %s, end: %s", cachedKey, fixedStart, fixedEnd)
 			start, end = time.UnixMilli(fixedStart), time.UnixMilli(fixedEnd)
 		} else {
-			log.Debugf("get cache data error: %s", cached.Err)
+			if cached.Err != nil {
+				return &model.PromQueryResponse{Data: &model.PromQueryData{}, Status: _SUCCESS}, cached.Err
+			} else {
+				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
+			}
 		}
-	}
-
-	if !queryRequired {
-		return &model.PromQueryResponse{
-			Data:   &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value},
-			Status: _SUCCESS,
-		}, err
 	}
 
 	var queriable model.Querierable
@@ -317,6 +313,9 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	}
 
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
+	defer func(q model.Querierable) {
+		q.AfterQueryExec(qry)
+	}(queriable)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
@@ -329,9 +328,6 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 		log.Error(res.Err)
 		return nil, res.Err
 	}
-	if queriable != nil {
-		queriable.AfterQueryExec(qry)
-	}
 	data := &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value}
 	result = &model.PromQueryResponse{
 		Data:   data,
@@ -342,7 +338,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	}
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
-		if mergeResult, err := p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
+		if mergeResult, err := p.cacher.Merge(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
 			result.Data = &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value}
 		} else {
 			// err != nil
@@ -405,20 +401,19 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 
 	var cached promql.Result
 	var cachedKey string
-	var queryRequired = true
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
 		cachedKey = p.cacheKeyGenerator.GenerateCacheKey(promRequest)
+		queryRequired := true
 		if cached, _, _, queryRequired = p.cacher.Fetch(cachedKey, promRequest.Start, promRequest.End); queryRequired {
-			log.Debugf("cache hit for instant query: %s, start: %s, end: %s", cachedKey)
+			log.Debugf("cache hit for instant query: %s, start: %s, end: %s, not match time", cachedKey)
+		} else {
+			if cached.Err != nil {
+				return &model.PromQueryResponse{Data: &model.PromQueryData{}, Status: _SUCCESS}, cached.Err
+			} else {
+				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
+			}
 		}
-	}
-
-	if !queryRequired {
-		return &model.PromQueryResponse{
-			Data:   &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value},
-			Status: _SUCCESS,
-		}, err
 	}
 
 	var queriable model.Querierable
@@ -453,6 +448,9 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	}
 
 	qry, err := engine.NewInstantQuery(queriable, nil, args.Promql, queryTime)
+	defer func(q model.Querierable) {
+		q.AfterQueryExec(qry)
+	}(queriable)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
@@ -466,9 +464,6 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 		log.Error(res.Err)
 		return nil, res.Err
 	}
-	if queriable != nil {
-		queriable.AfterQueryExec(qry)
-	}
 	data := &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value}
 	result = &model.PromQueryResponse{
 		Data:   data,
@@ -480,7 +475,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
 		// instant query merge failed should not influence return result
-		if _, err = p.cacher.Merge(cachedKey, cached, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
+		if _, err = p.cacher.Merge(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
 			log.Errorf("cache merge error: %v", err)
 		}
 	}
@@ -523,7 +518,7 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 	}
 	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
 	if querierSql != "" {
-		result, _, _, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", false)
+		result, _, _, err := queryDataExecute(ctx, querierSql, chCommon.DB_NAME_PROMETHEUS, "", false)
 		if err != nil {
 			log.Error(err)
 			return nil, err

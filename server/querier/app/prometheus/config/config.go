@@ -35,6 +35,6 @@ type PrometheusCache struct {
 	ResponseCache      bool   `default:"false" yaml:"response-cache"`      // cache for query response (only operator offloading mode)
 	CacheItemSize      uint64 `default:"51200000" yaml:"cache-item-size"`  // cache-item-size for each cache item, default: 50M
 	CacheMaxCount      int    `default:"1024" yaml:"cache-max-count"`      // cache-max-count for list of cache size
-	CacheFirstTimeout  int    `default:"10000" yaml:"cache-first-timeout"` // time out for first cache item load, unit: ms, default: 10s
+	CacheFirstTimeout  int    `default:"10" yaml:"cache-first-timeout"`    // time out for first cache item load, unit: s, default: 10s
 	CacheCleanInterval int    `default:"3600" yaml:"cache-clean-interval"` // clean interval for cache, unit: s, default: 1h
 }
