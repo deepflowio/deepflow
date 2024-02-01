@@ -40,6 +40,8 @@ type item[T any] struct {
 	step  int64
 	vType parser.ValueType // origin value type
 	data  T
+
+	loadCompleted chan struct{}
 }
 
 func dataSizeOf(r *item[promql.Result]) uint64 {
@@ -108,13 +110,31 @@ func (c *Cacher) cleanCache() {
 }
 
 func (c *Cacher) Fetch(key string, start, end int64) (r promql.Result, fixedStart int64, fixedEnd int64, queryRequired bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	entry, ok := c.entries.Get(key)
 	if !ok {
+		c.lock.Lock()
+		c.entries.Add(key, item[promql.Result]{vType: parser.ValueTypeNone, loadCompleted: make(chan struct{})})
+		c.lock.Unlock()
+
 		return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, true
 	}
+
+	if entry.vType == parser.ValueTypeNone {
+		select {
+		case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
+			log.Infof("req [%s:%d-%d] wait %d to get cache result", key, start, end, config.Cfg.Prometheus.Cache.CacheFirstTimeout)
+			return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, false
+		case <-entry.loadCompleted:
+			entry, ok = c.entries.Get(key)
+			if !ok {
+				return promql.Result{Err: fmt.Errorf("key %s load failed", key)}, start, end, true
+			}
+			log.Debugf("req [%s:%d-%d] get cached result", key, start, end)
+		}
+	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	if entry.vType == parser.ValueTypeVector {
 		r, queryRequired = c.fetchInstant(&entry, start, end)
@@ -215,12 +235,12 @@ func (c *Cacher) extractSubData(r promql.Result, start, end int64) promql.Result
 	return promql.Result{Value: result}
 }
 
-func (c *Cacher) Merge(key string, cached promql.Result, start, end, step int64, res promql.Result) (promql.Result, error) {
+func (c *Cacher) Merge(key string, start, end, step int64, res promql.Result) (promql.Result, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	entry, ok := c.entries.Get(key)
-	if !ok {
+	if !ok || (entry.vType == parser.ValueTypeNone) {
 		item := item[promql.Result]{
 			start: start,
 			end:   end,
@@ -285,6 +305,15 @@ func (c *Cacher) Merge(key string, cached promql.Result, start, end, step int64,
 	}
 
 	entry.data = mergeResult
+
+	if entry.loadCompleted != nil {
+		select {
+		case _, ok := <-entry.loadCompleted:
+			log.Debugf("entry loadCompleted closed: %v", ok)
+		default:
+			close(entry.loadCompleted)
+		}
+	}
 	return entry.data, nil
 }
 

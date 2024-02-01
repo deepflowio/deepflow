@@ -29,44 +29,44 @@ import (
 )
 
 /*
-consider <VectorSelector> could only wrap by such expr:
-1. <Vector>  e.g.: node_cpu_seconds_total [output: <Vector>]
-2. Matrix<Vector>  e.g.: node_cpu_seconds_total[5m] [output: <Matrix>]
-3. SubQuery<Vector>  e.g.: node_cpu_seconds_total[5m:1m] [output: <Matrix>]
-4. Aggregate<Vector>  e.g.: sum(node_cpu_seconds_total)by(cpu) [input<Vector> output<Vector>]
-5. Call<Matrix>  e.g.: rate(node_cpu_seconds_total[5m]) [input<Matrix> output<Vector>]
-6. Call<Vector>  e.g.: abs(node_cpu_seconds_total) [input<Vector> output<Vector>]
+ consider <VectorSelector> could only wrap by such expr:
+ 1. <Vector>  e.g.: node_cpu_seconds_total [output: <Vector>]
+ 2. Matrix<Vector>  e.g.: node_cpu_seconds_total[5m] [output: <Matrix>]
+ 3. SubQuery<Vector>  e.g.: node_cpu_seconds_total[5m:1m] [output: <Matrix>]
+ 4. Aggregate<Vector>  e.g.: sum(node_cpu_seconds_total)by(cpu) [input<Vector> output<Vector>]
+ 5. Call<Matrix>  e.g.: rate(node_cpu_seconds_total[5m]) [input<Matrix> output<Vector>]
+ 6. Call<Vector>  e.g.: abs(node_cpu_seconds_total) [input<Vector> output<Vector>]
 
-...then, it can combined with each other,
-like: Call<SubQuery<Aggregate<Vector>>>
-e.g.: sum_over_time(sum(node_cpu_seconds_total)by(cpu)[5m:5m])
-e.g.: sum(sum_over_time(node_cpu_seconds_total[5m]))by(cpu)
+ ...then, it can combined with each other,
+ like: Call<SubQuery<Aggregate<Vector>>>
+ e.g.: sum_over_time(sum(node_cpu_seconds_total)by(cpu)[5m:5m])
+ e.g.: sum(sum_over_time(node_cpu_seconds_total[5m]))by(cpu)
 
-base on the combinations above, we could extract query hints by:
-- Call: get query func
-- MatrixSelector: get query range
-- AggregateExpr: get aggreagate function & aggregation group tags
+ base on the combinations above, we could extract query hints by:
+ - Call: get query func
+ - MatrixSelector: get query range
+ - AggregateExpr: get aggreagate function & aggregation group tags
 
-- Special: SubQueryExpr
-SubQueryExpr use a self-defined step for query (like: node_cpu_seconds_total[5m:1m]), [1m] is the step.
-When step > scrape_interval, it's downsampling, when step < scrape_interval, it's upsampling.
+ - Special: SubQueryExpr
+ SubQueryExpr use a self-defined step for query (like: node_cpu_seconds_total[5m:1m]), [1m] is the step.
+ When step > scrape_interval, it's downsampling, when step < scrape_interval, it's upsampling.
 
-parse case for wrap combinations:
-1&2. select value from m [where start < time < end];
-3. select last(value), time from m group by time;
-# upsampling:
-select time, sum(value) over (partition by metric_id,target_id,COLUMNS('app_label_value_id')
-order by time asc RANGE BETWEEN X PRECEDING AND CURRENT ROW) as `value`
-from m where start < time < end ORDER BY time WITH FILL STEP $STEP INTERPOLATE ( value AS value )
-4. select agg(value), time from m [where start < time < end] group by tags, time;
-- sum(node_cpu_seconds_total)by(cpu)[5m:1m]
-5. select time, call(value) over (partition by metric_id,target_id,COLUMNS('app_label_value_id')
-order by time asc RANGE BETWEEN X PRECEDING AND CURRENT ROW) from m where start < time < end;
-- x=[range * 60] (secs) (maybe it needs -1 secs for `x`), start = start - range (should calculate double time range for the first half of timestamp)
-6. select call(value) from m [where start < time < end];
+ parse case for wrap combinations:
+ 1&2. select value from m [where start < time < end];
+ 3. select last(value), time from m group by time;
+ # upsampling:
+ select time, sum(value) over (partition by metric_id,target_id,COLUMNS('app_label_value_id')
+ order by time asc RANGE BETWEEN X PRECEDING AND CURRENT ROW) as `value`
+ from m where start < time < end ORDER BY time WITH FILL STEP $STEP INTERPOLATE ( value AS value )
+ 4. select agg(value), time from m [where start < time < end] group by tags, time;
+ - sum(node_cpu_seconds_total)by(cpu)[5m:1m]
+ 5. select time, call(value) over (partition by metric_id,target_id,COLUMNS('app_label_value_id')
+ order by time asc RANGE BETWEEN X PRECEDING AND CURRENT ROW) from m where start < time < end;
+ - x=[range * 60] (secs) (maybe it needs -1 secs for `x`), start = start - range (should calculate double time range for the first half of timestamp)
+ 6. select call(value) from m [where start < time < end];
 
-such exprs could only calculate by prometheus engine, ignore currently:
-BinaryExpr/UnaryExpr/ParenExpr/StepInvariantExpr/Others...
+ such exprs could only calculate by prometheus engine, ignore currently:
+ BinaryExpr/UnaryExpr/ParenExpr/StepInvariantExpr/Others...
 */
 
 type queryAnalyzer struct {
@@ -76,8 +76,9 @@ type queryAnalyzer struct {
 
 type functionCall struct {
 	Range    time.Duration
-	Param    float64 // only for `topk`/`bottomk`/`quantile`
-	Name     string  // function name
+	Param    float64       // only for `topk`/`bottomk`/`quantile`
+	Name     string        // function name
+	SubStep  time.Duration // for subQuery step in range query
 	Grouping []string
 }
 
@@ -101,6 +102,7 @@ func (q *QueryHint) GetEnd() int64 {
 func (q *QueryHint) GetStep() int64 {
 	return q.step
 }
+
 func (q *QueryHint) GetFunc() []string {
 	f := make([]string, 0, len(q.funcs))
 	for _, v := range q.funcs {
@@ -122,6 +124,15 @@ func (q *QueryHint) GetRange(f string) int64 {
 	for i := 0; i < len(q.funcs); i++ {
 		if q.funcs[i].Name == f {
 			return int64(q.funcs[i].Range / (time.Millisecond / time.Nanosecond))
+		}
+	}
+	return 0
+}
+
+func (q *QueryHint) GetSubStep(f string) int64 {
+	for i := 0; i < len(q.funcs); i++ {
+		if q.funcs[i].Name == f {
+			return int64(q.funcs[i].SubStep / (time.Millisecond / time.Nanosecond))
 		}
 	}
 	return 0
@@ -205,6 +216,11 @@ func (p *prometheusHint) GetBy() bool {
 
 // not implement
 func (p *prometheusHint) GetFuncParam(f string) float64 {
+	return 0
+}
+
+// not implement
+func (q *prometheusHint) GetSubStep(f string) int64 {
 	return 0
 }
 
@@ -350,6 +366,7 @@ func extractSubFunctionFromPath(p []parser.Node) []functionCall {
 		return funcs
 	}
 	var evalRange time.Duration
+	var step time.Duration
 	for i := len(p) - 1; i >= 0; i-- {
 		switch n := p[i].(type) {
 		case *parser.AggregateExpr:
@@ -372,7 +389,7 @@ func extractSubFunctionFromPath(p []parser.Node) []functionCall {
 			// Call: rate/delta/increase/x_over_time...
 			f := functionCall{Name: n.Func.Name, Range: evalRange}
 			if n.Args != nil {
-				// for quantile_over_time
+				// p for quantile_over_time
 				for _, subE := range n.Args {
 					val := extractValFromSubNode(subE)
 					if val > 0 {
@@ -385,6 +402,23 @@ func extractSubFunctionFromPath(p []parser.Node) []functionCall {
 			funcs = append(funcs, f)
 		case *parser.MatrixSelector:
 			evalRange = n.Range
+		case *parser.SubqueryExpr:
+			// `for` loop is from inner-level to outer-leve
+			// so only the inner-level subQuery step is meaningful, outside level is base on the inner step
+			// only assign `step` one time
+			if step == 0 {
+				step = n.Step
+				if n.Step == 0 {
+					step = defaultNoStepSubQueryInterval
+				}
+				if len(funcs) > 0 {
+					funcs[len(funcs)-1].SubStep = step
+					step = 0
+				}
+			}
+		case *parser.ParenExpr, *parser.StepInvariantExpr:
+			// unwrap () and invariant expr
+			continue
 		default:
 			// other Expr can not be offloaded, when we meet other `Expr`, return funcs
 			return funcs
