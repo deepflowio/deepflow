@@ -74,7 +74,7 @@ func (v *ChVPC) generateUpdateInfo(oldItem, newItem mysql.ChVPC) (map[string]int
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if oldItem.UID != newItem.UID {
