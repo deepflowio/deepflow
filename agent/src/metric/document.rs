@@ -133,8 +133,7 @@ bitflags! {
         const TAP_PORT = 1<<49;
         const L7_PROTOCOL = 1<<51;
 
-        const TAG_TYPE = 1<<62;
-        const TAG_VALUE = 1<<63;
+        const TUNNEL_IP_ID = 1<<62;
     }
 }
 
@@ -271,18 +270,6 @@ impl From<SpanKind> for TapSide {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-#[repr(u8)]
-pub enum TagType {
-    TunnelIpId = 4,
-}
-
-impl Default for TagType {
-    fn default() -> Self {
-        TagType::TunnelIpId
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Tagger {
     pub code: Code,
@@ -304,7 +291,7 @@ pub struct Tagger {
     pub tap_side: TapSide,
     pub protocol: IpProtocol,
     pub acl_gid: u16,
-    pub server_port: u16,
+    pub server_port: u16, // tunnel_ip_id also uses this field
     pub vtap_id: u16,
     pub tap_port: TapPort,
     pub tap_type: TapType,
@@ -313,8 +300,6 @@ pub struct Tagger {
     pub gpid: u32,
     pub gpid_1: u32,
 
-    pub tag_type: TagType,
-    pub tag_value: u16,
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
     pub endpoint: Option<String>,
@@ -348,8 +333,6 @@ impl Default for Tagger {
             gpid: 0,
             gpid_1: 0,
 
-            tag_type: TagType::default(),
-            tag_value: 0,
             otel_service: None,
             otel_instance: None,
             endpoint: None,
@@ -403,8 +386,6 @@ impl From<Tagger> for metric::MiniTag {
                 tap_port: t.tap_port.0,
                 tap_type: u16::from(t.tap_type) as u32,
                 l7_protocol: t.l7_protocol as u32,
-                tag_type: t.tag_type as u32,
-                tag_value: t.tag_value as u32,
                 gpid: t.gpid,
                 gpid1: t.gpid_1,
                 signal_source: t.signal_source as u32,
