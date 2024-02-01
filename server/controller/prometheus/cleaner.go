@@ -181,7 +181,7 @@ func (c *Cleaner) tryDeleteExpired(expiredAt time.Time) error {
 }
 
 func (c *Cleaner) deleteExpiredMetricName(tx *gorm.DB, expiredAt time.Time) error {
-	metricNames, err := DeleteExpired[mysql.PrometheusMetricName](tx, expiredAt)
+	metricNames, err := DeleteExpired[mysql.PrometheusMetricName](tx, expiredAt, "metric_name")
 	if err != nil {
 		return err
 	}
@@ -207,12 +207,12 @@ func (c *Cleaner) deleteExpiredMetricName(tx *gorm.DB, expiredAt time.Time) erro
 }
 
 func (c *Cleaner) deleteExpiredLabel(tx *gorm.DB, expiredAt time.Time) error {
-	_, err := DeleteExpired[mysql.PrometheusLabel](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
+	_, err := DeleteExpired[mysql.PrometheusLabel](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt, "label")
 	return err
 }
 
 func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error {
-	labelNames, err := DeleteExpired[mysql.PrometheusLabelName](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt)
+	labelNames, err := DeleteExpired[mysql.PrometheusLabelName](tx.Where("name NOT IN (?)", []string{labelNameInstance, labelNameJob}), expiredAt, "label_name")
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (c *Cleaner) deleteExpiredLabelName(tx *gorm.DB, expiredAt time.Time) error
 
 func (c *Cleaner) deleteExpiredLabelValue(tx *gorm.DB, expiredAt time.Time) error {
 	instancesJobValues := c.getTargetInstanceJobValues()
-	labelValues, err := DeleteExpired[mysql.PrometheusLabelValue](tx.Where("value NOT IN (?)", instancesJobValues), expiredAt)
+	labelValues, err := DeleteExpired[mysql.PrometheusLabelValue](tx.Where("value NOT IN (?)", instancesJobValues), expiredAt, "label_value")
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (c *Cleaner) deleteExpiredLabelValue(tx *gorm.DB, expiredAt time.Time) erro
 }
 
 func (c *Cleaner) deleteExpiredMetricLabelName(tx *gorm.DB, expiredAt time.Time) error {
-	_, err := DeleteExpired[mysql.PrometheusMetricLabelName](tx, expiredAt)
+	_, err := DeleteExpired[mysql.PrometheusMetricLabelName](tx, expiredAt, "metric_label_name")
 	if err != nil {
 		return err
 	}
@@ -268,14 +268,14 @@ func (c *Cleaner) deleteExpiredMetricLabelName(tx *gorm.DB, expiredAt time.Time)
 }
 
 func (c *Cleaner) deleteExpiredMetricAPPLabelLayout(tx *gorm.DB, expiredAt time.Time) error {
-	_, err := DeleteExpired[mysql.PrometheusMetricAPPLabelLayout](tx, expiredAt)
+	_, err := DeleteExpired[mysql.PrometheusMetricAPPLabelLayout](tx, expiredAt, "metric_app_label_layout")
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time) ([]MT, error) {
+func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time, resourceType string) ([]MT, error) {
 	var items []MT
 	if err := tx.Where("synced_at < ?", expiredAt).Find(&items).Error; err != nil {
 		log.Errorf("mysql delete resource failed: %v", err)
@@ -284,11 +284,27 @@ func DeleteExpired[MT any](tx *gorm.DB, expiredAt time.Time) ([]MT, error) {
 	if len(items) == 0 {
 		return items, nil
 	}
-	if err := tx.Delete(&items).Error; err != nil {
-		log.Errorf("mysql delete resource failed: %v", err)
-		return items, err
+
+	count := len(items)
+	offset := 5000
+	pages := count/offset + 1
+	if count%offset == 0 {
+		pages = count / offset
 	}
-	log.Infof("clear data count: %d", len(items))
-	log.Infof("clear data detail: %v", items)
+	for i := 0; i < pages; i++ {
+		start := i * offset
+		end := (i + 1) * offset
+		if end > count {
+			end = count
+		}
+		toDel := items[start:end]
+		if err := tx.Delete(&toDel).Error; err != nil {
+			log.Errorf("mysql delete resource failed: %v", err)
+			return items, err
+		}
+		log.Infof("clear %s data count: %d", resourceType, len(items))
+		log.Debugf("clear %s data detail: %v", resourceType, items)
+	}
+
 	return items, nil
 }
