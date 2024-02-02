@@ -1405,12 +1405,11 @@ mod tests {
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
 
-        tagger.code = Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID;
-        tagger.tag_type = TagType::TunnelIpId;
-        tagger.tag_value = 0xffff;
+        tagger.code = Code::ACL_GID | Code::TUNNEL_IP_ID | Code::VTAP_ID;
+        tagger.server_port = 0xffff;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
-        tagger.tag_value = 0x7fff;
+        tagger.server_port = 0x7fff;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
     }
