@@ -53,6 +53,9 @@ type QueryRequest interface {
 
 	// GetFuncParam returns query params of query function, only for 'topk'/'quantile'/'bottomk'
 	GetFuncParam(f string) float64
+
+	// GetSubStep returns query step in subQuery, like [15m:1m], get `1m` (60000ms) from this
+	GetSubStep(f string) int64
 }
 
 /*

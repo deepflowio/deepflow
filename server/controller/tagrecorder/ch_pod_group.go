@@ -21,18 +21,18 @@ import (
 )
 
 type ChPodGroup struct {
-	UpdaterBase[mysql.ChPodGroup, IDKey]
+	UpdaterComponent[mysql.ChPodGroup, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 	updater := &ChPodGroup{
-		UpdaterBase[mysql.ChPodGroup, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD_GROUP,
-		},
+		newUpdaterComponent[mysql.ChPodGroup, IDKey](
+			RESOURCE_TYPE_CH_POD_GROUP,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

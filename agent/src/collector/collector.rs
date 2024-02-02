@@ -42,9 +42,7 @@ use crate::{
     },
     config::handler::{CollectorAccess, CollectorConfig},
     metric::{
-        document::{
-            BoxedDocument, Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide,
-        },
+        document::{BoxedDocument, Code, Direction, Document, DocumentFlag, Tagger, TapSide},
         meter::{AppMeter, FlowMeter, Meter, UsageMeter},
     },
     rpc::get_timestamp,
@@ -187,10 +185,7 @@ impl StashKey {
         .union(Code::SERVER_PORT)
         .union(Code::L7_PROTOCOL);
 
-    const ACL: Code = Code::ACL_GID
-        .union(Code::TAG_TYPE)
-        .union(Code::TAG_VALUE)
-        .union(Code::VTAP_ID);
+    const ACL: Code = Code::ACL_GID.union(Code::TUNNEL_IP_ID).union(Code::VTAP_ID);
 
     fn new(tagger: &Tagger, src_ip: IpAddr, dst_ip: Option<IpAddr>, endpoint_hash: u32) -> Self {
         let mut fast_id = 0;
@@ -305,11 +300,7 @@ impl StashKey {
                     .0 as u128)
                     << 64;
             }
-            Self::ACL => {
-                fast_id |= tagger.acl_gid as u128
-                    | (tagger.tag_type as u128) << 16
-                    | (tagger.tag_value as u128) << 24;
-            }
+            Self::ACL => fast_id |= tagger.acl_gid as u128 | (tagger.server_port as u128) << 16,
             _ => panic!(
                 "There is no matching code. You need to update the tagger.code: {:?}",
                 tagger.code
@@ -443,10 +434,9 @@ impl Stash {
             let id_map = &acc_flow.id_maps[0];
             for (&acl_gid, &ip_id) in id_map.iter() {
                 let tagger = Tagger {
-                    code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
+                    code: StashKey::ACL,
                     acl_gid,
-                    tag_value: ip_id,
-                    tag_type: TagType::TunnelIpId,
+                    server_port: ip_id,
                     signal_source: flow.signal_source,
                     ..Default::default()
                 };
@@ -464,10 +454,9 @@ impl Stash {
             let id_map = &acc_flow.id_maps[1];
             for (&acl_gid, &ip_id) in id_map.iter() {
                 let tagger = Tagger {
-                    code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
+                    code: StashKey::ACL,
                     acl_gid,
-                    tag_value: ip_id,
-                    tag_type: TagType::TunnelIpId,
+                    server_port: ip_id,
                     signal_source: flow.signal_source,
                     ..Default::default()
                 };
@@ -1412,12 +1401,11 @@ mod tests {
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
 
-        tagger.code = Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID;
-        tagger.tag_type = TagType::TunnelIpId;
-        tagger.tag_value = 0xffff;
+        tagger.code = Code::ACL_GID | Code::TUNNEL_IP_ID | Code::VTAP_ID;
+        tagger.server_port = 0xffff;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
-        tagger.tag_value = 0x7fff;
+        tagger.server_port = 0x7fff;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
     }

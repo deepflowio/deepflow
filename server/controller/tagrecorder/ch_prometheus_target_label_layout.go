@@ -23,17 +23,17 @@ import (
 )
 
 type ChPrometheusTargetLabelLayout struct {
-	UpdaterBase[mysql.ChPrometheusTargetLabelLayout, IDKey]
+	UpdaterComponent[mysql.ChPrometheusTargetLabelLayout, IDKey]
 }
 
 func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 	updater := &ChPrometheusTargetLabelLayout{
-		UpdaterBase[mysql.ChPrometheusTargetLabelLayout, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
-		},
+		newUpdaterComponent[mysql.ChPrometheusTargetLabelLayout, IDKey](
+			RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
+		),
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

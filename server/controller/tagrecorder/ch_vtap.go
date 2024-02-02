@@ -21,18 +21,18 @@ import (
 )
 
 type ChVTap struct {
-	UpdaterBase[mysql.ChVTap, IDKey]
+	UpdaterComponent[mysql.ChVTap, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater := &ChVTap{
-		UpdaterBase[mysql.ChVTap, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_VTAP,
-		},
+		newUpdaterComponent[mysql.ChVTap, IDKey](
+			RESOURCE_TYPE_CH_VTAP,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
