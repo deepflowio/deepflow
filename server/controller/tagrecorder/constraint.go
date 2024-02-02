@@ -31,12 +31,12 @@ type MySQLChModel interface {
 		mysql.ChDevice | mysql.ChIPRelation | mysql.ChPodGroup | mysql.ChNetwork | mysql.ChPod | mysql.ChPodCluster |
 		mysql.ChPodNode | mysql.ChPodNamespace | mysql.ChTapType | mysql.ChVTap | mysql.ChPodK8sLabels | mysql.ChNodeType | mysql.ChGProcess | mysql.ChPodK8sAnnotation | mysql.ChPodK8sAnnotations |
 		mysql.ChPodServiceK8sAnnotation | mysql.ChPodServiceK8sAnnotations |
-		mysql.ChPodK8sEnv | mysql.ChPodK8sEnvs
+		mysql.ChPodK8sEnv | mysql.ChPodK8sEnvs | mysql.ChPolicy | mysql.ChNpbTunnel
 }
 
 // ch资源的组合key
 type ChModelKey interface {
 	PrometheusTargetLabelKey | PrometheusAPPLabelKey | OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
 		IPRelationKey | TapTypeKey | K8sLabelsKey | NodeTypeKey | K8sAnnotationKey | K8sAnnotationsKey |
-		K8sEnvKey | K8sEnvsKey
+		K8sEnvKey | K8sEnvsKey | PolicyKey
 }

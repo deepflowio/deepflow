@@ -996,5 +996,39 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			)}
 	}
+	// Policy
+	tagResourceMap["policy_id"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'id', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'id', (toUInt64(1),toUInt64(acl_gid))))",
+			"",
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'id', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'id', (toUInt64(1),toUInt64(acl_gid)))) %s %s",
+			"",
+		),
+	}
+	tagResourceMap["policy"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'name', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'name', (toUInt64(1),toUInt64(acl_gid))))",
+			"",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE name %s %s)",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE %s(name,%s))",
+		),
+	}
+	// Npb Tunnel
+	tagResourceMap["npb_tunnel_id"] = map[string]*Tag{
+		"default": NewTag(
+			"tunnel_ip_id",
+			"",
+			"tunnel_ip_id %s %s",
+			"",
+		),
+	}
+	tagResourceMap["npb_tunnel"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(flow_tag.npb_tunnel_map, 'name', toUInt64(tunnel_ip_id))",
+			"",
+			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE name %s %s)",
+			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE %s(name,%s))",
+		),
+	}
 	return tagResourceMap
 }
