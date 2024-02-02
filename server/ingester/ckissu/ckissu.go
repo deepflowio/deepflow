@@ -995,6 +995,15 @@ var TableModTTL64 = []*TableModTTL{
 	},
 }
 
+var ColumnAdd65 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_acl.1m", "vtap_acl.1m_local"},
+		ColumnNames: []string{"tunnel_ip_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1375,7 +1384,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		datasourceInfo: make(map[string]*DatasourceInfo),
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626, ColumnAdd633, ColumnAdd635}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626, ColumnAdd633, ColumnAdd635, ColumnAdd65}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {

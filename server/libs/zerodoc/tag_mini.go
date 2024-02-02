@@ -33,7 +33,7 @@ import (
 
 const (
 	MINI_FIELD_FULL_CODES = IP | IPPath | L3EpcID | L3EpcIDPath | VTAPID | Protocol | ServerPort |
-		MAC | MACPath | Direction | TAPType | ACLGID | L7Protocol | TagType | TagValue
+		MAC | MACPath | Direction | TAPType | ACLGID | L7Protocol | TunnelIPID
 )
 
 type MiniField struct {
@@ -60,8 +60,7 @@ type MiniField struct {
 	TAPType    TAPTypeEnum
 	L7Protocol datatype.L7Protocol
 
-	TagType  uint8 // (8B)
-	TagValue uint16
+	TunnelIPID uint16
 
 	AppService  string
 	AppInstance string
@@ -99,13 +98,12 @@ func (f *MiniField) WriteToPB(p *pb.MiniField) {
 	p.TapSide = uint32(f.Direction.ToTAPSide())
 	p.Protocol = uint32(f.Protocol)
 	p.AclGid = uint32(f.ACLGID)
+	// ServerPort also represents TunneIPID
 	p.ServerPort = uint32(f.ServerPort)
 	p.VtapId = uint32(f.VTAPID)
 	p.TapPort = uint64(f.TAPPort)
 	p.TapType = uint32(f.TAPType)
 	p.L7Protocol = uint32(f.L7Protocol)
-	p.TagType = uint32(f.TagType)
-	p.TagValue = uint32(f.TagValue)
 }
 
 func (f *MiniField) SetIP1(ip net.IP) {
@@ -200,14 +198,9 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",server_port=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
-	if t.Code&TagType != 0 && t.Code&TagValue != 0 {
-		offset += copy(b[offset:], ",tag_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagType), 10))
-		switch t.TagType {
-		case TAG_TYPE_TUNNEL_IP_ID:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-		}
+	if t.Code&TunnelIPID != 0 {
+		offset += copy(b[offset:], ",tunnel_ip_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TunnelIPID), 10))
 	}
 	if t.Code&TAPPort != 0 {
 		offset += copy(b[offset:], ",tap_port=")
