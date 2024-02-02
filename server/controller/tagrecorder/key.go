@@ -133,3 +133,8 @@ type PrometheusTargetLabelKey struct {
 	LabelNameID int
 	TargetID    int
 }
+
+type PolicyKey struct {
+	ACLGID     int
+	TunnelType int
+}
