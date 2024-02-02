@@ -66,14 +66,17 @@ var QueryFuncCall = map[string]QueryFunc{
 		// if(count(`_sum_value`)=31, min(`_sum_value`), 0)
 		// so we specific time window=1s here
 
-		resetQueryInterval(query, 1, 0)
 		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Instant {
+			resetQueryInterval(query, 1, 0)
 			*query = append(*query, fmt.Sprintf("%s(%s)", "Min", metric))
 		} else if queryType == model.Range {
-			*query = append(*query, fmt.Sprintf("Last(%s)", metric))
+			interval := getRangeInterval(req, "min_over_time")
+
+			resetQueryInterval(query, interval/1e3, getRangeOffset(req, interval)/1e3)
+			*query = append(*query, fmt.Sprintf("Percentile(%s, 0)", metric))
 		}
 	},
 	"stddev_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
@@ -98,18 +101,14 @@ var QueryFuncCall = map[string]QueryFunc{
 		}
 	},
 	"sum_over_time":     simpleCallMatrixFunc("sum_over_time", "Sum"),
-	"present_over_time": simpleSelectMatrix("count_over_time", "1"),
+	"present_over_time": simpleSelectMatrix("present_over_time", "1"),
 	"quantile_over_time": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Range {
-			step := req.GetStep()
-			timeRange := req.GetRange("quantile_over_time") // unit:ms
-			interval := int64(math.Min(float64(step), float64(timeRange)))
-			offset := req.GetStart()%interval + min_interval.Milliseconds()
-
-			resetQueryInterval(query, interval/1e3, offset/1e3)
+			interval := getRangeInterval(req, "quantile_over_time")
+			resetQueryInterval(query, interval/1e3, getRangeOffset(req, interval)/1e3)
 		}
 
 		quantile_param := req.GetFuncParam("quantile_over_time")
@@ -136,10 +135,8 @@ var QueryFuncCall = map[string]QueryFunc{
 	"count_values": simpleCallFunc("count_values", "Last"),
 
 	"topk": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-		if len(*group) == 0 {
-			*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
-			*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
-		}
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*query = append(*query, fmt.Sprintf("Max(%s)", metric)) // use for max value, then order by value, try best to get topN
 		// *order = append(*order, fmt.Sprintf("%s desc", metric))
 	},
@@ -149,6 +146,7 @@ var QueryFuncCall = map[string]QueryFunc{
 	"quantile": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		*group = append(*group, PROMETHEUS_LABELS_INDEX)
 		*query = append(*query, fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX))
+
 		quantile_param := req.GetFuncParam("quantile")
 		*query = append(*query, fmt.Sprintf("Percentile(%s, %g)", metric, quantile_param))
 		for _, tag := range req.GetGrouping("quantile") {
@@ -157,72 +155,44 @@ var QueryFuncCall = map[string]QueryFunc{
 	},
 
 	// range-vector functions, but needs counter reset
-	"idelta":   nil, // minus(last, last-1) maybe: (nonNegativeDerivative * interval?)
-	"increase": nil, // minus(last, first) maybe: (nonNegativeDerivative * interval?)
-	"delta":    nil, // minus(last, last-1) without counter reset (nonNegativeDerivative)
-
+	// ignore counter reset right now
+	"idelta":   nil,                     // minus(last, last-1)
+	"delta":    nil,                     // minus(last, last-1) without counter reset
+	"increase": offloadRate("increase"), // minus(last, first)
 	"irate": func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		if queryType == model.Range {
 			// NOTICE: for irate, `range` is meaningless, it always calculate the last 2 points
 			// e.g.: irate(m[5m]) == irate(m[15m]) == irate(m[1h])
-
-			// use toUnixTimestamp will change to time(time, 15) as default interval grouping when using Derivative func
-			if len(*query) > 0 {
-				(*query)[0] = fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS)
-			} else {
-				*query = append(*query, fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS))
-			}
+			resetQueryInterval(query, int64(min_interval.Seconds()), getRangeOffset(req, min_interval.Milliseconds())/1e3)
 		}
 
-		if len(*group) == 0 {
-			*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
-			*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
-		}
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		// use default interval to get irate in instant query
 		*query = append(*query, fmt.Sprintf("Derivative(%s,%s)", metric, PROMETHEUS_NATIVE_TAG_NAME))
 	},
+	"rate": offloadRate("rate"), // minus(last, first) / time
+}
 
-	"rate": nil, // not implemented
-	// the functions below is PARTLY correct, but is not fully correct
-	// like, when we try to get rate(m[5m]), it gets rate(m[5m+(scrape_interval)m]) actually, it's always calculate 1 more point
-	// KEEP this for a refer
-	// 目前计算 rate 算子不正确，因为 time() 会聚合时间范围[5m]内的数据，再做相邻计算，无法确定准确的聚合时间窗口（因取决于 scrape_interval）
-	// 期望：(m.At(5m)-m.At(0))/5m, 实际：(m.At(5m+1m)-m.At(5m))/1m
-	// 保留注释以供参考
-	// func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
-	// 	var interval, offset int64
-	// 	if queryType == model.Instant {
-	// 		interval = req.GetRange("rate")
-	// 		// when timeRange > 1m, use t-1m as rate range
-	// 		// otherwise it calculs wrong value
-	// 		if interval > 0 {
-	// 			offset = req.GetStart() % interval
-	// 		}
-	// 	} else if queryType == model.Range {
-	// 		step := req.GetStep()
-	// 		timeRange := req.GetRange("rate") // unit:ms
-	// 		// use min(step, range) as interval
-	// 		// if range < step, it will downsampling data
-	// 		// if step < range, ???
-	// 		interval = int64(math.Min(float64(step), float64(timeRange)))
-	// 		offset = req.GetStart() % interval
-	// 	}
+func getRangeInterval(req model.QueryRequest, f string) int64 {
+	step := req.GetStep()
+	timeRange := req.GetRange(f) // unit:ms
+	subStep := req.GetSubStep(f)
+	if step > 0 {
+		interval := int64(math.Min(float64(step), float64(timeRange)))
+		if subStep > 0 && interval > subStep {
+			return subStep
+		}
+		return interval
+	} else {
+		return timeRange
+	}
+}
 
-	// 	// set `time` column query
-	// 	if len(*query) > 0 {
-	// 		(*query)[0] = fmt.Sprintf("time(time, %d, 1,'', %d) AS %s", interval/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS)
-	// 	} else {
-	// 		*query = append(*query, fmt.Sprintf("time(time, %d, 1, '', %d) AS %s", interval/1e3, offset/1e3, PROMETHEUS_TIME_COLUMNS))
-	// 	}
-
-	// 	if len(*group) == 0 {
-	// 		*group = append(*group, _prometheus_tag_key)
-	// 		*query = append(*query, _prometheus_tag_key)
-	// 	}
-
-	// 	*query = append(*query, fmt.Sprintf("Last(%s)", metric))
-	// },
+func getRangeOffset(req model.QueryRequest, interval int64) int64 {
+	offset := req.GetStart()%interval + min_interval.Milliseconds()
+	return offset
 }
 
 func resetQueryInterval(query *[]string, interval, offset int64) {
@@ -272,15 +242,11 @@ func simpleCallMatrixFunc(oriFunc string, aftFunc string) QueryFunc {
 		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 
 		if queryType == model.Range {
-			step := req.GetStep()
-			timeRange := req.GetRange(oriFunc) // unit:ms
 			// use min(step, range) as interval
 			// if range < step, it will downsampling data
 			// if step < range, aggregate to step, then calculate range in engine
-			interval := int64(math.Min(float64(step), float64(timeRange)))
-			offset := req.GetStart()%interval + min_interval.Milliseconds()
-
-			resetQueryInterval(query, interval/1e3, offset/1e3)
+			interval := getRangeInterval(req, oriFunc)
+			resetQueryInterval(query, interval/1e3, getRangeOffset(req, interval)/1e3)
 		}
 
 		*query = append(*query, fmt.Sprintf("%s(%s)", aftFunc, metric))
@@ -290,15 +256,42 @@ func simpleCallMatrixFunc(oriFunc string, aftFunc string) QueryFunc {
 func simpleSelectMatrix(oriFunc string, q string) QueryFunc {
 	return func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
 		if queryType == model.Range {
-			step := req.GetStep()
-			timeRange := req.GetRange(oriFunc) // unit:ms
-			interval := int64(math.Min(float64(step), float64(timeRange)))
-			offset := req.GetStart()%interval + min_interval.Milliseconds()
-
-			resetQueryInterval(query, interval/1e3, offset/1e3)
+			interval := getRangeInterval(req, oriFunc)
+			resetQueryInterval(query, interval/1e3, getRangeOffset(req, interval)/1e3)
 		}
 		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		*query = append(*query, q)
+	}
+}
+
+func offloadRate(fun string) QueryFunc {
+	return func(metric string, query, order, group *[]string, req model.QueryRequest, queryType model.QueryType, handleLabelsMatch func(string) string) {
+		// for rate/increase, interval is only use for sampling
+		// when step/range > scrape_interval, it will downsampling in query
+		interval := getRangeInterval(req, fun)
+		resetQueryInterval(query, interval/1e3, (getRangeOffset(req, interval)-min_interval.Milliseconds())/1e3)
+
+		*group = append(*group, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+		*query = append(*query, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+
+		// rate/increase could not implement by Derivative, use other way to offload it
+
+		/*
+		 NOTE:
+		 what this query trying to get: we should get first & last value and time in each time window
+		 why not first(): first() func not supprted
+		 why not last(): we build 2-levels sqls, in the inner-level sql it did not order by time asc, so last() cannot get the value of last time, it's random
+		 SO:
+		 assume metrics are `COUNTER` (only COUNTER with `rate`/`increase` is meaningful)
+		 we use MIN/MAX instead of first/last
+		 why not min(): min() will do `fill 0` in the time window, so we use Percentile(0) instead of it
+		 why not max(time): MAX(time) is not supported
+		*/
+		*query = append(*query, fmt.Sprintf("Percentile(toUnixTimestamp(time),1) as %s", PROMETHEUS_WINDOW_LAST_TIME))  // last time
+		*query = append(*query, fmt.Sprintf("Percentile(toUnixTimestamp(time),0) as %s", PROMETHEUS_WINDOW_FIRST_TIME)) // first time
+
+		*query = append(*query, fmt.Sprintf("Percentile(%s, 0) as %s", metric, PROMETHEUS_WINDOW_FIRST_VALUE)) // first
+		*query = append(*query, fmt.Sprintf("Max(%s)", metric))
 	}
 }

@@ -21,19 +21,19 @@ import (
 )
 
 type ChLbListener struct {
-	UpdaterBase[mysql.ChLBListener, IDKey]
+	UpdaterComponent[mysql.ChLBListener, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	updater := &ChLbListener{
-		UpdaterBase[mysql.ChLBListener, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_LB_LISTENER,
-		},
+		newUpdaterComponent[mysql.ChLBListener, IDKey](
+			RESOURCE_TYPE_CH_LB_LISTENER,
+		),
 		resourceTypeToIconID,
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

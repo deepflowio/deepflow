@@ -25,16 +25,16 @@ import (
 )
 
 type ChStringEnum struct {
-	UpdaterBase[mysql.ChStringEnum, StringEnumTagKey]
+	UpdaterComponent[mysql.ChStringEnum, StringEnumTagKey]
 }
 
 func NewChStringEnum() *ChStringEnum {
 	updater := &ChStringEnum{
-		UpdaterBase[mysql.ChStringEnum, StringEnumTagKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_STRING_ENUM,
-		},
+		newUpdaterComponent[mysql.ChStringEnum, StringEnumTagKey](
+			RESOURCE_TYPE_CH_STRING_ENUM,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

@@ -27,18 +27,18 @@ import (
 )
 
 type ChIPResource struct {
-	UpdaterBase[mysql.ChIPResource, IPResourceKey]
+	UpdaterComponent[mysql.ChIPResource, IPResourceKey]
 	ctx context.Context
 }
 
 func NewChIPResource(ctx context.Context) *ChIPResource {
 	updater := &ChIPResource{
-		UpdaterBase[mysql.ChIPResource, IPResourceKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_IP_RESOURCE,
-		},
+		newUpdaterComponent[mysql.ChIPResource, IPResourceKey](
+			RESOURCE_TYPE_CH_IP_RESOURCE,
+		),
 		ctx,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
