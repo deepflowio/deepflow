@@ -99,6 +99,9 @@ const (
 	RESOURCE_TYPE_CH_NODE_TYPE      = "ch_node_type"
 	RESOURCE_TYPE_CH_GPROCESS       = "ch_gprocess"
 
+	RESOURCE_TYPE_CH_POLICY     = "ch_policy"
+	RESOURCE_TYPE_CH_NPB_TUNNEL = "ch_npb_tunnel"
+
 	RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
 	RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
 	RESOURCE_TYPE_CH_POD_GROUP_RC                    = "pod_group_rc"
@@ -166,6 +169,9 @@ const (
 
 	CH_DICTIONARY_NODE_TYPE = "node_type_map"
 	CH_DICTIONARY_GPROCESS  = "gprocess_map"
+
+	CH_DICTIONARY_POLICY     = "policy_map"
+	CH_DICTIONARY_NPB_TUNNEL = "npb_tunnel_map"
 
 	CH_TARGET_LABEL                       = "target_label_map"
 	CH_APP_LABEL                          = "app_label_map"
@@ -608,6 +614,17 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX %d)\n" +
 		"LAYOUT(FLAT())"
+	CREATE_POLICY_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `tunnel_type` UInt64,\n" +
+		"    `acl_gid` UInt64,\n" +
+		"    `id` Int64,\n" +
+		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY tunnel_type, acl_gid\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 )
 
 const (
@@ -717,6 +734,9 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS: CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_ENV:                 CREATE_K8S_ENV_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_ENVS:                CREATE_K8S_ENVS_DICTIONARY_SQL,
+
+	CH_DICTIONARY_POLICY:     CREATE_POLICY_DICTIONARY_SQL,
+	CH_DICTIONARY_NPB_TUNNEL: CREATE_ID_NAME_DICTIONARY_SQL,
 
 	CH_PROMETHEUS_LABEL_NAME:              CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
 	CH_PROMETHEUS_METRIC_NAME:             CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,

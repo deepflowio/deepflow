@@ -472,3 +472,15 @@ type ChPrometheusTargetLabelLayout struct {
 type ChViewChange struct {
 	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
+
+type ChPolicy struct {
+	ACLGID     int    `gorm:"primaryKey;column:acl_gid;type:int;not null" json:"ACL_GID"`
+	TunnelType int    `gorm:"primaryKey;column:tunnel_type;type:int;not null" json:"TUNNEL_TYPE"`
+	ID         int    `gorm:"column:id;type:int;not null" json:"ID"`
+	Name       string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
+
+type ChNpbTunnel struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
