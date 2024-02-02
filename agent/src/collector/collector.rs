@@ -42,9 +42,7 @@ use crate::{
     },
     config::handler::{CollectorAccess, CollectorConfig},
     metric::{
-        document::{
-            BoxedDocument, Code, Direction, Document, DocumentFlag, Tagger, TapSide,
-        },
+        document::{BoxedDocument, Code, Direction, Document, DocumentFlag, Tagger, TapSide},
         meter::{AppMeter, AppMeterWithFlow, FlowMeter, Meter, UsageMeter},
     },
     rpc::get_timestamp,

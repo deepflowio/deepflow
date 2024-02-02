@@ -133,8 +133,7 @@ bitflags! {
         const TAP_PORT = 1<<49;
         const L7_PROTOCOL = 1<<51;
 
-        const TAG_TYPE = 1<<62;
-        const TAG_VALUE = 1<<63;
+        const TUNNEL_IP_ID = 1<<62;
     }
 }
 
