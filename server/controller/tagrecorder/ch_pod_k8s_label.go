@@ -23,16 +23,16 @@ import (
 )
 
 type ChPodK8sLabel struct {
-	UpdaterBase[mysql.ChPodK8sLabel, K8sLabelKey]
+	UpdaterComponent[mysql.ChPodK8sLabel, K8sLabelKey]
 }
 
 func NewChPodK8sLabel() *ChPodK8sLabel {
 	updater := &ChPodK8sLabel{
-		UpdaterBase[mysql.ChPodK8sLabel, K8sLabelKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_K8S_LABEL,
-		},
+		newUpdaterComponent[mysql.ChPodK8sLabel, K8sLabelKey](
+			RESOURCE_TYPE_CH_K8S_LABEL,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

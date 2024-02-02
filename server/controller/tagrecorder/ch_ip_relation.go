@@ -25,16 +25,16 @@ import (
 
 // 以VPCID和IP为key，获取IP关联的NAT网关、负载均衡、负载均衡监听器、容器Ingress和容器服务数据
 type ChIPRelation struct {
-	UpdaterBase[mysql.ChIPRelation, IPRelationKey]
+	UpdaterComponent[mysql.ChIPRelation, IPRelationKey]
 }
 
 func NewChIPRelation() *ChIPRelation {
 	updater := &ChIPRelation{
-		UpdaterBase[mysql.ChIPRelation, IPRelationKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_IP_RELATION,
-		},
+		newUpdaterComponent[mysql.ChIPRelation, IPRelationKey](
+			RESOURCE_TYPE_CH_IP_RELATION,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
