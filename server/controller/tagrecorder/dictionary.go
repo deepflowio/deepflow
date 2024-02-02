@@ -211,6 +211,9 @@ func (c *TagRecorder) updateChDictionary(clickHouseCfg *clickhouse.ClickHouseCon
 		CH_PROMETHEUS_METRIC_NAME,
 		CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
 		CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
+
+		CH_DICTIONARY_POLICY,
+		CH_DICTIONARY_NPB_TUNNEL,
 	)
 	chDicts := mapset.NewSet()
 	for _, dictionary := range dictionaries {
