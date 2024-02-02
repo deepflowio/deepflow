@@ -489,3 +489,15 @@ type ChChost struct {
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 	HostID  int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
 }
+
+type ChPolicy struct {
+	ACLGID     int    `gorm:"primaryKey;column:acl_gid;type:int;not null" json:"ACL_GID"`
+	TunnelType int    `gorm:"primaryKey;column:tunnel_type;type:int;not null" json:"TUNNEL_TYPE"`
+	ID         int    `gorm:"column:id;type:int;not null" json:"ID"`
+	Name       string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
+
+type ChNpbTunnel struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
