@@ -267,7 +267,6 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		offset = HTTP2_MAGIC_SIZE;
 	}
 
-#pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
 
 		/*
@@ -921,9 +920,25 @@ struct dns_header {
 
 static __inline enum message_type infer_dns_message(const char *buf,
 						    size_t count,
+						    const char *ptr,
+						    __u32 infer_len, 
 						    struct conn_info_t
 						    *conn_info)
 {
+	/*
+ 	 * Note: When testing with 'curl' accessing a domain, the following
+	 * situations are observed in DNS:
+	 * (1) An 'A' type DNS request is sent.
+	 * (2) An 'A' type response is received.
+	 * (3) An 'AAAA' type response is received.
+	 *
+	 * It is noticed that the Transaction ID for (2) and (3) are different.
+	 * We observe that the data obtained through eBPF is missing the data for
+	 * the 'AAAA' type request, which differs from the data obtained through
+	 * the ‘AF_PACKET’ method ('AF_PACKET' method includes data for the 'AAAA'
+	 * type request).
+	 */
+
 	if (!is_protocol_enabled(PROTO_DNS)) {
 		return MSG_UNKNOWN;
 	}
@@ -983,15 +998,22 @@ static __inline enum message_type infer_dns_message(const char *buf,
 
 	// FIXME: Remove this code when the call chain can correctly handle the
 	// Go DNS case.
-	__u8 *queries_start = (__u8 *)(dns + 1);
+
+	/*
+	 * Here, we assume a maximum length of 128 bytes for the queries name.
+	 * If queries name exceeds 128 bytes, the identification of AAAA or A
+	 * types will be impossible.
+	 */
 	conn_info->dns_q_type = 0;
-	for (int idx = 0; idx < 32; ++idx) {
-		if (queries_start[idx] == 0) {
-			conn_info->dns_q_type = __bpf_ntohs(
-				*(__u16 *)(queries_start + idx + 1));
-			break;
-		}
+	__u8 tmp_buf[128];
+	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
+	// bpf_probe_read_str() returns the length including '\0'.
+	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
+	if (len > 0 && len < sizeof(tmp_buf)) {
+		bpf_probe_read(tmp_buf, 2, queries_start + len);
+		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
 	}
+
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
 	// the offset to correct the TCP sequence number.
@@ -1006,7 +1028,6 @@ static __inline bool is_include_crlf(const char *buf)
 #define PARAMS_LIMIT 20
 
 	int i;
-#pragma unroll
 	for (i = 1; i < PARAMS_LIMIT; ++i) {
 		if (buf[i] == '\r')
 			break;
@@ -1669,12 +1690,12 @@ infer_protocol(struct ctx_info_s *ctx,
 	 * system call for inference.
 	 * Examples of such protocols include HTTP2 and Postgre.
 	 */
-	char *syscall_infer_buf = NULL;
+	char *syscall_infer_ptr = NULL;
 	__u32 syscall_infer_len = 0;
 	if (extra->vecs) {
 		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
 						     count, DATA_BUF_MAX,
-						     &syscall_infer_buf,
+						     &syscall_infer_ptr,
 						     &syscall_infer_len);
 		/*
 		 * The syscall_infer_len(iov_cpy.iov_len) may be larger than
@@ -1684,7 +1705,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			syscall_infer_len = count;
 	} else {
 		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
-		syscall_infer_buf = (char *)buf;
+		syscall_infer_ptr = (char *)buf;
 		syscall_infer_len = count;
 	}
 
@@ -1753,6 +1774,8 @@ infer_protocol(struct ctx_info_s *ctx,
 		case PROTO_DNS:
 			if ((inferred_message.type =
 			     infer_dns_message(infer_buf, count,
+					       syscall_infer_ptr,
+					       syscall_infer_len,
 					       conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_DNS;
 				return inferred_message;
@@ -1798,7 +1821,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-				infer_http2_message(syscall_infer_buf,
+				infer_http2_message(syscall_infer_ptr,
 						    syscall_infer_len,
 						    conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
@@ -1807,7 +1830,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_POSTGRESQL:
 			if ((inferred_message.type =
-			     infer_postgre_message(syscall_infer_buf, syscall_infer_len,
+			     infer_postgre_message(syscall_infer_ptr, syscall_infer_len,
 						   conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_POSTGRESQL;
 				return inferred_message;
@@ -1881,6 +1904,8 @@ infer_protocol(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_dns_message(infer_buf, count,
+				      syscall_infer_ptr,
+				      syscall_infer_len,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
 	}
@@ -1931,7 +1956,7 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(syscall_infer_buf, syscall_infer_len, 
+		    infer_http2_message(syscall_infer_ptr, syscall_infer_len, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 #ifdef LINUX_VER_5_2_PLUS
@@ -1939,7 +1964,7 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_postgre_message(syscall_infer_buf, syscall_infer_len,
+		    infer_postgre_message(syscall_infer_ptr, syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
