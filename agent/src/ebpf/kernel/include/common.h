@@ -68,6 +68,7 @@ enum traffic_protocol {
 	PROTO_MONGO = 81,
 	PROTO_KAFKA = 100,
 	PROTO_MQTT = 101,
+	PROTO_AMQP = 102,
 	PROTO_DNS = 120,
 	PROTO_TLS = 121,
 	PROTO_CUSTOM = 127,
