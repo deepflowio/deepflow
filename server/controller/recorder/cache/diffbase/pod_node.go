@@ -47,9 +47,9 @@ func (b *DataSet) DeletePodNode(lcuuid string) {
 
 type PodNode struct {
 	DiffBase
-	Type            int `json:"type"`
-	State           int `json:"state"`
-	Hostname        string
+	Type            int    `json:"type"`
+	State           int    `json:"state"`
+	Hostname        string `json:"hostname"`
 	VCPUNum         int    `json:"vcpu_num"`
 	MemTotal        int    `json:"mem_total"`
 	RegionLcuuid    string `json:"region_lcuuid"`
