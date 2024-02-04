@@ -45,7 +45,7 @@ type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constr
 	// 生成插入 DB 所需的数据
 	generateDBItemToAdd(*CT) (*MT, bool)
 	// 生产更新 DB 所需的数据
-	generateUpdateInfo(BT, *CT) (map[string]interface{}, bool)
+	generateUpdateInfo(BT, *CT) (interface{}, map[string]interface{}, bool)
 }
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase] struct {
@@ -85,7 +85,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 			}
 		} else {
 			diffBase.SetSequence(u.cache.GetSequence())
-			updateInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
+			_, updateInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
 				log.Infof("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase)
 				u.update(&cloudItem, diffBase, updateInfo)

@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VIP struct {
@@ -59,17 +60,17 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysql.VIP, bool) 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.VIPFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
-		updateInfo["ip"] = cloudItem.IP
+		mapInfo["ip"] = cloudItem.IP
+		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.VTapID != cloudItem.VTapID {
-		updateInfo["vtap_id"] = cloudItem.VTapID
+		mapInfo["vtap_id"] = cloudItem.VTapID
+		structInfo.VTapID.Set(diffBase.VTapID, cloudItem.VTapID)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PrometheusTarget struct {
@@ -80,21 +81,26 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 	return dbItem, true
 }
 
-func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.PrometheusTargetFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Instance != cloudItem.Instance {
-		updateInfo["name"] = cloudItem.Instance
+		mapInfo["name"] = cloudItem.Instance
+		structInfo.Name.Set(diffBase.Instance, cloudItem.Instance)
 	}
 	if diffBase.Job != cloudItem.Job {
-		updateInfo["job"] = cloudItem.Job
+		mapInfo["job"] = cloudItem.Job
+		structInfo.Job.Set(diffBase.Job, cloudItem.Job)
 	}
 
 	if diffBase.ScrapeURL != cloudItem.ScrapeURL {
-		updateInfo["scrape_url"] = cloudItem.ScrapeURL
+		mapInfo["scrape_url"] = cloudItem.ScrapeURL
+		structInfo.ScrapeURL.Set(diffBase.ScrapeURL, cloudItem.ScrapeURL)
 	}
 
 	if diffBase.OtherLabels != cloudItem.OtherLabels {
-		updateInfo["other_labels"] = cloudItem.OtherLabels
+		mapInfo["other_labels"] = cloudItem.OtherLabels
+		structInfo.OtherLabels.Set(diffBase.OtherLabels, cloudItem.OtherLabels)
 	}
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
@@ -103,12 +109,11 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarge
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["vpc_id"] = vpcID
+		mapInfo["vpc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID)
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }
