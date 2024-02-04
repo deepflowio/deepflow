@@ -93,10 +93,9 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 		mapInfo["type"] = cloudItem.Type
 		structInfo.Type.Set(diffBase.Type, cloudItem.Type)
 	}
-	//  TODO why?
-	if diffBase.Hostname != "" {
-		mapInfo["hostname"] = ""
-		structInfo.Hostname.Set(diffBase.Hostname, "")
+	if diffBase.Hostname != cloudItem.Hostname {
+		mapInfo["hostname"] = cloudItem.Hostname
+		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State
