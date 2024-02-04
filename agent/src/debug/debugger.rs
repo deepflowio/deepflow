@@ -49,7 +49,10 @@ use crate::{
     trident::RunningMode,
     utils::command::get_hostname,
 };
-use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
+use public::{
+    consts::DEFAULT_CONTROLLER_PORT,
+    debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE},
+};
 
 struct ModuleDebuggers {
     #[cfg(target_os = "linux")]
@@ -545,7 +548,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(addr: SocketAddr) -> Result<Self> {
-        let sock = UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0))?;
+        let sock = UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), DEFAULT_CONTROLLER_PORT))?;
         Ok(Self {
             sock,
             conf: config::standard(),
