@@ -34,6 +34,8 @@ struct AppTable4Key {
     // only ebpf and loopback addr will set pid
     // maybe remove in future
     pid: u32,
+    // only ebpf
+    source: u8,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -44,6 +46,8 @@ struct AppTable6Key {
     // only ebpf and loopback addr will set pid
     // maybe remove in future
     pid: u32,
+    // only ebpf
+    source: u8,
 }
 
 struct AppTableValue {
@@ -119,8 +123,15 @@ impl AppTable {
         epc: i32,
         port: u16,
         pid: u32,
+        source: u8,
     ) -> Option<(L7ProtocolEnum, u32, u64)> {
-        let key = AppTable4Key { ip, epc, port, pid };
+        let key = AppTable4Key {
+            ip,
+            epc,
+            port,
+            pid,
+            source,
+        };
         if let Some(v) = self.ipv4.get_mut(&key) {
             if v.last + self.l7_protocol_inference_ttl < time_in_sec {
                 self.ipv4.pop(&key);
@@ -148,8 +159,15 @@ impl AppTable {
         epc: i32,
         port: u16,
         pid: u32,
+        source: u8,
     ) -> Option<(L7ProtocolEnum, u32, u64)> {
-        let key = AppTable6Key { ip, epc, port, pid };
+        let key = AppTable6Key {
+            ip,
+            epc,
+            port,
+            pid,
+            source,
+        };
         if let Some(v) = self.ipv6.get_mut(&key) {
             if v.last + self.l7_protocol_inference_ttl < time_in_sec {
                 self.ipv6.pop(&key);
@@ -178,8 +196,8 @@ impl AppTable {
         );
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
-            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, port, 0),
-            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port, 0),
+            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, port, 0, 0),
+            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port, 0, 0),
         }
     }
 
@@ -203,9 +221,10 @@ impl AppTable {
         } else {
             remote_epc
         };
+        let source = packet.ebpf_type.into();
         let dst_protocol = match ip {
-            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, dport, pid),
-            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, dport, pid),
+            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, dport, pid, source),
+            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, dport, pid, source),
         };
         match dst_protocol.as_ref() {
             Some((dst_protocol, _, last)) => {
@@ -228,8 +247,8 @@ impl AppTable {
             remote_epc
         };
         let src_protocol = match ip {
-            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, sport, pid),
-            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, sport, pid),
+            IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, sport, pid, source),
+            IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, sport, pid, source),
         };
         match src_protocol.as_ref() {
             Some((src_protocol, _, last)) => {
@@ -268,8 +287,15 @@ impl AppTable {
         port: u16,
         l7_protocol_enum: L7ProtocolEnum,
         pid: u32,
+        source: u8,
     ) -> bool {
-        let key = AppTable4Key { ip, epc, port, pid };
+        let key = AppTable4Key {
+            ip,
+            epc,
+            port,
+            pid,
+            source,
+        };
         let value = self.ipv4.get_mut(&key);
         if let Some(value) = value {
             if l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown {
@@ -309,8 +335,15 @@ impl AppTable {
         port: u16,
         l7_protocol_enum: L7ProtocolEnum,
         pid: u32,
+        source: u8,
     ) -> bool {
-        let key = AppTable6Key { ip, epc, port, pid };
+        let key = AppTable6Key {
+            ip,
+            epc,
+            port,
+            pid,
+            source,
+        };
         let value = self.ipv6.get_mut(&key);
         if let Some(value) = value {
             if l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown {
@@ -359,8 +392,8 @@ impl AppTable {
         }
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
-            IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, 0),
-            IpAddr::V6(i) => self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol, 0),
+            IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, 0, 0),
+            IpAddr::V6(i) => self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol, 0, 0),
         }
     }
 
@@ -394,9 +427,14 @@ impl AppTable {
         } else {
             remote_epc
         };
+        let source = packet.ebpf_type.into();
         match ip {
-            IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, pid),
-            IpAddr::V6(i) => self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol, pid),
+            IpAddr::V4(i) => {
+                self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, pid, source)
+            }
+            IpAddr::V6(i) => {
+                self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol, pid, source)
+            }
         }
     }
 }
