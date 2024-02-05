@@ -605,7 +605,11 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
+<<<<<<< HEAD
 			"operators", "permissions", "description", "related_tag", "deprecated",
+=======
+			"operators", "permissions", "description", "related_tag","deprecated",
+>>>>>>> 9b989e32c ([Querier] deprecated columns)
 		},
 		Values: []interface{}{},
 	}
@@ -1077,7 +1081,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		case "gprocess":
 			return &common.Result{}, sqlList, nil
-		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
+		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE, common.CAPTURE_NIC_HOST, common.CAPTURE_NIC_CHOST, common.CAPTURE_NIC_POD_NODE:
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
 			} else {

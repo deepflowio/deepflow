@@ -109,7 +109,7 @@ agent                     , agent                     , agent                   
 nat_source                , nat_source                , nat_source                 , int_enum       , nat_source            , Capture Info      , 111          , 0
 tap_port                  , tap_port                  , tap_port                   , mac            ,                       , Capture Info      , 111          , 1
 tap_port_name             , tap_port_name             , tap_port_name              , string         ,                       , Capture Info      , 111          , 1
-tap_port_type             , tap_port_type             , tap_port_type              , int_enum       , tap_port_type         , Capture Info      , 111          , 1
+tap_port_type             , tap_port_type             , tap_port_type              , int_enum       , capture_nic_type      , Capture Info      , 111          , 1
 capture_nic               , capture_nic               , capture_nic                , mac            ,                       , Capture Info      , 111          , 0
 capture_nic_name          , capture_nic_name          , capture_nic_name           , string         ,                       , Capture Info      , 111          , 0
 capture_nic_type          , capture_nic_type          , capture_nic_type           , int_enum       , capture_nic_type      , Capture Info      , 111          , 0

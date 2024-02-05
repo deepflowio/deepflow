@@ -42,11 +42,14 @@ var TAP_PORT_DEVICE_MAP = map[string]int{
 	common.TAP_PORT_HOST:     VIF_DEVICE_TYPE_HOST,
 	common.TAP_PORT_CHOST:    VIF_DEVICE_TYPE_VM,
 	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
+	common.CAPTURE_NIC_HOST:     VIF_DEVICE_TYPE_HOST,
+	common.CAPTURE_NIC_CHOST:    VIF_DEVICE_TYPE_VM,
+	common.CAPTURE_NIC_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
 }
 
-var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type", "is_tls"}
+var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type", "is_tls"}
 var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"}
-var STRING_ENUM_TAG = []string{"tap_side", "event_type", "profile_language_type"}
+var STRING_ENUM_TAG = []string{"observation_point", "event_type", "profile_language_type"}
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap := make(map[string]map[string]*Tag)
@@ -954,6 +957,24 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				enumName+" IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
 			),
 		}
+	}
+	// Enum(tap_side)
+	tagResourceMap["tap_side"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('%s',observation_point), observation_point)",
+			"",
+			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
+			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
+	}
+	// Enum(tap_port_type)
+	tagResourceMap["tap_port_type"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(capture_nic_type)), capture_nic_type)",
+			"",
+			"toUInt64(capture_nic_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(capture_nic_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
 	}
 	// Pcap
 	tagResourceMap["has_pcap"] = map[string]*Tag{
