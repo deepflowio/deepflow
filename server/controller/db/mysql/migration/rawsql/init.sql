@@ -2289,6 +2289,10 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (19, '分发策略', 'flow_metrics.vtap_acl', 60, 3*24, @lcuuid);
+
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
