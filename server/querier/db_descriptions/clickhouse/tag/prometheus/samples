@@ -41,5 +41,5 @@ os.app                     , os.app                    , os.app                 
 ip                         , ip                        , ip                        , ip            ,                       , Network Layer   , 111            , 0
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum      , ip_type               , Network Layer   , 111            , 0
 
-vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111            , 0
+vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111            , 1
 agent                      , agent                     , agent                     , resource      ,                       , Capture Info    , 111            , 0

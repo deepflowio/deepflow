@@ -146,7 +146,7 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 			tsdbType = "network"
 		} else if strings.HasPrefix(table, "application") {
 			tsdbType = "application"
-		} else if table == "vtap_acl" {
+		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
 	case DB_NAME_DEEPFLOW_SYSTEM, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:

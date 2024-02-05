@@ -56,7 +56,8 @@ tunnel_type                , tunnel_type               , tunnel_type            
 
 server_port                , server_port               , server_port               , int_enum      , server_port            , Transport Layer , 111            , 0
 
-tap                        , tap                       , tap                       , resource      ,                        , Capture Info    , 110            , 0
+tap                        , tap                       , tap                       , resource      ,                        , Capture Info    , 110            , 1
+capture_network_type       , capture_network_type      , capture_network_type      , resource      ,                        , Capture Info    , 110            , 0
 vtap                       , vtap                      , vtap                      , resource      ,                        , Capture Info    , 111            , 1
 agent                      , agent                     , agent                     , resource      ,                        , Capture Info    , 111            , 0
 nat_source                 , nat_source                , nat_source                , int_enum      , nat_source             , Capture Info    , 111            , 0

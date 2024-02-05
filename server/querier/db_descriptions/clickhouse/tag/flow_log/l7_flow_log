@@ -103,7 +103,8 @@ start_time                , start_time                , start_time              
 end_time                  , end_time                  , end_time                   , int            ,                       , Flow Info         , 111          , 0
 
 signal_source             , signal_source             , signal_source              , int_enum       , l7_signal_source      , Capture Info      , 111          , 0
-tap                       , tap                       , tap                        , resource       ,                       , Capture Info      , 110          , 0
+tap                       , tap                       , tap                        , resource       ,                       , Capture Info      , 110          , 1
+capture_network_type      , capture_network_type      , capture_network_type       , resource       ,                       , Capture Info      , 110          , 0
 vtap                      , vtap                      , vtap                       , resource       ,                       , Capture Info      , 111          , 1
 agent                     , agent                     , agent                      , resource       ,                       , Capture Info      , 111          , 0
 nat_source                , nat_source                , nat_source                 , int_enum       , nat_source            , Capture Info      , 111          , 0
@@ -115,4 +116,3 @@ capture_nic_name          , capture_nic_name          , capture_nic_name        
 capture_nic_type          , capture_nic_type          , capture_nic_type           , int_enum       , capture_nic_type      , Capture Info      , 111          , 0
 tap_side                  , tap_side                  , tap_side                   , string_enum    , observation_point     , Capture Info      , 111          , 1
 observation_point         , observation_point         , observation_point          , string_enum    , observation_point     , Capture Info      , 111          , 0
-

@@ -52,8 +52,9 @@ app_service                , app_service               , app_service            
 app_instance               , app_instance              , app_instance              , string        ,                      , Application Layer , 111           , 0
 endpoint                   , endpoint                  , endpoint                  , string        ,                      , Application Layer , 111           , 0
 
-tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 111           , 0
-vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111           , 0
+tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 110           , 1
+capture_network_type       , capture_network_type      , capture_network_type      , resource      ,                      , Capture Info      , 110           , 0
+vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111           , 1
 agent                      , agent                     , agent                     , resource      ,                      , Capture Info      , 111           , 0
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source     , Capture Info      , 111           , 0
 role                       , role                      , role                      , int_enum      , role                 , Capture Info      , 111           , 0

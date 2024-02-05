@@ -48,6 +48,7 @@ protocol                   , 网络协议                   ,
 server_port                , 服务端口                   ,
 
 tap                        , 采集点                     ,
+capture_network_type       , 采集网络类型                , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。
 vtap                       , 采集器                     ,
 agent                      , 采集器                     ,
 signal_source              , 信号源                     ,

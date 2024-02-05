@@ -104,6 +104,7 @@ end_time                  , End Time                      , Unit: microseconds. 
 
 signal_source             , Signal Source                 ,
 tap                       , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
+capture_network_type      , Capture Network Type          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                      , DeepFlow Agent                ,
 agent                     , DeepFlow Agent                ,
 nat_source                , NAT Source                    ,
