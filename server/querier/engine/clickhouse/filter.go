@@ -151,29 +151,6 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
 			}
-		} else if _, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]; ok {
-			var idName string
-
-			deviceTypeValue = tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]
-			switch deviceTypeValue {
-			case tag.VIF_DEVICE_TYPE_HOST:
-				idName = "host_id" + suffix
-			case tag.VIF_DEVICE_TYPE_POD_NODE:
-				idName = "pod_node_id" + suffix
-			case tag.VIF_DEVICE_TYPE_VM:
-				idName = "l3_device_id" + suffix
-			}
-
-			deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
-
-			if deviceTypeValue == tag.VIF_DEVICE_TYPE_VM {
-				filter = strings.Join([]string{
-					idName, "!=0 AND l3_device_type", suffix, "=", deviceTypeValueStr,
-				}, "")
-			} else {
-				filter = idName + "!=0"
-			}
-
 		}
 	}
 	return

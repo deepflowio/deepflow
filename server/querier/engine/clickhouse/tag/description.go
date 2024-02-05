@@ -1067,20 +1067,6 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
 			}
 			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		case common.HOST_IP, common.CHOST_IP, common.POD_NODE_IP:
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			} else {
-				whereSql = fmt.Sprintf(" WHERE devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			}
-			sql = fmt.Sprintf("SELECT deviceid AS value, ip AS display_name FROM device_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		case common.HOST_HOSTNAME, common.CHOST_HOSTNAME, common.POD_NODE_HOSTNAME:
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			} else {
-				whereSql = fmt.Sprintf(" WHERE devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			}
-			sql = fmt.Sprintf("SELECT deviceid AS value, hostname AS display_name FROM device_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		default:
 			if strings.HasPrefix(tag, "k8s.label.") {
 				labelTag := strings.TrimPrefix(tag, "k8s.label.")
@@ -1212,20 +1198,6 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
 			}
 			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == common.HOST_IP || tag == common.CHOST_IP || tag == common.POD_NODE_IP {
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			} else {
-				whereSql = fmt.Sprintf(" WHERE devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			}
-			sql = fmt.Sprintf("SELECT deviceid AS value, ip AS display_name FROM device_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == common.HOST_HOSTNAME || tag == common.CHOST_HOSTNAME || tag == common.POD_NODE_HOSTNAME {
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			} else {
-				whereSql = fmt.Sprintf(" WHERE devicetype=%d", HOSTNAME_IP_DEVICE_MAP[tag])
-			}
-			sql = fmt.Sprintf("SELECT deviceid AS value, hostname AS display_name FROM device_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if strings.HasPrefix(tag, "k8s.label.") {
