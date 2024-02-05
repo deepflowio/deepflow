@@ -47,7 +47,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-IO 事件",      // event.perf_event
 	"事件-告警事件",       // event.alarm_event
 	"应用-性能剖析",       // profile.in_process
-	"分发策略",          // flow_metrics.vtap_acl
+	"网络策略",          // flow_metrics.vtap_acl
 }
 
 func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
