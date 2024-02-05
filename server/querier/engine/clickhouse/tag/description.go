@@ -605,11 +605,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-<<<<<<< HEAD
 			"operators", "permissions", "description", "related_tag", "deprecated",
-=======
-			"operators", "permissions", "description", "related_tag","deprecated",
->>>>>>> 9b989e32c ([Querier] deprecated columns)
 		},
 		Values: []interface{}{},
 	}
