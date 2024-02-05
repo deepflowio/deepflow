@@ -8,3 +8,4 @@ end_time                  , End Time                 , Unit: microseconds. Maxim
 packet_batch              , PCAP File                ,
 
 vtap                      , Agent Name               ,
+agent                     , Agent Name               ,

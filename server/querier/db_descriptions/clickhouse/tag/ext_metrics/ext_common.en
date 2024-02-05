@@ -50,3 +50,4 @@ ip                         , IP Address                    ,
 is_ipv4                    , IPv4 Flag                     ,
 
 vtap                       , DeepFlow Agent                ,
+agent                      , DeepFlow Agent                ,
