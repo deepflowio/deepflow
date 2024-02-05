@@ -821,6 +821,7 @@ mod tests {
             residual_request: 0,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
+            last_cap_seq: 0,
             packet_in_tick: false,
             policy_in_tick: [false; 2],
             packet_sequence_block: Some(Box::new(PacketSequenceBlock::default())), // Enterprise Edition Feature: packet-sequence
@@ -889,6 +890,7 @@ mod tests {
             residual_request: 0,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
+            last_cap_seq: 0,
             packet_in_tick: false,
             policy_in_tick: [false; 2],
             packet_sequence_block: Some(Box::new(PacketSequenceBlock::default())), // Enterprise Edition Feature: packet-sequence
