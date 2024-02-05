@@ -48,7 +48,7 @@ use crate::{
     },
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
-    flow_generator::MetaAppProto,
+    flow_generator::AppProto,
     handler::PacketHandlerBuilder,
     policy::PolicyGetter,
     rpc::get_timestamp,
@@ -99,7 +99,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) flow_output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
     pub(super) l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
+    pub(super) log_output_queue: DebugSender<Box<AppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,

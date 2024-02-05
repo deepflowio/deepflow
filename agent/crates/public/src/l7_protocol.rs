@@ -72,6 +72,22 @@ pub enum L7Protocol {
     Max = 255,
 }
 
+impl L7Protocol {
+    pub fn has_session_id(&self) -> bool {
+        match self {
+            Self::DNS
+            | Self::FastCGI
+            | Self::Http2
+            | Self::TLS
+            | Self::Kafka
+            | Self::Dubbo
+            | Self::SofaRPC
+            | Self::Custom => true,
+            _ => false,
+        }
+    }
+}
+
 // Translate the string value of l7_protocol into a L7Protocol enumeration value used by OTEL.
 impl From<String> for L7Protocol {
     fn from(l7_protocol_str: String) -> Self {

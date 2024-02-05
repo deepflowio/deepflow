@@ -190,7 +190,7 @@ pub struct FlowLog {
     l7_protocol_log_parser: Option<Box<L7ProtocolParser>>,
     // use for cache previous log info, use for calculate rrt
     perf_cache: Rc<RefCell<L7PerfCache>>,
-    l7_protocol_enum: L7ProtocolEnum,
+    pub l7_protocol_enum: L7ProtocolEnum,
 
     // Only for eBPF data, the server_port will be set in l7_check() method, it checks the first
     // request packet's payload, and then set self.server_port = packet.lookup_key.dst_port,
