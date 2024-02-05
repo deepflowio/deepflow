@@ -34,9 +34,6 @@ auto_instance              , Instance - K8s POD First      , The instance of IP,
 auto_service_type          , Type - K8s Service First      , The type of 'auto_service'.
 auto_service               , Instance - K8s Service First  , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
 gprocess                   , Process                       ,
-tap_port_host              , Tap Port Host                 ,
-tap_port_chost             , Tap Port Cloud Host           ,
-tap_port_pod_node          , Tap Port K8s Node             ,
 
 k8s.label                  , K8s Label                     ,
 k8s.annotation             , K8s Annotation                ,
@@ -46,23 +43,12 @@ os.app                     , OS APP                        ,
 
 ip                         , IP Address                    ,
 is_ipv4                    , IPv4 Flag                     ,
-is_internet                , Internet IP Flag              , Whether the IP address is an external Internet address.
 protocol                   , Network Protocol              ,
-
-tunnel_type                , Tunnel Type                   ,
 
 server_port                , Server Port                   ,
 
-l7_protocol                , Application Protocol          ,
-app_service                , Application Service           ,
-app_instance               , Application Instance          ,
-endpoint                   , Endpoint                      ,
-
 tap                        , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                       , DeepFlow Agent                ,
-nat_source                 , NAT Source                    ,
-tap_port                   , TAP Port Identifier           , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.
-tap_port_name              , TAP Port Name                 , When the value of tap_port_type is 'Local NIC', tap_port_name indicates the name of the tap interface.
-tap_port_type              , TAP Port Type                 , Indicates the type of traffic collection location, including Local NIC (cloud traffic), NFV Gateway NIC (NFV Gateway traffic), Traffic Mirror (traditional IDC traffic), etc.
-tap_side                   , TAP Side                      , The logical location of the collection location in the traffic path, such as Cient NIC, Client Node, Server Node, Server NIC, etc.
+agent                      , DeepFlow Agent                ,
 signal_source              , Signal Source                 ,
+role                       , Role                          ,

@@ -44,3 +44,4 @@ ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
 
 vtap                       , 采集器                     ,
+agent                      , 采集器                     ,

@@ -49,5 +49,6 @@ server_port                , 服务端口                   ,
 
 tap                        , 采集点                     ,
 vtap                       , 采集器                     ,
+agent                      , 采集器                     ,
 signal_source              , 信号源                     ,
 role                       , 角色                       ,

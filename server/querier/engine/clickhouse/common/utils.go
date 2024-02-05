@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,9 +94,9 @@ func GetDatasources(db string, table string) ([]string, error) {
 	case "flow_metrics":
 		var tsdbType string
 		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
-			tsdbType = "flow"
+			tsdbType = "network"
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
-			tsdbType = "app"
+			tsdbType = "application"
 		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
@@ -142,10 +142,10 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 				name = tableSlice[1]
 			}
 		}
-		if strings.HasPrefix(table, "vtap_flow") {
-			tsdbType = "flow"
-		} else if strings.HasPrefix(table, "vtap_app") {
-			tsdbType = "app"
+		if strings.HasPrefix(table, "network") {
+			tsdbType = "network"
+		} else if strings.HasPrefix(table, "application") {
+			tsdbType = "application"
 		} else if table == "vtap_acl" {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}

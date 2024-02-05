@@ -92,11 +92,12 @@ type TagDescription struct {
 	Operators   []string
 	Permissions []bool
 	RelatedTag  string
+	Deprecated  bool
 }
 
 func NewTagDescription(
 	name, clientName, serverName, displayName, tagType, enumFile, category string,
-	permissions []bool, description, relatedTag string,
+	permissions []bool, description, relatedTag string, deprecated bool,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -114,6 +115,7 @@ func NewTagDescription(
 		Permissions: permissions,
 		Description: description,
 		RelatedTag:  relatedTag,
+		Deprecated:  deprecated,
 	}
 }
 
@@ -159,6 +161,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 7 - Permissions
 				// 8 - Description
 				// 9 - RelatedTag
+				// 10 - Deprecated
+
 				permissions, err := ckcommon.ParsePermission(tag[6])
 				if err != nil {
 					return errors.New(
@@ -167,6 +171,19 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 							db, table, tag, err.Error(),
 						),
 					)
+				}
+				deprecated := false
+				deprecatedNum, err := strconv.Atoi(tag[7].(string))
+				if err != nil {
+					return errors.New(
+						fmt.Sprintf(
+							"parse tag deprecated failed! db:%s table:%s, tag:%v, err:%s",
+							db, table, tag, err.Error(),
+						),
+					)
+				}
+				if deprecatedNum == 1 {
+					deprecated = true
 				}
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
@@ -179,7 +196,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				des := tagLanguage[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, tag[5].(string), permissions, des, "",
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, "", deprecated,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -588,7 +605,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag",
+			"operators", "permissions", "description", "related_tag", "deprecated",
 		},
 		Values: []interface{}{},
 	}
@@ -602,7 +619,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			response.Values,
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag, tag.Deprecated,
 			},
 		)
 	}
@@ -1191,8 +1208,6 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "policy" || tag == "npb_tunnel" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE {
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])

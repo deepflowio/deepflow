@@ -248,6 +248,18 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			where = strings.Join(sqlSplit[i+1:], " ")
 		}
 	}
+	switch table {
+	case "vtap_app_port":
+		table = "application"
+	case "vtap_app_edge_port":
+		table = "application_map"
+	case "vtap_flow_port":
+		table = "network"
+	case "vtap_flow_edge_port":
+		table = "network_map"
+	case "vtap_acl":
+		table = "traffic_policy"
+	}
 	switch strings.ToLower(sqlSplit[1]) {
 	case "metrics":
 		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
@@ -1044,6 +1056,18 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := strings.Trim(sqlparser.String(from), "`")
+			if strings.Contains(table, "vtap_app_port") {
+				table = strings.ReplaceAll(table, "vtap_app_port", "application")
+			} else if strings.Contains(table, "vtap_app_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_app_edge_port", "application_map")
+			} else if strings.Contains(table, "vtap_flow_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_port", "network")
+			} else if strings.Contains(table, "vtap_flow_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_edge_port", "network_map")
+			} else if strings.Contains(table, "vtap_acl") {
+				table = strings.ReplaceAll(table, "vtap_acl", "traffic_policy")
+			}
+
 			e.Table = table
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {

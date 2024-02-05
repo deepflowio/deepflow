@@ -2,5 +2,6 @@
 time                       , Time                       ,
 
 vtap                       , vtap                       ,
+agent                      , agent                      ,
 policy                     , policy                     ,
 npb_tunnel                 , npb_tunnel                 ,

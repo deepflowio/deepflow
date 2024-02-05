@@ -33,13 +33,22 @@ auto_instance_type         , auto_instance_type        , auto_instance_type     
 auto_instance              , auto_instance             , auto_instance             , resource      ,                       , Universal Tag   , 111            , 0
 auto_service_type          , auto_service_type         , auto_service_type         , int_enum      , auto_service_type     , Universal Tag   , 111            , 0
 auto_service               , auto_service              , auto_service              , resource      ,                       , Universal Tag   , 111            , 0
+gprocess                   , gprocess                  , gprocess                  , resource      ,                       , Universal Tag   , 111            , 0
 
 k8s.label                  , k8s.label                 , k8s.label                 , map           ,                       , Custom Tag      , 111            , 0
+k8s.annotation             , k8s.annotation            , k8s.annotation            , map           ,                       , Custom Tag      , 111            , 0
+k8s.env                    , k8s.env                   , k8s.env                   , map           ,                       , Custom Tag      , 111            , 0
 cloud.tag                  , cloud.tag                 , cloud.tag                 , map           ,                       , Custom Tag      , 111            , 0
 os.app                     , os.app                    , os.app                    , map           ,                       , Custom Tag      , 111            , 0
 
 ip                         , ip                        , ip                        , ip            ,                       , Network Layer   , 111            , 0
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum      , ip_type               , Network Layer   , 111            , 0
+protocol                   , protocol                  , protocol                  , int_enum      , protocol              , Network Layer   , 111            , 0
 
-vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111            , 0
+server_port                , server_port               , server_port               , int_enum      , server_port           , Transport Layer , 111            , 0
+
+tap                        , tap                       , tap                       , resource      ,                       , Capture Info    , 110            , 0
+vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111            , 1
 agent                      , agent                     , agent                     , resource      ,                       , Capture Info    , 111            , 0
+signal_source              , signal_source             , signal_source             , int_enum      , l4_signal_source      , Capture Info    , 111            , 0
+role                       , role                      , role                      , int_enum      , role                  , Capture Info    , 111            , 0

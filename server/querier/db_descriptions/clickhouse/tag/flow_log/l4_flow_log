@@ -1,101 +1,109 @@
-# Name              , ClientName           , ServerName            , Type         , EnumFile             , Category             , Permission
-_id                 , _id                  , _id                   , id           ,                      , Flow Info            , 111
-time                , time                 , time                  , time         ,                      , Flow Info            , 111
+# Name              , ClientName           , ServerName            , Type         , EnumFile             , Category             , Permission    , Deprecated
+_id                 , _id                  , _id                   , id           ,                      , Flow Info            , 111           , 0
+time                , time                 , time                  , time         ,                      , Flow Info            , 111           , 0
 
-region              , region_0             , region_1              , resource     ,                      , Universal Tag        , 110
-az                  , az_0                 , az_1                  , resource     ,                      , Universal Tag        , 110
-host                , host_0               , host_1                , resource     ,                      , Universal Tag        , 100
-chost               , chost_0              , chost_1               , resource     ,                      , Universal Tag        , 111
-vpc                 , vpc_0                , vpc_1                 , resource     ,                      , Universal Tag        , 111
-l2_vpc              , l2_vpc_0             , l2_vpc_1              , resource     ,                      , Universal Tag        , 110
-subnet              , subnet_0             , subnet_1              , resource     ,                      , Universal Tag        , 111
-router              , router_0             , router_1              , resource     ,                      , Universal Tag        , 110
-dhcpgw              , dhcpgw_0             , dhcpgw_1              , resource     ,                      , Universal Tag        , 110
-lb                  , lb_0                 , lb_1                  , resource     ,                      , Universal Tag        , 110
-lb_listener         , lb_listener_0        , lb_listener_1         , resource     ,                      , Universal Tag        , 110
-natgw               , natgw_0              , natgw_1               , resource     ,                      , Universal Tag        , 110
-redis               , redis_0              , redis_1               , resource     ,                      , Universal Tag        , 110
-rds                 , rds_0                , rds_1                 , resource     ,                      , Universal Tag        , 110
-pod_cluster         , pod_cluster_0        , pod_cluster_1         , resource     ,                      , Universal Tag        , 111
-pod_ns              , pod_ns_0             , pod_ns_1              , resource     ,                      , Universal Tag        , 111
-pod_node            , pod_node_0           , pod_node_1            , resource     ,                      , Universal Tag        , 111
-pod_ingress         , pod_ingress_0        , pod_ingress_1         , resource     ,                      , Universal Tag        , 111
-pod_service         , pod_service_0        , pod_service_1         , resource     ,                      , Universal Tag        , 111
-pod_group_type      , pod_group_type_0     , pod_group_type_1      , int_enum     , pod_group_type       , Universal Tag        , 111
-pod_group           , pod_group_0          , pod_group_1           , resource     ,                      , Universal Tag        , 111
-pod                 , pod_0                , pod_1                 , resource     ,                      , Universal Tag        , 111
-service             , service_0            , service_1             , resource     ,                      , Universal Tag        , 111
-resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , int_enum     , resource_gl0_type    , Universal Tag        , 111
-resource_gl0        , resource_gl0_0       , resource_gl0_1        , resource     ,                      , Universal Tag        , 111
-resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , int_enum     , resource_gl1_type    , Universal Tag        , 111
-resource_gl1        , resource_gl1_0       , resource_gl1_1        , resource     ,                      , Universal Tag        , 111
-resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , int_enum     , resource_gl2_type    , Universal Tag        , 111
-resource_gl2        , resource_gl2_0       , resource_gl2_1        , resource     ,                      , Universal Tag        , 111
-auto_instance_type  , auto_instance_type_0 , auto_instance_type_1  , int_enum     , auto_instance_type   , Universal Tag        , 111
-auto_instance       , auto_instance_0      , auto_instance_1       , resource     ,                      , Universal Tag        , 111
-auto_service_type   , auto_service_type_0  , auto_service_type_1   , int_enum     , auto_service_type    , Universal Tag        , 111
-auto_service        , auto_service_0       , auto_service_1        , resource     ,                      , Universal Tag        , 111
-gprocess            , gprocess_0           , gprocess_1            , resource     ,                      , Universal Tag        , 111
-tap_port_host       , tap_port_host        , tap_port_host         , resource     ,                      , Universal Tag        , 111
-tap_port_chost      , tap_port_chost       , tap_port_chost        , resource     ,                      , Universal Tag        , 111
-tap_port_pod_node   , tap_port_pod_node    , tap_port_pod_node     , resource     ,                      , Universal Tag        , 111
+region              , region_0             , region_1              , resource     ,                      , Universal Tag        , 110           , 0
+az                  , az_0                 , az_1                  , resource     ,                      , Universal Tag        , 110           , 0
+host                , host_0               , host_1                , resource     ,                      , Universal Tag        , 100           , 0
+chost               , chost_0              , chost_1               , resource     ,                      , Universal Tag        , 111           , 0
+vpc                 , vpc_0                , vpc_1                 , resource     ,                      , Universal Tag        , 111           , 0
+l2_vpc              , l2_vpc_0             , l2_vpc_1              , resource     ,                      , Universal Tag        , 110           , 0
+subnet              , subnet_0             , subnet_1              , resource     ,                      , Universal Tag        , 111           , 0
+router              , router_0             , router_1              , resource     ,                      , Universal Tag        , 110           , 0
+dhcpgw              , dhcpgw_0             , dhcpgw_1              , resource     ,                      , Universal Tag        , 110           , 0
+lb                  , lb_0                 , lb_1                  , resource     ,                      , Universal Tag        , 110           , 0
+lb_listener         , lb_listener_0        , lb_listener_1         , resource     ,                      , Universal Tag        , 110           , 0
+natgw               , natgw_0              , natgw_1               , resource     ,                      , Universal Tag        , 110           , 0
+redis               , redis_0              , redis_1               , resource     ,                      , Universal Tag        , 110           , 0
+rds                 , rds_0                , rds_1                 , resource     ,                      , Universal Tag        , 110           , 0
+pod_cluster         , pod_cluster_0        , pod_cluster_1         , resource     ,                      , Universal Tag        , 111           , 0
+pod_ns              , pod_ns_0             , pod_ns_1              , resource     ,                      , Universal Tag        , 111           , 0
+pod_node            , pod_node_0           , pod_node_1            , resource     ,                      , Universal Tag        , 111           , 0
+pod_ingress         , pod_ingress_0        , pod_ingress_1         , resource     ,                      , Universal Tag        , 111           , 0
+pod_service         , pod_service_0        , pod_service_1         , resource     ,                      , Universal Tag        , 111           , 0
+pod_group_type      , pod_group_type_0     , pod_group_type_1      , int_enum     , pod_group_type       , Universal Tag        , 111           , 0
+pod_group           , pod_group_0          , pod_group_1           , resource     ,                      , Universal Tag        , 111           , 0
+pod                 , pod_0                , pod_1                 , resource     ,                      , Universal Tag        , 111           , 0
+service             , service_0            , service_1             , resource     ,                      , Universal Tag        , 111           , 0
+resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , int_enum     , resource_gl0_type    , Universal Tag        , 111           , 0
+resource_gl0        , resource_gl0_0       , resource_gl0_1        , resource     ,                      , Universal Tag        , 111           , 0
+resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , int_enum     , resource_gl1_type    , Universal Tag        , 111           , 0
+resource_gl1        , resource_gl1_0       , resource_gl1_1        , resource     ,                      , Universal Tag        , 111           , 0
+resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , int_enum     , resource_gl2_type    , Universal Tag        , 111           , 0
+resource_gl2        , resource_gl2_0       , resource_gl2_1        , resource     ,                      , Universal Tag        , 111           , 0
+auto_instance_type  , auto_instance_type_0 , auto_instance_type_1  , int_enum     , auto_instance_type   , Universal Tag        , 111           , 0
+auto_instance       , auto_instance_0      , auto_instance_1       , resource     ,                      , Universal Tag        , 111           , 0
+auto_service_type   , auto_service_type_0  , auto_service_type_1   , int_enum     , auto_service_type    , Universal Tag        , 111           , 0
+auto_service        , auto_service_0       , auto_service_1        , resource     ,                      , Universal Tag        , 111           , 0
+gprocess            , gprocess_0           , gprocess_1            , resource     ,                      , Universal Tag        , 111           , 0
+tap_port_host       , tap_port_host        , tap_port_host         , resource     ,                      , Universal Tag        , 111           , 1
+tap_port_chost      , tap_port_chost       , tap_port_chost        , resource     ,                      , Universal Tag        , 111           , 1
+tap_port_pod_node   , tap_port_pod_node    , tap_port_pod_node     , resource     ,                      , Universal Tag        , 111           , 1
+capture_nic_host    , capture_nic_host     , capture_nic_chost     , resource     ,                      , Universal Tag        , 111           , 0
+capture_nic_chost   , capture_nic_chost    , capture_nic_chost     , resource     ,                      , Universal Tag        , 111           , 0
+capture_nic_pod_node , capture_nic_pod_node , capture_nic_pod_node , resource     ,                      , Universal Tag        , 111           , 0
 
-k8s.label           , k8s.label_0          , k8s.label_1           , map          ,                      , Custom Tag           , 111
-k8s.annotation      , k8s.annotation_0     , k8s.annotation_1      , map          ,                      , Custom Tag           , 111
-k8s.env             , k8s.env_0            , k8s.env_1             , map          ,                      , Custom Tag           , 111
-cloud.tag           , cloud.tag_0          , cloud.tag_1           , map          ,                      , Custom Tag           , 111
-os.app              , os.app_0             , os.app_1              , map          ,                      , Custom Tag           , 111
+k8s.label           , k8s.label_0          , k8s.label_1           , map          ,                      , Custom Tag           , 111           , 0
+k8s.annotation      , k8s.annotation_0     , k8s.annotation_1      , map          ,                      , Custom Tag           , 111           , 0
+k8s.env             , k8s.env_0            , k8s.env_1             , map          ,                      , Custom Tag           , 111           , 0
+cloud.tag           , cloud.tag_0          , cloud.tag_1           , map          ,                      , Custom Tag           , 111           , 0
+os.app              , os.app_0             , os.app_1              , map          ,                      , Custom Tag           , 111           , 0
 
-eth_type            , eth_type             , eth_type              , int_enum     , eth_type             , Data Link Layer      , 111
-vlan                , vlan                 , vlan                  , int          ,                      , Data Link Layer      , 111
-mac                 , mac_0                , mac_1                 , mac          ,                      , Data Link Layer      , 111
+eth_type            , eth_type             , eth_type              , int_enum     , eth_type             , Data Link Layer      , 111           , 0
+vlan                , vlan                 , vlan                  , int          ,                      , Data Link Layer      , 111           , 0
+mac                 , mac_0                , mac_1                 , mac          ,                      , Data Link Layer      , 111           , 0
 
-ip                  , ip_0                 , ip_1                  , ip           ,                      , Network Layer        , 111
-is_ipv4             , is_ipv4              , is_ipv4               , int_enum     , ip_type              , Network Layer        , 111
-is_internet         , is_internet_0        , is_internet_1         , bool         ,                      , Network Layer        , 111
-province            , province_0           , province_1            , string       ,                      , Network Layer        , 111
-protocol            , protocol             , protocol              , int_enum     , protocol             , Network Layer        , 111
+ip                  , ip_0                 , ip_1                  , ip           ,                      , Network Layer        , 111           , 0
+is_ipv4             , is_ipv4              , is_ipv4               , int_enum     , ip_type              , Network Layer        , 111           , 0
+is_internet         , is_internet_0        , is_internet_1         , bool         ,                      , Network Layer        , 111           , 0
+province            , province_0           , province_1            , string       ,                      , Network Layer        , 111           , 0
+protocol            , protocol             , protocol              , int_enum     , protocol             , Network Layer        , 111           , 0
 
-tunnel_tier         , tunnel_tier          , tunnel_tier           , int_enum     , tunnel_tier          , Tunnel Info          , 111
-tunnel_type         , tunnel_type          , tunnel_type           , int_enum     , tunnel_type          , Tunnel Info          , 111
-tunnel_tx_id        , tunnel_tx_id         , tunnel_tx_id          , int          ,                      , Tunnel Info          , 111
-tunnel_rx_id        , tunnel_rx_id         , tunnel_rx_id          , int          ,                      , Tunnel Info          , 111
-tunnel_tx_ip_0      , tunnel_tx_ip_0       , tunnel_tx_ip_0        , ip           ,                      , Tunnel Info          , 111
-tunnel_tx_ip_1      , tunnel_tx_ip_1       , tunnel_tx_ip_1        , ip           ,                      , Tunnel Info          , 111
-tunnel_rx_ip_0      , tunnel_rx_ip_0       , tunnel_rx_ip_0        , ip           ,                      , Tunnel Info          , 111
-tunnel_rx_ip_1      , tunnel_rx_ip_1       , tunnel_rx_ip_1        , ip           ,                      , Tunnel Info          , 111
-tunnel_tx_mac_0     , tunnel_tx_mac_0      , tunnel_tx_mac_0       , mac          ,                      , Tunnel Info          , 111
-tunnel_tx_mac_1     , tunnel_tx_mac_1      , tunnel_tx_mac_1       , mac          ,                      , Tunnel Info          , 111
-tunnel_rx_mac_0     , tunnel_rx_mac_0      , tunnel_rx_mac_0       , mac          ,                      , Tunnel Info          , 111
-tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , mac          ,                      , Tunnel Info          , 111
+tunnel_tier         , tunnel_tier          , tunnel_tier           , int_enum     , tunnel_tier          , Tunnel Info          , 111           , 0
+tunnel_type         , tunnel_type          , tunnel_type           , int_enum     , tunnel_type          , Tunnel Info          , 111           , 0
+tunnel_tx_id        , tunnel_tx_id         , tunnel_tx_id          , int          ,                      , Tunnel Info          , 111           , 0
+tunnel_rx_id        , tunnel_rx_id         , tunnel_rx_id          , int          ,                      , Tunnel Info          , 111           , 0
+tunnel_tx_ip_0      , tunnel_tx_ip_0       , tunnel_tx_ip_0        , ip           ,                      , Tunnel Info          , 111           , 0
+tunnel_tx_ip_1      , tunnel_tx_ip_1       , tunnel_tx_ip_1        , ip           ,                      , Tunnel Info          , 111           , 0
+tunnel_rx_ip_0      , tunnel_rx_ip_0       , tunnel_rx_ip_0        , ip           ,                      , Tunnel Info          , 111           , 0
+tunnel_rx_ip_1      , tunnel_rx_ip_1       , tunnel_rx_ip_1        , ip           ,                      , Tunnel Info          , 111           , 0
+tunnel_tx_mac_0     , tunnel_tx_mac_0      , tunnel_tx_mac_0       , mac          ,                      , Tunnel Info          , 111           , 0
+tunnel_tx_mac_1     , tunnel_tx_mac_1      , tunnel_tx_mac_1       , mac          ,                      , Tunnel Info          , 111           , 0
+tunnel_rx_mac_0     , tunnel_rx_mac_0      , tunnel_rx_mac_0       , mac          ,                      , Tunnel Info          , 111           , 0
+tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , mac          ,                      , Tunnel Info          , 111           , 0
 
-client_port         , client_port          , client_port           , int          ,                      , Transport Layer      , 111
-server_port         , server_port          , server_port           , int_enum     , server_port          , Transport Layer      , 111
-tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , bit_enum     , tcp_flags_bit        , Transport Layer      , 111
-syn_seq             , syn_seq              , syn_seq               , int          ,                      , Transport Layer      , 111
-syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , int          ,                      , Transport Layer      , 111
-last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , int          ,                      , Transport Layer      , 111
-last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , int          ,                      , Transport Layer      , 111
+client_port         , client_port          , client_port           , int          ,                      , Transport Layer      , 111           , 0
+server_port         , server_port          , server_port           , int_enum     , server_port          , Transport Layer      , 111           , 0
+tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , bit_enum     , tcp_flags_bit        , Transport Layer      , 111           , 0
+syn_seq             , syn_seq              , syn_seq               , int          ,                      , Transport Layer      , 111           , 0
+syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , int          ,                      , Transport Layer      , 111           , 0
+last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , int          ,                      , Transport Layer      , 111           , 0
+last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , int          ,                      , Transport Layer      , 111           , 0
 
-l7_protocol         , l7_protocol          , l7_protocol           , int_enum     , l7_protocol          , Application Layer    , 111
+l7_protocol         , l7_protocol          , l7_protocol           , int_enum     , l7_protocol          , Application Layer    , 111           , 0
 
-flow_id             , flow_id              , flow_id               , int          ,                      , Flow Info            , 111
-start_time          , start_time           , start_time            , int          ,                      , Flow Info            , 111
-end_time            , end_time             , end_time              , int          ,                      , Flow Info            , 111
-close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111
-status              , status               , status                , int_enum     , status               , Flow Info            , 111
-is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , Flow Info            , 111
+flow_id             , flow_id              , flow_id               , int          ,                      , Flow Info            , 111           , 0
+start_time          , start_time           , start_time            , int          ,                      , Flow Info            , 111           , 0
+end_time            , end_time             , end_time              , int          ,                      , Flow Info            , 111           , 0
+close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111           , 0
+status              , status               , status                , int_enum     , status               , Flow Info            , 111           , 0
+is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , Flow Info            , 111           , 0
 
-signal_source       , signal_source        , signal_source         , int_enum     , l4_signal_source     , Capture Info         , 111
-tap                 , tap                  , tap                   , resource     ,                      , Capture Info         , 110
-vtap                , vtap                 , vtap                  , resource     ,                      , Capture Info         , 111
-nat_source          , nat_source           , nat_source            , int_enum     , nat_source           , Capture Info         , 111
-tap_port            , tap_port             , tap_port              , mac          ,                      , Capture Info         , 111
-tap_port_name       , tap_port_name        , tap_port_name         , string       ,                      , Capture Info         , 111
-tap_port_type       , tap_port_type        , tap_port_type         , int_enum     , tap_port_type        , Capture Info         , 111
-tap_side            , tap_side             , tap_side              , string_enum  , tap_side             , Capture Info         , 111
-l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , Capture Info         , 111
-l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , Capture Info         , 111
-has_pcap            , has_pcap             , has_pcap              , bool         ,                      , Capture Info         , 111
-nat_real_ip         , nat_real_ip_0        , nat_real_ip_1         , ip           ,                      , Capture Info         , 111
-nat_real_port       , nat_real_port_0      , nat_real_port_1       , int          ,                      , Capture Info         , 111
+signal_source       , signal_source        , signal_source         , int_enum     , l4_signal_source     , Capture Info         , 111           , 0
+tap                 , tap                  , tap                   , resource     ,                      , Capture Info         , 110           , 0
+vtap                , vtap                 , vtap                  , resource     ,                      , Capture Info         , 111           , 1
+agent               , agent                , agent                 , resource     ,                      , Capture Info         , 111           , 0
+nat_source          , nat_source           , nat_source            , int_enum     , nat_source           , Capture Info         , 111           , 0
+tap_port            , tap_port             , tap_port              , mac          ,                      , Capture Info         , 111           , 1
+tap_port_name       , tap_port_name        , tap_port_name         , string       ,                      , Capture Info         , 111           , 1
+tap_port_type       , tap_port_type        , tap_port_type         , int_enum     , capture_nic_type     , Capture Info         , 111           , 1
+capture_nic         , capture_nic          , capture_nic           , mac          ,                      , Capture Info         , 111           , 0
+capture_nic_name    , capture_nic_name     , capture_nic_name      , string       ,                      , Capture Info         , 111           , 0
+capture_nic_type    , capture_nic_type     , capture_nic_type      , int_enum     , capture_nic_type     , Capture Info         , 111           , 0
+tap_side            , tap_side             , tap_side              , string_enum  , observation_point    , Capture Info         , 111           , 1
+observation_point   , observation_point    , observation_point     , string_enum  , observation_point    , Capture Info         , 111           , 0
+l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , Capture Info         , 111           , 0
+l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , Capture Info         , 111           , 0
+has_pcap            , has_pcap             , has_pcap              , bool         ,                      , Capture Info         , 111           , 0
+nat_real_ip         , nat_real_ip_0        , nat_real_ip_1         , ip           ,                      , Capture Info         , 111           , 0
+nat_real_port       , nat_real_port_0      , nat_real_port_1       , int          ,                      , Capture Info         , 111           , 0

@@ -40,6 +40,7 @@ trace_id                   , TraceID                    ,
 span_name                  , Span名称                    ,
 
 vtap                       , 采集器                      ,
+agent                      , 采集器                      ,
 
 profile_value_unit         , 单位                        ,
 profile_event_type         , 剖析类型                    ,

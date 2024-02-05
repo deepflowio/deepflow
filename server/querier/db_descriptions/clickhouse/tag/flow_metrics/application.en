@@ -54,5 +54,6 @@ endpoint                   , Endpoint                      ,
 
 tap                        , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                       , DeepFlow Agent                ,
+agent                      , DeepFlow Agent                ,
 signal_source              , Signal Source                 ,
 role                       , Role                          ,
