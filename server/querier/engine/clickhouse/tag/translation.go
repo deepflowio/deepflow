@@ -52,9 +52,6 @@ var HOSTNAME_IP_DEVICE_MAP = map[string]struct {
 	common.TAP_PORT_HOST:     VIF_DEVICE_TYPE_HOST,
 	common.TAP_PORT_CHOST:    VIF_DEVICE_TYPE_VM,
 	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
-	common.CAPTURE_NIC_HOST:     VIF_DEVICE_TYPE_HOST,
-	common.CAPTURE_NIC_CHOST:    VIF_DEVICE_TYPE_VM,
-	common.CAPTURE_NIC_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
 }
 
 var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type", "is_tls"}

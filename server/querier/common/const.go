@@ -30,13 +30,6 @@ const (
 )
 
 const (
-	HOST_HOSTNAME     = "host_hostname"
-	HOST_IP           = "host_ip"
-	CHOST_HOSTNAME    = "chost_hostname"
-	CHOST_IP          = "chost_ip"
-	POD_NODE_HOSTNAME = "pod_node_hostname"
-	POD_NODE_IP       = "pod_node_ip"
-
 	TAP_PORT_HOST        = "tap_port_host"
 	TAP_PORT_CHOST       = "tap_port_chost"
 	TAP_PORT_POD_NODE    = "tap_port_pod_node"
