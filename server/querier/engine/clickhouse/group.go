@@ -36,7 +36,10 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	}
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
+		// Only vtap_acl translate policy_id
+		if name == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
 			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
