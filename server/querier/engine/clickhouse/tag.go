@@ -280,7 +280,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		m.AddCallback(strings.Trim(t.Value, "`"), ColumnNameSwap([]interface{}{strings.Trim(t.Value, "`")}))
 	} else {
 		m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-		if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+		if common.IsValueInSliceString(t.Value, []string{"tap_port", "capture_nic", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
 			alias := t.Value
 			if t.Alias != "" {
 				alias = t.Alias
