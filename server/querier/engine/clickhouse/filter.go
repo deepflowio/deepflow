@@ -872,6 +872,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				return &view.Expr{Value: filter}, nil
 			}
 		}
+		// Only vtap_acl translate policy_id
+		if strings.Trim(t.Tag, "`") == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			return &view.Expr{Value: filter}, nil
+		}
 		whereFilter := tagItem.WhereTranslator
 		if whereFilter != "" {
 			switch whereTag {
