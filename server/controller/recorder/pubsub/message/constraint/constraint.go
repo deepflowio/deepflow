@@ -44,10 +44,6 @@ type Add interface {
 type UpdatePtr[T Update] interface {
 	*T
 
-	// SetID(int)
-	// GetID() int
-	// SetLcuuid(string)
-	// GetLcuuid() string
 	SetFields(interface{})
 	GetFields() interface{} // return *FieldsUpdate
 	SetDiffBase(interface{})

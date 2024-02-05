@@ -27,18 +27,25 @@ import (
 )
 
 type PodReplicaSet struct {
-	UpdaterBase[cloudmodel.PodReplicaSet, mysql.PodReplicaSet, *diffbase.PodReplicaSet]
+	UpdaterBase[
+		cloudmodel.PodReplicaSet,
+		mysql.PodReplicaSet,
+		*diffbase.PodReplicaSet, *message.PodReplicaSetAdd, message.PodReplicaSetAdd, *message.PodReplicaSetUpdate, message.PodReplicaSetUpdate, *message.PodReplicaSetFieldsUpdate, message.PodReplicaSetFieldsUpdate, *message.PodReplicaSetDelete, message.PodReplicaSetDelete]
 }
 
 func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplicaSet) *PodReplicaSet {
 	updater := &PodReplicaSet{
-		UpdaterBase[cloudmodel.PodReplicaSet, mysql.PodReplicaSet, *diffbase.PodReplicaSet]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodReplicaSet(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodReplicaSets,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodReplicaSet,
+			mysql.PodReplicaSet,
+			*diffbase.PodReplicaSet, *message.PodReplicaSetAdd, message.PodReplicaSetAdd, *message.PodReplicaSetUpdate, message.PodReplicaSetUpdate, *message.PodReplicaSetFieldsUpdate, message.PodReplicaSetFieldsUpdate, *message.PodReplicaSetDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
+			wholeCache,
+			db.NewPodReplicaSet(),
+			wholeCache.DiffBaseDataSet.PodReplicaSets,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -90,7 +97,7 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 	return dbItem, true
 }
 
-func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (interface{}, map[string]interface{}, bool) {
+func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (*message.PodReplicaSetFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodReplicaSetFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -41,12 +41,12 @@ func (a *PodNode) setDBItemID(dbItem *mysql.PodNode, id int) {
 	dbItem.ID = id
 }
 
-func (n *PodNode) DeleteBatch(lcuuids []string) bool {
+func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	err := mysql.Db.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
 		log.Errorf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err)
-		return false
+		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
 			err = mysql.Db.Delete(con).Error
@@ -57,11 +57,13 @@ func (n *PodNode) DeleteBatch(lcuuids []string) bool {
 			log.Infof("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con)
 		}
 	}
-	err = mysql.Db.Where("lcuuid IN ?", lcuuids).Delete(&mysql.PodNode{}).Error
+
+	var dbItems []*mysql.PodNode
+	err = mysql.Db.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err)
-		return false
+		return nil, false
 	}
 	log.Infof("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids)
-	return true
+	return dbItems, true
 }

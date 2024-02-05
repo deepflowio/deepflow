@@ -23,21 +23,29 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type LBVMConnection struct {
-	UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *diffbase.LBVMConnection]
+	UpdaterBase[
+		cloudmodel.LBVMConnection,
+		mysql.LBVMConnection,
+		*diffbase.LBVMConnection, *message.LBVMConnectionAdd, message.LBVMConnectionAdd, *message.LBVMConnectionUpdate, message.LBVMConnectionUpdate, *message.LBVMConnectionFieldsUpdate, message.LBVMConnectionFieldsUpdate, *message.LBVMConnectionDelete, message.LBVMConnectionDelete]
 }
 
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
 	updater := &LBVMConnection{
-		UpdaterBase[cloudmodel.LBVMConnection, mysql.LBVMConnection, *diffbase.LBVMConnection]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewLBVMConnection(),
-			diffBaseData: wholeCache.DiffBaseDataSet.LBVMConnections,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.LBVMConnection,
+			mysql.LBVMConnection,
+			*diffbase.LBVMConnection, *message.LBVMConnectionAdd, message.LBVMConnectionAdd, *message.LBVMConnectionUpdate, message.LBVMConnectionUpdate, *message.LBVMConnectionFieldsUpdate, message.LBVMConnectionFieldsUpdate, *message.LBVMConnectionDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
+			wholeCache,
+			db.NewLBVMConnection(),
+			wholeCache.DiffBaseDataSet.LBVMConnections,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -76,6 +84,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (interface{}, map[string]interface{}, bool) {
+func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (*message.LBVMConnectionFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
 }

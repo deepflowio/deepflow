@@ -23,21 +23,29 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PodIngressRuleBackend struct {
-	UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *diffbase.PodIngressRuleBackend]
+	UpdaterBase[
+		cloudmodel.PodIngressRuleBackend,
+		mysql.PodIngressRuleBackend,
+		*diffbase.PodIngressRuleBackend, *message.PodIngressRuleBackendAdd, message.PodIngressRuleBackendAdd, *message.PodIngressRuleBackendUpdate, message.PodIngressRuleBackendUpdate, *message.PodIngressRuleBackendFieldsUpdate, message.PodIngressRuleBackendFieldsUpdate, *message.PodIngressRuleBackendDelete, message.PodIngressRuleBackendDelete]
 }
 
 func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRuleBackend) *PodIngressRuleBackend {
 	updater := &PodIngressRuleBackend{
-		UpdaterBase[cloudmodel.PodIngressRuleBackend, mysql.PodIngressRuleBackend, *diffbase.PodIngressRuleBackend]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodIngressRuleBackend(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodIngressRuleBackend,
+			mysql.PodIngressRuleBackend,
+			*diffbase.PodIngressRuleBackend, *message.PodIngressRuleBackendAdd, message.PodIngressRuleBackendAdd, *message.PodIngressRuleBackendUpdate, message.PodIngressRuleBackendUpdate, *message.PodIngressRuleBackendFieldsUpdate, message.PodIngressRuleBackendFieldsUpdate, *message.PodIngressRuleBackendDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
+			wholeCache,
+			db.NewPodIngressRuleBackend(),
+			wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -87,6 +95,6 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 }
 
 // 保留接口
-func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (interface{}, map[string]interface{}, bool) {
+func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (*message.PodIngressRuleBackendFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
 }

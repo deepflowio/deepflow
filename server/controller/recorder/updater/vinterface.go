@@ -30,20 +30,27 @@ import (
 )
 
 type VInterface struct {
-	UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]
+	UpdaterBase[
+		cloudmodel.VInterface,
+		mysql.VInterface,
+		*diffbase.VInterface, *message.VInterfaceAdd, message.VInterfaceAdd, *message.VInterfaceUpdate, message.VInterfaceUpdate, *message.VInterfaceFieldsUpdate, message.VInterfaceFieldsUpdate, *message.VInterfaceDelete, message.VInterfaceDelete]
 }
 
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
 	updater := &VInterface{
-		UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]{
-			resourceType:      ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
-			cache:             wholeCache,
-			domainToolDataSet: domainToolDataSet,
-			dbOperator:        db.NewVInterface(),
-			diffBaseData:      wholeCache.DiffBaseDataSet.VInterfaces,
-			cloudData:         cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VInterface,
+			mysql.VInterface,
+			*diffbase.VInterface, *message.VInterfaceAdd, message.VInterfaceAdd, *message.VInterfaceUpdate, message.VInterfaceUpdate, *message.VInterfaceFieldsUpdate, message.VInterfaceFieldsUpdate, *message.VInterfaceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
+			wholeCache,
+			db.NewVInterface(),
+			wholeCache.DiffBaseDataSet.VInterfaces,
+			cloudData,
+		),
 	}
+	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
 	return updater
 }
@@ -101,7 +108,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (interface{}, map[string]interface{}, bool) {
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.VInterfaceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VInterfaceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {

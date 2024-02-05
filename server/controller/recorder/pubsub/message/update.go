@@ -155,22 +155,6 @@ type RegionUpdate struct {
 	MySQLData[mysql.Region]
 }
 
-func (r RegionUpdate) GetFields() interface{} {
-	return r.Fields.data
-}
-
-func (r RegionUpdate) SetFields(fields interface{}) {
-	r.Fields.SetFields(fields.(*RegionFieldsUpdate))
-}
-
-func (r RegionUpdate) GetMySQLItems() interface{} {
-	return r.MySQLData.GetNewMySQL()
-}
-
-func (r RegionUpdate) SetMySQLItems(items interface{}) {
-	r.MySQLData.SetNewMySQL(items.(*mysql.Region))
-}
-
 type AZFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]

@@ -27,18 +27,25 @@ import (
 )
 
 type SubDomain struct {
-	UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *diffbase.SubDomain]
+	UpdaterBase[
+		cloudmodel.SubDomain,
+		mysql.SubDomain,
+		*diffbase.SubDomain, *message.SubDomainAdd, message.SubDomainAdd, *message.SubDomainUpdate, message.SubDomainUpdate, *message.SubDomainFieldsUpdate, message.SubDomainFieldsUpdate, *message.SubDomainDelete, message.SubDomainDelete]
 }
 
 func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *SubDomain {
 	updater := &SubDomain{
-		UpdaterBase[cloudmodel.SubDomain, mysql.SubDomain, *diffbase.SubDomain]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewSubDomain(),
-			diffBaseData: wholeCache.DiffBaseDataSet.SubDomains,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.SubDomain,
+			mysql.SubDomain,
+			*diffbase.SubDomain, *message.SubDomainAdd, message.SubDomainAdd, *message.SubDomainUpdate, message.SubDomainUpdate, *message.SubDomainFieldsUpdate, message.SubDomainFieldsUpdate, *message.SubDomainDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
+			wholeCache,
+			db.NewSubDomain(),
+			wholeCache.DiffBaseDataSet.SubDomains,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -61,7 +68,7 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 	return dbItem, true
 }
 
-func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (interface{}, map[string]interface{}, bool) {
+func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (*message.SubDomainFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.SubDomainFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

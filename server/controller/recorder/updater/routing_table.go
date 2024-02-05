@@ -27,18 +27,25 @@ import (
 )
 
 type RoutingTable struct {
-	UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *diffbase.RoutingTable]
+	UpdaterBase[
+		cloudmodel.RoutingTable,
+		mysql.RoutingTable,
+		*diffbase.RoutingTable, *message.RoutingTableAdd, message.RoutingTableAdd, *message.RoutingTableUpdate, message.RoutingTableUpdate, *message.RoutingTableFieldsUpdate, message.RoutingTableFieldsUpdate, *message.RoutingTableDelete, message.RoutingTableDelete]
 }
 
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
 	updater := &RoutingTable{
-		UpdaterBase[cloudmodel.RoutingTable, mysql.RoutingTable, *diffbase.RoutingTable]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewRoutingTable(),
-			diffBaseData: wholeCache.DiffBaseDataSet.RoutingTables,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.RoutingTable,
+			mysql.RoutingTable,
+			*diffbase.RoutingTable, *message.RoutingTableAdd, message.RoutingTableAdd, *message.RoutingTableUpdate, message.RoutingTableUpdate, *message.RoutingTableFieldsUpdate, message.RoutingTableFieldsUpdate, *message.RoutingTableDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
+			wholeCache,
+			db.NewRoutingTable(),
+			wholeCache.DiffBaseDataSet.RoutingTables,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -68,7 +75,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
-func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (interface{}, map[string]interface{}, bool) {
+func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (*message.RoutingTableFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RoutingTableFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Destination != cloudItem.Destination {
