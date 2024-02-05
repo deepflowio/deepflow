@@ -21,16 +21,16 @@ import (
 )
 
 type ChPodNSCloudTag struct {
-	UpdaterBase[mysql.ChPodNSCloudTag, CloudTagKey]
+	UpdaterComponent[mysql.ChPodNSCloudTag, CloudTagKey]
 }
 
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	updater := &ChPodNSCloudTag{
-		UpdaterBase[mysql.ChPodNSCloudTag, CloudTagKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
-		},
+		newUpdaterComponent[mysql.ChPodNSCloudTag, CloudTagKey](
+			RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

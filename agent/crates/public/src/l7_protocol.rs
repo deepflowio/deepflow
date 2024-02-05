@@ -61,6 +61,7 @@ pub enum L7Protocol {
     Kafka = 100,
     MQTT = 101,
     AMQP = 102,
+    OpenWire = 103,
 
     // INFRA
     DNS = 120,
@@ -90,6 +91,7 @@ impl From<String> for L7Protocol {
             "kafka" => Self::Kafka,
             "mqtt" => Self::MQTT,
             "amqp" => Self::AMQP,
+            "openwire" => Self::OpenWire,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "tls" => Self::TLS,

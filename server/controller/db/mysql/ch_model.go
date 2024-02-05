@@ -45,6 +45,8 @@ type ChDevice struct {
 	Name       string `gorm:"column:name;type:text;default:null" json:"NAME"`
 	IconID     int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	UID        string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	Hostname   string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP         string `gorm:"column:ip;type:varchar(64)" json:"IP"`
 }
 
 type ChVTapPort struct {
@@ -488,4 +490,16 @@ type ChChost struct {
 	Name    string `gorm:"column:name;type:varchar(256)" json:"NAME"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 	HostID  int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+}
+
+type ChPolicy struct {
+	ACLGID     int    `gorm:"primaryKey;column:acl_gid;type:int;not null" json:"ACL_GID"`
+	TunnelType int    `gorm:"primaryKey;column:tunnel_type;type:int;not null" json:"TUNNEL_TYPE"`
+	ID         int    `gorm:"column:id;type:int;not null" json:"ID"`
+	Name       string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
+
+type ChNpbTunnel struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
 }

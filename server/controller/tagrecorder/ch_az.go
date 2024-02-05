@@ -21,20 +21,20 @@ import (
 )
 
 type ChAZ struct {
-	UpdaterBase[mysql.ChAZ, IDKey]
+	UpdaterComponent[mysql.ChAZ, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	updater := &ChAZ{
-		UpdaterBase[mysql.ChAZ, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_AZ,
-		},
+		newUpdaterComponent[mysql.ChAZ, IDKey](
+			RESOURCE_TYPE_CH_AZ,
+		),
 		domainLcuuidToIconID,
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -84,7 +84,7 @@ func (a *ChAZ) generateUpdateInfo(oldItem, newItem mysql.ChAZ) (map[string]inter
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if len(updateInfo) > 0 {

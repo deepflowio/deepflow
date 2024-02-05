@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type Subnet struct {
@@ -76,17 +77,17 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	return dbItem, true
 }
 
-func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.SubnetFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

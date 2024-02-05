@@ -1398,6 +1398,10 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 				derivativeArgStr := strings.TrimPrefix(argStr, "Derivative(")
 				derivativeArgStr = strings.TrimSuffix(derivativeArgStr, ")")
 				derivativeArgSlice := strings.Split(derivativeArgStr, ",")
+				// Add default group
+				if len(derivativeArgSlice) == 1 {
+					derivativeArgSlice = append(derivativeArgSlice, "tag")
+				}
 				for i, originArg := range derivativeArgSlice {
 					originArg = strings.TrimSpace(originArg)
 					if e.IsDerivative && i > 0 {

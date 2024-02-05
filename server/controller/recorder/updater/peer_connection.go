@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PeerConnection struct {
@@ -94,10 +95,12 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	return dbItem, true
 }
 
-func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.PeerConnectionFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.RemoteRegionLcuuid != cloudItem.RemoteRegionLcuuid {
 		remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
@@ -106,9 +109,11 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.RemoteRegionLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["remote_region_id"] = remoteRegionID
+		mapInfo["remote_region_id"] = remoteRegionID
+		structInfo.RemoteRegionID.SetNew(remoteRegionID)
+		structInfo.RemoteRegionLcuuid.Set(diffBase.RemoteRegionLcuuid, cloudItem.RemoteRegionLcuuid)
 	}
 	if diffBase.LocalRegionLcuuid != cloudItem.LocalRegionLcuuid {
 		localRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.LocalRegionLcuuid)
@@ -117,13 +122,12 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.LocalRegionLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["local_region_id"] = localRegionID
+		mapInfo["local_region_id"] = localRegionID
+		structInfo.LocalRegionID.SetNew(localRegionID)
+		structInfo.LocalRegionLcuuid.Set(diffBase.LocalRegionLcuuid, cloudItem.LocalRegionLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

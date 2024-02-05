@@ -90,7 +90,7 @@ message SyncRequest {
     optional uint64 version_groups = 11 [default = 0];
 
     optional string ctrl_ip = 21;
-    optional string host = 22;      // 仅作为注册使用
+    optional string host = 22;      // 表示hostname，操作系统的原始主机名，注册和信息同步使用
     repeated string host_ips = 23;  // 仅作为注册使用
     optional string ctrl_mac = 25;
     optional string vtap_group_id_request = 26;  // 支持采集器自动加入组
@@ -908,7 +908,7 @@ message LabelResponse {
     optional string value = 2;
     optional uint32 name_id = 3;
     optional uint32 value_id = 4;
-    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label
+    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label. When requesting all, response will not carry index
 }
 
 message MetricLabelRequest {
@@ -954,6 +954,7 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
+    repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
 }
 
 message PrometheusTargetRequest {

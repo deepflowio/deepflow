@@ -23,16 +23,16 @@ import (
 )
 
 type ChPodK8sEnv struct {
-	UpdaterBase[mysql.ChPodK8sEnv, K8sEnvKey]
+	UpdaterComponent[mysql.ChPodK8sEnv, K8sEnvKey]
 }
 
 func NewChPodK8sEnv() *ChPodK8sEnv {
 	updater := &ChPodK8sEnv{
-		UpdaterBase[mysql.ChPodK8sEnv, K8sEnvKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_K8S_ENV,
-		},
+		newUpdaterComponent[mysql.ChPodK8sEnv, K8sEnvKey](
+			RESOURCE_TYPE_CH_K8S_ENV,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

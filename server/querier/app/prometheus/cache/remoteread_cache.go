@@ -18,7 +18,6 @@ package cache
 
 import (
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,7 +34,8 @@ type CacheItem struct {
 	endTime   int64 // unit: ms, cache item end time
 	data      *prompb.ReadResponse
 
-	rwLock *sync.RWMutex
+	loadCompleted chan struct{}
+	rwLock        *sync.RWMutex
 }
 
 const (
@@ -47,6 +47,14 @@ func (c *CacheItem) Range() int64 {
 	return c.endTime - c.startTime
 }
 
+func (c *CacheItem) Data() *prompb.ReadResponse {
+	return c.data
+}
+
+func (c *CacheItem) GetLoadCompleteSignal() chan struct{} {
+	return c.loadCompleted
+}
+
 func (c *CacheItem) isZero() bool {
 	c.rwLock.RLock()
 	defer c.rwLock.RUnlock()
@@ -55,20 +63,21 @@ func (c *CacheItem) isZero() bool {
 }
 
 func (c *CacheItem) Size() uint64 {
-	size := 0
+	var size uintptr
 	if c.data == nil {
 		return 0
 	}
 	for i := 0; i < len(c.data.Results); i++ {
 		r := c.data.Results[i]
-		size += int(unsafe.Sizeof(*r))
+		size += unsafe.Sizeof(*r)
 		for j := 0; j < len(r.Timeseries); j++ {
 			ts := r.Timeseries[j]
-			size += int(unsafe.Sizeof(*ts))
-			size += len(ts.Samples) * sampleSize
-			size += len(ts.Samples) * samplePtrSize
+			size += unsafe.Sizeof(*ts)
+			size += uintptr(len(ts.Samples) * sampleSize)
+			size += uintptr(len(ts.Samples) * samplePtrSize)
 			for k := 0; k < len(ts.Labels); k++ {
-				size += int(unsafe.Sizeof(ts.Labels[k]))
+				size += uintptr(len(ts.Labels[k].Name) + len(ts.Labels[k].Value))
+				size += unsafe.Sizeof((*string)(unsafe.Pointer(&ts.Labels[k].Name))) + unsafe.Sizeof((*string)(unsafe.Pointer(&ts.Labels[k].Value)))
 			}
 		}
 	}
@@ -131,15 +140,6 @@ func (c *CacheItem) FixupQueryTime(start int64, end int64) (int64, int64) {
 	return start, end
 }
 
-func getSeriesLabels(lb *[]prompb.Label) string {
-	sort.Slice(*lb, func(i, j int) bool { return (*lb)[i].Name < (*lb)[j].Name })
-	labels := make([]string, 0, len(*lb))
-	for i := 0; i < len(*lb); i++ {
-		labels = append(labels, (*lb)[i].Name+":"+(*lb)[i].Value)
-	}
-	return strings.Join(labels, ",")
-}
-
 func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) *prompb.ReadResponse {
 	log.Debugf("cache merged, query range: [%d-%d], cache range: [%d-%d]", start, end, c.startTime, c.endTime)
 	if query == nil || len(query.Results) == 0 || len(query.Results[0].Timeseries) == 0 {
@@ -195,12 +195,16 @@ func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) 
 		c.endTime = end
 	}
 
+	cacheLabelsMap := make(map[*prompb.TimeSeries](map[string]string), len(cachedTs))
+	var cachedLabels map[string]string
+	var ok bool
 	for _, ts := range queryTs {
-		labels := getSeriesLabels(&ts.Labels)
-
 		for _, existsTs := range cachedTs {
-			cachedLabels := getSeriesLabels(&existsTs.Labels)
-			if labels == cachedLabels {
+			if cachedLabels, ok = cacheLabelsMap[existsTs]; !ok {
+				cachedLabels = pbLabelsToMap(&existsTs.Labels)
+				cacheLabelsMap[existsTs] = cachedLabels
+			}
+			if pbLabelsEqual(&ts.Labels, cachedLabels) {
 				existsSamples := existsTs.Samples
 				existsSamplesStart := existsSamples[0].Timestamp
 				existsSamplesEnd := existsSamples[len(existsSamples)-1].Timestamp
@@ -246,6 +250,9 @@ func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) 
 type RemoteReadQueryCache struct {
 	cache   *lru.Cache[string, *CacheItem]
 	counter *CacheCounter
+	// use a ticker to clear oversize cache
+	// avoid query -> get cache oversize -> clean -> new query -> ... endless loop
+	cleanUpCache *time.Ticker
 
 	lock *sync.RWMutex
 }
@@ -258,8 +265,37 @@ var (
 func PromReadResponseCache() *RemoteReadQueryCache {
 	syncOnce.Do(func() {
 		readResponseCache = NewRemoteReadQueryCache()
+		go readResponseCache.startUpCleanCache(config.Cfg.Prometheus.Cache.CacheCleanInterval)
 	})
 	return readResponseCache
+}
+
+func (r *RemoteReadQueryCache) startUpCleanCache(cleanUpInterval int) {
+	r.cleanUpCache = time.NewTicker(time.Duration(cleanUpInterval) * time.Second)
+	defer func() {
+		r.cleanUpCache.Stop()
+		if err := recover(); err != nil {
+			go r.startUpCleanCache(cleanUpInterval)
+		}
+	}()
+	for range r.cleanUpCache.C {
+		r.cleanCache()
+	}
+}
+
+func (r *RemoteReadQueryCache) cleanCache() {
+	keys := r.cache.Keys()
+	for _, k := range keys {
+		item, ok := r.cache.Peek(k)
+		if !ok {
+			continue
+		}
+		size := item.Size()
+		if size > config.Cfg.Prometheus.Cache.CacheItemSize {
+			log.Infof("cache item remove: %s, real size: %d", k, size)
+			r.cache.Remove(k)
+		}
+	}
 }
 
 func NewRemoteReadQueryCache() *RemoteReadQueryCache {
@@ -272,16 +308,19 @@ func NewRemoteReadQueryCache() *RemoteReadQueryCache {
 	return s
 }
 
-func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, query *prompb.ReadResponse) *prompb.ReadResponse {
+func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, resp *prompb.ReadResponse) *prompb.ReadResponse {
 	if req == nil || len(req.Queries) == 0 {
-		return query
+		return resp
+	}
+	if resp == nil || len(resp.Results) == 0 {
+		return resp
 	}
 	q := req.Queries[0]
 	if q.Hints.Func == "series" {
-		return query
+		return resp
 	}
 
-	key, _ := promRequestToCacheKey(q)
+	key := promRequestToCacheKey(q)
 	start, end := GetPromRequestQueryTime(q)
 	start = timeAlign(start)
 
@@ -289,14 +328,10 @@ func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, query *prompb
 	defer s.lock.Unlock()
 
 	item, ok := s.cache.Get(key)
-	defer func() {
-		if item.Size() > config.Cfg.Prometheus.Cache.CacheItemSize {
-			s.cache.Remove(key)
-		}
-	}()
 
+	// can not clear cache here, because other routine may get data through cache
 	if !ok {
-		item = &CacheItem{startTime: start, endTime: end, data: query, rwLock: &sync.RWMutex{}}
+		item = &CacheItem{startTime: start, endTime: end, data: resp, rwLock: &sync.RWMutex{}}
 		s.cache.Add(key, item)
 	} else {
 		// cache hit, merge data
@@ -306,11 +341,19 @@ func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, query *prompb
 		item.rwLock.Lock()
 		defer item.rwLock.Unlock()
 
-		item.data = item.mergeResponse(start, end, query)
+		item.data = item.mergeResponse(start, end, resp)
 		d := time.Since(t1)
 		atomic.AddUint64(&s.counter.Stats.CacheMergeDuration, uint64(d.Seconds()))
 	}
-
+	if item.loadCompleted != nil {
+		select {
+		case _, ok := <-item.loadCompleted:
+			log.Debugf("item merged signal close status: %v", ok)
+		default:
+			// for non-blocking channel get & avoid channel closed panic
+			close(item.loadCompleted)
+		}
+	}
 	// avoid pointer ref modify cached data
 	return copyResponse(item.data)
 }
@@ -338,30 +381,26 @@ func copyResponse(cached *prompb.ReadResponse) *prompb.ReadResponse {
 	return resp
 }
 
-func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*prompb.ReadResponse, CacheHit, string, int64, int64) {
-	emptyResponse := &prompb.ReadResponse{}
+func (s *RemoteReadQueryCache) Remove(req *prompb.ReadRequest) {
 	if req == nil || len(req.Queries) == 0 {
-		return emptyResponse, CacheMiss, "", 0, 0
+		return
 	}
-	q := req.Queries[0]
-	start, end := GetPromRequestQueryTime(q)
-	if q.Hints.Func == "series" {
+	key := promRequestToCacheKey(req.Queries[0])
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.cache.Remove(key)
+}
+
+func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64) (*CacheItem, CacheHit, int64, int64) {
+	if req.Hints.Func == "series" {
 		// for series api, don't use cache
 		// not count cache miss here
-		return emptyResponse, CacheMiss, "", start, end
-	}
-
-	if !config.Cfg.Prometheus.Cache.RemoteReadCache {
-		return emptyResponse, CacheMiss, "", start, end
+		return nil, CacheMiss, start, end
 	}
 
 	// for query api, cache query samples
-	key, metric := promRequestToCacheKey(q)
-	if strings.Contains(metric, "__") {
-		// for DeepFlow Native metrics, don't use cache
-		return emptyResponse, CacheMiss, metric, start, end
-	}
-
+	key := promRequestToCacheKey(req)
 	start = timeAlign(start)
 
 	// lock for concurrency key reading
@@ -372,27 +411,27 @@ func (s *RemoteReadQueryCache) Get(req *prompb.ReadRequest) (*prompb.ReadRespons
 	if !ok {
 		atomic.AddUint64(&s.counter.Stats.CacheMiss, 1)
 		// totally cache miss, no such key
-		emptyItem := &CacheItem{startTime: 0, endTime: 0, data: nil, rwLock: &sync.RWMutex{}}
+		emptyItem := &CacheItem{startTime: 0, endTime: 0, data: nil, rwLock: &sync.RWMutex{}, loadCompleted: make(chan struct{})}
 		s.cache.Add(key, emptyItem)
-		return emptyResponse, CacheKeyNotFound, metric, start, end
+		return emptyItem, CacheKeyNotFound, start, end
 	}
 
 	if item.isZero() {
-		return emptyResponse, CacheKeyFoundNil, metric, start, end
+		return item, CacheKeyFoundNil, start, end
 	}
 
 	switch item.Hit(start, end) {
 	case CacheMiss:
 		atomic.AddUint64(&s.counter.Stats.CacheMiss, 1)
-		return nil, CacheMiss, metric, start, end
+		return nil, CacheMiss, start, end
 	case CacheHitFull:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
-		return item.data, CacheHitFull, metric, start, end
+		return item, CacheHitFull, start, end
 	case CacheHitPart:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
 		query_start, query_end := item.FixupQueryTime(start, end)
-		return item.data, CacheHitPart, metric, query_start, query_end
+		return item, CacheHitPart, query_start, query_end
 	default:
-		return emptyResponse, CacheMiss, metric, start, end
+		return nil, CacheMiss, start, end
 	}
 }

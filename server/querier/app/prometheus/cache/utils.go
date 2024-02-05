@@ -17,12 +17,10 @@
 package cache
 
 import (
-	"reflect"
 	"strings"
-	"unsafe"
 
-	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/op/go-logging"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
 )
 
@@ -55,48 +53,57 @@ func GetPromRequestQueryTime(q *prompb.Query) (int64, int64) {
 	return q.Hints.StartMs / 1000, endTime
 }
 
-func promRequestToCacheKey(q *prompb.Query) (string, string) {
+func promRequestToCacheKey(q *prompb.Query) string {
 	matcher := &strings.Builder{}
-	var metric string
 	for i := 0; i < len(q.Matchers); i++ {
 		matcher.WriteString(q.Matchers[i].GetName() + q.Matchers[i].Type.String() + q.Matchers[i].GetValue())
 		matcher.WriteByte('-')
-
-		if q.Matchers[i].Name == "__name__" {
-			metric = q.Matchers[i].Value
-		}
 	}
-	return matcher.String(), metric
+	return matcher.String()
 }
 
-func unsafeSize(d *common.Result) uint64 {
-	if d == nil || len(d.Values) == 0 {
-		return 0
-	}
-	v1 := d.Values[0].([]interface{})
-	var size uintptr
-	if v1 != nil {
-		for i := 0; i < len(v1); i++ {
-			// for slice/array: calcute size of every element
-			// for string: add len(string)
-			// for others: only add sizeof(v) now
-			c := reflect.Indirect(reflect.ValueOf(v1[i]))
-			switch c.Kind() {
-			case reflect.Slice:
-				if c.Len() > 0 {
-					size += unsafe.Sizeof(c.Index(0)) * uintptr(c.Len())
-				}
-			case reflect.Array:
-				if c.Len() > 0 {
-					size += unsafe.Sizeof(c.Index(0)) * uintptr(c.Len())
-				}
-			case reflect.String:
-				size += uintptr(len(c.String()))
-			default:
-				size += unsafe.Sizeof(v1[i])
-			}
+func GetMetricFromLabelMatcher(matchers *[]*prompb.LabelMatcher) string {
+	var metric string
+	for i := 0; i < len(*matchers); i++ {
+		if (*matchers)[i].Name == "__name__" {
+			metric = (*matchers)[i].Value
 		}
 	}
-	// d.values would have the same structure, so simply just sizeof(0)*len(value) would probably equals real size(not 100% exactly)
-	return uint64(size) * uint64(len(d.Values))
+	return metric
+}
+
+func promLabelsEqual(new *labels.Labels, old *labels.Labels) bool {
+	if new == nil || old == nil || len(*new) != len(*old) {
+		return false
+	}
+	for i := 0; i < len(*old); i++ {
+		if (*old)[i].Name != (*new)[i].Name || (*old)[i].Value != (*new)[i].Value {
+			return false
+		}
+	}
+	return true
+}
+
+func pbLabelsToMap(labels *[]prompb.Label) map[string]string {
+	if labels == nil {
+		return nil
+	}
+	m := make(map[string]string, len(*labels))
+	for _, v := range *labels {
+		m[v.Name] = v.Value
+	}
+	return m
+}
+
+func pbLabelsEqual(new *[]prompb.Label, old map[string]string) bool {
+	if new == nil || old == nil || len(*new) != len(old) {
+		return false
+	}
+
+	for _, v := range *new {
+		if value, ok := old[v.Name]; !ok || value != v.Value {
+			return false
+		}
+	}
+	return true
 }

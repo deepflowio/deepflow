@@ -509,8 +509,8 @@ impl MirrorModeDispatcher {
                 let _ = Self::handler(
                     self.base.id,
                     sa_key,
-                    src_local,
-                    dst_local,
+                    true,
+                    false,
                     overlay_packet,
                     timestamp,
                     original_length,
@@ -530,8 +530,8 @@ impl MirrorModeDispatcher {
                 let _ = Self::handler(
                     self.base.id,
                     da_key,
-                    src_local,
-                    dst_local,
+                    false,
+                    true,
                     overlay_packet,
                     timestamp,
                     original_length,

@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type PodNode struct {
@@ -73,6 +74,7 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.Pod
 		ServerType:   cloudItem.ServerType,
 		State:        cloudItem.State,
 		IP:           cloudItem.IP,
+		Hostname:     cloudItem.Hostname,
 		PodClusterID: podClusterID,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		Domain:       n.cache.DomainLcuuid,
@@ -84,29 +86,37 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.Pod
 	return dbItem, true
 }
 
-func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.PodNodeFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Type != cloudItem.Type {
-		updateInfo["type"] = cloudItem.Type
+		mapInfo["type"] = cloudItem.Type
+		structInfo.Type.Set(diffBase.Type, cloudItem.Type)
+	}
+	if diffBase.Hostname != cloudItem.Hostname {
+		mapInfo["hostname"] = cloudItem.Hostname
+		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
 	if diffBase.State != cloudItem.State {
-		updateInfo["state"] = cloudItem.State
+		mapInfo["state"] = cloudItem.State
+		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if diffBase.VCPUNum != cloudItem.VCPUNum {
-		updateInfo["vcpu_num"] = cloudItem.VCPUNum
+		mapInfo["vcpu_num"] = cloudItem.VCPUNum
+		structInfo.VCPUNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
 	}
 	if diffBase.MemTotal != cloudItem.MemTotal {
-		updateInfo["mem_total"] = cloudItem.MemTotal
+		mapInfo["mem_total"] = cloudItem.MemTotal
+		structInfo.MemTotal.Set(diffBase.MemTotal, cloudItem.MemTotal)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

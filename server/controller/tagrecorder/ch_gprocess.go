@@ -22,18 +22,18 @@ import (
 )
 
 type ChGProcess struct {
-	UpdaterBase[mysql.ChGProcess, IDKey]
+	UpdaterComponent[mysql.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	updater := &ChGProcess{
-		UpdaterBase[mysql.ChGProcess, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_GPROCESS,
-		},
+		newUpdaterComponent[mysql.ChGProcess, IDKey](
+			RESOURCE_TYPE_CH_GPROCESS,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -76,7 +76,7 @@ func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysql.ChGProcess) (map[
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if oldItem.CHostID != newItem.CHostID {

@@ -89,6 +89,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (map[string]interface{}, bool) {
-	return nil, false
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (interface{}, map[string]interface{}, bool) {
+	return nil, nil, false
 }

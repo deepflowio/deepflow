@@ -362,6 +362,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	}
 	// check if vm is behind NAT
 	behindNat := peer != natIP
+	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode)
 	vpc := model.GenesisVpc{
 		Name:   "default-public-cloud-vpc",
 		Lcuuid: common.GetUUID("default-public-cloud-vpc", uuid.Nil),

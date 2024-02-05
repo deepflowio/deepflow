@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type Network struct {
@@ -75,8 +76,9 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 	return dbItem, true
 }
 
-func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.NetworkFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
@@ -84,34 +86,40 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["epc_id"] = vpcID
+		mapInfo["epc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID)
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 	if diffBase.TunnelID != cloudItem.TunnelID {
-		updateInfo["tunnel_id"] = cloudItem.TunnelID
+		mapInfo["tunnel_id"] = cloudItem.TunnelID
+		structInfo.TunnelID.Set(diffBase.TunnelID, cloudItem.TunnelID)
 	}
 	if diffBase.SegmentationID != cloudItem.SegmentationID {
-		updateInfo["segmentation_id"] = cloudItem.SegmentationID
+		mapInfo["segmentation_id"] = cloudItem.SegmentationID
+		structInfo.SegmentationID.Set(diffBase.SegmentationID, cloudItem.SegmentationID)
 	}
 	if diffBase.NetType != cloudItem.NetType {
-		updateInfo["net_type"] = cloudItem.NetType
+		mapInfo["net_type"] = cloudItem.NetType
+		structInfo.NetType.Set(diffBase.NetType, cloudItem.NetType)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

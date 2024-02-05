@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type LANIP struct {
@@ -108,8 +109,9 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	return dbItem, true
 }
 
-func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.LANIPFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
 		subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 		if !exists {
@@ -121,11 +123,13 @@ func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmod
 					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
 				))
-				return nil, false
+				return nil, nil, false
 			}
 		}
-		updateInfo["vl2_net_id"] = subnetID
+		mapInfo["vl2_net_id"] = subnetID
+		structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
+		structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
 	}
 
-	return updateInfo, len(updateInfo) > 0
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

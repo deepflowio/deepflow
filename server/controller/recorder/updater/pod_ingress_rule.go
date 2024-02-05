@@ -70,6 +70,6 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 }
 
 // 保留接口
-func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (map[string]interface{}, bool) {
-	return nil, false
+func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (interface{}, map[string]interface{}, bool) {
+	return nil, nil, false
 }

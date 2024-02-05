@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type LBTargetServer struct {
@@ -99,20 +100,21 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
-func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (interface{}, map[string]interface{}, bool) {
+	structInfo := new(message.LBTargetServerFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
-		updateInfo["ip"] = cloudItem.IP
+		mapInfo["ip"] = cloudItem.IP
+		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.Port != cloudItem.Port {
-		updateInfo["port"] = cloudItem.Port
+		mapInfo["port"] = cloudItem.Port
+		structInfo.Port.Set(diffBase.Port, cloudItem.Port)
 	}
 	if diffBase.Protocol != cloudItem.Protocol {
-		updateInfo["protocol"] = cloudItem.Protocol
+		mapInfo["protocol"] = cloudItem.Protocol
+		structInfo.Protocol.Set(diffBase.Protocol, cloudItem.Protocol)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

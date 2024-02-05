@@ -24,6 +24,12 @@ pod_group                  , K8s 工作负载               , 例如 Deployment�
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
 gprocess                   , 进程                       ,
+host_ip                    , 宿主机                     , 宿主机的管理 IP。
+host_hostname              , 宿主机                     , 宿主机的 Hostname。
+chost_ip                   , 云服务器                   , 云服务器的主 IP。
+chost_hostname             , 云服务器                   , 云服务器的 Hostname。
+pod_node_ip                , K8s 容器节点               , 容器节点的主 IP。
+pod_node_hostname          , K8s 容器节点               , 容器节点的 Hostname。
 
 k8s.label                  , K8s Label                  ,
 k8s.annotation             , K8s Annotation             ,

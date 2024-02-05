@@ -30,6 +30,7 @@ func (b *DataSet) AddPodNode(dbItem *mysql.PodNode, seq int) {
 		},
 		Type:            dbItem.Type,
 		State:           dbItem.State,
+		Hostname:        dbItem.Hostname,
 		VCPUNum:         dbItem.VCPUNum,
 		MemTotal:        dbItem.MemTotal,
 		RegionLcuuid:    dbItem.Region,
@@ -48,6 +49,7 @@ type PodNode struct {
 	DiffBase
 	Type            int    `json:"type"`
 	State           int    `json:"state"`
+	Hostname        string `json:"hostname"`
 	VCPUNum         int    `json:"vcpu_num"`
 	MemTotal        int    `json:"mem_total"`
 	RegionLcuuid    string `json:"region_lcuuid"`
@@ -58,6 +60,7 @@ type PodNode struct {
 func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
 	p.Type = cloudItem.Type
 	p.State = cloudItem.State
+	p.Hostname = cloudItem.Hostname
 	p.VCPUNum = cloudItem.VCPUNum
 	p.MemTotal = cloudItem.MemTotal
 	p.RegionLcuuid = cloudItem.RegionLcuuid

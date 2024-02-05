@@ -1359,6 +1359,228 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	return MSG_RESPONSE;
 }
 
+// https://www.rabbitmq.com/specification.html
+static __inline enum message_type infer_amqp_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s
+							 *conn_info)
+{
+	const char amqp_header[9] = "AMQP\x00\x00\x09\x01";
+	if (count < 8)
+		return MSG_UNKNOWN;
+	if (!protocol_port_check_2(PROTO_AMQP, conn_info))
+		return MSG_UNKNOWN;
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)
+			&& conn_info->socket_info_ptr->l7_proto != PROTO_AMQP)
+		return MSG_UNKNOWN;
+	bool is_magic = true;
+	for (int i = 0; i < 8; i++)
+		if (buf[i] != amqp_header[i]) {
+			is_magic = false;
+			break;
+		}
+	if (is_magic)
+		return MSG_REQUEST;
+	if (!is_infer_socket_valid(conn_info->socket_info_ptr)
+			|| conn_info->socket_info_ptr->l7_proto != PROTO_AMQP)
+		return MSG_UNKNOWN;
+	int frame_type = buf[0];
+
+	static const int frame_method = 0x1;
+	static const int frame_header = 0x2;
+	static const int frame_body = 0x3;
+	static const int frame_heartbeat = 0x8;
+
+	if (frame_type == frame_method) {
+		if (count < 12)
+			return MSG_UNKNOWN;
+		__s16 class_id = __bpf_ntohs(*(__s16 *) & buf[7]);
+		__s16 method_id = __bpf_ntohs(*(__s16 *) & buf[9]);
+		static const int class_connection = 10;
+		static const int class_channel = 20;
+		static const int class_exchange = 40;
+		static const int class_queue = 50;
+		static const int class_basic = 60;
+		static const int class_tx = 90;
+		static const int class_confirm = 85;
+		if (class_id == class_connection) {
+			static const int method_start = 10;
+			static const int method_start_ok = 11;
+			static const int method_secure = 20;
+			static const int method_secure_ok = 21;
+			static const int method_tune = 30;
+			static const int method_tune_ok = 31;
+			static const int method_open = 40;
+			static const int method_open_ok = 41;
+			static const int method_close = 50;
+			static const int method_close_ok = 51;
+			static const int method_blocked = 60;
+			static const int method_unblocked = 61;
+			static const int method_update_secret = 70;
+			static const int method_update_secret_ok = 71;
+			switch (method_id) {
+			case method_start:
+			case method_secure:
+			case method_tune:
+			case method_open:
+			case method_close:
+			case method_update_secret:
+				return MSG_REQUEST;
+			case method_start_ok:
+			case method_secure_ok:
+			case method_tune_ok:
+			case method_open_ok:
+			case method_close_ok:
+			case method_update_secret_ok:
+				return MSG_RESPONSE;
+			case method_blocked:
+			case method_unblocked:
+				// Session
+				return MSG_REQUEST;
+			}
+		} else if (class_id == class_channel) {
+			static const int method_open = 10;
+			static const int method_open_ok = 11;
+			static const int method_flow = 20;
+			static const int method_flow_ok = 21;
+			static const int method_close = 40;
+			static const int method_close_ok = 41;
+			switch (method_id) {
+			case method_open:
+			case method_flow:
+			case method_close:
+				return MSG_REQUEST;
+			case method_open_ok:
+			case method_flow_ok:
+			case method_close_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_exchange) {
+			static const int method_declare = 10;
+			static const int method_declare_ok = 11;
+			static const int method_delete = 20;
+			static const int method_delete_ok = 21;
+			static const int method_bind = 30;
+			static const int method_bind_ok = 31;
+			static const int method_unbind = 40;
+			static const int method_unbind_ok = 51;
+			switch (method_id) {
+			case method_declare:
+			case method_delete:
+			case method_bind:
+			case method_unbind:
+				return MSG_REQUEST;
+			case method_declare_ok:
+			case method_delete_ok:
+			case method_bind_ok:
+			case method_unbind_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_queue) {
+			static const int method_declare = 10;
+			static const int method_declare_ok = 11;
+			static const int method_bind = 20;
+			static const int method_bind_ok = 21;
+			static const int method_purge = 30;
+			static const int method_purge_ok = 31;
+			static const int method_delete = 40;
+			static const int method_delete_ok = 41;
+			static const int method_unbind = 50;
+			static const int method_unbind_ok = 51;
+			switch (method_id) {
+			case method_declare:
+			case method_bind:
+			case method_purge:
+			case method_delete:
+			case method_unbind:
+				return MSG_REQUEST;
+			case method_declare_ok:
+			case method_bind_ok:
+			case method_purge_ok:
+			case method_delete_ok:
+			case method_unbind_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_basic) {
+			static const int method_qos = 10;
+			static const int method_qos_ok = 11;
+			static const int method_consume = 20;
+			static const int method_consume_ok = 21;
+			static const int method_cancel = 30;
+			static const int method_cancel_ok = 31;
+			static const int method_publish = 40;
+			static const int method_return = 50;
+			static const int method_deliver = 60;
+			static const int method_get = 70;
+			static const int method_get_ok = 71;
+			static const int method_get_empty = 72;
+			static const int method_ack = 80;
+			static const int method_reject = 90;
+			static const int method_recover_async = 100;
+			static const int method_recover = 110;
+			static const int method_recover_ok = 111;
+			static const int method_nack = 120;
+			switch (method_id) {
+			case method_qos:
+			case method_consume:
+			case method_cancel:
+			case method_get:
+			case method_recover:
+				return MSG_REQUEST;
+			case method_qos_ok:
+			case method_consume_ok:
+			case method_cancel_ok:
+			case method_get_ok:
+			case method_get_empty:
+			case method_recover_ok:
+				return MSG_RESPONSE;
+			case method_publish:
+			case method_return:
+			case method_deliver:
+			case method_ack:
+			case method_reject:
+			case method_recover_async:
+			case method_nack:
+				// Session
+				return MSG_REQUEST;
+			}
+		} else if (class_id == class_tx) {
+			static const int method_select = 10;
+			static const int method_select_ok = 11;
+			static const int method_commit = 20;
+			static const int method_commit_ok = 21;
+			static const int method_rollback = 30;
+			static const int method_rollback_ok = 31;
+			switch (method_id) {
+			case method_select:
+			case method_commit:
+			case method_rollback:
+				return MSG_REQUEST;
+			case method_select_ok:
+			case method_commit_ok:
+			case method_rollback_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_confirm) {
+			static const int method_select = 10;
+			static const int method_select_ok = 11;
+			switch (method_id) {
+			case method_select:
+				return MSG_REQUEST;
+			case method_select_ok:
+				return MSG_RESPONSE;
+			}
+		}
+	} else if (frame_type == frame_header) {
+		return MSG_REQUEST;
+	} else if (frame_type == frame_body) {
+		return MSG_REQUEST;
+	} else if (frame_type == frame_heartbeat) {
+		return MSG_REQUEST;
+	}
+	return MSG_UNKNOWN;
+}
+
 /*
  * https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/
  * 0                                                                                       31
@@ -2260,6 +2482,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_AMQP:
+			if ((inferred_message.type =
+			     infer_amqp_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_AMQP;
+				return inferred_message;
+			}
+			break;
 		case PROTO_DUBBO:
 			if ((inferred_message.type =
 			     infer_dubbo_message(infer_buf, count,
@@ -2496,6 +2726,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 #endif
 	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DUBBO;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_AMQP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_amqp_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_AMQP;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else

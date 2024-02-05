@@ -21,19 +21,19 @@ import (
 )
 
 type ChNetwork struct {
-	UpdaterBase[mysql.ChNetwork, IDKey]
+	UpdaterComponent[mysql.ChNetwork, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	updater := &ChNetwork{
-		UpdaterBase[mysql.ChNetwork, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_NETWORK,
-		},
+		newUpdaterComponent[mysql.ChNetwork, IDKey](
+			RESOURCE_TYPE_CH_NETWORK,
+		),
 		resourceTypeToIconID,
 	}
 
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -69,7 +69,7 @@ func (n *ChNetwork) generateUpdateInfo(oldItem, newItem mysql.ChNetwork) (map[st
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if len(updateInfo) > 0 {
