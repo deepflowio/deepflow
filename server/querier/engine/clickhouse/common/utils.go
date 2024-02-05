@@ -97,6 +97,8 @@ func GetDatasources(db string, table string) ([]string, error) {
 			tsdbType = "flow"
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
 			tsdbType = "app"
+		} else if table == TABLE_NAME_VTAP_ACL {
+			tsdbType = TABLE_NAME_VTAP_ACL
 		}
 		client := &http.Client{}
 		url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
@@ -145,7 +147,7 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		} else if strings.HasPrefix(table, "vtap_app") {
 			tsdbType = "app"
 		} else if table == "vtap_acl" {
-			return 60, nil
+			tsdbType = TABLE_NAME_VTAP_ACL
 		}
 	case DB_NAME_DEEPFLOW_SYSTEM, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:
 		tsdbType = db
