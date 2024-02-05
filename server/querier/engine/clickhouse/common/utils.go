@@ -93,9 +93,9 @@ func GetDatasources(db string, table string) ([]string, error) {
 	switch db {
 	case "flow_metrics":
 		var tsdbType string
-		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
+		if table == "network" || table == "network_map" {
 			tsdbType = "network"
-		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
+		} else if table == "application" || table == "application_map" {
 			tsdbType = "application"
 		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
