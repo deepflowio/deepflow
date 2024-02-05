@@ -29,6 +29,12 @@ auto_instance              , auto_instance             , auto_instance          
 auto_service_type          , auto_service_type         , auto_service_type         , int_enum       , auto_service_type     , Universal Tag   , 111             , 0
 auto_service               , auto_service              , auto_service              , resource       ,                       , Universal Tag   , 111             , 0
 gprocess                   , gprocess                  , gprocess                  , resource       ,                       , Universal Tag   , 111             , 0
+host_ip                    , host_ip                   , host_ip                   , resource       ,                       , Universal Tag   , 111             , 0
+host_hostname              , host_hostname             , host_hostname             , resource       ,                       , Universal Tag   , 111             , 0
+chost_ip                   , chost_ip                  , chost_ip                  , resource       ,                       , Universal Tag   , 111             , 0
+chost_hostname             , chost_hostname            , chost_hostname            , resource       ,                       , Universal Tag   , 111             , 0
+pod_node_ip                , pod_node_ip               , pod_node_ip               , resource       ,                       , Universal Tag   , 111             , 0
+pod_node_hostname          , pod_node_hostname         , pod_node_hostname         , resource       ,                       , Universal Tag   , 111             , 0
 
 attribute                  , attribute                 , attribute                 , map            ,                       , Native Tag      , 111             , 0
 k8s.label                  , k8s.label                 , k8s.label                 , map            ,                       , Custom Tag      , 111             , 0
@@ -41,8 +47,8 @@ ip                         , ip                        , ip                     
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type               , Network Layer   , 111             , 0
 
 event_type                 , event_type                , event_type                , string_enum    , perf_event_type       , Event Info      , 111             , 0
-event_desc                 , event_desc                , event_desc                , string         ,                       , Event Info      , 111             , 0
 
+process_kname              , process_kname             , process_kname             , string         ,                           , Service Info    , 111         , 0
 app_instance               , app_instance              , app_instance              , string         ,                           , Service Info    , 111         , 0
 vtap                       , vtap                      , vtap                      , resource       ,                           , Capture Info    , 111         , 1
 agent                      , agent                     , agent                     , resource       ,                           , Capture Info    , 111         , 0

@@ -39,6 +39,12 @@ gprocess              , Process                           ,
 tap_port_host         , Tap Port Host                     ,
 tap_port_chost        , Tap Port Cloud Host               ,
 tap_port_pod_node     , Tap Port K8s Node                 ,
+host_ip               , VM Hypervisor                     , The management IP address of VM Hypervisor.
+host_hostname         , VM Hypervisor                     , The hostname of VM Hypervisor.
+chost_ip              , Cloud Host                        , The primary IP address of Cloud Host.
+chost_hostname        , Cloud Host                        , The hostname of Cloud Host.
+pod_node_ip           , K8s Node                          , The primary IP address of K8s Node.
+pod_node_hostname     , K8s Node                          , The hostname of K8s Node.
 capture_nic_host      , Host of Capture NIC               ,
 capture_nic_chost     , Cloud Host of Capture NIC         ,
 capture_nic_pod_node  , K8s Node of Capture NIC           ,

@@ -39,12 +39,24 @@ var DEVICE_MAP = map[string]int{
 	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
 var TAP_PORT_DEVICE_MAP = map[string]int{
-	common.TAP_PORT_HOST:     VIF_DEVICE_TYPE_HOST,
-	common.TAP_PORT_CHOST:    VIF_DEVICE_TYPE_VM,
-	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
+	common.TAP_PORT_HOST:        VIF_DEVICE_TYPE_HOST,
+	common.TAP_PORT_CHOST:       VIF_DEVICE_TYPE_VM,
+	common.TAP_PORT_POD_NODE:    VIF_DEVICE_TYPE_POD_NODE,
 	common.CAPTURE_NIC_HOST:     VIF_DEVICE_TYPE_HOST,
 	common.CAPTURE_NIC_CHOST:    VIF_DEVICE_TYPE_VM,
 	common.CAPTURE_NIC_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
+}
+var HOSTNAME_IP_DEVICE_MAP = map[string]struct {
+	ResourceType int
+	ResourceName string
+	FieldName    string
+}{
+	common.HOST_HOSTNAME:     {ResourceType: VIF_DEVICE_TYPE_HOST, ResourceName: "host", FieldName: "hostname"},
+	common.HOST_IP:           {ResourceType: VIF_DEVICE_TYPE_HOST, ResourceName: "host", FieldName: "ip"},
+	common.CHOST_HOSTNAME:    {ResourceType: VIF_DEVICE_TYPE_VM, ResourceName: "chost", FieldName: "hostname"},
+	common.CHOST_IP:          {ResourceType: VIF_DEVICE_TYPE_VM, ResourceName: "chost", FieldName: "ip"},
+	common.POD_NODE_HOSTNAME: {ResourceType: VIF_DEVICE_TYPE_POD_NODE, ResourceName: "pod_node", FieldName: "hostname"},
+	common.POD_NODE_IP:       {ResourceType: VIF_DEVICE_TYPE_POD_NODE, ResourceName: "pod_node", FieldName: "ip"},
 }
 
 var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "policy_app_type", "is_tls"}
@@ -280,6 +292,23 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
 			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
+		),
+	}
+	tagResourceMap["agent"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(flow_tag.vtap_map, 'name', toUInt64(agent_id))",
+			"",
+			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
+			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
+		),
+	}
+	// 采集器名称ID
+	tagResourceMap["vtap_id"] = map[string]*Tag{
+		"default": NewTag(
+			"agent_id",
+			"",
+			"agent_id %s %s",
+			"",
 		),
 	}
 	tagResourceMap["agent"] = map[string]*Tag{
@@ -1001,13 +1030,19 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
-	// Enum(tap_side)
+	// tap_side & Enum(tap_side)
 	tagResourceMap["tap_side"] = map[string]*Tag{
 		"enum": NewTag(
 			"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('%s',observation_point), observation_point)",
 			"",
 			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
 			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
+		"default": NewTag(
+			"observation_point",
+			"",
+			"observation_point %s %s",
+			"%s (observation_point, %s)",
 		),
 	}
 	// Enum(tap_port_type)

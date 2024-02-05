@@ -40,6 +40,12 @@ tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node      
 capture_nic_host           , capture_nic_host          , capture_nic_chost          , resource     ,                        , Universal Tag   , 111           , 0
 capture_nic_chost          , capture_nic_chost         , capture_nic_chost          , resource     ,                        , Universal Tag   , 111           , 0
 capture_nic_pod_node       , capture_nic_pod_node      , capture_nic_pod_node       , resource     ,                        , Universal Tag   , 111           , 0
+host_ip                    , host_ip_0                 , host_ip_1                 , resource      ,                        , Universal Tag   , 111           , 0
+host_hostname              , host_hostname_0           , host_hostname_1           , resource      ,                        , Universal Tag   , 111           , 0
+chost_ip                   , chost_ip_0                , chost_ip_1                , resource      ,                        , Universal Tag   , 111           , 0
+chost_hostname             , chost_hostname_0          , chost_hostname_1          , resource      ,                        , Universal Tag   , 111           , 0
+pod_node_ip                , pod_node_ip_0             , pod_node_ip_1             , resource      ,                        , Universal Tag   , 111           , 0
+pod_node_hostname          , pod_node_hostname_0       , pod_node_hostname_1       , resource      ,                        , Universal Tag   , 111           , 0
 
 k8s.label                  , k8s.label_0               , k8s.label_1               , map           ,                        , Custom Tag      , 111           , 0
 k8s.annotation             , k8s.annotation_0          , k8s.annotation_1          , map           ,                        , Custom Tag      , 111           , 0

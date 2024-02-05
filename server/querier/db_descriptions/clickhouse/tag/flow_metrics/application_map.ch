@@ -37,6 +37,12 @@ gprocess                   , 进程                       ,
 tap_port_host              , 采集网卡所属宿主机           ,
 tap_port_chost             , 采集网卡所属云服务器         ,
 tap_port_pod_node          , 采集网卡所属容器节点         ,
+host_ip                    , 宿主机                      , 宿主机的管理 IP。
+host_hostname              , 宿主机                      , 宿主机的 Hostname。
+chost_ip                   , 云服务器                    , 云服务器的主 IP。
+chost_hostname             , 云服务器                    , 云服务器的 Hostname。
+pod_node_ip                , K8s 容器节点                , 容器节点的主 IP。
+pod_node_hostname          , K8s 容器节点                , 容器节点的 Hostname。
 capture_nic_host           , 采集网卡所属宿主机           ,
 capture_nic_chost          , 采集网卡所属云服务器         ,
 capture_nic_pod_node       , 采集网卡所属容器节点         ,
