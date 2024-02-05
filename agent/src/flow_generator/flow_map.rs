@@ -1155,7 +1155,7 @@ impl FlowMap {
                 TunnelField::default()
             },
             flow_id: if meta_packet.signal_source == SignalSource::EBPF {
-                meta_packet.socket_id
+                meta_packet.generate_ebpf_flow_id()
             } else {
                 self.generate_flow_id(lookup_key.timestamp, self.id)
             },
