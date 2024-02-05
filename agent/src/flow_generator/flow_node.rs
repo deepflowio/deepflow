@@ -133,6 +133,8 @@ pub struct FlowNode {
     pub residual_request: i32,
     pub next_tcp_seq0: u32,
     pub next_tcp_seq1: u32,
+    pub last_cap_seq: u32,
+
     // 当前统计周期（目前是自然秒）是否更新策略
     pub policy_in_tick: [bool; 2],
     pub packet_in_tick: bool, // 当前统计周期（目前是自然秒）是否有包

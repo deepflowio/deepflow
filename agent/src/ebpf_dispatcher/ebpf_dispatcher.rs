@@ -41,7 +41,7 @@ use crate::ebpf::{
     self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
     set_profiler_regex, set_protocol_ports_bitmap, start_continuous_profiler,
 };
-use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
+use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
@@ -191,7 +191,7 @@ struct EbpfDispatcher {
     collector_config: CollectorAccess,
 
     config: EbpfAccess,
-    output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
+    output: DebugSender<Box<AppProto>>, // Send AppProtos to the AppProtoLogsParser
     flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>, // Send TaggedFlows to the QuadrupleGenerator
     l7_stats_output: DebugSender<BatchedBox<L7Stats>>,     // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
@@ -634,7 +634,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
-        output: DebugSender<Box<MetaAppProto>>,
+        output: DebugSender<Box<AppProto>>,
         flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
