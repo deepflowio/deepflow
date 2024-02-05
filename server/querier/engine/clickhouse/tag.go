@@ -145,7 +145,10 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		}
 	} else {
-		if name == "metrics" {
+		// Only vtap_acl translate policy_id
+		if strings.Trim(name, "`") == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			stmts = append(stmts, &SelectTag{Value: selectTag})
+		} else if name == "metrics" {
 			tagTranslator := ""
 			if db == "flow_log" {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")

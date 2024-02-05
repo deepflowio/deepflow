@@ -37,7 +37,10 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	}
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if ok {
-		if db == chCommon.DB_NAME_PROMETHEUS && strings.Contains(name, "tag") {
+		// Only vtap_acl translate policy_id
+		if name == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+		} else if db == chCommon.DB_NAME_PROMETHEUS && strings.Contains(name, "tag") {
 			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
 			if tagTranslatorStr == name {
 				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
