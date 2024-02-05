@@ -32,6 +32,7 @@ const (
 	ORIGIN_TABLE_1S = "1s"
 	FLOW_METRICS    = "vtap_flow"
 	APP_METRICS     = "vtap_app"
+	VTAP_ACL        = "vtap_acl"
 
 	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
@@ -80,12 +81,12 @@ func IsModifiedOnlyDatasource(datasource string) bool {
 	return ok
 }
 
-// VATP_ACL数据库, 不进行数据源修改
 var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
 	zerodoc.VTAP_FLOW_PORT_1M: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1M, zerodoc.VTAP_FLOW_PORT_1M},
 	zerodoc.VTAP_FLOW_PORT_1S: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1S, zerodoc.VTAP_FLOW_PORT_1S},
 	zerodoc.VTAP_APP_PORT_1M:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1M, zerodoc.VTAP_APP_PORT_1M},
 	zerodoc.VTAP_APP_PORT_1S:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1S, zerodoc.VTAP_APP_PORT_1S},
+	zerodoc.VTAP_ACL_1M:       []zerodoc.MetricsTableID{zerodoc.VTAP_ACL_1M},
 }
 
 func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
@@ -102,6 +103,8 @@ func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTable
 		} else {
 			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1M], nil
 		}
+	case VTAP_ACL:
+		return metricsGroupTableIDs[zerodoc.VTAP_ACL_1M], nil
 	default:
 		return nil, fmt.Errorf("unknown table group(%s)", tableGroup)
 	}
