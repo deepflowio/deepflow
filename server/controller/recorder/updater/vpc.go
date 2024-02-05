@@ -27,18 +27,25 @@ import (
 )
 
 type VPC struct {
-	UpdaterBase[cloudmodel.VPC, mysql.VPC, *diffbase.VPC]
+	UpdaterBase[
+		cloudmodel.VPC,
+		mysql.VPC,
+		*diffbase.VPC, *message.VPCAdd, message.VPCAdd, *message.VPCUpdate, message.VPCUpdate, *message.VPCFieldsUpdate, message.VPCFieldsUpdate, *message.VPCDelete, message.VPCDelete]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	updater := &VPC{
-		UpdaterBase[cloudmodel.VPC, mysql.VPC, *diffbase.VPC]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VPC_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVPC(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VPCs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VPC,
+			mysql.VPC,
+			*diffbase.VPC, *message.VPCAdd, message.VPCAdd, *message.VPCUpdate, message.VPCUpdate, *message.VPCFieldsUpdate, message.VPCFieldsUpdate, *message.VPCDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
+			wholeCache,
+			db.NewVPC(),
+			wholeCache.DiffBaseDataSet.VPCs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -64,7 +71,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (interface{}, map[string]interface{}, bool) {
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.VPCFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VPCFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

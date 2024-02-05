@@ -27,18 +27,25 @@ import (
 )
 
 type AZ struct {
-	UpdaterBase[cloudmodel.AZ, mysql.AZ, *diffbase.AZ]
+	UpdaterBase[
+		cloudmodel.AZ,
+		mysql.AZ,
+		*diffbase.AZ, *message.AZAdd, message.AZAdd, *message.AZUpdate, message.AZUpdate, *message.AZFieldsUpdate, message.AZFieldsUpdate, *message.AZDelete, message.AZDelete]
 }
 
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	updater := &AZ{
-		UpdaterBase[cloudmodel.AZ, mysql.AZ, *diffbase.AZ]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_AZ_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewAZ(),
-			diffBaseData: wholeCache.DiffBaseDataSet.AZs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.AZ,
+			mysql.AZ,
+			*diffbase.AZ, *message.AZAdd, message.AZAdd, *message.AZUpdate, message.AZUpdate, *message.AZFieldsUpdate, message.AZFieldsUpdate, *message.AZDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
+			wholeCache,
+			db.NewAZ(),
+			wholeCache.DiffBaseDataSet.AZs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -60,7 +67,7 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysql.AZ, bool) {
 	return dbItem, true
 }
 
-func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (interface{}, map[string]interface{}, bool) {
+func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (*message.AZFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.AZFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

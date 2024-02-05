@@ -27,18 +27,25 @@ import (
 )
 
 type LBTargetServer struct {
-	UpdaterBase[cloudmodel.LBTargetServer, mysql.LBTargetServer, *diffbase.LBTargetServer]
+	UpdaterBase[
+		cloudmodel.LBTargetServer,
+		mysql.LBTargetServer,
+		*diffbase.LBTargetServer, *message.LBTargetServerAdd, message.LBTargetServerAdd, *message.LBTargetServerUpdate, message.LBTargetServerUpdate, *message.LBTargetServerFieldsUpdate, message.LBTargetServerFieldsUpdate, *message.LBTargetServerDelete, message.LBTargetServerDelete]
 }
 
 func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetServer) *LBTargetServer {
 	updater := &LBTargetServer{
-		UpdaterBase[cloudmodel.LBTargetServer, mysql.LBTargetServer, *diffbase.LBTargetServer]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewLBTargetServer(),
-			diffBaseData: wholeCache.DiffBaseDataSet.LBTargetServers,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.LBTargetServer,
+			mysql.LBTargetServer,
+			*diffbase.LBTargetServer, *message.LBTargetServerAdd, message.LBTargetServerAdd, *message.LBTargetServerUpdate, message.LBTargetServerUpdate, *message.LBTargetServerFieldsUpdate, message.LBTargetServerFieldsUpdate, *message.LBTargetServerDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
+			wholeCache,
+			db.NewLBTargetServer(),
+			wholeCache.DiffBaseDataSet.LBTargetServers,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -100,7 +107,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
-func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (interface{}, map[string]interface{}, bool) {
+func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (*message.LBTargetServerFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LBTargetServerFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {

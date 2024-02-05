@@ -27,18 +27,25 @@ import (
 )
 
 type Region struct {
-	UpdaterBase[cloudmodel.Region, mysql.Region, *diffbase.Region]
+	UpdaterBase[
+		cloudmodel.Region,
+		mysql.Region,
+		*diffbase.Region, *message.RegionAdd, message.RegionAdd, *message.RegionUpdate, message.RegionUpdate, *message.RegionFieldsUpdate, message.RegionFieldsUpdate, *message.RegionDelete, message.RegionDelete]
 }
 
 func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 	updater := &Region{
-		UpdaterBase[cloudmodel.Region, mysql.Region, *diffbase.Region]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_REGION_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewRegion(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Regions,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Region,
+			mysql.Region,
+			*diffbase.Region, *message.RegionAdd, message.RegionAdd, *message.RegionUpdate, message.RegionUpdate, *message.RegionFieldsUpdate, message.RegionFieldsUpdate, *message.RegionDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
+			wholeCache,
+			db.NewRegion(),
+			wholeCache.DiffBaseDataSet.Regions,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -58,7 +65,7 @@ func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*mysql.Regio
 	return dbItem, true
 }
 
-func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (interface{}, map[string]interface{}, bool) {
+func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (*message.RegionFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RegionFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

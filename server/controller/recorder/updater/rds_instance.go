@@ -27,18 +27,25 @@ import (
 )
 
 type RDSInstance struct {
-	UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]
+	UpdaterBase[
+		cloudmodel.RDSInstance,
+		mysql.RDSInstance,
+		*diffbase.RDSInstance, *message.RDSInstanceAdd, message.RDSInstanceAdd, *message.RDSInstanceUpdate, message.RDSInstanceUpdate, *message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, *message.RDSInstanceDelete, message.RDSInstanceDelete]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
-		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewRDSInstance(),
-			diffBaseData: wholeCache.DiffBaseDataSet.RDSInstances,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.RDSInstance,
+			mysql.RDSInstance,
+			*diffbase.RDSInstance, *message.RDSInstanceAdd, message.RDSInstanceAdd, *message.RDSInstanceUpdate, message.RDSInstanceUpdate, *message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, *message.RDSInstanceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
+			wholeCache,
+			db.NewRDSInstance(),
+			wholeCache.DiffBaseDataSet.RDSInstances,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -76,7 +83,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (interface{}, map[string]interface{}, bool) {
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.RDSInstanceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RDSInstanceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

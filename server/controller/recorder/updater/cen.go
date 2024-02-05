@@ -28,18 +28,25 @@ import (
 )
 
 type CEN struct {
-	UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]
+	UpdaterBase[
+		cloudmodel.CEN,
+		mysql.CEN,
+		*diffbase.CEN, *message.CENAdd, message.CENAdd, *message.CENUpdate, message.CENUpdate, *message.CENFieldsUpdate, message.CENFieldsUpdate, *message.CENDelete, message.CENDelete]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
-		UpdaterBase[cloudmodel.CEN, mysql.CEN, *diffbase.CEN]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewCEN(),
-			diffBaseData: wholeCache.DiffBaseDataSet.CENs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.CEN,
+			mysql.CEN,
+			*diffbase.CEN, *message.CENAdd, message.CENAdd, *message.CENUpdate, message.CENUpdate, *message.CENFieldsUpdate, message.CENFieldsUpdate, *message.CENDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
+			wholeCache,
+			db.NewCEN(),
+			wholeCache.DiffBaseDataSet.CENs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -73,7 +80,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (interface{}, map[string]interface{}, bool) {
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.CENFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.CENFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

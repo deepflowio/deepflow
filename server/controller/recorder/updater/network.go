@@ -27,18 +27,25 @@ import (
 )
 
 type Network struct {
-	UpdaterBase[cloudmodel.Network, mysql.Network, *diffbase.Network]
+	UpdaterBase[
+		cloudmodel.Network,
+		mysql.Network,
+		*diffbase.Network, *message.NetworkAdd, message.NetworkAdd, *message.NetworkUpdate, message.NetworkUpdate, *message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, *message.NetworkDelete, message.NetworkDelete]
 }
 
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
 	updater := &Network{
-		UpdaterBase[cloudmodel.Network, mysql.Network, *diffbase.Network]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewNetwork(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Networks,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Network,
+			mysql.Network,
+			*diffbase.Network, *message.NetworkAdd, message.NetworkAdd, *message.NetworkUpdate, message.NetworkUpdate, *message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, *message.NetworkDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
+			wholeCache,
+			db.NewNetwork(),
+			wholeCache.DiffBaseDataSet.Networks,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -76,7 +83,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 	return dbItem, true
 }
 
-func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (interface{}, map[string]interface{}, bool) {
+func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (*message.NetworkFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.NetworkFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

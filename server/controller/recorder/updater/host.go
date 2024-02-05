@@ -27,18 +27,25 @@ import (
 )
 
 type Host struct {
-	UpdaterBase[cloudmodel.Host, mysql.Host, *diffbase.Host]
+	UpdaterBase[
+		cloudmodel.Host,
+		mysql.Host,
+		*diffbase.Host, *message.HostAdd, message.HostAdd, *message.HostUpdate, message.HostUpdate, *message.HostFieldsUpdate, message.HostFieldsUpdate, *message.HostDelete, message.HostDelete]
 }
 
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	updater := &Host{
-		UpdaterBase[cloudmodel.Host, mysql.Host, *diffbase.Host]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewHost(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Hosts,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Host,
+			mysql.Host,
+			*diffbase.Host, *message.HostAdd, message.HostAdd, *message.HostUpdate, message.HostUpdate, *message.HostFieldsUpdate, message.HostFieldsUpdate, *message.HostDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
+			wholeCache,
+			db.NewHost(),
+			wholeCache.DiffBaseDataSet.Hosts,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -70,7 +77,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 	return dbItem, true
 }
 
-func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (interface{}, map[string]interface{}, bool) {
+func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (*message.HostFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.HostFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

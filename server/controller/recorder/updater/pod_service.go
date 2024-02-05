@@ -27,18 +27,25 @@ import (
 )
 
 type PodService struct {
-	UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]
+	UpdaterBase[
+		cloudmodel.PodService,
+		mysql.PodService,
+		*diffbase.PodService, *message.PodServiceAdd, message.PodServiceAdd, *message.PodServiceUpdate, message.PodServiceUpdate, *message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, *message.PodServiceDelete, message.PodServiceDelete]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
 	updater := &PodService{
-		UpdaterBase[cloudmodel.PodService, mysql.PodService, *diffbase.PodService]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodService(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodServices,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodService,
+			mysql.PodService,
+			*diffbase.PodService, *message.PodServiceAdd, message.PodServiceAdd, *message.PodServiceUpdate, message.PodServiceUpdate, *message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, *message.PodServiceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
+			wholeCache,
+			db.NewPodService(),
+			wholeCache.DiffBaseDataSet.PodServices,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -104,7 +111,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	return dbItem, true
 }
 
-func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (interface{}, map[string]interface{}, bool) {
+func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.PodServiceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodServiceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {

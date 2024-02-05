@@ -28,18 +28,25 @@ import (
 )
 
 type FloatingIP struct {
-	UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *diffbase.FloatingIP]
+	UpdaterBase[
+		cloudmodel.FloatingIP,
+		mysql.FloatingIP,
+		*diffbase.FloatingIP, *message.FloatingIPAdd, message.FloatingIPAdd, *message.FloatingIPUpdate, message.FloatingIPUpdate, *message.FloatingIPFieldsUpdate, message.FloatingIPFieldsUpdate, *message.FloatingIPDelete, message.FloatingIPDelete]
 }
 
 func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *FloatingIP {
 	updater := &FloatingIP{
-		UpdaterBase[cloudmodel.FloatingIP, mysql.FloatingIP, *diffbase.FloatingIP]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewFloatingIP(),
-			diffBaseData: wholeCache.DiffBaseDataSet.FloatingIPs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.FloatingIP,
+			mysql.FloatingIP,
+			*diffbase.FloatingIP, *message.FloatingIPAdd, message.FloatingIPAdd, *message.FloatingIPUpdate, message.FloatingIPUpdate, *message.FloatingIPFieldsUpdate, message.FloatingIPFieldsUpdate, *message.FloatingIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
+			wholeCache,
+			db.NewFloatingIP(),
+			wholeCache.DiffBaseDataSet.FloatingIPs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -94,7 +101,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 	return dbItem, true
 }
 
-func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (interface{}, map[string]interface{}, bool) {
+func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (*message.FloatingIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.FloatingIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

@@ -27,18 +27,25 @@ import (
 )
 
 type PodGroupPort struct {
-	UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *diffbase.PodGroupPort]
+	UpdaterBase[
+		cloudmodel.PodGroupPort,
+		mysql.PodGroupPort,
+		*diffbase.PodGroupPort, *message.PodGroupPortAdd, message.PodGroupPortAdd, *message.PodGroupPortUpdate, message.PodGroupPortUpdate, *message.PodGroupPortFieldsUpdate, message.PodGroupPortFieldsUpdate, *message.PodGroupPortDelete, message.PodGroupPortDelete]
 }
 
 func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPort) *PodGroupPort {
 	updater := &PodGroupPort{
-		UpdaterBase[cloudmodel.PodGroupPort, mysql.PodGroupPort, *diffbase.PodGroupPort]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodGroupPort(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodGroupPorts,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodGroupPort,
+			mysql.PodGroupPort,
+			*diffbase.PodGroupPort, *message.PodGroupPortAdd, message.PodGroupPortAdd, *message.PodGroupPortUpdate, message.PodGroupPortUpdate, *message.PodGroupPortFieldsUpdate, message.PodGroupPortFieldsUpdate, *message.PodGroupPortDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
+			wholeCache,
+			db.NewPodGroupPort(),
+			wholeCache.DiffBaseDataSet.PodGroupPorts,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -79,7 +86,7 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 	return dbItem, true
 }
 
-func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (interface{}, map[string]interface{}, bool) {
+func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (*message.PodGroupPortFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodGroupPortFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

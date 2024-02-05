@@ -27,18 +27,25 @@ import (
 )
 
 type VIP struct {
-	UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]
+	UpdaterBase[
+		cloudmodel.VIP,
+		mysql.VIP,
+		*diffbase.VIP, *message.VIPAdd, message.VIPAdd, *message.VIPUpdate, message.VIPUpdate, *message.VIPFieldsUpdate, message.VIPFieldsUpdate, *message.VIPDelete, message.VIPDelete]
 }
 
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	updater := &VIP{
-		UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VIP_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVIP(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VIP,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VIP,
+			mysql.VIP,
+			*diffbase.VIP, *message.VIPAdd, message.VIPAdd, *message.VIPUpdate, message.VIPUpdate, *message.VIPFieldsUpdate, message.VIPFieldsUpdate, *message.VIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
+			wholeCache,
+			db.NewVIP(),
+			wholeCache.DiffBaseDataSet.VIP,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -60,7 +67,7 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysql.VIP, bool) 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (interface{}, map[string]interface{}, bool) {
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (*message.VIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {

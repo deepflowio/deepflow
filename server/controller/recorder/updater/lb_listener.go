@@ -27,18 +27,25 @@ import (
 )
 
 type LBListener struct {
-	UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]
+	UpdaterBase[
+		cloudmodel.LBListener,
+		mysql.LBListener,
+		*diffbase.LBListener, *message.LBListenerAdd, message.LBListenerAdd, *message.LBListenerUpdate, message.LBListenerUpdate, *message.LBListenerFieldsUpdate, message.LBListenerFieldsUpdate, *message.LBListenerDelete, message.LBListenerDelete]
 }
 
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
 	updater := &LBListener{
-		UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewLBListener(),
-			diffBaseData: wholeCache.DiffBaseDataSet.LBListeners,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.LBListener,
+			mysql.LBListener,
+			*diffbase.LBListener, *message.LBListenerAdd, message.LBListenerAdd, *message.LBListenerUpdate, message.LBListenerUpdate, *message.LBListenerFieldsUpdate, message.LBListenerFieldsUpdate, *message.LBListenerDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
+			wholeCache,
+			db.NewLBListener(),
+			wholeCache.DiffBaseDataSet.LBListeners,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -73,7 +80,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 	return dbItem, true
 }
 
-func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (interface{}, map[string]interface{}, bool) {
+func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (*message.LBListenerFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LBListenerFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

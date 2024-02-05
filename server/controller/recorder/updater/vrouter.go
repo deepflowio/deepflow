@@ -28,18 +28,25 @@ import (
 )
 
 type VRouter struct {
-	UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]
+	UpdaterBase[
+		cloudmodel.VRouter,
+		mysql.VRouter,
+		*diffbase.VRouter, *message.VRouterAdd, message.VRouterAdd, *message.VRouterUpdate, message.VRouterUpdate, *message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, *message.VRouterDelete, message.VRouterDelete]
 }
 
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
 	updater := &VRouter{
-		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVRouter(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VRouters,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VRouter,
+			mysql.VRouter,
+			*diffbase.VRouter, *message.VRouterAdd, message.VRouterAdd, *message.VRouterUpdate, message.VRouterUpdate, *message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, *message.VRouterDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
+			wholeCache,
+			db.NewVRouter(),
+			wholeCache.DiffBaseDataSet.VRouters,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -72,7 +79,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRo
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (interface{}, map[string]interface{}, bool) {
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (*message.VRouterFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VRouterFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

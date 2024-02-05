@@ -27,18 +27,25 @@ import (
 )
 
 type SecurityGroupRule struct {
-	UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]
+	UpdaterBase[
+		cloudmodel.SecurityGroupRule,
+		mysql.SecurityGroupRule,
+		*diffbase.SecurityGroupRule, *message.SecurityGroupRuleAdd, message.SecurityGroupRuleAdd, *message.SecurityGroupRuleUpdate, message.SecurityGroupRuleUpdate, *message.SecurityGroupRuleFieldsUpdate, message.SecurityGroupRuleFieldsUpdate, *message.SecurityGroupRuleDelete, message.SecurityGroupRuleDelete]
 }
 
 func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroupRule) *SecurityGroupRule {
 	updater := &SecurityGroupRule{
-		UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewSecurityGroupRule(),
-			diffBaseData: wholeCache.DiffBaseDataSet.SecurityGroupRules,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.SecurityGroupRule,
+			mysql.SecurityGroupRule,
+			*diffbase.SecurityGroupRule, *message.SecurityGroupRuleAdd, message.SecurityGroupRuleAdd, *message.SecurityGroupRuleUpdate, message.SecurityGroupRuleUpdate, *message.SecurityGroupRuleFieldsUpdate, message.SecurityGroupRuleFieldsUpdate, *message.SecurityGroupRuleDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
+			wholeCache,
+			db.NewSecurityGroupRule(),
+			wholeCache.DiffBaseDataSet.SecurityGroupRules,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -75,7 +82,7 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 	return dbItem, true
 }
 
-func (r *SecurityGroupRule) generateUpdateInfo(diffBase *diffbase.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (interface{}, map[string]interface{}, bool) {
+func (r *SecurityGroupRule) generateUpdateInfo(diffBase *diffbase.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (*message.SecurityGroupRuleFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.SecurityGroupRuleFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {

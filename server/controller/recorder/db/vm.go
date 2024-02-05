@@ -41,12 +41,12 @@ func (a *VM) setDBItemID(dbItem *mysql.VM, id int) {
 	dbItem.ID = id
 }
 
-func (v *VM) DeleteBatch(lcuuids []string) bool {
+func (v *VM) DeleteBatch(lcuuids []string) ([]*mysql.VM, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	err := mysql.Db.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN vm On vm_pod_node_connection.vm_id = vm.id").Where("vm.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
 		log.Errorf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err)
-		return false
+		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
 			err = mysql.Db.Delete(con).Error
@@ -57,11 +57,13 @@ func (v *VM) DeleteBatch(lcuuids []string) bool {
 			log.Infof("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con)
 		}
 	}
-	err = mysql.Db.Where("lcuuid IN ?", lcuuids).Delete(&mysql.VM{}).Error
+
+	var dbItems []*mysql.VM
+	err = mysql.Db.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err)
-		return false
+		return nil, false
 	}
 	log.Infof("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids)
-	return true
+	return dbItems, true
 }

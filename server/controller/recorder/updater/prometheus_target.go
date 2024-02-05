@@ -27,18 +27,25 @@ import (
 )
 
 type PrometheusTarget struct {
-	UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *diffbase.PrometheusTarget]
+	UpdaterBase[
+		cloudmodel.PrometheusTarget,
+		mysql.PrometheusTarget,
+		*diffbase.PrometheusTarget, *message.PrometheusTargetAdd, message.PrometheusTargetAdd, *message.PrometheusTargetUpdate, message.PrometheusTargetUpdate, *message.PrometheusTargetFieldsUpdate, message.PrometheusTargetFieldsUpdate, *message.PrometheusTargetDelete, message.PrometheusTargetDelete]
 }
 
 func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.PrometheusTarget) *PrometheusTarget {
 	updater := &PrometheusTarget{
-		UpdaterBase[cloudmodel.PrometheusTarget, mysql.PrometheusTarget, *diffbase.PrometheusTarget]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPrometheusTarget(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PrometheusTarget,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PrometheusTarget,
+			mysql.PrometheusTarget,
+			*diffbase.PrometheusTarget, *message.PrometheusTargetAdd, message.PrometheusTargetAdd, *message.PrometheusTargetUpdate, message.PrometheusTargetUpdate, *message.PrometheusTargetFieldsUpdate, message.PrometheusTargetFieldsUpdate, *message.PrometheusTargetDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
+			wholeCache,
+			db.NewPrometheusTarget(),
+			wholeCache.DiffBaseDataSet.PrometheusTarget,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -81,7 +88,7 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 	return dbItem, true
 }
 
-func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (interface{}, map[string]interface{}, bool) {
+func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarget, cloudItem *cloudmodel.PrometheusTarget) (*message.PrometheusTargetFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PrometheusTargetFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Instance != cloudItem.Instance {
