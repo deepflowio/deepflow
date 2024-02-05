@@ -337,7 +337,7 @@ func NewPrometheusWriter(
 		BatchSize:    ckWriterConfig.BatchSize,
 		FlushTimeout: ckWriterConfig.FlushTimeout,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, name, db, config.TTL, DefaultPartition, config.Base, &flowTagWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, name, db, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}
