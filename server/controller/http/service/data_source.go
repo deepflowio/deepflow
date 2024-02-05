@@ -72,6 +72,8 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 			collection = "ext_metrics.*"
 		case "prometheus":
 			collection = "prometheus.*"
+		case "vtap_acl":
+			collection = "flow_metrics.vtap_acl"
 		default:
 			return nil, fmt.Errorf("not support type(%s)", t)
 		}
