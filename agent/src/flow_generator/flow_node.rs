@@ -188,7 +188,7 @@ impl FlowNode {
         trident_type: TridentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
-            if self.tagged_flow.flow.flow_id != meta_packet.socket_id {
+            if self.tagged_flow.flow.flow_id != meta_packet.generate_ebpf_flow_id() {
                 return false;
             }
 

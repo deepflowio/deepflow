@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use num_enum::IntoPrimitive;
 use serde::Serialize;
 
 //ebpf 上报的数据类型
@@ -44,7 +45,7 @@ const EBPF_TYPE_GO_HTTP2_UPROBE_DATA: u8 = 5;
 const EBPF_TYPE_NONE: u8 = 255;
 
 // ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
-#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone, IntoPrimitive)]
 #[repr(u8)]
 pub enum EbpfType {
     // 常规 tp, 通过 hook 系统调用 read/write 获取到原始报文, l7_protocol_from_ebpf 不可信,目前通过遍历所有支持的协议判断协议类型
