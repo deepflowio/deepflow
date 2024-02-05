@@ -38,8 +38,8 @@ use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
-    AmqpLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, OpenWireLog,
-    OracleLog, PostgresqlLog, RedisLog, SofaRpcLog, TlsLog,
+    AmqpLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, NatsLog,
+    OpenWireLog, OracleLog, PostgresqlLog, RedisLog, SofaRpcLog, TlsLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -174,6 +174,7 @@ impl_protocol_parser! {
         Oracle(OracleLog),
         MQTT(MqttLog),
         AMQP(AmqpLog),
+        NATS(NatsLog),
         TLS(TlsLog),
         OpenWire(OpenWireLog),
         // add protocol below
