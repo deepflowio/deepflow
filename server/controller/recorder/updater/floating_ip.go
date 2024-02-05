@@ -31,7 +31,15 @@ type FloatingIP struct {
 	UpdaterBase[
 		cloudmodel.FloatingIP,
 		mysql.FloatingIP,
-		*diffbase.FloatingIP, *message.FloatingIPAdd, message.FloatingIPAdd, *message.FloatingIPUpdate, message.FloatingIPUpdate, *message.FloatingIPFieldsUpdate, message.FloatingIPFieldsUpdate, *message.FloatingIPDelete, message.FloatingIPDelete]
+		*diffbase.FloatingIP,
+		*message.FloatingIPAdd,
+		message.FloatingIPAdd,
+		*message.FloatingIPUpdate,
+		message.FloatingIPUpdate,
+		*message.FloatingIPFieldsUpdate,
+		message.FloatingIPFieldsUpdate,
+		*message.FloatingIPDelete,
+		message.FloatingIPDelete]
 }
 
 func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *FloatingIP {
@@ -39,7 +47,14 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		newUpdaterBase[
 			cloudmodel.FloatingIP,
 			mysql.FloatingIP,
-			*diffbase.FloatingIP, *message.FloatingIPAdd, message.FloatingIPAdd, *message.FloatingIPUpdate, message.FloatingIPUpdate, *message.FloatingIPFieldsUpdate, message.FloatingIPFieldsUpdate, *message.FloatingIPDelete,
+			*diffbase.FloatingIP,
+			*message.FloatingIPAdd,
+			message.FloatingIPAdd,
+			*message.FloatingIPUpdate,
+			message.FloatingIPUpdate,
+			*message.FloatingIPFieldsUpdate,
+			message.FloatingIPFieldsUpdate,
+			*message.FloatingIPDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,

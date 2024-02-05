@@ -30,7 +30,15 @@ type DHCPPort struct {
 	UpdaterBase[
 		cloudmodel.DHCPPort,
 		mysql.DHCPPort,
-		*diffbase.DHCPPort, *message.DHCPPortAdd, message.DHCPPortAdd, *message.DHCPPortUpdate, message.DHCPPortUpdate, *message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, *message.DHCPPortDelete, message.DHCPPortDelete]
+		*diffbase.DHCPPort,
+		*message.DHCPPortAdd,
+		message.DHCPPortAdd,
+		*message.DHCPPortUpdate,
+		message.DHCPPortUpdate,
+		*message.DHCPPortFieldsUpdate,
+		message.DHCPPortFieldsUpdate,
+		*message.DHCPPortDelete,
+		message.DHCPPortDelete]
 }
 
 func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
@@ -38,7 +46,14 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		newUpdaterBase[
 			cloudmodel.DHCPPort,
 			mysql.DHCPPort,
-			*diffbase.DHCPPort, *message.DHCPPortAdd, message.DHCPPortAdd, *message.DHCPPortUpdate, message.DHCPPortUpdate, *message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, *message.DHCPPortDelete,
+			*diffbase.DHCPPort,
+			*message.DHCPPortAdd,
+			message.DHCPPortAdd,
+			*message.DHCPPortUpdate,
+			message.DHCPPortUpdate,
+			*message.DHCPPortFieldsUpdate,
+			message.DHCPPortFieldsUpdate,
+			*message.DHCPPortDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,

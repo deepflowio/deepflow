@@ -30,7 +30,15 @@ type PodService struct {
 	UpdaterBase[
 		cloudmodel.PodService,
 		mysql.PodService,
-		*diffbase.PodService, *message.PodServiceAdd, message.PodServiceAdd, *message.PodServiceUpdate, message.PodServiceUpdate, *message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, *message.PodServiceDelete, message.PodServiceDelete]
+		*diffbase.PodService,
+		*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
@@ -38,7 +46,14 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 		newUpdaterBase[
 			cloudmodel.PodService,
 			mysql.PodService,
-			*diffbase.PodService, *message.PodServiceAdd, message.PodServiceAdd, *message.PodServiceUpdate, message.PodServiceUpdate, *message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, *message.PodServiceDelete,
+			*diffbase.PodService,
+			*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			wholeCache,

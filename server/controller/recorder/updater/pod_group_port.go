@@ -30,7 +30,15 @@ type PodGroupPort struct {
 	UpdaterBase[
 		cloudmodel.PodGroupPort,
 		mysql.PodGroupPort,
-		*diffbase.PodGroupPort, *message.PodGroupPortAdd, message.PodGroupPortAdd, *message.PodGroupPortUpdate, message.PodGroupPortUpdate, *message.PodGroupPortFieldsUpdate, message.PodGroupPortFieldsUpdate, *message.PodGroupPortDelete, message.PodGroupPortDelete]
+		*diffbase.PodGroupPort,
+		*message.PodGroupPortAdd,
+		message.PodGroupPortAdd,
+		*message.PodGroupPortUpdate,
+		message.PodGroupPortUpdate,
+		*message.PodGroupPortFieldsUpdate,
+		message.PodGroupPortFieldsUpdate,
+		*message.PodGroupPortDelete,
+		message.PodGroupPortDelete]
 }
 
 func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPort) *PodGroupPort {
@@ -38,7 +46,14 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		newUpdaterBase[
 			cloudmodel.PodGroupPort,
 			mysql.PodGroupPort,
-			*diffbase.PodGroupPort, *message.PodGroupPortAdd, message.PodGroupPortAdd, *message.PodGroupPortUpdate, message.PodGroupPortUpdate, *message.PodGroupPortFieldsUpdate, message.PodGroupPortFieldsUpdate, *message.PodGroupPortDelete,
+			*diffbase.PodGroupPort,
+			*message.PodGroupPortAdd,
+			message.PodGroupPortAdd,
+			*message.PodGroupPortUpdate,
+			message.PodGroupPortUpdate,
+			*message.PodGroupPortFieldsUpdate,
+			message.PodGroupPortFieldsUpdate,
+			*message.PodGroupPortDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			wholeCache,

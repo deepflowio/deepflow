@@ -30,7 +30,15 @@ type Pod struct {
 	UpdaterBase[
 		cloudmodel.Pod,
 		mysql.Pod,
-		*diffbase.Pod, *message.PodAdd, message.PodAdd, *message.PodUpdate, message.PodUpdate, *message.PodFieldsUpdate, message.PodFieldsUpdate, *message.PodDelete, message.PodDelete]
+		*diffbase.Pod,
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodUpdate,
+		message.PodUpdate,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete]
 }
 
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
@@ -38,7 +46,14 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 		newUpdaterBase[
 			cloudmodel.Pod,
 			mysql.Pod,
-			*diffbase.Pod, *message.PodAdd, message.PodAdd, *message.PodUpdate, message.PodUpdate, *message.PodFieldsUpdate, message.PodFieldsUpdate, *message.PodDelete,
+			*diffbase.Pod,
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodUpdate,
+			message.PodUpdate,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,

@@ -31,7 +31,15 @@ type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
 		mysql.VRouter,
-		*diffbase.VRouter, *message.VRouterAdd, message.VRouterAdd, *message.VRouterUpdate, message.VRouterUpdate, *message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, *message.VRouterDelete, message.VRouterDelete]
+		*diffbase.VRouter,
+		*message.VRouterAdd,
+		message.VRouterAdd,
+		*message.VRouterUpdate,
+		message.VRouterUpdate,
+		*message.VRouterFieldsUpdate,
+		message.VRouterFieldsUpdate,
+		*message.VRouterDelete,
+		message.VRouterDelete]
 }
 
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
@@ -39,7 +47,14 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		newUpdaterBase[
 			cloudmodel.VRouter,
 			mysql.VRouter,
-			*diffbase.VRouter, *message.VRouterAdd, message.VRouterAdd, *message.VRouterUpdate, message.VRouterUpdate, *message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, *message.VRouterDelete,
+			*diffbase.VRouter,
+			*message.VRouterAdd,
+			message.VRouterAdd,
+			*message.VRouterUpdate,
+			message.VRouterUpdate,
+			*message.VRouterFieldsUpdate,
+			message.VRouterFieldsUpdate,
+			*message.VRouterDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,

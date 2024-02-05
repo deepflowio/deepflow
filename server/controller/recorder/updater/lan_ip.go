@@ -32,7 +32,15 @@ type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
 		mysql.LANIP,
-		*diffbase.LANIP, *message.LANIPAdd, message.LANIPAdd, *message.LANIPUpdate, message.LANIPUpdate, *message.LANIPFieldsUpdate, message.LANIPFieldsUpdate, *message.LANIPDelete, message.LANIPDelete]
+		*diffbase.LANIP,
+		*message.LANIPAdd,
+		message.LANIPAdd,
+		*message.LANIPUpdate,
+		message.LANIPUpdate,
+		*message.LANIPFieldsUpdate,
+		message.LANIPFieldsUpdate,
+		*message.LANIPDelete,
+		message.LANIPDelete]
 }
 
 func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
@@ -40,7 +48,14 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 		newUpdaterBase[
 			cloudmodel.IP,
 			mysql.LANIP,
-			*diffbase.LANIP, *message.LANIPAdd, message.LANIPAdd, *message.LANIPUpdate, message.LANIPUpdate, *message.LANIPFieldsUpdate, message.LANIPFieldsUpdate, *message.LANIPDelete,
+			*diffbase.LANIP,
+			*message.LANIPAdd,
+			message.LANIPAdd,
+			*message.LANIPUpdate,
+			message.LANIPUpdate,
+			*message.LANIPFieldsUpdate,
+			message.LANIPFieldsUpdate,
+			*message.LANIPDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,

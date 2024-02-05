@@ -30,7 +30,15 @@ type PodCluster struct {
 	UpdaterBase[
 		cloudmodel.PodCluster,
 		mysql.PodCluster,
-		*diffbase.PodCluster, *message.PodClusterAdd, message.PodClusterAdd, *message.PodClusterUpdate, message.PodClusterUpdate, *message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, *message.PodClusterDelete, message.PodClusterDelete]
+		*diffbase.PodCluster,
+		*message.PodClusterAdd,
+		message.PodClusterAdd,
+		*message.PodClusterUpdate,
+		message.PodClusterUpdate,
+		*message.PodClusterFieldsUpdate,
+		message.PodClusterFieldsUpdate,
+		*message.PodClusterDelete,
+		message.PodClusterDelete]
 }
 
 func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *PodCluster {
@@ -38,7 +46,14 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 		newUpdaterBase[
 			cloudmodel.PodCluster,
 			mysql.PodCluster,
-			*diffbase.PodCluster, *message.PodClusterAdd, message.PodClusterAdd, *message.PodClusterUpdate, message.PodClusterUpdate, *message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, *message.PodClusterDelete,
+			*diffbase.PodCluster,
+			*message.PodClusterAdd,
+			message.PodClusterAdd,
+			*message.PodClusterUpdate,
+			message.PodClusterUpdate,
+			*message.PodClusterFieldsUpdate,
+			message.PodClusterFieldsUpdate,
+			*message.PodClusterDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			wholeCache,

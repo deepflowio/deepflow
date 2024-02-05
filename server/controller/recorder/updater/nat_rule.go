@@ -30,7 +30,15 @@ type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
 		mysql.NATRule,
-		*diffbase.NATRule, *message.NATRuleAdd, message.NATRuleAdd, *message.NATRuleUpdate, message.NATRuleUpdate, *message.NATRuleFieldsUpdate, message.NATRuleFieldsUpdate, *message.NATRuleDelete, message.NATRuleDelete]
+		*diffbase.NATRule,
+		*message.NATRuleAdd,
+		message.NATRuleAdd,
+		*message.NATRuleUpdate,
+		message.NATRuleUpdate,
+		*message.NATRuleFieldsUpdate,
+		message.NATRuleFieldsUpdate,
+		*message.NATRuleDelete,
+		message.NATRuleDelete]
 }
 
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
@@ -38,7 +46,14 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		newUpdaterBase[
 			cloudmodel.NATRule,
 			mysql.NATRule,
-			*diffbase.NATRule, *message.NATRuleAdd, message.NATRuleAdd, *message.NATRuleUpdate, message.NATRuleUpdate, *message.NATRuleFieldsUpdate, message.NATRuleFieldsUpdate, *message.NATRuleDelete,
+			*diffbase.NATRule,
+			*message.NATRuleAdd,
+			message.NATRuleAdd,
+			*message.NATRuleUpdate,
+			message.NATRuleUpdate,
+			*message.NATRuleFieldsUpdate,
+			message.NATRuleFieldsUpdate,
+			*message.NATRuleDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,

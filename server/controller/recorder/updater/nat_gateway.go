@@ -30,7 +30,15 @@ type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
 		mysql.NATGateway,
-		*diffbase.NATGateway, *message.NATGatewayAdd, message.NATGatewayAdd, *message.NATGatewayUpdate, message.NATGatewayUpdate, *message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, *message.NATGatewayDelete, message.NATGatewayDelete]
+		*diffbase.NATGateway,
+		*message.NATGatewayAdd,
+		message.NATGatewayAdd,
+		*message.NATGatewayUpdate,
+		message.NATGatewayUpdate,
+		*message.NATGatewayFieldsUpdate,
+		message.NATGatewayFieldsUpdate,
+		*message.NATGatewayDelete,
+		message.NATGatewayDelete]
 }
 
 func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *NATGateway {
@@ -38,7 +46,14 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		newUpdaterBase[
 			cloudmodel.NATGateway,
 			mysql.NATGateway,
-			*diffbase.NATGateway, *message.NATGatewayAdd, message.NATGatewayAdd, *message.NATGatewayUpdate, message.NATGatewayUpdate, *message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, *message.NATGatewayDelete,
+			*diffbase.NATGateway,
+			*message.NATGatewayAdd,
+			message.NATGatewayAdd,
+			*message.NATGatewayUpdate,
+			message.NATGatewayUpdate,
+			*message.NATGatewayFieldsUpdate,
+			message.NATGatewayFieldsUpdate,
+			*message.NATGatewayDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,

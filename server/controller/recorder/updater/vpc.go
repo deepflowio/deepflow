@@ -30,7 +30,15 @@ type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
 		mysql.VPC,
-		*diffbase.VPC, *message.VPCAdd, message.VPCAdd, *message.VPCUpdate, message.VPCUpdate, *message.VPCFieldsUpdate, message.VPCFieldsUpdate, *message.VPCDelete, message.VPCDelete]
+		*diffbase.VPC,
+		*message.VPCAdd,
+		message.VPCAdd,
+		*message.VPCUpdate,
+		message.VPCUpdate,
+		*message.VPCFieldsUpdate,
+		message.VPCFieldsUpdate,
+		*message.VPCDelete,
+		message.VPCDelete]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
@@ -38,7 +46,14 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		newUpdaterBase[
 			cloudmodel.VPC,
 			mysql.VPC,
-			*diffbase.VPC, *message.VPCAdd, message.VPCAdd, *message.VPCUpdate, message.VPCUpdate, *message.VPCFieldsUpdate, message.VPCFieldsUpdate, *message.VPCDelete,
+			*diffbase.VPC,
+			*message.VPCAdd,
+			message.VPCAdd,
+			*message.VPCUpdate,
+			message.VPCUpdate,
+			*message.VPCFieldsUpdate,
+			message.VPCFieldsUpdate,
+			*message.VPCDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,

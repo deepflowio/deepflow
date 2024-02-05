@@ -30,7 +30,15 @@ type VIP struct {
 	UpdaterBase[
 		cloudmodel.VIP,
 		mysql.VIP,
-		*diffbase.VIP, *message.VIPAdd, message.VIPAdd, *message.VIPUpdate, message.VIPUpdate, *message.VIPFieldsUpdate, message.VIPFieldsUpdate, *message.VIPDelete, message.VIPDelete]
+		*diffbase.VIP,
+		*message.VIPAdd,
+		message.VIPAdd,
+		*message.VIPUpdate,
+		message.VIPUpdate,
+		*message.VIPFieldsUpdate,
+		message.VIPFieldsUpdate,
+		*message.VIPDelete,
+		message.VIPDelete]
 }
 
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
@@ -38,7 +46,14 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		newUpdaterBase[
 			cloudmodel.VIP,
 			mysql.VIP,
-			*diffbase.VIP, *message.VIPAdd, message.VIPAdd, *message.VIPUpdate, message.VIPUpdate, *message.VIPFieldsUpdate, message.VIPFieldsUpdate, *message.VIPDelete,
+			*diffbase.VIP,
+			*message.VIPAdd,
+			message.VIPAdd,
+			*message.VIPUpdate,
+			message.VIPUpdate,
+			*message.VIPFieldsUpdate,
+			message.VIPFieldsUpdate,
+			*message.VIPDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,

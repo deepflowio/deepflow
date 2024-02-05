@@ -30,7 +30,15 @@ type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
 		mysql.VMPodNodeConnection,
-		*diffbase.VMPodNodeConnection, *message.VMPodNodeConnectionAdd, message.VMPodNodeConnectionAdd, *message.VMPodNodeConnectionUpdate, message.VMPodNodeConnectionUpdate, *message.VMPodNodeConnectionFieldsUpdate, message.VMPodNodeConnectionFieldsUpdate, *message.VMPodNodeConnectionDelete, message.VMPodNodeConnectionDelete]
+		*diffbase.VMPodNodeConnection,
+		*message.VMPodNodeConnectionAdd,
+		message.VMPodNodeConnectionAdd,
+		*message.VMPodNodeConnectionUpdate,
+		message.VMPodNodeConnectionUpdate,
+		*message.VMPodNodeConnectionFieldsUpdate,
+		message.VMPodNodeConnectionFieldsUpdate,
+		*message.VMPodNodeConnectionDelete,
+		message.VMPodNodeConnectionDelete]
 }
 
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
@@ -38,7 +46,14 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		newUpdaterBase[
 			cloudmodel.VMPodNodeConnection,
 			mysql.VMPodNodeConnection,
-			*diffbase.VMPodNodeConnection, *message.VMPodNodeConnectionAdd, message.VMPodNodeConnectionAdd, *message.VMPodNodeConnectionUpdate, message.VMPodNodeConnectionUpdate, *message.VMPodNodeConnectionFieldsUpdate, message.VMPodNodeConnectionFieldsUpdate, *message.VMPodNodeConnectionDelete,
+			*diffbase.VMPodNodeConnection,
+			*message.VMPodNodeConnectionAdd,
+			message.VMPodNodeConnectionAdd,
+			*message.VMPodNodeConnectionUpdate,
+			message.VMPodNodeConnectionUpdate,
+			*message.VMPodNodeConnectionFieldsUpdate,
+			message.VMPodNodeConnectionFieldsUpdate,
+			*message.VMPodNodeConnectionDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,

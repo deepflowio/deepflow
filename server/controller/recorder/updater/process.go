@@ -31,7 +31,15 @@ type Process struct {
 	UpdaterBase[
 		cloudmodel.Process,
 		mysql.Process,
-		*diffbase.Process, *message.ProcessAdd, message.ProcessAdd, *message.ProcessUpdate, message.ProcessUpdate, *message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, *message.ProcessDelete, message.ProcessDelete]
+		*diffbase.Process,
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessUpdate,
+		message.ProcessUpdate,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete]
 }
 
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
@@ -39,7 +47,14 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		newUpdaterBase[
 			cloudmodel.Process,
 			mysql.Process,
-			*diffbase.Process, *message.ProcessAdd, message.ProcessAdd, *message.ProcessUpdate, message.ProcessUpdate, *message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, *message.ProcessDelete,
+			*diffbase.Process,
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessUpdate,
+			message.ProcessUpdate,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,

@@ -33,7 +33,15 @@ type PodNamespace struct {
 	UpdaterBase[
 		cloudmodel.PodNamespace,
 		mysql.PodNamespace,
-		*diffbase.PodNamespace, *message.PodNamespaceAdd, message.PodNamespaceAdd, *message.PodNamespaceUpdate, message.PodNamespaceUpdate, *message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, *message.PodNamespaceDelete, message.PodNamespaceDelete]
+		*diffbase.PodNamespace,
+		*message.PodNamespaceAdd,
+		message.PodNamespaceAdd,
+		*message.PodNamespaceUpdate,
+		message.PodNamespaceUpdate,
+		*message.PodNamespaceFieldsUpdate,
+		message.PodNamespaceFieldsUpdate,
+		*message.PodNamespaceDelete,
+		message.PodNamespaceDelete]
 }
 
 func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespace) *PodNamespace {
@@ -41,7 +49,14 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		newUpdaterBase[
 			cloudmodel.PodNamespace,
 			mysql.PodNamespace,
-			*diffbase.PodNamespace, *message.PodNamespaceAdd, message.PodNamespaceAdd, *message.PodNamespaceUpdate, message.PodNamespaceUpdate, *message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, *message.PodNamespaceDelete,
+			*diffbase.PodNamespace,
+			*message.PodNamespaceAdd,
+			message.PodNamespaceAdd,
+			*message.PodNamespaceUpdate,
+			message.PodNamespaceUpdate,
+			*message.PodNamespaceFieldsUpdate,
+			message.PodNamespaceFieldsUpdate,
+			*message.PodNamespaceDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			wholeCache,

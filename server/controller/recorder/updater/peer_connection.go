@@ -30,7 +30,15 @@ type PeerConnection struct {
 	UpdaterBase[
 		cloudmodel.PeerConnection,
 		mysql.PeerConnection,
-		*diffbase.PeerConnection, *message.PeerConnectionAdd, message.PeerConnectionAdd, *message.PeerConnectionUpdate, message.PeerConnectionUpdate, *message.PeerConnectionFieldsUpdate, message.PeerConnectionFieldsUpdate, *message.PeerConnectionDelete, message.PeerConnectionDelete]
+		*diffbase.PeerConnection,
+		*message.PeerConnectionAdd,
+		message.PeerConnectionAdd,
+		*message.PeerConnectionUpdate,
+		message.PeerConnectionUpdate,
+		*message.PeerConnectionFieldsUpdate,
+		message.PeerConnectionFieldsUpdate,
+		*message.PeerConnectionDelete,
+		message.PeerConnectionDelete]
 }
 
 func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConnection) *PeerConnection {
@@ -38,7 +46,14 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		newUpdaterBase[
 			cloudmodel.PeerConnection,
 			mysql.PeerConnection,
-			*diffbase.PeerConnection, *message.PeerConnectionAdd, message.PeerConnectionAdd, *message.PeerConnectionUpdate, message.PeerConnectionUpdate, *message.PeerConnectionFieldsUpdate, message.PeerConnectionFieldsUpdate, *message.PeerConnectionDelete,
+			*diffbase.PeerConnection,
+			*message.PeerConnectionAdd,
+			message.PeerConnectionAdd,
+			*message.PeerConnectionUpdate,
+			message.PeerConnectionUpdate,
+			*message.PeerConnectionFieldsUpdate,
+			message.PeerConnectionFieldsUpdate,
+			*message.PeerConnectionDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,

@@ -30,7 +30,15 @@ type PodIngress struct {
 	UpdaterBase[
 		cloudmodel.PodIngress,
 		mysql.PodIngress,
-		*diffbase.PodIngress, *message.PodIngressAdd, message.PodIngressAdd, *message.PodIngressUpdate, message.PodIngressUpdate, *message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, *message.PodIngressDelete, message.PodIngressDelete]
+		*diffbase.PodIngress,
+		*message.PodIngressAdd,
+		message.PodIngressAdd,
+		*message.PodIngressUpdate,
+		message.PodIngressUpdate,
+		*message.PodIngressFieldsUpdate,
+		message.PodIngressFieldsUpdate,
+		*message.PodIngressDelete,
+		message.PodIngressDelete]
 }
 
 func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *PodIngress {
@@ -38,7 +46,14 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 		newUpdaterBase[
 			cloudmodel.PodIngress,
 			mysql.PodIngress,
-			*diffbase.PodIngress, *message.PodIngressAdd, message.PodIngressAdd, *message.PodIngressUpdate, message.PodIngressUpdate, *message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, *message.PodIngressDelete,
+			*diffbase.PodIngress,
+			*message.PodIngressAdd,
+			message.PodIngressAdd,
+			*message.PodIngressUpdate,
+			message.PodIngressUpdate,
+			*message.PodIngressFieldsUpdate,
+			message.PodIngressFieldsUpdate,
+			*message.PodIngressDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			wholeCache,
