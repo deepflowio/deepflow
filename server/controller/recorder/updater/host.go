@@ -30,7 +30,15 @@ type Host struct {
 	UpdaterBase[
 		cloudmodel.Host,
 		mysql.Host,
-		*diffbase.Host, *message.HostAdd, message.HostAdd, *message.HostUpdate, message.HostUpdate, *message.HostFieldsUpdate, message.HostFieldsUpdate, *message.HostDelete, message.HostDelete]
+		*diffbase.Host,
+		*message.HostAdd,
+		message.HostAdd,
+		*message.HostUpdate,
+		message.HostUpdate,
+		*message.HostFieldsUpdate,
+		message.HostFieldsUpdate,
+		*message.HostDelete,
+		message.HostDelete]
 }
 
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
@@ -38,7 +46,14 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		newUpdaterBase[
 			cloudmodel.Host,
 			mysql.Host,
-			*diffbase.Host, *message.HostAdd, message.HostAdd, *message.HostUpdate, message.HostUpdate, *message.HostFieldsUpdate, message.HostFieldsUpdate, *message.HostDelete,
+			*diffbase.Host,
+			*message.HostAdd,
+			message.HostAdd,
+			*message.HostUpdate,
+			message.HostUpdate,
+			*message.HostFieldsUpdate,
+			message.HostFieldsUpdate,
+			*message.HostDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,

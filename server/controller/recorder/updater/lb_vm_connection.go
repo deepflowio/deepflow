@@ -30,7 +30,15 @@ type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
 		mysql.LBVMConnection,
-		*diffbase.LBVMConnection, *message.LBVMConnectionAdd, message.LBVMConnectionAdd, *message.LBVMConnectionUpdate, message.LBVMConnectionUpdate, *message.LBVMConnectionFieldsUpdate, message.LBVMConnectionFieldsUpdate, *message.LBVMConnectionDelete, message.LBVMConnectionDelete]
+		*diffbase.LBVMConnection,
+		*message.LBVMConnectionAdd,
+		message.LBVMConnectionAdd,
+		*message.LBVMConnectionUpdate,
+		message.LBVMConnectionUpdate,
+		*message.LBVMConnectionFieldsUpdate,
+		message.LBVMConnectionFieldsUpdate,
+		*message.LBVMConnectionDelete,
+		message.LBVMConnectionDelete]
 }
 
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
@@ -38,7 +46,14 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		newUpdaterBase[
 			cloudmodel.LBVMConnection,
 			mysql.LBVMConnection,
-			*diffbase.LBVMConnection, *message.LBVMConnectionAdd, message.LBVMConnectionAdd, *message.LBVMConnectionUpdate, message.LBVMConnectionUpdate, *message.LBVMConnectionFieldsUpdate, message.LBVMConnectionFieldsUpdate, *message.LBVMConnectionDelete,
+			*diffbase.LBVMConnection,
+			*message.LBVMConnectionAdd,
+			message.LBVMConnectionAdd,
+			*message.LBVMConnectionUpdate,
+			message.LBVMConnectionUpdate,
+			*message.LBVMConnectionFieldsUpdate,
+			message.LBVMConnectionFieldsUpdate,
+			*message.LBVMConnectionDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,

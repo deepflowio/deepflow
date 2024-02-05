@@ -30,7 +30,15 @@ type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
 		mysql.LBTargetServer,
-		*diffbase.LBTargetServer, *message.LBTargetServerAdd, message.LBTargetServerAdd, *message.LBTargetServerUpdate, message.LBTargetServerUpdate, *message.LBTargetServerFieldsUpdate, message.LBTargetServerFieldsUpdate, *message.LBTargetServerDelete, message.LBTargetServerDelete]
+		*diffbase.LBTargetServer,
+		*message.LBTargetServerAdd,
+		message.LBTargetServerAdd,
+		*message.LBTargetServerUpdate,
+		message.LBTargetServerUpdate,
+		*message.LBTargetServerFieldsUpdate,
+		message.LBTargetServerFieldsUpdate,
+		*message.LBTargetServerDelete,
+		message.LBTargetServerDelete]
 }
 
 func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetServer) *LBTargetServer {
@@ -38,7 +46,14 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		newUpdaterBase[
 			cloudmodel.LBTargetServer,
 			mysql.LBTargetServer,
-			*diffbase.LBTargetServer, *message.LBTargetServerAdd, message.LBTargetServerAdd, *message.LBTargetServerUpdate, message.LBTargetServerUpdate, *message.LBTargetServerFieldsUpdate, message.LBTargetServerFieldsUpdate, *message.LBTargetServerDelete,
+			*diffbase.LBTargetServer,
+			*message.LBTargetServerAdd,
+			message.LBTargetServerAdd,
+			*message.LBTargetServerUpdate,
+			message.LBTargetServerUpdate,
+			*message.LBTargetServerFieldsUpdate,
+			message.LBTargetServerFieldsUpdate,
+			*message.LBTargetServerDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,

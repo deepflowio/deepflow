@@ -30,7 +30,15 @@ type RedisInstance struct {
 	UpdaterBase[
 		cloudmodel.RedisInstance,
 		mysql.RedisInstance,
-		*diffbase.RedisInstance, *message.RedisInstanceAdd, message.RedisInstanceAdd, *message.RedisInstanceUpdate, message.RedisInstanceUpdate, *message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, *message.RedisInstanceDelete, message.RedisInstanceDelete]
+		*diffbase.RedisInstance,
+		*message.RedisInstanceAdd,
+		message.RedisInstanceAdd,
+		*message.RedisInstanceUpdate,
+		message.RedisInstanceUpdate,
+		*message.RedisInstanceFieldsUpdate,
+		message.RedisInstanceFieldsUpdate,
+		*message.RedisInstanceDelete,
+		message.RedisInstanceDelete]
 }
 
 func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
@@ -38,7 +46,14 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		newUpdaterBase[
 			cloudmodel.RedisInstance,
 			mysql.RedisInstance,
-			*diffbase.RedisInstance, *message.RedisInstanceAdd, message.RedisInstanceAdd, *message.RedisInstanceUpdate, message.RedisInstanceUpdate, *message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, *message.RedisInstanceDelete,
+			*diffbase.RedisInstance,
+			*message.RedisInstanceAdd,
+			message.RedisInstanceAdd,
+			*message.RedisInstanceUpdate,
+			message.RedisInstanceUpdate,
+			*message.RedisInstanceFieldsUpdate,
+			message.RedisInstanceFieldsUpdate,
+			*message.RedisInstanceDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,

@@ -30,7 +30,15 @@ type PodIngressRule struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRule,
 		mysql.PodIngressRule,
-		*diffbase.PodIngressRule, *message.PodIngressRuleAdd, message.PodIngressRuleAdd, *message.PodIngressRuleUpdate, message.PodIngressRuleUpdate, *message.PodIngressRuleFieldsUpdate, message.PodIngressRuleFieldsUpdate, *message.PodIngressRuleDelete, message.PodIngressRuleDelete]
+		*diffbase.PodIngressRule,
+		*message.PodIngressRuleAdd,
+		message.PodIngressRuleAdd,
+		*message.PodIngressRuleUpdate,
+		message.PodIngressRuleUpdate,
+		*message.PodIngressRuleFieldsUpdate,
+		message.PodIngressRuleFieldsUpdate,
+		*message.PodIngressRuleDelete,
+		message.PodIngressRuleDelete]
 }
 
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
@@ -38,7 +46,14 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 		newUpdaterBase[
 			cloudmodel.PodIngressRule,
 			mysql.PodIngressRule,
-			*diffbase.PodIngressRule, *message.PodIngressRuleAdd, message.PodIngressRuleAdd, *message.PodIngressRuleUpdate, message.PodIngressRuleUpdate, *message.PodIngressRuleFieldsUpdate, message.PodIngressRuleFieldsUpdate, *message.PodIngressRuleDelete,
+			*diffbase.PodIngressRule,
+			*message.PodIngressRuleAdd,
+			message.PodIngressRuleAdd,
+			*message.PodIngressRuleUpdate,
+			message.PodIngressRuleUpdate,
+			*message.PodIngressRuleFieldsUpdate,
+			message.PodIngressRuleFieldsUpdate,
+			*message.PodIngressRuleDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,

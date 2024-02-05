@@ -30,7 +30,15 @@ type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
 		mysql.LB,
-		*diffbase.LB, *message.LBAdd, message.LBAdd, *message.LBUpdate, message.LBUpdate, *message.LBFieldsUpdate, message.LBFieldsUpdate, *message.LBDelete, message.LBDelete]
+		*diffbase.LB,
+		*message.LBAdd,
+		message.LBAdd,
+		*message.LBUpdate,
+		message.LBUpdate,
+		*message.LBFieldsUpdate,
+		message.LBFieldsUpdate,
+		*message.LBDelete,
+		message.LBDelete]
 }
 
 func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
@@ -38,7 +46,14 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		newUpdaterBase[
 			cloudmodel.LB,
 			mysql.LB,
-			*diffbase.LB, *message.LBAdd, message.LBAdd, *message.LBUpdate, message.LBUpdate, *message.LBFieldsUpdate, message.LBFieldsUpdate, *message.LBDelete,
+			*diffbase.LB,
+			*message.LBAdd,
+			message.LBAdd,
+			*message.LBUpdate,
+			message.LBUpdate,
+			*message.LBFieldsUpdate,
+			message.LBFieldsUpdate,
+			*message.LBDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,

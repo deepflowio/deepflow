@@ -30,7 +30,15 @@ type AZ struct {
 	UpdaterBase[
 		cloudmodel.AZ,
 		mysql.AZ,
-		*diffbase.AZ, *message.AZAdd, message.AZAdd, *message.AZUpdate, message.AZUpdate, *message.AZFieldsUpdate, message.AZFieldsUpdate, *message.AZDelete, message.AZDelete]
+		*diffbase.AZ,
+		*message.AZAdd,
+		message.AZAdd,
+		*message.AZUpdate,
+		message.AZUpdate,
+		*message.AZFieldsUpdate,
+		message.AZFieldsUpdate,
+		*message.AZDelete,
+		message.AZDelete]
 }
 
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
@@ -38,7 +46,14 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		newUpdaterBase[
 			cloudmodel.AZ,
 			mysql.AZ,
-			*diffbase.AZ, *message.AZAdd, message.AZAdd, *message.AZUpdate, message.AZUpdate, *message.AZFieldsUpdate, message.AZFieldsUpdate, *message.AZDelete,
+			*diffbase.AZ,
+			*message.AZAdd,
+			message.AZAdd,
+			*message.AZUpdate,
+			message.AZUpdate,
+			*message.AZFieldsUpdate,
+			message.AZFieldsUpdate,
+			*message.AZDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,

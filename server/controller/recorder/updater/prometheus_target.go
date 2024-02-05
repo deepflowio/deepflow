@@ -30,7 +30,15 @@ type PrometheusTarget struct {
 	UpdaterBase[
 		cloudmodel.PrometheusTarget,
 		mysql.PrometheusTarget,
-		*diffbase.PrometheusTarget, *message.PrometheusTargetAdd, message.PrometheusTargetAdd, *message.PrometheusTargetUpdate, message.PrometheusTargetUpdate, *message.PrometheusTargetFieldsUpdate, message.PrometheusTargetFieldsUpdate, *message.PrometheusTargetDelete, message.PrometheusTargetDelete]
+		*diffbase.PrometheusTarget,
+		*message.PrometheusTargetAdd,
+		message.PrometheusTargetAdd,
+		*message.PrometheusTargetUpdate,
+		message.PrometheusTargetUpdate,
+		*message.PrometheusTargetFieldsUpdate,
+		message.PrometheusTargetFieldsUpdate,
+		*message.PrometheusTargetDelete,
+		message.PrometheusTargetDelete]
 }
 
 func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.PrometheusTarget) *PrometheusTarget {
@@ -38,7 +46,14 @@ func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.Prometh
 		newUpdaterBase[
 			cloudmodel.PrometheusTarget,
 			mysql.PrometheusTarget,
-			*diffbase.PrometheusTarget, *message.PrometheusTargetAdd, message.PrometheusTargetAdd, *message.PrometheusTargetUpdate, message.PrometheusTargetUpdate, *message.PrometheusTargetFieldsUpdate, message.PrometheusTargetFieldsUpdate, *message.PrometheusTargetDelete,
+			*diffbase.PrometheusTarget,
+			*message.PrometheusTargetAdd,
+			message.PrometheusTargetAdd,
+			*message.PrometheusTargetUpdate,
+			message.PrometheusTargetUpdate,
+			*message.PrometheusTargetFieldsUpdate,
+			message.PrometheusTargetFieldsUpdate,
+			*message.PrometheusTargetDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
 			wholeCache,

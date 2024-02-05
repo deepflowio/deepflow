@@ -31,7 +31,15 @@ type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
 		mysql.CEN,
-		*diffbase.CEN, *message.CENAdd, message.CENAdd, *message.CENUpdate, message.CENUpdate, *message.CENFieldsUpdate, message.CENFieldsUpdate, *message.CENDelete, message.CENDelete]
+		*diffbase.CEN,
+		*message.CENAdd,
+		message.CENAdd,
+		*message.CENUpdate,
+		message.CENUpdate,
+		*message.CENFieldsUpdate,
+		message.CENFieldsUpdate,
+		*message.CENDelete,
+		message.CENDelete]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
@@ -39,7 +47,14 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		newUpdaterBase[
 			cloudmodel.CEN,
 			mysql.CEN,
-			*diffbase.CEN, *message.CENAdd, message.CENAdd, *message.CENUpdate, message.CENUpdate, *message.CENFieldsUpdate, message.CENFieldsUpdate, *message.CENDelete,
+			*diffbase.CEN,
+			*message.CENAdd,
+			message.CENAdd,
+			*message.CENUpdate,
+			message.CENUpdate,
+			*message.CENFieldsUpdate,
+			message.CENFieldsUpdate,
+			*message.CENDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,

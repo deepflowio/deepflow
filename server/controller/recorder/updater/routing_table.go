@@ -30,7 +30,15 @@ type RoutingTable struct {
 	UpdaterBase[
 		cloudmodel.RoutingTable,
 		mysql.RoutingTable,
-		*diffbase.RoutingTable, *message.RoutingTableAdd, message.RoutingTableAdd, *message.RoutingTableUpdate, message.RoutingTableUpdate, *message.RoutingTableFieldsUpdate, message.RoutingTableFieldsUpdate, *message.RoutingTableDelete, message.RoutingTableDelete]
+		*diffbase.RoutingTable,
+		*message.RoutingTableAdd,
+		message.RoutingTableAdd,
+		*message.RoutingTableUpdate,
+		message.RoutingTableUpdate,
+		*message.RoutingTableFieldsUpdate,
+		message.RoutingTableFieldsUpdate,
+		*message.RoutingTableDelete,
+		message.RoutingTableDelete]
 }
 
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
@@ -38,7 +46,14 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		newUpdaterBase[
 			cloudmodel.RoutingTable,
 			mysql.RoutingTable,
-			*diffbase.RoutingTable, *message.RoutingTableAdd, message.RoutingTableAdd, *message.RoutingTableUpdate, message.RoutingTableUpdate, *message.RoutingTableFieldsUpdate, message.RoutingTableFieldsUpdate, *message.RoutingTableDelete,
+			*diffbase.RoutingTable,
+			*message.RoutingTableAdd,
+			message.RoutingTableAdd,
+			*message.RoutingTableUpdate,
+			message.RoutingTableUpdate,
+			*message.RoutingTableFieldsUpdate,
+			message.RoutingTableFieldsUpdate,
+			*message.RoutingTableDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,

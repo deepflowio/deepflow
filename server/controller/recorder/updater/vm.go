@@ -33,7 +33,15 @@ type VM struct {
 	UpdaterBase[
 		cloudmodel.VM,
 		mysql.VM,
-		*diffbase.VM, *message.VMAdd, message.VMAdd, *message.VMUpdate, message.VMUpdate, *message.VMFieldsUpdate, message.VMFieldsUpdate, *message.VMDelete, message.VMDelete]
+		*diffbase.VM,
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMUpdate,
+		message.VMUpdate,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete]
 }
 
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
@@ -41,7 +49,14 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		newUpdaterBase[
 			cloudmodel.VM,
 			mysql.VM,
-			*diffbase.VM, *message.VMAdd, message.VMAdd, *message.VMUpdate, message.VMUpdate, *message.VMFieldsUpdate, message.VMFieldsUpdate, *message.VMDelete,
+			*diffbase.VM,
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMUpdate,
+			message.VMUpdate,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,

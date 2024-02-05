@@ -30,7 +30,15 @@ type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
 		mysql.RDSInstance,
-		*diffbase.RDSInstance, *message.RDSInstanceAdd, message.RDSInstanceAdd, *message.RDSInstanceUpdate, message.RDSInstanceUpdate, *message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, *message.RDSInstanceDelete, message.RDSInstanceDelete]
+		*diffbase.RDSInstance,
+		*message.RDSInstanceAdd,
+		message.RDSInstanceAdd,
+		*message.RDSInstanceUpdate,
+		message.RDSInstanceUpdate,
+		*message.RDSInstanceFieldsUpdate,
+		message.RDSInstanceFieldsUpdate,
+		*message.RDSInstanceDelete,
+		message.RDSInstanceDelete]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
@@ -38,7 +46,14 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		newUpdaterBase[
 			cloudmodel.RDSInstance,
 			mysql.RDSInstance,
-			*diffbase.RDSInstance, *message.RDSInstanceAdd, message.RDSInstanceAdd, *message.RDSInstanceUpdate, message.RDSInstanceUpdate, *message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, *message.RDSInstanceDelete,
+			*diffbase.RDSInstance,
+			*message.RDSInstanceAdd,
+			message.RDSInstanceAdd,
+			*message.RDSInstanceUpdate,
+			message.RDSInstanceUpdate,
+			*message.RDSInstanceFieldsUpdate,
+			message.RDSInstanceFieldsUpdate,
+			*message.RDSInstanceDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
