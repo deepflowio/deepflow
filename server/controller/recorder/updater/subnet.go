@@ -31,7 +31,15 @@ type Subnet struct {
 	UpdaterBase[
 		cloudmodel.Subnet,
 		mysql.Subnet,
-		*diffbase.Subnet, *message.SubnetAdd, message.SubnetAdd, *message.SubnetUpdate, message.SubnetUpdate, *message.SubnetFieldsUpdate, message.SubnetFieldsUpdate, *message.SubnetDelete, message.SubnetDelete]
+		*diffbase.Subnet,
+		*message.SubnetAdd,
+		message.SubnetAdd,
+		*message.SubnetUpdate,
+		message.SubnetUpdate,
+		*message.SubnetFieldsUpdate,
+		message.SubnetFieldsUpdate,
+		*message.SubnetDelete,
+		message.SubnetDelete]
 }
 
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
@@ -39,7 +47,14 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		newUpdaterBase[
 			cloudmodel.Subnet,
 			mysql.Subnet,
-			*diffbase.Subnet, *message.SubnetAdd, message.SubnetAdd, *message.SubnetUpdate, message.SubnetUpdate, *message.SubnetFieldsUpdate, message.SubnetFieldsUpdate, *message.SubnetDelete,
+			*diffbase.Subnet,
+			*message.SubnetAdd,
+			message.SubnetAdd,
+			*message.SubnetUpdate,
+			message.SubnetUpdate,
+			*message.SubnetFieldsUpdate,
+			message.SubnetFieldsUpdate,
+			*message.SubnetDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,

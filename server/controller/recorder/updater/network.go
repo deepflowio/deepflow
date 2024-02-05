@@ -30,7 +30,15 @@ type Network struct {
 	UpdaterBase[
 		cloudmodel.Network,
 		mysql.Network,
-		*diffbase.Network, *message.NetworkAdd, message.NetworkAdd, *message.NetworkUpdate, message.NetworkUpdate, *message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, *message.NetworkDelete, message.NetworkDelete]
+		*diffbase.Network,
+		*message.NetworkAdd,
+		message.NetworkAdd,
+		*message.NetworkUpdate,
+		message.NetworkUpdate,
+		*message.NetworkFieldsUpdate,
+		message.NetworkFieldsUpdate,
+		*message.NetworkDelete,
+		message.NetworkDelete]
 }
 
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
@@ -38,7 +46,14 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		newUpdaterBase[
 			cloudmodel.Network,
 			mysql.Network,
-			*diffbase.Network, *message.NetworkAdd, message.NetworkAdd, *message.NetworkUpdate, message.NetworkUpdate, *message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, *message.NetworkDelete,
+			*diffbase.Network,
+			*message.NetworkAdd,
+			message.NetworkAdd,
+			*message.NetworkUpdate,
+			message.NetworkUpdate,
+			*message.NetworkFieldsUpdate,
+			message.NetworkFieldsUpdate,
+			*message.NetworkDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,

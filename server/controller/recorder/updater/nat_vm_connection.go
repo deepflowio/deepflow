@@ -30,7 +30,15 @@ type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
 		mysql.NATVMConnection,
-		*diffbase.NATVMConnection, *message.NATVMConnectionAdd, message.NATVMConnectionAdd, *message.NATVMConnectionUpdate, message.NATVMConnectionUpdate, *message.NATVMConnectionFieldsUpdate, message.NATVMConnectionFieldsUpdate, *message.NATVMConnectionDelete, message.NATVMConnectionDelete]
+		*diffbase.NATVMConnection,
+		*message.NATVMConnectionAdd,
+		message.NATVMConnectionAdd,
+		*message.NATVMConnectionUpdate,
+		message.NATVMConnectionUpdate,
+		*message.NATVMConnectionFieldsUpdate,
+		message.NATVMConnectionFieldsUpdate,
+		*message.NATVMConnectionDelete,
+		message.NATVMConnectionDelete]
 }
 
 func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMConnection) *NATVMConnection {
@@ -38,7 +46,14 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		newUpdaterBase[
 			cloudmodel.NATVMConnection,
 			mysql.NATVMConnection,
-			*diffbase.NATVMConnection, *message.NATVMConnectionAdd, message.NATVMConnectionAdd, *message.NATVMConnectionUpdate, message.NATVMConnectionUpdate, *message.NATVMConnectionFieldsUpdate, message.NATVMConnectionFieldsUpdate, *message.NATVMConnectionDelete,
+			*diffbase.NATVMConnection,
+			*message.NATVMConnectionAdd,
+			message.NATVMConnectionAdd,
+			*message.NATVMConnectionUpdate,
+			message.NATVMConnectionUpdate,
+			*message.NATVMConnectionFieldsUpdate,
+			message.NATVMConnectionFieldsUpdate,
+			*message.NATVMConnectionDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,

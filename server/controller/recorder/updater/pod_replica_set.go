@@ -30,7 +30,15 @@ type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
 		mysql.PodReplicaSet,
-		*diffbase.PodReplicaSet, *message.PodReplicaSetAdd, message.PodReplicaSetAdd, *message.PodReplicaSetUpdate, message.PodReplicaSetUpdate, *message.PodReplicaSetFieldsUpdate, message.PodReplicaSetFieldsUpdate, *message.PodReplicaSetDelete, message.PodReplicaSetDelete]
+		*diffbase.PodReplicaSet,
+		*message.PodReplicaSetAdd,
+		message.PodReplicaSetAdd,
+		*message.PodReplicaSetUpdate,
+		message.PodReplicaSetUpdate,
+		*message.PodReplicaSetFieldsUpdate,
+		message.PodReplicaSetFieldsUpdate,
+		*message.PodReplicaSetDelete,
+		message.PodReplicaSetDelete]
 }
 
 func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplicaSet) *PodReplicaSet {
@@ -38,7 +46,14 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 		newUpdaterBase[
 			cloudmodel.PodReplicaSet,
 			mysql.PodReplicaSet,
-			*diffbase.PodReplicaSet, *message.PodReplicaSetAdd, message.PodReplicaSetAdd, *message.PodReplicaSetUpdate, message.PodReplicaSetUpdate, *message.PodReplicaSetFieldsUpdate, message.PodReplicaSetFieldsUpdate, *message.PodReplicaSetDelete,
+			*diffbase.PodReplicaSet,
+			*message.PodReplicaSetAdd,
+			message.PodReplicaSetAdd,
+			*message.PodReplicaSetUpdate,
+			message.PodReplicaSetUpdate,
+			*message.PodReplicaSetFieldsUpdate,
+			message.PodReplicaSetFieldsUpdate,
+			*message.PodReplicaSetDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			wholeCache,

@@ -30,7 +30,15 @@ type PodGroup struct {
 	UpdaterBase[
 		cloudmodel.PodGroup,
 		mysql.PodGroup,
-		*diffbase.PodGroup, *message.PodGroupAdd, message.PodGroupAdd, *message.PodGroupUpdate, message.PodGroupUpdate, *message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, *message.PodGroupDelete, message.PodGroupDelete]
+		*diffbase.PodGroup,
+		*message.PodGroupAdd,
+		message.PodGroupAdd,
+		*message.PodGroupUpdate,
+		message.PodGroupUpdate,
+		*message.PodGroupFieldsUpdate,
+		message.PodGroupFieldsUpdate,
+		*message.PodGroupDelete,
+		message.PodGroupDelete]
 }
 
 func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodGroup {
@@ -38,7 +46,14 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		newUpdaterBase[
 			cloudmodel.PodGroup,
 			mysql.PodGroup,
-			*diffbase.PodGroup, *message.PodGroupAdd, message.PodGroupAdd, *message.PodGroupUpdate, message.PodGroupUpdate, *message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, *message.PodGroupDelete,
+			*diffbase.PodGroup,
+			*message.PodGroupAdd,
+			message.PodGroupAdd,
+			*message.PodGroupUpdate,
+			message.PodGroupUpdate,
+			*message.PodGroupFieldsUpdate,
+			message.PodGroupFieldsUpdate,
+			*message.PodGroupDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			wholeCache,

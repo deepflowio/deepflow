@@ -30,7 +30,15 @@ type LBListener struct {
 	UpdaterBase[
 		cloudmodel.LBListener,
 		mysql.LBListener,
-		*diffbase.LBListener, *message.LBListenerAdd, message.LBListenerAdd, *message.LBListenerUpdate, message.LBListenerUpdate, *message.LBListenerFieldsUpdate, message.LBListenerFieldsUpdate, *message.LBListenerDelete, message.LBListenerDelete]
+		*diffbase.LBListener,
+		*message.LBListenerAdd,
+		message.LBListenerAdd,
+		*message.LBListenerUpdate,
+		message.LBListenerUpdate,
+		*message.LBListenerFieldsUpdate,
+		message.LBListenerFieldsUpdate,
+		*message.LBListenerDelete,
+		message.LBListenerDelete]
 }
 
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
@@ -38,7 +46,14 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		newUpdaterBase[
 			cloudmodel.LBListener,
 			mysql.LBListener,
-			*diffbase.LBListener, *message.LBListenerAdd, message.LBListenerAdd, *message.LBListenerUpdate, message.LBListenerUpdate, *message.LBListenerFieldsUpdate, message.LBListenerFieldsUpdate, *message.LBListenerDelete,
+			*diffbase.LBListener,
+			*message.LBListenerAdd,
+			message.LBListenerAdd,
+			*message.LBListenerUpdate,
+			message.LBListenerUpdate,
+			*message.LBListenerFieldsUpdate,
+			message.LBListenerFieldsUpdate,
+			*message.LBListenerDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,

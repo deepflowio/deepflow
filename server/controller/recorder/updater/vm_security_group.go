@@ -30,7 +30,15 @@ type VMSecurityGroup struct {
 	UpdaterBase[
 		cloudmodel.VMSecurityGroup,
 		mysql.VMSecurityGroup,
-		*diffbase.VMSecurityGroup, *message.VMSecurityGroupAdd, message.VMSecurityGroupAdd, *message.VMSecurityGroupUpdate, message.VMSecurityGroupUpdate, *message.VMSecurityGroupFieldsUpdate, message.VMSecurityGroupFieldsUpdate, *message.VMSecurityGroupDelete, message.VMSecurityGroupDelete]
+		*diffbase.VMSecurityGroup,
+		*message.VMSecurityGroupAdd,
+		message.VMSecurityGroupAdd,
+		*message.VMSecurityGroupUpdate,
+		message.VMSecurityGroupUpdate,
+		*message.VMSecurityGroupFieldsUpdate,
+		message.VMSecurityGroupFieldsUpdate,
+		*message.VMSecurityGroupDelete,
+		message.VMSecurityGroupDelete]
 }
 
 func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecurityGroup) *VMSecurityGroup {
@@ -38,7 +46,14 @@ func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecuri
 		newUpdaterBase[
 			cloudmodel.VMSecurityGroup,
 			mysql.VMSecurityGroup,
-			*diffbase.VMSecurityGroup, *message.VMSecurityGroupAdd, message.VMSecurityGroupAdd, *message.VMSecurityGroupUpdate, message.VMSecurityGroupUpdate, *message.VMSecurityGroupFieldsUpdate, message.VMSecurityGroupFieldsUpdate, *message.VMSecurityGroupDelete,
+			*diffbase.VMSecurityGroup,
+			*message.VMSecurityGroupAdd,
+			message.VMSecurityGroupAdd,
+			*message.VMSecurityGroupUpdate,
+			message.VMSecurityGroupUpdate,
+			*message.VMSecurityGroupFieldsUpdate,
+			message.VMSecurityGroupFieldsUpdate,
+			*message.VMSecurityGroupDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			wholeCache,

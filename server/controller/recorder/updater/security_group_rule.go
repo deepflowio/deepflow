@@ -30,7 +30,15 @@ type SecurityGroupRule struct {
 	UpdaterBase[
 		cloudmodel.SecurityGroupRule,
 		mysql.SecurityGroupRule,
-		*diffbase.SecurityGroupRule, *message.SecurityGroupRuleAdd, message.SecurityGroupRuleAdd, *message.SecurityGroupRuleUpdate, message.SecurityGroupRuleUpdate, *message.SecurityGroupRuleFieldsUpdate, message.SecurityGroupRuleFieldsUpdate, *message.SecurityGroupRuleDelete, message.SecurityGroupRuleDelete]
+		*diffbase.SecurityGroupRule,
+		*message.SecurityGroupRuleAdd,
+		message.SecurityGroupRuleAdd,
+		*message.SecurityGroupRuleUpdate,
+		message.SecurityGroupRuleUpdate,
+		*message.SecurityGroupRuleFieldsUpdate,
+		message.SecurityGroupRuleFieldsUpdate,
+		*message.SecurityGroupRuleDelete,
+		message.SecurityGroupRuleDelete]
 }
 
 func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroupRule) *SecurityGroupRule {
@@ -38,7 +46,14 @@ func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.Securi
 		newUpdaterBase[
 			cloudmodel.SecurityGroupRule,
 			mysql.SecurityGroupRule,
-			*diffbase.SecurityGroupRule, *message.SecurityGroupRuleAdd, message.SecurityGroupRuleAdd, *message.SecurityGroupRuleUpdate, message.SecurityGroupRuleUpdate, *message.SecurityGroupRuleFieldsUpdate, message.SecurityGroupRuleFieldsUpdate, *message.SecurityGroupRuleDelete,
+			*diffbase.SecurityGroupRule,
+			*message.SecurityGroupRuleAdd,
+			message.SecurityGroupRuleAdd,
+			*message.SecurityGroupRuleUpdate,
+			message.SecurityGroupRuleUpdate,
+			*message.SecurityGroupRuleFieldsUpdate,
+			message.SecurityGroupRuleFieldsUpdate,
+			*message.SecurityGroupRuleDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			wholeCache,

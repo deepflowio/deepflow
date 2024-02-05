@@ -30,7 +30,15 @@ type PodNode struct {
 	UpdaterBase[
 		cloudmodel.PodNode,
 		mysql.PodNode,
-		*diffbase.PodNode, *message.PodNodeAdd, message.PodNodeAdd, *message.PodNodeUpdate, message.PodNodeUpdate, *message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, *message.PodNodeDelete, message.PodNodeDelete]
+		*diffbase.PodNode,
+		*message.PodNodeAdd,
+		message.PodNodeAdd,
+		*message.PodNodeUpdate,
+		message.PodNodeUpdate,
+		*message.PodNodeFieldsUpdate,
+		message.PodNodeFieldsUpdate,
+		*message.PodNodeDelete,
+		message.PodNodeDelete]
 }
 
 func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNode {
@@ -38,7 +46,14 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 		newUpdaterBase[
 			cloudmodel.PodNode,
 			mysql.PodNode,
-			*diffbase.PodNode, *message.PodNodeAdd, message.PodNodeAdd, *message.PodNodeUpdate, message.PodNodeUpdate, *message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, *message.PodNodeDelete,
+			*diffbase.PodNode,
+			*message.PodNodeAdd,
+			message.PodNodeAdd,
+			*message.PodNodeUpdate,
+			message.PodNodeUpdate,
+			*message.PodNodeFieldsUpdate,
+			message.PodNodeFieldsUpdate,
+			*message.PodNodeDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			wholeCache,

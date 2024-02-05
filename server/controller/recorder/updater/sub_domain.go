@@ -30,7 +30,15 @@ type SubDomain struct {
 	UpdaterBase[
 		cloudmodel.SubDomain,
 		mysql.SubDomain,
-		*diffbase.SubDomain, *message.SubDomainAdd, message.SubDomainAdd, *message.SubDomainUpdate, message.SubDomainUpdate, *message.SubDomainFieldsUpdate, message.SubDomainFieldsUpdate, *message.SubDomainDelete, message.SubDomainDelete]
+		*diffbase.SubDomain,
+		*message.SubDomainAdd,
+		message.SubDomainAdd,
+		*message.SubDomainUpdate,
+		message.SubDomainUpdate,
+		*message.SubDomainFieldsUpdate,
+		message.SubDomainFieldsUpdate,
+		*message.SubDomainDelete,
+		message.SubDomainDelete]
 }
 
 func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *SubDomain {
@@ -38,7 +46,14 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		newUpdaterBase[
 			cloudmodel.SubDomain,
 			mysql.SubDomain,
-			*diffbase.SubDomain, *message.SubDomainAdd, message.SubDomainAdd, *message.SubDomainUpdate, message.SubDomainUpdate, *message.SubDomainFieldsUpdate, message.SubDomainFieldsUpdate, *message.SubDomainDelete,
+			*diffbase.SubDomain,
+			*message.SubDomainAdd,
+			message.SubDomainAdd,
+			*message.SubDomainUpdate,
+			message.SubDomainUpdate,
+			*message.SubDomainFieldsUpdate,
+			message.SubDomainFieldsUpdate,
+			*message.SubDomainDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,

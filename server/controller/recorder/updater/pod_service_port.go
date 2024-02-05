@@ -30,7 +30,15 @@ type PodServicePort struct {
 	UpdaterBase[
 		cloudmodel.PodServicePort,
 		mysql.PodServicePort,
-		*diffbase.PodServicePort, *message.PodServicePortAdd, message.PodServicePortAdd, *message.PodServicePortUpdate, message.PodServicePortUpdate, *message.PodServicePortFieldsUpdate, message.PodServicePortFieldsUpdate, *message.PodServicePortDelete, message.PodServicePortDelete]
+		*diffbase.PodServicePort,
+		*message.PodServicePortAdd,
+		message.PodServicePortAdd,
+		*message.PodServicePortUpdate,
+		message.PodServicePortUpdate,
+		*message.PodServicePortFieldsUpdate,
+		message.PodServicePortFieldsUpdate,
+		*message.PodServicePortDelete,
+		message.PodServicePortDelete]
 }
 
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
@@ -38,7 +46,14 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		newUpdaterBase[
 			cloudmodel.PodServicePort,
 			mysql.PodServicePort,
-			*diffbase.PodServicePort, *message.PodServicePortAdd, message.PodServicePortAdd, *message.PodServicePortUpdate, message.PodServicePortUpdate, *message.PodServicePortFieldsUpdate, message.PodServicePortFieldsUpdate, *message.PodServicePortDelete,
+			*diffbase.PodServicePort,
+			*message.PodServicePortAdd,
+			message.PodServicePortAdd,
+			*message.PodServicePortUpdate,
+			message.PodServicePortUpdate,
+			*message.PodServicePortFieldsUpdate,
+			message.PodServicePortFieldsUpdate,
+			*message.PodServicePortDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,

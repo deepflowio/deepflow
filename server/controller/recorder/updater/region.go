@@ -30,7 +30,15 @@ type Region struct {
 	UpdaterBase[
 		cloudmodel.Region,
 		mysql.Region,
-		*diffbase.Region, *message.RegionAdd, message.RegionAdd, *message.RegionUpdate, message.RegionUpdate, *message.RegionFieldsUpdate, message.RegionFieldsUpdate, *message.RegionDelete, message.RegionDelete]
+		*diffbase.Region,
+		*message.RegionAdd,
+		message.RegionAdd,
+		*message.RegionUpdate,
+		message.RegionUpdate,
+		*message.RegionFieldsUpdate,
+		message.RegionFieldsUpdate,
+		*message.RegionDelete,
+		message.RegionDelete]
 }
 
 func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
@@ -38,7 +46,14 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 		newUpdaterBase[
 			cloudmodel.Region,
 			mysql.Region,
-			*diffbase.Region, *message.RegionAdd, message.RegionAdd, *message.RegionUpdate, message.RegionUpdate, *message.RegionFieldsUpdate, message.RegionFieldsUpdate, *message.RegionDelete,
+			*diffbase.Region,
+			*message.RegionAdd,
+			message.RegionAdd,
+			*message.RegionUpdate,
+			message.RegionUpdate,
+			*message.RegionFieldsUpdate,
+			message.RegionFieldsUpdate,
+			*message.RegionDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			wholeCache,

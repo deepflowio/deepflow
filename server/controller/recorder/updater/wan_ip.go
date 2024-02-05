@@ -34,7 +34,15 @@ type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
 		mysql.WANIP,
-		*diffbase.WANIP, *message.WANIPAdd, message.WANIPAdd, *message.WANIPUpdate, message.WANIPUpdate, *message.WANIPFieldsUpdate, message.WANIPFieldsUpdate, *message.WANIPDelete, message.WANIPDelete]
+		*diffbase.WANIP,
+		*message.WANIPAdd,
+		message.WANIPAdd,
+		*message.WANIPUpdate,
+		message.WANIPUpdate,
+		*message.WANIPFieldsUpdate,
+		message.WANIPFieldsUpdate,
+		*message.WANIPDelete,
+		message.WANIPDelete]
 }
 
 func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
@@ -42,7 +50,14 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 		newUpdaterBase[
 			cloudmodel.IP,
 			mysql.WANIP,
-			*diffbase.WANIP, *message.WANIPAdd, message.WANIPAdd, *message.WANIPUpdate, message.WANIPUpdate, *message.WANIPFieldsUpdate, message.WANIPFieldsUpdate, *message.WANIPDelete,
+			*diffbase.WANIP,
+			*message.WANIPAdd,
+			message.WANIPAdd,
+			*message.WANIPUpdate,
+			message.WANIPUpdate,
+			*message.WANIPFieldsUpdate,
+			message.WANIPFieldsUpdate,
+			*message.WANIPDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,

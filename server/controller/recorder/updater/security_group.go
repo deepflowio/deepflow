@@ -30,7 +30,15 @@ type SecurityGroup struct {
 	UpdaterBase[
 		cloudmodel.SecurityGroup,
 		mysql.SecurityGroup,
-		*diffbase.SecurityGroup, *message.SecurityGroupAdd, message.SecurityGroupAdd, *message.SecurityGroupUpdate, message.SecurityGroupUpdate, *message.SecurityGroupFieldsUpdate, message.SecurityGroupFieldsUpdate, *message.SecurityGroupDelete, message.SecurityGroupDelete]
+		*diffbase.SecurityGroup,
+		*message.SecurityGroupAdd,
+		message.SecurityGroupAdd,
+		*message.SecurityGroupUpdate,
+		message.SecurityGroupUpdate,
+		*message.SecurityGroupFieldsUpdate,
+		message.SecurityGroupFieldsUpdate,
+		*message.SecurityGroupDelete,
+		message.SecurityGroupDelete]
 }
 
 func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroup) *SecurityGroup {
@@ -38,7 +46,14 @@ func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGr
 		newUpdaterBase[
 			cloudmodel.SecurityGroup,
 			mysql.SecurityGroup,
-			*diffbase.SecurityGroup, *message.SecurityGroupAdd, message.SecurityGroupAdd, *message.SecurityGroupUpdate, message.SecurityGroupUpdate, *message.SecurityGroupFieldsUpdate, message.SecurityGroupFieldsUpdate, *message.SecurityGroupDelete,
+			*diffbase.SecurityGroup,
+			*message.SecurityGroupAdd,
+			message.SecurityGroupAdd,
+			*message.SecurityGroupUpdate,
+			message.SecurityGroupUpdate,
+			*message.SecurityGroupFieldsUpdate,
+			message.SecurityGroupFieldsUpdate,
+			*message.SecurityGroupDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			wholeCache,

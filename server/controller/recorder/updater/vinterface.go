@@ -33,7 +33,15 @@ type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
 		mysql.VInterface,
-		*diffbase.VInterface, *message.VInterfaceAdd, message.VInterfaceAdd, *message.VInterfaceUpdate, message.VInterfaceUpdate, *message.VInterfaceFieldsUpdate, message.VInterfaceFieldsUpdate, *message.VInterfaceDelete, message.VInterfaceDelete]
+		*diffbase.VInterface,
+		*message.VInterfaceAdd,
+		message.VInterfaceAdd,
+		*message.VInterfaceUpdate,
+		message.VInterfaceUpdate,
+		*message.VInterfaceFieldsUpdate,
+		message.VInterfaceFieldsUpdate,
+		*message.VInterfaceDelete,
+		message.VInterfaceDelete]
 }
 
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
@@ -41,7 +49,14 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		newUpdaterBase[
 			cloudmodel.VInterface,
 			mysql.VInterface,
-			*diffbase.VInterface, *message.VInterfaceAdd, message.VInterfaceAdd, *message.VInterfaceUpdate, message.VInterfaceUpdate, *message.VInterfaceFieldsUpdate, message.VInterfaceFieldsUpdate, *message.VInterfaceDelete,
+			*diffbase.VInterface,
+			*message.VInterfaceAdd,
+			message.VInterfaceAdd,
+			*message.VInterfaceUpdate,
+			message.VInterfaceUpdate,
+			*message.VInterfaceFieldsUpdate,
+			message.VInterfaceFieldsUpdate,
+			*message.VInterfaceDelete,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
