@@ -473,6 +473,7 @@ const (
 const (
 	DATA_SOURCE_FLOW = "flow_metrics.vtap_flow*"
 	DATA_SOURCE_APP  = "flow_metrics.vtap_app*"
+	DATA_SOURCE_ACL  = "flow_metrics.vtap_acl"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1
