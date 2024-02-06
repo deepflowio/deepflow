@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -24,6 +25,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
+use base64::{prelude::BASE64_STANDARD, Engine};
 use bytesize::ByteSize;
 use flexi_logger::{
     writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
@@ -873,8 +875,8 @@ impl From<&str> for TraceType {
     // Example 1: "sw8"
     // Example 2: " sw8"
     fn from(t: &str) -> TraceType {
-        let format_t = Self::format_str(t);
-        match format_t.to_lowercase().as_str() {
+        let tag_lowercase = t.trim().to_lowercase();
+        match tag_lowercase.as_str() {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
@@ -884,73 +886,160 @@ impl From<&str> for TraceType {
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             TRACE_TYPE_X_TINGYUN => TraceType::XTingyun,
-            _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
+            _ if tag_lowercase.len() > 0 => TraceType::Customize(tag_lowercase),
             _ => TraceType::Disabled,
         }
     }
 }
 
 impl TraceType {
-    // 删除有效位前的所有空格
-    // ============================================
-    // Remove all spaces before significant digits
-    fn format_str(t: &str) -> &str {
-        let bytes = t.as_bytes();
-        for i in 0..bytes.len() {
-            if bytes[i] != b' ' as u8 {
-                return &t[i..];
-            }
-        }
-        return t;
-    }
-
-    fn check(&self, context: &str) -> bool {
+    pub fn check(&self, context: &str) -> bool {
         match &*self {
-            TraceType::XB3 => context.to_ascii_lowercase() == TRACE_TYPE_XB3,
-            TraceType::XB3Span => context.to_ascii_lowercase() == TRACE_TYPE_XB3SPAN,
-            TraceType::Uber => context.to_ascii_lowercase() == TRACE_TYPE_UBER,
-            TraceType::Sw3 => context.to_ascii_lowercase() == TRACE_TYPE_SW3,
-            TraceType::Sw6 => context.to_ascii_lowercase() == TRACE_TYPE_SW6,
-            TraceType::Sw8 => context.to_ascii_lowercase() == TRACE_TYPE_SW8,
-            TraceType::TraceParent => context.to_ascii_lowercase() == TRACE_TYPE_TRACE_PARENT,
+            TraceType::XB3 => context.eq_ignore_ascii_case(TRACE_TYPE_XB3),
+            TraceType::XB3Span => context.eq_ignore_ascii_case(TRACE_TYPE_XB3SPAN),
+            TraceType::Uber => context.eq_ignore_ascii_case(TRACE_TYPE_UBER),
+            TraceType::Sw3 => context.eq_ignore_ascii_case(TRACE_TYPE_SW3),
+            TraceType::Sw6 => context.eq_ignore_ascii_case(TRACE_TYPE_SW6),
+            TraceType::Sw8 => context.eq_ignore_ascii_case(TRACE_TYPE_SW8),
+            TraceType::TraceParent => context.eq_ignore_ascii_case(TRACE_TYPE_TRACE_PARENT),
             TraceType::NewRpcTraceContext => {
-                context.to_ascii_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY
+                context.eq_ignore_ascii_case(SOFA_NEW_RPC_TRACE_CTX_KEY)
             }
-            TraceType::XTingyun => context.to_ascii_lowercase() == TRACE_TYPE_X_TINGYUN,
-            TraceType::Customize(tag) => context.to_ascii_lowercase() == tag.to_ascii_lowercase(),
+            TraceType::XTingyun => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
+            TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
             _ => false,
         }
     }
 
-    pub fn to_checker_string(&self) -> String {
+    pub fn as_str(&self) -> &str {
         match self {
-            &TraceType::XB3 => TRACE_TYPE_XB3.into(),
-            &TraceType::XB3Span => TRACE_TYPE_XB3SPAN.into(),
-            &TraceType::Uber => TRACE_TYPE_UBER.into(),
-            &TraceType::Sw3 => TRACE_TYPE_SW3.into(),
-            &TraceType::Sw6 => TRACE_TYPE_SW6.into(),
-            &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
-            &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
-            &TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY.into(),
-            &TraceType::XTingyun => TRACE_TYPE_X_TINGYUN.into(),
-            &TraceType::Customize(ref tag) => tag.to_ascii_lowercase(),
-            _ => "".into(),
+            TraceType::XB3 => TRACE_TYPE_XB3,
+            TraceType::XB3Span => TRACE_TYPE_XB3SPAN,
+            TraceType::Uber => TRACE_TYPE_UBER,
+            TraceType::Sw3 => TRACE_TYPE_SW3,
+            TraceType::Sw6 => TRACE_TYPE_SW6,
+            TraceType::Sw8 => TRACE_TYPE_SW8,
+            TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT,
+            TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY,
+            TraceType::XTingyun => TRACE_TYPE_X_TINGYUN,
+            TraceType::Customize(tag) => &tag,
+            _ => "",
         }
     }
 
-    pub fn to_string(&self) -> String {
-        match &*self {
-            TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
-            TraceType::XB3Span => TRACE_TYPE_XB3SPAN.to_string(),
-            TraceType::Uber => TRACE_TYPE_UBER.to_string(),
-            TraceType::Sw3 => TRACE_TYPE_SW3.to_string(),
-            TraceType::Sw6 => TRACE_TYPE_SW6.to_string(),
-            TraceType::Sw8 => TRACE_TYPE_SW8.to_string(),
-            TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.to_string(),
-            TraceType::XTingyun => TRACE_TYPE_X_TINGYUN.to_string(),
-            TraceType::Customize(tag) => tag.to_string(),
-            _ => "".to_string(),
+    const TRACE_ID: u8 = 0;
+    const SPAN_ID: u8 = 1;
+
+    // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+    // separeted by ':'
+    // extract TRACEID from the first field and SPANID from the third field
+    fn decode_uber_id(value: &str, id_type: u8) -> Option<&str> {
+        let mut segs = value.split(":");
+        if id_type == Self::TRACE_ID {
+            segs.nth(0)
+        } else if id_type == Self::SPAN_ID {
+            segs.nth(2)
+        } else {
+            unreachable!()
         }
+    }
+
+    // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
+    // sw3 values are separeted by '|'
+    // extract "SEGMENTID-SPANID" as span_id
+    fn decode_skywalking3_id(value: &str, id_type: u8) -> Option<Cow<'_, str>> {
+        let mut segs = value.split("|");
+        if id_type == Self::TRACE_ID {
+            segs.nth(7).map(|s| s.into())
+        } else if id_type == Self::SPAN_ID {
+            let seg0 = segs.next();
+            let seg1 = segs.next();
+            seg0.zip(seg1)
+                .map(|(seg_id, span_id)| format!("{}-{}", seg_id, span_id).into())
+        } else {
+            unreachable!()
+        }
+    }
+
+    // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+    // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+    // sw6 and sw8 values are separeted by '-'
+    // trace id and segment id are encoded in base64
+    // extract "SEGMENTID-SPANID" as span_id
+    fn decode_skywalking_id(value: &str, id_type: u8) -> Option<Cow<'_, str>> {
+        let mut segs = value.split("-");
+        if id_type == Self::TRACE_ID {
+            let id = segs.nth(1)?;
+            Some(
+                BASE64_STANDARD
+                    .decode(id)
+                    .ok()
+                    .and_then(|v| String::from_utf8(v).ok())
+                    .map(|s| Cow::Owned(s))
+                    .unwrap_or(Cow::Borrowed(id)),
+            )
+        } else if id_type == Self::SPAN_ID {
+            let seg_id = segs.nth(2)?;
+            let span_id = segs.next()?;
+            let mut result = Vec::new();
+            if BASE64_STANDARD.decode_vec(seg_id, &mut result).is_err() {
+                result.clear();
+                result.extend_from_slice(seg_id.as_bytes());
+            };
+            let Ok(mut s) = String::from_utf8(result) else {
+                return Some(format!("{}-{}", seg_id, span_id).into());
+            };
+            s.push('-');
+            s.push_str(span_id);
+            Some(s.into())
+        } else {
+            unreachable!()
+        }
+    }
+
+    // OTel HTTP Trace format:
+    // traceparent: 00-TRACEID-SPANID-01
+    fn decode_traceparent(value: &str, id_type: u8) -> Option<&str> {
+        let mut segs = value.split("-");
+        if id_type == Self::TRACE_ID {
+            segs.nth(1)
+        } else if id_type == Self::SPAN_ID {
+            segs.nth(2)
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn decode_tingyun(value: &str, id_type: u8) -> Option<Cow<'_, str>> {
+        if id_type == Self::TRACE_ID {
+            cloud_platform::tingyun::decode_trace_id(value)
+        } else {
+            None
+        }
+    }
+
+    fn decode_id<'a>(&self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
+        let value = value.trim();
+        match self {
+            TraceType::Disabled => None,
+            TraceType::XB3
+            | TraceType::XB3Span
+            | TraceType::NewRpcTraceContext
+            | TraceType::Customize(_) => Some(value.into()),
+            TraceType::Uber => Self::decode_uber_id(value, id_type).map(|s| s.into()),
+            TraceType::Sw3 => Self::decode_skywalking3_id(value, id_type),
+            TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(value, id_type),
+            TraceType::TraceParent => Self::decode_traceparent(value, id_type).map(|s| s.into()),
+            TraceType::XTingyun => Self::decode_tingyun(value, id_type),
+        }
+    }
+
+    pub fn decode_trace_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+        self.decode_id(value, Self::TRACE_ID)
+    }
+
+    pub fn decode_span_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+        self.decode_id(value, Self::SPAN_ID)
     }
 }
 
@@ -1006,16 +1095,16 @@ impl L7LogDynamicConfig {
 
         let mut trace_set = HashSet::new();
         for t in trace_types.iter() {
-            let t = t.to_checker_string();
+            let t = t.as_str();
             expected_headers_set.insert(t.as_bytes().to_vec());
-            trace_set.insert(t);
+            trace_set.insert(t.to_owned());
         }
 
         let mut span_set = HashSet::new();
         for t in span_types.iter() {
-            let t = t.to_checker_string();
+            let t = t.as_str();
             expected_headers_set.insert(t.as_bytes().to_vec());
-            span_set.insert(t);
+            span_set.insert(t.to_owned());
         }
 
         Self {
@@ -2725,5 +2814,45 @@ mod tests {
         assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
         assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
         assert_eq!(trie.find_matching_rule("/x/y/z"), 0);
+    }
+
+    #[test]
+    fn trace_type_id_parse() {
+        let testcases = vec![
+            (
+                TraceType::Uber,
+                "trace_id:xxx:span_id:xxx",
+                Some("trace_id"),
+                Some("span_id"),
+            ),
+            (
+                TraceType::Sw3,
+                "span|id|x|x|x|x|x|trace_id|x",
+                Some("trace_id"),
+                Some("span-id"),
+            ),
+            (
+                TraceType::Sw6,
+                "1-dHJhY2VfaWQ=-c3Bhbg==-id-x-x-x-x-",
+                Some("trace_id"),
+                Some("span-id"),
+            ),
+            (
+                TraceType::Sw8,
+                "1-dHJhY2VfaWQ=-c3Bhbg==-id-x-x-x-x-",
+                Some("trace_id"),
+                Some("span-id"),
+            ),
+            (
+                TraceType::TraceParent,
+                "00-trace_id-span_id-01",
+                Some("trace_id"),
+                Some("span_id"),
+            ),
+        ];
+        for (tt, value, tid, sid) in testcases {
+            assert_eq!(tt.decode_trace_id(value).as_ref().map(|s| s.as_ref()), tid);
+            assert_eq!(tt.decode_span_id(value).as_ref().map(|s| s.as_ref()), sid);
+        }
     }
 }
