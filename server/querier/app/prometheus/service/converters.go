@@ -724,7 +724,11 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			// if tagIndex = -1 and len(tagsFieldIndex) = 0, append metric name
 			// if all tags were filterd by `replica label`, append metric name
 			deepflowNativeTagString = fmt.Sprintf("%s:%s", PROMETHEUS_METRICS_NAME, metricsName)
-			filterTagMap[PROMETHEUS_METRICS_NAME] = metricsName
+			if filterTagMap == nil {
+				filterTagMap = map[string]string{PROMETHEUS_METRICS_NAME: metricsName}
+			} else {
+				filterTagMap[PROMETHEUS_METRICS_NAME] = metricsName
+			}
 		}
 
 		// merge deepflow autotagging tags
