@@ -15,9 +15,12 @@
  */
 
 use std::{
+    env,
     io::{Error, ErrorKind, Result},
     process::Command,
 };
+
+use super::environment::K8S_NODE_NAME_FOR_DEEPFLOW;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
@@ -41,7 +44,12 @@ fn exec_command(program: &str, args: &[&str]) -> Result<String> {
 }
 
 pub fn get_hostname() -> Result<String> {
-    hostname::get()?
-        .into_string()
-        .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
+    env::var(K8S_NODE_NAME_FOR_DEEPFLOW).map_or_else(
+        |_| {
+            hostname::get()?
+                .into_string()
+                .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
+        },
+        |name| Ok(name),
+    )
 }
