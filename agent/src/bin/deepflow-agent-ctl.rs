@@ -412,7 +412,9 @@ impl Controller {
         client.send_to(msg)?;
 
         loop {
-            let resp = client.recv::<RpcMessage>()?;
+            let Ok(resp) = client.recv::<RpcMessage>() else {
+                continue;
+            };
             match resp {
                 RpcMessage::Acls(v)
                 | RpcMessage::PlatformData(v)
@@ -452,7 +454,9 @@ impl Controller {
             println!("available queues: ");
 
             loop {
-                let res = client.recv::<QueueMessage>()?;
+                let Ok(res) = client.recv::<QueueMessage>() else {
+                    continue;
+                };
                 match res {
                     QueueMessage::Names(e) => match e {
                         Some(e) => {
@@ -481,7 +485,9 @@ impl Controller {
             };
             client.send_to(msg)?;
 
-            let res = client.recv::<QueueMessage>()?;
+            let Ok(res) = client.recv::<QueueMessage>() else {
+                return Ok(());
+            };
             match res {
                 QueueMessage::Fin => {
                     println!("turn off all queues successful");
@@ -498,7 +504,9 @@ impl Controller {
                 msg: QueueMessage::Off(s.clone()),
             };
             client.send_to(msg)?;
-            let res = client.recv::<QueueMessage>()?;
+            let Ok(res) = client.recv::<QueueMessage>() else {
+                return Ok(());
+            };
             match res {
                 QueueMessage::Fin => {
                     println!("turn off queue={} successful", s);
@@ -522,14 +530,18 @@ impl Controller {
             };
             client.send_to(msg)?;
 
-            let res = client.recv::<QueueMessage>()?;
+            let Ok(res) = client.recv::<QueueMessage>() else {
+                return Ok(());
+            };
             if let QueueMessage::Err(e) = res {
                 return Err(anyhow!(e));
             }
             println!("loading queue item...");
             let mut seq = 0;
             loop {
-                let res = client.recv::<QueueMessage>()?;
+                let Ok(res) = client.recv::<QueueMessage>() else {
+                    continue;
+                };
                 match res {
                     QueueMessage::Send(e) => {
                         println!("MSG-{} {}", seq, e);
@@ -572,7 +584,9 @@ impl Controller {
             println!("Interface Index \t MAC address");
 
             loop {
-                let res = client.recv::<PlatformMessage>()?;
+                let Ok(res) = client.recv::<PlatformMessage>() else {
+                    continue;
+                };
                 match res {
                     PlatformMessage::MacMappings(e) => {
                         match e {
@@ -605,7 +619,9 @@ impl Controller {
                 };
                 client.send_to(msg)?;
                 loop {
-                    let res = client.recv::<PlatformMessage>()?;
+                    let Ok(res) = client.recv::<PlatformMessage>() else {
+                        continue;
+                    };
                     match res {
                         PlatformMessage::Version(v) => {
                             /*
@@ -630,7 +646,9 @@ impl Controller {
             client.send_to(msg)?;
             let mut decoder = ZlibDecoder::new(vec![]);
             loop {
-                let res = client.recv::<PlatformMessage>()?;
+                let Ok(res) = client.recv::<PlatformMessage>() else {
+                    continue;
+                };
                 match res {
                     PlatformMessage::Watcher(v) => {
                         /*
@@ -665,7 +683,9 @@ impl Controller {
                 })?;
 
                 loop {
-                    let res = client.recv::<PolicyMessage>()?;
+                    let Ok(res) = client.recv::<PolicyMessage>() else {
+                        continue;
+                    };
                     match res {
                         PolicyMessage::Context(c) => println!("{}", c),
                         PolicyMessage::Done => return Ok(()),
@@ -685,7 +705,9 @@ impl Controller {
 
                 let mut count = 1;
                 loop {
-                    let res = client.recv::<PolicyMessage>()?;
+                    let Ok(res) = client.recv::<PolicyMessage>() else {
+                        continue;
+                    };
                     match res {
                         PolicyMessage::Title(t) => {
                             println!("{}", t);
@@ -708,7 +730,9 @@ impl Controller {
                     msg: PolicyMessage::Analyzing(args.id.unwrap_or_default()),
                 })?;
 
-                let res = client.recv::<PolicyMessage>()?;
+                let Ok(res) = client.recv::<PolicyMessage>() else {
+                    return Ok(());
+                };
                 match res {
                     PolicyMessage::Context(c) => println!("{}", c),
                     _ => unreachable!(),
@@ -741,7 +765,9 @@ impl Controller {
         }
 
         loop {
-            let res = client.recv::<EbpfMessage>()?;
+            let Ok(res) = client.recv::<EbpfMessage>() else {
+                continue;
+            };
             match res {
                 EbpfMessage::Context((seq, c)) => {
                     println!("SEQ {}: {}", seq, String::from_utf8_lossy(&c))
