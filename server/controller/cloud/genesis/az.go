@@ -25,7 +25,11 @@ import (
 
 func (g *Genesis) getAZ() (model.AZ, error) {
 	log.Debug("get az starting")
-	azLcuuid := common.GetUUID(common.DEFAULT_REGION_NAME, uuid.Nil)
+	azName := common.DEFAULT_REGION_NAME
+	if g.regionUuid != common.DEFAULT_REGION {
+		azName = g.Name
+	}
+	azLcuuid := common.GetUUID(azName, uuid.Nil)
 
 	g.cloudStatsd.APICost["az"] = []int{0}
 	g.cloudStatsd.APICount["az"] = []int{0}
@@ -33,7 +37,7 @@ func (g *Genesis) getAZ() (model.AZ, error) {
 	az := model.AZ{
 		Lcuuid:       azLcuuid,
 		RegionLcuuid: g.regionUuid,
-		Name:         common.DEFAULT_REGION_NAME,
+		Name:         azName,
 	}
 	g.azLcuuid = azLcuuid
 	log.Debug("get az complete")
