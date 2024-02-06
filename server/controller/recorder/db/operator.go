@@ -34,7 +34,7 @@ type Operator[MT constraint.MySQLModel] interface {
 	// 更新数据
 	Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool)
 	// 批量删除数据
-	DeleteBatch(lcuuids []string) bool
+	DeleteBatch(lcuuids []string) ([]*MT, bool)
 }
 
 // TODO 使用结构体而非结构体指针作为泛型类型，在需要对结构体value修改时十分不便，
@@ -92,21 +92,22 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 
 func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool) {
 	dbItem := new(MT)
-	err := mysql.Db.Model(dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
+	err := mysql.Db.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (lcuuid: %s, detail: %+v) failed", o.resourceTypeName, lcuuid, updateInfo, err)
 		return dbItem, false
 	}
 	log.Infof("update %s (lcuuid: %s, detail: %+v) success", o.resourceTypeName, lcuuid, updateInfo)
+	mysql.Db.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
 }
 
-func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
+func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 	var deletedItems []*MT
 	err := mysql.Db.Clauses(clause.Returning{}).Where("lcuuid IN ?", lcuuids).Delete(&deletedItems).Error
 	if err != nil {
 		log.Errorf("delete %s (lcuuids: %v) failed: %v", o.resourceTypeName, lcuuids, err)
-		return false
+		return nil, false
 	}
 	if o.softDelete {
 		log.Infof("update %s (lcuuids: %v) deleted_at success", o.resourceTypeName, lcuuids)
@@ -115,7 +116,7 @@ func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
 	}
 
 	o.returnUsedIDs(deletedItems)
-	return true
+	return deletedItems, true
 }
 
 func (o *OperatorBase[MT]) formatItemsToAdd(items []*MT) ([]*MT, []string, []int, bool) {

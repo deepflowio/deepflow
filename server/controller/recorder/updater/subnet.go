@@ -28,18 +28,40 @@ import (
 )
 
 type Subnet struct {
-	UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *diffbase.Subnet]
+	UpdaterBase[
+		cloudmodel.Subnet,
+		mysql.Subnet,
+		*diffbase.Subnet,
+		*message.SubnetAdd,
+		message.SubnetAdd,
+		*message.SubnetUpdate,
+		message.SubnetUpdate,
+		*message.SubnetFieldsUpdate,
+		message.SubnetFieldsUpdate,
+		*message.SubnetDelete,
+		message.SubnetDelete]
 }
 
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	updater := &Subnet{
-		UpdaterBase[cloudmodel.Subnet, mysql.Subnet, *diffbase.Subnet]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewSubnet(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Subnets,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Subnet,
+			mysql.Subnet,
+			*diffbase.Subnet,
+			*message.SubnetAdd,
+			message.SubnetAdd,
+			*message.SubnetUpdate,
+			message.SubnetUpdate,
+			*message.SubnetFieldsUpdate,
+			message.SubnetFieldsUpdate,
+			*message.SubnetDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
+			wholeCache,
+			db.NewSubnet(),
+			wholeCache.DiffBaseDataSet.Subnets,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -77,7 +99,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	return dbItem, true
 }
 
-func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (interface{}, map[string]interface{}, bool) {
+func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (*message.SubnetFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.SubnetFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

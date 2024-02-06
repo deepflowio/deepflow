@@ -31,19 +31,42 @@ import (
 )
 
 type WANIP struct {
-	UpdaterBase[cloudmodel.IP, mysql.WANIP, *diffbase.WANIP]
+	UpdaterBase[
+		cloudmodel.IP,
+		mysql.WANIP,
+		*diffbase.WANIP,
+		*message.WANIPAdd,
+		message.WANIPAdd,
+		*message.WANIPUpdate,
+		message.WANIPUpdate,
+		*message.WANIPFieldsUpdate,
+		message.WANIPFieldsUpdate,
+		*message.WANIPDelete,
+		message.WANIPDelete]
 }
 
 func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 	updater := &WANIP{
-		UpdaterBase[cloudmodel.IP, mysql.WANIP, *diffbase.WANIP]{
-			resourceType:      ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
-			cache:             wholeCache,
-			domainToolDataSet: domainToolDataSet,
-			dbOperator:        db.NewWANIP(),
-			diffBaseData:      wholeCache.DiffBaseDataSet.WANIPs,
-		},
+		newUpdaterBase[
+			cloudmodel.IP,
+			mysql.WANIP,
+			*diffbase.WANIP,
+			*message.WANIPAdd,
+			message.WANIPAdd,
+			*message.WANIPUpdate,
+			message.WANIPUpdate,
+			*message.WANIPFieldsUpdate,
+			message.WANIPFieldsUpdate,
+			*message.WANIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
+			wholeCache,
+			db.NewWANIP(),
+			wholeCache.DiffBaseDataSet.WANIPs,
+			nil,
+		),
 	}
+	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
 	return updater
 }
@@ -100,7 +123,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (interface{}, map[string]interface{}, bool) {
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.WANIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.WANIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {

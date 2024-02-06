@@ -27,18 +27,40 @@ import (
 )
 
 type NATGateway struct {
-	UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *diffbase.NATGateway]
+	UpdaterBase[
+		cloudmodel.NATGateway,
+		mysql.NATGateway,
+		*diffbase.NATGateway,
+		*message.NATGatewayAdd,
+		message.NATGatewayAdd,
+		*message.NATGatewayUpdate,
+		message.NATGatewayUpdate,
+		*message.NATGatewayFieldsUpdate,
+		message.NATGatewayFieldsUpdate,
+		*message.NATGatewayDelete,
+		message.NATGatewayDelete]
 }
 
 func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *NATGateway {
 	updater := &NATGateway{
-		UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *diffbase.NATGateway]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewNATGateway(),
-			diffBaseData: wholeCache.DiffBaseDataSet.NATGateways,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.NATGateway,
+			mysql.NATGateway,
+			*diffbase.NATGateway,
+			*message.NATGatewayAdd,
+			message.NATGatewayAdd,
+			*message.NATGatewayUpdate,
+			message.NATGatewayUpdate,
+			*message.NATGatewayFieldsUpdate,
+			message.NATGatewayFieldsUpdate,
+			*message.NATGatewayDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
+			wholeCache,
+			db.NewNATGateway(),
+			wholeCache.DiffBaseDataSet.NATGateways,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -72,7 +94,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (interface{}, map[string]interface{}, bool) {
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (*message.NATGatewayFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.NATGatewayFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

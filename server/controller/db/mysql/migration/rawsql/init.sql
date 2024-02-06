@@ -1699,7 +1699,7 @@ CREATE TABLE IF NOT EXISTS genesis_host (
     vtap_id     INTEGER,
     node_ip     CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_host;
 
 CREATE TABLE IF NOT EXISTS genesis_vm (
@@ -1713,7 +1713,7 @@ CREATE TABLE IF NOT EXISTS genesis_vm (
     vtap_id         INTEGER,
     created_at      DATETIME,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vm;
 
 CREATE TABLE IF NOT EXISTS genesis_vip (
@@ -1722,7 +1722,7 @@ CREATE TABLE IF NOT EXISTS genesis_vip (
     vtap_id     INTEGER,
     node_ip     CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vip;
 
 CREATE TABLE IF NOT EXISTS genesis_vpc (
@@ -1731,7 +1731,7 @@ CREATE TABLE IF NOT EXISTS genesis_vpc (
     vtap_id         INTEGER,
     name            VARCHAR(256),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vpc;
 
 CREATE TABLE IF NOT EXISTS genesis_network (
@@ -1744,7 +1744,7 @@ CREATE TABLE IF NOT EXISTS genesis_network (
     vtap_id         INTEGER,
     node_ip         CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_network;
 
 CREATE TABLE IF NOT EXISTS genesis_port (
@@ -1758,7 +1758,7 @@ CREATE TABLE IF NOT EXISTS genesis_port (
     vtap_id         INTEGER,
     node_ip         CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_port;
 
 CREATE TABLE IF NOT EXISTS genesis_ip (
@@ -1770,7 +1770,7 @@ CREATE TABLE IF NOT EXISTS genesis_ip (
     vtap_id             INTEGER,
     masklen             INTEGER DEFAULT 0,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_ip;
 
 CREATE TABLE IF NOT EXISTS genesis_lldp (
@@ -1785,7 +1785,7 @@ CREATE TABLE IF NOT EXISTS genesis_lldp (
     vtap_id                 INTEGER,
     last_seen               DATETIME,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_lldp;
 
 CREATE TABLE IF NOT EXISTS genesis_vinterface (
@@ -1806,7 +1806,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;
 
 CREATE TABLE IF NOT EXISTS genesis_process (
@@ -1823,13 +1823,13 @@ CREATE TABLE IF NOT EXISTS genesis_process (
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE genesis_process;
 
 CREATE TABLE IF NOT EXISTS genesis_storage (
     vtap_id     INTEGER NOT NULL PRIMARY KEY,
     node_ip     CHAR(48)
-) ENGINE=MyISAM DEFAULT CHARSET = utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET = utf8mb4;
 TRUNCATE TABLE genesis_storage;
 
 CREATE TABLE IF NOT EXISTS controller (
@@ -2296,6 +2296,10 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (19, '网络-网络策略', 'flow_metrics.vtap_acl', 60, 3*24, @lcuuid);
+
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,

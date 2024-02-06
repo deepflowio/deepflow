@@ -29,19 +29,42 @@ import (
 )
 
 type LANIP struct {
-	UpdaterBase[cloudmodel.IP, mysql.LANIP, *diffbase.LANIP]
+	UpdaterBase[
+		cloudmodel.IP,
+		mysql.LANIP,
+		*diffbase.LANIP,
+		*message.LANIPAdd,
+		message.LANIPAdd,
+		*message.LANIPUpdate,
+		message.LANIPUpdate,
+		*message.LANIPFieldsUpdate,
+		message.LANIPFieldsUpdate,
+		*message.LANIPDelete,
+		message.LANIPDelete]
 }
 
 func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 	updater := &LANIP{
-		UpdaterBase[cloudmodel.IP, mysql.LANIP, *diffbase.LANIP]{
-			resourceType:      ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
-			cache:             wholeCache,
-			domainToolDataSet: domainToolDataSet,
-			dbOperator:        db.NewLANIP(),
-			diffBaseData:      wholeCache.DiffBaseDataSet.LANIPs,
-		},
+		newUpdaterBase[
+			cloudmodel.IP,
+			mysql.LANIP,
+			*diffbase.LANIP,
+			*message.LANIPAdd,
+			message.LANIPAdd,
+			*message.LANIPUpdate,
+			message.LANIPUpdate,
+			*message.LANIPFieldsUpdate,
+			message.LANIPFieldsUpdate,
+			*message.LANIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
+			wholeCache,
+			db.NewLANIP(),
+			wholeCache.DiffBaseDataSet.LANIPs,
+			nil,
+		),
 	}
+	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
 	return updater
 }
@@ -109,7 +132,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	return dbItem, true
 }
 
-func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (interface{}, map[string]interface{}, bool) {
+func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.LANIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LANIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {

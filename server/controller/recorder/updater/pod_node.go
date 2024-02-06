@@ -27,18 +27,40 @@ import (
 )
 
 type PodNode struct {
-	UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *diffbase.PodNode]
+	UpdaterBase[
+		cloudmodel.PodNode,
+		mysql.PodNode,
+		*diffbase.PodNode,
+		*message.PodNodeAdd,
+		message.PodNodeAdd,
+		*message.PodNodeUpdate,
+		message.PodNodeUpdate,
+		*message.PodNodeFieldsUpdate,
+		message.PodNodeFieldsUpdate,
+		*message.PodNodeDelete,
+		message.PodNodeDelete]
 }
 
 func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNode {
 	updater := &PodNode{
-		UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *diffbase.PodNode]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodNode(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodNodes,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodNode,
+			mysql.PodNode,
+			*diffbase.PodNode,
+			*message.PodNodeAdd,
+			message.PodNodeAdd,
+			*message.PodNodeUpdate,
+			message.PodNodeUpdate,
+			*message.PodNodeFieldsUpdate,
+			message.PodNodeFieldsUpdate,
+			*message.PodNodeDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
+			wholeCache,
+			db.NewPodNode(),
+			wholeCache.DiffBaseDataSet.PodNodes,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -86,7 +108,7 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.Pod
 	return dbItem, true
 }
 
-func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (interface{}, map[string]interface{}, bool) {
+func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (*message.PodNodeFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodNodeFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Type != cloudItem.Type {

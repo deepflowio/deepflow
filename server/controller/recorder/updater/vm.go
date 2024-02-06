@@ -30,18 +30,40 @@ import (
 )
 
 type VM struct {
-	UpdaterBase[cloudmodel.VM, mysql.VM, *diffbase.VM]
+	UpdaterBase[
+		cloudmodel.VM,
+		mysql.VM,
+		*diffbase.VM,
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMUpdate,
+		message.VMUpdate,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete]
 }
 
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	updater := &VM{
-		UpdaterBase[cloudmodel.VM, mysql.VM, *diffbase.VM]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVM(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VMs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VM,
+			mysql.VM,
+			*diffbase.VM,
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMUpdate,
+			message.VMUpdate,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VM_EN,
+			wholeCache,
+			db.NewVM(),
+			wholeCache.DiffBaseDataSet.VMs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -87,7 +109,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	return dbItem, true
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (interface{}, map[string]interface{}, bool) {
+func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.VMFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VMFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
