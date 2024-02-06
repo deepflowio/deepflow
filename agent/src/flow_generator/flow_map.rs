@@ -1408,6 +1408,11 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         new_endpoint: Option<String>,
     ) {
+        // endpoint as long as it can be parsed in the request packet
+        if meta_packet.lookup_key.direction == PacketDirection::ServerToClient {
+            return;
+        }
+
         let flow_id = &node.tagged_flow.flow.flow_id;
         // The original endpoint is inconsistent with new_endpoint
         if let (Some(flow_perf_stats), Some(last_endpoint), Some(new_endpoint)) = (
@@ -1446,8 +1451,7 @@ impl FlowMap {
                     .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
         }
-        // endpoint as long as it can be parsed in the request packet
-        if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
+        if new_endpoint.is_some() {
             node.tagged_flow.flow.last_endpoint = new_endpoint;
         }
     }
