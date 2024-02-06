@@ -16,6 +16,6 @@
 
 //! Enterprise Edition Feature: tingyun
 
-pub fn decode_trace_id(_: &str) -> Option<String> {
+pub fn decode_trace_id(_: &str) -> Option<std::borrow::Cow<'_, str>> {
     None
 }
