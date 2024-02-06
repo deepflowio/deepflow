@@ -1,7 +1,6 @@
 # Name                     , DisplayName                , Description
 time                       , Time                       ,
 
-acl_gid                    , acl_gid                    ,
 vtap                       , vtap                       ,
 policy                     , policy                     ,
 npb_tunnel                 , npb_tunnel                 ,
