@@ -14,10 +14,10 @@ BEGIN
         SET @lcuuid = (SELECT UUID());
         INSERT INTO data_source (display_name, data_table_collection, `interval`, retention_time, lcuuid) VALUES ('网络-网络策略', 'flow_metrics.vtap_acl', 60, 3*24, @lcuuid);
 
-        UPDATE db_version SET version = '6.5.1.6';
-
-        COMMIT;
+        COMMIT; 
     END IF;
+
+    UPDATE db_version SET version = '6.5.1.6';
 END;
 
 CALL update_data_sources();
