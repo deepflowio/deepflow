@@ -528,14 +528,14 @@ impl KafkaLog {
 
     // traceparent: 00-TRACEID-SPANID-01
     fn decode_traceparent(payload: &str, info: &mut KafkaInfo) {
-        let tag = TraceType::TraceParent.to_string();
+        let tag = TraceType::TraceParent.as_str();
         let mut start = 0;
         let mut trace_id = "";
         while start < payload.len() {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
@@ -564,14 +564,14 @@ impl KafkaLog {
 
     // Example: 'sw8  1-{trace-id}-{other}'
     fn decode_sw8(payload: &str, info: &mut KafkaInfo) {
-        let tag = TraceType::Sw8.to_string();
+        let tag = TraceType::Sw8.as_str();
         let mut start = 0;
         let mut trace_id = "";
         while start < payload.len() {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
