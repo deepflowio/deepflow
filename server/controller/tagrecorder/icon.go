@@ -34,7 +34,7 @@ type IconKey struct {
 	SubType  int
 }
 
-func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) {
+func (c *UpdaterManager) UpdateIconInfo() (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
 	if !c.cfg.DFWebService.Enabled {

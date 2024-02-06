@@ -145,18 +145,21 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	prometheus.SynchronizerCache.Start(ctx, &cfg.PrometheusCfg)
 	prometheus.Encoder.Init(ctx, &cfg.PrometheusCfg)
 	prometheus.Clear.Init(ctx, &cfg.PrometheusCfg)
+	prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)
 	if isMasterController {
 		prometheus.Encoder.Start()
 	}
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
-	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
-	go checkAndStartAllRegionMasterFunctions(tr)
+	tr := tagrecorder.GetSingleton()
+	tr.Init(ctx, *cfg)
+	tr.SubscriberManager.Start()
+	go checkAndStartAllRegionMasterFunctions()
 
 	router.SetInitStageForHealthChecker("Master function init")
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)
-	go checkAndStartMasterFunctions(cfg, ctx, tr, controllerCheck, analyzerCheck)
+	go checkAndStartMasterFunctions(cfg, ctx, controllerCheck, analyzerCheck)
 
 	router.SetInitStageForHealthChecker("Register routers init")
 	httpServer.SetControllerChecker(controllerCheck)
