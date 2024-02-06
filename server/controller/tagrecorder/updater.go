@@ -17,21 +17,121 @@
 package tagrecorder
 
 import (
+	"context"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
-	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
+	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
-type ChResourceUpdater interface {
+type UpdaterManager struct {
+	tCtx                 context.Context
+	tCancel              context.CancelFunc
+	cfg                  config.ControllerConfig
+	domainLcuuidToIconID map[string]int // TODO
+	resourceTypeToIconID map[IconKey]int
+}
+
+func GetUpdaterManager() *UpdaterManager {
+	updaterManagerOnce.Do(func() {
+		updaterManager = &UpdaterManager{}
+	})
+	return updaterManager
+}
+
+func (u *UpdaterManager) Init(ctx context.Context, cfg config.ControllerConfig) {
+	u.cfg = cfg
+	u.tCtx, u.tCancel = context.WithCancel(ctx)
+}
+
+func (c *UpdaterManager) Start() {
+	log.Info("tagrecorder updater manager started")
+	go func() {
+		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
+			c.run()
+		}
+	}()
+}
+
+func (t *UpdaterManager) Stop() {
+	if t.tCancel != nil {
+		t.tCancel()
+	}
+	log.Info("tagrecorder updater manager stopped")
+}
+
+func (c *UpdaterManager) run() {
+	// 调用API获取资源对应的icon_id
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = c.UpdateIconInfo()
+	c.refresh()
+}
+
+func (c *UpdaterManager) refresh() {
+	log.Info("tagrecorder updaters refresh")
+	// 生成各资源更新器，刷新ch数据
+	updaters := []Updater{
+		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChVPC(c.resourceTypeToIconID),
+		NewChDevice(c.resourceTypeToIconID),
+		NewChIPRelation(),
+		NewChPodK8sLabel(),
+		NewChPodK8sLabels(),
+		NewChPodServiceK8sLabel(),
+		NewChPodServiceK8sLabels(),
+		NewChPodNSCloudTag(),
+		NewChPodNSCloudTags(),
+		NewChOSAppTag(),
+		NewChOSAppTags(),
+		NewChVTapPort(),
+		NewChStringEnum(),
+		NewChIntEnum(),
+		NewChNodeType(),
+		NewChAPPLabel(),
+		NewChTargetLabel(),
+		NewChPrometheusTargetLabelLayout(),
+		NewChPrometheusLabelName(),
+		NewChPrometheusMetricNames(),
+		NewChPrometheusMetricAPPLabelLayout(),
+		NewChNetwork(c.resourceTypeToIconID),
+		NewChTapType(c.resourceTypeToIconID),
+		NewChVTap(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
+		NewChPodCluster(c.resourceTypeToIconID),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodNode(c.resourceTypeToIconID),
+		NewChLbListener(c.resourceTypeToIconID),
+		NewChPodIngress(c.resourceTypeToIconID),
+		NewChGProcess(c.resourceTypeToIconID),
+
+		NewChPodK8sAnnotation(),
+		NewChPodK8sAnnotations(),
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodK8sEnv(),
+		NewChPodK8sEnvs(),
+		NewChPodService(),
+		NewChChost(),
+	}
+	if c.cfg.RedisCfg.Enabled {
+		updaters = append(updaters, NewChIPResource(c.tCtx))
+	}
+	for _, updater := range updaters {
+		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.Refresh()
+	}
+}
+
+type Updater interface {
 	// 刷新ch资源入口
 	// 基于资源基础数据，构建新的ch数据
 	// 直接查询ch表，构建旧的ch数据
 	// 遍历新的ch数据，若key不在旧的ch数据中，则新增；否则检查是否有更新，若有更新，则更新
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	Refresh() bool
-	SetConfig(cfg config.TagRecorderConfig)
+	SetConfig(cfg trconfig.TagRecorderConfig)
 }
 
 type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
@@ -44,7 +144,7 @@ type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 }
 
 type UpdaterComponent[MT MySQLChModel, KT ChModelKey] struct {
-	cfg              config.TagRecorderConfig
+	cfg              trconfig.TagRecorderConfig
 	resourceTypeName string
 	updaterDG        updaterDataGenerator[MT, KT]
 	dbOperator       operator[MT, KT]
@@ -58,7 +158,7 @@ func newUpdaterComponent[MT MySQLChModel, KT ChModelKey](resourceTypeName string
 	return u
 }
 
-func (b *UpdaterComponent[MT, KT]) SetConfig(cfg config.TagRecorderConfig) {
+func (b *UpdaterComponent[MT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
 	b.cfg = cfg
 	b.dbOperator.setConfig(cfg)
 }

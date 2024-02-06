@@ -72,7 +72,7 @@ func migrateMySQL(cfg *config.ControllerConfig) {
 }
 
 func checkAndStartMasterFunctions(
-	cfg *config.ControllerConfig, ctx context.Context, tr *tagrecorder.TagRecorder,
+	cfg *config.ControllerConfig, ctx context.Context,
 	controllerCheck *monitor.ControllerCheck, analyzerCheck *monitor.AnalyzerCheck,
 ) {
 
@@ -98,7 +98,7 @@ func checkAndStartMasterFunctions(
 	recorderResource := recorder.GetSingletonResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
-	prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)
+	tagRecorder := tagrecorder.GetSingleton()
 
 	httpService := http.GetSingleton()
 
@@ -125,7 +125,7 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 启动tagrecorder
-				tr.Start()
+				tagRecorder.UpdaterManager.Start()
 
 				// 控制器检查
 				controllerCheck.Start()
@@ -162,7 +162,7 @@ func checkAndStartMasterFunctions(
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
 
 				// stop tagrecorder
-				tr.Stop()
+				tagRecorder.UpdaterManager.Stop()
 
 				// stop controller check
 				controllerCheck.Stop()
@@ -200,7 +200,8 @@ func checkAndStartMasterFunctions(
 	}
 }
 
-func checkAndStartAllRegionMasterFunctions(tr *tagrecorder.TagRecorder) {
+func checkAndStartAllRegionMasterFunctions() {
+	tr := tagrecorder.GetSingleton()
 	masterController := ""
 	thisIsMasterController := false
 	for range time.Tick(time.Minute) {
@@ -212,7 +213,7 @@ func checkAndStartAllRegionMasterFunctions(tr *tagrecorder.TagRecorder) {
 			if newThisIsMasterController {
 				thisIsMasterController = true
 				log.Infof("I am the master controller now, previous master controller is %s", masterController)
-				go tr.StartChDictionaryUpdate()
+				go tr.Dictionary.Start()
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
