@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,10 +44,6 @@ type Add interface {
 type UpdatePtr[T Update] interface {
 	*T
 
-	// SetID(int)
-	// GetID() int
-	// SetLcuuid(string)
-	// GetLcuuid() string
 	SetFields(interface{})
 	GetFields() interface{} // return *FieldsUpdate
 	SetDiffBase(interface{})

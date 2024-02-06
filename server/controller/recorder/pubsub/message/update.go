@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -153,22 +153,6 @@ type RegionUpdate struct {
 	CloudItem[cloudmodel.Region]
 	DiffBase[*diffbase.Region]
 	MySQLData[mysql.Region]
-}
-
-func (r RegionUpdate) GetFields() interface{} {
-	return r.Fields.data
-}
-
-func (r RegionUpdate) SetFields(fields interface{}) {
-	r.Fields.SetFields(fields.(*RegionFieldsUpdate))
-}
-
-func (r RegionUpdate) GetMySQLItems() interface{} {
-	return r.MySQLData.GetNewMySQL()
-}
-
-func (r RegionUpdate) SetMySQLItems(items interface{}) {
-	r.MySQLData.SetNewMySQL(items.(*mysql.Region))
 }
 
 type AZFieldsUpdate struct {

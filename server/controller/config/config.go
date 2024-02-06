@@ -40,7 +40,7 @@ import (
 var log = logging.MustGetLogger("config")
 
 type IngesterApi struct {
-	Port    int `default:"20106" yaml:"port"`
+	Port    int `default:"30106" yaml:"port"`
 	Timeout int `default:"60" yaml:"timeout"`
 }
 

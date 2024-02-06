@@ -68,7 +68,7 @@ use crate::{
         DispatcherConfig,
     },
     exception::ExceptionHandler,
-    flow_generator::MetaAppProto,
+    flow_generator::AppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     policy::PolicyGetter,
     utils::{
@@ -656,7 +656,7 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: Option<DebugSender<BatchedBox<L7Stats>>>,
-    log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
+    log_output_queue: Option<DebugSender<Box<AppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
@@ -758,7 +758,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn log_output_queue(mut self, v: DebugSender<Box<MetaAppProto>>) -> Self {
+    pub fn log_output_queue(mut self, v: DebugSender<Box<AppProto>>) -> Self {
         self.log_output_queue = Some(v);
         self
     }

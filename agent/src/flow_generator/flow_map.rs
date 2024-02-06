@@ -42,7 +42,7 @@ use super::{
     pool::MemoryPool,
     protocol_logs::{
         sql::{ObfuscateCache, OBFUSCATE_CACHE_SIZE},
-        MetaAppProto,
+        AppProto, MetaAppProto,
     },
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -53,6 +53,7 @@ use super::{
 
 use crate::{
     common::{
+        ebpf::EbpfType,
         endpoint::{
             EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
         },
@@ -75,6 +76,7 @@ use crate::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    flow_generator::protocol_logs::PseudoAppProto,
     metric::document::TapSide,
     plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
@@ -95,6 +97,8 @@ use public::{
 };
 
 use packet_sequence_block::PacketSequenceBlock;
+
+const DEFAULT_SOCKET_CLOSE_TIMEOUT: Timestamp = Timestamp::from_secs(1);
 
 pub struct Config<'a> {
     pub flow: &'a FlowConfig,
@@ -133,10 +137,10 @@ pub struct FlowMap {
     l7_stats_allocator: Allocator<L7Stats>,
     output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
     l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    out_log_queue: DebugSender<Box<MetaAppProto>>,
+    out_log_queue: DebugSender<Box<AppProto>>,
     output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
     l7_stats_buffer: Vec<BatchedBox<L7Stats>>,
-    protolog_buffer: Vec<Box<MetaAppProto>>,
+    protolog_buffer: Vec<Box<AppProto>>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
@@ -170,7 +174,7 @@ impl FlowMap {
         output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
-        app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
+        app_proto_log_queue: DebugSender<Box<AppProto>>,
         ntp_diff: Arc<AtomicI64>,
         config: &FlowConfig,
         packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -558,6 +562,10 @@ impl FlowMap {
                 // handle and remove timeout nodes
                 for node in nodes.drain(index..) {
                     let timeout = node.recent_time + node.timeout;
+                    // Only node whose SignalSource is EBPF needs to send close event when it is timeout.
+                    if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                        self.send_socket_close_event(&node);
+                    }
                     self.node_removed_aftercare(&config, node, timeout.into(), None);
                 }
                 if nodes.is_empty() {
@@ -661,7 +669,12 @@ impl FlowMap {
                     )
                 });
                 let Some(index) = index else {
-                    // 没有找到严格匹配的 FlowNode，插入新 Node
+                    // If no exact match of FlowNode is found and close event is received, there is no need to create a new FlowNode
+                    if meta_packet.ebpf_type == EbpfType::SocketCloseEvent {
+                        self.node_map.replace((node_map, time_set));
+                        return;
+                    }
+                    // No exact match of FlowNode was found, insert new Node
                     let node = self.new_flow_node(config, meta_packet);
                     if let Some(node) = node {
                         time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
@@ -709,6 +722,7 @@ impl FlowMap {
 
                 if flow_closed {
                     let node = nodes.swap_remove(index);
+                    self.send_socket_close_event(&node);
                     self.node_removed_aftercare(
                         &flow_config,
                         node,
@@ -735,8 +749,12 @@ impl FlowMap {
                     }
                 }
             }
-            // 未找到匹配的 FlowNode，需要插入新的节点
+            // No exact match of FlowNode was found, insert new Node
             None => {
+                if meta_packet.ebpf_type == EbpfType::SocketCloseEvent {
+                    self.node_map.replace((node_map, time_set));
+                    return;
+                }
                 let node = self.new_flow_node(config, meta_packet);
                 if let Some(node) = node {
                     time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
@@ -807,6 +825,13 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &mut MetaPacket,
     ) -> bool {
+        node.last_cap_seq = meta_packet.cap_seq as u32;
+        // For short connections, in order to quickly get the node flush of the closed socket out, set a short timeout
+        // FIXME: At present, the purpose of flush is to set the timeout, and different node type may be set in the future.
+        if meta_packet.ebpf_type == EbpfType::SocketCloseEvent {
+            node.timeout = DEFAULT_SOCKET_CLOSE_TIMEOUT;
+            return false;
+        }
         let flow_config = config.flow;
         let collector_config = config.collector;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
@@ -1182,6 +1207,7 @@ impl FlowMap {
         node.meta_flow_log = None;
         node.next_tcp_seq0 = 0;
         node.next_tcp_seq1 = 0;
+        node.last_cap_seq = meta_packet.cap_seq as u32;
         node.policy_data_cache = Default::default();
         node.endpoint_data_cache = Default::default();
         node.packet_sequence_block = None; // Enterprise Edition Feature: packet-sequence
@@ -1619,8 +1645,13 @@ impl FlowMap {
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-            node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+            if meta_packet.ebpf_type == EbpfType::SocketCloseEvent {
+                // When receiving the socket close event, set the node timeout to 1s to reduce the memory occupation
+                node.timeout = DEFAULT_SOCKET_CLOSE_TIMEOUT;
+            } else {
+                // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
+                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+            }
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true);
 
@@ -1648,7 +1679,9 @@ impl FlowMap {
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF
+            && meta_packet.ebpf_type != EbpfType::SocketCloseEvent
+        {
             if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
                 node.residual_request += 1;
             } else {
@@ -1927,6 +1960,31 @@ impl FlowMap {
         }
     }
 
+    // When a socket close event is received, the event is sent to the SessionAggregator to prevent the accumulation of the SessionAggregator
+    fn send_socket_close_event(&mut self, node: &FlowNode) {
+        match node.meta_flow_log.as_ref() {
+            Some(l) => {
+                let l7_protocol = l.l7_protocol_enum.get_l7_protocol();
+                // If this protocol has session_id, the AppProto in SessionAggregator cannot be found based on flow_id alone.
+                if !l7_protocol.has_session_id() {
+                    let app_proto = PseudoAppProto::new(
+                        PseudoAppProto::session_key(
+                            node.tagged_flow.flow.flow_id,
+                            node.last_cap_seq,
+                            node.tagged_flow.flow.signal_source,
+                            l7_protocol,
+                        ),
+                        node.recent_time,
+                        node.tagged_flow.flow.tap_side,
+                    );
+                    self.protolog_buffer
+                        .push(Box::new(AppProto::PseudoAppProto(app_proto)));
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn write_to_app_proto_log(
         &mut self,
         config: &FlowConfig,
@@ -1945,7 +2003,8 @@ impl FlowMap {
             if let Some(app_proto) =
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
             {
-                self.protolog_buffer.push(Box::new(app_proto));
+                self.protolog_buffer
+                    .push(Box::new(AppProto::MetaAppProto(app_proto)));
             }
         }
     }
