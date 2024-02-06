@@ -330,8 +330,7 @@ impl DubboLog {
     // 注意 dubbo trace id 解析是区分大小写的
     fn decode_trace_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
-            TraceType::Sw8 => TraceType::Sw8.to_string(),
-            TraceType::Customize(tag) => tag.to_string(),
+            TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
             _ => return,
         };
 
@@ -340,7 +339,7 @@ impl DubboLog {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
@@ -382,8 +381,7 @@ impl DubboLog {
 
     fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
-            TraceType::Customize(tag) => tag.to_string(),
-            TraceType::Sw8 => TraceType::Sw8.to_string(),
+            TraceType::Customize(_) | TraceType::Sw8 => trace_type.as_str(),
             _ => return,
         };
 
@@ -392,7 +390,7 @@ impl DubboLog {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
@@ -494,7 +492,7 @@ impl DubboLog {
 
         let payload_str = String::from_utf8_lossy(&payload[para_index..]);
         for trace_type in config.trace_types.iter() {
-            if trace_type.to_string().len() > u8::MAX as usize {
+            if trace_type.as_str().len() > u8::MAX as usize {
                 continue;
             }
 
@@ -504,7 +502,7 @@ impl DubboLog {
             }
         }
         for span_type in config.span_types.iter() {
-            if span_type.to_string().len() > u8::MAX as usize {
+            if span_type.as_str().len() > u8::MAX as usize {
                 continue;
             }
 
