@@ -489,7 +489,7 @@ func convertNameToInterval(name string) (interval int) {
 
 func getTableName(collection string) string {
 	name := collection
-	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW {
+	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW || collection == common.DATA_SOURCE_ACL {
 		name = strings.TrimPrefix(name, "flow_metrics.")
 		name = strings.TrimSuffix(name, "*")
 	}
