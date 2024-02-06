@@ -45,9 +45,6 @@ func GetTables(db string, ctx context.Context) *common.Result {
 		values = append(values, chCommon.GetPrometheusTables(db, ctx)...)
 	} else {
 		for _, table := range tables {
-			if table == "vtap_acl" {
-				continue
-			}
 			datasource, err := chCommon.GetDatasources(db, table)
 			if err != nil {
 				log.Error(err)
