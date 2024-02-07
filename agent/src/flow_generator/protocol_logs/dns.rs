@@ -133,7 +133,8 @@ impl From<DnsInfo> for L7ProtocolSendLog {
         let log = L7ProtocolSendLog {
             req: L7Request {
                 req_type,
-                resource: f.query_name,
+                resource: f.query_name.clone(),
+                endpoint: f.query_name,
                 ..Default::default()
             },
             resp: L7Response {
