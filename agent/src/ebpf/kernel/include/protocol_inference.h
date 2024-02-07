@@ -1603,6 +1603,148 @@ static __inline enum message_type infer_amqp_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+static __inline enum message_type decode_openwire(const char *buf,
+						  size_t count,
+						  bool is_size_prefix_disabled,
+						  bool is_tight_encoding_enabled,
+						  bool strict_check)
+{
+	static const __u32 ACTIVEMQ_MAGIC_1 = 0x41637469;  // "Acti"
+	static const __u32 ACTIVEMQ_MAGIC_2 = 0x76654d51;  // "veMQ"
+	// [length(4 bytes)] + command_type(1 byte) + [boolean_stream(2 byte at least)]
+	// + command_id(4 bytes) + [response_required(1 byte)]
+	__u32 min_length = 6;
+	if (is_tight_encoding_enabled) {
+		min_length++;
+	}
+	if (!is_size_prefix_disabled) {
+		min_length += 4;
+	}
+	if (count < min_length)
+		return MSG_UNKNOWN;
+	const char *cur_buf = buf;
+	__u32 command_length = 0;
+	if (!is_size_prefix_disabled) {
+		command_length = __bpf_ntohl(*(__u32 *) cur_buf);
+		if (command_length < min_length - 4
+			|| command_length + 4 != count)
+			return MSG_UNKNOWN;
+		cur_buf += 4;
+	}
+	__u8 cmd_type = *(__u8 *) (cur_buf++);
+	// WireFormatInfo
+	if (cmd_type == 1) {
+		// magic value
+		if (count < 13) {
+			return MSG_UNKNOWN;
+		}
+		if (__bpf_ntohl(*(__u32 *) cur_buf) != ACTIVEMQ_MAGIC_1
+			|| __bpf_ntohl(*(__u32 *) (cur_buf + 4)) != ACTIVEMQ_MAGIC_2) {
+			return MSG_UNKNOWN;
+		}
+		return MSG_REQUEST;
+	}
+	if (strict_check) {
+		if (is_tight_encoding_enabled) {
+			// parse a boolean stream
+			__u16 stream_size = *(__u8 *) (cur_buf++);
+			if (stream_size == 0xC0) {
+				stream_size = *(__u8 *) (cur_buf++);
+			} else if (stream_size == 0x80) {
+				stream_size = *(__u16 *) (cur_buf);
+				cur_buf += 2;
+			}
+			if (stream_size == 0)
+				return MSG_UNKNOWN;
+			// stream should not exceed the command length
+			if (!is_size_prefix_disabled
+				&& (cur_buf - buf) + stream_size > 4 + command_length)
+				return MSG_UNKNOWN;
+		} else {
+			// parse command_id
+			__bpf_ntohl(*(__u32 *) cur_buf);
+			cur_buf += 4;
+			// parse response_required
+			__u8 response_required = *(__u8 *) (cur_buf++);
+			// validate the boolean value
+			if (response_required != 0x00 && response_required != 0x01)
+				return MSG_UNKNOWN;
+		}
+	}
+	if (!cmd_type)
+		return MSG_UNKNOWN;
+	// [Request / Session]
+	// WireFormatInfo | BrokerInfo | ConnectionInfo | SessionInfo | ConsumerInfo
+	// ProducerInfo | TransactionInfo | DestinationInfo | RemoveSubscriptionInfo
+	// KeepAliveInfo | ShutdownInfo | RemoveInfo (0x01 ~ 0x0c)
+	// ControlCommand | FlushCommand | ConnectionError | ConsumerControl | ConnectionControl
+	// ProducerAck | MessagePull | MessageDispatch | MessageAck | ActiveMQMessage | ActiveMQBytesMessage
+	// ActiveMQMapMessage | ActiveMQObjectMessage | ActiveMQStreamMessage | ActiveMQTextMessage
+	// ActiveMQBlobMessage (0x0e ~ 0x1d)
+	// DiscoveryEvent(0x28) | DurableSubscriptionInfo(0x37) | PartialCommand(0x3c)
+	// PartialLastCommand(0x3d) | Replay(0x41) | MessageDispatchNotification(0x5a)
+	if (cmd_type <= 0x0c || (0x0e <= cmd_type && cmd_type <= 0x1d)
+		|| cmd_type == 0x28 || cmd_type == 0x37 || cmd_type == 0x3c
+		|| cmd_type == 0x3d || cmd_type == 0x41 || cmd_type == 0x5a) {
+		return MSG_REQUEST;
+	}
+	// [Response]
+	// Response | ExceptionResponse | DataResponse | DataArrayResponse | IntegerResponse
+	if (0x1e <= cmd_type && cmd_type <= 0x22) {
+		return MSG_RESPONSE;
+	}
+	return MSG_UNKNOWN;
+}
+
+enum OpenWireEncoding {
+	OPENWIRE_LOOSE_ENCODING = 0x00,
+	OPENWIRE_TIGHT_ENCODING = 0x01,
+};
+
+// https://activemq.apache.org/openwire
+static __inline enum message_type infer_openwire_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s
+							 *conn_info)
+{
+	if (count < 4)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_OPENWIRE, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_OPENWIRE)
+			return MSG_UNKNOWN;
+		conn_info->encoding_type =
+			conn_info->socket_info_ptr->encoding_type;
+	}
+	enum message_type msg_type;
+	if (conn_info->encoding_type != OPENWIRE_LOOSE_ENCODING
+		&& conn_info->encoding_type != OPENWIRE_TIGHT_ENCODING) {
+		// try to parse the packet in both tight and loose encoding format
+		// we now only support `SizePrefixDisabled` assigned to false
+		if ((msg_type =
+			decode_openwire(buf, count, false, false, true)) != MSG_UNKNOWN) {
+				conn_info->encoding_type = OPENWIRE_LOOSE_ENCODING;
+				return msg_type;
+			}
+		if ((msg_type =
+			decode_openwire(buf, count, false, true, true)) != MSG_UNKNOWN) {
+				conn_info->encoding_type = OPENWIRE_TIGHT_ENCODING;
+				return msg_type;
+			}
+		return MSG_UNKNOWN;
+	} else {
+		if ((msg_type =
+			decode_openwire(buf, count, false, conn_info->encoding_type, false)
+			) != MSG_UNKNOWN) {
+				return msg_type;
+			}
+		return MSG_CLEAR;
+	}
+}
+
 /*
  * https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/
  * 0                                                                                       31
@@ -2603,6 +2745,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_OPENWIRE:
+			if ((inferred_message.type =
+			     infer_openwire_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_OPENWIRE;
+				return inferred_message;
+			}
+			break;
 		default:
 			break;
 		}
@@ -2777,6 +2927,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_OPENWIRE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_openwire_message(infer_buf, count,
+					  conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_OPENWIRE;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
 #else

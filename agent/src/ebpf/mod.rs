@@ -75,6 +75,8 @@ pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
 pub const SOCK_DATA_AMQP: u16 = 102;
 #[allow(dead_code)]
+pub const SOCK_DATA_OPENWIRE: u16 = 103;
+#[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]
 pub const SOCK_DATA_TLS: u16 = 121;

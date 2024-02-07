@@ -111,6 +111,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    100: PROTO_KAFKA\n");
 	fprintf(stderr, "    101: PROTO_MQTT\n");
 	fprintf(stderr, "    102: PROTO_AMQP\n");
+	fprintf(stderr, "    103: PROTO_OPENWIRE\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
 	fprintf(stderr, "    121: PROTO_TLS\n");
 	fprintf(stderr, "PID:\n");

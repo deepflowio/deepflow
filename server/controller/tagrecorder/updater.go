@@ -73,6 +73,7 @@ func (c *UpdaterManager) refresh() {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []Updater{
 		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
 		NewChDevice(c.resourceTypeToIconID),
 		NewChIPRelation(),
@@ -80,7 +81,9 @@ func (c *UpdaterManager) refresh() {
 		NewChPodK8sLabels(),
 		NewChPodServiceK8sLabel(),
 		NewChPodServiceK8sLabels(),
+		NewChChostCloudTag(),
 		NewChPodNSCloudTag(),
+		NewChChostCloudTags(),
 		NewChPodNSCloudTags(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
@@ -114,6 +117,9 @@ func (c *UpdaterManager) refresh() {
 		NewChPodK8sEnvs(),
 		NewChPodService(),
 		NewChChost(),
+
+		NewChPolicy(),
+		NewChNpbTunnel(),
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))

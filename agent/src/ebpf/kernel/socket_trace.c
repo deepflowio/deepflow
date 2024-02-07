@@ -543,7 +543,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
-	conn_info->correlation_id = -1; // 当前用于kafka协议推断
+	conn_info->correlation_id = -1; // 当前用于kafka,openwire协议推断
 	conn_info->fd = fd;
 
 	conn_info->sk = sk;
