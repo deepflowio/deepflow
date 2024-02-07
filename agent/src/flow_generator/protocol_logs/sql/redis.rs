@@ -539,6 +539,11 @@ mod stringifier {
     }
 
     fn decode_resp_type<'a>(output: Option<&mut Vec<u8>>, payload: &'a [u8]) -> Result<&'a [u8]> {
+        if payload.is_empty() {
+            // happens when compound RESP types are truncated between valid segments
+            // for example: parsing b"*3\r\n+bbb\r\n" will call this function with empty payload
+            return Err(Error::RedisLogParsePartial);
+        }
         // decode '+', '-' and '!' RESP types used in fill_response
         // other types are only validated
         match payload[0] {
@@ -561,6 +566,9 @@ mod stringifier {
     }
 
     pub fn decode(payload: &[u8], strict: bool) -> Result<Vec<u8>> {
+        if payload.is_empty() {
+            return Err(Error::RedisLogParseFailed);
+        }
         let mut output = match payload[0] {
             b'+' | b'-' | b'!' => Vec::with_capacity(payload.len()),
             _ => Vec::new(),
@@ -1034,6 +1042,16 @@ mod tests {
                 "testcase input '{}' failed",
                 str::from_utf8(input.0.as_bytes()).unwrap().escape_default()
             );
+        }
+    }
+
+    #[test]
+    fn truncated_compound_type() {
+        assert!(stringifier::decode(b"%1\r\n+key\r\n", false).is_ok());
+        assert!(stringifier::decode(b"%1\r\n+key\r\n", true).is_err());
+        let s = "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n";
+        for i in 0..(s.len() - 1) {
+            assert!(stringifier::decode(&s.as_bytes()[..i], true).is_err());
         }
     }
 
