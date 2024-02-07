@@ -108,7 +108,7 @@ func newUpdaterBase[
 		diffBaseData: diffBaseData,
 		cloudData:    cloudData,
 	}
-	// u.initPubSub() // TODO recovery
+	u.initPubSub()
 	return u
 }
 

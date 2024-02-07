@@ -52,7 +52,7 @@ type TagRecorder struct {
 func (c *TagRecorder) Init(ctx context.Context, cfg config.ControllerConfig) {
 	c.Dictionary.Init(cfg)
 	c.UpdaterManager.Init(ctx, cfg)
-	c.SubscriberManager.Init(cfg.TagRecorderCfg)
+	c.SubscriberManager.Init(cfg)
 }
 
 var (

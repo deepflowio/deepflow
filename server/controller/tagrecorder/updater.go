@@ -64,7 +64,7 @@ func (t *UpdaterManager) Stop() {
 
 func (c *UpdaterManager) run() {
 	// 调用API获取资源对应的icon_id
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = c.UpdateIconInfo()
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg)
 	c.refresh()
 }
 
@@ -73,7 +73,6 @@ func (c *UpdaterManager) refresh() {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []Updater{
 		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
-		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
 		NewChDevice(c.resourceTypeToIconID),
 		NewChIPRelation(),
@@ -81,9 +80,7 @@ func (c *UpdaterManager) refresh() {
 		NewChPodK8sLabels(),
 		NewChPodServiceK8sLabel(),
 		NewChPodServiceK8sLabels(),
-		NewChChostCloudTag(),
 		NewChPodNSCloudTag(),
-		NewChChostCloudTags(),
 		NewChPodNSCloudTags(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
