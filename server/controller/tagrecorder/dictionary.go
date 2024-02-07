@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -33,14 +35,43 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 )
 
-func (c *TagRecorder) UpdateChDictionary() {
+var (
+	dictionaryOnce sync.Once
+	dictionary     *Dictionary
+)
+
+type Dictionary struct {
+	cfg config.ControllerConfig
+}
+
+func GetDictionary() *Dictionary {
+	dictionaryOnce.Do(func() {
+		dictionary = &Dictionary{}
+	})
+	return dictionary
+}
+
+func (c *Dictionary) Init(cfg config.ControllerConfig) {
+	c.cfg = cfg
+}
+
+func (c *Dictionary) Start() {
+	go func() {
+		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
+			c.Update()
+		}
+	}()
+}
+
+func (c *Dictionary) Update() {
 	log.Info("tagrecorder update ch dictionary")
 	if common.IsStandaloneRunningMode() {
 		// in standalone mode, only supports one ClickHouse node
-		c.updateChDictionary(&c.cfg.ClickHouseCfg)
+		c.update(&c.cfg.ClickHouseCfg)
 		return
 	}
 
@@ -94,7 +125,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 				for _, port := range subset.Ports {
 					if port.Name == "tcp-port" {
 						clickHouseCfg.Port = uint32(port.Port)
-						c.updateChDictionary(&clickHouseCfg)
+						c.update(&clickHouseCfg)
 					}
 				}
 			}
@@ -106,7 +137,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 	return
 }
 
-func (c *TagRecorder) updateChDictionary(clickHouseCfg *clickhouse.ClickHouseConfig) {
+func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	// 在本区域所有数据节点更新字典
 	// Update the dictionary at all data nodes in the region
 	replicaSQL := fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
