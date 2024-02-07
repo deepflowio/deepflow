@@ -27,18 +27,40 @@ import (
 )
 
 type PodCluster struct {
-	UpdaterBase[cloudmodel.PodCluster, mysql.PodCluster, *diffbase.PodCluster]
+	UpdaterBase[
+		cloudmodel.PodCluster,
+		mysql.PodCluster,
+		*diffbase.PodCluster,
+		*message.PodClusterAdd,
+		message.PodClusterAdd,
+		*message.PodClusterUpdate,
+		message.PodClusterUpdate,
+		*message.PodClusterFieldsUpdate,
+		message.PodClusterFieldsUpdate,
+		*message.PodClusterDelete,
+		message.PodClusterDelete]
 }
 
 func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *PodCluster {
 	updater := &PodCluster{
-		UpdaterBase[cloudmodel.PodCluster, mysql.PodCluster, *diffbase.PodCluster]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPodCluster(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PodClusters,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PodCluster,
+			mysql.PodCluster,
+			*diffbase.PodCluster,
+			*message.PodClusterAdd,
+			message.PodClusterAdd,
+			*message.PodClusterUpdate,
+			message.PodClusterUpdate,
+			*message.PodClusterFieldsUpdate,
+			message.PodClusterFieldsUpdate,
+			*message.PodClusterDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
+			wholeCache,
+			db.NewPodCluster(),
+			wholeCache.DiffBaseDataSet.PodClusters,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -72,7 +94,7 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mys
 	return dbItem, true
 }
 
-func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem *cloudmodel.PodCluster) (interface{}, map[string]interface{}, bool) {
+func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem *cloudmodel.PodCluster) (*message.PodClusterFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodClusterFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

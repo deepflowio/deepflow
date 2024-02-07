@@ -1190,17 +1190,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			socket_info_ptr->l7_proto = conn_info->protocol;
 
 		/*
-		 * 同方向多个连续请求或回应的场景时，
-		 * 保持捕获数据的序列号保持不变。
+		 * Ensure that the accumulation operation of capturing the
+		 * data sequence number is an atomic operation when multiple
+		 * threads read/write to the socket simultaneously.
 		 */
-		if (!conn_info->keep_data_seq) {
-			/*
-			 * Ensure that the accumulation operation of capturing the
-			 * data sequence number is an atomic operation when multiple
-			 * threads read/write to the socket simultaneously.
-			 */
-			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-		}
+		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
@@ -1340,6 +1334,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = (bool) vecs;
+	context->is_close = false;
 	context->dir = conn_info->direction;
 
 	return SUBMIT_OK;
@@ -1898,7 +1893,6 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-// 为什么不用tcp_fin? 主要原因要考虑UDP场景。
 TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
 	//Ignore stdin, stdout and stderr
@@ -1914,14 +1908,71 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 
 	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);
 	if (sock_addr) {
-		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, (__u64)fd);
+		__u64 id = bpf_get_current_pid_tgid();
+		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)fd);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL)
+		if (socket_info_ptr != NULL) {
+			struct data_args_t read_args = {};
+			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+			read_args.data_seq = socket_info_ptr->seq;
+			read_args.socket_id = socket_info_ptr->uid;
+			active_read_args_map__update(&id, &read_args);
 			delete_socket_info(conn_key, socket_info_ptr);
-		
+		}
+
 		socket_role_map__delete(&conn_key);
 	}
 
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
+TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx *ctx) {
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
+	if (read_args == NULL)
+		return 0;
+
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		goto exit;
+
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	if (trace_conf == NULL)
+		goto exit;
+	int data_max_sz = trace_conf->data_limit_max;
+	struct __socket_data_buffer *v_buff =
+		bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		goto exit;
+
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+		goto exit;
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
+	v->socket_id = read_args->socket_id;
+	v->tgid = (__u32) (pid_tgid >> 32);
+	v->pid = (__u32)pid_tgid;
+	v->timestamp = bpf_ktime_get_ns();
+	v->source = DATA_SOURCE_CLOSE;
+	v->syscall_len = 0;
+	v->data_seq = read_args->data_seq;
+	bpf_get_current_comm(v->comm, sizeof(v->comm));
+	struct tail_calls_context *context =
+		(struct tail_calls_context *)v->data;
+	context->max_size_limit = data_max_sz;
+	context->vecs = false;
+	context->is_close = true;
+	context->dir = T_INGRESS;
+
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+		      PROG_OUTPUT_DATA_TP_IDX);
+
+exit:
+	active_read_args_map__delete(&pid_tgid);
 	return 0;
 }
 
@@ -2045,6 +2096,7 @@ static __inline int output_data_common(void *ctx) {
 	enum traffic_direction dir;
 	bool vecs = false;
 	int max_size = 0;
+	bool is_close = false;
 	__u32 k0 = 0;
 	char *buffer = NULL;
 
@@ -2064,6 +2116,7 @@ static __inline int output_data_common(void *ctx) {
 
 	dir = context->dir;
 	vecs = context->vecs;
+	is_close = context->is_close;
 	max_size = context->max_size_limit;
 
 	struct data_args_t *args;
@@ -2079,6 +2132,11 @@ static __inline int output_data_common(void *ctx) {
 	    (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
 		goto clear_args_map_1;
+
+	if (is_close) {
+		v->data_len = 0;
+		goto skip_copy;
+	}
 
 	if (v->source == DATA_SOURCE_IO_EVENT) {
 		buffer = (char *)io_event_buffer__lookup(&k0);
@@ -2122,6 +2180,8 @@ static __inline int output_data_common(void *ctx) {
 	}
 
 	v->data_len = len;
+
+skip_copy:
 	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
@@ -2416,6 +2476,7 @@ static __inline void trace_io_event_common(void *ctx,
 		(struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = false;
+	context->is_close = false;
 	context->dir = direction;
 
 	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),

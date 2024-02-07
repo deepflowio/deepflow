@@ -140,7 +140,7 @@ struct conn_info_s {
 	 * True to keep the sequence number of the
 	 * captured data unchanged, otherwise false.
 	 */
-	__u8 keep_data_seq:1;
+	__u8 reserve:1;
 	__u8 direction:1;	// current T_INGRESS or T_EGRESS
 	__u8 prev_direction:1;	// The direction of the last saved data
 	__u8 role:2;
@@ -221,9 +221,11 @@ struct tail_calls_context {
 	 * private data.
 	 */
 	char private_data[sizeof(struct infer_data_s)];
-	int max_size_limit;	// The maximum size of the socket data that can be transferred.
+	int max_size_limit;		// The maximum size of the socket data that can be transferred.
 	enum traffic_direction dir;	// Data flow direction.
-	bool vecs;		// Whether a memory vector is used ? (for specific syscall)
+	__u8 vecs: 1;			// Whether a memory vector is used ? (for specific syscall)
+	__u8 is_close: 1;		// Is it a close() systemcall ?
+	__u8 reserve: 6;
 	struct conn_info_s conn_info;
 	struct process_data_extra extra;
 	__u32 bytes_count;
@@ -269,10 +271,17 @@ struct data_args_t {
 		// For clock_gettime()
 		struct timespec *timestamp_ptr;
 	};
-	// Timestamp for enter syscall function.
-	__u64 enter_ts;
+
+	union {
+		__u64 socket_id; // Use for socket close
+		__u64 enter_ts;  // Timestamp for enter syscall function.
+	};
+
 	__u32 tcp_seq;		// Used to record the entry of syscalls
-	ssize_t bytes_count;	// io event
+	union {
+		ssize_t bytes_count;	// io event
+		ssize_t data_seq;	// Use for socket close
+	};
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {

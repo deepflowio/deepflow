@@ -27,18 +27,40 @@ import (
 )
 
 type RedisInstance struct {
-	UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *diffbase.RedisInstance]
+	UpdaterBase[
+		cloudmodel.RedisInstance,
+		mysql.RedisInstance,
+		*diffbase.RedisInstance,
+		*message.RedisInstanceAdd,
+		message.RedisInstanceAdd,
+		*message.RedisInstanceUpdate,
+		message.RedisInstanceUpdate,
+		*message.RedisInstanceFieldsUpdate,
+		message.RedisInstanceFieldsUpdate,
+		*message.RedisInstanceDelete,
+		message.RedisInstanceDelete]
 }
 
 func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
 	updater := &RedisInstance{
-		UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *diffbase.RedisInstance]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewRedisInstance(),
-			diffBaseData: wholeCache.DiffBaseDataSet.RedisInstances,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.RedisInstance,
+			mysql.RedisInstance,
+			*diffbase.RedisInstance,
+			*message.RedisInstanceAdd,
+			message.RedisInstanceAdd,
+			*message.RedisInstanceUpdate,
+			message.RedisInstanceUpdate,
+			*message.RedisInstanceFieldsUpdate,
+			message.RedisInstanceFieldsUpdate,
+			*message.RedisInstanceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
+			wholeCache,
+			db.NewRedisInstance(),
+			wholeCache.DiffBaseDataSet.RedisInstances,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -75,7 +97,7 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 	return dbItem, true
 }
 
-func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (interface{}, map[string]interface{}, bool) {
+func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (*message.RedisInstanceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RedisInstanceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -27,18 +27,40 @@ import (
 )
 
 type PeerConnection struct {
-	UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *diffbase.PeerConnection]
+	UpdaterBase[
+		cloudmodel.PeerConnection,
+		mysql.PeerConnection,
+		*diffbase.PeerConnection,
+		*message.PeerConnectionAdd,
+		message.PeerConnectionAdd,
+		*message.PeerConnectionUpdate,
+		message.PeerConnectionUpdate,
+		*message.PeerConnectionFieldsUpdate,
+		message.PeerConnectionFieldsUpdate,
+		*message.PeerConnectionDelete,
+		message.PeerConnectionDelete]
 }
 
 func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConnection) *PeerConnection {
 	updater := &PeerConnection{
-		UpdaterBase[cloudmodel.PeerConnection, mysql.PeerConnection, *diffbase.PeerConnection]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPeerConnection(),
-			diffBaseData: wholeCache.DiffBaseDataSet.PeerConnections,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.PeerConnection,
+			mysql.PeerConnection,
+			*diffbase.PeerConnection,
+			*message.PeerConnectionAdd,
+			message.PeerConnectionAdd,
+			*message.PeerConnectionUpdate,
+			message.PeerConnectionUpdate,
+			*message.PeerConnectionFieldsUpdate,
+			message.PeerConnectionFieldsUpdate,
+			*message.PeerConnectionDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
+			wholeCache,
+			db.NewPeerConnection(),
+			wholeCache.DiffBaseDataSet.PeerConnections,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -95,7 +117,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	return dbItem, true
 }
 
-func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (interface{}, map[string]interface{}, bool) {
+func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (*message.PeerConnectionFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PeerConnectionFieldsUpdate)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
