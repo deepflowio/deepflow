@@ -546,12 +546,12 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
+                        output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_dns: {}\r\n", DnsInfo::default(), is_dns));
+                output.push_str(&format!("{:?} is_dns: {}\n", DnsInfo::default(), is_dns));
             }
         }
         output
