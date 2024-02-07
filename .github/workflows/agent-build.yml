@@ -66,6 +66,8 @@ jobs:
       - name: Package code build results
         run: |
           tar cvf agent-artifact-amd64.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+          curl -o agent/output/target/release/ecapture https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/ecapture
+          chmod a+x agent/output/target/release/ecapture
 
       - name: Archive code build results
         uses: actions/upload-artifact@v3
@@ -89,7 +91,9 @@ jobs:
         run: |
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
+          mkdir -p pkg/debian/systemd/usr/bin/
           cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -99,6 +103,7 @@ jobs:
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
           cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -190,6 +195,8 @@ jobs:
       - name: Package code build results
         run: |
           tar cvf agent-artifact-arm64.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+          curl -o agent/output/target/release/ecapture https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/ecapture
+          chmod a+x agent/output/target/release/ecapture
 
       - name: Archive code build results
         uses: actions/upload-artifact@v3
@@ -213,7 +220,9 @@ jobs:
         run: |
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
+          mkdir -p pkg/debian/systemd/usr/bin/
           cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -223,6 +232,7 @@ jobs:
           dpkg-deb  -Zxz --no-uniform-compression -b pkg/debian/systemd aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
           cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -300,6 +310,10 @@ jobs:
           tar xvf agent-artifact-amd64.tar -C x86_64
           tar xvf agent-artifact-arm64.tar -C aarch64
           tar xvf package-artifact-arm64.tar
+          curl -o x86_64/agent/output/target/release/ecapture https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/ecapture
+          chmod a+x x86_64/agent/output/target/release/ecapture
+          curl -o aarch64/agent/output/target/release/ecapture https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/ecapture
+          chmod a+x aarch64/agent/output/target/release/ecapture
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
