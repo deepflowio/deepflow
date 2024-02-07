@@ -19,10 +19,11 @@ package tagrecorder
 import (
 	"sync"
 
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
-	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
+	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 var (
@@ -31,7 +32,9 @@ var (
 )
 
 type SubscriberManager struct {
-	cfg config.TagRecorderConfig
+	cfg                  config.ControllerConfig
+	domainLcuuidToIconID map[string]int
+	resourceTypeToIconID map[IconKey]int
 }
 
 func GetSubscriberManager() *SubscriberManager {
@@ -41,42 +44,49 @@ func GetSubscriberManager() *SubscriberManager {
 	return subscriberManager
 }
 
-func (c *SubscriberManager) Init(cfg config.TagRecorderConfig) {
+func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
 func (c *SubscriberManager) Start() {
 	log.Info("tagrecorder subscriber manager started")
-	subscribers := []Subscriber{}
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
+	subscribers := []Subscriber{
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
+	}
 	for _, subscriber := range subscribers {
-		subscriber.SetConfig(c.cfg)
+		subscriber.SetConfig(c.cfg.TagRecorderCfg)
 		subscriber.Subscribe()
 	}
 }
 
 type Subscriber interface {
 	Subscribe()
-	SetConfig(config.TagRecorderConfig)
+	SetConfig(trconfig.TagRecorderConfig)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
-	sourceToTarget(resourceMySQLItem *MT) (keys []KT, chItems []CT)
+	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
-	cfg config.TagRecorderConfig
+	cfg trconfig.TagRecorderConfig
 
-	resourceTypeName string
-	dbOperator       operator[CT, KT]
-	subscriberDG     SubscriberDataGenerator[MUPT, MUT, MT, CT, KT]
+	subResourceTypeName string // 订阅表资源类型，即源表资源类型
+	resourceTypeName    string // CH表资源类型
+	dbOperator          operator[CT, KT]
+	subscriberDG        SubscriberDataGenerator[MUPT, MUT, MT, CT, KT]
 }
 
 func newSubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey](
-	resourceType string,
+	sourceResourceTypeName, resourceTypeName string,
 ) SubscriberComponent[MUPT, MUT, MT, CT, KT] {
 	s := SubscriberComponent[MUPT, MUT, MT, CT, KT]{
-		resourceTypeName: resourceType,
+		subResourceTypeName: sourceResourceTypeName,
+		resourceTypeName:    resourceTypeName,
 	}
 	s.initDBOperator()
 	return s
@@ -97,15 +107,19 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(sources 
 	return keys, targets
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg config.TagRecorderConfig) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
 	s.cfg = cfg
 	s.dbOperator.setConfig(cfg)
 }
 
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetIconInfo(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
+
+}
+
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
-	pubsub.Subscribe(s.resourceTypeName, pubsub.TopicResourceBatchAddedMySQL, s)
-	pubsub.Subscribe(s.resourceTypeName, pubsub.TopicResourceUpdatedFields, s)
-	pubsub.Subscribe(s.resourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMySQL, s)
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -118,7 +132,6 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(msg in
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(msg interface{}) {
-	log.Infof("OnResourceUpdated resource type %s: %v", s.resourceTypeName, msg)
 	updateFields := msg.(MUPT)
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields)
 }
