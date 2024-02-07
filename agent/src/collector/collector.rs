@@ -437,6 +437,7 @@ impl Stash {
                     acl_gid,
                     server_port: ip_id,
                     signal_source: flow.signal_source,
+                    vtap_id: config.vtap_id,
                     ..Default::default()
                 };
                 let meter = &acc_flow.flow_meter;
@@ -457,6 +458,7 @@ impl Stash {
                     acl_gid,
                     server_port: ip_id,
                     signal_source: flow.signal_source,
+                    vtap_id: config.vtap_id,
                     ..Default::default()
                 };
 
