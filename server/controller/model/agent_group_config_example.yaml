@@ -955,6 +955,7 @@ vtap_group_id: g-xxxxxx
   #- MQTT
   #- AMQP
   #- OpenWire
+  #- NATS
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin
