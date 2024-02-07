@@ -750,7 +750,7 @@ mod tests {
             } else {
                 DubboInfo::default()
             };
-            output.push_str(&format!("{:?} is_dubbo: {}\r\n", info, is_dubbo));
+            output.push_str(&format!("{:?} is_dubbo: {}\n", info, is_dubbo));
         }
         output
     }
