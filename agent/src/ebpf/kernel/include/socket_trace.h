@@ -179,7 +179,10 @@ struct conn_info_s {
 	enum traffic_protocol protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
 	enum message_type message_type;
-	__s32 correlation_id;	// Currently used for Kafka determination
+	union {
+		__u8  encoding_type;    // Currently used for OpenWire encoding inference
+		__s32 correlation_id;	// Currently used for Kafka determination
+	};
 	__u32 prev_count;	// Prestored data length
 	__u32 syscall_infer_len;
 	__u64 count:40;

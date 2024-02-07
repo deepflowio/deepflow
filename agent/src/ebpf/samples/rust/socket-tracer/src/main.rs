@@ -17,10 +17,10 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
-use std::ffi::CString;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::env::set_var;
+use std::ffi::CString;
 use std::fmt::Write;
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -197,7 +197,7 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
             // Handle the case where conversion to a Rust string fails
             eprintln!("Error: Unable to convert C string to Rust string");
         }
-    }	
+    }
 }
 
 extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
@@ -235,6 +235,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("TLS");
         } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
             proto_tag.push_str("ORACLE");
+        } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
+            proto_tag.push_str("OPENWIRE");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -376,8 +378,8 @@ fn get_counter(counter_type: u32) -> u32 {
 fn main() {
     set_var("RUST_LOG", "info");
     env_logger::builder()
-      .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
-      .init();
+        .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+        .init();
 
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
@@ -393,6 +395,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_AMQP as c_int);
+        enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
@@ -441,7 +444,7 @@ fn main() {
                     ::std::process::exit(1);
                 }
         */
- 
+
         set_protocol_ports_bitmap(
             SOCK_DATA_HTTP1 as c_int,
             CString::new("1-65535".as_bytes())
@@ -520,6 +523,13 @@ fn main() {
                 .as_ptr(),
         );
         set_protocol_ports_bitmap(
+            SOCK_DATA_OPENWIRE as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
             SOCK_DATA_DNS as c_int,
             CString::new("53".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
@@ -535,7 +545,7 @@ fn main() {
             CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
-       if running_socket_tracer(
+        if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
             128, /* Number of page frames occupied by kernel-shared memory, must be a power of 2. Used for perf data transfer */
