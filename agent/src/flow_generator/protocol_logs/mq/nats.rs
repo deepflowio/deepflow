@@ -901,7 +901,7 @@ mod tests {
             if first_packet {
                 first_packet = false;
                 if !nats.check_payload(payload, param) {
-                    output.push_str("not nats\r\n");
+                    output.push_str("not nats\n");
                     break;
                 }
             }
@@ -910,19 +910,19 @@ mod tests {
             if let Ok(info) = info {
                 match info {
                     L7ParseResult::Single(s) => {
-                        output.push_str(&format!("{:?}\r\n", s));
+                        output.push_str(&format!("{:?}\n", s));
                     }
                     L7ParseResult::Multi(m) => {
                         for i in m {
-                            output.push_str(&format!("{:?}\r\n", i));
+                            output.push_str(&format!("{:?}\n", i));
                         }
                     }
                     L7ParseResult::None => {
-                        output.push_str("None\r\n");
+                        output.push_str("None\n");
                     }
                 }
             } else {
-                output.push_str(&format!("{:?}\r\n", NatsInfo::default()));
+                output.push_str(&format!("{:?}\n", NatsInfo::default()));
             }
         }
         output
