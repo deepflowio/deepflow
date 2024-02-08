@@ -404,7 +404,7 @@ pub struct stack_profile_data {
 
 extern "C" {
     /*
-     * Set maximum amount of data passed to the agent by eBPF programe.
+     * Set maximum amount of data passed to the agent by eBPF program.
      * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
      *               it will automatically adjust to 8192 bytes.
      *               If limit_size is 0, use the default values 4096.
