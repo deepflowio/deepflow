@@ -34,9 +34,9 @@ import (
 )
 
 var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
-	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.vtap_flow*
+	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.network*
 	"网络-流日志",                  // flow_log.l4_flow_log
-	"应用-指标（秒级）", "应用-指标（分钟级）", // flow_metrics.vtap_app*
+	"应用-指标（秒级）", "应用-指标（分钟级）", // flow_metrics.application*
 	"应用-调用日志",       // flow_log.l7_flow_log
 	"网络-TCP 时序数据",   // flow_log.l4_packet
 	"网络-PCAP 数据",    // flow_log.l7_packet
@@ -62,10 +62,10 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 	if t, ok := filter["type"]; ok {
 		var collection string
 		switch t {
-		case "app":
-			collection = "flow_metrics.vtap_app*"
-		case "flow":
-			collection = "flow_metrics.vtap_flow*"
+		case "application":
+			collection = "flow_metrics.application*"
+		case "network":
+			collection = "flow_metrics.network*"
 		case "deepflow_system":
 			collection = "deepflow_system.*"
 		case "ext_metrics":
@@ -489,7 +489,7 @@ func convertNameToInterval(name string) (interval int) {
 
 func getTableName(collection string) string {
 	name := collection
-	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW || collection == common.DATA_SOURCE_ACL {
+	if collection == common.DATA_SOURCE_APPLICATION || collection == common.DATA_SOURCE_NETWORK || collection == common.DATA_SOURCE_ACL {
 		name = strings.TrimPrefix(name, "flow_metrics.")
 		name = strings.TrimSuffix(name, "*")
 	}

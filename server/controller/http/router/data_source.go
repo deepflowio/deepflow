@@ -72,8 +72,8 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&dataSourceCreate, binding.JSON)
 		if dataSourceCreate != nil &&
-			!(dataSourceCreate.DataTableCollection == "flow_metrics.vtap_app*" || dataSourceCreate.DataTableCollection == "flow_metrics.vtap_flow*") {
-			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, "tsdb type only supports flow_metrics.vtap_app* and flow_metrics.vtap_flow*")
+			!(dataSourceCreate.DataTableCollection == "flow_metrics.application*" || dataSourceCreate.DataTableCollection == "flow_metrics.network*") {
+			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, "tsdb type only supports flow_metrics.application* and flow_metrics.network*")
 			return
 		}
 		if err != nil {
