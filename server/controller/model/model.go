@@ -252,7 +252,7 @@ type DataSource struct {
 
 type DataSourceCreate struct {
 	DisplayName               string `json:"DISPLAY_NAME" binding:"required,min=1,max=10"`
-	DataTableCollection       string `json:"DATA_TABLE_COLLECTION" binding:"required,oneof=flow_metrics.vtap_flow* flow_metrics.vtap_app*"`
+	DataTableCollection       string `json:"DATA_TABLE_COLLECTION" binding:"required,oneof=flow_metrics.network* flow_metrics.application*"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID" binding:"required"`
 	Interval                  int    `json:"INTERVAL" binding:"required"`
 	RetentionTime             int    `json:"RETENTION_TIME" binding:"required,min=1"`

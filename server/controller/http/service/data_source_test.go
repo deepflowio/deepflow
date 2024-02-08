@@ -30,18 +30,18 @@ func Test_getTableName(t *testing.T) {
 		want string
 	}{
 		{
-			name: "vtap_flow",
+			name: "network",
 			args: args{
-				collection: "flow_metrics.vtap_flow*",
+				collection: "flow_metrics.network*",
 			},
-			want: "vtap_flow",
+			want: "network",
 		},
 		{
-			name: "vtap_app",
+			name: "application",
 			args: args{
-				collection: "flow_metrics.vtap_app*",
+				collection: "flow_metrics.application*",
 			},
-			want: "vtap_app",
+			want: "application",
 		},
 		{
 			name: "flow_log.l4_flow_log",
@@ -82,7 +82,7 @@ func Test_getName(t *testing.T) {
 			name: "1s",
 			args: args{
 				interval:   1,
-				collection: "flow_metrics.vtap_flow*",
+				collection: "flow_metrics.network*",
 			},
 			want:    "1s",
 			wantErr: false,
@@ -91,7 +91,7 @@ func Test_getName(t *testing.T) {
 			name: "1m",
 			args: args{
 				interval:   60 * 1,
-				collection: "flow_metrics.vtap_app*",
+				collection: "flow_metrics.application*",
 			},
 			want:    "1m",
 			wantErr: false,
@@ -100,7 +100,7 @@ func Test_getName(t *testing.T) {
 			name: "1h",
 			args: args{
 				interval:   60 * 60 * 1,
-				collection: "flow_metrics.vtap_app*",
+				collection: "flow_metrics.application*",
 			},
 			want:    "1h",
 			wantErr: false,
@@ -109,7 +109,7 @@ func Test_getName(t *testing.T) {
 			name: "1d",
 			args: args{
 				interval:   60 * 60 * 24 * 1,
-				collection: "flow_metrics.vtap_app*",
+				collection: "flow_metrics.application*",
 			},
 			want:    "1d",
 			wantErr: false,
