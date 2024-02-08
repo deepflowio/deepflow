@@ -161,7 +161,7 @@ macro_rules! impl_protocol_parser {
 impl_protocol_parser! {
     pub enum L7ProtocolParser {
         // http have two version but one parser, can not place in macro param.
-        // custom must in frist so can not place in macro
+        // custom must in first so can not place in macro
         DNS(DnsLog),
         SofaRPC(SofaRpcLog),
         MySQL(MysqlLog),
