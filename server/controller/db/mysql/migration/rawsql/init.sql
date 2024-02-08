@@ -1690,7 +1690,7 @@ CREATE TABLE IF NOT EXISTS tap_type (
 TRUNCATE TABLE tap_type;
 
 set @lcuuid = (select uuid());
-INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('虚拟网络', 3, 768, '', @lcuuid);
+INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('云网络', 3, 768, '', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS genesis_host (
     lcuuid      CHAR(64),
