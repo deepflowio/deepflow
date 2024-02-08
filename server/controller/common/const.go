@@ -482,9 +482,9 @@ const (
 )
 
 const (
-	DATA_SOURCE_NETWORK     = "flow_metrics.network*"
-	DATA_SOURCE_APPLICATION = "flow_metrics.application*"
-	DATA_SOURCE_ACL         = "flow_metrics.vtap_acl"
+	DATA_SOURCE_NETWORK        = "flow_metrics.network*"
+	DATA_SOURCE_APPLICATION    = "flow_metrics.application*"
+	DATA_SOURCE_TRAFFIC_POLICY = "flow_metrics.traffic_policy"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1
