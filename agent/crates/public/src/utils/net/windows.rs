@@ -117,7 +117,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
     };
 
     Ok(NeighborEntry {
-        src_addr: route.src_ip,
+        src_addr: route.pref_src.unwrap(),
         dest_addr,
         dest_mac_addr: mac_addr,
         src_link: link,
@@ -193,12 +193,13 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
 }
 
 pub fn get_route_src_ip_and_mac(dest_addr: &IpAddr) -> Result<(IpAddr, MacAddr)> {
-    route_get(*dest_addr)
-        .and_then(|r| get_interface_by_index(r.oif_index).map(|link| (r.src_ip, link.mac_addr)))
+    route_get(*dest_addr).and_then(|r| {
+        get_interface_by_index(r.oif_index).map(|link| (r.pref_src.unwrap(), link.mac_addr))
+    })
 }
 
 pub fn get_route_src_ip(dest_addr: &IpAddr) -> Result<IpAddr> {
-    route_get(*dest_addr).map(|r| r.src_ip)
+    route_get(*dest_addr).map(|r| r.pref_src.unwrap())
 }
 
 pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
@@ -313,9 +314,10 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
         };
 
         Ok(Route {
-            src_ip: src_addr,
+            pref_src: Some(src_addr),
             oif_index: best_if_index,
             gateway,
+            ..Default::default()
         })
     }
 }
