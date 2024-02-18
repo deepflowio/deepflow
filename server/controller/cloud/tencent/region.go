@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getRegions() ([]tencentRegion, error) {
@@ -29,7 +29,7 @@ func (t *Tencent) getRegions() ([]tencentRegion, error) {
 	var regionList []tencentRegion
 
 	attrs := []string{"RegionState", "Region", "RegionName"}
-	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeRegions", "", "RegionSet", false, map[string]interface{}{})
+	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeRegions", t.defaultRegion, "RegionSet", false, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("region request tencent api error: (%s)", err.Error())
 		return []tencentRegion{}, err

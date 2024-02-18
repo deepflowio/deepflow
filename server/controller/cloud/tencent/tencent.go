@@ -41,7 +41,7 @@ var log = logging.MustGetLogger("cloud.tencent")
 
 const (
 	FINANCE_REGION_PROFILE = "金融"
-	TENCENT_ENDPOINT       = ".tencentcloudapi.com"
+	TENCENT_ENDPOINT       = "https://tencentcloudapi.com"
 )
 
 var pagesIntControl = map[string]int{
@@ -58,6 +58,8 @@ type Tencent struct {
 	lcuuid               string
 	regionUUID           string
 	uuidGenerate         string
+	defaultRegion        string
+	endpoint             string
 	httpTimeout          int
 	includeRegions       []string
 	excludeRegions       []string
@@ -118,6 +120,11 @@ func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, err
 		return nil, err
 	}
 
+	endpoint := cfg.TencentConfig.Endpoint
+	if endpoint == "" {
+		endpoint = TENCENT_ENDPOINT
+	}
+
 	excludeRegionsStr := config.Get("exclude_regions").MustString()
 	excludeRegions := []string{}
 	if excludeRegionsStr != "" {
@@ -134,12 +141,14 @@ func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, err
 
 	return &Tencent{
 		// TODO: display_name后期需要修改为uuid_generate
+		endpoint:       endpoint,
 		name:           domain.Name,
 		lcuuid:         domain.Lcuuid,
 		uuidGenerate:   domain.DisplayName,
 		excludeRegions: excludeRegions,
 		includeRegions: includeRegions,
 		httpTimeout:    cfg.HTTPTimeout,
+		defaultRegion:  cfg.TencentConfig.Region,
 		regionUUID:     config.Get("region_uuid").MustString(),
 		credential:     tcommon.NewCredential(secretID, decryptSecretKey),
 
@@ -167,6 +176,11 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	var err error
 	var totalCount int
 
+	endpointSlice := strings.Split(t.endpoint, "://")
+	if len(endpointSlice) != 2 {
+		return []*simplejson.Json{}, errors.New(fmt.Sprintf("tencent endpoint (%s) invalid , must be contains http scheme.", t.endpoint))
+	}
+
 	startTime := time.Now()
 	// tencent api 3.0 limit max 100
 	offset, limit := 0, 100
@@ -174,7 +188,8 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	cpf := profile.NewClientProfile()
 	// sdk debug
 	// cpf.Debug = true
-	cpf.HttpProfile.Endpoint = service + ".tencentcloudapi.com"
+	cpf.HttpProfile.Scheme = strings.ToUpper(endpointSlice[0])
+	cpf.HttpProfile.Endpoint = strings.Join([]string{service, endpointSlice[1]}, ".")
 	cpf.HttpProfile.ReqMethod = "POST"
 	cpf.HttpProfile.ReqTimeout = t.httpTimeout
 	cpf.NetworkFailureMaxRetries = 1
