@@ -1266,6 +1266,26 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
 			}
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		} else {
+			for resourceName, resourceInfo := range HOSTNAME_IP_DEVICE_MAP {
+				if tag != resourceName {
+					continue
+				}
+
+				deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
+				if whereSql != "" {
+					whereSql += " AND devicetype=" + deviceTypeStr
+				} else {
+					whereSql = " WHERE devicetype=" + deviceTypeStr
+				}
+				sql = strings.Join([]string{
+					"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
+					"FROM device_map", whereSql,
+					"GROUP BY value, display_name",
+					"ORDER BY", orderBy, "ASC", limitSql,
+				}, " ")
+				break
+			}
 		}
 		if sql == "" {
 			return GetExternalTagValues(db, table, rawSql)
