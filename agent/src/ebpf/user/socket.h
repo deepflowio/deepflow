@@ -210,6 +210,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "AMQP";
 	case PROTO_OPENWIRE:
 		return "OpenWire";
+	case PROTO_NATS:
+		return "NATS";
 	case PROTO_DUBBO:
 		return "Dubbo";
 	case PROTO_SOFARPC:

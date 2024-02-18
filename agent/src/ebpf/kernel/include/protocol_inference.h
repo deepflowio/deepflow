@@ -1745,6 +1745,201 @@ static __inline enum message_type infer_openwire_message(const char *buf,
 	}
 }
 
+static __inline bool nats_check_info(const char *buf,
+						size_t count)
+{
+	if (count < 6)
+		return false;
+
+	// info
+	if (buf[0] != 'I' && buf[0] != 'i') return false;
+	if (buf[1] != 'N' && buf[1] != 'n') return false;
+	if (buf[2] != 'F' && buf[2] != 'f') return false;
+	if (buf[3] != 'O' && buf[3] != 'o') return false;
+	if (buf[4] != ' ' && buf[4] != '\t') return false;
+
+	// NATS allows arbitrary whitespace after INFO
+	// we only check the first 20 bytes due to eBPF limitations
+	for (int p = 5; p < 20; p++)
+		if (buf[p] == '{') return true;
+		else if (buf[p] != ' ' && buf[p] != '\t') return false;
+	return false;
+}
+
+
+static __inline bool nats_check_connect(const char *buf,
+						size_t count)
+{
+	if (count < 8)
+		return false;
+
+	// connect
+	if (buf[0] != 'C' && buf[0] != 'c') return false;
+	if (buf[1] != 'O' && buf[1] != 'o') return false;
+	if (buf[2] != 'N' && buf[2] != 'n') return false;
+	if (buf[3] != 'N' && buf[3] != 'n') return false;
+	if (buf[4] != 'E' && buf[4] != 'e') return false;
+	if (buf[5] != 'C' && buf[5] != 'c') return false;
+	if (buf[6] != 'T' && buf[6] != 't') return false;
+	if (buf[7] != ' ' && buf[7] != '\t') return false;
+
+	// NATS allows arbitrary whitespace after CONNECT
+	// we only check the first 20 bytes due to eBPF limitations
+	for (int p = 8; p < 20; p++)
+		if (buf[p] == '{') return true;
+		else if (buf[p] != ' ' && buf[p] != '\t') return false;
+	return false;
+}
+
+
+// https://docs.nats.io/reference/reference-protocols/nats-protocol
+static __inline enum message_type infer_nats_message(const char *buf,
+						     size_t count,
+						     const char *ptr,
+						     __u32 infer_len,
+						     struct conn_info_s
+						     *conn_info)
+{
+	if (count < 5)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_NATS, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_NATS)
+			return MSG_UNKNOWN;
+	} else {
+		char buffer[2];
+		bpf_probe_read(buffer, 2, ptr + infer_len - 2);
+		if (buffer[0] != '\r' || buffer[1] != '\n')
+			return MSG_UNKNOWN;
+	}
+
+	if (nats_check_info(buf, count))
+		return MSG_REQUEST;
+
+	if (nats_check_connect(buf, count))
+		return MSG_RESPONSE;
+
+	// pub
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'U' || buf[1] == 'u') {
+			if (buf[2] == 'B' || buf[2] == 'b') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// hpub
+	if (buf[0] == 'H' || buf[0] == 'h') {
+		if (buf[1] == 'P' || buf[1] == 'p') {
+			if (buf[2] == 'U' || buf[2] == 'u') {
+				if (buf[3] == 'B' || buf[3] == 'b') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// sub
+	if (buf[0] == 'S' || buf[0] == 's') {
+		if (buf[1] == 'U' || buf[1] == 'u') {
+			if (buf[2] == 'B' || buf[2] == 'b') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// msg
+	if (buf[0] == 'M' || buf[0] == 'm') {
+		if (buf[1] == 'S' || buf[1] == 's') {
+			if (buf[2] == 'G' || buf[2] == 'g') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// hmsg
+	if (buf[0] == 'H' || buf[0] == 'h') {
+		if (buf[1] == 'M' || buf[1] == 'm') {
+			if (buf[2] == 'S' || buf[2] == 's') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// ping
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'I' || buf[1] == 'i') {
+			if (buf[2] == 'N' || buf[2] == 'n') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// pong
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'O' || buf[1] == 'o') {
+			if (buf[2] == 'N' || buf[2] == 'n') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_RESPONSE;
+					}
+				}
+			}
+		}
+	}
+	// +ok
+	if (buf[0] == '+') {
+		if (buf[1] == 'O' || buf[1] == 'o') {
+			if (buf[2] == 'K' || buf[2] == 'k') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// -err
+	if (buf[0] == '-') {
+		if (buf[1] == 'E' || buf[1] == 'e') {
+			if (buf[2] == 'R' || buf[2] == 'r') {
+				if (buf[3] == 'R' || buf[3] == 'r') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	if (count < 6) return MSG_UNKNOWN;
+	// unsub
+	if (buf[0] == 'U' || buf[0] == 'u') {
+		if (buf[1] == 'N' || buf[1] == 'n') {
+			if (buf[2] == 'S' || buf[2] == 's') {
+				if (buf[3] == 'U' || buf[3] == 'u') {
+					if (buf[4] == 'B' || buf[4] == 'b') {
+						if (buf[5] == ' ' || buf[5] == '\t') {
+							return MSG_REQUEST;
+						}
+					}
+				}
+			}
+		}
+	}
+	return MSG_UNKNOWN;
+}
+
 /*
  * https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/
  * 0                                                                                       31
@@ -2654,6 +2849,16 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_NATS:
+			if ((inferred_message.type =
+			     infer_nats_message(infer_buf, count,
+						syscall_infer_addr,
+						syscall_infer_len,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_NATS;
+				return inferred_message;
+			}
+			break;
 		case PROTO_DUBBO:
 			if ((inferred_message.type =
 			     infer_dubbo_message(infer_buf, count,
@@ -2910,6 +3115,16 @@ infer_protocol_2(const char *infer_buf, size_t count,
 		    infer_amqp_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_AMQP;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_NATS && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_nats_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_NATS;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else
