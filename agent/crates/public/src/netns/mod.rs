@@ -26,7 +26,6 @@ pub use self::windows::*;
 
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
-use std::net::IpAddr;
 
 #[cfg(target_os = "linux")]
 use neli::err::{NlError, SerError};
@@ -71,7 +70,7 @@ pub struct InterfaceInfo {
     pub tap_ns: NsFile,
     pub tap_idx: u32,
     pub mac: MacAddr,
-    pub ips: Vec<IpAddr>,
+    pub ips: Vec<ipnet::IpNet>,
     pub name: String,
     pub device_id: String,
     pub ns_inode: u64,
