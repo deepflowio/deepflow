@@ -52,7 +52,7 @@ impl SidecarPoller {
         let info = InterfaceInfo {
             tap_idx: link.if_index,
             mac: ctrl_mac,
-            ips: vec![ctrl_ip],
+            ips: vec![ctrl_ip.into()],
             name: link.name,
             device_id: ns.to_string(),
             tap_ns: ns,
