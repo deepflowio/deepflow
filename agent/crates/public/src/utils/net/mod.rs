@@ -22,6 +22,7 @@ use std::{
 };
 
 use bitflags::bitflags;
+use ipnet::IpNet;
 use serde::Serialize;
 
 #[cfg(target_os = "linux")]
@@ -149,11 +150,19 @@ pub struct Addr {
     pub prefix_len: u8,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Route {
-    pub src_ip: IpAddr,
+    pub table: u32,
+    pub pref_src: Option<IpAddr>,
+    pub dst_ip: Option<IpNet>,
     pub oif_index: u32,
     pub gateway: Option<IpAddr>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Rule {
+    pub table: u32,
+    pub dst_ip: Option<IpNet>,
 }
 
 pub const MAC_ADDR_LEN: usize = 6;
