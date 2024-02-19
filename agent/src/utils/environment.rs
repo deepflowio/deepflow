@@ -42,6 +42,7 @@ use winapi::{
 };
 
 use crate::common::PROCESS_NAME;
+use crate::config::K8S_CA_CRT_PATH;
 use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use public::proto::{common::TridentType, trident::Exception};
@@ -455,7 +456,25 @@ pub fn running_in_container() -> bool {
     env::var_os(IN_CONTAINER).is_some()
 }
 
-pub fn k8s_mem_limit_for_deepflow() -> Option<u64> {
+fn running_in_k8s() -> bool {
+    // Judge whether Agent is running in k8s according to the existence of K8S_CA_CRT_PATH
+    fs::metadata(K8S_CA_CRT_PATH).is_ok()
+}
+
+fn container_mem_limit() -> Option<u64> {
+    let limit_files = [
+        "/sys/fs/cgroup/memory.max", // If the docker image uses cgroups v2
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes", // If the docker image uses cgroups v1
+    ];
+
+    limit_files.iter().find_map(|limit_file| {
+        fs::read_to_string(limit_file)
+            .ok()
+            .and_then(|content| content.trim().parse().ok())
+    })
+}
+
+fn k8s_mem_limit() -> Option<u64> {
     // Environment variable "K8S_MEM_LIMIT_FOR_DEEPFLOW" is set from container fields
     // https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/#use-container-fields-as-values-for-environment-variables
     env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).ok().and_then(|v| {
@@ -468,6 +487,14 @@ pub fn k8s_mem_limit_for_deepflow() -> Option<u64> {
             }
         })
     })
+}
+
+pub fn get_container_mem_limit() -> Option<u64> {
+    if running_in_k8s() {
+        k8s_mem_limit()
+    } else {
+        container_mem_limit()
+    }
 }
 
 pub fn get_env() -> String {

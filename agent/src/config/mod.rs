@@ -19,7 +19,7 @@ pub mod handler;
 
 pub use config::{
     AgentIdType, Config, ConfigError, KubernetesPollerType, OracleParseConfig, PcapConfig,
-    PrometheusExtraConfig, RuntimeConfig, YamlConfig,
+    PrometheusExtraConfig, RuntimeConfig, YamlConfig, K8S_CA_CRT_PATH,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use config::{
