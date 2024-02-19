@@ -16,7 +16,7 @@
 
 use std::{
     env::{self, VarError},
-    io,
+    fs, io,
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::{Path, PathBuf},
@@ -26,7 +26,7 @@ use std::{
 #[cfg(target_os = "windows")]
 use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use std::{fs, io::Read, os::unix::fs::MetadataExt};
+use std::{io::Read, os::unix::fs::MetadataExt};
 
 use bytesize::ByteSize;
 #[cfg(any(target_os = "linux", target_os = "android"))]
