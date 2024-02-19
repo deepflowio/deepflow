@@ -328,6 +328,10 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.L7Base.StartTime)
 	}
 
+	if eventsJSON, err := json.Marshal(l.Events); err == nil {
+		h.Events = string(eventsJSON)
+	}
+
 	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {

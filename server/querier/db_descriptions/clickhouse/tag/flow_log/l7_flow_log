@@ -72,6 +72,7 @@ response_status           , response_status           , response_status         
 response_code             , response_code             , response_code              , int            ,                       , Application Layer , 111
 response_exception        , response_exception        , response_exception         , string         ,                       , Application Layer , 111
 response_result           , response_result           , response_result            , string         ,                       , Application Layer , 111
+events                    , events                    , events                     , string         ,                       , Application Layer , 111
 
 app_service               , app_service               , app_service                , string         ,                       , Service Info      , 111
 app_instance              , app_instance              , app_instance               , string         ,                       , Service Info      , 111
