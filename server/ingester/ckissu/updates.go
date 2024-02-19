@@ -154,14 +154,14 @@ var ColumnRename65 = []*ColumnRenames{
 	},
 	{
 		Db:             "flow_metrics",
-		Tables:         []string{"application.1m_local", "application.1s_local", "network.1m_local", "network.1s_local"},
+		Tables:         []string{"application.1m_local", "application.1s_local", "network.1m_local", "network.1s_local", "application.1m", "application.1s", "network.1m", "network.1s"},
 		OldColumnNames: []string{"vtap_id", "tap_type"},
 		NewColumnNames: []string{"agent_id", "capture_network_type"},
 		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16, ckdb.UInt8},
 	},
 	{
 		Db:             "flow_metrics",
-		Tables:         []string{"traffic_policy.1m_local"},
+		Tables:         []string{"traffic_policy.1m_local", "traffic_policy.1m"},
 		OldColumnNames: []string{"vtap_id"},
 		NewColumnNames: []string{"agent_id"},
 		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16},
@@ -176,7 +176,7 @@ var ColumnRename65 = []*ColumnRenames{
 	},
 	{
 		Db:             "flow_metrics",
-		Tables:         []string{"application_map.1m_local", "application_map.1s_local", "network_map.1m_local", "network_map.1s_local"},
+		Tables:         []string{"application_map.1m_local", "application_map.1s_local", "network_map.1m_local", "network_map.1s_local", "application_map.1m", "application_map.1s", "network_map.1m", "network_map.1s"},
 		OldColumnNames: []string{"vtap_id", "tap_type", "tap_side", "tap_port", "tap_port_type"},
 		NewColumnNames: []string{"agent_id", "capture_network_type", "observation_point", "capture_nic", "capture_nic_type"},
 		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16, ckdb.UInt8, ckdb.LowCardinalityString, ckdb.UInt32, ckdb.UInt8},
