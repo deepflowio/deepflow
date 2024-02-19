@@ -72,7 +72,7 @@ response_status           , Response Status               ,
 response_code             , Response Code                 ,
 response_exception        , Response Exception            ,
 response_result           , Response Result               ,
-events , Events ,
+events                    , Events                        ,
 
 app_service               , Application Service           ,
 app_instance              , Application Instance          ,
