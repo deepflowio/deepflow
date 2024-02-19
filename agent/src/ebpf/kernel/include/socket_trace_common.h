@@ -124,7 +124,10 @@ struct socket_info_t {
 	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
 	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
-	__s32 correlation_id;   // Currently used for Kafka protocol inference.
+	union {
+		__u8  encoding_type;    // Currently used for OpenWire encoding inference.
+		__s32 correlation_id;   // Currently used for Kafka protocol inference.
+	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
 

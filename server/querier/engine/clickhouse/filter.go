@@ -151,6 +151,15 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
 			}
+		} else if resourceInfo, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]; ok {
+			deviceTypeValue = resourceInfo.ResourceType
+			deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
+
+			if deviceTypeValue == tag.VIF_DEVICE_TYPE_VM {
+				filter = "l3_device_id" + suffix + "!=0 AND l3_device_type" + suffix + "=" + deviceTypeValueStr
+			} else {
+				filter = resourceInfo.ResourceName + "_id" + suffix + "!=0"
+			}
 		}
 	}
 	return

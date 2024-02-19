@@ -1,7 +1,6 @@
-# Name                     , ClientName                , ServerName                , Type          , EnumFile     , Category    , Permission 
-time                       , time                      , time                      , time          ,              , Timestamp   , 111        
+# Name                     , ClientName                , ServerName                , Type          , EnumFile     , Category     , Permission 
+time                       , time                      , time                      , time          ,              , Timestamp    , 111        
                                                                                                                                 
-acl_gid                    , acl_gid                   , acl_gid                   , int           ,              , Tag         , 111              
-vtap                       , vtap                      , vtap                      , resource      ,              , Tag         , 111        
-policy                     , policy                    , policy                    , resource      ,              , NPB Info    , 111        
-npb_tunnel                 , npb_tunnel                , npb_tunnel                , resource      ,              , NPB Info    , 111        
+vtap                       , vtap                      , vtap                      , resource      ,              , Capture Info , 111        
+policy                     , policy                    , policy                    , resource      ,              , NPB Info     , 111        
+npb_tunnel                 , npb_tunnel                , npb_tunnel                , resource      ,              , NPB Info     , 111        

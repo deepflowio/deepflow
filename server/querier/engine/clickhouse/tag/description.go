@@ -1191,6 +1191,8 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		} else if tag == "policy" || tag == "npb_tunnel" {
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE {
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
@@ -1264,6 +1266,26 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
 			}
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		} else {
+			for resourceName, resourceInfo := range HOSTNAME_IP_DEVICE_MAP {
+				if tag != resourceName {
+					continue
+				}
+
+				deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
+				if whereSql != "" {
+					whereSql += " AND devicetype=" + deviceTypeStr
+				} else {
+					whereSql = " WHERE devicetype=" + deviceTypeStr
+				}
+				sql = strings.Join([]string{
+					"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
+					"FROM device_map", whereSql,
+					"GROUP BY value, display_name",
+					"ORDER BY", orderBy, "ASC", limitSql,
+				}, " ")
+				break
+			}
 		}
 		if sql == "" {
 			return GetExternalTagValues(db, table, rawSql)

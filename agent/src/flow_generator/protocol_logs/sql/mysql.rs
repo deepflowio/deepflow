@@ -16,6 +16,7 @@
 
 mod comment_parser;
 
+use log::{debug, trace};
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
@@ -23,21 +24,20 @@ use super::sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_w
 use super::sql_obfuscate::attempt_obfuscation;
 use super::ObfuscateCache;
 
-use crate::common::flow::L7PerfStats;
-use crate::common::l7_protocol_log::L7ParseResult;
-use crate::flow_generator::protocol_logs::pb_adapter::TraceInfo;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::L7Protocol,
-        flow::PacketDirection,
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::{
         error::{Error, Result},
-        protocol_logs::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+        protocol_logs::pb_adapter::{
+            ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+        },
     },
     utils::bytes,
 };
@@ -86,6 +86,7 @@ pub struct MysqlInfo {
     statement_id: u32,
 
     trace_id: Option<String>,
+    span_id: Option<String>,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -184,22 +185,76 @@ impl MysqlInfo {
 
     fn request_string(
         &mut self,
+        config: Option<&LogParserConfig>,
         payload: &[u8],
         obfuscate_cache: &Option<ObfuscateCache>,
-        trace_id: Option<&str>,
     ) -> Result<()> {
         let payload = mysql_string(payload);
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
-        self.context = attempt_obfuscation(obfuscate_cache, payload)
+        let context = attempt_obfuscation(obfuscate_cache, payload)
             .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
                 String::from_utf8_lossy(&m).to_string()
             });
-        if let Some(t) = trace_id {
-            self.trace_id = extra_sql_trace_id(self.context.as_str(), t);
+        if let Some(c) = config {
+            self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
         }
+        self.context = context;
         Ok(())
+    }
+
+    // extra trace id from comment like # TraceID: xxxxxxxxxxxxxxx
+    fn extract_trace_and_span_id(&mut self, config: &L7LogDynamicConfig, sql: &str) {
+        if config.trace_types.is_empty() && config.span_types.is_empty() {
+            return;
+        }
+        debug!("extract id from sql {}", sql);
+        'outer: for comment in comment_parser::MysqlCommentParserIter::new(sql) {
+            trace!("comment={}", comment);
+            let mut segs = comment.split(":");
+            let mut value = segs.next();
+            loop {
+                let key = value;
+                value = segs.next();
+                if value.is_none() {
+                    break;
+                };
+
+                // take last word before ':' and first word after it
+                let Some(rk) = key.as_ref().unwrap().trim().split_whitespace().last() else {
+                    continue;
+                };
+                let Some(rv) = value.as_ref().unwrap().trim().split_whitespace().next() else {
+                    continue;
+                };
+                let rk = rk.trim();
+                let rv = rv.trim();
+                trace!("key={} value={}", rk, rv);
+                for tt in config.trace_types.iter() {
+                    if tt.check(rk) {
+                        self.trace_id = tt.decode_trace_id(rv).map(|s| s.to_string());
+                        break;
+                    }
+                }
+                for st in config.span_types.iter() {
+                    if st.check(rk) {
+                        self.span_id = st.decode_span_id(rv).map(|s| s.to_string());
+                        break;
+                    }
+                }
+                if self.trace_id.is_some() && config.span_types.is_empty()
+                    || self.span_id.is_some() && config.trace_types.is_empty()
+                    || self.trace_id.is_some() && self.span_id.is_some()
+                {
+                    break 'outer;
+                }
+            }
+        }
+        debug!(
+            "extracted trace_id={:?} span_id={:?}",
+            self.trace_id, self.span_id
+        );
     }
 
     fn statement_id(&mut self, payload: &[u8]) {
@@ -251,9 +306,10 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 request_id: f.statement_id.into(),
                 ..Default::default()
             }),
-            trace_info: if f.trace_id.is_some() {
+            trace_info: if let (Some(tid), Some(sid)) = (f.trace_id, f.span_id) {
                 Some(TraceInfo {
-                    trace_id: f.trace_id,
+                    trace_id: Some(tid),
+                    span_id: Some(sid),
                     ..Default::default()
                 })
             } else {
@@ -289,19 +345,10 @@ impl L7ProtocolParserInterface for MysqlLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         if self.parse(
+            param.parse_config,
             payload,
             param.l4_protocol,
             param.direction,
-            param.parse_config.and_then(|c| {
-                // FIXME: all custom trace id label should be effective
-                for i in c.l7_log_dynamic.trace_types.iter() {
-                    match i {
-                        crate::config::handler::TraceType::Customize(c) => return Some(c.as_str()),
-                        _ => continue,
-                    }
-                }
-                None
-            }),
             &mut info,
         )? {
             // ignore greeting
@@ -369,8 +416,8 @@ impl MysqlLog {
 
     fn request(
         &mut self,
+        config: Option<&LogParserConfig>,
         payload: &[u8],
-        trace_id: Option<&str>,
         info: &mut MysqlInfo,
     ) -> Result<LogMessageType> {
         if payload.len() < COMMAND_LEN {
@@ -383,9 +430,9 @@ impl MysqlLog {
             COM_FIELD_LIST | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 info.request_string(
+                    config,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
                     &self.obfuscate_cache,
-                    trace_id,
                 )?;
             }
             COM_STMT_EXECUTE => {
@@ -506,10 +553,10 @@ impl MysqlLog {
     // return is_greeting?
     fn parse(
         &mut self,
+        config: Option<&LogParserConfig>,
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        trace_id: Option<&str>,
         info: &mut MysqlInfo,
     ) -> Result<bool> {
         if proto != IpProtocol::TCP {
@@ -527,9 +574,7 @@ impl MysqlLog {
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => {
-                msg_type = self.request(&payload[offset..], trace_id, info)?
-            }
+            LogMessageType::Request => msg_type = self.request(config, &payload[offset..], info)?,
             LogMessageType::Response => self.response(&payload[offset..], info)?,
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
@@ -606,22 +651,6 @@ impl MysqlHeader {
     }
 }
 
-// extra trace id from comment like # TraceID: xxxxxxxxxxxxxxx
-fn extra_sql_trace_id(sql: &str, trace_id: &str) -> Option<String> {
-    for i in comment_parser::MysqlCommentParserIter::new(sql) {
-        let s = i.trim();
-        let Some(idx) = s.find(trace_id) else {
-            continue;
-        };
-
-        let start = idx + trace_id.len() + 1;
-        if start < s.len() {
-            return Some((&s[start..].trim()).to_string());
-        }
-    }
-    None
-}
-
 // test log parse
 #[cfg(test)]
 mod tests {
@@ -633,6 +662,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        config::handler::TraceType,
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -692,7 +722,7 @@ mod tests {
                 if info.is_none() {
                     let mut i = MysqlInfo::default();
                     i.protocol_version = mysql.protocol_version;
-                    output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                    output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
                     previous_command = 0;
                     continue;
                 }
@@ -708,14 +738,14 @@ mod tests {
                         }
 
                         i.rrt = 0;
-                        output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                        output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
                     }
                     _ => unreachable!(),
                 }
             } else {
                 let mut i = MysqlInfo::default();
                 i.protocol_version = mysql.protocol_version;
-                output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
             }
         }
         output
@@ -836,5 +866,47 @@ mod tests {
             }
         }
         mysql.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn comment_extractor() {
+        flexi_logger::Logger::try_with_env()
+            .unwrap()
+            .start()
+            .unwrap();
+        let testcases = vec![
+        (
+            "/* traceparent: 00-trace_id-span_id-01 */ SELECT * FROM table",
+            Some("trace_id"),
+            Some("span_id"),
+        ),
+        (
+            "/* traceparent: traceparent   \t : 00-trace_id-span_id-01 */ SELECT * FROM table",
+            Some("trace_id"),
+            Some("span_id"),
+        ),
+        (
+            " SELECT * FROM table # traceparent: traceparent   \ttRaCeId \t: 00-trace_id-span_id-01: traceparent",
+            Some("00-trace_id-span_id-01"),
+            None,
+        ),
+        ];
+        let mut info = MysqlInfo::default();
+        let config = L7LogDynamicConfig::new(
+            "".to_owned(),
+            vec![],
+            vec![
+                TraceType::TraceParent,
+                TraceType::Customize("TraceID".to_owned()),
+            ],
+            vec![TraceType::TraceParent],
+        );
+        for (input, tid, sid) in testcases {
+            info.trace_id = None;
+            info.span_id = None;
+            info.extract_trace_and_span_id(&config, input);
+            assert_eq!(info.trace_id.as_ref().map(|s| s.as_str()), tid);
+            assert_eq!(info.span_id.as_ref().map(|s| s.as_str()), sid);
+        }
     }
 }

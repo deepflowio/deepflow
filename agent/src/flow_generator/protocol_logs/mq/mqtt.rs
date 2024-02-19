@@ -194,7 +194,8 @@ impl From<MqttInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: f.pkt_type.to_string(),
                 domain: f.client_id.unwrap_or_default(),
-                resource: topic_str,
+                resource: topic_str.clone(),
+                endpoint: topic_str,
                 ..Default::default()
             },
             resp: L7Response {

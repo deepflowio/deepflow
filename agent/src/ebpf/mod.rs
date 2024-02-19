@@ -75,6 +75,10 @@ pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
 pub const SOCK_DATA_AMQP: u16 = 102;
 #[allow(dead_code)]
+pub const SOCK_DATA_OPENWIRE: u16 = 103;
+#[allow(dead_code)]
+pub const SOCK_DATA_NATS: u16 = 104;
+#[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]
 pub const SOCK_DATA_TLS: u16 = 121;
@@ -402,7 +406,7 @@ pub struct stack_profile_data {
 
 extern "C" {
     /*
-     * Set maximum amount of data passed to the agent by eBPF programe.
+     * Set maximum amount of data passed to the agent by eBPF program.
      * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
      *               it will automatically adjust to 8192 bytes.
      *               If limit_size is 0, use the default values 4096.

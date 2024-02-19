@@ -68,8 +68,8 @@ pub struct FastCGIInfo {
     pub host: String,
     #[serde(rename = "user_agent", skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
-    #[serde(rename = "server_addr", skip_serializing_if = "value_is_default")]
-    pub server_addr: Option<String>,
+    #[serde(rename = "endpoint", skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
     #[serde(rename = "response_status")]
@@ -188,9 +188,9 @@ impl FastCGIInfo {
                 }
             }
             b"REQUEST_URI" => self.path = String::from_utf8_lossy(val).to_string(),
-            b"SERVER_ADDR" => self.server_addr = Some(String::from_utf8_lossy(val).to_string()),
             b"HTTP_HOST" => self.host = String::from_utf8_lossy(val).to_string(),
             b"HTTP_USER_AGENT" => self.user_agent = Some(String::from_utf8_lossy(val).to_string()),
+            b"DOCUMENT_URI" => self.endpoint = Some(String::from_utf8_lossy(val).to_string()),
             _ => {
                 // value must be valid utf8 from here
                 let (Ok(key), Ok(val)) = (std::str::from_utf8(key), std::str::from_utf8(val))
@@ -244,7 +244,7 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
                 req_type: f.method,
                 domain: f.host,
                 resource: f.path,
-                endpoint: f.server_addr.unwrap_or_default(),
+                endpoint: f.endpoint.unwrap_or_default(),
             },
             resp: L7Response {
                 status: f.status,
@@ -605,7 +605,7 @@ mod test {
             path: "/aaaaa".into(),
             host: "172.17.0.3:8080".into(),
             user_agent: Some("curl/7.87.0".into()),
-            server_addr: Some("172.17.0.3".into()),
+            endpoint: Some("/index.php".into()),
             status_code: Some(200),
             status: L7ResponseStatus::Ok,
             seq_off: 16,

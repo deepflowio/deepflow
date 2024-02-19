@@ -405,9 +405,6 @@ vtap_group_id: g-xxxxxx
 ## - 34 (s-gw: Server-side Gateway)
 ## - 41 (c-p: Client Process)
 ## - 42 (s-p: Server Process)
-## - 48 (app: Application)
-## - 49 (c-app: Client Application)
-## - 50 (s-app: Server Application)
 #l4_log_ignore_tap_sides: []
 
 ## L7 flow log ignored tap sides
@@ -958,6 +955,7 @@ vtap_group_id: g-xxxxxx
   #- MQTT
   #- AMQP
   #- OpenWire
+  #- NATS
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin

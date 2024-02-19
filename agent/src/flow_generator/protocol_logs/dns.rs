@@ -133,7 +133,8 @@ impl From<DnsInfo> for L7ProtocolSendLog {
         let log = L7ProtocolSendLog {
             req: L7Request {
                 req_type,
-                resource: f.query_name,
+                resource: f.query_name.clone(),
+                endpoint: f.query_name,
                 ..Default::default()
             },
             resp: L7Response {
@@ -546,12 +547,12 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
+                        output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_dns: {}\r\n", DnsInfo::default(), is_dns));
+                output.push_str(&format!("{:?} is_dns: {}\n", DnsInfo::default(), is_dns));
             }
         }
         output

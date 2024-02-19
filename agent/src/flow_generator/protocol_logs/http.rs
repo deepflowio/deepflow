@@ -1218,7 +1218,7 @@ impl HttpLog {
         if id_type != Self::TRACE_ID {
             return None;
         }
-        tingyun::decode_trace_id(value)
+        tingyun::decode_trace_id(value).map(|s| s.into())
     }
 
     pub fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
@@ -1557,9 +1557,9 @@ mod tests {
             };
 
             let mut trace_set = HashSet::new();
-            trace_set.insert(TraceType::Sw8.to_checker_string());
+            trace_set.insert(TraceType::Sw8.as_str());
             let mut span_set = HashSet::new();
-            span_set.insert(TraceType::Sw8.to_checker_string());
+            span_set.insert(TraceType::Sw8.as_str());
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
             http2.set_header_decoder(config.expected_headers_set.clone());

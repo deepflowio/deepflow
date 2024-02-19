@@ -30,7 +30,8 @@ use self::pb_adapter::L7ProtocolSendLog;
 
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{
-    AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog, OpenWireInfo, OpenWireLog,
+    AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog, NatsInfo, NatsLog, OpenWireInfo,
+    OpenWireLog,
 };
 use num_enum::TryFromPrimitive;
 pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator, SLOT_WIDTH};
@@ -53,6 +54,7 @@ use std::{
     str,
 };
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use prost::Message;
 use serde::{Serialize, Serializer};
 
@@ -465,7 +467,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
 }
 
 fn decode_base64_to_string(value: &str) -> String {
-    let bytes = match base64::decode(value) {
+    let bytes = match BASE64_STANDARD.decode(value) {
         Ok(v) => v,
         Err(_) => return value.to_string(),
     };

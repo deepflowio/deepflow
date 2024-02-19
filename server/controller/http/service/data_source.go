@@ -47,7 +47,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-IO 事件",      // event.perf_event
 	"事件-告警事件",       // event.alarm_event
 	"应用-性能剖析",       // profile.in_process
-	"网络策略",          // flow_metrics.vtap_acl
+	"网络-网络策略",       // flow_metrics.vtap_acl
 }
 
 func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
@@ -489,7 +489,7 @@ func convertNameToInterval(name string) (interval int) {
 
 func getTableName(collection string) string {
 	name := collection
-	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW {
+	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW || collection == common.DATA_SOURCE_ACL {
 		name = strings.TrimPrefix(name, "flow_metrics.")
 		name = strings.TrimSuffix(name, "*")
 	}
