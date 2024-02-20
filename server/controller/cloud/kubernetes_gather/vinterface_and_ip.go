@@ -403,7 +403,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 
 	// 处理nodeIP，生成port，ip，cidrs信息
-	invalidNodeIPs := mapset.NewSet()
 	nodeVinterfaceLcuuids := mapset.NewSet()
 	nodeSubnetLcuuids := mapset.NewSet()
 	for _, vItem := range vData {
@@ -448,13 +447,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			// K8s API的容器节点IP，直接处理port和ip
 			// 如果上报的node相关ip在node ip中，则使用上报ip的cidr替换掉聚合的node cidr
 			case k8sNodeIPs.Contains(ipPrefix.IP().String()):
-				// if is subdomain, don't record node ip and vinterface
-				if k.isSubDomain {
-					k8sNodeIPs.Remove(ipPrefix.IP().String())
-					invalidNodeIPs.Add(ipPrefix.IP().String())
-					log.Debugf("vinterface,ip the subdomain node ip (%s) already exists on the vm ip", ipPrefix.IP().String())
-					continue
-				}
 				rangePrefix, ok := ipPrefix.Range().Prefix()
 				if !ok {
 					log.Warningf("vinterface,ip node ip (%s) to cidr format not valid", ipString)
@@ -518,10 +510,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				k8sNodeIPs.Remove(ipPrefix.IP().String())
 			// 处理genesis额外上报的IP
 			case k.PortNameRegex != "" && portNameRegex.MatchString(nName):
-				if invalidNodeIPs.Contains(ipPrefix.IP().String()) {
-					log.Debugf("vinterface,ip invalid node ip (%s)", ipPrefix.IP().String())
-					continue
-				}
 				// 判断是否在节点默认cidr中，如果在则使用该cidr
 				// 判断网段是否节点已有其他cidr中，如果在则使用该cidr
 				// 判断网段是否在POD默认cidr中，如果在则使用该cidr

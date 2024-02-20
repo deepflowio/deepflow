@@ -106,7 +106,7 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
 	if c.basicInfo.Type != common.KUBERNETES {
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified {
 			cResource.SubDomainResources = c.getSubDomainData(cResource)
 			cResource = c.appendResourceVIPs(cResource)
 		}
@@ -179,7 +179,7 @@ func (c *Cloud) getCloudData() {
 		cResource, cloudCost = c.getKubernetesData()
 	}
 
-	if len(cResource.VMs) == 0 {
+	if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
 		cResource = model.Resource{
 			ErrorState:   cResource.ErrorState,
 			ErrorMessage: cResource.ErrorMessage,
