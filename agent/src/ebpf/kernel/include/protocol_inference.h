@@ -1102,9 +1102,25 @@ struct dns_header {
 
 static __inline enum message_type infer_dns_message(const char *buf,
 						    size_t count,
+						    const char *ptr,
+						    __u32 infer_len, 
 						    struct conn_info_s
 						    *conn_info)
 {
+	/*
+ 	 * Note: When testing with 'curl' accessing a domain, the following
+	 * situations are observed in DNS:
+	 * (1) An 'A' type DNS request is sent.
+	 * (2) An 'A' type response is received.
+	 * (3) An 'AAAA' type response is received.
+	 *
+	 * It is noticed that the Transaction ID for (2) and (3) are different.
+	 * We observe that the data obtained through eBPF is missing the data for
+	 * the 'AAAA' type request, which differs from the data obtained through
+	 * the ‘AF_PACKET’ method ('AF_PACKET' method includes data for the 'AAAA'
+	 * type request).
+	 */
+
 	const int dns_header_size = 12;
 
 	// This is the typical maximum size for DNS.
@@ -1160,17 +1176,24 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (num_rr > max_num_rr) {
 		return MSG_UNKNOWN;
 	}
+
 	// FIXME: Remove this code when the call chain can correctly handle the
 	// Go DNS case.
-	__u8 *queries_start = (__u8 *) (dns + 1);
+	/*
+	 * Here, we assume a maximum length of 128 bytes for the queries name.
+	 * If queries name exceeds 128 bytes, the identification of AAAA or A
+	 * types will be impossible.
+	 */
 	conn_info->dns_q_type = 0;
-	for (int idx = 0; idx < 32; ++idx) {
-		if (queries_start[idx] == 0) {
-			conn_info->dns_q_type =
-			    __bpf_ntohs(*(__u16 *) (queries_start + idx + 1));
-			break;
-		}
+	__u8 tmp_buf[128];
+	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
+	// bpf_probe_read_str() returns the length including '\0'.
+	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
+	if (len > 0 && len < sizeof(tmp_buf)) {
+		bpf_probe_read(tmp_buf, 2, queries_start + len);
+		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
 	}
+
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
 	// the offset to correct the TCP sequence number.
@@ -1185,7 +1208,6 @@ static __inline bool is_include_crlf(const char *buf)
 #define PARAMS_LIMIT 20
 
 	int i;
-#pragma unroll
 	for (i = 1; i < PARAMS_LIMIT; ++i) {
 		if (buf[i] == '\r')
 			break;
@@ -2277,6 +2299,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_DNS:
 			if ((inferred_message.type =
 			     infer_dns_message(infer_buf, count,
+					       syscall_infer_addr,
+					       syscall_infer_len,
 					       conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_DNS;
 				return inferred_message;
@@ -2343,7 +2367,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_oracle_tns_message(infer_buf, count,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_POSTGRESQL;
+				inferred_message.protocol = PROTO_ORACLE;
 				return inferred_message;
 			}
 			break;
@@ -2416,6 +2440,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_dns_message(infer_buf, count,
+				      syscall_infer_addr,
+				      syscall_infer_len,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
 	}

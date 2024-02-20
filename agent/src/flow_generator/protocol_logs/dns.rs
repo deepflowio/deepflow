@@ -531,19 +531,27 @@ mod tests {
             };
 
             let mut dns = DnsLog::default();
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
             let is_dns = dns.check_payload(payload, param);
             dns.reset();
             let info = dns.parse_payload(payload, param);
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
+                        output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_dns: {}\r\n", DnsInfo::default(), is_dns));
+                output.push_str(&format!("{:?} is_dns: {}\n", DnsInfo::default(), is_dns));
             }
         }
         output
@@ -613,7 +621,15 @@ mod tests {
             }
             let _ = dns.parse_payload(
                 packet.get_l4_payload().unwrap(),
-                &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                &ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    Default::default(),
+                    true,
+                    true,
+                ),
             );
         }
         dns.perf_stats.unwrap()

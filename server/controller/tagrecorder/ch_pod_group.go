@@ -81,7 +81,7 @@ func (p *ChPodGroup) generateUpdateInfo(oldItem, newItem mysql.ChPodGroup) (map[
 	if oldItem.PodGroupType != newItem.PodGroupType {
 		updateInfo["pod_group_type"] = newItem.PodGroupType
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if oldItem.PodClusterID != newItem.PodClusterID {

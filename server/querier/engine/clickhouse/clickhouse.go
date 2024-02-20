@@ -288,6 +288,9 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 								continue
 							}
 							name := tagSlice[0].(string)
+							if name == "lb_listener" || name == "pod_ingress" {
+								continue
+							}
 							clientName := tagSlice[1].(string)
 							serverName := tagSlice[2].(string)
 							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
@@ -1384,6 +1387,10 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 				derivativeArgStr := strings.TrimPrefix(argStr, "Derivative(")
 				derivativeArgStr = strings.TrimSuffix(derivativeArgStr, ")")
 				derivativeArgSlice := strings.Split(derivativeArgStr, ",")
+				// Add default group
+				if len(derivativeArgSlice) == 1 {
+					derivativeArgSlice = append(derivativeArgSlice, "tag")
+				}
 				for i, originArg := range derivativeArgSlice {
 					originArg = strings.TrimSpace(originArg)
 					if e.IsDerivative && i > 0 {

@@ -74,6 +74,11 @@
 
 #define MAX_CPU_NR      256
 
+// RHEL 7 & CentOS 7 systems that run on kernel 3.10.
+// eBPF support has been backported to kernel 3.10 since 3.10.0-940.el7.x86_64.
+// See this blog post(https://www.redhat.com/en/blog/introduction-ebpf-red-hat-enterprise-linux-7).
+#define LINUX_3_10_MIN_REV_NUM	940
+
 /*
  * timeout (100ms), use for perf reader epoll().
  */

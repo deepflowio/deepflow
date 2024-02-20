@@ -17,7 +17,7 @@
 package cache
 
 import (
-	"sync"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -28,6 +28,10 @@ type LabelKey struct {
 	Value string
 }
 
+func (k LabelKey) String() string {
+	return k.Name + "-" + k.Value
+}
+
 func NewLabelKey(name, value string) LabelKey {
 	return LabelKey{
 		Name:  name,
@@ -36,33 +40,30 @@ func NewLabelKey(name, value string) LabelKey {
 }
 
 type label struct {
-	idToKey sync.Map
-	keyToID sync.Map
+	keyToID cmap.ConcurrentMap[LabelKey, int]
 }
 
 func newLabel() *label {
-	return &label{}
+	return &label{
+		keyToID: cmap.NewStringer[LabelKey, int](),
+	}
+}
+
+func (l *label) GetKeyToID() cmap.ConcurrentMap[LabelKey, int] {
+	return l.keyToID
 }
 
 func (l *label) GetIDByKey(key LabelKey) (int, bool) {
-	if item, ok := l.keyToID.Load(key); ok {
-		return item.(int), true
+	if item, ok := l.keyToID.Get(key); ok {
+		return item, true
 	}
 	return 0, false
-}
-
-func (l *label) GetKeyByID(id int) (LabelKey, bool) {
-	if item, ok := l.idToKey.Load(id); ok {
-		return item.(LabelKey), true
-	}
-	return LabelKey{}, false
 }
 
 func (l *label) Add(batch []*controller.PrometheusLabel) {
 	for _, item := range batch {
 		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.keyToID.Store(k, int(item.GetId()))
-		l.idToKey.Store(int(item.GetId()), k)
+		l.keyToID.Set(k, int(item.GetId()))
 	}
 }
 
@@ -73,8 +74,7 @@ func (l *label) refresh(args ...interface{}) error {
 	}
 	for _, item := range ls {
 		k := NewLabelKey(item.Name, item.Value)
-		l.keyToID.Store(k, item.ID)
-		l.idToKey.Store(item.ID, k)
+		l.keyToID.Set(k, item.ID)
 	}
 	return nil
 }

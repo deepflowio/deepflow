@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 )
 
 func RegisterAgentGroupConfigCommand() *cobra.Command {
@@ -141,18 +142,21 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 			return
 		}
 
-		cmdFormat := "%-46s %s\n"
-		fmt.Printf(cmdFormat, "NAME", "AGENT_GROUP_ID")
+		t := table.New()
+		t.SetHeader([]string{"NAME", "AGENT_GROUP_ID"})
+		tableItems := [][]string{}
 		for i := range response.Get("DATA").MustArray() {
 			config := response.Get("DATA").GetIndex(i)
 			if agentGroupShortUUID != "" && config.Get("VTAP_GROUP_ID").MustString() != agentGroupShortUUID {
 				continue
 			}
-			fmt.Printf(
-				cmdFormat, config.Get("VTAP_GROUP_NAME").MustString(),
+			tableItems = append(tableItems, []string{
+				config.Get("VTAP_GROUP_NAME").MustString(),
 				config.Get("VTAP_GROUP_ID").MustString(),
-			)
+			})
 		}
+		t.AppendBulk(tableItems)
+		t.Render()
 	}
 }
 

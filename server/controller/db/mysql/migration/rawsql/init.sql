@@ -2289,6 +2289,10 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (19, '网络-网络策略', 'flow_metrics.vtap_acl', 60, 3*24, @lcuuid);
+
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2563,15 +2567,15 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_app_label_layout;
 
-CREATE TABLE IF NOT EXISTS prometheus_metric_label (
-    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`   VARCHAR(256) NOT NULL,
-    `label_id`      INT NOT NULL,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX metric_label_index(metric_name, label_id)
+CREATE TABLE IF NOT EXISTS prometheus_metric_label_name (
+    `id`                INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`       VARCHAR(256) NOT NULL,
+    `label_name_id`     INT NOT NULL,
+    `synced_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_label_name_index(metric_name, label_name_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE prometheus_metric_label;
+TRUNCATE TABLE prometheus_metric_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     `id`            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2670,3 +2674,20 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;
+
+CREATE TABLE IF NOT EXISTS ch_policy (
+    `tunnel_type`     INTEGER NOT NULL,
+    `acl_gid`         INTEGER NOT NULL,
+    `id`              INTEGER,
+    `name`            VARCHAR(256),
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`tunnel_type`, `acl_gid`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_policy;
+
+CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_npb_tunnel;

@@ -261,14 +261,14 @@ pub trait L7ProtocolParserInterface {
 }
 
 #[derive(Clone)]
-pub struct EbpfParam {
+pub struct EbpfParam<'a> {
     pub is_tls: bool,
     // 目前仅 http2 uprobe 有意义
     // ==========================
     // now only http2 uprobe uses
     pub is_req_end: bool,
     pub is_resp_end: bool,
-    pub process_kname: String,
+    pub process_kname: &'a str,
 }
 
 pub struct KafkaInfoCache {
@@ -346,7 +346,7 @@ pub struct ParseParam<'a> {
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
     // ===================================
     // not None when payload from ebpf
-    pub ebpf_param: Option<EbpfParam>,
+    pub ebpf_param: Option<EbpfParam<'a>>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
     pub packet_seq: u64,
     pub time: u64, // micro second
@@ -373,14 +373,18 @@ pub struct ParseParam<'a> {
     pub oracle_parse_conf: OracleParseConfig,
 }
 
-impl ParseParam<'_> {
+impl<'a> ParseParam<'a> {
     pub fn is_from_ebpf(&self) -> bool {
         self.ebpf_type != EbpfType::None
     }
 
     pub fn new(
-        packet: &MetaPacket<'_>,
+        packet: &'a MetaPacket<'a>,
         cache: Rc<RefCell<L7PerfCache>>,
+        wasm_vm: Rc<RefCell<Option<WasmVm>>>,
+        #[cfg(any(target_os = "linux", target_os = "android"))] so_func: Rc<
+            RefCell<Option<Vec<SoPluginFunc>>>,
+        >,
         parse_perf: bool,
         parse_log: bool,
     ) -> Self {
@@ -403,9 +407,9 @@ impl ParseParam<'_> {
 
             l7_perf_cache: cache,
 
-            wasm_vm: Default::default(),
+            wasm_vm,
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            so_func: Default::default(),
+            so_func,
 
             stats_counter: None,
 
@@ -422,9 +426,9 @@ impl ParseParam<'_> {
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
                 #[cfg(any(target_os = "linux", target_os = "android"))]
-                process_kname: String::from_utf8_lossy(&packet.process_kname[..]).to_string(),
+                process_kname: std::str::from_utf8(&packet.process_kname[..]).unwrap_or(""),
                 #[cfg(target_os = "windows")]
-                process_kname: "".into(),
+                process_kname: "",
             });
         }
 
@@ -438,15 +442,6 @@ impl<'a> ParseParam<'a> {
             return ebpf_param.is_tls;
         }
         false
-    }
-
-    pub fn set_wasm_vm(&mut self, vm: Rc<RefCell<Option<WasmVm>>>) {
-        self.wasm_vm = vm;
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    pub fn set_so_func(&mut self, so_func: Rc<RefCell<Option<Vec<SoPluginFunc>>>>) {
-        self.so_func = so_func;
     }
 
     pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {

@@ -34,8 +34,11 @@ import (
 
 var log = logging.MustGetLogger("prometheus")
 
-// equals defaultLookbackDelta in prometheus engine
-const defaultLookbackDelta = 5 * time.Minute
+const (
+	// equals defaultLookbackDelta in prometheus engine
+	defaultLookbackDelta          = 5 * time.Minute
+	defaultNoStepSubQueryInterval = 1 * time.Minute
+)
 
 type PrometheusService struct {
 	// keep only 1 instance of prometheus engine during server lifetime
@@ -53,7 +56,7 @@ func NewPrometheusService() *PrometheusService {
 		MaxSamples:               config.Cfg.Prometheus.MaxSamples,
 		LookbackDelta:            defaultLookbackDelta,
 		Timeout:                  100 * time.Second,
-		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
+		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(defaultNoStepSubQueryInterval) },
 		EnableAtModifier:         true,
 		EnableNegativeOffset:     true,
 		EnablePerStepStats:       true,

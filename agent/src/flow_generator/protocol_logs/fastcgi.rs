@@ -639,7 +639,15 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
 
         let mut parser = FastCGILog::default();
-        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
+        let req_param = &mut ParseParam::new(
+            &p[0],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
@@ -647,7 +655,15 @@ mod test {
 
         (&mut parser).reset();
 
-        let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
+        let resp_param = &ParseParam::new(
+            &p[1],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let resp_payload = p[1].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let mut resp = (&mut parser)

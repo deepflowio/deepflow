@@ -97,7 +97,7 @@ func (p *ChPod) generateUpdateInfo(oldItem, newItem mysql.ChPod) (map[string]int
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if oldItem.PodClusterID != newItem.PodClusterID {

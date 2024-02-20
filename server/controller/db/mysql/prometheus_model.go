@@ -56,11 +56,11 @@ type PrometheusLabel struct {
 	Value                  string `gorm:"column:value;type:text;default:''"`
 }
 
-type PrometheusMetricLabel struct {
+type PrometheusMetricLabelName struct {
 	PrometheusAutoIncID    `gorm:"embedded"`
 	PrometheusOperatedTime `gorm:"embedded"`
 	MetricName             string `gorm:"column:metric_name;type:varchar(256);not null"`
-	LabelID                int    `gorm:"column:label_id;type:int(10);not null"`
+	LabelNameID            int    `gorm:"column:label_name_id;type:int(10);not null"`
 }
 
 type PrometheusMetricTarget struct {

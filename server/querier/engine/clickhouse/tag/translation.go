@@ -251,8 +251,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet(flow_tag.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), '')",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -996,6 +996,40 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
 				"",
 			)}
+	}
+	// Policy
+	tagResourceMap["policy_id"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'id', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'id', (toUInt64(1),toUInt64(acl_gid))))",
+			"",
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'id', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'id', (toUInt64(1),toUInt64(acl_gid)))) %s %s",
+			"",
+		),
+	}
+	tagResourceMap["policy"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_ip_id=0,dictGet(flow_tag.policy_map, 'name', (toUInt64(0),toUInt64(acl_gid))),dictGet(flow_tag.policy_map, 'name', (toUInt64(1),toUInt64(acl_gid))))",
+			"",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE name %s %s)",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE %s(name,%s))",
+		),
+	}
+	// Npb Tunnel
+	tagResourceMap["npb_tunnel_id"] = map[string]*Tag{
+		"default": NewTag(
+			"tunnel_ip_id",
+			"",
+			"tunnel_ip_id %s %s",
+			"",
+		),
+	}
+	tagResourceMap["npb_tunnel"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(flow_tag.npb_tunnel_map, 'name', toUInt64(tunnel_ip_id))",
+			"",
+			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE name %s %s)",
+			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE %s(name,%s))",
+		),
 	}
 	return tagResourceMap
 }

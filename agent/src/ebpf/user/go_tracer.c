@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <linux/version.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -59,6 +60,7 @@ struct process_event {
 	uint32_t expire_time;           // Expiration Date, the number of seconds since the system started.
 };
 
+extern uint32_t k_version;
 static char build_info_magic[] = "\xff Go buildinf:";
 static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
 static struct list_head proc_events_head;     // For process execute/exit events list.
@@ -682,6 +684,23 @@ bool is_go_process(int pid)
 	return ret;
 }
 
+// Lower version kernels do not support hooking so files in containers
+static inline bool golang_kern_check(void)
+{
+	return ((k_version == KERNEL_VERSION(3, 10, 0))
+	    || (k_version >= KERNEL_VERSION(4, 14, 0)));
+}
+
+static inline bool golang_process_check(int pid)
+{
+	char c_id[65];
+	memset(c_id, 0, sizeof(c_id));
+	if ((k_version < KERNEL_VERSION(4, 16, 0)) &&
+	    (fetch_container_id(pid, c_id, sizeof(c_id)) == 0))
+		return false;
+
+	return true;
+}
 
 /**
  * collect_go_uprobe_syms_from_procfs -- Find all golang binary executables from Procfs,
@@ -702,6 +721,11 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	if (!is_feature_enabled(FEATURE_UPROBE_GOLANG))
 		return ETR_OK;
 
+	if (!golang_kern_check()) {
+		ebpf_warning("Uprobe golang requires Linux version 4.14+ or linux 3.10.0\n");
+		return ETR_OK;
+	}
+
 	fddir = opendir("/proc/");
 	if (fddir == NULL) {
 		ebpf_warning("Failed to open %s.\n");
@@ -711,6 +735,8 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	int pid;
 	while ((entry = readdir(fddir)) != NULL) {
 		pid = atoi(entry->d_name);
+		if (!golang_process_check(pid))
+			continue;
 		if (entry->d_type == DT_DIR && pid > 1 && is_user_process(pid))
 			proc_parse_and_register(pid, conf);
 	}

@@ -655,7 +655,15 @@ mod tests {
                 None => continue,
             };
 
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
             let is_tls = tls.check_payload(payload, param);
             tls.reset();
             let info = tls.parse_payload(payload, param);
@@ -742,7 +750,15 @@ mod tests {
             }
             let _ = tls.parse_payload(
                 packet.get_l4_payload().unwrap(),
-                &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                &ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    Default::default(),
+                    true,
+                    true,
+                ),
             );
         }
         tls.perf_stats.unwrap()

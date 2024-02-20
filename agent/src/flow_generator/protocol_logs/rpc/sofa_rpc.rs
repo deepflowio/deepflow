@@ -664,7 +664,15 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
+        let req_param = &mut ParseParam::new(
+            &p[0],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -689,7 +697,15 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::new(&p[1], log_cache.clone(), true, true);
+        let resp_param = &mut ParseParam::new(
+            &p[1],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser
@@ -734,7 +750,15 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
+        let req_param = &mut ParseParam::new(
+            &p[0],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -759,7 +783,15 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::new(&p[1], log_cache.clone(), true, true);
+        let resp_param = &mut ParseParam::new(
+            &p[1],
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser

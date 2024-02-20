@@ -94,8 +94,7 @@ const (
 )
 
 const (
-	TagType  Code = 1 << 62
-	TagValue Code = 1 << 63
+	TunnelIPID Code = 1 << 62
 )
 
 func (c Code) HasEdgeTagField() bool {
@@ -234,15 +233,6 @@ const (
 	CLOUD   TAPTypeEnum = 3
 )
 
-const (
-	_ = 1 + iota // TAG_TYPE_PROVINCE = 1 + iota，已删除
-	_            // TAG_TYPE_TCP_FLAG，已删除
-	_            // TAG_TYPE_CAST_TYPE，已删除
-	TAG_TYPE_TUNNEL_IP_ID
-	_ // TAG_TYPE_TTL，已删除
-	_ // TAG_TYPE_PACKET_SIZE，已删除
-)
-
 type TagSource uint8
 
 const (
@@ -324,8 +314,7 @@ type Field struct {
 
 	TagSource, TagSource1 uint8
 
-	TagType  uint8
-	TagValue uint16
+	TunnelIPID uint16
 }
 
 func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
@@ -397,7 +386,7 @@ func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy st
 	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is always 7 day
+	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 3*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is default 3 day
 
 	secondTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1S; i <= VTAP_FLOW_EDGE_PORT_1S; i++ {
@@ -473,7 +462,7 @@ const (
 	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol
 	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol
 
-	VTAP_ACL = ACLGID | TagType | TagValue | VTAPID
+	VTAP_ACL = ACLGID | TunnelIPID | VTAPID
 )
 
 var metricsTableCodes = []Code{
@@ -833,14 +822,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",subnet_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
 	}
-	if t.Code&TagType != 0 && t.Code&TagValue != 0 {
-		offset += copy(b[offset:], ",tag_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagType), 10))
-		switch t.TagType {
-		case TAG_TYPE_TUNNEL_IP_ID:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-		}
+	if t.Code&TunnelIPID != 0 {
+		offset += copy(b[offset:], ",tunnel_ip_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TunnelIPID), 10))
 	}
 	if t.Code&TAPPort != 0 {
 		offset += copy(b[offset:], ",tap_port=")
@@ -1084,9 +1068,8 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的子网ID(0: 未找到)"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的子网ID(0: 未找到)"))
 	}
-	if code&TagType != 0 && code&TagValue != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_type", ckdb.UInt8).SetComment("1: 省份(仅针对geo库), 2: TCP Flag(仅针对packet库), 3: 播送类型(仅针对packet库), 4: 隧道分发点ID(仅针对flow库), 5: TTL, 6: 包长范围"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.LowCardinalityString).SetComment("tag_type对应的具体值. tag_type=1: 省份, tag_type=2: TCP包头的Flag字段, tag_type=3: 播送类性(broadcast: 广播, multicast: 组播, unicast: 未知单播), tag_type=4: 隧道分发点ID, tag_type=5: TTL的值, tag_type=6: 包长范围值"))
+	if code&TunnelIPID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tunnel_ip_id", ckdb.UInt16).SetComment("隧道分发点ID"))
 	}
 	if code&TAPPort != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("采集位置标识类型 0: MAC，1: IPv4, 2: IPv6, 3: ID, 4: NetFlow, 5: SFlow"))
@@ -1284,12 +1267,8 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	if code&SubnetIDPath != 0 {
 		block.Write(t.SubnetID, t.SubnetID1)
 	}
-	if code&TagType != 0 && code&TagValue != 0 {
-		block.Write(t.TagType)
-		switch t.TagType {
-		case TAG_TYPE_TUNNEL_IP_ID:
-			block.Write(strconv.FormatUint(uint64(t.TagValue), 10))
-		}
+	if code&TunnelIPID != 0 {
+		block.Write(t.TunnelIPID)
 	}
 	if code&TAPPort != 0 {
 		tapPort, tapPortType, natSource, tunnelType := t.TAPPort.SplitToPortTypeTunnel()
@@ -1395,8 +1374,9 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 		}
 	}
 	t.SignalSource = uint16(p.Field.SignalSource)
-	t.TagType = uint8(p.Field.TagType)
-	t.TagValue = uint16(p.Field.TagValue)
+
+	// tunnel_ip_id get from server_port field
+	t.TunnelIPID = uint16(p.Field.ServerPort)
 }
 
 func (t *Tag) SetID(id string) {

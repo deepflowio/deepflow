@@ -22,10 +22,10 @@ BEGIN
         SET @lcuuid = (SELECT UUID());
         INSERT INTO data_source (name, tsdb_type, `interval`, retention_time, lcuuid) VALUES ('deepflow_system', 'deepflow_system', 0, 3*24, @lcuuid);
 
-        UPDATE db_version SET version = '6.2.1.17';
-
         COMMIT;
     END IF;
+
+    UPDATE db_version SET version = '6.2.1.17';
 END;
 
 CALL update_data_sources();

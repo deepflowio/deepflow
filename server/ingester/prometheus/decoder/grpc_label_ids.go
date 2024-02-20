@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/cornelk/hashmap"
 	"github.com/golang/protobuf/proto"
@@ -44,17 +45,25 @@ const (
 	JOBID_OFFSET          = 32
 )
 
+func uint64ToFloat64(i uint64) float64 {
+	return *(*float64)(unsafe.Pointer(&i))
+}
+
+func float64ToUint64(f float64) uint64 {
+	return *(*uint64)(unsafe.Pointer(&f))
+}
+
 func columnIndexKey(metricID, labelNameID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(labelNameID)
 }
 
 func targetIdKey(epcId, podClusterId uint16, jobID, instanceID uint32) complex128 {
-	return complex(float64(uint64(jobID)<<JOBID_OFFSET|uint64(instanceID)),
-		float64(uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET|uint64(epcId)))
+	return complex(uint64ToFloat64(uint64(jobID)<<JOBID_OFFSET|uint64(instanceID)),
+		uint64ToFloat64(uint64(podClusterId)<<POD_CLUSTER_ID_OFFSET|uint64(epcId)))
 }
 
 func parseTargetIdKey(key complex128) (epcId, podClusterId uint16, jobID, instanceID uint32) {
-	return uint16(imag(key)), uint16(uint64(imag(key)) >> POD_CLUSTER_ID_OFFSET), uint32(uint64(real(key)) >> JOBID_OFFSET), uint32(real(key))
+	return uint16(float64ToUint64(imag(key))), uint16(uint64(float64ToUint64(imag(key))) >> POD_CLUSTER_ID_OFFSET), uint32(uint64(float64ToUint64(real(key))) >> JOBID_OFFSET), uint32(float64ToUint64(real(key)))
 }
 
 func nameValueKey(nameID, valueID uint32) uint64 {
@@ -434,6 +443,26 @@ func (t *PrometheusLabelTable) getId(value uint64) (id uint32, valid bool) {
 func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse, isAll bool) {
 	t.updatePrometheusTargets(resp.GetResponseTargetIds())
 
+	if isAll {
+		for _, labelInfo := range resp.GetResponseLabels() {
+			name := labelInfo.GetName()
+			nameId := labelInfo.GetNameId()
+			if name != "" && nameId != 0 {
+				t.labelNameIDs.Set(strings.Clone(name), t.genId(isAll, nameId))
+			} else {
+				t.counter.LabelNameUnknown++
+			}
+			value := labelInfo.GetValue()
+			valueId := labelInfo.GetValueId()
+			if valueId != 0 {
+				t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
+			} else {
+				t.counter.LabelValueUnknown++
+			}
+			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
+		}
+	}
+
 	for _, metric := range resp.GetResponseLabelIds() {
 		metricName := metric.GetMetricName()
 		if metricName == "" {
@@ -451,19 +480,22 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			} else {
 				t.counter.LabelNameUnknown++
 			}
-			value := labelInfo.GetValue()
-			valueId := labelInfo.GetValueId()
-			if valueId != 0 {
-				t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
-			} else {
-				t.counter.LabelValueUnknown++
+			// if get all lables, value info is nothing
+			if !isAll {
+				value := labelInfo.GetValue()
+				valueId := labelInfo.GetValueId()
+				if valueId != 0 {
+					t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
+				} else {
+					t.counter.LabelValueUnknown++
+				}
+				if jobId == 0 && name == model.JobLabel {
+					jobId = valueId
+				} else if instanceId == 0 && name == model.InstanceLabel {
+					instanceId = valueId
+				}
+				t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 			}
-			if jobId == 0 && name == model.JobLabel {
-				jobId = valueId
-			} else if instanceId == 0 && name == model.InstanceLabel {
-				instanceId = valueId
-			}
-			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
 			t.labelColumnIndexs.Set(columnIndexKey(metricId, nameId), cIndex)
@@ -698,6 +730,9 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	targetReq.EpcId = proto.Uint32(uint32(epcId))
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
+	if request == "all" {
+		req = &trident.PrometheusLabelRequest{}
+	}
 	resp, err := t.RequestLabelIDs(req)
 	if err != nil {
 		return fmt.Sprintf("request: %s\nresponse failed: %s", req, err)

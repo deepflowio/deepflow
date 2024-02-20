@@ -19,13 +19,12 @@ package cache
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 )
@@ -41,30 +40,36 @@ type item[T any] struct {
 	step  int64
 	vType parser.ValueType // origin value type
 	data  T
+
+	loadCompleted chan struct{}
 }
 
 func dataSizeOf(r *item[promql.Result]) uint64 {
 	if r == nil {
 		return 0
 	}
-	size := uint64(unsafe.Sizeof(r.start) + unsafe.Sizeof(r.end) + unsafe.Sizeof(r.step) + unsafe.Sizeof(r.vType))
+	var size uintptr
+	size = unsafe.Sizeof(r.start) + unsafe.Sizeof(r.end) + unsafe.Sizeof(r.step) + unsafe.Sizeof(r.vType)
 	matrix, err := r.data.Matrix()
 	if err != nil {
 		totalPoints := 0
 		for _, m := range matrix {
 			for _, v := range m.Metric {
-				size += uint64(unsafe.Sizeof(v))
+				size += uintptr(len(v.Name) + len(v.Value))
+				size += unsafe.Sizeof((*string)(unsafe.Pointer(&v.Name))) + unsafe.Sizeof((*string)(unsafe.Pointer(&v.Value)))
 			}
 			totalPoints += len(m.Points)
 		}
-		size += uint64(totalPoints*pointSize + totalPoints*pointPtrSize)
+		size += uintptr(totalPoints*pointSize + totalPoints*pointPtrSize)
 	}
-	return size
+	return uint64(size)
 }
 
 type Cacher struct {
 	entries *lru.Cache[string, item[promql.Result]]
 	lock    *sync.RWMutex
+
+	cleanUpCache *time.Ticker
 }
 
 func NewCacher() *Cacher {
@@ -72,17 +77,64 @@ func NewCacher() *Cacher {
 		lock:    &sync.RWMutex{},
 		entries: lru.NewCache[string, item[promql.Result]](config.Cfg.Prometheus.Cache.CacheMaxCount),
 	}
+	go c.startUpCleanCache(config.Cfg.Prometheus.Cache.CacheCleanInterval)
 	return c
 }
 
-func (c *Cacher) Fetch(key string, start, end int64) (r promql.Result, fixedStart int64, fixedEnd int64, queryRequired bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+func (c *Cacher) startUpCleanCache(cleanUpInterval int) {
+	c.cleanUpCache = time.NewTicker(time.Duration(cleanUpInterval) * time.Second)
+	defer func() {
+		c.cleanUpCache.Stop()
+		if err := recover(); err != nil {
+			go c.startUpCleanCache(cleanUpInterval)
+		}
+	}()
+	for range c.cleanUpCache.C {
+		c.cleanCache()
+	}
+}
 
+func (c *Cacher) cleanCache() {
+	keys := c.entries.Keys()
+	for _, k := range keys {
+		item, ok := c.entries.Peek(k)
+		if !ok {
+			continue
+		}
+		size := dataSizeOf(&item)
+		if size > config.Cfg.Prometheus.Cache.CacheItemSize {
+			log.Infof("cache item remove: %s, real size: %d", k, size)
+			c.entries.Remove(k)
+		}
+	}
+}
+
+func (c *Cacher) Fetch(key string, start, end int64) (r promql.Result, fixedStart int64, fixedEnd int64, queryRequired bool) {
 	entry, ok := c.entries.Get(key)
 	if !ok {
+		c.lock.Lock()
+		c.entries.Add(key, item[promql.Result]{vType: parser.ValueTypeNone, loadCompleted: make(chan struct{})})
+		c.lock.Unlock()
+
 		return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, true
 	}
+
+	if entry.vType == parser.ValueTypeNone {
+		select {
+		case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
+			log.Infof("req [%s:%d-%d] wait %d to get cache result", key, start, end, config.Cfg.Prometheus.Cache.CacheFirstTimeout)
+			return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, false
+		case <-entry.loadCompleted:
+			entry, ok = c.entries.Get(key)
+			if !ok {
+				return promql.Result{Err: fmt.Errorf("key %s load failed", key)}, start, end, true
+			}
+			log.Debugf("req [%s:%d-%d] get cached result", key, start, end)
+		}
+	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	if entry.vType == parser.ValueTypeVector {
 		r, queryRequired = c.fetchInstant(&entry, start, end)
@@ -183,19 +235,12 @@ func (c *Cacher) extractSubData(r promql.Result, start, end int64) promql.Result
 	return promql.Result{Value: result}
 }
 
-func (c *Cacher) Merge(key string, cached promql.Result, start, end, step int64, res promql.Result) (promql.Result, error) {
+func (c *Cacher) Merge(key string, start, end, step int64, res promql.Result) (promql.Result, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	defer func(k string) {
-		// over size
-		val, _ := c.entries.Peek(k)
-		if dataSizeOf(&val) > config.Cfg.Prometheus.Cache.CacheItemSize {
-			c.entries.Remove(k)
-		}
-	}(key)
 
 	entry, ok := c.entries.Get(key)
-	if !ok {
+	if !ok || (entry.vType == parser.ValueTypeNone) {
 		item := item[promql.Result]{
 			start: start,
 			end:   end,
@@ -260,6 +305,15 @@ func (c *Cacher) Merge(key string, cached promql.Result, start, end, step int64,
 	}
 
 	entry.data = mergeResult
+
+	if entry.loadCompleted != nil {
+		select {
+		case _, ok := <-entry.loadCompleted:
+			log.Debugf("entry loadCompleted closed: %v", ok)
+		default:
+			close(entry.loadCompleted)
+		}
+	}
 	return entry.data, nil
 }
 
@@ -270,12 +324,10 @@ func (c *Cacher) matrixMerge(resp promql.Matrix, cache *promql.Result) (promql.R
 	}
 	output := make(promql.Matrix, 0, len(cacheMatrix))
 	for _, cachedTs := range cacheMatrix {
-		cachedSeries := genSeriesLabelString(&cachedTs.Metric)
 		newSeries := promql.Series{Metric: cachedTs.Metric}
 		newSeries.Points = cachedTs.Points
 		for _, series := range resp {
-			respSeries := genSeriesLabelString(&series.Metric)
-			if respSeries == cachedSeries {
+			if promLabelsEqual(&cachedTs.Metric, &series.Metric) {
 				existsStartT := newSeries.Points[0].T
 				existsEndT := newSeries.Points[len(newSeries.Points)-1].T
 
@@ -304,7 +356,6 @@ func (c *Cacher) matrixMerge(resp promql.Matrix, cache *promql.Result) (promql.R
 		output = append(output, newSeries)
 	}
 
-	sort.Sort(output)
 	return promql.Result{Value: output}, nil
 }
 
@@ -315,12 +366,10 @@ func (c *Cacher) vectorMerge(resp promql.Vector, cached *promql.Result) (promql.
 	}
 	output := make(promql.Matrix, 0, len(cacheMatrix))
 	for _, cachedTs := range cacheMatrix {
-		cachedSeries := genSeriesLabelString(&cachedTs.Metric)
 		newSeries := promql.Series{Metric: cachedTs.Metric}
 		newSeries.Points = cachedTs.Points
 		for _, samples := range resp {
-			respSeries := genSeriesLabelString(&samples.Metric)
-			if respSeries == cachedSeries {
+			if promLabelsEqual(&cachedTs.Metric, &samples.Metric) {
 				insertedPointAt := sort.Search(len(newSeries.Points), func(i int) bool {
 					return newSeries.Points[i].T >= samples.Point.T
 				})
@@ -334,7 +383,6 @@ func (c *Cacher) vectorMerge(resp promql.Vector, cached *promql.Result) (promql.
 			}
 		}
 	}
-	sort.Sort(output)
 	return promql.Result{Value: output}, nil
 }
 
@@ -347,12 +395,4 @@ func vectorTomatrix(v *promql.Vector) promql.Matrix {
 		})
 	}
 	return output
-}
-
-func genSeriesLabelString(lb *labels.Labels) string {
-	lbs := make([]string, 0, len(*lb))
-	for i := 0; i < len(*lb); i++ {
-		lbs = append(lbs, fmt.Sprintf("%s=%s", (*lb)[i].Name, (*lb)[i].Value))
-	}
-	return strings.Join(lbs, ",")
 }

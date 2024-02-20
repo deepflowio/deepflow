@@ -42,12 +42,16 @@ static int get_fd_from_openssl_ssl(void *ssl)
 	void *rbio;
 
 	static const int rbio_ssl_offset = 0x10;
+	static const int fd_rbio_offset_v3 = 0x38;
 	static const int fd_rbio_offset_v1_1_1 = 0x30;
 	static const int fd_rbio_offset_v1_1_0 = 0x28;
 
 	// The openssl library generally does not have debug information, so
 	// here we use constants instead.
 	bpf_probe_read(&rbio, sizeof(rbio), ssl + rbio_ssl_offset);
+	bpf_probe_read(&fd, sizeof(fd), rbio + fd_rbio_offset_v3);
+	if (fd > 2)
+		return fd;
 	bpf_probe_read(&fd, sizeof(fd), rbio + fd_rbio_offset_v1_1_1);
 	if (fd > 2)
 		return fd;

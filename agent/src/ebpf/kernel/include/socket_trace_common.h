@@ -64,8 +64,9 @@ struct __socket_data {
 
 	/* 追踪数据信息 */
 	__u64 timestamp;     // 数据捕获时间戳
-	__u8  direction: 1;  // bits[0]: 方向，值为T_EGRESS(0), T_INGRESS(1)
-	__u8  msg_type:  7;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 direction: 1;  // bits[0]: 方向，值为T_EGRESS(0), T_INGRESS(1)
+	__u8 msg_type:  6;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 is_tls: 1;
 
 	__u64 syscall_len;   // 本次系统调用读、写数据的总长度
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号

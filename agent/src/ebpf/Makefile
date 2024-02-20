@@ -144,6 +144,7 @@ $(ELFFILES): tools/bintobuffer
         fi
 	@rm -rf data
 	$(call compile_socket_trace_elf, common)
+	$(call compile_socket_trace_elf, 3_10_0, LINUX_VER_3_10_0=1)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
 	$(call compile_socket_trace_elf, kylin, LINUX_VER_KYLIN=1)
 	$(call compile_perf_profiler_elf, common)

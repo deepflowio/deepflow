@@ -207,6 +207,7 @@ const (
 	VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING
 	VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING
 	VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING
+	VTAP_LICENSE_FUNCTION_DATABASE_MONITORING
 	VTAP_LICENSE_FUNCTION_MAX
 )
 
@@ -280,6 +281,7 @@ const (
 	BAIDU_BCE         = 25
 	ESHORE            = 26
 	CLOUD_TOWER       = 27
+	NFVO              = 28
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -308,6 +310,7 @@ const (
 	MICROSOFT_ACS_EN     = "microsoft_acs"
 	BAIDU_BCE_EN         = "baidu_bce"
 	CLOUD_TOWER_EN       = "cloudtower"
+	NFVO_EN              = "nfvo"
 
 	TENCENT_CH          = "腾讯云"
 	PINGAN_CH           = "平安云"
@@ -318,6 +321,7 @@ const (
 	MICROSOFT_CH        = "微软云"
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
+	NFVO_CH             = "华为NFVO+"
 
 	OPENSTACK_CH   = "OpenStack"
 	VSPHERE_CH     = "vSphere"
@@ -480,6 +484,7 @@ const (
 const (
 	DATA_SOURCE_FLOW = "flow_metrics.vtap_flow*"
 	DATA_SOURCE_APP  = "flow_metrics.vtap_app*"
+	DATA_SOURCE_ACL  = "flow_metrics.vtap_acl"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1

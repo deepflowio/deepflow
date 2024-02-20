@@ -908,7 +908,7 @@ message LabelResponse {
     optional string value = 2;
     optional uint32 name_id = 3;
     optional uint32 value_id = 4;
-    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label
+    optional uint32 app_label_column_index = 5;  // starting from 1, if it is 0, it means the label is the target label. When requesting all, response will not carry index
 }
 
 message MetricLabelRequest {
@@ -954,6 +954,7 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
+    repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
 }
 
 message PrometheusTargetRequest {
