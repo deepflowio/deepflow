@@ -48,8 +48,8 @@ ip                         , ip                        , ip                     
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type               , Network Layer   , 111
 
 event_type                 , event_type                , event_type                , string_enum    , perf_event_type       , Event Info      , 111
-event_desc                 , event_desc                , event_desc                , string         ,                       , Event Info      , 111
 
+process_kname              , process_kname             , process_kname             , string         ,                           , Service Info    , 111
 app_instance               , app_instance              , app_instance              , string         ,                           , Service Info    , 111
 vtap                       , vtap                      , vtap                      , resource       ,                           , Capture Info    , 111
 signal_source              , signal_source             , signal_source             , int_enum       , perf_event_signal_source  , Capture Info    , 111

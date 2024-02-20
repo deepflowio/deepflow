@@ -85,7 +85,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 		w.ttl = config.PerfTTL
 		w.writerConfig = config.PerfCKWriterConfig
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, DefaultPartition, config.Base, &w.writerConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
 	}
