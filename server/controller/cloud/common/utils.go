@@ -185,7 +185,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uu
 
 	for _, region := range regions {
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
-		vpcName := domainName + fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
+		vpcName := fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
 		retVPCs = append(retVPCs, model.VPC{
 			Lcuuid:       vpcLcuuid,
 			Name:         vpcName,
