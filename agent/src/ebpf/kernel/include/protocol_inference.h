@@ -389,6 +389,12 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		static const int HTTP2_MAGIC_SIZE = 24;
 		offset = HTTP2_MAGIC_SIZE;
 	}
+
+	/*
+	 * Use '#pragma unroll' to avoid the following error during the
+	 * loading process in Linux 5.2.x:
+	 * bpf load "socket-trace-bpf-linux-5.2_plus" failed, error:Invalid argument (22)
+	 */
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
 
