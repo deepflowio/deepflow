@@ -52,6 +52,7 @@ type OverwriteQueue struct {
 	writeCursor   uint
 	pending       uint
 	release       func(x interface{})
+	C             chan struct{}
 
 	counter *Counter
 }
@@ -74,6 +75,7 @@ func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 	var flushIndicator time.Duration
 	statOptions := []stats.Option{stats.OptionStatTags{"module": name}}
 	var module string
+	var chanSignal OptionChanSignal
 	for _, option := range options {
 		switch option.(type) {
 		case OptionRelease:
@@ -84,6 +86,8 @@ func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 			module = option.(OptionModule)
 		case OptionStatsOption: // XXX: interface{}类型，必须放在最后
 			statOptions = append(statOptions, option.(OptionStatsOption))
+		case OptionChanSignal:
+			chanSignal = option.(OptionChanSignal)
 		default:
 			panic(fmt.Sprintf("Unknown option %v", option))
 		}
@@ -109,6 +113,29 @@ func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 				}
 			}
 		}()
+	}
+
+	if chanSignal.Size != 0 {
+		go func() {
+			ticker := time.NewTicker(chanSignal.Interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if q.Len() > 0 {
+						// send signal to indicate there are message waiting to be handled
+						select {
+						case q.C <- struct{}{}:
+							//signaled
+						default:
+							// not block this goroutine
+						}
+					}
+				}
+			}
+
+		}()
+
 	}
 }
 
