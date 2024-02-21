@@ -248,7 +248,7 @@ impl LocalModeDispatcher {
                 base.npb_dedup_enabled.load(Ordering::Relaxed),
             );
             flow_map.inject_meta_packet(&config, &mut meta_packet);
-            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
+            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
             for h in pipeline.handlers.iter_mut() {
                 h.handle(&mini_packet);
             }
@@ -459,7 +459,7 @@ impl LocalModeDispatcherListener {
         result
     }
 
-    fn parse_tap_mac_script_output(result: &mut HashMap<String, MacAddr>, bytes: &[u8]) {
+    pub fn parse_tap_mac_script_output(result: &mut HashMap<String, MacAddr>, bytes: &[u8]) {
         let mut iter = bytes.split(|x| *x == b'\n');
         while let Some(line) = iter.next() {
             let mut kvs = line.split(|x| *x == b',');
@@ -486,7 +486,7 @@ impl LocalModeDispatcherListener {
 
 #[cfg(any(target_os = "windows", target_os = "android"))]
 impl LocalModeDispatcherListener {
-    fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
+    pub fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
         match public::utils::net::link_list() {
@@ -510,7 +510,7 @@ impl LocalModeDispatcherListener {
 
 #[cfg(target_os = "linux")]
 impl LocalModeDispatcherListener {
-    fn get_if_index_to_inner_mac_map(
+    pub fn get_if_index_to_inner_mac_map(
         poller: &GenericPoller,
         ns: &public::netns::NsFile,
     ) -> HashMap<u32, MacAddr> {
@@ -550,7 +550,7 @@ impl LocalModeDispatcherListener {
 }
 
 #[derive(Clone)]
-struct MacRewriter {
+pub struct MacRewriter {
     contrail_regex: Regex,
     qing_cloud_vm_regex: Regex,
     qing_cloud_sriov_regex: Regex,

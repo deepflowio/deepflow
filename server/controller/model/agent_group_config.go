@@ -98,7 +98,6 @@ type StaticConfig struct {
 	OsProcSyncTaggedOnly               *bool                       `yaml:"os-proc-sync-tagged-only,omitempty"`
 	GuardInterval                      *string                     `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled              *bool                       `yaml:"check-core-file-disabled,omitempty"`
-	WasmPlugins                        []string                    `yaml:"wasm-plugins,omitempty"`
 	SoPlugins                          []string                    `yaml:"so-plugins,omitempty"`
 	MemoryTrimDisabled                 *bool                       `yaml:"memory-trim-disabled,omitempty"`
 	FastPathDisabled                   *bool                       `yaml:"fast-path-disabled,omitempty"`
@@ -113,6 +112,7 @@ type StaticConfig struct {
 	ExternalMetricIntegrationDisabled  *bool                       `yaml:"external-metric-integration-disabled,omitempty"`
 	NtpMaxInterval                     *string                     `yaml:"ntp-max-interval,omitempty"`
 	NtpMinInterval                     *string                     `yaml:"ntp-min-interval,omitempty"`
+	DispatcherQueue                    *bool                       `yaml:"dispatcher-queue,omitempty"`
 }
 
 type XflowCollectorConfig struct {

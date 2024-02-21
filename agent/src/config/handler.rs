@@ -328,6 +328,7 @@ pub struct DispatcherConfig {
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
+    pub dispatcher_queue: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1230,6 +1231,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
                 dpdk_enabled: conf.yaml_config.dpdk_enabled,
+                dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,
