@@ -2076,6 +2076,7 @@ impl AgentComponents {
                         .dispatcher
                         .capture_packet_size as usize,
                     dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
+                    dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
                     ..Default::default()
                 })))
                 .bpf_options(bpf_options.clone())
