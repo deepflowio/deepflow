@@ -166,7 +166,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			}
 		}
 		if myRegionID != 0 && t.RegionID1 != 0 {
-			if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
+			if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
 				platformData.AddOtherRegion()
 				return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
 			}
@@ -214,7 +214,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		}
 
 		if myRegionID != 0 && t.RegionID != 0 {
-			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
+			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
 				if t.TAPSide == zerodoc.Client && t.RegionID != myRegionID {
 					platformData.AddOtherRegion()
 					return fmt.Errorf("My regionID is %d, but document regionID is %d", myRegionID, t.RegionID)

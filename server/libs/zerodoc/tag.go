@@ -225,7 +225,7 @@ func (d DirectionEnum) ToTAPSide() TAPSideEnum {
 // in the IDC.
 //
 // Note: For historical reasons, we use the confusing term VTAP to refer
-// to deepflow-agent, and vtap_id to represent the id of a deepflow-agent.
+// to deepflow-agent, and agent_id to represent the id of a deepflow-agent.
 type TAPTypeEnum uint8
 
 const (
@@ -335,11 +335,11 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 
 	var meterColumns []*ckdb.Column
 	switch id {
-	case VTAP_FLOW_PORT_1M, VTAP_FLOW_EDGE_PORT_1M:
+	case NETWORK_1M, NETWORK_MAP_1M:
 		meterColumns = FlowMeterColumns()
-	case VTAP_ACL_1M:
+	case TRAFFIC_POLICY_1M:
 		meterColumns = UsageMeterColumns()
-	case VTAP_APP_PORT_1M, VTAP_APP_EDGE_PORT_1M:
+	case APPLICATION_1M, APPLICATION_MAP_1M:
 		meterColumns = AppMeterColumns()
 	}
 
@@ -365,7 +365,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 // 由分钟表生成秒表
 func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int, coldStorages *ckdb.ColdStorage) *ckdb.Table {
 	t := *minuteTable
-	t.ID = minuteTable.ID + uint8(VTAP_FLOW_PORT_1S)
+	t.ID = minuteTable.ID + uint8(NETWORK_1S)
 	t.LocalName = MetricsTableID(t.ID).TableName() + ckdb.LOCAL_SUBFFIX
 	t.GlobalName = MetricsTableID(t.ID).TableName()
 	t.TTL = ttl
@@ -380,20 +380,20 @@ func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy st
 	var metricsTables []*ckdb.Table
 
 	minuteTables := []*ckdb.Table{}
-	for i := VTAP_FLOW_PORT_1M; i <= VTAP_FLOW_EDGE_PORT_1M; i++ {
+	for i := NETWORK_1M; i <= NETWORK_MAP_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, flowMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
+	for i := APPLICATION_1M; i <= APPLICATION_MAP_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 3*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is default 3 day
+	minuteTables = append(minuteTables, newMetricsMinuteTable(TRAFFIC_POLICY_1M, engine, version, cluster, storagePolicy, 3*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, TRAFFIC_POLICY_1M.TableName()))) // traffic_policy ttl is 3 day default
 
 	secondTables := []*ckdb.Table{}
-	for i := VTAP_FLOW_PORT_1S; i <= VTAP_FLOW_EDGE_PORT_1S; i++ {
-		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], flowSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
+	for i := NETWORK_1S; i <= NETWORK_MAP_1S; i++ {
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-NETWORK_1S], flowSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	for i := VTAP_APP_PORT_1S; i <= VTAP_APP_EDGE_PORT_1S; i++ {
-		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], appSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
+	for i := APPLICATION_1S; i <= APPLICATION_MAP_1S; i++ {
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-NETWORK_1S], appSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
 	metricsTables = append(minuteTables, secondTables...)
 	return metricsTables
@@ -402,21 +402,21 @@ func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy st
 type MetricsTableID uint8
 
 const (
-	VTAP_FLOW_PORT_1M MetricsTableID = iota
-	VTAP_FLOW_EDGE_PORT_1M
+	NETWORK_1M MetricsTableID = iota
+	NETWORK_MAP_1M
 
-	VTAP_APP_PORT_1M
-	VTAP_APP_EDGE_PORT_1M
+	APPLICATION_1M
+	APPLICATION_MAP_1M
 
-	VTAP_ACL_1M
+	TRAFFIC_POLICY_1M
 
-	VTAP_FLOW_PORT_1S
-	VTAP_FLOW_EDGE_PORT_1S
+	NETWORK_1S
+	NETWORK_MAP_1S
 
-	VTAP_APP_PORT_1S
-	VTAP_APP_EDGE_PORT_1S
+	APPLICATION_1S
+	APPLICATION_MAP_1S
 
-	VTAP_TABLE_ID_MAX
+	METRICS_TABLE_ID_MAX
 )
 
 func (i MetricsTableID) TableName() string {
@@ -428,19 +428,19 @@ func (i MetricsTableID) TableCode() Code {
 }
 
 var metricsTableNames = []string{
-	VTAP_FLOW_PORT_1M:      "vtap_flow_port.1m",
-	VTAP_FLOW_EDGE_PORT_1M: "vtap_flow_edge_port.1m",
+	NETWORK_1M:     "network.1m",
+	NETWORK_MAP_1M: "network_map.1m",
 
-	VTAP_APP_PORT_1M:      "vtap_app_port.1m",
-	VTAP_APP_EDGE_PORT_1M: "vtap_app_edge_port.1m",
+	APPLICATION_1M:     "application.1m",
+	APPLICATION_MAP_1M: "application_map.1m",
 
-	VTAP_ACL_1M: "vtap_acl.1m",
+	TRAFFIC_POLICY_1M: "traffic_policy.1m",
 
-	VTAP_FLOW_PORT_1S:      "vtap_flow_port.1s",
-	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port.1s",
+	NETWORK_1S:     "network.1s",
+	NETWORK_MAP_1S: "network_map.1s",
 
-	VTAP_APP_PORT_1S:      "vtap_app_port.1s",
-	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port.1s",
+	APPLICATION_1S:     "application.1s",
+	APPLICATION_MAP_1S: "application_map.1s",
 }
 
 func MetricsTableNameToID(name string) MetricsTableID {
@@ -449,7 +449,7 @@ func MetricsTableNameToID(name string) MetricsTableID {
 			return MetricsTableID(i)
 		}
 	}
-	return VTAP_TABLE_ID_MAX
+	return METRICS_TABLE_ID_MAX
 }
 
 const (
@@ -457,28 +457,28 @@ const (
 	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath | GPIDPath | SignalSource
 	BasePortCode = Protocol | ServerPort | IsKeyService
 
-	VTAP_FLOW_PORT      = BaseCode | BasePortCode | Direction
-	VTAP_FLOW_EDGE_PORT = BasePathCode | BasePortCode | TAPPort
-	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol
-	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol
+	NETWORK         = BaseCode | BasePortCode | Direction
+	NETWORK_MAP     = BasePathCode | BasePortCode | TAPPort
+	APPLICATION     = BaseCode | BasePortCode | Direction | L7Protocol
+	APPLICATION_MAP = BasePathCode | BasePortCode | TAPPort | L7Protocol
 
-	VTAP_ACL = ACLGID | TunnelIPID | VTAPID
+	TRAFFIC_POLICY = ACLGID | TunnelIPID | VTAPID
 )
 
 var metricsTableCodes = []Code{
-	VTAP_FLOW_PORT_1M:      VTAP_FLOW_PORT,
-	VTAP_FLOW_EDGE_PORT_1M: VTAP_FLOW_EDGE_PORT,
+	NETWORK_1M:     NETWORK,
+	NETWORK_MAP_1M: NETWORK_MAP,
 
-	VTAP_APP_PORT_1M:      VTAP_APP_PORT,
-	VTAP_APP_EDGE_PORT_1M: VTAP_APP_EDGE_PORT,
+	APPLICATION_1M:     APPLICATION,
+	APPLICATION_MAP_1M: APPLICATION_MAP,
 
-	VTAP_ACL_1M: VTAP_ACL,
+	TRAFFIC_POLICY_1M: TRAFFIC_POLICY,
 
-	VTAP_FLOW_PORT_1S:      VTAP_FLOW_PORT,
-	VTAP_FLOW_EDGE_PORT_1S: VTAP_FLOW_EDGE_PORT,
+	NETWORK_1S:     NETWORK,
+	NETWORK_MAP_1S: NETWORK_MAP,
 
-	VTAP_APP_PORT_1S:      VTAP_APP_PORT,
-	VTAP_APP_EDGE_PORT_1S: VTAP_APP_EDGE_PORT,
+	APPLICATION_1S:     APPLICATION,
+	APPLICATION_MAP_1S: APPLICATION_MAP,
 }
 
 type Tag struct {
@@ -827,41 +827,41 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TunnelIPID), 10))
 	}
 	if t.Code&TAPPort != 0 {
-		offset += copy(b[offset:], ",tap_port=")
+		offset += copy(b[offset:], ",capture_nic=")
 		offset += putTAPPort(b[offset:], uint64(t.TAPPort))
 	}
 	if t.Code&TAPSide != 0 {
 		switch t.TAPSide {
 		case Rest:
-			offset += copy(b[offset:], ",tap_side=rest")
+			offset += copy(b[offset:], ",observation_point=rest")
 		case Client:
-			offset += copy(b[offset:], ",tap_side=c")
+			offset += copy(b[offset:], ",observation_point=c")
 		case Server:
-			offset += copy(b[offset:], ",tap_side=s")
+			offset += copy(b[offset:], ",observation_point=s")
 		case ClientNode:
-			offset += copy(b[offset:], ",tap_side=c-nd")
+			offset += copy(b[offset:], ",observation_point=c-nd")
 		case ServerNode:
-			offset += copy(b[offset:], ",tap_side=s-nd")
+			offset += copy(b[offset:], ",observation_point=s-nd")
 		case ClientHypervisor:
-			offset += copy(b[offset:], ",tap_side=c-hv")
+			offset += copy(b[offset:], ",observation_point=c-hv")
 		case ServerHypervisor:
-			offset += copy(b[offset:], ",tap_side=s-hv")
+			offset += copy(b[offset:], ",observation_point=s-hv")
 		case ClientGatewayHypervisor:
-			offset += copy(b[offset:], ",tap_side=c-gw-hv")
+			offset += copy(b[offset:], ",observation_point=c-gw-hv")
 		case ServerGatewayHypervisor:
-			offset += copy(b[offset:], ",tap_side=s-gw-hv")
+			offset += copy(b[offset:], ",observation_point=s-gw-hv")
 		case ClientGateway:
-			offset += copy(b[offset:], ",tap_side=c-gw")
+			offset += copy(b[offset:], ",observation_point=c-gw")
 		case ServerGateway:
-			offset += copy(b[offset:], ",tap_side=s-gw")
+			offset += copy(b[offset:], ",observation_point=s-gw")
 		}
 	}
 	if t.Code&TAPType != 0 {
-		offset += copy(b[offset:], ",tap_type=")
+		offset += copy(b[offset:], ",capture_network_type_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
 	}
 	if t.Code&VTAPID != 0 {
-		offset += copy(b[offset:], ",vtap_id=")
+		offset += copy(b[offset:], ",agent_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VTAPID), 10))
 	}
 
@@ -873,7 +873,7 @@ func (t *Tag) TableID(isSecond bool) (uint8, error) {
 		// 有时会有MAC,MACPath字段，需要先排除再比较
 		if t.Code&^MAC&^MACPath == code {
 			if isSecond {
-				return uint8(i) + uint8(VTAP_FLOW_PORT_1S), nil
+				return uint8(i) + uint8(NETWORK_1S), nil
 			}
 			return uint8(i), nil
 		}
@@ -1072,19 +1072,19 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tunnel_ip_id", ckdb.UInt16).SetComment("隧道分发点ID"))
 	}
 	if code&TAPPort != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("采集位置标识类型 0: MAC，1: IPv4, 2: IPv6, 3: ID, 4: NetFlow, 5: SFlow"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("capture_nic_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("采集位置标识类型 0: MAC，1: IPv4, 2: IPv6, 3: ID, 4: NetFlow, 5: SFlow"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("隧道封装类型 0：--，1：VXLAN，2：IPIP，3：GRE"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集位置标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("capture_nic", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集位置标识 若capture_network_type_id为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("nat_source", ckdb.UInt8).SetComment("0: NONE, 1: VIP, 2: TOA"))
 	}
 	if code&TAPSide != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集, s: 服务端(1侧)采集)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("observation_point", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集, s: 服务端(1侧)采集)"))
 	}
 	if code&TAPType != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_type", ckdb.UInt8).SetComment("流量采集点(1-2,4-255: 接入网络流量, 3: 虚拟网络流量)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("capture_network_type_id", ckdb.UInt8).SetComment("流量采集点(1-2,4-255: 接入网络流量, 3: 虚拟网络流量)"))
 	}
 	if code&VTAPID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("vtap_id", ckdb.UInt16).SetComment("采集器的ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("agent_id", ckdb.UInt16).SetComment("采集器的ID"))
 	}
 
 	return columns
@@ -1359,7 +1359,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath
 		t.Code |= SignalSource
-	} else if t.Code != VTAP_ACL {
+	} else if t.Code != TRAFFIC_POLICY {
 		t.Code |= GPID
 		t.Code |= SignalSource
 	}

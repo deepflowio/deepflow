@@ -364,12 +364,12 @@ type FlowInfo struct {
 	CloseType    uint16 `json:"close_type"`
 	SignalSource uint16 `json:"signal_source"`
 	FlowID       uint64 `json:"flow_id"`
-	TapType      uint16 `json:"tap_type"`
+	TapType      uint8  `json:"capture_network_type_id"`
 	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort      uint32 `json:"tap_port"`
-	TapSide      string `json:"tap_side"`
-	VtapID       uint16 `json:"vtap_id"`
+	TapPortType  uint8  `json:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort      uint32 `json:"capture_nic"`
+	TapSide      string `json:"observation_point"`
+	VtapID       uint16 `json:"agent_id"`
 	L2End0       bool   `json:"l2_end_0"`
 	L2End1       bool   `json:"l2_end_1"`
 	L3End0       bool   `json:"l3_end_0"`
@@ -398,12 +398,12 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-	ckdb.NewColumn("tap_type", ckdb.UInt16),
+	ckdb.NewColumn("capture_network_type_id", ckdb.UInt8),
 	ckdb.NewColumn("nat_source", ckdb.UInt8),
-	ckdb.NewColumn("tap_port_type", ckdb.UInt8),
-	ckdb.NewColumn("tap_port", ckdb.UInt32),
-	ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
-	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+	ckdb.NewColumn("capture_nic_type", ckdb.UInt8),
+	ckdb.NewColumn("capture_nic", ckdb.UInt32),
+	ckdb.NewColumn("observation_point", ckdb.LowCardinalityString),
+	ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("l2_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l2_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l3_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
@@ -873,7 +873,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
 	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
-	i.TapType = uint16(f.FlowKey.TapType)
+	i.TapType = uint8(f.FlowKey.TapType)
 	var natSource datatype.NATSource
 	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
 	i.NatSource = uint8(natSource)
