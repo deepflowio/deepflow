@@ -1003,6 +1003,12 @@ var ColumnAdd64 = []*ColumnAdds{
 		ColumnNames: []string{"tls_rtt"},
 		ColumnType:  ckdb.Float64,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"request_domain"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 var IndexAdd64 = []*IndexAdds{
@@ -1017,6 +1023,12 @@ var IndexAdd64 = []*IndexAdds{
 		Tables:      []string{"l7_flow_log_local"},
 		ColumnNames: []string{"_id", "trace_id_index"},
 		IndexType:   ckdb.IndexMinmax,
+	},
+	&IndexAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log_local"},
+		ColumnNames: []string{"request_domain"},
+		IndexType:   ckdb.IndexBloomfilter,
 	},
 }
 

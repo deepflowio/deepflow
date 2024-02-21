@@ -85,6 +85,7 @@ end_time              , End Time                          , Unit: microseconds. 
 close_type            , Flow Close Type                   ,
 status                , Status                            , Determined by the close_type and protocol: Normal/ForceReport/Non-TCP timeout = Normal, Client* = Client Error, Server*/TCP Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,
+request_domain        , Request Domain                    ,
 
 signal_source         , Signal Source                     ,
 tap                   , Traffic Access Point              , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
