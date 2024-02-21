@@ -131,6 +131,10 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
     fn tcp_seq_offset(&self) -> u32 {
         self.seq_off
     }
+
+    fn get_request_domain(&self) -> String {
+        self.host.clone()
+    }
 }
 
 impl FastCGIInfo {

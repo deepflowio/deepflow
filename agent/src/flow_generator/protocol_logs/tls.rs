@@ -284,6 +284,10 @@ impl L7ProtocolInfoInterface for TlsInfo {
     fn is_tls(&self) -> bool {
         true
     }
+
+    fn get_request_domain(&self) -> String {
+        self.request_domain.clone()
+    }
 }
 
 impl TlsInfo {
