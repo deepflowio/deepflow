@@ -942,8 +942,8 @@ vtap_group_id: g-xxxxxx
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
   #l7-protocol-enabled:
-  #- HTTP ## for both HTTP and HTTP_TLS
-  #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- HTTP
+  #- HTTP2 ## for both HTTP2 and gRPC
   #- SofaRPC
   #- FastCGI
   #- Dubbo
@@ -967,9 +967,8 @@ vtap_group_id: g-xxxxxx
   ## Note: HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
   ##   All data obtained through Uprobe is not subject to port restrictions.
   #l7-protocol-ports:
-    #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
-    #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
-    #"Custom": "1-65535" # plugins
+    #"HTTP": "1-65535"
+    #"HTTP2": "1-65535" # for both HTTP2 and gRPC
     #"SofaRPC": "1-65535"
     #"FastCGI": "1-65535"
     #"Dubbo": "1-65535"
@@ -982,6 +981,7 @@ vtap_group_id: g-xxxxxx
     #"OpenWire": "1-65535"
     #"DNS": "53,5353"
     #"TLS": "443"
+    #"Custom": "1-65535" # plugins
 
   ## L7 Protocol Advanced Features
   #l7-protocol-advanced-features:
