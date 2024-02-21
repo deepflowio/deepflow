@@ -50,7 +50,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 	case common.L4_FLOW_ID:
 		orderKeys = append(orderKeys, flowKeys...)
 	case common.L4_PACKET_ID:
-		orderKeys = append(orderKeys, "flow_id", "vtap_id")
+		orderKeys = append(orderKeys, "flow_id", "agent_id")
 	default:
 		panic("unreachalable")
 	}
