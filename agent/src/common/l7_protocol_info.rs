@@ -409,6 +409,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     fn tcp_seq_offset(&self) -> u32 {
         return 0;
     }
+
+    fn get_request_domain(&self) -> String {
+        String::default()
+    }
 }
 
 impl L7ProtocolInfo {

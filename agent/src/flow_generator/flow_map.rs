@@ -1995,6 +1995,11 @@ impl FlowMap {
         if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
             self.flush_app_protolog();
         }
+        let domain = l7_info.get_request_domain();
+        if !domain.is_empty() {
+            node.tagged_flow.flow.request_domain = domain;
+        }
+
         if let Some(head) = l7_info.app_proto_head() {
             node.tagged_flow
                 .flow
