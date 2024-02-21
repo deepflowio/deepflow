@@ -389,6 +389,7 @@ type FlowInfo struct {
 	NatRealPort1 uint16
 
 	DirectionScore uint8
+	RequestDomain  string
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -420,6 +421,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 	ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
+	ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
@@ -450,7 +452,7 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
 
 	block.WriteIPv4(f.NatRealIP0)
 	block.WriteIPv4(f.NatRealIP1)
-	block.Write(f.NatRealPort0, f.NatRealPort1, f.DirectionScore)
+	block.Write(f.NatRealPort0, f.NatRealPort1, f.DirectionScore, f.RequestDomain)
 }
 
 type Metrics struct {
@@ -899,6 +901,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)
 	i.NatRealPort1 = uint16(f.MetricsPeerDst.RealPort)
 	i.DirectionScore = uint8(f.DirectionScore)
+	i.RequestDomain = f.RequestDomain
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {

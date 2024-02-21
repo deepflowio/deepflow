@@ -1041,6 +1041,21 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnNames: []string{"process_kname"},
 		ColumnType:  ckdb.String,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"request_domain"},
+		ColumnType:  ckdb.String,
+	},
+}
+
+var IndexAdd65 = []*IndexAdds{
+	&IndexAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log_local"},
+		ColumnNames: []string{"request_domain"},
+		IndexType:   ckdb.IndexBloomfilter,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
@@ -1431,7 +1446,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		}
 	}
 
-	for _, v := range [][]*IndexAdd{getIndexAdds(IndexAdd64)} {
+	for _, v := range [][]*IndexAdd{getIndexAdds(IndexAdd64), getIndexAdds(IndexAdd65)} {
 		i.indexAdds = append(i.indexAdds, v...)
 	}
 
