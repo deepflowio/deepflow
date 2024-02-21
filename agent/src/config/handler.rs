@@ -334,6 +334,7 @@ pub struct DispatcherConfig {
     pub pod_cluster_id: u32,
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
+    pub dispatcher_queue: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1120,6 +1121,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             dispatcher: DispatcherConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
+                dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,

@@ -113,6 +113,7 @@ type StaticConfig struct {
 	ExternalMetricIntegrationDisabled  *bool                      `yaml:"external-metric-integration-disabled,omitempty"`
 	NtpMaxInterval                     *string                    `yaml:"ntp-max-interval,omitempty"`
 	NtpMinInterval                     *string                    `yaml:"ntp-min-interval,omitempty"`
+	DispatcherQueue                    *bool                      `yaml:"dispatcher-queue,omitempty"`
 }
 
 type XflowCollectorConfig struct {

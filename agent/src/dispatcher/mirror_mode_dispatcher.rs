@@ -364,7 +364,7 @@ impl MirrorModeDispatcher {
         );
         // flowProcesser
         flow_map.inject_meta_packet(&config, &mut meta_packet);
-        let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
+        let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
         for i in pipeline.handlers.iter_mut() {
             i.handle(&mini_packet);
         }

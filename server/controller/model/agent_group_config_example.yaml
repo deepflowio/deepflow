@@ -630,6 +630,10 @@ vtap_group_id: g-xxxxxx
   ## Note: The configuration takes effect when tap_mode is 0 and extra_netns_regex is null
   #local-dispatcher-count: 1
 
+  ## Dispatcher queue
+  ## Note: The configuration takes effect when tap_mode is 0 or 2, dispatcher-queue is always true when tap_mode is 2
+  #dispatcher-queue: false
+
   ####################
   ## InMemory Queue ##
   ####################
