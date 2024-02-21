@@ -1035,6 +1035,12 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnNames: []string{"tunnel_ip_id"},
 		ColumnType:  ckdb.UInt16,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
+		ColumnNames: []string{"process_kname"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {

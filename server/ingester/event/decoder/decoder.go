@@ -17,7 +17,6 @@
 package decoder
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -177,7 +176,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
-		s.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, s.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		s.ProcessKName = string(e.ProcessKname)
 		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id")
 		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
 		s.Bytes = ioData.BytesCount

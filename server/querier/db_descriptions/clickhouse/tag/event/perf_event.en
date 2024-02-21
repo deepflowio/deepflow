@@ -49,6 +49,7 @@ is_ipv4               , IPv4 Flag                    ,
 event_type            , Event Type                   ,
 event_desc            , Event Message                ,
 
+process_kname         , Kernel Thread Name           ,
 app_instance          , Application Instance         ,
 vtap                  , DeepFlow Agent               ,
 signal_source         , Signal Source                ,

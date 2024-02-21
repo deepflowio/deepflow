@@ -36,6 +36,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -135,7 +136,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		flowTagWriter, err := flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+		flowTagWriter, err := flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base, &config.CKWriterConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +252,7 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 	var err error
 	for i := 0; i < queueCount; i++ {
 		if flowLogWriter != nil {
-			flowTagWriter, err = flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+			flowTagWriter, err = flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base, &config.CKWriterConfig)
 			if err != nil {
 				return nil, err
 			}
