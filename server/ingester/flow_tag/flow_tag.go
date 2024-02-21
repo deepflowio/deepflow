@@ -25,7 +25,7 @@ const (
 	FLOW_TAG_DB = "flow_tag"
 )
 
-type TagType int
+type TagType uint8
 
 const (
 	TagField TagType = iota
@@ -81,6 +81,7 @@ type FlowTagInfo struct {
 
 type FlowTag struct {
 	pool.ReferenceCount
+	TagType
 
 	Timestamp uint32 // s
 	FlowTagInfo
@@ -100,7 +101,7 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 		t.FieldName,
 		fieldValueType,
 	)
-	if len(t.FieldValue) != 0 {
+	if t.TagType == TagFieldValue {
 		block.Write(t.FieldValue, uint64(1)) // count is 1
 	}
 }
@@ -116,7 +117,7 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 		ckdb.NewColumn("field_name", ckdb.LowCardinalityString),
 		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float"),
 	)
-	if len(t.FieldValue) != 0 {
+	if t.TagType == TagFieldValue {
 		columns = append(columns,
 			ckdb.NewColumn("field_value", ckdb.String),
 			ckdb.NewColumn("count", ckdb.UInt64))
@@ -161,9 +162,10 @@ var flowTagPool = pool.NewLockFreePool(func() interface{} {
 	return &FlowTag{}
 })
 
-func AcquireFlowTag() *FlowTag {
+func AcquireFlowTag(tagType TagType) *FlowTag {
 	f := flowTagPool.Get().(*FlowTag)
 	f.ReferenceCount.Reset()
+	f.TagType = tagType
 	return f
 }
 
