@@ -419,6 +419,7 @@ pub struct YamlConfig {
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
     pub dpdk_ring_port: String,
+    pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
@@ -785,6 +786,7 @@ impl Default for YamlConfig {
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
+            dispatcher_queue: false,
             #[cfg(target_os = "linux")]
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]

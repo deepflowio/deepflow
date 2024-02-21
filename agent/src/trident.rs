@@ -2000,6 +2000,7 @@ impl AgentComponents {
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
                     libpcap_enabled: yaml_config.libpcap_enabled,
+                    dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
                     snap_len: config_handler
                         .candidate_config
                         .dispatcher
