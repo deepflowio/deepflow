@@ -321,6 +321,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn tcp_seq_offset(&self) -> u32 {
         self.headers_offset
     }
+
+    fn get_request_domain(&self) -> String {
+        self.host.clone()
+    }
 }
 
 impl HttpInfo {

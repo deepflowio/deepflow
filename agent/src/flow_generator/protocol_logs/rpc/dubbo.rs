@@ -150,6 +150,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
             None
         }
     }
+
+    fn get_request_domain(&self) -> String {
+        self.service_name.clone()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
