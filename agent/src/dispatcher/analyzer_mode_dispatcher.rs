@@ -414,7 +414,7 @@ impl AnalyzerModeDispatcher {
                             );
                             flow_map.inject_meta_packet(&config, &mut meta_packet);
                             let mini_packet =
-                                MiniPacket::new(meta_packet.raw.take().unwrap(), &meta_packet);
+                                MiniPacket::new(meta_packet.raw.take().unwrap(), &meta_packet, 0);
                             output_batch.push((tap_type, mini_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
