@@ -91,6 +91,7 @@ end_time            , end_time             , end_time              , int        
 close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111
 status              , status               , status                , int_enum     , status               , Flow Info            , 111
 is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , Flow Info            , 111
+request_domain      , request_domain       , request_domain        , string       ,                      , Flow Info            , 111
 
 signal_source       , signal_source        , signal_source         , int_enum     , l4_signal_source     , Capture Info         , 111
 tap                 , tap                  , tap                   , resource     ,                      , Capture Info         , 110
