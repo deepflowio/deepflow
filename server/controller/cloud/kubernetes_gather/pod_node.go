@@ -30,6 +30,10 @@ import (
 func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork, podNetwork model.Network, err error) {
 	log.Debug("get nodes starting")
 	podNetworkCIDRs := []string{}
+	nodeLcuuidToHostName, err := cloudcommon.GetNodeHostNameByDomain(k.Lcuuid, k.isSubDomain)
+	if err != nil {
+		log.Warningf("get pod node hostname error : (%s)", err.Error())
+	}
 	for _, n := range k.k8sInfo["*v1.Node"] {
 		nData, nErr := simplejson.NewJson([]byte(n))
 		if nErr != nil {
@@ -108,6 +112,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			ServerType:       common.POD_NODE_SERVER_TYPE_HOST,
 			State:            state,
 			IP:               nodeIP,
+			Hostname:         nodeLcuuidToHostName[uID],
 			VCPUNum:          cpuNum,
 			MemTotal:         memory,
 			VPCLcuuid:        k.VPCUUID,
