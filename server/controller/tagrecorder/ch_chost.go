@@ -17,82 +17,66 @@
 package tagrecorder
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChChost struct {
-	UpdaterComponent[mysql.ChChost, IDKey]
+	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChChost, IDKey]
 }
 
 func NewChChost() *ChChost {
-	updater := &ChChost{
-		newUpdaterComponent[mysql.ChChost, IDKey](
-			RESOURCE_TYPE_CH_CHOST,
+	mng := &ChChost{
+		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChChost, IDKey](
+			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
-	var (
-		chosts []mysql.VM
-		hosts  []mysql.Host
-	)
-	err := mysql.Db.Unscoped().Find(&chosts).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Select("id", "ip").Find(&hosts).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChChost) sourceToTarget(source *mysql.VM) (keys []IDKey, targets []mysql.ChChost) {
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	ipToHostID := make(map[string]int, len(hosts))
-	for _, host := range hosts {
-		ipToHostID[host.IP] = host.ID
-	}
-
-	keyToItem := make(map[IDKey]mysql.ChChost)
-	for _, chost := range chosts {
-		if chost.DeletedAt.Valid {
-			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name + " (deleted)",
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
-			}
-		} else {
-			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name,
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChChost{
+		ID:       source.ID,
+		Name:     sourceName,
+		L3EPCID:  source.VPCID,
+		HostID:   source.HostID,
+		Hostname: source.Hostname,
+		IP:       source.IP,
+	})
+	return
 }
 
-func (p *ChChost) generateKey(dbItem mysql.ChChost) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (p *ChChost) generateUpdateInfo(oldItem, newItem mysql.ChChost) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.L3EPCID != newItem.L3EPCID {
-		updateInfo["l3_epc_id"] = newItem.L3EPCID
+	if fieldsUpdate.VPCID.IsDifferent() {
+		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
-	if oldItem.HostID != newItem.HostID {
-		updateInfo["host_id"] = newItem.HostID
+	if fieldsUpdate.HostID.IsDifferent() {
+		updateInfo["host_id"] = fieldsUpdate.HostID.GetNew()
 	}
+	if fieldsUpdate.Hostname.IsDifferent() {
+		updateInfo["hostname"] = fieldsUpdate.Hostname.GetNew()
+	}
+	if fieldsUpdate.IP.IsDifferent() {
+		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
+	}
+
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChChost
+		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
 	}
-	return nil, false
 }
