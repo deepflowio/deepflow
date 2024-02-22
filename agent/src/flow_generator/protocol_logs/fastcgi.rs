@@ -135,6 +135,10 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
     fn get_request_domain(&self) -> String {
         self.host.clone()
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
+    }
 }
 
 impl FastCGIInfo {
