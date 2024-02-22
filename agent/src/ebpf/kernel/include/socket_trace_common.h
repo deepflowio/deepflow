@@ -245,6 +245,16 @@ struct process_event_t {
 	__u8 name[TASK_COMM_LEN]; // process name
 };
 
+struct debug_data {
+	__u16 magic;
+	__u8 fun;
+	__u8 num;
+	union {
+		__u32 len;
+		__u8 buf[4];
+	};
+};
+
 #define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
 
 #endif /* BPF_SOCKET_TRACE_COMMON */
