@@ -92,11 +92,12 @@ type TagDescription struct {
 	Operators   []string
 	Permissions []bool
 	RelatedTag  string
+	Deprecated  bool
 }
 
 func NewTagDescription(
 	name, clientName, serverName, displayName, tagType, enumFile, category string,
-	permissions []bool, description, relatedTag string,
+	permissions []bool, description, relatedTag string, deprecated bool,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -114,6 +115,7 @@ func NewTagDescription(
 		Permissions: permissions,
 		Description: description,
 		RelatedTag:  relatedTag,
+		Deprecated:  deprecated,
 	}
 }
 
@@ -159,6 +161,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 7 - Permissions
 				// 8 - Description
 				// 9 - RelatedTag
+				// 10 - Deprecated
+
 				permissions, err := ckcommon.ParsePermission(tag[6])
 				if err != nil {
 					return errors.New(
@@ -167,6 +171,19 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 							db, table, tag, err.Error(),
 						),
 					)
+				}
+				deprecated := false
+				deprecatedNum, err := strconv.Atoi(tag[7].(string))
+				if err != nil {
+					return errors.New(
+						fmt.Sprintf(
+							"parse tag deprecated failed! db:%s table:%s, tag:%v, err:%s",
+							db, table, tag, err.Error(),
+						),
+					)
+				}
+				if deprecatedNum == 1 {
+					deprecated = true
 				}
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
@@ -179,7 +196,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				des := tagLanguage[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, tag[5].(string), permissions, des, "",
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, "", deprecated,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -588,7 +605,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag",
+			"operators", "permissions", "description", "related_tag", "deprecated",
 		},
 		Values: []interface{}{},
 	}
@@ -602,7 +619,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			response.Values,
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag, tag.Deprecated,
 			},
 		)
 	}
@@ -631,12 +648,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		}
 	}
@@ -653,12 +670,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		}
 	}
@@ -675,12 +692,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey, envKey, envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		}
 	}
@@ -697,12 +714,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		}
 	}
@@ -719,12 +736,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == "ext_metrics" || db == "event" || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
 		}
 
@@ -741,12 +758,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields,
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false,
 				})
 			} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields,
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false,
 				})
 			}
 		}
@@ -784,20 +801,20 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false,
 			})
 		}
 	}
 	if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS {
 		response.Values = append(response.Values, []interface{}{
 			"tag", "tag", "tag", "tag", "map",
-			"Native Tag", []string{}, []bool{true, true, true}, "tag", "",
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false,
 		})
 	}
 	return response, nil
@@ -1060,7 +1077,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		case "gprocess":
 			return &common.Result{}, sqlList, nil
-		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
+		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE, common.CAPTURE_NIC_HOST, common.CAPTURE_NIC_CHOST, common.CAPTURE_NIC_POD_NODE:
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
 			} else {

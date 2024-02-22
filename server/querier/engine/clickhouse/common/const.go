@@ -25,7 +25,7 @@ const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
 const DB_NAME_PROMETHEUS = "prometheus"
 const DB_NAME_FLOW_TAG = "flow_tag"
-const TABLE_NAME_VTAP_ACL = "vtap_acl"
+const TABLE_NAME_VTAP_ACL = "traffic_policy"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
 const TagServerChPrefix = "服务端"
@@ -35,7 +35,7 @@ const TagClientEnPrefix = "Client"
 
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
-	DB_NAME_FLOW_METRICS:    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
+	DB_NAME_FLOW_METRICS:    []string{"network", "network_map", "application", "application_map", "traffic_policy"},
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_SYSTEM: []string{"deepflow_system_common"},
 	DB_NAME_EVENT:           []string{"event", "perf_event", "alarm_event"},
