@@ -56,3 +56,9 @@ pub fn get_ip_address() -> Result<String, Error> {
     }
     Ok(link_info)
 }
+
+pub fn get_hostname() -> Result<String> {
+    hostname::get()?
+        .into_string()
+        .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
+}
