@@ -643,6 +643,40 @@ static int register_events_handle(struct event_meta *meta,
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
+#ifdef TLS_DEBUG
+	struct debug_data *debug = raw;
+	if (debug->magic == 0xffff || debug->magic == 0xfffe) {
+		const char *fun;
+		if (debug->fun == 1)
+			fun = "go_tls_write_enter";
+		else if (debug->fun == 2)
+			fun = "go_tls_write_exit";
+		else if (debug->fun == 3)
+                        fun = "go_tls_read_enter";
+		else if (debug->fun == 4)
+                        fun = "go_tls_read_exit";
+		else
+			fun = "unknown";
+
+		const char *err = "";
+		if (debug->num == 1 || debug->num == 2)
+			err = "(E)";
+		
+
+		if (debug->magic == 0xffff) {
+			ebpf_info(stdout, ">UPROBE DEBUG nobuf fun %s num %d%s len %d\n",
+		  		  fun, debug->num, err, debug->len);
+		} else {
+			ebpf_info(stdout, ">UPROBE DEBUG buf fun %s num %d%s [%d(%c) "
+				  "%d(%c) %d(%c) %d(%c)]\n",
+				  fun, debug->num, err, debug->buf[0], debug->buf[0],
+				  debug->buf[1], debug->buf[1], debug->buf[2],
+				  debug->buf[2], debug->buf[3], debug->buf[3]);
+		}
+		return;
+	}
+#endif
+
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	struct event_meta *ev_meta = raw;
 
