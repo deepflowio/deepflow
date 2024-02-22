@@ -17,59 +17,90 @@
 package tagrecorder
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodNSCloudTag struct {
-	UpdaterComponent[mysql.ChPodNSCloudTag, CloudTagKey]
+	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTag, CloudTagKey]
 }
 
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
-	updater := &ChPodNSCloudTag{
-		newUpdaterComponent[mysql.ChPodNSCloudTag, CloudTagKey](
-			RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
+	mng := &ChPodNSCloudTag{
+		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTag, CloudTagKey](
+			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudTag, bool) {
-	var podNamespaces []mysql.PodNamespace
-	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
-	}
-
-	keyToItem := make(map[CloudTagKey]mysql.ChPodNSCloudTag)
-	for _, podNamespace := range podNamespaces {
-		for k, v := range podNamespace.CloudTags {
-			key := CloudTagKey{
-				ID:  podNamespace.ID,
-				Key: k,
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate) {
+	keysToAdd := make([]CloudTagKey, 0)
+	targetsToAdd := make([]mysql.ChPodNSCloudTag, 0)
+	keysToDelete := make([]CloudTagKey, 0)
+	targetsToDelete := make([]mysql.ChPodNSCloudTag, 0)
+	var chItem mysql.ChPodNSCloudTag
+	updateInfo := make(map[string]interface{})
+	if fieldsUpdate.CloudTags.IsDifferent() {
+		new := fieldsUpdate.CloudTags.GetNew()
+		old := fieldsUpdate.CloudTags.GetOld()
+		for k, v := range new {
+			oldV, ok := old[k]
+			if !ok {
+				keysToAdd = append(keysToAdd, CloudTagKey{ID: sourceID, Key: k})
+				targetsToAdd = append(targetsToAdd, mysql.ChPodNSCloudTag{
+					ID:    sourceID,
+					Key:   k,
+					Value: v,
+				})
+			} else {
+				if oldV != v {
+					key := CloudTagKey{ID: sourceID, Key: k}
+					updateInfo["value"] = v
+					mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+					if chItem.ID == 0 {
+						keysToAdd = append(keysToAdd, key)
+						targetsToAdd = append(targetsToAdd, mysql.ChPodNSCloudTag{
+							ID:    sourceID,
+							Key:   k,
+							Value: v,
+						})
+					} else {
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, key)
+					}
+				}
 			}
-			keyToItem[key] = mysql.ChPodNSCloudTag{
-				ID:    podNamespace.ID,
-				Key:   k,
-				Value: v,
+		}
+		for k := range old {
+			if _, ok := new[k]; !ok {
+				keysToDelete = append(keysToDelete, CloudTagKey{ID: sourceID, Key: k})
+				targetsToDelete = append(targetsToDelete, mysql.ChPodNSCloudTag{
+					ID:  sourceID,
+					Key: k,
+				})
 			}
 		}
 	}
-	return keyToItem, true
+	if len(keysToAdd) > 0 {
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+	}
+	if len(keysToDelete) > 0 {
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+	}
 }
 
-func (p *ChPodNSCloudTag) generateKey(dbItem mysql.ChPodNSCloudTag) CloudTagKey {
-	return CloudTagKey{ID: dbItem.ID, Key: dbItem.Key}
-}
-
-func (p *ChPodNSCloudTag) generateUpdateInfo(oldItem, newItem mysql.ChPodNSCloudTag) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if oldItem.Value != newItem.Value {
-		updateInfo["value"] = newItem.Value
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTag) sourceToTarget(source *mysql.PodNamespace) (keys []CloudTagKey, targets []mysql.ChPodNSCloudTag) {
+	for k, v := range source.CloudTags {
+		keys = append(keys, CloudTagKey{ID: source.ID, Key: k})
+		targets = append(targets, mysql.ChPodNSCloudTag{
+			ID:    source.ID,
+			Key:   k,
+			Value: v,
+		})
 	}
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return
 }

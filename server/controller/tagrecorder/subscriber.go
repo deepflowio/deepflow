@@ -65,6 +65,24 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChChostCloudTag(),
 		NewChChostCloudTags(),
+		NewChNetwork(c.resourceTypeToIconID),
+		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChChost(),
+		NewChGProcess(c.resourceTypeToIconID),
+		NewChVPC(c.resourceTypeToIconID),
+		NewChPodCluster(c.resourceTypeToIconID),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPodIngress(),
+		NewChPodNode(c.resourceTypeToIconID),
+		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodService(),
+
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodNSCloudTag(),
+		NewChPodNSCloudTags(),
+		NewChPodServiceK8sLabel(),
+		NewChPodServiceK8sLabels(),
 	}
 	return subscribers
 }
