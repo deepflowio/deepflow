@@ -972,12 +972,12 @@ mod tests {
             if first_packet {
                 first_packet = false;
                 if !amqp.check_payload(payload, param) {
-                    output.push_str("not amqp\r\n");
+                    output.push_str("not amqp\n");
                     break;
                 }
                 if let Ok(L7ParseResult::None) = amqp.parse_payload(payload, param) {
                 } else {
-                    output.push_str("parse error\r\n");
+                    output.push_str("parse error\n");
                     break;
                 }
             }
@@ -986,19 +986,19 @@ mod tests {
             if let Ok(info) = info {
                 match info {
                     L7ParseResult::Single(s) => {
-                        output.push_str(&format!("{:?}\r\n", s));
+                        output.push_str(&format!("{:?}\n", s));
                     }
                     L7ParseResult::Multi(m) => {
                         for i in m {
-                            output.push_str(&format!("{:?}\r\n", i));
+                            output.push_str(&format!("{:?}\n", i));
                         }
                     }
                     L7ParseResult::None => {
-                        output.push_str("None\r\n");
+                        output.push_str("None\n");
                     }
                 }
             } else {
-                output.push_str(&format!("{:?}\r\n", AmqpInfo::default()));
+                output.push_str(&format!("{:?}\n", AmqpInfo::default()));
             }
         }
         output

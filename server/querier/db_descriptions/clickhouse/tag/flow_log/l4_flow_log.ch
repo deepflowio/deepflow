@@ -39,6 +39,12 @@ gprocess              , 进程                         ,
 tap_port_host         , 采集网卡所属宿主机            ,
 tap_port_chost        , 采集网卡所属云服务器           ,
 tap_port_pod_node     , 采集网卡所属容器节点           ,
+host_ip               , 宿主机                        , 宿主机的管理 IP。
+host_hostname         , 宿主机                        , 宿主机的 Hostname。
+chost_ip              , 云服务器                      , 云服务器的主 IP。
+chost_hostname        , 云服务器                      , 云服务器的 Hostname。
+pod_node_ip           , K8s 容器节点                  , 容器节点的主 IP。
+pod_node_hostname     , K8s 容器节点                  , 容器节点的 Hostname。
 
 k8s.label             , K8s Label                    ,
 k8s.annotation        , K8s Annotation               ,
@@ -85,6 +91,7 @@ end_time              , 结束时间                     , 单位: 微秒。表�
 close_type            , 流结束类型                   ,
 status                , 状态                         , 由 close_type（流结束类型）与 protocol（协议）决定：正常结束/周期性上报/非TCP超时=正常，客户端XX=客户端异常，服务端XX/TCP超时=服务端异常，其他结束方式=未知。
 is_new_flow           , 新建流                       ,
+request_domain        , 请求域名                     ,
 
 signal_source         , 信号源                       ,
 tap                   , 采集点                       , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。

@@ -185,7 +185,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uu
 
 	for _, region := range regions {
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
-		vpcName := domainName + fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
+		vpcName := fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
 		retVPCs = append(retVPCs, model.VPC{
 			Lcuuid:       vpcLcuuid,
 			Name:         vpcName,
@@ -566,6 +566,103 @@ func DiffMap(base, newTags map[string]string) bool {
 		}
 	}
 	return false
+}
+
+func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool) (map[string]string, error) {
+	podNodeLcuuidToHostName := map[string]string{}
+	var domain string
+	if isSubDomain {
+		var subDomain mysql.SubDomain
+		err := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&subDomain).Error
+		if err != nil {
+			return map[string]string{}, err
+		}
+		domain = subDomain.Domain
+	} else {
+		domain = lcuuid
+	}
+
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain = ?", domain).Find(&azs).Error
+	if err != nil {
+		return map[string]string{}, err
+	}
+	azLcuuids := []string{}
+	for _, az := range azs {
+		azLcuuids = append(azLcuuids, az.Lcuuid)
+	}
+	var vtaps []mysql.VTap
+	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
+	if err != nil {
+		return map[string]string{}, err
+	}
+	var podNodes []mysql.PodNode
+	if isSubDomain {
+		err = mysql.Db.Where("domain = ? AND sub_domain = ?", domain, lcuuid).Find(&podNodes).Error
+		if err != nil {
+			return map[string]string{}, err
+		}
+	} else {
+		err = mysql.Db.Where("domain = ?", domain).Find(&podNodes).Error
+		if err != nil {
+			return map[string]string{}, err
+		}
+	}
+
+	podNodeIDs := map[int]bool{}
+	for _, podNode := range podNodes {
+		podNodeIDs[podNode.ID] = false
+	}
+
+	for _, vtap := range vtaps {
+		if vtap.Type != common.VTAP_TYPE_POD_HOST && vtap.Type != common.VTAP_TYPE_POD_VM {
+			continue
+		}
+		if _, ok := podNodeIDs[vtap.LaunchServerID]; !ok {
+			continue
+		}
+		podNodeLcuuidToHostName[vtap.Lcuuid] = vtap.RawHostname
+	}
+	return podNodeLcuuidToHostName, nil
+}
+
+func GetHostAndVmHostNameByDomain(domain string) (map[string]string, map[string]string, error) {
+	hostIPToHostName := map[string]string{}
+	vmLcuuidToHostName := map[string]string{}
+
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain = ?", domain).Find(&azs).Error
+	if err != nil {
+		return map[string]string{}, map[string]string{}, err
+	}
+	azLcuuids := []string{}
+	for _, az := range azs {
+		azLcuuids = append(azLcuuids, az.Lcuuid)
+	}
+	var vtaps []mysql.VTap
+	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
+	if err != nil {
+		return map[string]string{}, map[string]string{}, err
+	}
+	var podNodes []mysql.PodNode
+	err = mysql.Db.Where("domain = ?", domain).Find(&podNodes).Error
+	if err != nil {
+		return map[string]string{}, map[string]string{}, err
+	}
+	podNodeIDs := map[int]bool{}
+	for _, podNode := range podNodes {
+		podNodeIDs[podNode.ID] = false
+	}
+
+	for _, vtap := range vtaps {
+		switch vtap.Type {
+		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_HYPER_V:
+			hostIPToHostName[vtap.CtrlIP] = vtap.RawHostname
+		case common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P:
+			vmLcuuidToHostName[vtap.Lcuuid] = vtap.RawHostname
+		}
+	}
+	return hostIPToHostName, vmLcuuidToHostName, nil
 }
 
 func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {

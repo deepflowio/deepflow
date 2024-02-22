@@ -457,6 +457,61 @@ var (
 		datasource: "1m",
 		input:      "SELECT time(time,1,1,0) as toi, PerSecond(Avg(`byte`)) AS `流量速率`, pod as pod FROM `vtap_flow_port` WHERE time>=1705040184 AND time<=1705045184 GROUP BY toi, pod ORDER BY toi desc SLIMIT 5",
 		output:     "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod`, toUnixTimestamp(`_toi`) AS `toi`, divide(sum(byte)/(60/60), 60) AS `流量速率` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE (pod) GLOBAL IN (SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (pod_id!=0) GROUP BY dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` LIMIT 5) AND `time` >= 1705040184 AND `time` <= 1705045184 AND (pod_id!=0) GROUP BY `toi`, dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` ORDER BY `toi` desc LIMIT 10000",
+	}, {
+		name:       "test_host_hostname_ip",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT region as region, host_hostname_id, host_ip_id, host_hostname, host_ip, node_type(host_ip) as `node_type`, icon_id(host_ip) as icon_id FROM `vtap_flow_port` WHERE time>=1705040184 AND time<=1705045184 AND host_ip != '1.1.1.1' AND host_hostname_id != 1 AND host_ip_id != 2 GROUP BY region, host_hostname_id, host_ip_id, host_hostname, host_ip, `node_type` limit 5",
+		output:     "WITH dictGet(flow_tag.device_map, 'icon_id', (toUInt64(6),toUInt64(host_id))) AS `icon_id` SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))) AS `region`, host_id AS `host_hostname_id`, host_id AS `host_ip_id`, dictGet(flow_tag.device_map, 'hostname', (toUInt64(6),toUInt64(host_id))) AS `host_hostname`, dictGet(flow_tag.device_map, 'ip', (toUInt64(6),toUInt64(host_id))) AS `host_ip`, 'host' AS `node_type`, `icon_id` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (toUInt64(host_id) IN (SELECT deviceid FROM flow_tag.device_map WHERE ip != '1.1.1.1' AND devicetype=6)) AND (host_id != 1) AND (host_id != 2) AND (host_id!=0) AND (host_id!=0) AND (host_id!=0) AND (host_id!=0) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))) AS `region`, host_id AS `host_hostname_id`, host_id AS `host_ip_id`, dictGet(flow_tag.device_map, 'hostname', (toUInt64(6),toUInt64(host_id))) AS `host_hostname`, dictGet(flow_tag.device_map, 'ip', (toUInt64(6),toUInt64(host_id))) AS `host_ip`, `node_type`, `icon_id` LIMIT 5",
+	}, {
+		name:       "test_chost_hostname_ip",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT region_0 as region_0, chost_hostname_id_0, chost_ip_id_0, chost_hostname_0, chost_ip_0, node_type(chost_ip_0), node_type(chost_hostname_0) as `client_node_type`, icon_id(chost_hostname_0) as `client_icon_id` FROM `vtap_flow_edge_port` WHERE time>=1705040184 AND time<=1705045184 AND chost_hostname_0 != 'a' AND chost_hostname_id_0 != 1 AND chost_ip_id_0 != 2 GROUP BY region_0, chost_hostname_id_0, chost_ip_id_0, chost_hostname_0, chost_ip_0, `client_node_type` limit 5",
+		output:     "WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `client_icon_id` SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_hostname_id_0`, if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_ip_id_0`, if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'hostname', (toUInt64(1),toUInt64(l3_device_id_0))), '') AS `chost_hostname_0`, if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'ip', (toUInt64(1),toUInt64(l3_device_id_0))), '') AS `chost_ip_0`, 'chost', 'chost' AS `client_node_type`, `client_icon_id` FROM flow_metrics.`vtap_flow_edge_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (toUInt64(l3_device_id_0) IN (SELECT deviceid FROM flow_tag.device_map WHERE hostname != 'a' AND devicetype=1) AND l3_device_type_0=1) AND (l3_device_id_0 != 1 AND l3_device_type_0=1) AND (l3_device_id_0 != 2 AND l3_device_type_0=1) AND (l3_device_id_0!=0 AND l3_device_type_0=1) AND (l3_device_id_0!=0 AND l3_device_type_0=1) AND (l3_device_id_0!=0 AND l3_device_type_0=1) AND (l3_device_id_0!=0 AND l3_device_type_0=1) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_hostname_id_0`, if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_ip_id_0`, if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'hostname', (toUInt64(1),toUInt64(l3_device_id_0))), '') AS `chost_hostname_0`, if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'ip', (toUInt64(1),toUInt64(l3_device_id_0))), '') AS `chost_ip_0`, `client_node_type`, `client_icon_id` LIMIT 5",
+	}, {
+		name:       "test_pod_node_hostname_ip",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT pod_node_hostname_id_1, pod_node_ip_id_1, pod_node_hostname_1, pod_node_ip_1, node_type(pod_node_ip_0) as `client_node_type`, node_type(pod_node_hostname_1) as `server_node_type`, icon_id(pod_node_ip_0) as `client_icon_id`, icon_id(pod_node_hostname_1) as `server_icon_id` FROM `vtap_flow_edge_port` WHERE time>=1705040184 AND time<=1705045184 AND pod_node_hostname_1 != 'a' AND pod_node_hostname_id_1 != 1 AND pod_node_hostname_id_1 != 2 GROUP BY pod_node_hostname_id_1, pod_node_ip_id_1, pod_node_hostname_1, pod_node_ip_1, `client_node_type`, `server_node_type` limit 5",
+		output:     "WITH dictGet(flow_tag.pod_node_map, 'icon_id', (toUInt64(pod_node_id_0))) AS `client_icon_id`, dictGet(flow_tag.pod_node_map, 'icon_id', (toUInt64(pod_node_id_1))) AS `server_icon_id` SELECT pod_node_id_1 AS `pod_node_hostname_id_1`, pod_node_id_1 AS `pod_node_ip_id_1`, dictGet(flow_tag.device_map, 'hostname', (toUInt64(14),toUInt64(pod_node_id_1))) AS `pod_node_hostname_1`, dictGet(flow_tag.device_map, 'ip', (toUInt64(14),toUInt64(pod_node_id_1))) AS `pod_node_ip_1`, 'pod_node' AS `client_node_type`, 'pod_node' AS `server_node_type`, `client_icon_id`, `server_icon_id` FROM flow_metrics.`vtap_flow_edge_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (toUInt64(pod_node_id_1) IN (SELECT deviceid FROM flow_tag.device_map WHERE hostname != 'a' AND devicetype=14)) AND (pod_node_id_1 != 1) AND (pod_node_id_1 != 2) AND (pod_node_id_1!=0) AND (pod_node_id_1!=0) AND (pod_node_id_1!=0) AND (pod_node_id_1!=0) GROUP BY pod_node_id_1 AS `pod_node_hostname_id_1`, pod_node_id_1 AS `pod_node_ip_id_1`, dictGet(flow_tag.device_map, 'hostname', (toUInt64(14),toUInt64(pod_node_id_1))) AS `pod_node_hostname_1`, dictGet(flow_tag.device_map, 'ip', (toUInt64(14),toUInt64(pod_node_id_1))) AS `pod_node_ip_1`, `client_node_type`, `client_icon_id`, `server_node_type`, `server_icon_id` LIMIT 5",
+	}, {
+		name:       "test_host_ip_exist",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT region as region FROM `vtap_flow_port` WHERE time>=1705040184 AND time<=1705045184 AND exist(host_ip) GROUP BY region limit 5",
+		output:     "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))) AS `region` FROM flow_metrics.`vtap_flow_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (host_id!=0) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id))) AS `region` LIMIT 5",
+	}, {
+		name:       "test_chost_hostname_exist",
+		db:         "flow_metrics",
+		datasource: "1m",
+		input:      "SELECT region_0 as region_0 FROM `vtap_flow_edge_port` WHERE time>=1705040184 AND time<=1705045184 AND exist(chost_hostname_0) GROUP BY region_0 limit 5",
+		output:     "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` FROM flow_metrics.`vtap_flow_edge_port.1m` PREWHERE `time` >= 1705040184 AND `time` <= 1705045184 AND (l3_device_id_0!=0 AND l3_device_type_0=1) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` LIMIT 5",
+	}, {
+		name:   "test_show_1",
+		db:     "flow_metrics",
+		input:  "SHOW tag chost values from vtap_flow_edge_port where chost = ''",
+		output: "SELECT id AS `value`, name AS `display_name` FROM flow_tag.`chost_map` WHERE (display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_show_2",
+		db:     "flow_metrics",
+		input:  "SHOW tag chost values from vtap_flow_edge_port where chost_id = 1",
+		output: "SELECT id AS `value`, name AS `display_name` FROM flow_tag.`chost_map` WHERE (value = 1) GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_show_3",
+		db:     "flow_metrics",
+		input:  "SHOW tag host values from vtap_flow_port where host like '*xx'",
+		output: "SELECT deviceid AS `value`, name AS `display_name`, uid FROM flow_tag.`device_map` WHERE (display_name ilike '%xx') AND devicetype = 6 GROUP BY `value`, `display_name`, `uid` ORDER BY length(display_name) asc LIMIT 10000",
+	}, {
+		name:   "test_show_host_ip",
+		db:     "flow_metrics",
+		input:  "SHOW tag host_ip values from vtap_flow_port where host_ip like '*xx'",
+		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (display_name ilike '%xx') AND devicetype = 6 GROUP BY `value`, `display_name` ORDER BY length(display_name) asc LIMIT 10000",
+	}, {
+		name:   "test_show_host_ip_id",
+		db:     "flow_metrics",
+		input:  "SHOW tag host_ip values from vtap_flow_port where host_ip_id != 1",
+		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (not(value = 1)) AND devicetype = 6 GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
 	}}
 )
 
@@ -494,9 +549,17 @@ func TestGetSql(t *testing.T) {
 		} else if strings.Contains(pcase.input, "SLIMIT") || strings.Contains(pcase.input, "slimit") {
 			out, _, _, err = e.ParseSlimitSql(pcase.input)
 		} else {
-			parser := parse.Parser{Engine: &e}
-			err = parser.ParseSQL(pcase.input)
-			out = parser.Engine.ToSQLString()
+			input := pcase.input
+			if strings.HasPrefix(pcase.input, "SHOW") {
+				_, sqlList, _, err1 := e.ParseShowSql(pcase.input)
+				err = err1
+				input = sqlList[0]
+			}
+			if err == nil {
+				parser := parse.Parser{Engine: &e}
+				err = parser.ParseSQL(input)
+				out = parser.Engine.ToSQLString()
+			}
 		}
 		if out != pcase.output {
 			caseName := pcase.name

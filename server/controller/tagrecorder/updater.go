@@ -64,7 +64,7 @@ func (t *UpdaterManager) Stop() {
 
 func (c *UpdaterManager) run() {
 	// 调用API获取资源对应的icon_id
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = c.UpdateIconInfo()
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg)
 	c.refresh()
 }
 
@@ -114,6 +114,9 @@ func (c *UpdaterManager) refresh() {
 		NewChPodK8sEnvs(),
 		NewChPodService(),
 		NewChChost(),
+
+		NewChPolicy(),
+		NewChNpbTunnel(),
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))

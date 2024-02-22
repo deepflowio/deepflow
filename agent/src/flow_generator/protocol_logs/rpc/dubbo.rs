@@ -150,6 +150,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
             None
         }
     }
+
+    fn get_request_domain(&self) -> String {
+        self.service_name.clone()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
@@ -750,7 +754,7 @@ mod tests {
             } else {
                 DubboInfo::default()
             };
-            output.push_str(&format!("{:?} is_dubbo: {}\r\n", info, is_dubbo));
+            output.push_str(&format!("{:?} is_dubbo: {}\n", info, is_dubbo));
         }
         output
     }

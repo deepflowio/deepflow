@@ -1965,7 +1965,7 @@ mod tests {
             let is_openwire = OpenWireLog::check_protocol(payload, param);
             match openwire.parse(payload, param) {
                 Ok(info) => {
-                    output.push_str(&format!("{:?} is_openwire: {}\r\n", info, is_openwire));
+                    output.push_str(&format!("{:?} is_openwire: {}\n", info, is_openwire));
                 }
                 Err(_) => unreachable!(),
             }
