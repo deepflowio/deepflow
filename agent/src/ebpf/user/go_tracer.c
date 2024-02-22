@@ -598,13 +598,23 @@ static int resolve_bin_file(const char *path, int pid,
 			p_info->info.offsets[off->idx] = offset;
 		}
 
-		p_info->info.net_TCPConn_itab =
-			get_symbol_addr_from_binary(binary_path, "go.itab.*net.TCPConn,net.Conn");
-		p_info->info.crypto_tls_Conn_itab =
-			get_symbol_addr_from_binary(binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
-		p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
-			binary_path,
-			"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		if (p_info->info.version < GO_VERSION(1, 20, 0)) {
+			p_info->info.net_TCPConn_itab =
+				get_symbol_addr_from_binary(binary_path, "go.itab.*net.TCPConn,net.Conn");
+			p_info->info.crypto_tls_Conn_itab =
+				get_symbol_addr_from_binary(binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
+			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+				binary_path,
+				"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		} else {
+			p_info->info.net_TCPConn_itab =
+				get_symbol_addr_from_binary(binary_path, "go:itab.*net.TCPConn,net.Conn");
+			p_info->info.crypto_tls_Conn_itab =
+				get_symbol_addr_from_binary(binary_path, "go:itab.*crypto/tls.Conn,net.Conn");
+			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+				binary_path,
+				"go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+		}
 
 		p_info->has_updated = false;
 
