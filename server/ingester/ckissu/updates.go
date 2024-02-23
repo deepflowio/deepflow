@@ -164,7 +164,7 @@ var ColumnRename65 = []*ColumnRenames{
 		Tables:         []string{"l4_flow_log", "l4_flow_log_local"},
 		OldColumnNames: []string{"tap_type"},
 		NewColumnNames: []string{"capture_network_type_id"},
-		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16},
+		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt8},
 	},
 	{
 		Db:             "flow_log",
