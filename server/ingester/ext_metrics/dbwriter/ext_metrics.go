@@ -20,7 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
@@ -34,9 +34,14 @@ type ExtMetrics struct {
 
 	UniversalTag flow_metrics.UniversalTag
 
-	// in deepflow_system: table name
-	// in ext_metrids: virtual_table_name
 	VTableName string
+
+	AgentID uint16
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database '<DatabaseName()>', otherwise stored in '<OrgId>_<DatabaseName()>'.
+	OrgId  uint16
+	TeamID uint16
 
 	TagNames  []string
 	TagValues []string
@@ -46,7 +51,7 @@ type ExtMetrics struct {
 }
 
 func (m *ExtMetrics) DatabaseName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
+	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS || m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
 		return DEEPFLOW_SYSTEM_DB
 	} else {
 		return EXT_METRICS_DB
@@ -55,7 +60,9 @@ func (m *ExtMetrics) DatabaseName() string {
 
 func (m *ExtMetrics) TableName() string {
 	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
-		return DEEPFLOW_SYSTEM_TABLE
+		return DEEPFLOW_SYSTEM_AGENT_TABLE
+	} else if m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
+		return DEEPFLOW_SYSTEM_SERVER_TABLE
 	} else {
 		return EXT_METRICS_TABLE
 	}
@@ -68,11 +75,12 @@ func (m *ExtMetrics) VirtualTableName() string {
 // Note: The order of Write() must be consistent with the order of append() in Columns.
 func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(m.Timestamp)
-	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS && m.MsgType != datatype.MESSAGE_TYPE_SERVER_DFSTATS {
 		m.UniversalTag.WriteBlock(block)
 	}
 	block.Write(
 		m.VTableName,
+		m.TeamID,
 		m.TagNames,
 		m.TagValues,
 		m.MetricsFloatNames,
@@ -80,16 +88,21 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
 	)
 }
 
+func (m *ExtMetrics) OrgID() uint16 {
+	return m.OrgId
+}
+
 // Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *ExtMetrics) Columns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
-	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS && m.MsgType != datatype.MESSAGE_TYPE_SERVER_DFSTATS {
 		columns = flow_metrics.GenUniversalTagColumns(columns)
 	}
 	columns = append(columns,
 		ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名"),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("团队ID"),
 		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("额外的tag"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayLowCardinalityString).SetComment("额外的tag对应的值"),
 		ckdb.NewColumn("metrics_float_names", ckdb.ArrayLowCardinalityString).SetComment("额外的float类型metrics"),
@@ -109,7 +122,7 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 
 	// order key
 	orderKeys := []string{"virtual_table_name", timeKey}
-	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS && m.MsgType != datatype.MESSAGE_TYPE_SERVER_DFSTATS {
 		// order key in universal tags
 		orderKeys = append(orderKeys, "l3_epc_id")
 		orderKeys = append(orderKeys, "ip4")
@@ -146,6 +159,9 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		Table:   tableName,
 		VpcId:   m.UniversalTag.L3EpcID,
 		PodNsId: m.UniversalTag.PodNSID,
+		VtapId:  m.UniversalTag.VTAPID,
+		OrgId:   m.OrgId,
+		TeamID:  m.TeamID,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	logging "github.com/op/go-logging"
 
@@ -37,11 +38,12 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	QUEUE_BATCH_SIZE      = 1024
-	EXT_METRICS_DB        = "ext_metrics"
-	EXT_METRICS_TABLE     = "metrics"
-	DEEPFLOW_SYSTEM_DB    = "deepflow_system"
-	DEEPFLOW_SYSTEM_TABLE = "deepflow_system"
+	QUEUE_BATCH_SIZE             = 1024
+	EXT_METRICS_DB               = "ext_metrics"
+	EXT_METRICS_TABLE            = "metrics"
+	DEEPFLOW_SYSTEM_DB           = "deepflow_system"
+	DEEPFLOW_SYSTEM_SERVER_TABLE = "deepflow_system_server"
+	DEEPFLOW_SYSTEM_AGENT_TABLE  = "deepflow_system_agent"
 )
 
 type ClusterNode struct {
@@ -75,95 +77,11 @@ type ExtMetricsWriter struct {
 
 	ckdbConn common.DBs
 
-	tables             map[string]*tableInfo
-	metricsWriterCache *ckwriter.CKWriter // the writer for ext_metrics.metrics table
-	flowTagWriter      *flow_tag.FlowTagWriter
+	flowTagWriter *flow_tag.FlowTagWriter
+	ckWriter      *ckwriter.CKWriter
 
 	counter *Counter
 	utils.Closable
-}
-
-func (w *ExtMetricsWriter) InitDatabase() error {
-	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
-		if err != nil {
-			return err
-		}
-		w.ckdbConn = conn
-	}
-	_, err := w.ckdbConn.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", EXT_METRICS_DB))
-	return err
-}
-
-func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWriter, error) {
-	// fast find
-	if s.MsgType != datatype.MESSAGE_TYPE_DFSTATS && w.metricsWriterCache != nil {
-		return w.metricsWriterCache, nil
-	}
-
-	if info, ok := w.tables[s.TableName()]; ok {
-		if info.ckwriter != nil {
-			if s.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
-				w.metricsWriterCache = info.ckwriter
-			}
-			return info.ckwriter, nil
-		}
-	}
-
-	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
-		if err != nil {
-			return nil, err
-		}
-		w.ckdbConn = conn
-	}
-
-	// 将要创建的表信息
-	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
-
-	ckwriter, err := ckwriter.NewCKWriter(
-		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
-		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
-	if err != nil {
-		return nil, err
-	}
-	// 需要在cluseter其他节点也创建
-	if err := w.createTableOnCluster(table); err != nil {
-		log.Warningf("crate table on cluster other node failed. %s", err)
-	}
-
-	ckwriter.Run()
-	if w.ttl != config.DefaultExtMetricsTTL {
-		w.setTTL(s.DatabaseName(), s.TableName())
-	}
-
-	w.tables[s.TableName()] = &tableInfo{
-		tableName: s.TableName(),
-		ckwriter:  ckwriter,
-	}
-
-	return ckwriter, nil
-}
-
-func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
-	// in standalone mode, ckdbWatcher will be nil
-	if w.ckdbWatcher == nil {
-		return nil
-	}
-	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
-	if err != nil {
-		return err
-	}
-	for _, endpoint := range endpoints {
-		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, w.ckdbTimeZone, table)
-		if err != nil {
-			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
-		} else {
-			log.Infof("node %s:%d init table %s success", endpoint.Host, endpoint.Port, table.LocalName)
-		}
-	}
-	return nil
 }
 
 func (w *ExtMetricsWriter) getClusterNodesWithoutLocal(clusterName string) ([]ClusterNode, error) {
@@ -196,14 +114,6 @@ func (w *ExtMetricsWriter) GetCounter() interface{} {
 	return counter
 }
 
-func (w *ExtMetricsWriter) setTTL(database, tableName string) error {
-	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY TTL time +  toIntervalHour(%d)",
-		database, tableName+ckdb.LOCAL_SUBFFIX, w.ttl)
-	log.Info(sql)
-	_, err := w.ckdbConn.Exec(sql)
-	return err
-}
-
 // This function can be called when the FlowTags in the batch are the same (e.g. Prometheus metrics).
 func (w *ExtMetricsWriter) WriteBatch(batch []interface{}) {
 	if len(batch) == 0 {
@@ -212,41 +122,25 @@ func (w *ExtMetricsWriter) WriteBatch(batch []interface{}) {
 
 	// Only the FlowTag in the first item needs to be written.
 	extMetrics := batch[0].(*ExtMetrics)
-	ckwriter, err := w.getOrCreateCkwriter(extMetrics)
-	if err != nil {
-		if w.counter.WriteErr == 0 {
-			log.Warningf("get writer failed:", err)
-		}
-		atomic.AddInt64(&w.counter.WriteErr, 1)
-		return
-	}
 	extMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
 	atomic.AddInt64(&w.counter.MetricsCount, int64(len(batch)))
-	ckwriter.Put(batch...)
+	w.ckWriter.Put(batch...)
 }
 
 func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
-	ckwriter, err := w.getOrCreateCkwriter(m)
-	if err != nil {
-		if w.counter.WriteErr == 0 {
-			log.Warningf("get writer failed:", err)
-		}
-		atomic.AddInt64(&w.counter.WriteErr, 1)
-		return
-	}
 	m.GenerateNewFlowTags(w.flowTagWriter.Cache)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
 	atomic.AddInt64(&w.counter.MetricsCount, 1)
-	ckwriter.Put(m)
+	w.ckWriter.Put(m)
 }
 
 func NewExtMetricsWriter(
 	decoderIndex int,
 	msgType datatype.MessageType,
-	db string,
+	flowTagTablePrefix string,
 	config *config.Config) (*ExtMetricsWriter, error) {
 
 	ckWriterConfig := config.CKWriterConfig
@@ -257,13 +151,13 @@ func NewExtMetricsWriter(
 		BatchSize:    ckWriterConfig.BatchSize,
 		FlushTimeout: ckWriterConfig.FlushTimeout,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), db, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &flowTagWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), flowTagTablePrefix, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// ExtMetricsWriter
-	writer := &ExtMetricsWriter{
+	w := &ExtMetricsWriter{
 		decoderIndex:      decoderIndex,
 		msgType:           msgType,
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
@@ -273,7 +167,6 @@ func NewExtMetricsWriter(
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
 		ckdbTimeZone:      config.Base.CKDB.TimeZone,
-		tables:            make(map[string]*tableInfo),
 		ttl:               config.TTL,
 		ckdbWatcher:       config.Base.CKDB.Watcher,
 		writerConfig:      ckWriterConfig,
@@ -281,9 +174,22 @@ func NewExtMetricsWriter(
 
 		counter: &Counter{},
 	}
-	if err := writer.InitDatabase(); err != nil {
+
+	s := AcquireExtMetrics()
+	s.Timestamp = uint32(time.Now().Unix())
+	s.MsgType = msgType
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
+	ckwriter, err := ckwriter.NewCKWriter(
+		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
+		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
+	if err != nil {
 		return nil, err
 	}
-	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
-	return writer, nil
+
+	w.ckWriter = ckwriter
+	w.ckWriter.Run()
+
+	common.RegisterCountableForIngester("ext_metrics_writer", w, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
+	return w, nil
 }

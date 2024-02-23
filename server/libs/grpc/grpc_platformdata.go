@@ -34,6 +34,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/hmap/lru"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -107,10 +108,12 @@ type PodInfo struct {
 }
 
 type VtapInfo struct {
-	VtapId       uint32
+	VtapId       uint16
 	EpcId        int32
 	Ip           string
 	PodClusterId uint32
+	OrgId        uint16
+	TeamId       uint16
 }
 
 type Counter struct {
@@ -175,7 +178,8 @@ type PlatformInfoTable struct {
 	*ServiceTable
 
 	podNameInfos       map[string][]*PodInfo
-	vtapIdInfos        map[uint32]*VtapInfo
+	vtapIdInfos        map[uint16]*VtapInfo
+	orgIds             []uint16
 	containerInfos     map[string][]*PodInfo
 	containerHitCount  map[string]*uint64
 	containerMissCount map[string]*uint64
@@ -186,6 +190,26 @@ type PlatformInfoTable struct {
 
 	counter *Counter
 	utils.Closable
+}
+
+func QueryAllOrgIDs() []uint16 {
+	var orgIDs []uint16
+	// wait until get orgIDs
+	for orgIDs == nil {
+		log.Info("waiting for get orgIDs")
+		time.Sleep(time.Second)
+		if platformDataManager != nil {
+			orgIDs = platformDataManager.GetMasterPlatformInfoTable().orgIds
+		}
+	}
+	return orgIDs
+}
+
+func QueryVtapOrgAndTeamID(vtapId uint16) (uint16, uint16) {
+	if platformDataManager == nil {
+		return ckdb.DEFAULT_ORG_ID, ckdb.INVALID_TEAM_ID
+	}
+	return platformDataManager.GetMasterPlatformInfoTable().QueryVtapOrgAndTeamID(vtapId)
 }
 
 func (t *PlatformInfoTable) GetCounter() interface{} {
@@ -339,8 +363,13 @@ type PlatformDataManager struct {
 	receiver      *receiver.Receiver
 }
 
+var platformDataManager *PlatformDataManager
+
 func NewPlatformDataManager(ips []net.IP, port, maxSlaveTableSize, rpcMaxMsgSize int, nodeIP string, receiver *receiver.Receiver) *PlatformDataManager {
-	return &PlatformDataManager{
+	if platformDataManager != nil {
+		return platformDataManager
+	}
+	platformDataManager = &PlatformDataManager{
 		slaveTables:       make([]*PlatformInfoTable, maxSlaveTableSize),
 		maxSlaveTableSize: maxSlaveTableSize,
 		ips:               ips,
@@ -349,6 +378,7 @@ func NewPlatformDataManager(ips []net.IP, port, maxSlaveTableSize, rpcMaxMsgSize
 		nodeIP:            nodeIP,
 		receiver:          receiver,
 	}
+	return platformDataManager
 }
 
 func (m *PlatformDataManager) NewPlatformInfoTable(moudleName string) (*PlatformInfoTable, error) {
@@ -412,7 +442,8 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		ServiceTable:       NewServiceTable(nil),
 
 		podNameInfos:       make(map[string][]*PodInfo),
-		vtapIdInfos:        make(map[uint32]*VtapInfo),
+		vtapIdInfos:        make(map[uint16]*VtapInfo),
+		orgIds:             make([]uint16, 0),
 		containerInfos:     make(map[string][]*PodInfo),
 		containerMissCount: make(map[string]*uint64),
 		containerHitCount:  make(map[string]*uint64),
@@ -1041,6 +1072,7 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 		t.otherRegionCount = 0
 	}
 	t.vtapIdInfos = masterTable.vtapIdInfos
+	t.orgIds = masterTable.orgIds
 	t.podNameInfos = masterTable.podNameInfos
 	t.regionID = masterTable.regionID
 	t.analyzerID = masterTable.analyzerID
@@ -1406,18 +1438,25 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 	}
 }
 
-func (t *PlatformInfoTable) QueryVtapEpc0(vtapId uint32) int32 {
+func (t *PlatformInfoTable) QueryVtapEpc0(vtapId uint16) int32 {
 	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
 		return int32(vtapInfo.EpcId)
 	}
 	return datatype.EPC_FROM_INTERNET
 }
 
-func (t *PlatformInfoTable) QueryVtapInfo(vtapId uint32) *VtapInfo {
+func (t *PlatformInfoTable) QueryVtapInfo(vtapId uint16) *VtapInfo {
 	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
 		return vtapInfo
 	}
 	return nil
+}
+
+func (t *PlatformInfoTable) QueryVtapOrgAndTeamID(vtapId uint16) (uint16, uint16) {
+	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+		return vtapInfo.OrgId, vtapInfo.TeamId
+	}
+	return ckdb.DEFAULT_ORG_ID, ckdb.INVALID_TEAM_ID
 }
 
 func (t *PlatformInfoTable) inPlatformData(epcID int32, isIPv4 bool, ip4 uint32, ip6 net.IP) bool {
@@ -1458,7 +1497,7 @@ func (t *PlatformInfoTable) findEpcInWan(isIPv4 bool, ip4 uint32, ip6 net.IP) in
 // 2.3 假设等于epc_0_1: 验证epc0_0+ip1是否在cidr list中
 // 2.4 ...
 // 3. 如果还找不到, 直接使用ip1去查wan ip
-func (t *PlatformInfoTable) QueryVtapEpc1(vtapId uint32, isIPv4 bool, ip41 uint32, ip61 net.IP) int32 {
+func (t *PlatformInfoTable) QueryVtapEpc1(vtapId uint16, isIPv4 bool, ip41 uint32, ip61 net.IP) int32 {
 	epc0 := t.QueryVtapEpc0(vtapId)
 	if t.inPlatformData(epc0, isIPv4, ip41, ip61) {
 		return epc0
@@ -1474,21 +1513,35 @@ func (t *PlatformInfoTable) QueryVtapEpc1(vtapId uint32, isIPv4 bool, ip41 uint3
 }
 
 func (t *PlatformInfoTable) updateVtapIps(vtapIps []*trident.VtapIp) {
-	vtapIdInfos := make(map[uint32]*VtapInfo)
+	vtapIdInfos := make(map[uint16]*VtapInfo)
+	orgIdMap := make(map[uint16]struct{})
+	orgIds := make([]uint16, 0)
 	for _, vtapIp := range vtapIps {
 		// vtapIp.GetEpcId() in range (0,64000], when convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
 		epcId := int32(vtapIp.GetEpcId())
 		if epcId == 0 {
 			epcId = datatype.EPC_FROM_INTERNET
 		}
-		vtapIdInfos[vtapIp.GetVtapId()] = &VtapInfo{
-			VtapId:       vtapIp.GetVtapId(),
+		vtapIdInfos[uint16(vtapIp.GetVtapId())] = &VtapInfo{
+			VtapId:       uint16(vtapIp.GetVtapId()),
 			EpcId:        epcId,
 			Ip:           vtapIp.GetIp(),
 			PodClusterId: vtapIp.GetPodClusterId(),
+			OrgId:        uint16(vtapIp.GetOrgId()),
+			TeamId:       uint16(vtapIp.GetTeamId()),
 		}
+		orgIdMap[uint16(vtapIp.GetOrgId())] = struct{}{}
 	}
+	// add default org
+	orgIdMap[ckdb.DEFAULT_ORG_ID] = struct{}{}
+	for orgId := range orgIdMap {
+		orgIds = append(orgIds, orgId)
+	}
+	sort.Slice(orgIds, func(i, j int) bool {
+		return orgIds[i] < orgIds[j]
+	})
 	t.vtapIdInfos = vtapIdInfos
+	t.orgIds = orgIds
 }
 
 func (t *PlatformInfoTable) vtapsString() string {
@@ -1499,7 +1552,7 @@ func (t *PlatformInfoTable) vtapsString() string {
 	return sb.String()
 }
 
-func (t *PlatformInfoTable) QueryPodInfo(vtapId uint32, podName string) *PodInfo {
+func (t *PlatformInfoTable) QueryPodInfo(vtapId uint16, podName string) *PodInfo {
 	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
 		podClusterId := vtapInfo.PodClusterId
 		for _, podInfo := range t.podNameInfos[podName] {
@@ -1511,7 +1564,7 @@ func (t *PlatformInfoTable) QueryPodInfo(vtapId uint32, podName string) *PodInfo
 	return nil
 }
 
-func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint32, containerID string) *PodInfo {
+func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint16, containerID string) *PodInfo {
 	if vtapInfo, ok := t.vtapIdInfos[vtapID]; ok {
 		podClusterId := vtapInfo.PodClusterId
 		atomic.AddInt64(&t.counter.ContainerTotalCount, 1)
@@ -1741,15 +1794,15 @@ func (t *PlatformInfoTable) gprocessInfosString() string {
 }
 
 // return vtapID, podID
-func (t *PlatformInfoTable) QueryGprocessInfo(gprocessId uint32) (uint32, uint32) {
+func (t *PlatformInfoTable) QueryGprocessInfo(gprocessId uint32) (uint16, uint32) {
 	if vtapPod, ok := t.gprocessInfos[gprocessId]; ok {
-		return uint32(vtapPod >> 32), uint32(vtapPod << 32 >> 32)
+		return uint16(vtapPod >> 32), uint32(vtapPod << 32 >> 32)
 	}
 	return 0, 0
 }
 
 // return gProcessID
-func (t *PlatformInfoTable) QueryProcessInfo(vtapId, processId uint32) uint32 {
+func (t *PlatformInfoTable) QueryProcessInfo(vtapId uint16, processId uint32) uint32 {
 	return t.vtapIDProcessInfos[uint64(vtapId)<<32|uint64(processId)]
 }
 
