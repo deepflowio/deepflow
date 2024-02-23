@@ -209,6 +209,7 @@ type VMFieldsUpdate struct {
 	HType        fieldDetail[int]
 	LaunchServer fieldDetail[string]
 	CloudTags    fieldDetail[map[string]string]
+	HostID       fieldDetail[int]
 	Hostname     fieldDetail[string]
 	VPCID        fieldDetail[int]
 	VPCLcuuid    fieldDetail[string]

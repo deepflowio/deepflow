@@ -45,7 +45,7 @@ func (vm *VM) OnUpdaterAdded(addedDBItems []*mysql.VM) {
 
 func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) {
 	vm.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, vm.cache.ToolDataSet)
 	vm.cache.UpdateVM(cloudItem)
 }
 
