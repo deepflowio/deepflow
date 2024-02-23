@@ -18,9 +18,12 @@ package manager
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
@@ -28,13 +31,22 @@ import (
 )
 
 type Task struct {
-	tCtx         context.Context
-	tCancel      context.CancelFunc
-	cfg          config.TaskConfig
+	tCtx    context.Context
+	tCancel context.CancelFunc
+	cfg     config.TaskConfig
+
 	Cloud        *cloud.Cloud
 	Recorder     *recorder.Recorder
 	DomainName   string // 云平台名称
 	DomainConfig string // 云平台配置字段config
+
+	// 云平台刷新控制，初始化时本信号自动启动一个 goroutine 定时输入信号，用于定时刷新；
+	// kubernetes 类型云平台的 kubernetes_gather，也通过输入到此信号，触发实时刷新。
+	domainRefreshSignal *queue.OverwriteQueue
+	// 附属容器集群刷新控制，因为定时刷新云平台包含了刷新附属容器集群，所以此信号初始化时不启动定时输入信号 goroutine；
+	// kubernetes_gather，通过输入到此信号，触发实时性刷新。
+	// TODO 增删与 Cloud.GetResource() 的 SubDomainResources 同步
+	subDomainRefreshSignals map[string]*queue.OverwriteQueue // key: subDomainLcuuid
 }
 
 func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
@@ -49,24 +61,76 @@ func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, re
 		Recorder:     recorder.NewRecorder(domain.Lcuuid, domain.Name, cfg.RecorderCfg, tCtx, resourceEventQueue),
 		DomainName:   domain.Name,
 		DomainConfig: domain.Config,
+
+		domainRefreshSignal: queue.NewOverwriteQueue(
+			fmt.Sprintf("cloud-task-%s", domain.Name),
+			1,
+			queue.OptionFlushIndicator(time.Duration(cfg.ResourceRecorderInterval)*time.Second), // 定时输入信号，用于定时刷新
+		),
+		subDomainRefreshSignals: make(map[string]*queue.OverwriteQueue),
 	}
 }
 
 func (t *Task) Start() {
-	t.Recorder.Start()
+	// t.Recorder.Start()
 	t.Cloud.Start()
 
 	go func() {
-		ticker := time.NewTicker(time.Duration(t.cfg.ResourceRecorderInterval) * time.Second)
 	LOOP:
 		for {
+			log.Infof("tash (%s) wait for next refresh")
+			t.domainRefreshSignal.Get()
+			log.Infof("task (%s) call recorder refresh", t.DomainName)
+			log.Infof("tash (%s) sub_domain refresh signals: %#v", t.DomainName, t.subDomainRefreshSignals)
+			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); errors.Is(err, recorder.RefreshConflictError) {
+				log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
+				t.domainRefreshSignal.Put(struct{}{})
+				time.Sleep(5 * time.Second) // TODO
+			}
 			select {
-			case <-ticker.C:
-				cd := t.Cloud.GetResource()
-				log.Debugf("domain (%s) cloud data: %+v", t.DomainName, cd)
-				t.Recorder.Refresh(cd)
 			case <-t.tCtx.Done():
 				break LOOP
+			default:
+				continue
+			}
+		}
+	}()
+
+	go func() {
+	LOOP:
+		for {
+			ticker := time.NewTicker(time.Millisecond * 200)
+			defer ticker.Stop()
+
+			select {
+			case <-ticker.C:
+				resource := t.Cloud.GetResource()
+				for lcuuid := range resource.SubDomainResources {
+					if _, ok := t.subDomainRefreshSignals[lcuuid]; !ok {
+						t.subDomainRefreshSignals[lcuuid] = queue.NewOverwriteQueue(
+							fmt.Sprintf("sub-domain-task-%s", lcuuid),
+							1,
+						)
+					}
+				}
+				for lcuuid, signal := range t.subDomainRefreshSignals {
+					if subDomainResource, ok := resource.SubDomainResources[lcuuid]; !ok {
+						delete(t.subDomainRefreshSignals, lcuuid)
+					} else if signal.Len() != 0 {
+						newResource := resource
+						newResource.SubDomainResources = map[string]cloudmodel.SubDomainResource{lcuuid: subDomainResource}
+						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, newResource); errors.Is(err, recorder.RefreshConflictError) {
+							log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
+							signal.Put(struct{}{})
+							time.Sleep(5 * time.Second) // TODO
+						}
+					}
+				}
+
+			case <-t.tCtx.Done():
+				break LOOP
+			default:
+				continue
 			}
 		}
 	}()
