@@ -689,15 +689,16 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		
 
 		if (debug->magic == 0xffff) {
-			ebpf_info(stdout, ">UPROBE DEBUG nobuf fun %s num %d%s len %d\n",
+			fprintf(stdout, ">UPROBE DEBUG nobuf fun %s num %d%s len %d\n",
 		  		  fun, debug->num, err, debug->len);
 		} else {
-			ebpf_info(stdout, ">UPROBE DEBUG buf fun %s num %d%s [%d(%c) "
+			fprintf(stdout, ">UPROBE DEBUG buf fun %s num %d%s [%d(%c) "
 				  "%d(%c) %d(%c) %d(%c)]\n",
 				  fun, debug->num, err, debug->buf[0], debug->buf[0],
 				  debug->buf[1], debug->buf[1], debug->buf[2],
 				  debug->buf[2], debug->buf[3], debug->buf[3]);
 		}
+		fflush(stdout);
 		return;
 	}
 #endif
