@@ -272,6 +272,9 @@ impl RedisLog {
         if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
+        if payload.is_empty() {
+            return Err(Error::L7ProtocolUnknown);
+        }
 
         match direction {
             // only parse the request with payload start with '*' which indicate is a command start, otherwise assume tcp fragment of request
