@@ -1912,11 +1912,13 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)fd);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
 		if (socket_info_ptr != NULL) {
-			struct data_args_t read_args = {};
-			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-			read_args.data_seq = socket_info_ptr->seq;
-			read_args.socket_id = socket_info_ptr->uid;
-			active_read_args_map__update(&id, &read_args);
+			if (socket_info_ptr->uid) {
+				struct data_args_t read_args = {};
+				__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+				read_args.data_seq = socket_info_ptr->seq;
+				read_args.socket_id = socket_info_ptr->uid;
+				active_read_args_map__update(&id, &read_args);
+			}
 			delete_socket_info(conn_key, socket_info_ptr);
 		}
 
