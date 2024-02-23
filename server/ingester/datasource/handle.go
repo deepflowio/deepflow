@@ -24,7 +24,7 @@ import (
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 )
 
 const (
@@ -59,17 +59,17 @@ const (
 )
 
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
-	DEEPFLOW_SYSTEM:   {int(zerodoc.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
-	L4_FLOW_LOG:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
-	L7_FLOW_LOG:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
-	L4_PACKET:         {int(zerodoc.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
-	L7_PACKET:         {int(zerodoc.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
-	EXT_METRICS:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
-	PROMETHEUS:        {int(zerodoc.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
-	EVENT_EVENT:       {int(zerodoc.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}},
-	EVENT_PERF_EVENT:  {int(zerodoc.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
-	EVENT_ALARM_EVENT: {int(zerodoc.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
-	PROFILE:           {int(zerodoc.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
+	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
+	L4_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
+	L7_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
+	L4_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
+	L7_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
+	EXT_METRICS:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
+	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
+	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}},
+	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
+	EVENT_ALARM_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
+	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
@@ -81,36 +81,36 @@ func IsModifiedOnlyDatasource(datasource string) bool {
 	return ok
 }
 
-var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
-	zerodoc.NETWORK_1M:        {zerodoc.NETWORK_MAP_1M, zerodoc.NETWORK_1M},
-	zerodoc.NETWORK_1S:        {zerodoc.NETWORK_MAP_1S, zerodoc.NETWORK_1S},
-	zerodoc.APPLICATION_1M:    {zerodoc.APPLICATION_MAP_1M, zerodoc.APPLICATION_1M},
-	zerodoc.APPLICATION_1S:    {zerodoc.APPLICATION_MAP_1S, zerodoc.APPLICATION_1S},
-	zerodoc.TRAFFIC_POLICY_1M: {zerodoc.TRAFFIC_POLICY_1M},
+var metricsGroupTableIDs = [][]flow_metrics.MetricsTableID{
+	flow_metrics.NETWORK_1M:        {flow_metrics.NETWORK_MAP_1M, flow_metrics.NETWORK_1M},
+	flow_metrics.NETWORK_1S:        {flow_metrics.NETWORK_MAP_1S, flow_metrics.NETWORK_1S},
+	flow_metrics.APPLICATION_1M:    {flow_metrics.APPLICATION_MAP_1M, flow_metrics.APPLICATION_1M},
+	flow_metrics.APPLICATION_1S:    {flow_metrics.APPLICATION_MAP_1S, flow_metrics.APPLICATION_1S},
+	flow_metrics.TRAFFIC_POLICY_1M: {flow_metrics.TRAFFIC_POLICY_1M},
 }
 
-func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
+func getMetricsSubTableIDs(tableGroup, baseTable string) ([]flow_metrics.MetricsTableID, error) {
 	switch tableGroup {
 	case NETWORK:
 		if baseTable == ORIGIN_TABLE_1S {
-			return metricsGroupTableIDs[zerodoc.NETWORK_1S], nil
+			return metricsGroupTableIDs[flow_metrics.NETWORK_1S], nil
 		} else {
-			return metricsGroupTableIDs[zerodoc.NETWORK_1M], nil
+			return metricsGroupTableIDs[flow_metrics.NETWORK_1M], nil
 		}
 	case APPLICATION:
 		if baseTable == ORIGIN_TABLE_1S {
-			return metricsGroupTableIDs[zerodoc.APPLICATION_1S], nil
+			return metricsGroupTableIDs[flow_metrics.APPLICATION_1S], nil
 		} else {
-			return metricsGroupTableIDs[zerodoc.APPLICATION_1M], nil
+			return metricsGroupTableIDs[flow_metrics.APPLICATION_1M], nil
 		}
 	case TRAFFIC_POLICY:
-		return metricsGroupTableIDs[zerodoc.TRAFFIC_POLICY_1M], nil
+		return metricsGroupTableIDs[flow_metrics.TRAFFIC_POLICY_1M], nil
 	default:
 		return nil, fmt.Errorf("unknown table group(%s)", tableGroup)
 	}
 }
 
-// zerodoc 的 Latency 结构中的非累加聚合字段
+// flow_metrics 的 Latency 结构中的非累加聚合字段
 var unsummableMaxFieldsMap = map[string]struct{}{
 	"rtt_max":        {},
 	"rtt_client_max": {},
@@ -258,7 +258,7 @@ const (
 )
 
 func getMetricsTableName(id uint8, table string, t TableType) string {
-	tableId := zerodoc.MetricsTableID(id)
+	tableId := flow_metrics.MetricsTableID(id)
 	tablePrefix := strings.Split(tableId.TableName(), ".")[0]
 	if len(table) == 0 {
 		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), t.String())
@@ -424,11 +424,11 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	return createTable
 }
 
-func (m *DatasourceManager) getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
-	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
+func (m *DatasourceManager) getMetricsTable(id flow_metrics.MetricsTableID) *ckdb.Table {
+	return flow_metrics.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
 }
 
-func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -456,7 +456,7 @@ func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId zerodoc.Me
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId flow_metrics.MetricsTableID, dstTable string, duration int) error {
 	table := m.getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
@@ -525,7 +525,7 @@ func (m *DatasourceManager) modDeepflowSystemTables(cks basecommon.DBs, duration
 	return e
 }
 
-func delTableMV(cks basecommon.DBs, dbId zerodoc.MetricsTableID, table string) error {
+func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
 		getMetricsTableName(uint8(dbId), table, LOCAL),
@@ -553,10 +553,10 @@ func isFlowLogGroup(name string) bool {
 func getFlowLogDatasoureID(name string) (common.FlowLogID, uint8) {
 	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
 		if name == id.DataourceString() {
-			return id, uint8(id) + uint8(zerodoc.METRICS_TABLE_ID_MAX)
+			return id, uint8(id) + uint8(flow_metrics.METRICS_TABLE_ID_MAX)
 		}
 	}
-	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.METRICS_TABLE_ID_MAX)
+	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(flow_metrics.METRICS_TABLE_ID_MAX)
 }
 
 func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {
@@ -673,7 +673,7 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				return fmt.Errorf(ERR_IS_MODIFYING, tableId.TableName())
 			}
 			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
-			go func(id zerodoc.MetricsTableID) {
+			go func(id flow_metrics.MetricsTableID) {
 				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
 				if err != nil {
 					log.Error(err)

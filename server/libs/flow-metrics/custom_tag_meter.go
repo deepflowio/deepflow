@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import (
 	"encoding/binary"

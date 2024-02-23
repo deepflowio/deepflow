@@ -37,10 +37,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("flow_metrics.dbwriter")
@@ -64,14 +64,14 @@ type CkDbWriter struct {
 
 func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, timeZone string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage) (DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
-	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
+	tables := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
 		counterName := "metrics_1m"
-		if table.ID >= uint8(zerodoc.NETWORK_1S) && table.ID <= uint8(zerodoc.NETWORK_MAP_1S) {
+		if table.ID >= uint8(flow_metrics.NETWORK_1S) && table.ID <= uint8(flow_metrics.NETWORK_MAP_1S) {
 			counterName = "metrics_1s"
-		} else if table.ID >= uint8(zerodoc.APPLICATION_1S) && table.ID <= uint8(zerodoc.APPLICATION_MAP_1S) {
+		} else if table.ID >= uint8(flow_metrics.APPLICATION_1S) && table.ID <= uint8(flow_metrics.APPLICATION_MAP_1S) {
 			counterName = "app_1s"
-		} else if table.ID >= uint8(zerodoc.APPLICATION_1M) && table.ID <= uint8(zerodoc.APPLICATION_MAP_1M) {
+		} else if table.ID >= uint8(flow_metrics.APPLICATION_1M) && table.ID <= uint8(flow_metrics.APPLICATION_MAP_1M) {
 			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(addrs, user, password, counterName, timeZone, table,
@@ -90,7 +90,7 @@ func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, t
 }
 
 func (w *CkDbWriter) Put(items ...interface{}) error {
-	caches := [zerodoc.METRICS_TABLE_ID_MAX][]interface{}{}
+	caches := [flow_metrics.METRICS_TABLE_ID_MAX][]interface{}{}
 	for i := range caches {
 		caches[i] = make([]interface{}, 0, CACHE_SIZE)
 	}
@@ -204,7 +204,7 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 		}
 
 		// 只处理 APPLICATION_MAP_1S 这张表
-		if id != uint8(zerodoc.APPLICATION_MAP_1S) {
+		if id != uint8(flow_metrics.APPLICATION_MAP_1S) {
 			doc.Release()
 			continue
 		}
@@ -214,9 +214,9 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 		// TODO: 其余 metrics 类型待实现
 		if doc.Meter != nil {
 			switch meter := doc.Meter.(type) {
-			case *zerodoc.AppMeter:
+			case *flow_metrics.AppMeter:
 				if _, ok := pw.filter[metricsFilterApp]; ok {
-					metrics = zerodoc.EncodeAppMeterToMetrics(meter)
+					metrics = flow_metrics.EncodeAppMeterToMetrics(meter)
 				}
 			}
 		}
@@ -230,12 +230,12 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 		var labels []prompb.Label
 		if doc.Tagger != nil {
 			switch tag := doc.Tagger.(type) {
-			case *zerodoc.MiniTag:
-				labels = zerodoc.EncodeMiniTagToPromLabels(tag)
-			case *zerodoc.CustomTag:
-				labels = zerodoc.EncodeCustomTagToPromLabels(tag)
-			case *zerodoc.Tag:
-				labels = zerodoc.EncodeTagToPromLabels(tag)
+			case *flow_metrics.MiniTag:
+				labels = flow_metrics.EncodeMiniTagToPromLabels(tag)
+			case *flow_metrics.CustomTag:
+				labels = flow_metrics.EncodeCustomTagToPromLabels(tag)
+			case *flow_metrics.Tag:
+				labels = flow_metrics.EncodeTagToPromLabels(tag)
 			}
 		}
 
