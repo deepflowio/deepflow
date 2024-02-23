@@ -327,26 +327,6 @@ static __inline int get_fd_from_tls_conn_struct(void *conn,
 	return get_fd_from_tcp_conn_interface(conn + offset_conn_conn, info);
 }
 
-static __inline bool is_tls_conn_interface(void *conn,
-					   struct ebpf_proc_info *info)
-{
-	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), conn);
-	return info ? i.type == info->crypto_tls_Conn_itab : false;
-}
-
-static __inline int get_fd_from_tls_conn_interface(void *conn,
-						   struct ebpf_proc_info *info)
-{
-	if (!is_tls_conn_interface(conn, info)) {
-		return -1;
-	}
-	struct go_interface i = {};
-
-	bpf_probe_read(&i, sizeof(i), conn);
-	return get_fd_from_tls_conn_struct(i.ptr, info);
-}
-
 static __inline int
 get_fd_from_go_proxyproto_interface(void *conn,
 				    struct ebpf_proc_info *info)
@@ -367,6 +347,33 @@ get_fd_from_go_proxyproto_interface(void *conn,
 	void *proxyproto_conn = i.ptr + 8;
 	// proxyproto_conn is 'net.TCPConn,net.Conn'
 	return get_fd_from_tcp_conn_interface(proxyproto_conn, info);
+}
+
+static __inline bool is_tls_conn_interface(void *conn,
+					   struct ebpf_proc_info *info)
+{
+	struct go_interface i;
+	bpf_probe_read(&i, sizeof(i), conn);
+	return info ? i.type == info->crypto_tls_Conn_itab : false;
+}
+
+static __inline int get_fd_from_tls_conn_interface(void *conn,
+						   struct ebpf_proc_info *info)
+{
+	if (!is_tls_conn_interface(conn, info)) {
+		return -1;
+	}
+	struct go_interface i = {};
+
+	bpf_probe_read(&i, sizeof(i), conn);
+	int fd = get_fd_from_tls_conn_struct(i.ptr, info);
+	if (fd > 0)
+		return fd;
+	fd = get_fd_from_go_proxyproto_interface(i.ptr, info);
+	if (fd > 0) {
+		return fd;
+	}
+	return -1;
 }
 
 static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
