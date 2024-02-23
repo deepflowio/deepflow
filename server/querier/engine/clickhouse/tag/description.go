@@ -479,7 +479,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									selectPrefixTranslator += " OR if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
 									iconIDTranslator += fmt.Sprintf(", %s, %s", iconIDPrefixTranslator, iconIDStrSuffix)
 									nodeTypeTranslator += fmt.Sprintf(", %s, %s", nodeTypePrefixTranslator, nodeTypeStrSuffix)
-								case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress", "vtap":
+								case "region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "lb_listener", "pod_ingress":
 									tagValueName := tagValue + suffix
 									tagValueID := tagValue + "_id" + suffix
 									tagValueMap := tagValue + "_map"
@@ -650,7 +650,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				labelKey, labelKey, labelKey, labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
@@ -672,7 +672,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
@@ -694,7 +694,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				envKey, envKey, envKey, envKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
@@ -716,7 +716,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
@@ -738,7 +738,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false,
@@ -760,7 +760,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false,
 				})
-			} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false,
@@ -1071,9 +1071,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			}
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
 
-		case "tap":
+		case "tap", "capture_network_type":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		case "vtap":
+		case "vtap", "agent":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 		case "gprocess":
 			return &common.Result{}, sqlList, nil
@@ -1202,9 +1202,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "ip" {
 			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "tap" {
+		} else if tag == "tap" || tag == "capture_network_type" {
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "vtap" {
+		} else if tag == "vtap" || tag == "agent" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
