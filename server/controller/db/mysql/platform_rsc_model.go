@@ -827,6 +827,7 @@ type Pod struct {
 	ContainerIDs    string `gorm:"column:container_ids;type:text;default:''" json:"CONTAINER_IDS" mapstructure:"CONTAINER_IDS"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID" mapstructure:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
+	PodServiceID    int    `gorm:"column:pod_service_id;type:int;default:0" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodNodeID       int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`

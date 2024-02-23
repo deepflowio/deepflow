@@ -212,16 +212,22 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				// 在service确定有pod group的时候添加pod service port
 				servicePorts = append(servicePorts, servicePort)
 				for _, Lcuuid := range podGroupLcuuids.ToSlice() {
+					pgLcuuid, ok := Lcuuid.(string)
+					if !ok {
+						log.Warningf("pod group lcuuid (%v) assert failed", Lcuuid)
+						continue
+					}
 					key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
 					podGroupPort := model.PodGroupPort{
-						Lcuuid:           common.GetUUID(uID+Lcuuid.(string)+key, uuid.Nil),
+						Lcuuid:           common.GetUUID(uID+pgLcuuid+key, uuid.Nil),
 						Name:             ports.Get("name").MustString(),
 						Port:             targetPort,
 						Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-						PodGroupLcuuid:   Lcuuid.(string),
+						PodGroupLcuuid:   pgLcuuid,
 						PodServiceLcuuid: uID,
 					}
 					podGroupPorts = append(podGroupPorts, podGroupPort)
+					k.pgLcuuidToPSLcuuids[pgLcuuid] = append(k.pgLcuuidToPSLcuuids[pgLcuuid], uID)
 				}
 			}
 			if !hasPodGroup {
