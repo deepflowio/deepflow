@@ -846,7 +846,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in select
-	if (common.IsValueInSliceString("tap_port", tagSlice) || common.IsValueInSliceString("capture_nic", tagSlice)) && (!common.IsValueInSliceString("tap_port_type", tagSlice) || !common.IsValueInSliceString("capture_nic_type", tagSlice)) && (!common.IsValueInSliceString("enum(tap_port_type)", tagSlice) || !common.IsValueInSliceString("enum(capture_nic_type)", tagSlice)) {
+	if (common.IsValueInSliceString("tap_port", tagSlice) || common.IsValueInSliceString("capture_nic", tagSlice)) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("capture_nic_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", tagSlice) {
 		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in select")
 	}
 
@@ -1133,7 +1133,7 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in group
-	if (common.IsValueInSliceString("tap_port", groupSlice) || common.IsValueInSliceString("capture_nic", groupSlice)) && (!common.IsValueInSliceString("tap_port_type", groupSlice) || !common.IsValueInSliceString("capture_nic_type", groupSlice)) && (!common.IsValueInSliceString("enum(tap_port_type)", groupSlice) || !common.IsValueInSliceString("enum(capture_nic_type)", groupSlice)) {
+	if (common.IsValueInSliceString("tap_port", groupSlice) || common.IsValueInSliceString("capture_nic", groupSlice)) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("capture_nic_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", groupSlice) {
 		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in group")
 	}
 	for _, group := range groups {
