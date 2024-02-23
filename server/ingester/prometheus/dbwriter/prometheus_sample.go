@@ -185,7 +185,7 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 		}
 		fieldName := strings.Clone(label.Name)
 
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = m.Timestamp
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		tagFieldValue.FlowTagInfo.FieldName = fieldName
@@ -203,7 +203,7 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 				*old = m.Timestamp
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = m.Timestamp
 		tagField.FlowTagInfo = *flowTagInfo
 		tagField.FlowTagInfo.FieldName = fieldName

@@ -683,7 +683,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldValueCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagFieldValue := flow_tag.AcquireFlowTag()
+			tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 			tagFieldValue.Timestamp = time
 			tagFieldValue.FlowTagInfo = *flowTagInfo
 			cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -701,7 +701,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagField := flow_tag.AcquireFlowTag()
+			tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo
 			cache.Fields = append(cache.Fields, tagField)
@@ -719,7 +719,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagField := flow_tag.AcquireFlowTag()
+			tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo
 			cache.Fields = append(cache.Fields, tagField)

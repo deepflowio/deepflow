@@ -450,7 +450,7 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldValueCache.Add(*flowTagInfo, p.Time)
 			}
 		}
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = p.Time
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -464,7 +464,7 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldCache.Add(*flowTagInfo, p.Time)
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = p.Time
 		tagField.FlowTagInfo = *flowTagInfo
 		cache.Fields = append(cache.Fields, tagField)
