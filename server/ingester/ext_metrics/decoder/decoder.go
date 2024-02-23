@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
@@ -28,9 +27,10 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/dbwriter"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -108,7 +108,6 @@ func (d *Decoder) Run() {
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 
-	d.initMetricsTable()
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	for {
@@ -126,27 +125,11 @@ func (d *Decoder) Run() {
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 			if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF {
 				d.handleTelegraf(recvBytes.VtapID, decoder)
-			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS {
+			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS || d.msgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
 				d.handleDeepflowStats(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
-	}
-}
-
-func (d *Decoder) initMetricsTable() {
-	if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF && d.extMetricsWriter != nil {
-		// send empty metrics, trigger the creation of ext_metrics.metrics table
-		m := dbwriter.AcquireExtMetrics()
-		m.Timestamp = uint32(time.Now().Unix())
-		d.extMetricsWriter.Write(m)
-	}
-	if d.msgType == datatype.MESSAGE_TYPE_DFSTATS && d.extMetricsWriter != nil {
-		// send empty df stats, trigger the creation of deepflow_system.deepflow_system table
-		m := dbwriter.AcquireExtMetrics()
-		m.Timestamp = uint32(time.Now().Unix())
-		m.MsgType = datatype.MESSAGE_TYPE_DFSTATS
-		d.extMetricsWriter.Write(m)
 	}
 }
 
@@ -212,21 +195,27 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 		if d.debugEnabled {
 			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
 		}
-		d.extMetricsWriter.Write(StatsToExtMetrics(vtapID, pbStats))
+		d.extMetricsWriter.Write(d.StatsToExtMetrics(vtapID, pbStats))
 		d.counter.OutCount++
 	}
 }
 
-func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
+func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
 	m.UniversalTag.VTAPID = vtapID
-	m.MsgType = datatype.MESSAGE_TYPE_DFSTATS
+	m.MsgType = d.msgType
 	m.VTableName = s.Name
 	m.TagNames = s.TagNames
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
+	// from deepflow_server
+	if vtapID == 0 {
+		m.OrgId, m.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_TEAM_ID
+	} else {
+		m.OrgId, m.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
+	}
 	return m
 }
 
@@ -275,7 +264,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
 	if podName != "" {
-		podInfo := d.platformData.QueryPodInfo(uint32(vtapID), podName)
+		podInfo := d.platformData.QueryPodInfo(vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
@@ -283,8 +272,8 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 			ip = net.ParseIP(podInfo.Ip)
 		}
 	} else if fillWithVtapId {
-		t.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapID))
-		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapID))
+		t.L3EpcID = d.platformData.QueryVtapEpc0(vtapID)
+		vtapInfo := d.platformData.QueryVtapInfo(vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
@@ -341,6 +330,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 	m.MsgType = datatype.MESSAGE_TYPE_TELEGRAF
 	tableName := string(point.Name())
 	m.VTableName = VTABLE_PREFIX_TELEGRAF + tableName
+	m.OrgId, m.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapID)
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)

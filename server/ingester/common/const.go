@@ -17,5 +17,5 @@
 package common
 
 const (
-	CK_VERSION = "v6.5.1.6" // 用于表示clickhouse的表版本号
+	CK_VERSION = "v6.5.3.1" // 用于表示clickhouse的表版本号
 )

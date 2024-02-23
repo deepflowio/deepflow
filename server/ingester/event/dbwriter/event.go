@@ -76,6 +76,11 @@ type EventStore struct {
 	IP4          uint32
 	IP6          net.IP
 
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'event', otherwise stored in '<OrgId>_event'.
+	OrgId  uint16
+	TeamID uint16
+
 	AutoInstanceID   uint32
 	AutoInstanceType uint8
 	AutoServiceID    uint32
@@ -126,6 +131,7 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 	block.WriteIPv6(e.IP6)
 
 	block.Write(
+		e.TeamID,
 		e.AutoInstanceID,
 		e.AutoInstanceType,
 		e.AutoServiceID,
@@ -142,6 +148,10 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 			e.Duration,
 		)
 	}
+}
+
+func (e *EventStore) OrgID() uint16 {
+	return e.OrgId
 }
 
 func (e *EventStore) Table() string {
@@ -198,6 +208,8 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("ip4", ckdb.IPv4),
 		ckdb.NewColumn("ip6", ckdb.IPv6),
 
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("Team ID"),
+
 		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
 		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
 		ckdb.NewColumn("auto_service_id", ckdb.UInt32),
@@ -252,6 +264,8 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		Table:   e.Table(),
 		VpcId:   e.L3EpcID,
 		PodNsId: e.PodNSID,
+		OrgId:   e.OrgId,
+		TeamID:  e.TeamID,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]

@@ -338,6 +338,10 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 	)
 }
 
+func (h *L7FlowLog) OrgID() uint16 {
+	return h.KnowledgeGraph.OrgId
+}
+
 func base64ToHexString(str string) string {
 	if len(str) < 2 || str[len(str)-1] != '=' {
 		return str
@@ -597,7 +601,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		l.Gpid_0, l.Gpid_1,
-		l.VtapId, l.PodId_0, l.PodId_1,
+		uint16(l.VtapId), l.PodId_0, l.PodId_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,
@@ -671,6 +675,8 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			Table:   common.L7_FLOW_ID.String(),
 			VpcId:   L3EpcIDs[idx],
 			PodNsId: PodNSIDs[idx],
+			OrgId:   h.OrgId,
+			TeamID:  h.TeamID,
 		}
 
 		for i, name := range attributeNames[:minNamesLen] {

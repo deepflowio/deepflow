@@ -90,6 +90,11 @@ type InProcessProfile struct {
 	L3DeviceType uint8
 	L3DeviceID   uint32
 	ServiceID    uint32
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'profile', otherwise stored in '<OrgId>_profile'.
+	OrgId  uint16
+	TeamID uint16
 }
 
 // profile_event_type <-> profile_value_unit relation
@@ -161,6 +166,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("团队ID"),
 	}
 }
 
@@ -228,7 +234,12 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.L3DeviceType,
 		p.L3DeviceID,
 		p.ServiceID,
+		p.TeamID,
 	)
+}
+
+func (p *InProcessProfile) OrgID() uint16 {
+	return p.OrgId
 }
 
 var poolInProcess = pool.NewLockFreePool(func() interface{} {
@@ -295,13 +306,14 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime
-	p.GPID = platformData.QueryProcessInfo(uint32(vtapID), pid)
+	p.GPID = platformData.QueryProcessInfo(vtapID, pid)
 	tagNames = append(tagNames, LabelAppService, LabelLanguageType, LabelTraceID, LabelSpanName, LabelAppInstance)
 	tagValues = append(tagValues, p.AppService, p.ProfileLanguageType, p.TraceID, p.SpanName, p.AppInstance)
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
-	p.fillResource(uint32(vtapID), podID, platformData)
+	p.fillResource(vtapID, podID, platformData)
+	p.OrgId, p.TeamID = platformData.QueryVtapOrgAndTeamID(vtapID)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -309,7 +321,7 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
 	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
@@ -383,7 +395,7 @@ func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformDat
 	}
 }
 
-func (p *InProcessProfile) fillPodInfo(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillPodInfo(vtapID uint16, containerID string, platformData *grpc.PlatformInfoTable) {
 	if containerID == "" {
 		log.Debugf("%s-%s uploaded empty containerID by vtapID: %d", p.AppService, p.ProfileEventType, vtapID)
 		return
@@ -436,6 +448,8 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 		Table:   fmt.Sprintf("%s.%s", p.ProfileLanguageType, p.ProfileEventType),
 		VpcId:   p.L3EpcID,
 		PodNsId: p.PodNSID,
+		OrgId:   p.OrgId,
+		TeamID:  p.TeamID,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
