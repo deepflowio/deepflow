@@ -304,6 +304,7 @@ CREATE TABLE IF NOT EXISTS vm (
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     htype               INTEGER DEFAULT 1 COMMENT '1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s',
     launch_server       CHAR(64) DEFAULT '',
+    host_id             INTEGER DEFAULT 0,
     cloud_tags          TEXT COMMENT 'separated by ,',
     epc_id              INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
