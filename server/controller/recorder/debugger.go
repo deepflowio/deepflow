@@ -23,17 +23,19 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
 
+// TODO remove
 func (r *Recorder) GetCache(domainLcuuid, subDomainLcuuid string) cache.Cache {
-	if subDomainLcuuid != "" {
-		subDomainCache, exists := r.cacheMng.SubDomainCacheMap[subDomainLcuuid]
-		if exists {
-			return *subDomainCache
-		} else {
-			return cache.Cache{}
-		}
-	} else {
-		return *r.cacheMng.DomainCache
-	}
+	return cache.Cache{}
+	// if subDomainLcuuid != "" {
+	// 	subDomainCache, exists := r.cacheMng.SubDomainCacheMap[subDomainLcuuid]
+	// 	if exists {
+	// 		return *subDomainCache
+	// 	} else {
+	// 		return cache.Cache{}
+	// 	}
+	// } else {
+	// 	return *r.domainRefresher.cache
+	// }
 }
 
 func (r *Recorder) GetCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid, resourceType string) map[string]interface{} {

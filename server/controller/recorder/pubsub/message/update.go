@@ -242,6 +242,7 @@ type VPCFieldsUpdate struct {
 	CIDR         fieldDetail[string]
 	TunnelID     fieldDetail[int]
 	RegionLcuuid fieldDetail[string]
+	UID          fieldDetail[string]
 }
 
 type VPCUpdate struct {
