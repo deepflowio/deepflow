@@ -120,6 +120,10 @@ func (s *DFStats) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
+func (s *DFStats) OrgID() uint16 {
+	return ckdb.DEFAULT_ORG_ID
+}
+
 func (s *DFStats) Release() {
 	ReleaseDFStats(s)
 }

@@ -130,6 +130,65 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnNames: []string{"_id"},
 		ColumnType:  ckdb.UInt64,
 	},
+
+	{
+		Dbs: []string{"flow_metrics"},
+		Tables: []string{"application.1m", "application.1m_local", "application_map.1m", "application_map.1m_local",
+			"application.1s", "application.1s_local", "application_map.1s", "application_map.1s_local", "traffic_policy.1m", "traffic_policy.1m_local"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_flow_log_local", "l7_flow_log", "l4_packet_local", "l4_packet", "l7_packet_local", "l7_packet"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"event_local", "event", "alarm_event_local", "alarm_event", "perf_event", "perf_event_local"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"ext_metrics"},
+		Tables:      []string{"metrics_local", "metrics"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process_local", "in_process"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"prometheus"},
+		Tables:      []string{"samples_local", "samples"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs:         []string{"deepflow_system"},
+		Tables:      []string{"deepflow_system_local", "deepflow_system"},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
+	{
+		Dbs: []string{"flow_tag"},
+		Tables: []string{
+			"deepflow_system_custom_field_local", "deepflow_system_custom_field",
+			"deepflow_system_custom_field_value_local", "deepflow_system_custom_field_value",
+			"event_custom_field_local", "event_custom_field_local",
+			"event_custom_field_value_local", "event_custom_field_value",
+			"ext_metrics_custom_field_local", "ext_metrics_custom_field",
+			"ext_metrics_custom_field_value_local", "ext_metrics_custom_field_value",
+			"flow_log_custom_field_local", "flow_log_custom_field",
+			"flow_log_custom_field_value_local", "flow_log_custom_field_value",
+		},
+		ColumnNames: []string{"team_id"},
+		ColumnType:  ckdb.UInt16,
+	},
 }
 
 var TableRenames65 = []*TableRename{

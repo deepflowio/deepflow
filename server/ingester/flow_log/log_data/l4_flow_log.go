@@ -267,6 +267,9 @@ type KnowledgeGraph struct {
 
 	TagSource0 uint8
 	TagSource1 uint8
+
+	OrgId  uint16 // no need to store
+	TeamID uint16
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -312,6 +315,8 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 
 	ckdb.NewColumn("tag_source_0", ckdb.UInt8),
 	ckdb.NewColumn("tag_source_1", ckdb.UInt8),
+
+	ckdb.NewColumn("team_id", ckdb.UInt16),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
@@ -357,6 +362,7 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
 
 		k.TagSource0,
 		k.TagSource1,
+		k.TeamID,
 	)
 }
 
@@ -705,7 +711,7 @@ func (k *KnowledgeGraph) fill(
 	ip60, ip61 net.IP,
 	mac0, mac1 uint64,
 	gpID0, gpID1 uint32,
-	vtapId, podId0, podId1 uint32,
+	vtapId uint16, podId0, podId1 uint32,
 	port uint16,
 	tapSide uint32,
 	protocol layers.IPProtocol) {
@@ -839,6 +845,9 @@ func (k *KnowledgeGraph) fill(
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
 	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
+
+	k.OrgId, k.TeamID = platformData.QueryVtapOrgAndTeamID(vtapId)
+
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
@@ -850,7 +859,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,
 		f.MetricsPeerSrc.Gpid, f.MetricsPeerDst.Gpid,
-		f.FlowKey.VtapId, 0, 0,
+		uint16(f.FlowKey.VtapId), 0, 0,
 		uint16(f.FlowKey.PortDst),
 		f.TapSide,
 		layers.IPProtocol(f.FlowKey.Proto))
@@ -999,6 +1008,10 @@ func (f *L4FlowLog) WriteBlock(block *ckdb.Block) {
 	f.Internet.WriteBlock(block)
 	f.FlowInfo.WriteBlock(block)
 	f.Metrics.WriteBlock(block)
+}
+
+func (f *L4FlowLog) OrgID() uint16 {
+	return f.KnowledgeGraph.OrgId
 }
 
 func (f *L4FlowLog) EndTime() time.Duration {

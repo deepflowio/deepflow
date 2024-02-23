@@ -23,7 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -43,7 +43,7 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
 		if t.GPID != 0 && t.PodID == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.GPID)
-			if podId != 0 && vtapId == uint32(t.VTAPID) {
+			if podId != 0 && vtapId == t.VTAPID {
 				t.PodID = podId
 				t.TagSource |= uint8(flow_metrics.GpId)
 			}
@@ -77,7 +77,7 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
 		if t.GPID1 != 0 && t.PodID1 == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.GPID1)
-			if podId != 0 && vtapId == uint32(t.VTAPID) {
+			if podId != 0 && vtapId == t.VTAPID {
 				t.PodID1 = podId
 				t.TagSource1 |= uint8(flow_metrics.GpId)
 			}
@@ -133,6 +133,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.Code |= MainAddCode
 	}
 
+	t.OrgId, t.TeamID = platformData.QueryVtapOrgAndTeamID(t.VTAPID)
 	podGroupType, podGroupType1 := uint8(0), uint8(0)
 	if info1 != nil {
 		t.RegionID1 = uint16(info1.RegionID)

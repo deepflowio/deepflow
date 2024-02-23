@@ -37,7 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -62,7 +62,7 @@ type CkDbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, timeZone string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage) (DbWriter, error) {
+func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, timeZone string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage, ckdbWatcher *config.Watcher) (DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
 	tables := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
@@ -75,7 +75,7 @@ func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, t
 			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(addrs, user, password, counterName, timeZone, table,
-			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
+			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout, ckdbWatcher)
 		if err != nil {
 			log.Error(err)
 			return nil, err

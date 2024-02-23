@@ -106,7 +106,8 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		writer.writerConfig.QueueCount,
 		writer.writerConfig.QueueSize,
 		writer.writerConfig.BatchSize,
-		writer.writerConfig.FlushTimeout)
+		writer.writerConfig.FlushTimeout,
+		config.Base.CKDB.Watcher)
 	if err != nil {
 		log.Error(err)
 		return nil, err

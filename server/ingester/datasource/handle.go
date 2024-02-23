@@ -17,14 +17,12 @@
 package datasource
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 )
 
 const (
@@ -59,7 +57,7 @@ const (
 )
 
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
-	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{}}, // deepflow_system  tables need real-time query
+	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{"deepflow_system"}},
 	L4_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
 	L7_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
 	L4_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
@@ -257,16 +255,16 @@ const (
 	IntervalDay
 )
 
-func getMetricsTableName(id uint8, table string, t TableType) string {
+func getMetricsTableName(id uint8, db, table string, t TableType) string {
 	tableId := flow_metrics.MetricsTableID(id)
 	tablePrefix := strings.Split(tableId.TableName(), ".")[0]
 	if len(table) == 0 {
-		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), t.String())
+		return fmt.Sprintf("%s.`%s_%s`", db, tableId.TableName(), t.String())
 	}
 	if len(t.String()) == 0 {
-		return fmt.Sprintf("%s.`%s.%s`", ckdb.METRICS_DB, tablePrefix, table)
+		return fmt.Sprintf("%s.`%s.%s`", db, tablePrefix, table)
 	}
-	return fmt.Sprintf("%s.`%s.%s_%s`", ckdb.METRICS_DB, tablePrefix, table, t.String())
+	return fmt.Sprintf("%s.`%s.%s_%s`", db, tablePrefix, table, t.String())
 }
 
 func stringSliceHas(items []string, item string) bool {
@@ -288,8 +286,8 @@ func (m *DatasourceManager) makeTTLString(timeKey, db, table string, duration in
 	return fmt.Sprintf("%s + toIntervalHour(%d)", timeKey, duration)
 }
 
-func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
-	aggTable := getMetricsTableName(t.ID, dstTable, AGG)
+func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
+	aggTable := getMetricsTableName(t.ID, db, dstTable, AGG)
 
 	columns := []string{}
 	orderKeys := t.OrderKeys
@@ -319,7 +317,7 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 
 	engine := ckdb.AggregatingMergeTree.String()
 	if m.replicaEnabled {
-		engine = fmt.Sprintf(ckdb.ReplicatedAggregatingMergeTree.String(), t.Database, dstTable+"_"+AGG.String())
+		engine = fmt.Sprintf(ckdb.ReplicatedAggregatingMergeTree.String(), db, dstTable+"_"+AGG.String())
 	}
 
 	return fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s
@@ -340,14 +338,14 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 		t.StoragePolicy)
 }
 
-func MakeMVTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
-	tableMv := getMetricsTableName(t.ID, dstTable, MV)
-	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
+func MakeMVTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
+	tableMv := getMetricsTableName(t.ID, db, dstTable, MV)
+	tableAgg := getMetricsTableName(t.ID, db, dstTable, AGG)
 
 	// 对于从1m,1s表进行聚合的表，使用local表作为源表
 	baseTableType := LOCAL
 	columnTableType := MV
-	tableBase := getMetricsTableName(t.ID, "", baseTableType)
+	tableBase := getMetricsTableName(t.ID, db, "", baseTableType)
 
 	groupKeys := t.OrderKeys
 	columns := []string{}
@@ -381,9 +379,9 @@ func MakeMVTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable 
 		strings.Join(t.OrderKeys, ","))
 }
 
-func MakeCreateTableLocal(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string) string {
-	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
-	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
+func MakeCreateTableLocal(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsummable string) string {
+	tableAgg := getMetricsTableName(t.ID, db, dstTable, AGG)
+	tableLocal := getMetricsTableName(t.ID, db, dstTable, LOCAL)
 
 	columns := []string{}
 	groupKeys := t.OrderKeys
@@ -413,11 +411,11 @@ GROUP BY %s`,
 		strings.Join(groupKeys, ","))
 }
 
-func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
-	tableGlobal := getMetricsTableName(t.ID, dstTable, GLOBAL)
-	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
+func MakeGlobalTableCreateSQL(t *ckdb.Table, db, dstTable string) string {
+	tableGlobal := getMetricsTableName(t.ID, db, dstTable, GLOBAL)
+	tableLocal := getMetricsTableName(t.ID, db, dstTable, LOCAL)
 	tablePrefix := strings.Split(t.GlobalName, ".")[0]
-	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, tablePrefix+"."+dstTable+"_"+LOCAL.String())
+	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, db, tablePrefix+"."+dstTable+"_"+LOCAL.String())
 
 	createTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS %s ENGINE = %s",
 		tableGlobal, tableLocal, engine)
@@ -428,7 +426,7 @@ func (m *DatasourceManager) getMetricsTable(id flow_metrics.MetricsTableID) *ckd
 	return flow_metrics.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
 }
 
-func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -442,10 +440,10 @@ func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId flow_metri
 	}
 
 	commands := []string{
-		m.makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
-		MakeMVTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, aggTime),
-		MakeCreateTableLocal(table, dstTable, aggrSummable, aggrUnsummable),
-		MakeGlobalTableCreateSQL(table, dstTable),
+		m.makeAggTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
+		MakeMVTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, aggTime),
+		MakeCreateTableLocal(table, db, dstTable, aggrSummable, aggrUnsummable),
+		MakeGlobalTableCreateSQL(table, db, dstTable),
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)
@@ -456,81 +454,27 @@ func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId flow_metri
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId flow_metrics.MetricsTableID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId flow_metrics.MetricsTableID, db, dstTable string, duration int) error {
 	table := m.getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
-		tableMod = getMetricsTableName(uint8(tableId), "", LOCAL)
+		tableMod = getMetricsTableName(uint8(tableId), db, "", LOCAL)
 	} else {
-		tableMod = getMetricsTableName(uint8(tableId), dstTable, AGG)
+		tableMod = getMetricsTableName(uint8(tableId), db, dstTable, AGG)
 	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-		tableMod, m.makeTTLString(table.TimeKey, ckdb.METRICS_DB, table.GlobalName, duration))
+		tableMod, m.makeTTLString(table.TimeKey, db, table.GlobalName, duration))
 
 	_, err := cks.ExecParallel(modTable)
 	return err
 }
 
-func (m *DatasourceManager) modFlowLogLocalTable(cks basecommon.DBs, tableID common.FlowLogID, duration int) error {
-	timeKey := tableID.TimeKey()
-	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
-	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-		tableLocal, m.makeTTLString(timeKey, common.FLOW_LOG_DB, tableID.String(), duration))
-	_, err := cks.ExecParallel(modTable)
-	return err
-}
-
-func getDeepflowSystemLocalTables(connect *sql.DB) ([]string, error) {
-	sql := fmt.Sprintf("SHOW TABLES IN deepflow_system")
-	rows, err := connect.Query(sql)
-	if err != nil {
-		return nil, err
-	}
-	tables := []string{}
-	var table string
-	for rows.Next() {
-		err := rows.Scan(&table)
-		if err != nil {
-			return nil, err
-		}
-		if strings.HasSuffix(table, "_local") {
-			tables = append(tables, table)
-		}
-	}
-	return tables, nil
-}
-
-func (m *DatasourceManager) modDeepflowSystemTables(cks basecommon.DBs, duration int) error {
-	var e error
-	for _, ck := range cks {
-		tableNames, err := getDeepflowSystemLocalTables(ck)
-		if err != nil {
-			log.Error("get deepflow system tables failed: %s", err)
-			e = err
-			continue
-		}
-
-		for _, tableName := range tableNames {
-			tableLocal := fmt.Sprintf("%s.`%s`", DEEPFLOW_SYSTEM, tableName)
-			modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-				tableLocal, m.makeTTLString("time", "deepflow_system", tableName, duration))
-			log.Infof("modify deepflow_system table TTL: %s", modTable)
-			_, err := ck.Exec(modTable)
-			if err != nil {
-				e = err
-				log.Errorf("modify deepflow_system table(%s) TTL failed, err: %s", tableName, err)
-			}
-		}
-	}
-	return e
-}
-
-func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, table string) error {
+func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, db, table string) error {
 	dropTables := []string{
-		getMetricsTableName(uint8(dbId), table, GLOBAL),
-		getMetricsTableName(uint8(dbId), table, LOCAL),
-		getMetricsTableName(uint8(dbId), table, MV),
-		getMetricsTableName(uint8(dbId), table, AGG),
+		getMetricsTableName(uint8(dbId), db, table, GLOBAL),
+		getMetricsTableName(uint8(dbId), db, table, LOCAL),
+		getMetricsTableName(uint8(dbId), db, table, MV),
+		getMetricsTableName(uint8(dbId), db, table, AGG),
 	}
 	for _, name := range dropTables {
 		if _, err := cks.Exec("DROP TABLE IF EXISTS " + name); err != nil {
@@ -541,24 +485,6 @@ func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, table stri
 	return nil
 }
 
-func isFlowLogGroup(name string) bool {
-	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
-		if name == id.DataourceString() {
-			return true
-		}
-	}
-	return false
-}
-
-func getFlowLogDatasoureID(name string) (common.FlowLogID, uint8) {
-	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
-		if name == id.DataourceString() {
-			return id, uint8(id) + uint8(flow_metrics.METRICS_TABLE_ID_MAX)
-		}
-	}
-	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(flow_metrics.METRICS_TABLE_ID_MAX)
-}
-
 func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {
 	tableLocal := fmt.Sprintf("%s.%s_%s", db, table, LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
@@ -567,15 +493,15 @@ func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, du
 	return err
 }
 
-func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
+func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
 	if len(m.ckAddrs) == 0 {
 		return fmt.Errorf("ck addrs is empty")
 	}
 
-	if IsModifiedOnlyDatasource(dbGroup) && action == actionStrings[MOD] {
+	if IsModifiedOnlyDatasource(dbGroup) && action == MOD {
 		datasoureInfo := DatasourceModifiedOnly(dbGroup).DatasourceInfo()
 		datasourceId := datasoureInfo.ID
-		db := datasoureInfo.DB
+		db := ckdb.OrgDatabasePrefix(uint16(orgID)) + datasoureInfo.DB
 		tables := datasoureInfo.Tables
 
 		cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
@@ -586,28 +512,16 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		if m.isModifyingFlags[datasourceId] {
 			return fmt.Errorf(ERR_IS_MODIFYING, dbGroup)
 		}
-		switch DatasourceModifiedOnly(dbGroup) {
-		case DEEPFLOW_SYSTEM:
-			go func(id int) {
-				m.isModifyingFlags[id] = true
-				if err := m.modDeepflowSystemTables(cks, duration); err != nil {
-					log.Error(err)
+		go func(tableNames []string, id int) {
+			m.isModifyingFlags[id] = true
+			for _, tableName := range tableNames {
+				if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
+					log.Info(err)
 				}
-				m.isModifyingFlags[id] = false
-				cks.Close()
-			}(datasourceId)
-		default:
-			go func(tableNames []string, id int) {
-				m.isModifyingFlags[id] = true
-				for _, tableName := range tableNames {
-					if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
-						log.Info(err)
-					}
-				}
-				m.isModifyingFlags[id] = false
-				cks.Close()
-			}(tables, datasourceId)
-		}
+			}
+			m.isModifyingFlags[id] = false
+			cks.Close()
+		}(tables, datasourceId)
 
 		return nil
 	}
@@ -628,12 +542,7 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		return err
 	}
 
-	actionEnum, err := ActionToEnum(action)
-	if err != nil {
-		return err
-	}
-
-	if actionEnum == ADD {
+	if action == ADD {
 		if baseTable == "" {
 			return fmt.Errorf("base table name is empty")
 		}
@@ -658,14 +567,15 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		return fmt.Errorf("dst table name is empty")
 	}
 
+	db := ckdb.OrgDatabasePrefix(uint16(orgID)) + ckdb.METRICS_DB
 	for _, tableId := range subTableIDs {
-		switch actionEnum {
+		switch action {
 		case ADD:
 			aggInterval := IntervalHour
 			if interval == 1440 {
 				aggInterval = IntervalDay
 			}
-			if err := m.createTableMV(cks, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+			if err := m.createTableMV(cks, db, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 				return err
 			}
 		case MOD:
@@ -681,17 +591,17 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				}
 				defer cks.Close()
 				m.isModifyingFlags[id] = true
-				if err := m.modTableMV(cks, id, dstTable, duration); err != nil {
+				if err := m.modTableMV(cks, id, db, dstTable, duration); err != nil {
 					log.Warning(err)
 				}
 				m.isModifyingFlags[id] = false
 			}(tableId)
 		case DEL:
-			if err := delTableMV(cks, tableId, dstTable); err != nil {
+			if err := delTableMV(cks, tableId, db, dstTable); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("unsupport action %s", action)
+			return fmt.Errorf("unsupport action %d", action)
 		}
 	}
 	return nil

@@ -41,9 +41,10 @@ const (
 )
 
 type ExtMetrics struct {
-	Config        *config.Config
-	Telegraf      *Metricsor
-	MetaflowStats *Metricsor
+	Config              *config.Config
+	Telegraf            *Metricsor
+	DeepflowAgentStats  *Metricsor
+	DeepflowServerStats *Metricsor
 }
 
 type Metricsor struct {
@@ -61,14 +62,19 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 	if err != nil {
 		return nil, err
 	}
-	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, platformDataManager, manager, recv, false)
+	deepflowAgentStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_AGENT_TABLE, config, platformDataManager, manager, recv, false)
+	if err != nil {
+		return nil, err
+	}
+	deepflowServerStats, err := NewMetricsor(datatype.MESSAGE_TYPE_SERVER_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_SERVER_TABLE, config, platformDataManager, manager, recv, false)
 	if err != nil {
 		return nil, err
 	}
 	return &ExtMetrics{
-		Config:        config,
-		Telegraf:      telegraf,
-		MetaflowStats: deepflowStats,
+		Config:              config,
+		Telegraf:            telegraf,
+		DeepflowAgentStats:  deepflowAgentStats,
+		DeepflowServerStats: deepflowServerStats,
 	}, nil
 }
 
@@ -139,11 +145,13 @@ func (m *Metricsor) Close() {
 
 func (s *ExtMetrics) Start() {
 	s.Telegraf.Start()
-	s.MetaflowStats.Start()
+	s.DeepflowAgentStats.Start()
+	s.DeepflowServerStats.Start()
 }
 
 func (s *ExtMetrics) Close() error {
 	s.Telegraf.Close()
-	s.MetaflowStats.Close()
+	s.DeepflowAgentStats.Close()
+	s.DeepflowServerStats.Close()
 	return nil
 }

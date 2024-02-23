@@ -37,11 +37,12 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	QUEUE_BATCH_SIZE      = 1024
-	EXT_METRICS_DB        = "ext_metrics"
-	EXT_METRICS_TABLE     = "metrics"
-	DEEPFLOW_SYSTEM_DB    = "deepflow_system"
-	DEEPFLOW_SYSTEM_TABLE = "deepflow_system"
+	QUEUE_BATCH_SIZE             = 1024
+	EXT_METRICS_DB               = "ext_metrics"
+	EXT_METRICS_TABLE            = "metrics"
+	DEEPFLOW_SYSTEM_DB           = "deepflow_system"
+	DEEPFLOW_SYSTEM_SERVER_TABLE = "deepflow_system_server"
+	DEEPFLOW_SYSTEM_AGENT_TABLE  = "deepflow_system_agent"
 )
 
 type ClusterNode struct {
@@ -124,19 +125,12 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	ckwriter, err := ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
-		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
 	if err != nil {
 		return nil, err
 	}
-	// 需要在cluseter其他节点也创建
-	if err := w.createTableOnCluster(table); err != nil {
-		log.Warningf("crate table on cluster other node failed. %s", err)
-	}
 
 	ckwriter.Run()
-	if w.ttl != config.DefaultExtMetricsTTL {
-		w.setTTL(s.DatabaseName(), s.TableName())
-	}
 
 	w.tables[s.TableName()] = &tableInfo{
 		tableName: s.TableName(),
@@ -144,26 +138,6 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	}
 
 	return ckwriter, nil
-}
-
-func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
-	// in standalone mode, ckdbWatcher will be nil
-	if w.ckdbWatcher == nil {
-		return nil
-	}
-	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
-	if err != nil {
-		return err
-	}
-	for _, endpoint := range endpoints {
-		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, w.ckdbTimeZone, table)
-		if err != nil {
-			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
-		} else {
-			log.Infof("node %s:%d init table %s success", endpoint.Host, endpoint.Port, table.LocalName)
-		}
-	}
-	return nil
 }
 
 func (w *ExtMetricsWriter) getClusterNodesWithoutLocal(clusterName string) ([]ClusterNode, error) {

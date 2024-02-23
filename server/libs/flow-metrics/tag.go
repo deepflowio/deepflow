@@ -301,6 +301,8 @@ type Field struct {
 	Protocol     layers.IPProtocol
 	ServerPort   uint16
 	VTAPID       uint16
+	OrgId        uint16 // no need to store
+	TeamID       uint16
 	TAPPort      datatype.TapPort
 	TAPSide      TAPSideEnum
 	TAPType      TAPTypeEnum
@@ -866,6 +868,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 	if t.Code&VTAPID != 0 {
 		offset += copy(b[offset:], ",agent_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VTAPID), 10))
+		offset += copy(b[offset:], ",team_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TeamID), 10))
 	}
 
 	return offset
@@ -1089,6 +1093,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 	if code&VTAPID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("agent_id", ckdb.UInt16).SetComment("采集器的ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("team_id", ckdb.UInt16).SetComment("团队的ID"))
 	}
 
 	return columns
@@ -1287,6 +1292,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	}
 	if code&VTAPID != 0 {
 		block.Write(t.VTAPID)
+		block.Write(t.TeamID)
 	}
 }
 

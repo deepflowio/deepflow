@@ -119,7 +119,7 @@ func NewFlowTagWriter(
 			fmt.Sprintf("%s-%s-%d", name, tableName, decoderIndex),
 			config.CKDB.TimeZone,
 			t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, ttl, partition),
-			w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+			w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.CKDB.Watcher)
 		if err != nil {
 			return nil, err
 		}

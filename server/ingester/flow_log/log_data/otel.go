@@ -365,17 +365,17 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 	switch l.TapSide {
 	case "c-app":
 		// fill Epc0 with the Epc the Vtap belongs to
-		k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		k.L3EpcID0 = platformData.QueryVtapEpc0(l.VtapID)
 		// fill in Epc1 with other rules, see function description for details
-		k.L3EpcID1 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP41, l.IP61)
+		k.L3EpcID1 = platformData.QueryVtapEpc1(l.VtapID, l.IsIPv4, l.IP41, l.IP61)
 	case "s-app":
 		// fill Epc1 with the Epc the Vtap belongs to
-		k.L3EpcID1 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		k.L3EpcID1 = platformData.QueryVtapEpc0(l.VtapID)
 		// fill in Epc0 with other rules, see function description for details
-		k.L3EpcID0 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP40, l.IP60)
+		k.L3EpcID0 = platformData.QueryVtapEpc1(l.VtapID, l.IsIPv4, l.IP40, l.IP60)
 	default: // "app" or others
 		// fill Epc0 and Epc1 with the Epc the Vtap belongs to
-		k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		k.L3EpcID0 = platformData.QueryVtapEpc0(l.VtapID)
 		k.L3EpcID1 = k.L3EpcID0
 	}
 	k.fill(

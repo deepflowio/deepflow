@@ -22,7 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
@@ -162,6 +162,10 @@ func (d *Document) WriteToPB(p *pb.Document) error {
 func (d *Document) WriteBlock(block *ckdb.Block) {
 	d.Tagger.(*flow_metrics.Tag).WriteBlock(block, d.Timestamp)
 	d.Meter.WriteBlock(block)
+}
+
+func (d *Document) OrgID() uint16 {
+	return d.Tagger.(*flow_metrics.Tag).OrgId
 }
 
 func (d *Document) TableID() (uint8, error) {
