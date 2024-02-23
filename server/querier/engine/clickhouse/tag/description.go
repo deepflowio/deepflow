@@ -607,7 +607,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		)
 	}
 
-	if table == "alarm_event" {
+	if table == "alarm_event" || table == ckcommon.TABLE_NAME_VTAP_ACL{
 		return response, nil
 	}
 
