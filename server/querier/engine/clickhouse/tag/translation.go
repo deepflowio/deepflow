@@ -858,7 +858,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"capture_nic",
 			"",
-			"capture_nic %s %s",
+			"",
 			"",
 		)}
 	// 采集位置名称
