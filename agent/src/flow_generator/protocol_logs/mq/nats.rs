@@ -84,7 +84,7 @@ pub struct Pub {
     #[serde(rename = "payload_size")]
     payload_size: usize,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -102,7 +102,7 @@ pub struct Hpub {
     #[serde(rename = "headers")]
     headers: BTreeMap<String, String>,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -134,7 +134,7 @@ pub struct Msg {
     #[serde(rename = "payload_size")]
     payload_size: usize,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -154,7 +154,7 @@ pub struct Hmsg {
     #[serde(rename = "headers")]
     headers: BTreeMap<String, String>,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -323,7 +323,7 @@ impl Parsable for Pub {
             _ => return None,
         }
         let (payload, body) = slice_split(payload, pub_obj.payload_size)?;
-        pub_obj.payload = slice_to_string(body);
+        pub_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], pub_obj))
         } else {
@@ -358,7 +358,7 @@ impl Parsable for Hpub {
             read_headers(payload, hpub_obj.header_size, &mut hpub_obj.header_version)?;
         let (payload, body) = slice_split(payload, hpub_obj.payload_size)?;
         hpub_obj.headers = headers;
-        hpub_obj.payload = slice_to_string(body);
+        hpub_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], hpub_obj))
         } else {
@@ -433,7 +433,7 @@ impl Parsable for Msg {
             _ => return None,
         }
         let (payload, body) = slice_split(payload, msg_obj.payload_size)?;
-        msg_obj.payload = slice_to_string(body);
+        msg_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], msg_obj))
         } else {
@@ -469,7 +469,7 @@ impl Parsable for Hmsg {
             read_headers(payload, hmsg_obj.header_size, &mut hmsg_obj.header_version)?;
         let (payload, body) = slice_split(payload, hmsg_obj.payload_size)?;
         hmsg_obj.headers = headers;
-        hmsg_obj.payload = slice_to_string(body);
+        hmsg_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], hmsg_obj))
         } else {
