@@ -811,6 +811,7 @@ CREATE TABLE IF NOT EXISTS pod (
     state               INTEGER NOT NULL COMMENT '0.Exception 1.Running',
     pod_rs_id           INTEGER DEFAULT NULL,
     pod_group_id        INTEGER DEFAULT NULL,
+    pod_service_id      INTEGER DEFAULT 0,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_node_id         INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,

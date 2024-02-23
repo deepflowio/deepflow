@@ -182,6 +182,13 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		}
 		sort.Strings(containerIDs)
 
+		var podServiceLcuuid string
+		podServiceLcuuids, ok := k.pgLcuuidToPSLcuuids[podGroupLcuuid]
+		if ok && len(podServiceLcuuids) > 0 {
+			sort.Strings(podServiceLcuuids)
+			podServiceLcuuid = podServiceLcuuids[0]
+		}
+
 		pod := model.Pod{
 			Lcuuid:              podLcuuid,
 			Name:                name,
@@ -194,6 +201,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			PodReplicaSetLcuuid: podRSLcuuid,
 			PodNodeLcuuid:       k.nodeIPToLcuuid[hostIP],
 			PodGroupLcuuid:      podGroupLcuuid,
+			PodServiceLcuuid:    podServiceLcuuid,
 			PodNamespaceLcuuid:  namespaceLcuuid,
 			CreatedAt:           created,
 			AZLcuuid:            k.azLcuuid,
