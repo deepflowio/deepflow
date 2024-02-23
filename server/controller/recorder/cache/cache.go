@@ -17,6 +17,9 @@
 package cache
 
 import (
+	"context"
+	"time"
+
 	"github.com/op/go-logging"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -26,56 +29,35 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 )
 
 // 为支持domain及其sub_domain的独立刷新，将缓存拆分成对应的独立Cache
 type CacheManager struct {
-	DomainCache       *Cache
-	SubDomainCacheMap map[string]*Cache
+	ctx                      context.Context
+	cacheSetSelfHealInterval time.Duration
+	DomainCache              *Cache
+	SubDomainCacheMap        map[string]*Cache
 }
 
-func NewCacheManager(domainLcuuid string) *CacheManager {
-	cacheManager := &CacheManager{
-		DomainCache:       NewCache(domainLcuuid),
-		SubDomainCacheMap: make(map[string]*Cache),
+func NewCacheManager(ctx context.Context, cfg config.RecorderConfig, domainLcuuid string) *CacheManager {
+	mng := &CacheManager{
+		ctx:                      ctx,
+		cacheSetSelfHealInterval: time.Minute * time.Duration(cfg.CacheRefreshInterval),
+		SubDomainCacheMap:        make(map[string]*Cache),
 	}
+	mng.DomainCache = NewCache(ctx, domainLcuuid, "", mng.cacheSetSelfHealInterval)
+
 	var subDomains []*mysql.SubDomain
 	err := mysql.Db.Where("domain = ?", domainLcuuid).Find(&subDomains).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, err))
-		return cacheManager
+		return mng
 	}
 	for _, subDomain := range subDomains {
-		subDomainCache := NewCache(domainLcuuid)
-		subDomainCache.SubDomainLcuuid = subDomain.Lcuuid
-		cacheManager.SubDomainCacheMap[subDomain.Lcuuid] = subDomainCache
+		mng.SubDomainCacheMap[subDomain.Lcuuid] = mng.CreateSubDomainCacheIfNotExists(subDomain.Lcuuid)
 	}
-	return cacheManager
-}
-
-func (m *CacheManager) Refresh() {
-	log.Infof("refresh domain cache")
-	m.DomainCache.Refresh()
-	for _, subDomainCache := range m.SubDomainCacheMap {
-		log.Infof("refresh sub_domain cache (lcuuid: %s)", subDomainCache.SubDomainLcuuid)
-		subDomainCache.Refresh()
-	}
-}
-
-// sequence随cache刷新次数递增
-func (m *CacheManager) UpdateSequence() {
-	seq := m.DomainCache.GetSequence() + 1
-	m.DomainCache.SetSequence(seq)
-	for _, subDomainCache := range m.SubDomainCacheMap {
-		subDomainCache.SetSequence(seq)
-	}
-}
-
-func (m *CacheManager) SetLogLevel(logLevel logging.Level) {
-	m.DomainCache.SetLogLevel(logLevel)
-	for _, subDomainCache := range m.SubDomainCacheMap {
-		subDomainCache.SetLogLevel(logLevel)
-	}
+	return mng
 }
 
 func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *Cache {
@@ -83,27 +65,34 @@ func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *
 	if exists {
 		return cache
 	}
-	log.Infof("subdomain cache (lcuuid: %s) not exists", subDomainLcuuid)
-	cache = NewCache(m.DomainCache.DomainLcuuid)
-	cache.SubDomainLcuuid = subDomainLcuuid
-	m.SubDomainCacheMap[subDomainLcuuid] = cache
+	log.Infof("new subdomain cache (lcuuid: %s) because not exists", subDomainLcuuid)
+	m.SubDomainCacheMap[subDomainLcuuid] = NewCache(m.ctx, m.DomainCache.DomainLcuuid, subDomainLcuuid, m.cacheSetSelfHealInterval)
 	return cache
 }
 
 type Cache struct {
-	Sequence        int // 缓存的序列标识，根据刷新递增；为debug方便，设置为公有属性，需避免直接修改值，使用接口修改
-	DomainLcuuid    string
-	SubDomainLcuuid string
-	DiffBaseDataSet *diffbase.DataSet
-	ToolDataSet     *tool.DataSet
+	ctx              context.Context
+	SelfHealInterval time.Duration
+	RefreshSignal    chan struct{} // 用于限制并发刷新
+	Sequence         int           // 缓存的序列标识，根据刷新递增；为debug方便，设置为公有属性，需避免直接修改值，使用接口修改
+	DomainLcuuid     string
+	SubDomainLcuuid  string
+	DiffBaseDataSet  *diffbase.DataSet
+	ToolDataSet      *tool.DataSet
 }
 
-func NewCache(domainLcuuid string) *Cache {
-	return &Cache{
-		DomainLcuuid:    domainLcuuid,
-		DiffBaseDataSet: diffbase.NewDataSet(), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
-		ToolDataSet:     tool.NewDataSet(),     // 各类资源的映射关系，用于按需进行数据转换
+func NewCache(ctx context.Context, domainLcuuid, subDomainLcuuid string, selfHealInterval time.Duration) *Cache {
+	c := &Cache{
+		ctx:              ctx,
+		SelfHealInterval: selfHealInterval,
+		RefreshSignal:    make(chan struct{}, 1),
+		DomainLcuuid:     domainLcuuid,
+		SubDomainLcuuid:  subDomainLcuuid,
+		DiffBaseDataSet:  diffbase.NewDataSet(), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
+		ToolDataSet:      tool.NewDataSet(),     // 各类资源的映射关系，用于按需进行数据转换
 	}
+	c.StartSelfHealing()
+	return c
 }
 
 func (c *Cache) GetSequence() int {
@@ -112,6 +101,10 @@ func (c *Cache) GetSequence() int {
 
 func (c *Cache) SetSequence(sequence int) {
 	c.Sequence = sequence
+}
+
+func (c *Cache) IncrementSequence() {
+	c.Sequence++
 }
 
 func (c *Cache) SetLogLevel(level logging.Level) {
@@ -147,8 +140,57 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 	}
 }
 
+const (
+	RefreshSignalCallerSelfHeal  = "self_heal"
+	RefreshSignalCallerDomain    = "domain"
+	RefreshSignalCallerSubDomain = "sub_domain"
+)
+
+func (c *Cache) ResetRefreshSignal(caller string) {
+	log.Infof("domain: %s reset cache refresh signal (caller: %s)", c.DomainLcuuid, caller)
+	c.RefreshSignal <- struct{}{}
+}
+
+func (c *Cache) StartSelfHealing() {
+	go func() {
+		log.Infof("recorder (domain lcuuid: %s, sub_domain lcuuid: %s) cache self heal started", c.DomainLcuuid, c.SubDomainLcuuid)
+		c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
+		c.TryRefresh()
+
+		ticker := time.NewTicker(c.SelfHealInterval)
+		defer ticker.Stop()
+
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.TryRefresh()
+			case <-c.ctx.Done():
+				break LOOP
+			}
+		}
+		log.Infof("recorder (domain lcuuid: %s, sub_domain lcuuid: %s) cache self heal completed", c.DomainLcuuid, c.SubDomainLcuuid)
+	}()
+}
+
+func (c *Cache) TryRefresh() bool {
+	select {
+	case <-c.RefreshSignal:
+		c.Refresh()
+		return true
+	default:
+		log.Warningf("last cache refresh (domain lcuuid: %s, sub_domain lcuuid: %s) not completed now", c.DomainLcuuid, c.SubDomainLcuuid)
+		return false
+	}
+
+}
+
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
+	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
+
+	c.SetLogLevel(logging.DEBUG)
+
 	c.DiffBaseDataSet = diffbase.NewDataSet()
 	c.ToolDataSet = tool.NewDataSet()
 
