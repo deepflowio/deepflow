@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import (
 	"strconv"
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 )
 
 type UsageMeter struct {

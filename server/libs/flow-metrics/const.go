@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import logging "github.com/op/go-logging"
 
-var log = logging.MustGetLogger("zerodoc")
+var log = logging.MustGetLogger("flow_metrics")
 
 const (
 	MAX_STRING_LENGTH = 2048

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import (
 	"fmt"
@@ -27,8 +27,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 const (

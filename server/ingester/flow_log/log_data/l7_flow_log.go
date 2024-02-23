@@ -30,10 +30,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
@@ -552,7 +552,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_EBPF)
 	}
 	b.TunnelType = uint8(tunnelType)
-	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
+	b.TapSide = flow_metrics.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq

@@ -14,36 +14,49 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
-import (
-	"github.com/deepflowio/deepflow/server/libs/ckdb"
-)
+import "time"
 
-type Tagger interface {
-	SetID(string)
-	GetCode() uint64
-	SetCode(uint64)
-	GetTAPType() uint8
-	ToKVString() string
-	MarshalTo([]byte) int
-	String() string
-	Clone() Tagger
-	Release()
+func maxU64(vs ...uint64) uint64 {
+	if len(vs) == 0 {
+		panic("no number provided")
+	}
+	max := vs[0]
+	for _, v := range vs {
+		if v > max {
+			max = v
+		}
+	}
+	return max
 }
 
-type Meter interface {
-	ID() uint8
-	Name() string
-	VTAPName() string
-	ConcurrentMerge(Meter)
-	SequentialMerge(Meter)
-	ToKVString() string
-	MarshalTo([]byte) int
-	SortKey() uint64
-	Clone() Meter
-	Release()
-	Reverse()
-	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) // 写入clickhouse的block
+func minU64(vs ...uint64) uint64 {
+	if len(vs) == 0 {
+		panic("no number provided")
+	}
+	min := vs[0]
+	for _, v := range vs {
+		if v < min {
+			min = v
+		}
+	}
+	return min
+}
+
+func maxDuration(x, y time.Duration) time.Duration {
+	if x > y {
+		return x
+	}
+	return y
+}
+
+func minDuration(x, y time.Duration) time.Duration {
+	if x == 0 || y == 0 {
+		return x + y
+	}
+	if x < y {
+		return x
+	}
+	return y
 }

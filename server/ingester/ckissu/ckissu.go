@@ -29,7 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/datasource"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 )
 
 var log = logging.MustGetLogger("issu")
@@ -353,7 +353,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 	dstTableName := d.name[lastDotIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[zerodoc.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
+	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
@@ -1028,8 +1028,8 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	}
 
 	for _, tableName := range []string{
-		zerodoc.NETWORK_1M.TableName(), zerodoc.NETWORK_MAP_1M.TableName(),
-		zerodoc.APPLICATION_1M.TableName(), zerodoc.APPLICATION_MAP_1M.TableName()} {
+		flow_metrics.NETWORK_1M.TableName(), flow_metrics.NETWORK_MAP_1M.TableName(),
+		flow_metrics.APPLICATION_1M.TableName(), flow_metrics.APPLICATION_MAP_1M.TableName()} {
 		datasourceInfos, err := i.getUserDefinedDatasourceInfos(connect, ckdb.METRICS_DB, strings.Split(tableName, ".")[0])
 		if err != nil {
 			log.Warning(err)

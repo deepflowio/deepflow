@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/libs/codec"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 )
 
 func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, error) {
@@ -38,23 +38,23 @@ func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, erro
 	doc := AcquireDocument()
 	doc.Timestamp = pbDoc.Timestamp
 
-	tag := zerodoc.AcquireTag()
-	tag.Field = zerodoc.AcquireField()
+	tag := flow_metrics.AcquireTag()
+	tag.Field = flow_metrics.AcquireField()
 	tag.ReadFromPB(pbDoc.Tag)
 	doc.Tagger = tag
 
 	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
-	case zerodoc.FLOW_ID:
-		flowMeter := zerodoc.AcquireFlowMeter()
+	case flow_metrics.FLOW_ID:
+		flowMeter := flow_metrics.AcquireFlowMeter()
 		flowMeter.ReadFromPB(pbDoc.Meter.Flow)
 		doc.Meter = flowMeter
-	case zerodoc.ACL_ID:
-		usageMeter := zerodoc.AcquireUsageMeter()
+	case flow_metrics.ACL_ID:
+		usageMeter := flow_metrics.AcquireUsageMeter()
 		usageMeter.ReadFromPB(pbDoc.Meter.Usage)
 		doc.Meter = usageMeter
-	case zerodoc.APP_ID:
-		appMeter := zerodoc.AcquireAppMeter()
+	case flow_metrics.APP_ID:
+		appMeter := flow_metrics.AcquireAppMeter()
 		appMeter.ReadFromPB(pbDoc.Meter.App)
 		doc.Meter = appMeter
 	default:
@@ -77,23 +77,23 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*Document, error) {
 	doc := &Document{}
 	doc.Timestamp = pbDoc.Timestamp
 
-	tag := &zerodoc.Tag{}
-	tag.Field = &zerodoc.Field{}
+	tag := &flow_metrics.Tag{}
+	tag.Field = &flow_metrics.Field{}
 	tag.ReadFromPB(pbDoc.Tag)
 	doc.Tagger = tag
 
 	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
-	case zerodoc.FLOW_ID:
-		flowMeter := zerodoc.AcquireFlowMeter()
+	case flow_metrics.FLOW_ID:
+		flowMeter := flow_metrics.AcquireFlowMeter()
 		flowMeter.ReadFromPB(pbDoc.Meter.Flow)
 		doc.Meter = flowMeter
-	case zerodoc.ACL_ID:
-		usageMeter := zerodoc.AcquireUsageMeter()
+	case flow_metrics.ACL_ID:
+		usageMeter := flow_metrics.AcquireUsageMeter()
 		usageMeter.ReadFromPB(pbDoc.Meter.Usage)
 		doc.Meter = usageMeter
-	case zerodoc.APP_ID:
-		appMeter := zerodoc.AcquireAppMeter()
+	case flow_metrics.APP_ID:
+		appMeter := flow_metrics.AcquireAppMeter()
 		appMeter.ReadFromPB(pbDoc.Meter.App)
 		doc.Meter = appMeter
 	}

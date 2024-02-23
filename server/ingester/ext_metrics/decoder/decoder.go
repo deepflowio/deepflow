@@ -30,13 +30,13 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")
@@ -65,9 +65,9 @@ type Decoder struct {
 	config           *config.Config
 
 	// universal tag cache
-	podNameToUniversalTag    map[string]*zerodoc.UniversalTag
-	instanceIPToUniversalTag map[string]*zerodoc.UniversalTag
-	vtapIDToUniversalTag     map[uint16]*zerodoc.UniversalTag
+	podNameToUniversalTag    map[string]*flow_metrics.UniversalTag
+	instanceIPToUniversalTag map[string]*flow_metrics.UniversalTag
+	vtapIDToUniversalTag     map[uint16]*flow_metrics.UniversalTag
 	platformDataVersion      uint64
 
 	counter *Counter
@@ -89,9 +89,9 @@ func NewDecoder(
 		debugEnabled:             log.IsEnabledFor(logging.DEBUG),
 		extMetricsWriter:         extMetricsWriter,
 		config:                   config,
-		podNameToUniversalTag:    make(map[string]*zerodoc.UniversalTag),
-		instanceIPToUniversalTag: make(map[string]*zerodoc.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]*zerodoc.UniversalTag),
+		podNameToUniversalTag:    make(map[string]*flow_metrics.UniversalTag),
+		instanceIPToUniversalTag: make(map[string]*flow_metrics.UniversalTag),
+		vtapIDToUniversalTag:     make(map[uint16]*flow_metrics.UniversalTag),
 		counter:                  &Counter{},
 	}
 }
@@ -231,7 +231,7 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 }
 
 func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName string, fillWithVtapId bool) {
-	var universalTag *zerodoc.UniversalTag
+	var universalTag *flow_metrics.UniversalTag
 
 	// fast path
 	platformDataVersion := d.platformData.Version()
@@ -241,9 +241,9 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 				d.msgType, d.index, d.platformDataVersion, platformDataVersion)
 		}
 		d.platformDataVersion = platformDataVersion
-		d.podNameToUniversalTag = make(map[string]*zerodoc.UniversalTag)
-		d.instanceIPToUniversalTag = make(map[string]*zerodoc.UniversalTag)
-		d.vtapIDToUniversalTag = make(map[uint16]*zerodoc.UniversalTag)
+		d.podNameToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
+		d.instanceIPToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
+		d.vtapIDToUniversalTag = make(map[uint16]*flow_metrics.UniversalTag)
 	} else {
 		if podName != "" {
 			universalTag, _ = d.podNameToUniversalTag[podName]
@@ -260,7 +260,7 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	d.fillExtMetricsBaseSlow(m, vtapID, podName, fillWithVtapId)
 
 	// update fast path
-	universalTag = &zerodoc.UniversalTag{} // Since the cache dictionary will be cleaned up by GC, no need to use a pool here.
+	universalTag = &flow_metrics.UniversalTag{} // Since the cache dictionary will be cleaned up by GC, no need to use a pool here.
 	*universalTag = m.UniversalTag
 	if podName != "" {
 		d.podNameToUniversalTag[podName] = universalTag
@@ -319,7 +319,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
 		t.L3DeviceID = info.DeviceID
-		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		t.L3DeviceType = flow_metrics.DeviceType(info.DeviceType)
 		if t.PodClusterID == 0 {
 			t.PodClusterID = uint16(info.PodClusterID)
 		}

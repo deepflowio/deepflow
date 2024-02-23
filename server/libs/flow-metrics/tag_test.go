@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import (
 	"encoding/binary"
@@ -28,7 +28,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 )
 
 func TestHasEdgeTagField(t *testing.T) {

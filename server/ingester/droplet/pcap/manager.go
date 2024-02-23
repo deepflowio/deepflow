@@ -27,13 +27,13 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 var (
-	EXAMPLE_TEMPNAME        = getTempFilename(zerodoc.CLOUD, 0, time.Duration(time.Now().UnixNano()), 0)
+	EXAMPLE_TEMPNAME        = getTempFilename(flow_metrics.CLOUD, 0, time.Duration(time.Now().UnixNano()), 0)
 	EXAMPLE_TEMPNAME_SPLITS = len(strings.Split(EXAMPLE_TEMPNAME, "_"))
 )
 

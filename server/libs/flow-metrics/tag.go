@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package zerodoc
+package flow_metrics
 
 import (
 	"encoding/binary"
@@ -27,9 +27,9 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 	"github.com/google/gopacket/layers"
 )
 

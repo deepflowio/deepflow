@@ -41,11 +41,11 @@ const (
 	//		_CLOSE_TYPE_METERS[flowType].ServerRstFlow = 1
 	//	...
 	// 流统计指标量和数据库字段名之间的对应关系，见
-	// droplet-libs/zerodoc/basic_meter.go: Anomaly结构体定义
+	// droplet-libs/flow-metrics/basic_meter.go: Anomaly结构体定义
 	//	ClientRstFlow       uint64 `db:"client_rst_flow"`
 	//	...
 	// 数据库字段名和页面文案之间的对应关系，见
-	// droplet-libs/zerodoc/basic_meter.go: AnomalyColumns函数
+	// droplet-libs/flow-metrics/basic_meter.go: AnomalyColumns函数
 	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 	//	...
 
