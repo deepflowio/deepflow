@@ -132,7 +132,7 @@ func (t *FlowTag) GenCKTable(cluster, storagePolicy, tableName string, ttl int, 
 	orderKeys := []string{
 		"table", "vpc_id", "pod_ns_id", "field_type", "field_name", "field_value_type",
 	}
-	if len(t.FieldValue) != 0 {
+	if t.TagType == TagFieldValue {
 		orderKeys = append(orderKeys, "field_value")
 		engine = ckdb.SummingMergeTree
 	}
