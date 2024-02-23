@@ -113,10 +113,7 @@ func NewFlowTagWriter(
 	var err error
 	for _, tagType := range []TagType{TagField, TagFieldValue} {
 		tableName := fmt.Sprintf("%s_%s", srcDB, tagType.String())
-		t.FieldValue = ""
-		if tagType == TagFieldValue {
-			t.FieldValue = "x" // Assign a value to the FieldValue field to correctly identify the type of FlowTag.
-		}
+		t.TagType = tagType
 		w.ckwriters[tagType], err = ckwriter.NewCKWriter(
 			w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 			fmt.Sprintf("%s-%s-%d", name, tableName, decoderIndex),
