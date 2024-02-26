@@ -1297,7 +1297,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				}
 				sql = strings.Join([]string{
 					"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
-					"FROM device_map", whereSql,
+					"FROM device_map", whereSql, "AND display_name!=''",
 					"GROUP BY value, display_name",
 					"ORDER BY", orderBy, "ASC", limitSql,
 				}, " ")
