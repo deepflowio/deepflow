@@ -506,12 +506,12 @@ var (
 		name:   "test_show_host_ip",
 		db:     "flow_metrics",
 		input:  "SHOW tag host_ip values from vtap_flow_port where host_ip like '*xx'",
-		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (display_name ilike '%xx') AND devicetype = 6 GROUP BY `value`, `display_name` ORDER BY length(display_name) asc LIMIT 10000",
+		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (display_name ilike '%xx') AND devicetype = 6 AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY length(display_name) asc LIMIT 10000",
 	}, {
 		name:   "test_show_host_ip_id",
 		db:     "flow_metrics",
 		input:  "SHOW tag host_ip values from vtap_flow_port where host_ip_id != 1",
-		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (not(value = 1)) AND devicetype = 6 GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+		output: "SELECT deviceid AS `value`, ip AS `display_name` FROM flow_tag.`device_map` WHERE (not(value = 1)) AND devicetype = 6 AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
 	}}
 )
 
