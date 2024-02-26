@@ -251,6 +251,8 @@ pub struct AmqpInfo {
 
     vhost: Option<String>,
 
+    is_protcol_header: bool,
+
     #[serde(rename = "type")]
     frame_type: FrameType,
     #[serde(rename = "channel")]
@@ -412,6 +414,9 @@ fn read_table(payload: &[u8]) -> Option<(&[u8], Value)> {
 
 impl AmqpInfo {
     fn get_packet_type(&self) -> String {
+        if self.is_protcol_header {
+            return "Protocol-Header".to_string();
+        }
         match self.frame_type {
             FrameType::Method => format!("{:?}.{:?}", self.class_id, self.method_id),
             FrameType::Header => "Content-Header".to_string(),
@@ -422,6 +427,9 @@ impl AmqpInfo {
     }
 
     fn get_log_message_type(&self) -> LogMessageType {
+        if self.is_protcol_header {
+            return LogMessageType::Session;
+        }
         match self.frame_type {
             FrameType::Method => {}
             FrameType::Header => return LogMessageType::Session,
@@ -773,10 +781,15 @@ impl L7ProtocolParserInterface for AmqpLog {
         };
 
         let mut offset = 0;
+        let mut vec = Vec::new();
         if payload.starts_with(AMQPHEADER) {
             offset += AMQPHEADER.len();
+            let mut info = AmqpInfo::default();
+            info.is_protcol_header = true;
+            info.is_tls = param.is_tls();
+            info.msg_type = info.get_log_message_type();
+            vec.push(L7ProtocolInfo::AmqpInfo(info));
         }
-        let mut vec = Vec::new();
         loop {
             let offset_begin = offset;
             let mut info = AmqpInfo::default();
@@ -973,11 +986,6 @@ mod tests {
                 first_packet = false;
                 if !amqp.check_payload(payload, param) {
                     output.push_str("not amqp\n");
-                    break;
-                }
-                if let Ok(L7ParseResult::None) = amqp.parse_payload(payload, param) {
-                } else {
-                    output.push_str("parse error\n");
                     break;
                 }
             }
