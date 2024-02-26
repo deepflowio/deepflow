@@ -245,6 +245,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 		CH_DICTIONARY_POLICY,
 		CH_DICTIONARY_NPB_TUNNEL,
+		CH_DICTIONARY_ALARM_POLICY,
 	)
 	chDicts := mapset.NewSet()
 	for _, dictionary := range dictionaries {

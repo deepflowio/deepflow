@@ -503,3 +503,13 @@ type ChNpbTunnel struct {
 	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
 }
+
+type ChAlarmPolicy struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:char(128)" json:"NAME"`
+	UserID int    `gorm:"column:user_id;type:int" json:"USER_ID"`
+}
+
+func (ChAlarmPolicy) TableName() string {
+	return "ch_alarm_policy"
+}

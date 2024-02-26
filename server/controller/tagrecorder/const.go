@@ -102,6 +102,7 @@ const (
 	RESOURCE_TYPE_CH_CHOST          = "ch_chost"
 	RESOURCE_TYPE_CH_POLICY         = "ch_policy"
 	RESOURCE_TYPE_CH_NPB_TUNNEL     = "ch_npb_tunnel"
+	RESOURCE_TYPE_CH_ALARM_POLICY   = "ch_alarm_policy"
 
 	RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
 	RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
@@ -176,6 +177,8 @@ const (
 
 	CH_DICTIONARY_POLICY     = "policy_map"
 	CH_DICTIONARY_NPB_TUNNEL = "npb_tunnel_map"
+
+	CH_DICTIONARY_ALARM_POLICY = "alarm_policy_map"
 
 	CH_TARGET_LABEL                       = "target_label_map"
 	CH_APP_LABEL                          = "app_label_map"
@@ -693,6 +696,16 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_AlARM_POLICY_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` Int64,\n" +
+		"    `name` String,\n" +
+		"    `user_id` Int64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(FLAT())"
 )
 
 const (
@@ -807,6 +820,8 @@ var CREATE_SQL_MAP = map[string]string{
 
 	CH_DICTIONARY_POLICY:     CREATE_POLICY_DICTIONARY_SQL,
 	CH_DICTIONARY_NPB_TUNNEL: CREATE_ID_NAME_DICTIONARY_SQL,
+
+	CH_DICTIONARY_ALARM_POLICY: CREATE_AlARM_POLICY_DICTIONARY_SQL,
 
 	CH_PROMETHEUS_LABEL_NAME:              CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
 	CH_PROMETHEUS_METRIC_NAME:             CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,

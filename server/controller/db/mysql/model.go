@@ -599,3 +599,13 @@ type MailServer struct {
 func (MailServer) TableName() string {
 	return "mail_server"
 }
+
+type AlarmPolicy struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:char(128)" json:"NAME"`
+	UserID int    `gorm:"column:user_id;type:int" json:"USER_ID"`
+}
+
+func (AlarmPolicy) TableName() string {
+	return "alarm_policy"
+}
