@@ -866,16 +866,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"if(capture_nic_type in (0,1,2),dictGet(flow_tag.vtap_port_map, 'name', (toUInt64(agent_id),toUInt64(capture_nic))),'')",
 			"",
-			"toUInt64(capture_nic) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
-			"toUInt64(capture_nic) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
+			"(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
+			"(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
 		)}
 	// 采集网卡名称
 	tagResourceMap["capture_nic_name"] = map[string]*Tag{
 		"default": NewTag(
 			"if(capture_nic_type in (0,1,2),dictGet(flow_tag.vtap_port_map, 'name', (toUInt64(agent_id),toUInt64(capture_nic))),'')",
 			"",
-			"toUInt64(capture_nic) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
-			"toUInt64(capture_nic) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
+			"(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
+			"(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
 		)}
 	// Nat Real IP
 	for _, suffix := range []string{"", "_0", "_1"} {

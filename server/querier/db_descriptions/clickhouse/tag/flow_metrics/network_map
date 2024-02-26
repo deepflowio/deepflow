@@ -37,7 +37,7 @@ gprocess                   , gprocess_0                , gprocess_1             
 tap_port_host              , tap_port_host             , tap_port_host             , resource      ,                        , Universal Tag   , 111            , 1
 tap_port_chost             , tap_port_chost            , tap_port_chost            , resource      ,                        , Universal Tag   , 111            , 1
 tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node         , resource      ,                        , Universal Tag   , 111            , 1
-capture_nic_host           , capture_nic_host          , capture_nic_chost         , resource      ,                        , Universal Tag   , 111            , 0
+capture_nic_host           , capture_nic_host          , capture_nic_host          , resource      ,                        , Universal Tag   , 111            , 0
 capture_nic_chost          , capture_nic_chost         , capture_nic_chost         , resource      ,                        , Universal Tag   , 111            , 0
 capture_nic_pod_node       , capture_nic_pod_node      , capture_nic_pod_node      , resource      ,                        , Universal Tag   , 111            , 0
 host_ip                    , host_ip_0                 , host_ip_1                 , resource      ,                        , Universal Tag   , 111            , 0
