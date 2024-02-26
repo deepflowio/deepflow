@@ -222,7 +222,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
-		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='observation_point') OR tap_side = 'xxx') LIMIT 0, 50",
+		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='observation_point') OR observation_point = 'xxx') LIMIT 0, 50",
 	}, {
 		input:  "select request from l7_flow_log where Enum(tap_side) like 'xxx' limit 0, 50",
 		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='observation_point')) LIMIT 0, 50",
