@@ -694,9 +694,17 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
         };
-        let endpoint = match (&info.routing_key, &info.queue) {
-            (Some(x), _) if x.len() > 0 => x.clone(),
-            (_, y) => y.clone().unwrap_or_default(),
+        let req_type = info.get_packet_type();
+        let type1_len = info.exchange.as_ref().map_or(0, |r| r.len())
+            + info.routing_key.as_ref().map_or(0, |r| r.len());
+        let endpoint = if type1_len > 0 {
+            format!(
+                "{}.{}",
+                info.exchange.unwrap_or_default(),
+                info.routing_key.unwrap_or_default()
+            )
+        } else {
+            info.queue.unwrap_or_default()
         };
         let log = L7ProtocolSendLog {
             version: Some(std::str::from_utf8(AMQPVERSION).unwrap().to_string()),
@@ -704,7 +712,7 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             req_len: info.req_len,
             resp_len: info.resp_len,
             req: L7Request {
-                req_type: info.get_packet_type(),
+                req_type,
                 domain: info.vhost.unwrap_or_default(),
                 resource: endpoint.clone(),
                 endpoint: endpoint.clone(),
