@@ -105,6 +105,14 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.topic_name.is_empty() {
+            None
+        } else {
+            Some(self.topic_name.clone())
+        }
+    }
 }
 
 impl KafkaInfo {
