@@ -87,6 +87,7 @@ last_keepalive_seq    , 心跳包 Seq 号                , 最近一个心跳包
 last_keepalive_ack    , 心跳包 Ack 号                , 最近一个心跳包中的 ACK 确认号。
 
 l7_protocol           , 应用协议                     ,
+request_domain        , 请求域名                     ,
 
 flow_id               , 流日志 ID                    ,
 start_time            , 开始时间                     , 单位: 微秒。表示当前自然分钟内流的开始时间，对于新建流表示首包时间。
@@ -94,7 +95,6 @@ end_time              , 结束时间                     , 单位: 微秒。表�
 close_type            , 流结束类型                   ,
 status                , 状态                         , 由 close_type（流结束类型）与 protocol（协议）决定：正常结束/周期性上报/非TCP超时=正常，客户端XX=客户端异常，服务端XX/TCP超时=服务端异常，其他结束方式=未知。
 is_new_flow           , 新建流                       ,
-request_domain        , 请求域名                     ,
 
 signal_source         , 信号源                       ,
 tap                   , 采集点                       , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。
