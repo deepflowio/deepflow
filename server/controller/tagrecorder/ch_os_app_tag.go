@@ -19,63 +19,117 @@ package tagrecorder
 import (
 	"strings"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTag struct {
-	UpdaterComponent[mysql.ChOSAppTag, OSAPPTagKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTag, OSAPPTagKey]
 }
 
 func NewChOSAppTag() *ChOSAppTag {
-	updater := &ChOSAppTag{
-		newUpdaterComponent[mysql.ChOSAppTag, OSAPPTagKey](
-			RESOURCE_TYPE_CH_OS_APP_TAG,
+	mng := &ChOSAppTag{
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTag, OSAPPTagKey](
+			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
-		return nil, false
-	}
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate) {
+	keysToAdd := make([]OSAPPTagKey, 0)
+	targetsToAdd := make([]mysql.ChOSAppTag, 0)
+	keysToDelete := make([]OSAPPTagKey, 0)
+	targetsToDelete := make([]mysql.ChOSAppTag, 0)
+	var chItem mysql.ChOSAppTag
+	var updateKey OSAPPTagKey
+	updateInfo := make(map[string]interface{})
+	if fieldsUpdate.OSAPPTags.IsDifferent() {
+		new := map[string]string{}
+		old := map[string]string{}
+		newStr := fieldsUpdate.OSAPPTags.GetNew()
+		oldStr := fieldsUpdate.OSAPPTags.GetOld()
+		splitNews := strings.Split(newStr, ", ")
+		splitOlds := strings.Split(oldStr, ", ")
 
-	keyToItem := make(map[OSAPPTagKey]mysql.ChOSAppTag)
-	for _, process := range processes {
-		splitTags := strings.Split(process.OSAPPTags, ", ")
-		for _, singleTag := range splitTags {
-			splitSingleTag := strings.Split(singleTag, ":")
+		for _, splitNew := range splitNews {
+			splitSingleTag := strings.Split(splitNew, ":")
 			if len(splitSingleTag) == 2 {
-				key := OSAPPTagKey{
-					PID: process.ID,
-					Key: strings.Trim(splitSingleTag[0], " "),
-				}
-				keyToItem[key] = mysql.ChOSAppTag{
-					PID:   process.ID,
-					Key:   strings.Trim(splitSingleTag[0], " "),
-					Value: strings.Trim(splitSingleTag[1], " "),
+				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+			}
+		}
+		for _, splitOld := range splitOlds {
+			splitSingleTag := strings.Split(splitOld, ":")
+			if len(splitSingleTag) == 2 {
+				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+			}
+		}
+		for k, v := range new {
+			oldV, ok := old[k]
+			if !ok {
+				keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
+				targetsToAdd = append(targetsToAdd, mysql.ChOSAppTag{
+					PID:   sourceID,
+					Key:   k,
+					Value: v,
+				})
+			} else {
+				if oldV != v {
+					updateKey = OSAPPTagKey{PID: sourceID, Key: k}
+					updateInfo[k] = v
+					mysql.Db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+					if chItem.PID == 0 {
+						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
+						targetsToAdd = append(targetsToAdd, mysql.ChOSAppTag{
+							PID:   sourceID,
+							Key:   k,
+							Value: v,
+						})
+					} else if len(updateInfo) > 0 {
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey)
+					}
 				}
 			}
 		}
+		for k := range old {
+			if _, ok := new[k]; !ok {
+				keysToDelete = append(keysToDelete, OSAPPTagKey{PID: sourceID, Key: k})
+				targetsToDelete = append(targetsToDelete, mysql.ChOSAppTag{
+					PID: sourceID,
+					Key: k,
+				})
+			}
+		}
 	}
-	return keyToItem, true
+	if len(keysToAdd) > 0 {
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+	}
+	if len(keysToDelete) > 0 {
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+	}
 }
 
-func (o *ChOSAppTag) generateKey(dbItem mysql.ChOSAppTag) OSAPPTagKey {
-	return OSAPPTagKey{PID: dbItem.PID, Key: dbItem.Key}
-}
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTag) sourceToTarget(source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
+	osAppTagsMap := map[string]string{}
+	splitTags := strings.Split(source.OSAPPTags, ", ")
 
-func (o *ChOSAppTag) generateUpdateInfo(oldItem, newItem mysql.ChOSAppTag) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if oldItem.Value != newItem.Value {
-		updateInfo["value"] = newItem.Value
+	for _, splitTag := range splitTags {
+		splitSingleTag := strings.Split(splitTag, ":")
+		if len(splitSingleTag) == 2 {
+			osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+		}
 	}
-	if len(updateInfo) > 0 {
-		return updateInfo, true
+	for k, v := range osAppTagsMap {
+		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
+		targets = append(targets, mysql.ChOSAppTag{
+			PID:   source.ID,
+			Key:   k,
+			Value: v,
+		})
 	}
-	return nil, false
+	return
 }
