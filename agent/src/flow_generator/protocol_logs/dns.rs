@@ -88,9 +88,19 @@ impl L7ProtocolInfoInterface for DnsInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.query_name.is_empty() {
+            return None;
+        }
+        Some(self.query_name.clone())
+    }
 }
 
 impl DnsInfo {
+    const QUERY_IPV4: u16 = 1;
+    const QUERY_IPV6: u16 = 28;
+
     pub fn merge(&mut self, other: &mut Self) {
         std::mem::swap(&mut self.answers, &mut other.answers);
         if other.status != L7ResponseStatus::default() {
@@ -102,6 +112,10 @@ impl DnsInfo {
                 self.status_code = Some(code);
             }
         }
+    }
+
+    fn is_query_address(&self) -> bool {
+        self.domain_type == Self::QUERY_IPV4 || self.domain_type == Self::QUERY_IPV6
     }
 
     pub fn get_domain_str(&self) -> &'static str {
@@ -133,7 +147,13 @@ impl From<DnsInfo> for L7ProtocolSendLog {
         let log = L7ProtocolSendLog {
             req: L7Request {
                 req_type,
-                resource: f.query_name,
+                resource: f.query_name.clone(),
+                domain: if f.is_query_address() {
+                    f.query_name.clone()
+                } else {
+                    String::new()
+                },
+                endpoint: f.query_name,
                 ..Default::default()
             },
             resp: L7Response {
@@ -546,12 +566,12 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
+                        output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!("{:?} is_dns: {}\r\n", DnsInfo::default(), is_dns));
+                output.push_str(&format!("{:?} is_dns: {}\n", DnsInfo::default(), is_dns));
             }
         }
         output

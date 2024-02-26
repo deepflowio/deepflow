@@ -33,6 +33,12 @@ auto_instance_type         , Type - K8s POD First          , The type of 'auto_i
 auto_instance              , Instance - K8s POD First      , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
 auto_service_type          , Type - K8s Service First      , The type of 'auto_service'.
 auto_service               , Instance - K8s Service First  , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
+host_ip                    , VM Hypervisor                 , The management IP address of VM Hypervisor.
+host_hostname              , VM Hypervisor                 , The hostname of VM Hypervisor.
+chost_ip                   , Cloud Host                    , The primary IP address of Cloud Host.
+chost_hostname             , Cloud Host                    , The hostname of Cloud Host.
+pod_node_ip                , K8s Node                      , The primary IP address of K8s Node.
+pod_node_hostname          , K8s Node                      , The hostname of K8s Node.
 
 k8s.label                  , K8s Label                     ,
 k8s.annotation             , K8s Annotation                ,
@@ -44,3 +50,4 @@ ip                         , IP Address                    ,
 is_ipv4                    , IPv4 Flag                     ,
 
 vtap                       , DeepFlow Agent                ,
+agent                      , DeepFlow Agent                ,

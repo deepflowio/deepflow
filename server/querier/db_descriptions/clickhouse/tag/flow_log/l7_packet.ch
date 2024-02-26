@@ -8,3 +8,4 @@ end_time                  , 结束时间               , 单位：微秒。packe
 packet_batch              , PCAP 文件              ,
 
 vtap                      , 采集器                 ,
+agent                     , 采集器                 ,

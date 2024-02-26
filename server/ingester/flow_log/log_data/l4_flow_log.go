@@ -30,10 +30,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (
@@ -364,12 +364,12 @@ type FlowInfo struct {
 	CloseType    uint16 `json:"close_type"`
 	SignalSource uint16 `json:"signal_source"`
 	FlowID       uint64 `json:"flow_id"`
-	TapType      uint16 `json:"tap_type"`
+	TapType      uint8  `json:"capture_network_type_id"`
 	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort      uint32 `json:"tap_port"`
-	TapSide      string `json:"tap_side"`
-	VtapID       uint16 `json:"vtap_id"`
+	TapPortType  uint8  `json:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort      uint32 `json:"capture_nic"`
+	TapSide      string `json:"observation_point"`
+	VtapID       uint16 `json:"agent_id"`
 	L2End0       bool   `json:"l2_end_0"`
 	L2End1       bool   `json:"l2_end_1"`
 	L3End0       bool   `json:"l3_end_0"`
@@ -389,6 +389,7 @@ type FlowInfo struct {
 	NatRealPort1 uint16
 
 	DirectionScore uint8
+	RequestDomain  string
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -397,12 +398,12 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-	ckdb.NewColumn("tap_type", ckdb.UInt16),
+	ckdb.NewColumn("capture_network_type_id", ckdb.UInt8),
 	ckdb.NewColumn("nat_source", ckdb.UInt8),
-	ckdb.NewColumn("tap_port_type", ckdb.UInt8),
-	ckdb.NewColumn("tap_port", ckdb.UInt32),
-	ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
-	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+	ckdb.NewColumn("capture_nic_type", ckdb.UInt8),
+	ckdb.NewColumn("capture_nic", ckdb.UInt32),
+	ckdb.NewColumn("observation_point", ckdb.LowCardinalityString),
+	ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("l2_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l2_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l3_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
@@ -420,6 +421,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 	ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
+	ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
@@ -450,7 +452,7 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
 
 	block.WriteIPv4(f.NatRealIP0)
 	block.WriteIPv4(f.NatRealIP1)
-	block.Write(f.NatRealPort0, f.NatRealPort1, f.DirectionScore)
+	block.Write(f.NatRealPort0, f.NatRealPort1, f.DirectionScore, f.RequestDomain)
 }
 
 type Metrics struct {
@@ -713,7 +715,7 @@ func (k *KnowledgeGraph) fill(
 	// 对于VIP的流量，需要使用MAC来匹配
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
 	// 对于本地的流量，也需要使用MAC来匹配
-	if tapSide == uint32(zerodoc.Local) {
+	if tapSide == uint32(flow_metrics.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
 		if isLocalIP(isIPv6, ip40, ip60) {
 			lookupByMac0 = true
@@ -721,7 +723,7 @@ func (k *KnowledgeGraph) fill(
 		if isLocalIP(isIPv6, ip41, ip61) {
 			lookupByMac1 = true
 		}
-	} else if tapSide == uint32(zerodoc.ClientProcess) || tapSide == uint32(zerodoc.ServerProcess) {
+	} else if tapSide == uint32(flow_metrics.ClientProcess) || tapSide == uint32(flow_metrics.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
 			lookupByMac0 = true
@@ -736,45 +738,45 @@ func (k *KnowledgeGraph) fill(
 		vtapID, podId := platformData.QueryGprocessInfo(gpID0)
 		if podId != 0 && vtapID == vtapId {
 			podId0 = podId
-			k.TagSource0 |= uint8(zerodoc.GpId)
+			k.TagSource0 |= uint8(flow_metrics.GpId)
 		}
 	}
 	if gpID1 != 0 && podId1 == 0 {
 		vtapID, podId := platformData.QueryGprocessInfo(gpID1)
 		if podId != 0 && vtapID == vtapId {
 			podId1 = podId
-			k.TagSource1 |= uint8(zerodoc.GpId)
+			k.TagSource1 |= uint8(flow_metrics.GpId)
 		}
 	}
 
 	// use podId to match first
 	if podId0 != 0 {
-		k.TagSource0 |= uint8(zerodoc.PodId)
+		k.TagSource0 |= uint8(flow_metrics.PodId)
 		info0 = platformData.QueryPodIdInfo(podId0)
 	}
 	if podId1 != 0 {
-		k.TagSource1 |= uint8(zerodoc.PodId)
+		k.TagSource1 |= uint8(flow_metrics.PodId)
 		info1 = platformData.QueryPodIdInfo(podId1)
 	}
 
 	if info0 == nil {
 		if lookupByMac0 {
-			k.TagSource0 |= uint8(zerodoc.Mac)
+			k.TagSource0 |= uint8(flow_metrics.Mac)
 			info0 = platformData.QueryMacInfo(l3EpcMac0)
 		}
 		if info0 == nil {
-			k.TagSource0 |= uint8(zerodoc.EpcIP)
+			k.TagSource0 |= uint8(flow_metrics.EpcIP)
 			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
 	}
 
 	if info1 == nil {
 		if lookupByMac1 {
-			k.TagSource1 |= uint8(zerodoc.Mac)
+			k.TagSource1 |= uint8(flow_metrics.Mac)
 			info1 = platformData.QueryMacInfo(l3EpcMac1)
 		}
 		if info1 == nil {
-			k.TagSource1 |= uint8(zerodoc.EpcIP)
+			k.TagSource1 |= uint8(flow_metrics.EpcIP)
 			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
 	}
@@ -825,10 +827,10 @@ func (k *KnowledgeGraph) fill(
 	}
 
 	// 0端如果是clusterIP或后端podIP需要匹配service_id
-	if common.IsPodServiceIP(zerodoc.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
+	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
 		k.ServiceID0 = platformData.QueryService(k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
 	}
-	if common.IsPodServiceIP(zerodoc.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
+	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
 		k.ServiceID1 = platformData.QueryService(k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
@@ -843,7 +845,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 	k.fill(platformData,
 		isIPv6, f.MetricsPeerSrc.IsVipInterface == 1, f.MetricsPeerDst.IsVipInterface == 1,
 		// The range of EPC ID is [-2,65533], if EPC ID < -2 needs to be transformed into the range.
-		zerodoc.MarshalInt32WithSpecialID(f.MetricsPeerSrc.L3EpcId), zerodoc.MarshalInt32WithSpecialID(f.MetricsPeerDst.L3EpcId),
+		flow_metrics.MarshalInt32WithSpecialID(f.MetricsPeerSrc.L3EpcId), flow_metrics.MarshalInt32WithSpecialID(f.MetricsPeerDst.L3EpcId),
 		f.FlowKey.IpSrc, f.FlowKey.IpDst,
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,
@@ -871,11 +873,11 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
 	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
-	i.TapType = uint16(f.FlowKey.TapType)
+	i.TapType = uint8(f.FlowKey.TapType)
 	var natSource datatype.NATSource
 	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
 	i.NatSource = uint8(natSource)
-	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
+	i.TapSide = flow_metrics.TAPSideEnum(f.TapSide).String()
 	i.VtapID = uint16(f.FlowKey.VtapId)
 
 	i.L2End0 = f.MetricsPeerSrc.IsL2End == 1
@@ -899,6 +901,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)
 	i.NatRealPort1 = uint16(f.MetricsPeerDst.RealPort)
 	i.DirectionScore = uint8(f.DirectionScore)
+	i.RequestDomain = f.RequestDomain
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {

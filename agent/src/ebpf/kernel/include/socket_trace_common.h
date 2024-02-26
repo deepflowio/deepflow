@@ -124,7 +124,10 @@ struct socket_info_t {
 	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
 	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
-	__s32 correlation_id;   // Currently used for Kafka protocol inference.
+	union {
+		__u8  encoding_type;    // Currently used for OpenWire encoding inference.
+		__s32 correlation_id;   // Currently used for Kafka protocol inference.
+	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
 
@@ -240,6 +243,16 @@ struct process_event_t {
 	struct event_meta meta;
 	__u32 pid; // process ID
 	__u8 name[TASK_COMM_LEN]; // process name
+};
+
+struct debug_data {
+	__u16 magic;
+	__u8 fun;
+	__u8 num;
+	union {
+		__u32 len;
+		__u8 buf[4];
+	};
 };
 
 #define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))

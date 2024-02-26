@@ -131,7 +131,7 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "os.app.")
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
-			filter = fmt.Sprintf("(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
+			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
 
 		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
 			resourceNoSuffix == "host" || resourceNoSuffix == "service" {
@@ -150,6 +150,15 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (101,102)"}, "")
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
+			}
+		} else if resourceInfo, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]; ok {
+			deviceTypeValue = resourceInfo.ResourceType
+			deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
+
+			if deviceTypeValue == tag.VIF_DEVICE_TYPE_VM {
+				filter = "l3_device_id" + suffix + "!=0 AND l3_device_type" + suffix + "=" + deviceTypeValueStr
+			} else {
+				filter = resourceInfo.ResourceName + "_id" + suffix + "!=0"
 			}
 		}
 	}
@@ -458,6 +467,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		return &view.Expr{Value: filter}, nil
 	} else {
+		if t.Tag == "tap_port" {
+			t.Tag = "capture_nic"
+		}
 		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 		filter := ""
 		if !ok {
@@ -489,7 +501,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 							filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 						}
-					case "tap_port":
+					case "tap_port", "capture_nic":
 						macValue := strings.TrimLeft(t.Value, "(")
 						macValue = strings.TrimRight(macValue, ")")
 						macSlice := strings.Split(macValue, ",")
@@ -686,7 +698,10 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 						}
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 					}
-				case "tap_port":
+				case "tap_port", "capture_nic":
+					if t.Tag == "tap_port" {
+						t.Tag = "capture_nic"
+					}
 					macValue := strings.TrimLeft(t.Value, "(")
 					macValue = strings.TrimRight(macValue, ")")
 					macSlice := strings.Split(macValue, ",")
@@ -1350,6 +1365,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		if isStringEnumOK {
 			isIntEnum = false
 		}
+		if tagName == "tap_side" {
+			tagName = "observation_point"
+		} else if tagName == "tap_port_type" {
+			tagName = "capture_nic_type"
+		}
 		tagItem, ok := tag.GetTag(tagName, db, table, "enum")
 		if !ok {
 			right = view.Expr{Value: f.Value}
@@ -1406,6 +1426,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
 							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						} else {
+
 							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}
 					} else {

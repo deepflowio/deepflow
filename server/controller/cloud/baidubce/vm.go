@@ -86,6 +86,15 @@ func (b *BaiduBce) getVMs(
 			} else if vm.Status == "Stopped" {
 				vmState = common.VM_STATE_STOPPED
 			}
+
+			var pIP string
+			for _, nic := range vm.NicInfo.Ips {
+				if nic.Primary == "true" {
+					pIP = nic.PrivateIp
+					break
+				}
+			}
+
 			retVM := model.VM{
 				Lcuuid:       vmLcuuid,
 				Name:         vm.InstanceName,
@@ -93,6 +102,7 @@ func (b *BaiduBce) getVMs(
 				HType:        common.VM_HTYPE_VM_C,
 				VPCLcuuid:    vpcLcuuid,
 				State:        vmState,
+				IP:           pIP,
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: region.Lcuuid,
 			}

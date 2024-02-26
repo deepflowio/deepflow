@@ -681,6 +681,7 @@ where
         );
         let mut all_entries = HashMap::new();
         let mut total_count = 0;
+        let mut estimated_total = None;
         let mut total_bytes = 0;
         let mut params = ListParams::default().limit(ctx.config.list_limit);
         loop {
@@ -706,6 +707,9 @@ where
                             .remaining_item_count
                             .unwrap_or_default()
                     );
+                    if let Some(r) = object_list.metadata.remaining_item_count {
+                        estimated_total = Some(total_count + r as usize);
+                    }
 
                     for object in object_list.items {
                         if object.meta().uid.as_ref().is_none() {
@@ -768,7 +772,31 @@ where
                 }
                 Err(err) => {
                     ctx.stats_counter.list_error.fetch_add(1, Ordering::Relaxed);
-                    let msg = format!("{} watcher list failed: {}", ctx.kind, err);
+                    let msg = if matches!(
+                        err,
+                        ClientErr::Api(ErrorResponse {
+                            code: HTTP_GONE,
+                            ..
+                        })
+                    ) {
+                        // kubernetes api pagination token expires after a certain timeout (default 5min)
+                        // Should an api have high RTT or large quantity of resources, it may not
+                        // be able to return all resources before token expires. Notice the user to
+                        // increase page size if this happens.
+                        format!(
+                            "{} watcher list HTTP Gone failed when {}/{} entries returned, \
+                            try increasing 'kubernetes-api-list-limit' in agent config: {}",
+                            ctx.kind,
+                            total_count,
+                            match estimated_total {
+                                Some(total) => total.to_string(),
+                                None => "unknown".to_owned(),
+                            },
+                            err
+                        )
+                    } else {
+                        format!("{} watcher list failed: {}", ctx.kind, err)
+                    };
                     warn!("{}", msg);
                     ctx.err_msg.lock().await.replace(msg);
                     return false;
