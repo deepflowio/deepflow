@@ -37,7 +37,7 @@ use super::{
 };
 
 use crate::{
-    common::{endpoint::EPC_FROM_INTERNET, timestamp_to_micros, Timestamp},
+    common::{endpoint::EPC_INTERNET, timestamp_to_micros, Timestamp},
     metric::document::Direction,
 };
 use crate::{
@@ -1277,7 +1277,7 @@ pub fn get_direction(
             TridentType::TtDedicatedPhysicalMachine => {
                 //  接入网络
                 if tap_type != TapType::Cloud {
-                    if l3_epc_id != EPC_FROM_INTERNET {
+                    if l3_epc_id != EPC_INTERNET {
                         return (Direction::ClientToServer, Direction::ServerToClient);
                     }
                 } else {
