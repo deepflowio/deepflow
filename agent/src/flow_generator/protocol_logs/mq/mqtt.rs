@@ -98,6 +98,10 @@ impl L7ProtocolInfoInterface for MqttInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_domain(&self) -> String {
+        self.client_id.clone().unwrap_or_default()
+    }
 }
 
 pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>

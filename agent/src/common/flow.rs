@@ -1213,7 +1213,7 @@ impl From<Flow> for flow_log::Flow {
             last_keepalive_ack: f.last_keepalive_ack,
             acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
             direction_score: f.direction_score as u32,
-            request_domain: f.request_domain.clone(),
+            request_domain: f.request_domain,
         }
     }
 }
