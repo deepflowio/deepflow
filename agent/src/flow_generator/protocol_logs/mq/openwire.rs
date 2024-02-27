@@ -1603,6 +1603,10 @@ impl L7ProtocolInfoInterface for OpenWireInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_domain(&self) -> String {
+        self.broker_url.clone().unwrap_or_default()
+    }
 }
 
 impl From<OpenWireInfo> for L7ProtocolSendLog {

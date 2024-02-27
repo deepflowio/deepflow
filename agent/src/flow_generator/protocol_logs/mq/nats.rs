@@ -726,6 +726,10 @@ impl L7ProtocolInfoInterface for NatsInfo {
             rrt: self.rtt,
         })
     }
+
+    fn get_request_domain(&self) -> String {
+        self.server_name.clone()
+    }
 }
 
 impl L7ProtocolParserInterface for NatsLog {
