@@ -886,7 +886,7 @@ impl<'a> MetaPacket<'a> {
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
-        let data = &mut (*data);
+        let data = &mut data.read_unaligned();
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
                 {
