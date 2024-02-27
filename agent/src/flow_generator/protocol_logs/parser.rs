@@ -189,6 +189,7 @@ impl MetaAppProto {
             ebpf_type: meta_packet.ebpf_type,
             pod_id_0: 0,
             pod_id_1: 0,
+            biz_type: l7_info.get_biz_type(),
         };
 
         #[cfg(any(target_os = "linux", target_os = "android"))]

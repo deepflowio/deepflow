@@ -545,6 +545,7 @@ pub struct L7Stats {
     pub l7_protocol: L7Protocol,
     pub signal_source: SignalSource,
     pub time_in_second: Duration,
+    pub biz_type: u8,
 }
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq, Eq)]
@@ -957,6 +958,8 @@ pub struct Flow {
     pub otel_instance: Option<String>,
     #[serde(skip)]
     pub last_endpoint: Option<String>,
+    #[serde(skip)]
+    pub last_biz_type: u8,
     pub direction_score: u8,
     pub pod_id: u32,
     pub request_domain: String,

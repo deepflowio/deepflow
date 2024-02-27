@@ -101,6 +101,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         None
     }
 
+    fn get_biz_type(&self) -> u8 {
+        0
+    }
+
     fn skip_send(&self) -> bool {
         false
     }
