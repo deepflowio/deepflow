@@ -275,8 +275,14 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 		labels = segment.NewKey(labelKey)
 		labels.Add("__name__", profileName)
 	}
+	// use app-profile with `from` params
+	startTime := time.Unix(int64(profile.From), 0)
+	// using ebpf-profile with `timestamp` nanoseconds parse
+	if profile.Timestamp > 0 {
+		startTime = time.Unix(0, int64(profile.Timestamp))
+	}
 	return ingestion.Metadata{
-		StartTime:       time.Unix(int64(profile.From), 0),
+		StartTime:       startTime,
 		EndTime:         time.Unix(int64(profile.Until), 0),
 		SpyName:         profile.SpyName,
 		Key:             labels,
