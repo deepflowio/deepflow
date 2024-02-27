@@ -147,7 +147,7 @@ impl ProcEvent {
         data: *mut SK_BPF_DATA,
         event_type: EventType,
     ) -> Result<BoxedProcEvents, Error> {
-        let data = &mut (*data);
+        let data = &mut data.read_unaligned();
         let cap_len = data.cap_len as usize;
         let mut raw_data = vec![0u8; cap_len as usize]; // Copy from data.cap_data where stores event's data
         #[cfg(target_arch = "aarch64")]
