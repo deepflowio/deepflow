@@ -24,21 +24,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VRouter struct {
-	UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]
+	UpdaterBase[
+		cloudmodel.VRouter,
+		mysql.VRouter,
+		*diffbase.VRouter,
+		*message.VRouterAdd,
+		message.VRouterAdd,
+		*message.VRouterUpdate,
+		message.VRouterUpdate,
+		*message.VRouterFieldsUpdate,
+		message.VRouterFieldsUpdate,
+		*message.VRouterDelete,
+		message.VRouterDelete]
 }
 
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
 	updater := &VRouter{
-		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *diffbase.VRouter]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVRouter(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VRouters,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VRouter,
+			mysql.VRouter,
+			*diffbase.VRouter,
+			*message.VRouterAdd,
+			message.VRouterAdd,
+			*message.VRouterUpdate,
+			message.VRouterUpdate,
+			*message.VRouterFieldsUpdate,
+			message.VRouterFieldsUpdate,
+			*message.VRouterDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
+			wholeCache,
+			db.NewVRouter(),
+			wholeCache.DiffBaseDataSet.VRouters,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -71,8 +94,9 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRo
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (*message.VRouterFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.VRouterFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
@@ -80,22 +104,24 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["epc_id"] = vpcID
+		mapInfo["epc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID)
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

@@ -60,6 +60,9 @@ pub enum L7Protocol {
     // MQ
     Kafka = 100,
     MQTT = 101,
+    AMQP = 102,
+    OpenWire = 103,
+    NATS = 104,
 
     // INFRA
     DNS = 120,
@@ -68,6 +71,22 @@ pub enum L7Protocol {
     Custom = 127,
 
     Max = 255,
+}
+
+impl L7Protocol {
+    pub fn has_session_id(&self) -> bool {
+        match self {
+            Self::DNS
+            | Self::FastCGI
+            | Self::Http2
+            | Self::TLS
+            | Self::Kafka
+            | Self::Dubbo
+            | Self::SofaRPC
+            | Self::Custom => true,
+            _ => false,
+        }
+    }
 }
 
 // Translate the string value of l7_protocol into a L7Protocol enumeration value used by OTEL.
@@ -88,6 +107,9 @@ impl From<String> for L7Protocol {
             "redis" => Self::Redis,
             "kafka" => Self::Kafka,
             "mqtt" => Self::MQTT,
+            "amqp" => Self::AMQP,
+            "openwire" => Self::OpenWire,
+            "nats" => Self::NATS,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "tls" => Self::TLS,

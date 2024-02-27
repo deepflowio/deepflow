@@ -21,6 +21,7 @@
 #include <sys/prctl.h>
 #include <arpa/inet.h>
 #include <bcc/perf_reader.h>
+#include <linux/version.h>
 #include "clib.h"
 #include "symbol.h"
 #include "tracer.h"
@@ -36,6 +37,7 @@
 #include "config.h"
 
 #include "socket_trace_bpf_common.c"
+#include "socket_trace_bpf_3_10_0.c"
 #include "socket_trace_bpf_5_2_plus.c"
 #include "socket_trace_bpf_kylin.c"
 
@@ -101,6 +103,7 @@ static uint32_t conf_socket_map_max_reclaim;
  */
 ports_bitmap_t *ports_bitmap[PROTO_NUM];
 
+extern uint32_t k_version;
 extern int major, minor;
 extern char linux_release[128];
 
@@ -125,8 +128,19 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__sys_sendmmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmmsg");
-	probes_set_enter_symbol(tps, "do_writev");
-	probes_set_enter_symbol(tps, "do_readv");
+
+	if (k_version == KERNEL_VERSION(3, 10, 0)) {
+		/*
+		 * The Linux 3.10 kernel interface for Redhat7 and
+		 * Centos7 is sys_writev() and sys_readv()
+		 */
+		probes_set_enter_symbol(tps, "sys_writev");
+		probes_set_enter_symbol(tps, "sys_readv");
+	} else {
+		probes_set_enter_symbol(tps, "do_writev");
+		probes_set_enter_symbol(tps, "do_readv");
+	}
+
 	tps->kprobes_nr = index;
 
 	/* tracepoints */
@@ -164,6 +178,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 
 	// clear trace connection
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
+	// fetch close info
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_close");
 
 	// Used for process offsets management
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
@@ -652,6 +668,41 @@ static int register_events_handle(struct event_meta *meta,
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
+#ifdef TLS_DEBUG
+	struct debug_data *debug = raw;
+	if (debug->magic == 0xffff || debug->magic == 0xfffe) {
+		const char *fun;
+		if (debug->fun == 1)
+			fun = "go_tls_write_enter";
+		else if (debug->fun == 2)
+			fun = "go_tls_write_exit";
+		else if (debug->fun == 3)
+                        fun = "go_tls_read_enter";
+		else if (debug->fun == 4)
+                        fun = "go_tls_read_exit";
+		else
+			fun = "unknown";
+
+		const char *err = "";
+		if (debug->num == 1 || debug->num == 2)
+			err = "(E)";
+		
+
+		if (debug->magic == 0xffff) {
+			fprintf(stdout, ">UPROBE DEBUG nobuf fun %s num %d%s len %d\n",
+		  		  fun, debug->num, err, debug->len);
+		} else {
+			fprintf(stdout, ">UPROBE DEBUG buf fun %s num %d%s [%d(%c) "
+				  "%d(%c) %d(%c) %d(%c)]\n",
+				  fun, debug->num, err, debug->buf[0], debug->buf[0],
+				  debug->buf[1], debug->buf[1], debug->buf[2],
+				  debug->buf[2], debug->buf[3], debug->buf[3]);
+		}
+		fflush(stdout);
+		return;
+	}
+#endif
+
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	struct event_meta *ev_meta = raw;
 
@@ -798,11 +849,10 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->thread_id = sd->pid;
 		submit_data->coroutine_id = sd->coroutine_id;
 		submit_data->source = sd->source;
+		submit_data->is_tls = sd->is_tls;
 		if (sd->source == DATA_SOURCE_GO_TLS_UPROBE ||
 		    sd->source == DATA_SOURCE_OPENSSL_UPROBE)
 			submit_data->is_tls = true;
-		else
-			submit_data->is_tls = false;
 
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
@@ -1146,10 +1196,16 @@ static int update_offset_map_default(struct bpf_tracer *t)
 	struct bpf_offset_param offset;
 	memset(&offset, 0, sizeof(offset));
 
-	offset.struct_files_struct_fdt_offset = 0x20;
-	offset.struct_files_private_data_offset = 0xc8;
+	if (k_version == KERNEL_VERSION(3, 10, 0)) {
+		offset.struct_files_struct_fdt_offset = 0x8;
+		offset.struct_files_private_data_offset = 0xa8;
+	} else {
+		offset.struct_files_struct_fdt_offset = 0x20;
+		offset.struct_files_private_data_offset = 0xc8;
+	}
+
 	offset.struct_file_f_inode_offset = 0x20;
-	offset.struct_inode_i_mode_offset = 0x00;
+	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
 	offset.struct_dentry_name_offset = 0x28;
 	offset.struct_sock_family_offset = 0x10;
@@ -1803,10 +1859,6 @@ int running_socket_tracer(tracer_callback_t handle,
 	int buffer_sz;
 
 	if (check_kernel_version(4, 14) != 0) {
-		ebpf_warning
-		    ("[eBPF Kernel Adapt] Currnet linux %d.%d, not support, require Linux 4.14+\n",
-		     major, minor);
-
 		return -EINVAL;
 	}
 
@@ -1826,6 +1878,11 @@ int running_socket_tracer(tracer_callback_t handle,
 			 "socket-trace-bpf-linux-5.2_plus");
 		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
 		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
+	} else if (major == 3 && minor == 10) {
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-3.10.0");
+		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
+		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
 	} else {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");

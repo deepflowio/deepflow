@@ -57,7 +57,7 @@ use public::{
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
-const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
 
@@ -179,23 +179,19 @@ impl Config {
     pub async fn async_get_k8s_cluster_id(
         session: &Session,
         kubernetes_cluster_name: Option<&String>,
-    ) -> String {
-        let ca_md5 = loop {
-            match fs::read_to_string(K8S_CA_CRT_PATH) {
-                Ok(c) => {
-                    break Some(
-                        Md5::digest(c.as_bytes())
-                            .into_iter()
-                            .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "get kubernetes_cluster_id error: failed to read {} error: {}",
-                        K8S_CA_CRT_PATH, e
-                    );
-                    tokio::time::sleep(MINUTE).await;
-                }
+    ) -> Option<String> {
+        let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
+            Ok(c) => Some(
+                Md5::digest(c.as_bytes())
+                    .into_iter()
+                    .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
+            ),
+            Err(e) => {
+                info!(
+                    "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
+                    K8S_CA_CRT_PATH, e
+                );
+                return None;
             }
         };
 
@@ -231,7 +227,7 @@ impl Config {
                             // ==============================================================================================
                             // FIXME: 这里获取成功后 Session 中的 Channel 会失效，所以在这里重置 Session
                             session.reset();
-                            return id;
+                            return Some(id);
                         }
                         None => {
                             error!("call get_kubernetes_cluster_id return response is none")
@@ -256,7 +252,7 @@ impl Config {
         runtime: &Runtime,
         session: &Session,
         kubernetes_cluster_name: Option<&String>,
-    ) -> String {
+    ) -> Option<String> {
         runtime.block_on(Self::async_get_k8s_cluster_id(
             session,
             kubernetes_cluster_name,

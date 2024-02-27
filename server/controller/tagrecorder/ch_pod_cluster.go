@@ -21,18 +21,18 @@ import (
 )
 
 type ChPodCluster struct {
-	UpdaterBase[mysql.ChPodCluster, IDKey]
+	UpdaterComponent[mysql.ChPodCluster, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	updater := &ChPodCluster{
-		UpdaterBase[mysql.ChPodCluster, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD,
-		},
+		newUpdaterComponent[mysql.ChPodCluster, IDKey](
+			RESOURCE_TYPE_CH_POD,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -72,7 +72,7 @@ func (p *ChPodCluster) generateUpdateInfo(oldItem, newItem mysql.ChPodCluster) (
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if len(updateInfo) > 0 {

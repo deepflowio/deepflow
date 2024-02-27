@@ -90,7 +90,7 @@ use crate::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
             get_env, kernel_check, running_in_container, tap_interface_check,
-            trident_process_check, K8S_MEM_LIMIT_FOR_DEEPFLOW,
+            trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
@@ -412,9 +412,7 @@ impl Trident {
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
-            if env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).is_err() {
-                warn!("the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is not set in the container , use the limit value from server instead");
-            }
+            warn!("When running in a container, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s or docker for resource limits.");
         }
 
         #[cfg(target_os = "linux")]
@@ -491,8 +489,8 @@ impl Trident {
                     .static_config
                     .kubernetes_cluster_name
                     .as_ref(),
-            );
-            warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
+            )
+            .unwrap_or_default();
         }
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);

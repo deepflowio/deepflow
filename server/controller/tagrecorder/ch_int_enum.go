@@ -26,16 +26,16 @@ import (
 )
 
 type ChIntEnum struct {
-	UpdaterBase[mysql.ChIntEnum, IntEnumTagKey]
+	UpdaterComponent[mysql.ChIntEnum, IntEnumTagKey]
 }
 
 func NewChIntEnum() *ChIntEnum {
 	updater := &ChIntEnum{
-		UpdaterBase[mysql.ChIntEnum, IntEnumTagKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_INT_ENUM,
-		},
+		newUpdaterComponent[mysql.ChIntEnum, IntEnumTagKey](
+			RESOURCE_TYPE_CH_INT_ENUM,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

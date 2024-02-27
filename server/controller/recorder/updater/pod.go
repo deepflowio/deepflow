@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type Pod struct {
-	UpdaterBase[cloudmodel.Pod, mysql.Pod, *diffbase.Pod]
+	UpdaterBase[
+		cloudmodel.Pod,
+		mysql.Pod,
+		*diffbase.Pod,
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodUpdate,
+		message.PodUpdate,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete]
 }
 
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
-		UpdaterBase[cloudmodel.Pod, mysql.Pod, *diffbase.Pod]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewPod(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Pods,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Pod,
+			mysql.Pod,
+			*diffbase.Pod,
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodUpdate,
+			message.PodUpdate,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_POD_EN,
+			wholeCache,
+			db.NewPod(),
+			wholeCache.DiffBaseDataSet.Pods,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -118,8 +141,9 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 	return dbItem, true
 }
 
-func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.PodFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.PodFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
@@ -127,12 +151,17 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["epc_id"] = vpcID
+		mapInfo["epc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID) // TODO is old value needed?
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.PodNodeLcuuid != cloudItem.PodNodeLcuuid {
-		updateInfo["pod_node_id"] = p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
+		podNodeID := p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid) // TODO need to log not found error
+		mapInfo["pod_node_id"] = podNodeID
+		structInfo.PodNodeID.SetNew(podNodeID)
+		structInfo.PodNodeLcuuid.Set(diffBase.PodNodeLcuuid, cloudItem.PodNodeLcuuid)
 	}
 	if diffBase.PodReplicaSetLcuuid != cloudItem.PodReplicaSetLcuuid {
 		var podReplicaSetID int
@@ -144,10 +173,12 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 					ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 				))
-				return nil, false
+				return nil, nil, false
 			}
 		}
-		updateInfo["pod_rs_id"] = podReplicaSetID
+		mapInfo["pod_rs_id"] = podReplicaSetID
+		structInfo.PodReplicaSetID.SetNew(podReplicaSetID)
+		structInfo.PodReplicaSetLcuuid.Set(diffBase.PodReplicaSetLcuuid, cloudItem.PodReplicaSetLcuuid)
 	}
 	if diffBase.PodGroupLcuuid != cloudItem.PodGroupLcuuid {
 		podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
@@ -156,40 +187,48 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 				ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["pod_group_id"] = podGroupID
+		mapInfo["pod_group_id"] = podGroupID
+		structInfo.PodGroupID.SetNew(podGroupID)
+		structInfo.PodGroupLcuuid.Set(diffBase.PodGroupLcuuid, cloudItem.PodGroupLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 	if diffBase.Annotation != cloudItem.Annotation {
-		updateInfo["annotation"] = cloudItem.Annotation
+		mapInfo["annotation"] = cloudItem.Annotation
+		structInfo.Annotation.Set(diffBase.Annotation, cloudItem.Annotation)
 	}
 	if diffBase.ENV != cloudItem.ENV {
-		updateInfo["env"] = cloudItem.ENV
+		mapInfo["env"] = cloudItem.ENV
+		structInfo.ENV.Set(diffBase.ENV, cloudItem.ENV)
 	}
 	if diffBase.ContainerIDs != cloudItem.ContainerIDs {
-		updateInfo["container_ids"] = cloudItem.ContainerIDs
+		mapInfo["container_ids"] = cloudItem.ContainerIDs
+		structInfo.ContainerIDs.Set(diffBase.ContainerIDs, cloudItem.ContainerIDs)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if diffBase.State != cloudItem.State {
-		updateInfo["state"] = cloudItem.State
+		mapInfo["state"] = cloudItem.State
+		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
 	if diffBase.CreatedAt != cloudItem.CreatedAt {
-		updateInfo["created_at"] = cloudItem.CreatedAt
+		mapInfo["created_at"] = cloudItem.CreatedAt
+		structInfo.CreatedAt.Set(diffBase.CreatedAt, cloudItem.CreatedAt)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

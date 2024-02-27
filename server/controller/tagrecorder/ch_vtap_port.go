@@ -34,7 +34,7 @@ import (
 const vTapPortNameLength = 256
 
 type ChVTapPort struct {
-	UpdaterBase[mysql.ChVTapPort, VtapPortKey]
+	UpdaterComponent[mysql.ChVTapPort, VtapPortKey]
 }
 
 type DeviceInfo struct {
@@ -46,11 +46,11 @@ type DeviceInfo struct {
 
 func NewChVTapPort() *ChVTapPort {
 	updater := &ChVTapPort{
-		UpdaterBase[mysql.ChVTapPort, VtapPortKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_VTAP_PORT,
-		},
+		newUpdaterComponent[mysql.ChVTapPort, VtapPortKey](
+			RESOURCE_TYPE_CH_VTAP_PORT,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -568,8 +568,10 @@ func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{},
 				case common.VIF_DEVICE_TYPE_HOST:
 					vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_VM:
-					if toolDS.vmIDToPodNodeID[vtapVIF.DeviceID] != 0 {
-						vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
+					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
+						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
+						vtapVIF.DeviceID = podNodeID
+						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
 					} else {
 						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
 					}

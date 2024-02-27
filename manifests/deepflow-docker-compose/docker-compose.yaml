@@ -60,11 +60,11 @@ services:
     - clickhouse
     - deepflow-app
     ports:
-      - 20416:20416
-      - 20419:20419
-      - 30417:20417
-      - 30035:20035
-      - 30033:20033
+      - 20416:20416  # querier module, querying data usage, http port
+      - 20419:20419  # profile module
+      - 30417:20417  # controller module, deepflow-ctl is used interactively
+      - 30035:20035  # controller module, control plane, grpc port
+      - 30033:20033  # ingester module, data plane, port
   deepflow-app:
     image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:latest
     container_name: deepflow-app

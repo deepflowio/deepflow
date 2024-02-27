@@ -150,6 +150,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
             None
         }
     }
+
+    fn get_request_domain(&self) -> String {
+        self.service_name.clone()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
@@ -337,9 +341,7 @@ impl DubboLog {
     // 注意 dubbo trace id 解析是区分大小写的
     fn decode_trace_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
-            TraceType::Sw3 => TraceType::Sw3.to_string(),
-            TraceType::Sw8 => TraceType::Sw8.to_string(),
-            TraceType::Customize(tag) => tag.to_string(),
+            TraceType::Sw3 | TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
             _ => return,
         };
 
@@ -348,7 +350,7 @@ impl DubboLog {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
@@ -399,9 +401,7 @@ impl DubboLog {
 
     fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
-            TraceType::Customize(tag) => tag.to_string(),
-            TraceType::Sw3 => TraceType::Sw3.to_string(),
-            TraceType::Sw8 => TraceType::Sw8.to_string(),
+            TraceType::Customize(_) | TraceType::Sw3 | TraceType::Sw8 => trace_type.as_str(),
             _ => return,
         };
 
@@ -410,7 +410,7 @@ impl DubboLog {
             if !payload.is_char_boundary(start) {
                 break;
             }
-            let index = payload[start..].find(tag.as_str());
+            let index = payload[start..].find(tag);
             if index.is_none() {
                 break;
             }
@@ -521,7 +521,7 @@ impl DubboLog {
 
         let payload_str = String::from_utf8_lossy(&payload[para_index..]);
         for trace_type in config.trace_types.iter() {
-            if trace_type.to_string().len() > u8::MAX as usize {
+            if trace_type.as_str().len() > u8::MAX as usize {
                 continue;
             }
 
@@ -531,7 +531,7 @@ impl DubboLog {
             }
         }
         for span_type in config.span_types.iter() {
-            if span_type.to_string().len() > u8::MAX as usize {
+            if span_type.as_str().len() > u8::MAX as usize {
                 continue;
             }
 
@@ -733,7 +733,15 @@ mod tests {
                 ..Default::default()
             };
             let mut dubbo = DubboLog::default();
-            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 
@@ -746,7 +754,7 @@ mod tests {
             } else {
                 DubboInfo::default()
             };
-            output.push_str(&format!("{:?} is_dubbo: {}\r\n", info, is_dubbo));
+            output.push_str(&format!("{:?} is_dubbo: {}\n", info, is_dubbo));
         }
         output
     }
@@ -829,7 +837,15 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                &*packet,
+                rrt_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(&config);
             if packet.get_l4_payload().is_some() {
                 let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);

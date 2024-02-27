@@ -26,23 +26,46 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VInterface struct {
-	UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]
+	UpdaterBase[
+		cloudmodel.VInterface,
+		mysql.VInterface,
+		*diffbase.VInterface,
+		*message.VInterfaceAdd,
+		message.VInterfaceAdd,
+		*message.VInterfaceUpdate,
+		message.VInterfaceUpdate,
+		*message.VInterfaceFieldsUpdate,
+		message.VInterfaceFieldsUpdate,
+		*message.VInterfaceDelete,
+		message.VInterfaceDelete]
 }
 
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
 	updater := &VInterface{
-		UpdaterBase[cloudmodel.VInterface, mysql.VInterface, *diffbase.VInterface]{
-			resourceType:      ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
-			cache:             wholeCache,
-			domainToolDataSet: domainToolDataSet,
-			dbOperator:        db.NewVInterface(),
-			diffBaseData:      wholeCache.DiffBaseDataSet.VInterfaces,
-			cloudData:         cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VInterface,
+			mysql.VInterface,
+			*diffbase.VInterface,
+			*message.VInterfaceAdd,
+			message.VInterfaceAdd,
+			*message.VInterfaceUpdate,
+			message.VInterfaceUpdate,
+			*message.VInterfaceFieldsUpdate,
+			message.VInterfaceFieldsUpdate,
+			*message.VInterfaceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
+			wholeCache,
+			db.NewVInterface(),
+			wholeCache.DiffBaseDataSet.VInterfaces,
+			cloudData,
+		),
 	}
+	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
 	return updater
 }
@@ -100,11 +123,12 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.VInterfaceFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.VInterfaceFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
 		if cloudItem.NetworkLcuuid == "" {
-			updateInfo["subnetid"] = 0
+			mapInfo["subnetid"] = 0
 		} else {
 			networkID, exists := i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			if !exists {
@@ -116,29 +140,37 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 					))
-					return nil, false
+					return nil, nil, false
 				}
 			}
-			updateInfo["subnetid"] = networkID
+			mapInfo["subnetid"] = networkID
 		}
+		structInfo.NetworkID.SetNew(mapInfo["subnetid"].(int))
+		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.TapMac != cloudItem.TapMac {
-		updateInfo["tap_mac"] = cloudItem.TapMac
+		mapInfo["tap_mac"] = cloudItem.TapMac
+		structInfo.TapMac.Set(diffBase.TapMac, cloudItem.TapMac)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.Type != cloudItem.Type {
-		updateInfo["iftype"] = cloudItem.Type
+		mapInfo["iftype"] = cloudItem.Type
+		structInfo.Type.Set(diffBase.Type, cloudItem.Type)
 	}
 	if diffBase.NetnsID != cloudItem.NetnsID {
-		updateInfo["netns_id"] = cloudItem.NetnsID
+		mapInfo["netns_id"] = cloudItem.NetnsID
+		structInfo.NetnsID.Set(diffBase.NetnsID, cloudItem.NetnsID)
 	}
 	if diffBase.VtapID != cloudItem.VTapID {
-		updateInfo["vtap_id"] = cloudItem.VTapID
+		mapInfo["vtap_id"] = cloudItem.VTapID
+		structInfo.VTapID.Set(diffBase.VtapID, cloudItem.VTapID)
 	}
-	return updateInfo, len(updateInfo) > 0
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

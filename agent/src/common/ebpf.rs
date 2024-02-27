@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use num_enum::IntoPrimitive;
 use serde::Serialize;
 
 //ebpf 上报的数据类型
@@ -35,16 +36,19 @@ pub const IO_EVENT: u8 = 4;
 #[allow(dead_code)]
 // hook in go http2 read/write data
 pub const GO_HTTP2_UPROBE_DATA: u8 = 5;
+// socket close event
+pub const SOCKET_CLOSE_EVENT: u8 = 6;
 
 const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;
 const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
 const EBPF_TYPE_IO_EVENT: u8 = 4;
 const EBPF_TYPE_GO_HTTP2_UPROBE_DATA: u8 = 5;
+const EBPF_TYPE_SOCKET_CLOSE_EVENT: u8 = 6;
 const EBPF_TYPE_NONE: u8 = 255;
 
 // ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
-#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone, IntoPrimitive)]
 #[repr(u8)]
 pub enum EbpfType {
     // 常规 tp, 通过 hook 系统调用 read/write 获取到原始报文, l7_protocol_from_ebpf 不可信,目前通过遍历所有支持的协议判断协议类型
@@ -73,6 +77,7 @@ pub enum EbpfType {
     */
     GoHttp2UprobeData = EBPF_TYPE_GO_HTTP2_UPROBE_DATA,
     IOEvent = EBPF_TYPE_IO_EVENT,
+    SocketCloseEvent = EBPF_TYPE_SOCKET_CLOSE_EVENT,
     None = EBPF_TYPE_NONE, // 非 ebpf 类型.
 }
 
@@ -86,6 +91,7 @@ impl TryFrom<u8> for EbpfType {
             GO_HTTP2_UPROBE_DATA => Ok(Self::GoHttp2UprobeData),
             SYSCALL => Ok(Self::TracePoint),
             IO_EVENT => Ok(Self::IOEvent),
+            SOCKET_CLOSE_EVENT => Ok(Self::SocketCloseEvent),
             _ => Err(format!("unknown ebpf type: {}", value)),
         }
     }

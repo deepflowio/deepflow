@@ -94,7 +94,7 @@ static __inline bool is_set_ports_bitmap(ports_bitmap_t * ports, __u16 port)
 
 static __inline bool
 __protocol_port_check(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info, __u8 prog_num)
+		      struct conn_info_s *conn_info, __u8 prog_num)
 {
 	if (!is_protocol_enabled(proto)) {
 		return false;
@@ -127,14 +127,14 @@ __protocol_port_check(enum traffic_protocol proto,
 
 static __inline bool
 protocol_port_check_1(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_1);
 }
 
 static __inline bool
 protocol_port_check_2(enum traffic_protocol proto,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
 }
@@ -167,6 +167,12 @@ static __inline bool is_current_comm(char *comm)
 static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
 {
 	return (sk_info != NULL && sk_info->uid != 0);
+}
+
+static __inline bool is_infer_socket_valid(struct socket_info_t *sk_info)
+{
+	return (sk_info != NULL && sk_info->uid != 0
+		&& sk_info->l7_proto != PROTO_TLS);
 }
 
 static __inline int is_http_response(const char *data)
@@ -336,7 +342,7 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 // others as response.
 static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 							    size_t count,
-							    struct conn_info_t
+							    struct conn_info_s
 							    *conn_info,
 							    const bool is_first)
 {
@@ -383,6 +389,12 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		static const int HTTP2_MAGIC_SIZE = 24;
 		offset = HTTP2_MAGIC_SIZE;
 	}
+
+	/*
+	 * Use '#pragma unroll' to avoid the following error during the
+	 * loading process in Linux 5.2.x:
+	 * bpf load "socket-trace-bpf-linux-5.2_plus" failed, error:Invalid argument (22)
+	 */
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
 
@@ -474,7 +486,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 
 static __inline enum message_type infer_http2_message(const char *buf_src,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_HTTP2, conn_info))
@@ -498,7 +510,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		return MSG_UNKNOWN;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 
@@ -520,7 +532,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 
 static __inline enum message_type infer_http_message(const char *buf,
 						     size_t count,
-						     struct conn_info_t
+						     struct conn_info_s
 						     *conn_info)
 {
 	// HTTP/1.1 200 OK\r\n (HTTP response is 17 characters)
@@ -533,7 +545,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_HTTP1, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
 	}
@@ -553,7 +565,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 // compiler can optimize it into an immediate value and write it into the
 // instruction.
 static __inline void save_prev_data(const char *buf,
-				    struct conn_info_t *conn_info, size_t count)
+				    struct conn_info_s *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
@@ -573,7 +585,7 @@ static __inline void save_prev_data(const char *buf,
 }
 
 // MySQL and Kafka need the previous n bytes of data for inference
-static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
+static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
 	    conn_info->socket_info_ptr->prev_data_len > 0) {
@@ -617,7 +629,7 @@ static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 // ref : https://dev.mysql.com/doc/internals/en/com-process-kill.html
 static __inline enum message_type infer_mysql_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_MYSQL, conn_info))
@@ -637,7 +649,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	static const __u8 kComStmtExecute = 0x17;
 	static const __u8 kComStmtClose = 0x19;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
 	}
@@ -826,7 +838,7 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 
 static __inline enum message_type infer_postgre_message(const char *buf,
 							size_t count,
-							struct conn_info_t
+							struct conn_info_s
 							*conn_info)
 {
 #define POSTGRE_INFER_BUF_SIZE 32
@@ -841,7 +853,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	char infer_buf[POSTGRE_INFER_BUF_SIZE];
 	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
 		char tag = infer_buf[0];
@@ -870,7 +882,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 
 static __inline enum message_type infer_oracle_tns_message(const char *buf,
 							   size_t count,
-							   struct conn_info_t
+							   struct conn_info_s
 							   *conn_info)
 {
 #define OEACLE_INFER_BUF_SIZE 12
@@ -892,7 +904,7 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ORACLE)
 			return MSG_UNKNOWN;
 	}
@@ -963,7 +975,7 @@ static __inline bool sofarpc_check_character(__u8 val)
  */
 static __inline enum message_type infer_sofarpc_message(const char *buf,
 							size_t count,
-							struct conn_info_t
+							struct conn_info_s
 							*conn_info)
 {
 	static const __u8 bolt_resp_header_len = 20;
@@ -988,7 +1000,7 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	__u8 ver = infer_buf[0];	//version for protocol
 	__u8 type = infer_buf[1];	// request/response/request oneway
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
 		goto out;
@@ -1090,9 +1102,25 @@ struct dns_header {
 
 static __inline enum message_type infer_dns_message(const char *buf,
 						    size_t count,
-						    struct conn_info_t
+						    const char *ptr,
+						    __u32 infer_len, 
+						    struct conn_info_s
 						    *conn_info)
 {
+	/*
+ 	 * Note: When testing with 'curl' accessing a domain, the following
+	 * situations are observed in DNS:
+	 * (1) An 'A' type DNS request is sent.
+	 * (2) An 'A' type response is received.
+	 * (3) An 'AAAA' type response is received.
+	 *
+	 * It is noticed that the Transaction ID for (2) and (3) are different.
+	 * We observe that the data obtained through eBPF is missing the data for
+	 * the 'AAAA' type request, which differs from the data obtained through
+	 * the ‘AF_PACKET’ method ('AF_PACKET' method includes data for the 'AAAA'
+	 * type request).
+	 */
+
 	const int dns_header_size = 12;
 
 	// This is the typical maximum size for DNS.
@@ -1109,7 +1137,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_DNS, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
 	}
@@ -1148,17 +1176,24 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (num_rr > max_num_rr) {
 		return MSG_UNKNOWN;
 	}
+
 	// FIXME: Remove this code when the call chain can correctly handle the
 	// Go DNS case.
-	__u8 *queries_start = (__u8 *) (dns + 1);
+	/*
+	 * Here, we assume a maximum length of 128 bytes for the queries name.
+	 * If queries name exceeds 128 bytes, the identification of AAAA or A
+	 * types will be impossible.
+	 */
 	conn_info->dns_q_type = 0;
-	for (int idx = 0; idx < 32; ++idx) {
-		if (queries_start[idx] == 0) {
-			conn_info->dns_q_type =
-			    __bpf_ntohs(*(__u16 *) (queries_start + idx + 1));
-			break;
-		}
+	__u8 tmp_buf[128];
+	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
+	// bpf_probe_read_str() returns the length including '\0'.
+	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
+	if (len > 0 && len < sizeof(tmp_buf)) {
+		bpf_probe_read(tmp_buf, 2, queries_start + len);
+		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
 	}
+
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
 	// the offset to correct the TCP sequence number.
@@ -1173,7 +1208,6 @@ static __inline bool is_include_crlf(const char *buf)
 #define PARAMS_LIMIT 20
 
 	int i;
-#pragma unroll
 	for (i = 1; i < PARAMS_LIMIT; ++i) {
 		if (buf[i] == '\r')
 			break;
@@ -1194,7 +1228,7 @@ static __inline bool is_include_crlf(const char *buf)
 //  https://redis.io/docs/reference/protocol-spec/
 static __inline enum message_type infer_redis_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (count < 4)
@@ -1203,7 +1237,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_REDIS, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
 	}
@@ -1213,21 +1247,21 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	/*
 	 * The following table summarizes the RESP data types that Redis supports:
 	 *
-	 * RESP data type	Minimal protocol version	Category	First byte
-	 * Simple strings	RESP2				Simple		+
-	 * Simple Errors	RESP2				Simple		-
-	 * Integers		RESP2				Simple		:
-	 * Bulk strings		RESP2				Aggregate	$
-	 * Arrays		RESP2				Aggregate	*
-	 * Nulls		RESP3				Simple		_
-	 * Booleans		RESP3				Simple		#
-	 * Doubles		RESP3				Simple		,
-	 * Big numbers		RESP3				Simple		(
-	 * Bulk errors		RESP3				Aggregate	!
-	 * Verbatim strings	RESP3				Aggregate	=
-	 * Maps			RESP3				Aggregate	%
-	 * Sets			RESP3				Aggregate	~
-	 * Pushes		RESP3				Aggregate	>
+	 * RESP data type       Minimal protocol version        Category        First byte
+	 * Simple strings       RESP2                           Simple          +
+	 * Simple Errors        RESP2                           Simple          -
+	 * Integers             RESP2                           Simple          :
+	 * Bulk strings         RESP2                           Aggregate       $
+	 * Arrays               RESP2                           Aggregate       *
+	 * Nulls                RESP3                           Simple          _
+	 * Booleans             RESP3                           Simple          #
+	 * Doubles              RESP3                           Simple          ,
+	 * Big numbers          RESP3                           Simple          (
+	 * Bulk errors          RESP3                           Aggregate       !
+	 * Verbatim strings     RESP3                           Aggregate       =
+	 * Maps                 RESP3                           Aggregate       %
+	 * Sets                 RESP3                           Aggregate       ~
+	 * Pushes               RESP3                           Aggregate       >
 	 */
 	if (first_byte != '+' && first_byte != '-' && first_byte != ':' &&
 	    first_byte != '$' && first_byte != '*' && first_byte != '_' &&
@@ -1297,7 +1331,7 @@ static __inline bool mqtt_decoding_message_type(const __u8 * buffer,
 // http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
 static __inline enum message_type infer_mqtt_message(const char *buf,
 						     size_t count,
-						     struct conn_info_t
+						     struct conn_info_s
 						     *conn_info)
 {
 	if (count < 4)
@@ -1306,7 +1340,7 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr))
+	if (is_infer_socket_valid(conn_info->socket_info_ptr))
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
 			return MSG_UNKNOWN;
 
@@ -1351,6 +1385,565 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	    __mqtt_type == 15)
 		return MSG_REQUEST;
 	return MSG_RESPONSE;
+}
+
+// https://www.rabbitmq.com/specification.html
+static __inline enum message_type infer_amqp_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s
+							 *conn_info)
+{
+	const char amqp_header[9] = "AMQP\x00\x00\x09\x01";
+	if (count < 8)
+		return MSG_UNKNOWN;
+	if (!protocol_port_check_2(PROTO_AMQP, conn_info))
+		return MSG_UNKNOWN;
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)
+			&& conn_info->socket_info_ptr->l7_proto != PROTO_AMQP)
+		return MSG_UNKNOWN;
+	bool is_magic = true;
+	for (int i = 0; i < 8; i++)
+		if (buf[i] != amqp_header[i]) {
+			is_magic = false;
+			break;
+		}
+	if (is_magic)
+		return MSG_REQUEST;
+	if (!is_infer_socket_valid(conn_info->socket_info_ptr)
+			|| conn_info->socket_info_ptr->l7_proto != PROTO_AMQP)
+		return MSG_UNKNOWN;
+	int frame_type = buf[0];
+
+	static const int frame_method = 0x1;
+	static const int frame_header = 0x2;
+	static const int frame_body = 0x3;
+	static const int frame_heartbeat = 0x8;
+
+	if (frame_type == frame_method) {
+		if (count < 12)
+			return MSG_UNKNOWN;
+		__s16 class_id = __bpf_ntohs(*(__s16 *) & buf[7]);
+		__s16 method_id = __bpf_ntohs(*(__s16 *) & buf[9]);
+		static const int class_connection = 10;
+		static const int class_channel = 20;
+		static const int class_exchange = 40;
+		static const int class_queue = 50;
+		static const int class_basic = 60;
+		static const int class_tx = 90;
+		static const int class_confirm = 85;
+		if (class_id == class_connection) {
+			static const int method_start = 10;
+			static const int method_start_ok = 11;
+			static const int method_secure = 20;
+			static const int method_secure_ok = 21;
+			static const int method_tune = 30;
+			static const int method_tune_ok = 31;
+			static const int method_open = 40;
+			static const int method_open_ok = 41;
+			static const int method_close = 50;
+			static const int method_close_ok = 51;
+			static const int method_blocked = 60;
+			static const int method_unblocked = 61;
+			static const int method_update_secret = 70;
+			static const int method_update_secret_ok = 71;
+			switch (method_id) {
+			case method_start:
+			case method_secure:
+			case method_tune:
+			case method_open:
+			case method_close:
+			case method_update_secret:
+				return MSG_REQUEST;
+			case method_start_ok:
+			case method_secure_ok:
+			case method_tune_ok:
+			case method_open_ok:
+			case method_close_ok:
+			case method_update_secret_ok:
+				return MSG_RESPONSE;
+			case method_blocked:
+			case method_unblocked:
+				// Session
+				return MSG_REQUEST;
+			}
+		} else if (class_id == class_channel) {
+			static const int method_open = 10;
+			static const int method_open_ok = 11;
+			static const int method_flow = 20;
+			static const int method_flow_ok = 21;
+			static const int method_close = 40;
+			static const int method_close_ok = 41;
+			switch (method_id) {
+			case method_open:
+			case method_flow:
+			case method_close:
+				return MSG_REQUEST;
+			case method_open_ok:
+			case method_flow_ok:
+			case method_close_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_exchange) {
+			static const int method_declare = 10;
+			static const int method_declare_ok = 11;
+			static const int method_delete = 20;
+			static const int method_delete_ok = 21;
+			static const int method_bind = 30;
+			static const int method_bind_ok = 31;
+			static const int method_unbind = 40;
+			static const int method_unbind_ok = 51;
+			switch (method_id) {
+			case method_declare:
+			case method_delete:
+			case method_bind:
+			case method_unbind:
+				return MSG_REQUEST;
+			case method_declare_ok:
+			case method_delete_ok:
+			case method_bind_ok:
+			case method_unbind_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_queue) {
+			static const int method_declare = 10;
+			static const int method_declare_ok = 11;
+			static const int method_bind = 20;
+			static const int method_bind_ok = 21;
+			static const int method_purge = 30;
+			static const int method_purge_ok = 31;
+			static const int method_delete = 40;
+			static const int method_delete_ok = 41;
+			static const int method_unbind = 50;
+			static const int method_unbind_ok = 51;
+			switch (method_id) {
+			case method_declare:
+			case method_bind:
+			case method_purge:
+			case method_delete:
+			case method_unbind:
+				return MSG_REQUEST;
+			case method_declare_ok:
+			case method_bind_ok:
+			case method_purge_ok:
+			case method_delete_ok:
+			case method_unbind_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_basic) {
+			static const int method_qos = 10;
+			static const int method_qos_ok = 11;
+			static const int method_consume = 20;
+			static const int method_consume_ok = 21;
+			static const int method_cancel = 30;
+			static const int method_cancel_ok = 31;
+			static const int method_publish = 40;
+			static const int method_return = 50;
+			static const int method_deliver = 60;
+			static const int method_get = 70;
+			static const int method_get_ok = 71;
+			static const int method_get_empty = 72;
+			static const int method_ack = 80;
+			static const int method_reject = 90;
+			static const int method_recover_async = 100;
+			static const int method_recover = 110;
+			static const int method_recover_ok = 111;
+			static const int method_nack = 120;
+			switch (method_id) {
+			case method_qos:
+			case method_consume:
+			case method_cancel:
+			case method_get:
+			case method_recover:
+				return MSG_REQUEST;
+			case method_qos_ok:
+			case method_consume_ok:
+			case method_cancel_ok:
+			case method_get_ok:
+			case method_get_empty:
+			case method_recover_ok:
+				return MSG_RESPONSE;
+			case method_publish:
+			case method_return:
+			case method_deliver:
+			case method_ack:
+			case method_reject:
+			case method_recover_async:
+			case method_nack:
+				// Session
+				return MSG_REQUEST;
+			}
+		} else if (class_id == class_tx) {
+			static const int method_select = 10;
+			static const int method_select_ok = 11;
+			static const int method_commit = 20;
+			static const int method_commit_ok = 21;
+			static const int method_rollback = 30;
+			static const int method_rollback_ok = 31;
+			switch (method_id) {
+			case method_select:
+			case method_commit:
+			case method_rollback:
+				return MSG_REQUEST;
+			case method_select_ok:
+			case method_commit_ok:
+			case method_rollback_ok:
+				return MSG_RESPONSE;
+			}
+		} else if (class_id == class_confirm) {
+			static const int method_select = 10;
+			static const int method_select_ok = 11;
+			switch (method_id) {
+			case method_select:
+				return MSG_REQUEST;
+			case method_select_ok:
+				return MSG_RESPONSE;
+			}
+		}
+	} else if (frame_type == frame_header) {
+		return MSG_REQUEST;
+	} else if (frame_type == frame_body) {
+		return MSG_REQUEST;
+	} else if (frame_type == frame_heartbeat) {
+		return MSG_REQUEST;
+	}
+	return MSG_UNKNOWN;
+}
+
+static __inline enum message_type decode_openwire(const char *buf,
+						  size_t count,
+						  bool is_size_prefix_disabled,
+						  bool is_tight_encoding_enabled,
+						  bool strict_check)
+{
+	static const __u32 ACTIVEMQ_MAGIC_1 = 0x41637469;  // "Acti"
+	static const __u32 ACTIVEMQ_MAGIC_2 = 0x76654d51;  // "veMQ"
+	// [length(4 bytes)] + command_type(1 byte) + [boolean_stream(2 byte at least)]
+	// + command_id(4 bytes) + [response_required(1 byte)]
+	__u32 min_length = 6;
+	if (is_tight_encoding_enabled) {
+		min_length++;
+	}
+	if (!is_size_prefix_disabled) {
+		min_length += 4;
+	}
+	if (count < min_length)
+		return MSG_UNKNOWN;
+	const char *cur_buf = buf;
+	__u32 command_length = 0;
+	if (!is_size_prefix_disabled) {
+		command_length = __bpf_ntohl(*(__u32 *) cur_buf);
+		if (command_length < min_length - 4
+			|| command_length + 4 != count)
+			return MSG_UNKNOWN;
+		cur_buf += 4;
+	}
+	__u8 cmd_type = *(__u8 *) (cur_buf++);
+	// WireFormatInfo
+	if (cmd_type == 1) {
+		// magic value
+		if (count < 13) {
+			return MSG_UNKNOWN;
+		}
+		if (__bpf_ntohl(*(__u32 *) cur_buf) != ACTIVEMQ_MAGIC_1
+			|| __bpf_ntohl(*(__u32 *) (cur_buf + 4)) != ACTIVEMQ_MAGIC_2) {
+			return MSG_UNKNOWN;
+		}
+		return MSG_REQUEST;
+	}
+	if (strict_check) {
+		if (is_tight_encoding_enabled) {
+			// parse a boolean stream
+			__u16 stream_size = *(__u8 *) (cur_buf++);
+			if (stream_size == 0xC0) {
+				stream_size = *(__u8 *) (cur_buf++);
+			} else if (stream_size == 0x80) {
+				stream_size = *(__u16 *) (cur_buf);
+				cur_buf += 2;
+			}
+			if (stream_size == 0)
+				return MSG_UNKNOWN;
+			// stream should not exceed the command length
+			if (!is_size_prefix_disabled
+				&& (cur_buf - buf) + stream_size > 4 + command_length)
+				return MSG_UNKNOWN;
+		} else {
+			// parse command_id
+			__bpf_ntohl(*(__u32 *) cur_buf);
+			cur_buf += 4;
+			// parse response_required
+			__u8 response_required = *(__u8 *) (cur_buf++);
+			// validate the boolean value
+			if (response_required != 0x00 && response_required != 0x01)
+				return MSG_UNKNOWN;
+		}
+	}
+	if (!cmd_type)
+		return MSG_UNKNOWN;
+	// [Request / Session]
+	// WireFormatInfo | BrokerInfo | ConnectionInfo | SessionInfo | ConsumerInfo
+	// ProducerInfo | TransactionInfo | DestinationInfo | RemoveSubscriptionInfo
+	// KeepAliveInfo | ShutdownInfo | RemoveInfo (0x01 ~ 0x0c)
+	// ControlCommand | FlushCommand | ConnectionError | ConsumerControl | ConnectionControl
+	// ProducerAck | MessagePull | MessageDispatch | MessageAck | ActiveMQMessage | ActiveMQBytesMessage
+	// ActiveMQMapMessage | ActiveMQObjectMessage | ActiveMQStreamMessage | ActiveMQTextMessage
+	// ActiveMQBlobMessage (0x0e ~ 0x1d)
+	// DiscoveryEvent(0x28) | DurableSubscriptionInfo(0x37) | PartialCommand(0x3c)
+	// PartialLastCommand(0x3d) | Replay(0x41) | MessageDispatchNotification(0x5a)
+	if (cmd_type <= 0x0c || (0x0e <= cmd_type && cmd_type <= 0x1d)
+		|| cmd_type == 0x28 || cmd_type == 0x37 || cmd_type == 0x3c
+		|| cmd_type == 0x3d || cmd_type == 0x41 || cmd_type == 0x5a) {
+		return MSG_REQUEST;
+	}
+	// [Response]
+	// Response | ExceptionResponse | DataResponse | DataArrayResponse | IntegerResponse
+	if (0x1e <= cmd_type && cmd_type <= 0x22) {
+		return MSG_RESPONSE;
+	}
+	return MSG_UNKNOWN;
+}
+
+enum OpenWireEncoding {
+	OPENWIRE_LOOSE_ENCODING = 0x00,
+	OPENWIRE_TIGHT_ENCODING = 0x01,
+};
+
+// https://activemq.apache.org/openwire
+static __inline enum message_type infer_openwire_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s
+							 *conn_info)
+{
+	if (count < 4)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_OPENWIRE, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_OPENWIRE)
+			return MSG_UNKNOWN;
+		conn_info->encoding_type =
+			conn_info->socket_info_ptr->encoding_type;
+	}
+	enum message_type msg_type;
+	if (conn_info->encoding_type != OPENWIRE_LOOSE_ENCODING
+		&& conn_info->encoding_type != OPENWIRE_TIGHT_ENCODING) {
+		// try to parse the packet in both tight and loose encoding format
+		// we now only support `SizePrefixDisabled` assigned to false
+		if ((msg_type =
+			decode_openwire(buf, count, false, false, true)) != MSG_UNKNOWN) {
+				conn_info->encoding_type = OPENWIRE_LOOSE_ENCODING;
+				return msg_type;
+			}
+		if ((msg_type =
+			decode_openwire(buf, count, false, true, true)) != MSG_UNKNOWN) {
+				conn_info->encoding_type = OPENWIRE_TIGHT_ENCODING;
+				return msg_type;
+			}
+		return MSG_UNKNOWN;
+	} else {
+		if ((msg_type =
+			decode_openwire(buf, count, false, conn_info->encoding_type, false)
+			) != MSG_UNKNOWN) {
+				return msg_type;
+			}
+		return MSG_CLEAR;
+	}
+}
+
+static __inline bool nats_check_info(const char *buf,
+						size_t count)
+{
+	if (count < 6)
+		return false;
+
+	// info
+	if (buf[0] != 'I' && buf[0] != 'i') return false;
+	if (buf[1] != 'N' && buf[1] != 'n') return false;
+	if (buf[2] != 'F' && buf[2] != 'f') return false;
+	if (buf[3] != 'O' && buf[3] != 'o') return false;
+	if (buf[4] != ' ' && buf[4] != '\t') return false;
+
+	// NATS allows arbitrary whitespace after INFO
+	// we only check the first 20 bytes due to eBPF limitations
+	for (int p = 5; p < 20; p++)
+		if (buf[p] == '{') return true;
+		else if (buf[p] != ' ' && buf[p] != '\t') return false;
+	return false;
+}
+
+
+static __inline bool nats_check_connect(const char *buf,
+						size_t count)
+{
+	if (count < 8)
+		return false;
+
+	// connect
+	if (buf[0] != 'C' && buf[0] != 'c') return false;
+	if (buf[1] != 'O' && buf[1] != 'o') return false;
+	if (buf[2] != 'N' && buf[2] != 'n') return false;
+	if (buf[3] != 'N' && buf[3] != 'n') return false;
+	if (buf[4] != 'E' && buf[4] != 'e') return false;
+	if (buf[5] != 'C' && buf[5] != 'c') return false;
+	if (buf[6] != 'T' && buf[6] != 't') return false;
+	if (buf[7] != ' ' && buf[7] != '\t') return false;
+
+	// NATS allows arbitrary whitespace after CONNECT
+	// we only check the first 20 bytes due to eBPF limitations
+	for (int p = 8; p < 20; p++)
+		if (buf[p] == '{') return true;
+		else if (buf[p] != ' ' && buf[p] != '\t') return false;
+	return false;
+}
+
+
+// https://docs.nats.io/reference/reference-protocols/nats-protocol
+static __inline enum message_type infer_nats_message(const char *buf,
+						     size_t count,
+						     const char *ptr,
+						     __u32 infer_len,
+						     struct conn_info_s
+						     *conn_info)
+{
+	if (count < 5)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_NATS, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_NATS)
+			return MSG_UNKNOWN;
+	} else {
+		char buffer[2];
+		bpf_probe_read(buffer, 2, ptr + infer_len - 2);
+		if (buffer[0] != '\r' || buffer[1] != '\n')
+			return MSG_UNKNOWN;
+	}
+
+	if (nats_check_info(buf, count))
+		return MSG_REQUEST;
+
+	if (nats_check_connect(buf, count))
+		return MSG_RESPONSE;
+
+	// pub
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'U' || buf[1] == 'u') {
+			if (buf[2] == 'B' || buf[2] == 'b') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// hpub
+	if (buf[0] == 'H' || buf[0] == 'h') {
+		if (buf[1] == 'P' || buf[1] == 'p') {
+			if (buf[2] == 'U' || buf[2] == 'u') {
+				if (buf[3] == 'B' || buf[3] == 'b') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// sub
+	if (buf[0] == 'S' || buf[0] == 's') {
+		if (buf[1] == 'U' || buf[1] == 'u') {
+			if (buf[2] == 'B' || buf[2] == 'b') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// msg
+	if (buf[0] == 'M' || buf[0] == 'm') {
+		if (buf[1] == 'S' || buf[1] == 's') {
+			if (buf[2] == 'G' || buf[2] == 'g') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// hmsg
+	if (buf[0] == 'H' || buf[0] == 'h') {
+		if (buf[1] == 'M' || buf[1] == 'm') {
+			if (buf[2] == 'S' || buf[2] == 's') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// ping
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'I' || buf[1] == 'i') {
+			if (buf[2] == 'N' || buf[2] == 'n') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	// pong
+	if (buf[0] == 'P' || buf[0] == 'p') {
+		if (buf[1] == 'O' || buf[1] == 'o') {
+			if (buf[2] == 'N' || buf[2] == 'n') {
+				if (buf[3] == 'G' || buf[3] == 'g') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_RESPONSE;
+					}
+				}
+			}
+		}
+	}
+	// +ok
+	if (buf[0] == '+') {
+		if (buf[1] == 'O' || buf[1] == 'o') {
+			if (buf[2] == 'K' || buf[2] == 'k') {
+				if (buf[3] == ' ' || buf[3] == '\t') {
+					return MSG_REQUEST;
+				}
+			}
+		}
+	}
+	// -err
+	if (buf[0] == '-') {
+		if (buf[1] == 'E' || buf[1] == 'e') {
+			if (buf[2] == 'R' || buf[2] == 'r') {
+				if (buf[3] == 'R' || buf[3] == 'r') {
+					if (buf[4] == ' ' || buf[4] == '\t') {
+						return MSG_REQUEST;
+					}
+				}
+			}
+		}
+	}
+	if (count < 6) return MSG_UNKNOWN;
+	// unsub
+	if (buf[0] == 'U' || buf[0] == 'u') {
+		if (buf[1] == 'N' || buf[1] == 'n') {
+			if (buf[2] == 'S' || buf[2] == 's') {
+				if (buf[3] == 'U' || buf[3] == 'u') {
+					if (buf[4] == 'B' || buf[4] == 'b') {
+						if (buf[5] == ' ' || buf[5] == '\t') {
+							return MSG_REQUEST;
+						}
+					}
+				}
+			}
+		}
+	}
+	return MSG_UNKNOWN;
 }
 
 /*
@@ -1423,7 +2016,7 @@ struct dubbo_header {
 
 static __inline enum message_type infer_dubbo_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	/*
@@ -1437,7 +2030,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 	if (!protocol_port_check_2(PROTO_DUBBO, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
 	}
@@ -1503,7 +2096,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
  */
 static __inline enum message_type infer_kafka_request(const char *buf,
 						      bool is_first,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 #define RequestAPIKeyMax 67
@@ -1561,7 +2154,7 @@ static __inline enum message_type infer_kafka_request(const char *buf,
 
 static __inline bool kafka_data_check_len(size_t count,
 					  const char *buf,
-					  struct conn_info_t *conn_info,
+					  struct conn_info_s *conn_info,
 					  bool * use_prev_buf)
 {
 	*use_prev_buf = (conn_info->prev_count == 4)
@@ -1590,7 +2183,7 @@ static __inline bool kafka_data_check_len(size_t count,
 
 static __inline enum message_type infer_kafka_message(const char *buf,
 						      size_t count,
-						      struct conn_info_t
+						      struct conn_info_s
 						      *conn_info)
 {
 	if (!protocol_port_check_1(PROTO_KAFKA, conn_info))
@@ -1605,7 +2198,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
 
@@ -1711,7 +2304,7 @@ static bool fastcgi_header_common_check(struct fastcgi_header *header)
 // only receive the first response.
 static __inline enum message_type
 infer_fastcgi_message(const char *buf, size_t count,
-		      struct conn_info_t *conn_info)
+		      struct conn_info_s *conn_info)
 {
 	if (count < 8) {
 		return MSG_UNKNOWN;
@@ -1731,7 +2324,7 @@ infer_fastcgi_message(const char *buf, size_t count,
 		return MSG_PRESTORE;
 	}
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
 			return MSG_UNKNOWN;
 		if (header->type == FCGI_BEGIN_REQUEST
@@ -1791,12 +2384,12 @@ struct mongo_header {
 
 static __inline enum message_type
 infer_mongo_message(const char *buf, size_t count,
-		    struct conn_info_t *conn_info)
+		    struct conn_info_s *conn_info)
 {
 	if (!protocol_port_check_2(PROTO_MONGO, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MONGO)
 			return MSG_UNKNOWN;
 	}
@@ -1985,7 +2578,7 @@ typedef struct __attribute__ ((packed)) {
 } tls_handshake_t;
 
 static __inline enum message_type
-infer_tls_message(const char *buf, size_t count, struct conn_info_t *conn_info)
+infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
 	tls_handshake_t handshake = { 0 };
 
@@ -2101,7 +2694,7 @@ static __inline struct protocol_message_t
 infer_protocol_1(struct ctx_info_s *ctx,
 		 const struct data_args_t *args,
 		 size_t count,
-		 struct conn_info_t *conn_info,
+		 struct conn_info_s *conn_info,
 		 __u8 sk_state, const struct process_data_extra *extra)
 {
 	struct protocol_message_t inferred_message;
@@ -2109,10 +2702,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	inferred_message.type = MSG_UNKNOWN;
 
 	if (conn_info->sk == NULL)
-		return inferred_message;
-
-	if (conn_info->sk_type == SOCK_STREAM &&
-	    sk_state != SOCK_CHECK_TYPE_TCP_ES)
 		return inferred_message;
 
 	if (conn_info->tuple.dport == 0 || conn_info->tuple.num == 0) {
@@ -2258,6 +2847,24 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_AMQP:
+			if ((inferred_message.type =
+			     infer_amqp_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_AMQP;
+				return inferred_message;
+			}
+			break;
+		case PROTO_NATS:
+			if ((inferred_message.type =
+			     infer_nats_message(infer_buf, count,
+						syscall_infer_addr,
+						syscall_infer_len,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_NATS;
+				return inferred_message;
+			}
+			break;
 		case PROTO_DUBBO:
 			if ((inferred_message.type =
 			     infer_dubbo_message(infer_buf, count,
@@ -2269,6 +2876,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_DNS:
 			if ((inferred_message.type =
 			     infer_dns_message(infer_buf, count,
+					       syscall_infer_addr,
+					       syscall_infer_len,
 					       conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_DNS;
 				return inferred_message;
@@ -2335,7 +2944,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_oracle_tns_message(infer_buf, count,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_POSTGRESQL;
+				inferred_message.protocol = PROTO_ORACLE;
 				return inferred_message;
 			}
 			break;
@@ -2344,6 +2953,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_mongo_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_MONGO;
+				return inferred_message;
+			}
+			break;
+		case PROTO_OPENWIRE:
+			if ((inferred_message.type =
+			     infer_openwire_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_OPENWIRE;
 				return inferred_message;
 			}
 			break;
@@ -2408,6 +3025,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_dns_message(infer_buf, count,
+				      syscall_infer_addr,
+				      syscall_infer_len,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
 	}
@@ -2468,7 +3087,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 /* Will be called by proto_infer_2 eBPF program. */
 static __inline struct protocol_message_t
 infer_protocol_2(const char *infer_buf, size_t count,
-		 struct conn_info_t *conn_info)
+		 struct conn_info_s *conn_info)
 {
 	/*
 	 * Note:
@@ -2495,6 +3114,24 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DUBBO;
 #ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_AMQP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_amqp_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_AMQP;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_NATS && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_nats_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_NATS;
+#ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -2511,6 +3148,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_OPENWIRE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_openwire_message(infer_buf, count,
+					  conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_OPENWIRE;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
 #else

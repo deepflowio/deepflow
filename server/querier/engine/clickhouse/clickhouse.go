@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 	"github.com/deepflowio/deepflow/server/querier/parse"
@@ -47,6 +48,19 @@ var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
 var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
 var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
+
+// Perform regular checks on show SQL and support the following formats:
+// show tag {tag_name} values from {table_name} where xxx order by xxx limit xxx :{tag_name} and {table_name} can be any character
+// show tags
+// show tags from xxx
+// show language
+// show metrics
+// show metrics from xxx
+// show metrics functions
+// show metrics on db
+// show tables
+// show databases
+var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|metrics on db|tables|databases)$")
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -208,9 +222,14 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 }
 
 func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, error) {
-	sqlSplit := strings.Split(sql, " ")
+	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
+	}
+	sql = strings.Join(sqlSplit, " ")
+	if !showSqlRegexp.MatchString(strings.ToLower(sql)) {
+		err := fmt.Errorf("not support sql: '%s', please check", sql)
+		return nil, []string{}, true, err
 	}
 	if strings.ToLower(sqlSplit[1]) == "language" {
 		result := &common.Result{}
@@ -228,6 +247,18 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 		if strings.ToLower(item) == "where" {
 			where = strings.Join(sqlSplit[i+1:], " ")
 		}
+	}
+	switch table {
+	case "vtap_app_port":
+		table = "application"
+	case "vtap_app_edge_port":
+		table = "application_map"
+	case "vtap_flow_port":
+		table = "network"
+	case "vtap_flow_edge_port":
+		table = "network_map"
+	case "vtap_acl":
+		table = "traffic_policy"
 	}
 	switch strings.ToLower(sqlSplit[1]) {
 	case "metrics":
@@ -269,6 +300,9 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 								continue
 							}
 							name := tagSlice[0].(string)
+							if name == "lb_listener" || name == "pod_ingress" {
+								continue
+							}
 							clientName := tagSlice[1].(string)
 							serverName := tagSlice[2].(string)
 							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
@@ -812,8 +846,8 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in select
-	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) {
-		return errors.New("tap_port and tap_port_type must exist together in select")
+	if (common.IsValueInSliceString("tap_port", tagSlice) || common.IsValueInSliceString("capture_nic", tagSlice)) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("capture_nic_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", tagSlice) {
+		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in select")
 	}
 
 	e.AsTagMap = make(map[string]string)
@@ -1022,6 +1056,17 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := strings.Trim(sqlparser.String(from), "`")
+			if strings.Contains(table, "vtap_app_port") {
+				table = strings.ReplaceAll(table, "vtap_app_port", "application")
+			} else if strings.Contains(table, "vtap_app_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_app_edge_port", "application_map")
+			} else if strings.Contains(table, "vtap_flow_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_port", "network")
+			} else if strings.Contains(table, "vtap_flow_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_edge_port", "network_map")
+			} else if strings.Contains(table, "vtap_acl") {
+				table = strings.ReplaceAll(table, "vtap_acl", "traffic_policy")
+			}
 			e.Table = table
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
@@ -1088,8 +1133,8 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in group
-	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) {
-		return errors.New("tap_port and tap_port_type must exist together in group")
+	if (common.IsValueInSliceString("tap_port", groupSlice) || common.IsValueInSliceString("capture_nic", groupSlice)) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("capture_nic_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", groupSlice) {
+		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in group")
 	}
 	for _, group := range groups {
 		colName, ok := group.(*sqlparser.ColName)
@@ -1376,11 +1421,23 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 				derivativeArgStr := strings.TrimPrefix(argStr, "Derivative(")
 				derivativeArgStr = strings.TrimSuffix(derivativeArgStr, ")")
 				derivativeArgSlice := strings.Split(derivativeArgStr, ",")
+				// Add default group
+				if len(derivativeArgSlice) == 1 {
+					derivativeArgSlice = append(derivativeArgSlice, "tag")
+				}
 				for i, originArg := range derivativeArgSlice {
 					originArg = strings.TrimSpace(originArg)
 					if e.IsDerivative && i > 0 {
 						if !slices.Contains(e.DerivativeGroupBy, originArg) {
-							tagTranslatorStr := GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+							tagTranslatorStr := originArg
+							if strings.Contains(originArg, "tag") {
+								tagTranslatorStr = GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+							} else {
+								tagItem, ok := tag.GetTag(name, e.DB, e.Table, "default")
+								if ok {
+									tagTranslatorStr = tagItem.TagTranslator
+								}
+							}
 							if tagTranslatorStr == originArg {
 								e.Model.AddGroup(&view.Group{Value: tagTranslatorStr, Flag: view.GROUP_FLAG_METRICS_INNTER})
 							} else {

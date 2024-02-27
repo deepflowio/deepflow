@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -34,14 +35,14 @@ type IconKey struct {
 	SubType  int
 }
 
-func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) {
+func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
-	if !c.cfg.DFWebService.Enabled {
+	if !cfg.DFWebService.Enabled {
 		return domainToIconID, resourceToIconID, nil
 	}
 	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", c.cfg.DFWebService.Host, c.cfg.DFWebService.Port), body)
+	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err

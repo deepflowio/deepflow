@@ -39,7 +39,7 @@ use crate::{
         flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         meta_packet::ProtocolData,
-        MetaPacket, TaggedFlow,
+        MetaPacket, TaggedFlow, Timestamp,
     },
     config::handler::LogParserAccess,
     flow_generator::{error::Result, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
@@ -62,6 +62,61 @@ const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
 
 const THROTTLE_BUCKET_BITS: u8 = 2;
 const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送方是有突发的，需要累积一定时间做采样
+
+#[derive(Debug)]
+pub enum AppProto {
+    PseudoAppProto(PseudoAppProto), // Used to construct the AppProto that received the socket close event
+    MetaAppProto(MetaAppProto),
+}
+
+impl AppProto {
+    fn get_tap_side(&self) -> TapSide {
+        match self {
+            Self::MetaAppProto(m) => m.base_info.tap_side,
+            Self::PseudoAppProto(p) => p.tap_side,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PseudoAppProto {
+    session_key: u64,
+    stat_time: Timestamp,
+    tap_side: TapSide,
+}
+
+impl PseudoAppProto {
+    pub fn new(session_key: u64, stat_time: Timestamp, tap_side: TapSide) -> Self {
+        Self {
+            session_key,
+            stat_time,
+            tap_side,
+        }
+    }
+
+    pub fn session_key(
+        flow_id: u64,
+        cap_seq: u32,
+        signal_source: SignalSource,
+        l7_protocol: L7Protocol,
+    ) -> u64 {
+        if signal_source != SignalSource::EBPF {
+            if l7_protocol == L7Protocol::MQTT {
+                return flow_id;
+            }
+            return get_uniq_flow_id_in_one_minute(flow_id) << 32;
+        }
+
+        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
+        let l7_protocol = if l7_protocol == L7Protocol::Grpc {
+            L7Protocol::Http2
+        } else {
+            l7_protocol
+        };
+        let flow_id_part = (flow_id >> 56 << 56) | (flow_id << 40 >> 8);
+        flow_id_part | ((l7_protocol as u64) << 24) | (cap_seq as u64 & 0xffffff)
+    }
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct MetaAppProto {
@@ -420,15 +475,54 @@ impl SessionQueue {
     //   - 收到响应，根据报文时间-RRT时间，找到对应的时间窗口，查找是否有匹配的请求
     //      - 若有， 则合并请求和响应(将响应的数据填入请求中，并修改请求的类型为会话)，释放当前响应，发送会话
     //      - 若没有, 则直接发送当前响应
-    fn aggregate_session_and_send(&mut self, item: Box<MetaAppProto>) {
+    fn aggregate_session_and_send(&mut self, item: Box<AppProto>) {
         self.counter.receive.fetch_add(1, Ordering::Relaxed);
 
-        let slot_time = if item.base_info.head.msg_type == LogMessageType::Response {
+        let mut item = match *item {
+            AppProto::PseudoAppProto(p) => {
+                let slot_time = p.stat_time.as_secs();
+                let aggregate_start_time = self.aggregate_start_time.as_secs();
+                if slot_time < aggregate_start_time {
+                    return;
+                }
+                let mut slot = ((slot_time - aggregate_start_time) / SLOT_WIDTH) as usize;
+                let mut time_window = match self.time_window.take() {
+                    Some(t) => t,
+                    None => return,
+                };
+                if slot >= self.window_size {
+                    self.flush_window(slot - self.window_size + 1, &mut time_window);
+                    slot = self.window_size - 1;
+                }
+                let time_map = time_window.get_mut(slot).unwrap();
+                // If receive the socket close event, flush the log in the queue as soon as possible
+                if let Some(log) = time_map.remove(&p.session_key) {
+                    self.send(log);
+                }
+                self.time_window.replace(time_window);
+                return;
+            }
+            AppProto::MetaAppProto(m) => Box::new(m),
+        };
+
+        let slot_time = match item.base_info.head.msg_type {
             // request = response - RRT
-            (item.base_info.start_time - Duration::from_micros(item.base_info.head.rrt)).as_secs()
-        } else {
+            LogMessageType::Response => (item.base_info.start_time
+                - Duration::from_micros(item.base_info.head.rrt))
+            .as_secs(),
+            LogMessageType::Session => {
+                if item.base_info.start_time.is_zero() {
+                    item.base_info.start_time = item.base_info.end_time;
+                }
+                if item.base_info.end_time.is_zero() {
+                    item.base_info.end_time = item.base_info.start_time;
+                }
+                self.send(item);
+                return;
+            }
             // if req and rrt not 0, maybe ebpf disorder, the slot time is resp time and req should add the rrt.
-            (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt)).as_secs()
+            _ => (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt))
+                .as_secs(),
         };
         if slot_time < self.aggregate_start_time.as_secs() {
             if self
@@ -641,7 +735,7 @@ impl SessionQueue {
 }
 
 pub struct SessionAggregator {
-    input_queue: Arc<Receiver<Box<MetaAppProto>>>,
+    input_queue: Arc<Receiver<Box<AppProto>>>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
     id: u32,
     running: Arc<AtomicBool>,
@@ -653,7 +747,7 @@ pub struct SessionAggregator {
 
 impl SessionAggregator {
     pub fn new(
-        input_queue: Receiver<Box<MetaAppProto>>,
+        input_queue: Receiver<Box<AppProto>>,
         output_queue: DebugSender<BoxAppProtoLogsData>,
         id: u32,
         config: LogParserAccess,
@@ -701,8 +795,7 @@ impl SessionAggregator {
                         Ok(_) => {
                             let config = config.load();
                             for app_proto in batch_buffer.drain(..) {
-                                if config.l7_log_ignore_tap_sides
-                                    [app_proto.base_info.tap_side as usize]
+                                if config.l7_log_ignore_tap_sides[app_proto.get_tap_side() as usize]
                                 {
                                     continue;
                                 }

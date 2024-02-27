@@ -20,7 +20,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
@@ -69,7 +68,6 @@ type Config struct {
 	CKReadTimeout        int                   `yaml:"ck-read-timeout"`
 	CKWriterConfig       config.CKWriterConfig `yaml:"metrics-ck-writer"`
 	PromWriterConfig     PromWriterConfig      `yaml:"metrics-prom-writer"`
-	Pcap                 PCapConfig            `yaml:"pcap"`
 	DisableSecondWrite   bool                  `yaml:"disable-second-write"`
 	UnmarshallQueueCount int                   `yaml:"unmarshall-queue-count"`
 	UnmarshallQueueSize  int                   `yaml:"unmarshall-queue-size"`
@@ -131,8 +129,6 @@ func Load(base *config.Config, path string) *Config {
 			UnmarshallQueueSize:  DefaultUnmarshallQueueSize,
 			ReceiverWindowSize:   DefaultReceiverWindowSize,
 			FlowMetricsTTL:       FlowMetricsTTL{DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL, DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL},
-
-			Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

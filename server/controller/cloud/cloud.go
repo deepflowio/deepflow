@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"sync"
 	"time"
 
@@ -103,10 +104,67 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 	return c.basicInfo
 }
 
+func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource {
+	hostIPToHostName, vmLcuuidToHostName, err := cloudcommon.GetHostAndVmHostNameByDomain(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("cloud suffix operation get vtap info error : (%s)", err.Error())
+		return resource
+	}
+
+	vinterfaceLcuuidToIP := map[string]string{}
+	for _, ip := range resource.IPs {
+		vinterfaceLcuuidToIP[ip.VInterfaceLcuuid] = ip.IP
+	}
+	vmLcuuidToIPs := map[string][]string{}
+	for _, vinterface := range resource.VInterfaces {
+		if vinterface.DeviceType != common.VIF_DEVICE_TYPE_VM {
+			continue
+		}
+		ip, ok := vinterfaceLcuuidToIP[vinterface.Lcuuid]
+		if !ok || ip == "" {
+			continue
+		}
+		vmLcuuidToIPs[vinterface.DeviceLcuuid] = append(vmLcuuidToIPs[vinterface.DeviceLcuuid], ip)
+	}
+
+	var retHosts []model.Host
+	for _, host := range resource.Hosts {
+		// add hostname to host
+		if hostName, ok := hostIPToHostName[host.IP]; ok && host.Hostname == "" {
+			host.Hostname = hostName
+		}
+		retHosts = append(retHosts, host)
+	}
+
+	var retVMs []model.VM
+	for _, vm := range resource.VMs {
+		// return a default map, when not found cloud tags
+		if vm.CloudTags == nil {
+			vm.CloudTags = map[string]string{}
+		}
+		// select the first of the existing ips, when the ip is empty
+		if vm.IP == "" {
+			ips, ok := vmLcuuidToIPs[vm.Lcuuid]
+			if ok && len(ips) > 0 {
+				sort.Strings(ips)
+				vm.IP = ips[0]
+			}
+		}
+		// add hostname to vm
+		if hostName, ok := vmLcuuidToHostName[vm.Lcuuid]; ok && vm.Hostname == "" {
+			vm.Hostname = hostName
+		}
+		retVMs = append(retVMs, vm)
+	}
+	resource.Hosts = retHosts
+	resource.VMs = retVMs
+	return resource
+}
+
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
 	if c.basicInfo.Type != common.KUBERNETES {
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified {
 			cResource.SubDomainResources = c.getSubDomainData(cResource)
 			cResource = c.appendResourceVIPs(cResource)
 		}
@@ -115,6 +173,8 @@ func (c *Cloud) GetResource() model.Resource {
 	if cResource.Verified {
 		cResource = c.appendAddtionalResourcesData(cResource)
 		cResource = c.appendResourceProcess(cResource)
+		// don't move c.suffixResourceOperation, it need to always hold the last position
+		cResource = c.suffixResourceOperation(cResource)
 	}
 	return cResource
 }
@@ -134,20 +194,20 @@ func (c *Cloud) getCloudGatherInterval() int {
 	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Warningf("get cloud gather interval failed: (%s)", err.Error())
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	domainConfig, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Warningf("parse domain (%s) config failed: (%s)", c.basicInfo.Name, err.Error())
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	domainSyncTimer := domainConfig.Get("sync_timer").MustInt()
 	if domainSyncTimer == 0 {
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	if domainSyncTimer < cloudcommon.CLOUD_SYNC_TIMER_MIN || domainSyncTimer > cloudcommon.CLOUD_SYNC_TIMER_MAX {
 		log.Warningf("cloud sync timer invalid: (%d)", domainSyncTimer)
-		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
 	return domainSyncTimer
 }
@@ -179,7 +239,7 @@ func (c *Cloud) getCloudData() {
 		cResource, cloudCost = c.getKubernetesData()
 	}
 
-	if len(cResource.VMs) == 0 {
+	if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
 		cResource = model.Resource{
 			ErrorState:   cResource.ErrorState,
 			ErrorMessage: cResource.ErrorMessage,

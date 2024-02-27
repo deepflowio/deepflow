@@ -16,9 +16,9 @@ all: server
 generate_sources = $(shell find -not -path './vendor/*' -name '*.go.tmpl' -or -name '*.tmpldata')
 generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test.go \
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
-		 libs/zerodoc/pooled_meters.go libs/kubernetes/watcher.gen.go
+		 libs/flow-metrics/pooled_meters.go libs/kubernetes/watcher.gen.go
 
-proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go vendor/${MESSAGE}/alarm_event/alarm_event.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
+proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go vendor/${MESSAGE}/alarm_event/alarm_event.pb.go libs/datatype/pb/flow_log.pb.go libs/flow-metrics/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
 	go generate ./...
@@ -60,13 +60,13 @@ libs/datatype/pb/flow_log.proto: vendor
 libs/datatype/pb/flow_log.pb.go: libs/datatype/pb/flow_log.proto
 	cd libs/datatype/pb && go generate ./...
 
-libs/zerodoc/pb/metric.proto: vendor
-	cp -r ../message/metric.proto libs/zerodoc/pb
+libs/flow-metrics/pb/metric.proto: vendor
+	cp -r ../message/metric.proto libs/flow-metrics/pb
 	# delete first 3 char of line 6-10 for go language
-	sed -i '6,10s/^...//' libs/zerodoc/pb/metric.proto
+	sed -i '6,10s/^...//' libs/flow-metrics/pb/metric.proto
 
-libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
-	cd libs/zerodoc/pb && go generate ./...
+libs/flow-metrics/pb/metric.pb.go: libs/flow-metrics/pb/metric.proto
+	cd libs/flow-metrics/pb && go generate ./...
 
 vendor/${MESSAGE}/stats.proto: vendor
 	cp -r ../message/stats.proto vendor/${MESSAGE}/
@@ -118,6 +118,6 @@ clean:
 	rm -f libs/geo/ip_info.go
 	rm -f $(generated_libs)
 	rm -f libs/datatype/pb/flow_log.proto
-	rm -f libs/zerodoc/pb/metric.proto
+	rm -f libs/flow-metrics/pb/metric.proto
 	rm -f libs/stats/pb/stats.proto
 	rm -f libs/kubernetes/watcher.gen.go

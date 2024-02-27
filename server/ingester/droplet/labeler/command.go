@@ -246,7 +246,7 @@ func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 	for _, keyValue := range keyValues {
 		parts := strings.Split(keyValue, "=")
 		switch parts[0] {
-		case "tap_type":
+		case "capture_network_type_id":
 			key.TapType = parseTapType(parts[1])
 			if key.TapType >= datatype.TAP_MAX {
 				fmt.Printf("unknown tap type from: %s\n", cmdLine)
@@ -498,7 +498,7 @@ func parseAcl(args []string) *policy.Acl {
 				return nil
 			}
 			acl.Proto = uint16(proto)
-		case "tap_type":
+		case "capture_network_type_id":
 			switch keyValue[1] {
 			case "any":
 				acl.TapType = datatype.TAP_ANY
@@ -507,7 +507,7 @@ func parseAcl(args []string) *policy.Acl {
 			default:
 				typeId, err := strconv.Atoi(keyValue[1])
 				if err != nil {
-					fmt.Printf("invalid tap_type %s from %s\n", keyValue[1], args[0])
+					fmt.Printf("invalid capture_network_type_id %s from %s\n", keyValue[1], args[0])
 					return nil
 				}
 				acl.TapType = datatype.TapType(typeId)
@@ -614,7 +614,7 @@ func RegisterCommand(moduleId debug.ModuleId) *cobra.Command {
 		Short: "search policy and endpoint",
 		Long: "droplet-ctl labeler dump-acl {[key=value]+}\n" +
 			"key list:\n" +
-			"\ttap_type         use '[1-2,4-30]|tor'\n" +
+			"\tcapture_network_type_id         use '[1-2,4-30]|tor'\n" +
 			"\tsmac/dmac   packet mac address\n" +
 			"\teth_type    packet eth type\n" +
 			"\tvlan        packet vlan\n" +
@@ -622,7 +622,7 @@ func RegisterCommand(moduleId debug.ModuleId) *cobra.Command {
 			"\tproto       packet ip proto\n" +
 			"\tsport/dport packet port\n" +
 			"\ttype        use query type 'normal|first|fast' default normal",
-		Example: "droplet-ctl labeler dump-acl tap_type=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
+		Example: "droplet-ctl labeler dump-acl capture_network_type_id=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("filter is nil, Example: %s\n", cmd.Example)
@@ -658,7 +658,7 @@ func RegisterCommand(moduleId debug.ModuleId) *cobra.Command {
 		Long: "droplet-ctl labeler add-acl {[key=value]+}\n" +
 			"key list:\n" +
 			"\tid                 acl id and action id\n" +
-			"\ttap_type                use '[1-2,4-30]|tor|any'\n" +
+			"\tcapture_network_type_id                use '[1-2,4-30]|tor|any'\n" +
 			"\tvlan               packet vlan\n" +
 			"\tsgroup/dgroup      group id\n" +
 			"\tproto              packet ip proto\n" +

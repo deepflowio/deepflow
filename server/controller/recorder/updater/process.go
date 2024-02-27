@@ -24,21 +24,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type Process struct {
-	UpdaterBase[cloudmodel.Process, mysql.Process, *diffbase.Process]
+	UpdaterBase[
+		cloudmodel.Process,
+		mysql.Process,
+		*diffbase.Process,
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessUpdate,
+		message.ProcessUpdate,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete]
 }
 
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
 	updater := &Process{
-		UpdaterBase[cloudmodel.Process, mysql.Process, *diffbase.Process]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewProcess(),
-			diffBaseData: wholeCache.DiffBaseDataSet.Process,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.Process,
+			mysql.Process,
+			*diffbase.Process,
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessUpdate,
+			message.ProcessUpdate,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
+			wholeCache,
+			db.NewProcess(),
+			wholeCache.DiffBaseDataSet.Process,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -124,20 +147,21 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 	return dbItem, true
 }
 
-func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.ProcessFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.ProcessFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
-		updateInfo["os_app_tags"] = cloudItem.OSAPPTags
+		mapInfo["os_app_tags"] = cloudItem.OSAPPTags
+		structInfo.OSAPPTags.Set(diffBase.OSAPPTags, cloudItem.OSAPPTags)
 	}
 	if diffBase.ContainerID != cloudItem.ContainerID {
-		updateInfo["container_id"] = cloudItem.ContainerID
+		mapInfo["container_id"] = cloudItem.ContainerID
+		structInfo.ContainerID.Set(diffBase.ContainerID, cloudItem.ContainerID)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

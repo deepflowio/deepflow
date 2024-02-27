@@ -17,7 +17,6 @@
 package decoder
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -33,13 +32,13 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("event.decoder")
@@ -177,7 +176,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
-		s.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, s.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		s.ProcessKName = string(e.ProcessKname)
 		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id")
 		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
 		s.Bytes = ioData.BytesCount
@@ -230,7 +229,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.IP4 = info.IP4
 		s.IP6 = info.IP6
 		// if it is just Pod Node, there is no need to match the service
-		if ingestercommon.IsPodServiceIP(zerodoc.DeviceType(s.L3DeviceType), s.PodID, 0) {
+		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
 			s.ServiceID = d.platformData.QueryService(
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 		}

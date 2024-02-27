@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type LBListener struct {
-	UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]
+	UpdaterBase[
+		cloudmodel.LBListener,
+		mysql.LBListener,
+		*diffbase.LBListener,
+		*message.LBListenerAdd,
+		message.LBListenerAdd,
+		*message.LBListenerUpdate,
+		message.LBListenerUpdate,
+		*message.LBListenerFieldsUpdate,
+		message.LBListenerFieldsUpdate,
+		*message.LBListenerDelete,
+		message.LBListenerDelete]
 }
 
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
 	updater := &LBListener{
-		UpdaterBase[cloudmodel.LBListener, mysql.LBListener, *diffbase.LBListener]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewLBListener(),
-			diffBaseData: wholeCache.DiffBaseDataSet.LBListeners,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.LBListener,
+			mysql.LBListener,
+			*diffbase.LBListener,
+			*message.LBListenerAdd,
+			message.LBListenerAdd,
+			*message.LBListenerUpdate,
+			message.LBListenerUpdate,
+			*message.LBListenerFieldsUpdate,
+			message.LBListenerFieldsUpdate,
+			*message.LBListenerDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
+			wholeCache,
+			db.NewLBListener(),
+			wholeCache.DiffBaseDataSet.LBListeners,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -72,26 +95,29 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 	return dbItem, true
 }
 
-func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (*message.LBListenerFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.LBListenerFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.IPs != cloudItem.IPs {
-		updateInfo["ips"] = cloudItem.IPs
+		mapInfo["ips"] = cloudItem.IPs
+		structInfo.IPs.Set(diffBase.IPs, cloudItem.IPs)
 	}
 	if diffBase.SNATIPs != cloudItem.SNATIPs {
-		updateInfo["snat_ips"] = cloudItem.SNATIPs
+		mapInfo["snat_ips"] = cloudItem.SNATIPs
+		structInfo.SNATIPs.Set(diffBase.SNATIPs, cloudItem.SNATIPs)
 	}
 	if diffBase.Port != cloudItem.Port {
-		updateInfo["port"] = cloudItem.Port
+		mapInfo["port"] = cloudItem.Port
+		structInfo.Port.Set(diffBase.Port, cloudItem.Port)
 	}
 	if diffBase.Protocol != cloudItem.Protocol {
-		updateInfo["protocol"] = cloudItem.Protocol
+		mapInfo["protocol"] = cloudItem.Protocol
+		structInfo.Protocol.Set(diffBase.Protocol, cloudItem.Protocol)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

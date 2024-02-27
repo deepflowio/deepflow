@@ -1,0 +1,15 @@
+# Field                     , DBField              , Type       , Category      , Permission
+byte                        , byte                 , counter    , NPB           , 111
+byte_tx                     , byte_tx              , counter    , NPB           , 111
+byte_rx                     , byte_rx              , counter    , NPB           , 111
+packet                      , packet               , counter    , NPB           , 111
+packet_tx                   , packet_tx            , counter    , NPB           , 111
+packet_rx                   , packet_rx            , counter    , NPB           , 111
+l3_byte                     ,                      , counter    , NPB           , 111
+l3_byte_tx                  , l3_byte_tx           , counter    , NPB           , 111
+l3_byte_rx                  , l3_byte_rx           , counter    , NPB           , 111
+
+l4_byte                     ,                      , counter    , NPB           , 111
+l4_byte_tx                  , l4_byte_tx           , counter    , NPB           , 111
+l4_byte_rx                  , l4_byte_rx           , counter    , NPB           , 111
+row                         ,                      , other      , Other         , 111 

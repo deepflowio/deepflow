@@ -73,6 +73,12 @@ pub const SOCK_DATA_KAFKA: u16 = 100;
 #[allow(dead_code)]
 pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
+pub const SOCK_DATA_AMQP: u16 = 102;
+#[allow(dead_code)]
+pub const SOCK_DATA_OPENWIRE: u16 = 103;
+#[allow(dead_code)]
+pub const SOCK_DATA_NATS: u16 = 104;
+#[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]
 pub const SOCK_DATA_TLS: u16 = 121;
@@ -118,6 +124,10 @@ pub const DATA_SOURCE_GO_HTTP2_UPROBE: u8 = 2;
 pub const DATA_SOURCE_OPENSSL_UPROBE: u8 = 3;
 #[allow(dead_code)]
 pub const DATA_SOURCE_IO_EVENT: u8 = 4;
+#[allow(dead_code)]
+pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
+#[allow(dead_code)]
+pub const DATA_SOURCE_CLOSE: u8 = 6;
 
 // 消息类型
 // 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
@@ -396,7 +406,7 @@ pub struct stack_profile_data {
 
 extern "C" {
     /*
-     * Set maximum amount of data passed to the agent by eBPF programe.
+     * Set maximum amount of data passed to the agent by eBPF program.
      * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
      *               it will automatically adjust to 8192 bytes.
      *               If limit_size is 0, use the default values 4096.

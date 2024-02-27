@@ -26,9 +26,9 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	flowlogCfg "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -286,13 +286,18 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 			h.IsTLS = 1
 		}
 		for l7ProtocolStr, l7Protocol := range datatype.L7ProtocolStringMap {
-			if strings.Contains(strings.ToLower(l7ProtocolStr), l7ProtocolStrLower) {
+			if strings.Contains(l7ProtocolStr, l7ProtocolStrLower) {
 				h.L7Protocol = uint8(l7Protocol)
 				break
 			}
 		}
-		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) && strings.HasPrefix(h.Version, "2") {
-			h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
+		// If the protocol name is 'http', it may be randomly matched to 'http1' or 'http2' and needs to be corrected.
+		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) || h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_2) {
+			if strings.HasPrefix(h.Version, "2") {
+				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
+			} else {
+				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_1)
+			}
 		}
 	}
 
@@ -346,7 +351,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	}
 	h.L7Base.KnowledgeGraph.FillOTel(h, platformData)
 	// only show data for services as 'server side'
-	if h.TapSide == zerodoc.ServerApp.String() && h.ServerPort == 0 {
+	if h.TapSide == flow_metrics.ServerApp.String() && h.ServerPort == 0 {
 		h.ServerPort = 65535
 	}
 }
@@ -378,7 +383,7 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		l.GPID0, l.GPID1,
 		0, 0, 0,
 		uint16(l.ServerPort),
-		zerodoc.Rest,
+		flow_metrics.Rest,
 		layers.IPProtocol(l.Protocol),
 	)
 

@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS host_device (
     alias               CHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
     ip                  CHAR(64) DEFAULT '',
+    hostname            CHAR(64) DEFAULT '',
     htype               INTEGER COMMENT '1. Xen host 2. VMware host 3. KVM host 4. Public cloud host 5. Hyper-V',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     user_name           VARCHAR(64) DEFAULT '',
@@ -298,9 +299,12 @@ CREATE TABLE IF NOT EXISTS vm (
     name                VARCHAR(256) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
     label               CHAR(64) DEFAULT '',
+    ip                  CHAR(64) DEFAULT '',
+    hostname            CHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     htype               INTEGER DEFAULT 1 COMMENT '1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s',
     launch_server       CHAR(64) DEFAULT '',
+    host_id             INTEGER DEFAULT 0,
     cloud_tags          TEXT COMMENT 'separated by ,',
     epc_id              INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
@@ -780,6 +784,7 @@ CREATE TABLE IF NOT EXISTS pod_node (
     server_type         INTEGER DEFAULT NULL COMMENT '1: Host 2: VM',
     state               INTEGER DEFAULT 1 COMMENT '0: Exception 1: Normal',
     ip                  CHAR(64) DEFAULT '',
+    hostname            CHAR(64) DEFAULT '',
     vcpu_num            INTEGER DEFAULT 0,
     mem_total           INTEGER DEFAULT 0 COMMENT 'unit: M',
     pod_cluster_id      INTEGER,
@@ -1001,6 +1006,7 @@ CREATE TABLE IF NOT EXISTS `report` (
 CREATE TABLE IF NOT EXISTS vtap (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                    VARCHAR(256) NOT NULL,
+    raw_hostname            VARCHAR(256),
     state                   INTEGER DEFAULT 1 COMMENT '0.not-connected 1.normal',
     enable                  INTEGER DEFAULT 1 COMMENT '0: stop 1: running',
     type                    INTEGER DEFAULT 0 COMMENT '1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod',
@@ -1281,14 +1287,14 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "控制器系统负载高",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"load\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "数据节点系统负载高",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"load\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1341,7 +1347,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, agg,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: host", "", "/v1/stats/querier/UniversalPromHistory", "{\"DATABASE\":\"\",\"PROM_SQL\":\"delta(min(deepflow_system__deepflow_agent_monitor__create_time)by(host)[1m:])\",\"interval\":60,\"metric\":\"process_start\",\"time_tag\":\"toi\"}",
+    values(1, 1, "过滤项: N/A | 分组项: host", "", "/v1/stats/querier/UniversalPromHistory", "{\"DATABASE\":\"\",\"PROM_SQL\":\"delta(min(deepflow_system__deepflow_agent_monitor__create_time)by(host)[1m:10s])\",\"interval\":60,\"metric\":\"process_start\",\"time_tag\":\"toi\"}",
     "[{\"METRIC_LABEL\":\"process_start\",\"return_field_description\":\"最近 1 分钟进程启动时间变化\",\"unit\":\" 毫秒\"}]", "进程启动",  0, 1, 1, 20, 1, "", "", "{\"displayName\":\"process_start\", \"unit\": \"毫秒\"}", 1, "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1530,7 +1536,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.ingester.recviver\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid`) AS `rx_drop_packets`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_recviver\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid`) AS `rx_drop_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.recviver.metrics.invalid\",\"unit\":\"\"}]",
     "数据节点数据丢失 (ingester.recviver.metrics.invalid)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"rx_drop_packets\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1538,7 +1544,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.ingester.queue\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.overwritten`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.overwritten`) AS `rx_drop_packets`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_queue\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.overwritten`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.overwritten`) AS `rx_drop_packets`\"]}]}",
      "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.queue.metrics.overwritten\",\"unit\":\"\"}]",
      "数据节点数据丢失 (ingester.queue.metrics.overwritten)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"rx_drop_packets\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1546,7 +1552,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.ingester.decoder\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_count`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_count`) AS `rx_drop_packets`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_decoder\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_count`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_count`) AS `rx_drop_packets`\"]}]}",
      "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.decoder.metrics.drop_count\",\"unit\":\"\"}]",
      "数据节点数据丢失 (ingester.decoder.metrics.drop_count)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"rx_drop_packets\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1554,7 +1560,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.ingester.ckwriter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_ckwriter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\"]}]}",
      "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.ckwriter.metrics.write_failed_count\",\"unit\":\"\"}]",
      "数据节点数据丢失 (ingester.ckwriter.metrics.write_failed_count)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"rx_drop_packets\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1685,7 +1691,7 @@ CREATE TABLE IF NOT EXISTS tap_type (
 TRUNCATE TABLE tap_type;
 
 set @lcuuid = (select uuid());
-INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('虚拟网络', 3, 768, '', @lcuuid);
+INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('云网络', 3, 768, '', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS genesis_host (
     lcuuid      CHAR(64),
@@ -1694,7 +1700,7 @@ CREATE TABLE IF NOT EXISTS genesis_host (
     vtap_id     INTEGER,
     node_ip     CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_host;
 
 CREATE TABLE IF NOT EXISTS genesis_vm (
@@ -1708,7 +1714,7 @@ CREATE TABLE IF NOT EXISTS genesis_vm (
     vtap_id         INTEGER,
     created_at      DATETIME,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vm;
 
 CREATE TABLE IF NOT EXISTS genesis_vip (
@@ -1717,7 +1723,7 @@ CREATE TABLE IF NOT EXISTS genesis_vip (
     vtap_id     INTEGER,
     node_ip     CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vip;
 
 CREATE TABLE IF NOT EXISTS genesis_vpc (
@@ -1726,7 +1732,7 @@ CREATE TABLE IF NOT EXISTS genesis_vpc (
     vtap_id         INTEGER,
     name            VARCHAR(256),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vpc;
 
 CREATE TABLE IF NOT EXISTS genesis_network (
@@ -1739,7 +1745,7 @@ CREATE TABLE IF NOT EXISTS genesis_network (
     vtap_id         INTEGER,
     node_ip         CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_network;
 
 CREATE TABLE IF NOT EXISTS genesis_port (
@@ -1753,7 +1759,7 @@ CREATE TABLE IF NOT EXISTS genesis_port (
     vtap_id         INTEGER,
     node_ip         CHAR(48),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_port;
 
 CREATE TABLE IF NOT EXISTS genesis_ip (
@@ -1765,7 +1771,7 @@ CREATE TABLE IF NOT EXISTS genesis_ip (
     vtap_id             INTEGER,
     masklen             INTEGER DEFAULT 0,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_ip;
 
 CREATE TABLE IF NOT EXISTS genesis_lldp (
@@ -1780,7 +1786,7 @@ CREATE TABLE IF NOT EXISTS genesis_lldp (
     vtap_id                 INTEGER,
     last_seen               DATETIME,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_lldp;
 
 CREATE TABLE IF NOT EXISTS genesis_vinterface (
@@ -1801,7 +1807,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;
 
 CREATE TABLE IF NOT EXISTS genesis_process (
@@ -1818,13 +1824,13 @@ CREATE TABLE IF NOT EXISTS genesis_process (
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE genesis_process;
 
 CREATE TABLE IF NOT EXISTS genesis_storage (
     vtap_id     INTEGER NOT NULL PRIMARY KEY,
     node_ip     CHAR(48)
-) ENGINE=MyISAM DEFAULT CHARSET = utf8mb4;
+) ENGINE=innodb DEFAULT CHARSET = utf8mb4;
 TRUNCATE TABLE genesis_storage;
 
 CREATE TABLE IF NOT EXISTS controller (
@@ -1994,6 +2000,8 @@ CREATE TABLE IF NOT EXISTS ch_device (
     name                    TEXT,
     uid                     CHAR(64),
     icon_id                 INTEGER,
+    ip                      CHAR(64),
+    hostname                VARCHAR(256),
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (devicetype, deviceid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2165,8 +2173,8 @@ CREATE TABLE IF NOT EXISTS ch_ip_resource (
     host_name           VARCHAR(256),
     chost_id            INTEGER,
     chost_name          VARCHAR(256),
-    vpc_id              INTEGER,
-    vpc_name            VARCHAR(256),
+    l3_epc_id           INTEGER,
+    l3_epc_name         VARCHAR(256),
     router_id           INTEGER,
     router_name         VARCHAR(256),
     dhcpgw_id           INTEGER,
@@ -2246,19 +2254,19 @@ TRUNCATE TABLE data_source;
 
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (1, '网络-指标（秒级）', 'flow_metrics.vtap_flow*', 1, 1*24, @lcuuid);
+                 VALUES (1, '网络-指标（秒级）', 'flow_metrics.network*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-                 VALUES (3, '网络-指标（分钟级）', 'flow_metrics.vtap_flow*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+                 VALUES (3, '网络-指标（分钟级）', 'flow_metrics.network*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (7, '应用-指标（秒级）', 'flow_metrics.vtap_app*', 1, 1*24, @lcuuid);
+                 VALUES (7, '应用-指标（秒级）', 'flow_metrics.application*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-                 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.vtap_app*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+                 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.application*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
@@ -2289,6 +2297,10 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
+
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2454,7 +2466,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     name                    TEXT,
     icon_id                 INTEGER,
     chost_id                INTEGER,
-    vpc_id                  INTEGER,
+    l3_epc_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;
@@ -2563,15 +2575,15 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_app_label_layout;
 
-CREATE TABLE IF NOT EXISTS prometheus_metric_label (
-    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`   VARCHAR(256) NOT NULL,
-    `label_id`      INT NOT NULL,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX metric_label_index(metric_name, label_id)
+CREATE TABLE IF NOT EXISTS prometheus_metric_label_name (
+    `id`                INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`       VARCHAR(256) NOT NULL,
+    `label_name_id`     INT NOT NULL,
+    `synced_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_label_name_index(metric_name, label_name_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE prometheus_metric_label;
+TRUNCATE TABLE prometheus_metric_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     `id`            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2666,7 +2678,32 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     `id`              INTEGER NOT NULL PRIMARY KEY,
     `name`            VARCHAR(256),
     `host_id`         INTEGER,
-    `vpc_id`          INTEGER,
+    `l3_epc_id`       INTEGER,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;
+
+CREATE TABLE IF NOT EXISTS ch_policy (
+    `tunnel_type`     INTEGER NOT NULL,
+    `acl_gid`         INTEGER NOT NULL,
+    `id`              INTEGER,
+    `name`            VARCHAR(256),
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`tunnel_type`, `acl_gid`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_policy;
+
+CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_npb_tunnel;
+
+CREATE TABLE IF NOT EXISTS ch_alarm_policy (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `user_id`         INTEGER,
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_alarm_policy;

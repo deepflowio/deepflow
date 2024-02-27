@@ -33,13 +33,13 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("prometheus.decoder")
@@ -94,9 +94,9 @@ type PrometheusSamplesBuilder struct {
 	appLabelValueIDsBuffer  []uint32
 
 	// universal tag cache
-	podNameIDToUniversalTag  map[uint32]zerodoc.UniversalTag
-	instanceIPToUniversalTag map[uint32]zerodoc.UniversalTag
-	vtapIDToUniversalTag     map[uint16]zerodoc.UniversalTag
+	podNameIDToUniversalTag  map[uint32]flow_metrics.UniversalTag
+	instanceIPToUniversalTag map[uint32]flow_metrics.UniversalTag
+	vtapIDToUniversalTag     map[uint16]flow_metrics.UniversalTag
 
 	counter *BuilderCounter
 	utils.Closable
@@ -113,9 +113,9 @@ func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.Plat
 		name:                     name,
 		platformData:             platformData,
 		labelTable:               labelTable,
-		podNameIDToUniversalTag:  make(map[uint32]zerodoc.UniversalTag),
-		instanceIPToUniversalTag: make(map[uint32]zerodoc.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]zerodoc.UniversalTag),
+		podNameIDToUniversalTag:  make(map[uint32]flow_metrics.UniversalTag),
+		instanceIPToUniversalTag: make(map[uint32]flow_metrics.UniversalTag),
+		vtapIDToUniversalTag:     make(map[uint16]flow_metrics.UniversalTag),
 		appLabelColumnAlign:      appLabelColumnAlign,
 		ignoreUniversalTag:       ignoreUniversalTag,
 		counter:                  &BuilderCounter{},
@@ -442,7 +442,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 		b.appLabelValueIDsBuffer[index] = b.tsLabelValueIDsBuffer[i]
 	}
 
-	var universalTag *zerodoc.UniversalTag
+	var universalTag *flow_metrics.UniversalTag
 	for i, s := range ts.Samples {
 		v := float64(s.Value)
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -489,9 +489,9 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 				b.platformDataVersion, platformDataVersion)
 		}
 		b.platformDataVersion = platformDataVersion
-		b.podNameIDToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
-		b.instanceIPToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
-		b.vtapIDToUniversalTag = make(map[uint16]zerodoc.UniversalTag)
+		b.podNameIDToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
+		b.instanceIPToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
+		b.vtapIDToUniversalTag = make(map[uint16]flow_metrics.UniversalTag)
 	} else {
 		if podNameID != 0 {
 			if universalTag, ok := b.podNameIDToUniversalTag[podNameID]; ok {
@@ -592,7 +592,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
 		t.L3DeviceID = info.DeviceID
-		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		t.L3DeviceType = flow_metrics.DeviceType(info.DeviceType)
 		if t.PodClusterID == 0 {
 			t.PodClusterID = uint16(info.PodClusterID)
 		}

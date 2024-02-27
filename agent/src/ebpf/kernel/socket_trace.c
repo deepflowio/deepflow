@@ -390,6 +390,9 @@ static __inline void infer_sock_flags(void *sk,
 	// 0x238 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
 #ifdef LINUX_VER_KYLIN
 	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x220};
+#elif defined LINUX_VER_3_10_0
+	// 0x150 for 3.10.0-957, 3.10.0-1160
+	int sock_flags_offset_array[] = { 0x150 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x230 for OEL7.9 Linux 5.4.17
 	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x230, 0x238};
@@ -422,7 +425,7 @@ static __inline void infer_sock_flags(void *sk,
 
 static __inline void get_sock_flags(void *sk,
 				    struct member_fields_offset *offset,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_s *conn_info)
 {
 	struct sock_flags_t {
 		unsigned int sk_padding : 1;
@@ -474,7 +477,7 @@ do {									\
 
 static __inline int is_tcp_udp_data(void *sk,
 				    struct member_fields_offset *offset,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_s *conn_info)
 {
 	struct skc_flags_t {
 		unsigned char skc_reuse : 4;
@@ -531,7 +534,7 @@ static __inline int is_tcp_udp_data(void *sk,
 }
 
 static __inline void init_conn_info(__u32 tgid, __u32 fd,
-				    struct conn_info_t *conn_info, void *sk,
+				    struct conn_info_s *conn_info, void *sk,
 				    struct member_fields_offset *offset)
 {
 	__be16 inet_dport;
@@ -540,7 +543,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
-	conn_info->correlation_id = -1; // 当前用于kafka协议推断
+	conn_info->correlation_id = -1; // 当前用于kafka,openwire协议推断
 	conn_info->fd = fd;
 
 	conn_info->sk = sk;
@@ -550,7 +553,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 }
 
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
-				     struct conn_info_t *conn_info)
+				     struct conn_info_s *conn_info)
 {
 	if (v == NULL || sk == NULL)
 		return false;
@@ -591,7 +594,7 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 }
 
 #ifdef PROBE_CONN_SUBMIT
-static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, int act)
+static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v, int act)
 {
 	switch (act) {
 	case CONN_ADD:
@@ -611,7 +614,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 
 static __inline int
 infer_l7_class_1(struct ctx_info_s *ctx,
-		 struct conn_info_t* conn_info,
+		 struct conn_info_s* conn_info,
 		 enum traffic_direction direction,
 		 const struct data_args_t *args,
 		 size_t count, __u8 sk_type,
@@ -636,7 +639,7 @@ infer_l7_class_1(struct ctx_info_s *ctx,
 }
 
 static __inline int infer_l7_class_2(struct tail_calls_context *ctx,
-				     struct conn_info_t *conn_info)
+				     struct conn_info_s *conn_info)
 {
 	struct infer_data_s *infer_data;
 	infer_data = (struct infer_data_s *)ctx->private_data;
@@ -697,6 +700,20 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	 *     u32      snd_nxt;	    +8
 	 *     ...
 	 * }
+	 *
+	 * But linux 3.10.0 :
+	 * struct tcp_sock {
+	 *     ...
+	 *     u16	tcp_header_len;     -24
+	 *     ...
+	 *     u64	bytes_received;     -16
+	 *     ...
+	 *     u32	rcv_nxt;            -4
+	 *     u32	copied_seq;         0
+	 *     u32	rcv_wup;            +4
+	 *     u32      snd_nxt;	    +8
+	 *     ...
+	 * }
 	 */
 	__u32 rcv_nxt, rcv_wup, copied_seq;
 	__u16 tcp_header_len;
@@ -704,8 +721,11 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	bpf_probe_read(&copied_seq, sizeof(copied_seq), (void *)sk + offset);
 	bpf_probe_read(&rcv_nxt, sizeof(rcv_nxt), (void *)sk + offset - 4);
 	bpf_probe_read(&rcv_wup, sizeof(rcv_wup), (void *)sk + offset + 4);
+#ifdef LINUX_VER_3_10_0
+	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 24);
+#else
 	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 28);
-
+#endif
 	if (!(tcp_header_len >= 20 && tcp_header_len <= 60 && copied_seq != 0))
 		return 0;
 
@@ -729,6 +749,9 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				    0x544, 0x54c, 0x554, 0x55c, 0x564,
 				    0x56c, 0x574, 0x57c, 0x584, 0x58c,
 				    0x594, 0x59c, 0x5dc, 0x644, 0x65c};
+#elif defined LINUX_VER_3_10_0
+	// 0x560 for 3.10.0-957, 3.10.0-1160
+	int copied_seq_offsets[] = { 0x560 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x63c for OEL7.9 Linux 5.4.17
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
@@ -761,6 +784,9 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				   0x6ac, 0x6b4, 0x6bc, 0x6c4, 0x6cc, 0x6d4,
 				   0x6dc, 0x6ec, 0x6f4, 0x6fc, 0x704, 0x70c,
 				   0x714, 0x71c, 0x74c, 0x7b4, 0x7cc};
+#elif defined LINUX_VER_3_10_0
+	// 0x698 for 3.10.0-957, 3.10.0-1160
+	int write_seq_offsets[] = { 0x698 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x7bc for OEL7.9 Linux 5.4.17
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
@@ -868,7 +894,7 @@ do { \
 #define TRACE_MAP_ACT_DEL   2
 
 static __inline void trace_process(struct socket_info_t *socket_info_ptr,
-				   struct conn_info_t* conn_info,
+				   struct conn_info_s* conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_conf_t *trace_conf,
@@ -954,7 +980,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	    conn_info->direction == socket_info_ptr->direction) {
 		if (trace_info_ptr)
 			pre_trace_id = trace_info_ptr->thread_trace_id;
-		conn_info->keep_data_seq = true; // 同时这里确保捕获数据的序列号保持不变。
 	}
 
 	if (conn_info->direction == T_INGRESS) {
@@ -1044,7 +1069,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 }
 
 static __inline int
-__data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
+__data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	      const struct data_args_t *args, const bool vecs, __u32 syscall_len,
 	      struct member_fields_offset *offset, __u64 time_stamp,
 	      const struct process_data_extra *extra)
@@ -1057,8 +1082,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return SUBMIT_INVALID;
 	}
 
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -1110,7 +1134,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    (trace_conf->go_tracing_timeout != 0 || extra->is_go_process == false) &&
 	    !(conn_info->protocol == PROTO_DNS &&
 	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
-		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
+		trace_process(socket_info_ptr, conn_info, socket_id, bpf_get_current_pid_tgid(),
 			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
 
@@ -1158,17 +1182,19 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		sk_info.uid = socket_info_ptr->uid;
 
 		/*
-		 * 同方向多个连续请求或回应的场景时，
-		 * 保持捕获数据的序列号保持不变。
+		 * The kernel syscall interface determines that it is the TLS
+		 * handshake protocol, and for the uprobe program, it needs to
+		 * be re inferred to determine the upper layer protocol of TLS.
 		 */
-		if (!conn_info->keep_data_seq) {
-			/*
-			 * Ensure that the accumulation operation of capturing the
-			 * data sequence number is an atomic operation when multiple
-			 * threads read/write to the socket simultaneously.
-			 */
-			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-		}
+		if (socket_info_ptr->l7_proto == PROTO_TLS)
+			socket_info_ptr->l7_proto = conn_info->protocol;
+
+		/*
+		 * Ensure that the accumulation operation of capturing the
+		 * data sequence number is an atomic operation when multiple
+		 * threads read/write to the socket simultaneously.
+		 */
+		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
@@ -1211,7 +1237,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
-	v->pid = (__u32) pid_tgid;
+	v->is_tls = false;
+	v->pid = (__u32) bpf_get_current_pid_tgid();
 
 	// For blocking reads, there is a significant deviation between the
 	// entry time of the system call and the real time of the read
@@ -1293,12 +1320,12 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->source = extra->source;
 
 #ifdef LINUX_VER_5_2_PLUS
-	__u32 cache_key = (__u32) pid_tgid >> 16;
+	__u32 cache_key = ((__u32) bpf_get_current_pid_tgid()) >> 16;
 	if (cache_key < PROTO_INFER_CACHE_SIZE) {
 		struct proto_infer_cache_t *p;
 		p = proto_infer_cache_map__lookup(&cache_key);
 		if (p) {
-			__u16 idx = (__u16) pid_tgid;
+			__u16 idx = (__u16) bpf_get_current_pid_tgid();
 			p->protocols[idx] = (__u8) v->data_type;
 		}
 	}
@@ -1307,6 +1334,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = (bool) vecs;
+	context->is_close = false;
 	context->dir = conn_info->direction;
 
 	return SUBMIT_OK;
@@ -1330,7 +1358,10 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (unlikely(args->fd < 0 || (int)bytes_count <= 0))
 		return -1;
 
-	// TODO : 此处可以根据配置对进程号进行过滤
+	/*
+	 * TODO:
+	 * Here you can filter the pid according to the configuration.
+	 */
 
 	__u32 k0 = 0, k1 = 1;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -1341,7 +1372,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
-	struct conn_info_t *conn_info, __conn_info = { 0 };
+	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
 	__u8 sock_state;
 	if (!(sk != NULL &&
@@ -1350,7 +1381,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	}
 
-	init_conn_info(id >> 32, args->fd, &__conn_info, sk, offset);
+	init_conn_info(id >> 32, args->fd, conn_info, sk, offset);
 
 	conn_info->direction = direction;
 
@@ -1785,7 +1816,11 @@ TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 //static ssize_t do_writev(unsigned long fd, const struct iovec __user *vec,
 //			 unsigned long vlen, rwf_t flags)
 // ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+#ifdef LINUX_VER_3_10_0
+KPROG(sys_writev) (struct pt_regs* ctx) {
+#else
 KPROG(do_writev) (struct pt_regs* ctx) {
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
@@ -1820,7 +1855,11 @@ TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
+#ifdef LINUX_VER_3_10_0
+KPROG(sys_readv) (struct pt_regs* ctx) {
+#else
 KPROG(do_readv) (struct pt_regs* ctx) {
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
@@ -1854,7 +1893,6 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-// 为什么不用tcp_fin? 主要原因要考虑UDP场景。
 TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
 	//Ignore stdin, stdout and stderr
@@ -1870,14 +1908,73 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 
 	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);
 	if (sock_addr) {
-		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, (__u64)fd);
+		__u64 id = bpf_get_current_pid_tgid();
+		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)fd);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL)
+		if (socket_info_ptr != NULL) {
+			if (socket_info_ptr->uid) {
+				struct data_args_t read_args = {};
+				__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+				read_args.data_seq = socket_info_ptr->seq;
+				read_args.socket_id = socket_info_ptr->uid;
+				active_read_args_map__update(&id, &read_args);
+			}
 			delete_socket_info(conn_key, socket_info_ptr);
-		
+		}
+
 		socket_role_map__delete(&conn_key);
 	}
 
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
+TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx *ctx) {
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
+	if (read_args == NULL)
+		return 0;
+
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		goto exit;
+
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	if (trace_conf == NULL)
+		goto exit;
+	int data_max_sz = trace_conf->data_limit_max;
+	struct __socket_data_buffer *v_buff =
+		bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		goto exit;
+
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+		goto exit;
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
+	v->socket_id = read_args->socket_id;
+	v->tgid = (__u32) (pid_tgid >> 32);
+	v->pid = (__u32)pid_tgid;
+	v->timestamp = bpf_ktime_get_ns();
+	v->source = DATA_SOURCE_CLOSE;
+	v->syscall_len = 0;
+	v->data_seq = read_args->data_seq;
+	bpf_get_current_comm(v->comm, sizeof(v->comm));
+	struct tail_calls_context *context =
+		(struct tail_calls_context *)v->data;
+	context->max_size_limit = data_max_sz;
+	context->vecs = false;
+	context->is_close = true;
+	context->dir = T_INGRESS;
+
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+		      PROG_OUTPUT_DATA_TP_IDX);
+
+exit:
+	active_read_args_map__delete(&pid_tgid);
 	return 0;
 }
 
@@ -2001,6 +2098,7 @@ static __inline int output_data_common(void *ctx) {
 	enum traffic_direction dir;
 	bool vecs = false;
 	int max_size = 0;
+	bool is_close = false;
 	__u32 k0 = 0;
 	char *buffer = NULL;
 
@@ -2020,6 +2118,7 @@ static __inline int output_data_common(void *ctx) {
 
 	dir = context->dir;
 	vecs = context->vecs;
+	is_close = context->is_close;
 	max_size = context->max_size_limit;
 
 	struct data_args_t *args;
@@ -2035,6 +2134,11 @@ static __inline int output_data_common(void *ctx) {
 	    (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
 		goto clear_args_map_1;
+
+	if (is_close) {
+		v->data_len = 0;
+		goto skip_copy;
+	}
 
 	if (v->source == DATA_SOURCE_IO_EVENT) {
 		buffer = (char *)io_event_buffer__lookup(&k0);
@@ -2078,6 +2182,8 @@ static __inline int output_data_common(void *ctx) {
 	}
 
 	v->data_len = len;
+
+skip_copy:
 	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
@@ -2142,8 +2248,8 @@ static __inline int data_submit(void *ctx)
 		return SUBMIT_ABORT;
 
 	__u64 id = bpf_get_current_pid_tgid();
-	struct conn_info_t *conn_info;
-	struct conn_info_t __conn_info = ctx_map->tail_call.conn_info;
+	struct conn_info_s *conn_info;
+	struct conn_info_s __conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
@@ -2184,7 +2290,7 @@ static __inline int __proto_infer_2(void *ctx)
 	 * similar to "R1 invalid mem access 'inv'" will appear during the eBPF
 	 * loading process.
 	 */
-	struct conn_info_t *conn_info, __conn_info;
+	struct conn_info_s *conn_info, __conn_info;
 	__conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
@@ -2372,6 +2478,7 @@ static __inline void trace_io_event_common(void *ctx,
 		(struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = false;
+	context->is_close = false;
 	context->dir = direction;
 
 	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),

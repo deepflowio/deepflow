@@ -257,7 +257,7 @@ func NewExtMetricsWriter(
 		BatchSize:    ckWriterConfig.BatchSize,
 		FlushTimeout: ckWriterConfig.FlushTimeout,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), db, config.TTL, DefaultPartition, config.Base, &flowTagWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), db, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}

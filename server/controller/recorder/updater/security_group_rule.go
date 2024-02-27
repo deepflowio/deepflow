@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type SecurityGroupRule struct {
-	UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]
+	UpdaterBase[
+		cloudmodel.SecurityGroupRule,
+		mysql.SecurityGroupRule,
+		*diffbase.SecurityGroupRule,
+		*message.SecurityGroupRuleAdd,
+		message.SecurityGroupRuleAdd,
+		*message.SecurityGroupRuleUpdate,
+		message.SecurityGroupRuleUpdate,
+		*message.SecurityGroupRuleFieldsUpdate,
+		message.SecurityGroupRuleFieldsUpdate,
+		*message.SecurityGroupRuleDelete,
+		message.SecurityGroupRuleDelete]
 }
 
 func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroupRule) *SecurityGroupRule {
 	updater := &SecurityGroupRule{
-		UpdaterBase[cloudmodel.SecurityGroupRule, mysql.SecurityGroupRule, *diffbase.SecurityGroupRule]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewSecurityGroupRule(),
-			diffBaseData: wholeCache.DiffBaseDataSet.SecurityGroupRules,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.SecurityGroupRule,
+			mysql.SecurityGroupRule,
+			*diffbase.SecurityGroupRule,
+			*message.SecurityGroupRuleAdd,
+			message.SecurityGroupRuleAdd,
+			*message.SecurityGroupRuleUpdate,
+			message.SecurityGroupRuleUpdate,
+			*message.SecurityGroupRuleFieldsUpdate,
+			message.SecurityGroupRuleFieldsUpdate,
+			*message.SecurityGroupRuleDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
+			wholeCache,
+			db.NewSecurityGroupRule(),
+			wholeCache.DiffBaseDataSet.SecurityGroupRules,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -74,26 +97,29 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 	return dbItem, true
 }
 
-func (r *SecurityGroupRule) generateUpdateInfo(diffBase *diffbase.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (r *SecurityGroupRule) generateUpdateInfo(diffBase *diffbase.SecurityGroupRule, cloudItem *cloudmodel.SecurityGroupRule) (*message.SecurityGroupRuleFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.SecurityGroupRuleFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Priority != cloudItem.Priority {
-		updateInfo["priority"] = cloudItem.Priority
+		mapInfo["priority"] = cloudItem.Priority
+		structInfo.Priority.Set(diffBase.Priority, cloudItem.Priority)
 	}
 	if diffBase.EtherType != cloudItem.EtherType {
-		updateInfo["ethertype"] = cloudItem.EtherType
+		mapInfo["ethertype"] = cloudItem.EtherType
+		structInfo.EtherType.Set(diffBase.EtherType, cloudItem.EtherType)
 	}
 	if diffBase.RemotePortRange != cloudItem.RemotePortRange {
-		updateInfo["remote_port_range"] = cloudItem.RemotePortRange
+		mapInfo["remote_port_range"] = cloudItem.RemotePortRange
+		structInfo.RemotePortRange.Set(diffBase.RemotePortRange, cloudItem.RemotePortRange)
 	}
 	if diffBase.Local != cloudItem.Local {
-		updateInfo["local"] = cloudItem.Local
+		mapInfo["local"] = cloudItem.Local
+		structInfo.Local.Set(diffBase.Local, cloudItem.Local)
 	}
 	if diffBase.Remote != cloudItem.Remote {
-		updateInfo["remote"] = cloudItem.Remote
+		mapInfo["remote"] = cloudItem.Remote
+		structInfo.Remote.Set(diffBase.Remote, cloudItem.Remote)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

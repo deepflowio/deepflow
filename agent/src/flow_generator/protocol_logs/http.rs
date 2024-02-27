@@ -321,6 +321,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn tcp_seq_offset(&self) -> u32 {
         self.headers_offset
     }
+
+    fn get_request_domain(&self) -> String {
+        self.host.clone()
+    }
 }
 
 impl HttpInfo {
@@ -534,7 +538,7 @@ impl L7ProtocolParserInterface for HttpLog {
                         if param.direction == PacketDirection::ServerToClient {
                             return false;
                         }
-                        self.parse_http2_go_uprobe(
+                        self.check_http2_go_uprobe(
                             &config.l7_log_dynamic,
                             payload,
                             param,
@@ -542,7 +546,7 @@ impl L7ProtocolParserInterface for HttpLog {
                         )
                         .is_ok()
                     }
-                    _ => self.parse_http_v2(payload, param, &mut info).is_ok(),
+                    _ => self.check_http_v2(payload, param, &mut info).is_ok(),
                 }
             }
             _ => unreachable!(),
@@ -582,32 +586,24 @@ impl L7ProtocolParserInterface for HttpLog {
                             param,
                             &mut info,
                         )?;
-                        if param.parse_log {
-                            if self.proto == L7Protocol::Http2
-                                && !config.http_endpoint_disabled
-                                && info.path.len() > 0
-                            {
-                                info.endpoint = Some(handle_endpoint(config, &info.path));
-                            }
-                            return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
-                        } else {
-                            return Ok(L7ParseResult::None);
-                        }
                     }
                     _ => self.parse_http_v2(payload, param, &mut info)?,
                 }
             }
             _ => unreachable!(),
         }
-        match self.proto {
-            L7Protocol::Http1 | L7Protocol::Http2 => {
-                if !config.http_endpoint_disabled && info.path.len() > 0 {
-                    info.endpoint = Some(handle_endpoint(config, &info.path));
-                }
-            }
-            _ => {}
-        }
         if param.parse_log {
+            if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
+                && !config.http_endpoint_disabled
+                && info.path.len() > 0
+            {
+                // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
+                let path = match info.endpoint.as_ref() {
+                    Some(p) if !p.is_empty() => p,
+                    _ => &info.path,
+                };
+                info.endpoint = Some(handle_endpoint(config, path));
+            }
             Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
         } else {
             Ok(L7ParseResult::None)
@@ -718,7 +714,7 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
-    pub fn parse_http2_go_uprobe(
+    pub fn check_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
@@ -763,6 +759,19 @@ impl HttpLog {
                     .unwrap_or_default(),
             );
         }
+        info.version = Version::V2;
+        info.stream_id = Some(stream_id);
+        Ok(())
+    }
+
+    pub fn parse_http2_go_uprobe(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        param: &ParseParam,
+        info: &mut HttpInfo,
+    ) -> Result<()> {
+        self.check_http2_go_uprobe(config, payload, param, info)?;
 
         if info.is_req_end {
             self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -771,9 +780,6 @@ impl HttpLog {
             self.perf_stats.as_mut().map(|p| p.inc_resp());
         }
 
-        info.version = Version::V2;
-        info.stream_id = Some(stream_id);
-
         info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
             info.rrt = rrt;
         });
@@ -781,7 +787,7 @@ impl HttpLog {
         if info.is_req_end || info.is_resp_end {
             self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn parse_http_v1(
@@ -889,7 +895,7 @@ impl HttpLog {
         &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
-    fn parse_http_v2(
+    fn check_http_v2(
         &mut self,
         payload: &[u8],
         param: &ParseParam,
@@ -950,25 +956,16 @@ impl HttpLog {
                 let header_frame_payload =
                     &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
 
-                let parse_rst = if param.direction == PacketDirection::ClientToServer {
-                    self.http2_req_decoder
-                        .as_mut()
-                        .unwrap()
-                        .decode(header_frame_payload)
+                let mut decoder = if param.direction == PacketDirection::ClientToServer {
+                    self.http2_req_decoder.take().unwrap()
                 } else {
-                    self.http2_resp_decoder
-                        .as_mut()
-                        .unwrap()
-                        .decode(header_frame_payload)
+                    self.http2_resp_decoder.take().unwrap()
                 };
 
-                if let Err(_) = parse_rst {
-                    return Err(Error::HttpHeaderParseFailed);
-                }
-                let header_list = parse_rst.unwrap();
-
-                for (key, val) in header_list.iter() {
-                    self.on_header(config, key, val, direction, info)?;
+                let result = decoder.decode_with_cb(header_frame_payload, |key, val| {
+                    let key: &[u8] = &key;
+                    let val: &[u8] = &val;
+                    let _ = self.on_header(config, key, val, direction, info);
                     if key == b"content-length" {
                         content_length = Some(
                             str::from_utf8(val)
@@ -977,7 +974,17 @@ impl HttpLog {
                                 .unwrap_or_default(),
                         )
                     }
+                });
+                if param.direction == PacketDirection::ClientToServer {
+                    self.http2_req_decoder.replace(decoder);
+                } else {
+                    self.http2_resp_decoder.replace(decoder);
                 }
+
+                if result.is_err() {
+                    return Err(Error::HttpHeaderParseFailed);
+                }
+
                 header_frame_parsed = true;
                 if !param.is_from_ebpf() {
                     info.headers_offset = headers_offset as u32;
@@ -1024,11 +1031,14 @@ impl HttpLog {
         }
 
         if is_httpv2 {
+            info.version = Version::V2;
+            if info.stream_id.is_none() {
+                info.stream_id = Some(httpv2_header.stream_id);
+            }
             if direction == PacketDirection::ClientToServer {
                 if info.method.is_none() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_req());
                 info.req_content_length = content_length;
             } else {
                 if info.status_code == 0
@@ -1036,20 +1046,31 @@ impl HttpLog {
                 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
                 info.resp_content_length = content_length;
             }
-            info.version = Version::V2;
-            if info.stream_id.is_none() {
-                info.stream_id = Some(httpv2_header.stream_id);
-            }
-            info.cal_rrt(param, None).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
+    }
+
+    fn parse_http_v2(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        info: &mut HttpInfo,
+    ) -> Result<()> {
+        self.check_http_v2(payload, param, info)?;
+
+        if param.direction == PacketDirection::ClientToServer {
+            self.perf_stats.as_mut().map(|p| p.inc_req());
+        } else {
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
+        }
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+        });
+        Ok(())
     }
 
     fn on_header(
@@ -1201,7 +1222,7 @@ impl HttpLog {
         if id_type != Self::TRACE_ID {
             return None;
         }
-        tingyun::decode_trace_id(value)
+        tingyun::decode_trace_id(value).map(|s| s.into())
     }
 
     pub fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
@@ -1540,13 +1561,21 @@ mod tests {
             };
 
             let mut trace_set = HashSet::new();
-            trace_set.insert(TraceType::Sw8.to_checker_string());
+            trace_set.insert(TraceType::Sw8.as_str());
             let mut span_set = HashSet::new();
-            span_set.insert(TraceType::Sw8.to_checker_string());
+            span_set.insert(TraceType::Sw8.as_str());
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
             http2.set_header_decoder(config.expected_headers_set.clone());
-            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
             param.set_log_parse_config(parse_config);
 
             let get_http_info = |i: L7ProtocolInfo| match i {
@@ -1637,7 +1666,7 @@ mod tests {
                 is_tls: false,
                 is_req_end: false,
                 is_resp_end: false,
-                process_kname: "".to_string(),
+                process_kname: "",
             }),
             packet_seq: 0,
             time: 0,
@@ -1836,7 +1865,15 @@ mod tests {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             if packet.get_l4_payload().is_some() {
-                let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+                let param = &mut ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    Default::default(),
+                    true,
+                    true,
+                );
                 param.set_log_parse_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }

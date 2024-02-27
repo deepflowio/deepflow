@@ -25,16 +25,16 @@ import (
 )
 
 type ChOSAppTags struct {
-	UpdaterBase[mysql.ChOSAppTags, OSAPPTagsKey]
+	UpdaterComponent[mysql.ChOSAppTags, OSAPPTagsKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
 	updater := &ChOSAppTags{
-		UpdaterBase[mysql.ChOSAppTags, OSAPPTagsKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_OS_APP_TAGS,
-		},
+		newUpdaterComponent[mysql.ChOSAppTags, OSAPPTagsKey](
+			RESOURCE_TYPE_CH_OS_APP_TAGS,
+		),
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 

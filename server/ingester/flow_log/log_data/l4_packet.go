@@ -42,7 +42,7 @@ func L4PacketColumns() []*ckdb.Column {
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("packet_batch", ckdb.String).SetIndex(ckdb.IndexNone),
 	}

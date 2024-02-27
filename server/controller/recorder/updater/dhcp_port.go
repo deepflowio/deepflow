@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type DHCPPort struct {
-	UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *diffbase.DHCPPort]
+	UpdaterBase[
+		cloudmodel.DHCPPort,
+		mysql.DHCPPort,
+		*diffbase.DHCPPort,
+		*message.DHCPPortAdd,
+		message.DHCPPortAdd,
+		*message.DHCPPortUpdate,
+		message.DHCPPortUpdate,
+		*message.DHCPPortFieldsUpdate,
+		message.DHCPPortFieldsUpdate,
+		*message.DHCPPortDelete,
+		message.DHCPPortDelete]
 }
 
 func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
 	updater := &DHCPPort{
-		UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *diffbase.DHCPPort]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewDHCPPort(),
-			diffBaseData: wholeCache.DiffBaseDataSet.DHCPPorts,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.DHCPPort,
+			mysql.DHCPPort,
+			*diffbase.DHCPPort,
+			*message.DHCPPortAdd,
+			message.DHCPPortAdd,
+			*message.DHCPPortUpdate,
+			message.DHCPPortUpdate,
+			*message.DHCPPortFieldsUpdate,
+			message.DHCPPortFieldsUpdate,
+			*message.DHCPPortDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
+			wholeCache,
+			db.NewDHCPPort(),
+			wholeCache.DiffBaseDataSet.DHCPPorts,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -46,35 +69,6 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffBase *diffbase.DHCPPort, exists bool) {
 	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
 	return
-}
-
-func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
-		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
-		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
-		}
-		updateInfo["epc_id"] = vpcID
-	}
-	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
-	}
-	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
-	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
-	}
-
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
 }
 
 func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.DHCPPort, bool) {
@@ -95,4 +89,36 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.D
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (*message.DHCPPortFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.DHCPPortFieldsUpdate)
+	mapInfo := make(map[string]interface{})
+	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
+		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
+			))
+			return nil, nil, false
+		}
+		mapInfo["epc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID)
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+	}
+	if diffBase.Name != cloudItem.Name {
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
+	}
+	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
+	}
+	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	}
+
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

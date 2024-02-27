@@ -30,10 +30,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
@@ -59,14 +59,14 @@ type L7Base struct {
 
 	// 流信息
 	FlowID       uint64 `json:"flow_id"`
-	TapType      uint8  `json:"tap_type"`
+	TapType      uint8  `json:"capture_network_type_id"`
 	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"tap_port_type"`
+	TapPortType  uint8  `json:"capture_nic_type"`
 	SignalSource uint16 `json:"signal_source"`
 	TunnelType   uint8  `json:"tunnel_type"`
-	TapPort      uint32 `json:"tap_port"`
-	TapSide      string `json:"tap_side"`
-	VtapID       uint16 `json:"vtap_id"`
+	TapPort      uint32 `json:"capture_nic"`
+	TapSide      string `json:"observation_point"`
+	VtapID       uint16 `json:"agent_id"`
 	ReqTcpSeq    uint32 `json:"req_tcp_seq"`
 	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
 	StartTime    int64  `json:"start_time"` // us
@@ -108,14 +108,14 @@ func L7BaseColumns() []*ckdb.Column {
 
 		// 流信息
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-		ckdb.NewColumn("tap_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("capture_network_type_id", ckdb.UInt8).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("nat_source", ckdb.UInt8).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("capture_nic_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("signal_source", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("capture_nic", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("observation_point", ckdb.LowCardinalityString),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("req_tcp_seq", ckdb.UInt32),
 		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
@@ -251,9 +251,9 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("is_tls", ckdb.UInt8),
 
 		ckdb.NewColumn("request_type", ckdb.LowCardinalityString).SetComment("请求类型, HTTP请求方法、SQL命令类型、NoSQL命令类型、MQ命令类型、DNS查询类型"),
-		ckdb.NewColumn("request_domain", ckdb.String).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
-		ckdb.NewColumn("request_resource", ckdb.String).SetComment("请求资源, HTTP路径、RPC方法名称、SQL命令、NoSQL命令"),
-		ckdb.NewColumn("endpoint", ckdb.String).SetComment("端点"),
+		ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
+		ckdb.NewColumn("request_resource", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("请求资源, HTTP路径、RPC方法名称、SQL命令、NoSQL命令"),
+		ckdb.NewColumn("endpoint", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("端点"),
 		ckdb.NewColumn("request_id", ckdb.UInt64Nullable).SetComment("请求ID, HTTP请求ID、RPC请求ID、MQ请求ID、DNS请求ID"),
 
 		ckdb.NewColumn("response_status", ckdb.UInt8).SetComment("响应状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
@@ -552,7 +552,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_EBPF)
 	}
 	b.TunnelType = uint8(tunnelType)
-	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
+	b.TapSide = flow_metrics.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq
@@ -683,7 +683,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldValueCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagFieldValue := flow_tag.AcquireFlowTag()
+			tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 			tagFieldValue.Timestamp = time
 			tagFieldValue.FlowTagInfo = *flowTagInfo
 			cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -701,7 +701,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagField := flow_tag.AcquireFlowTag()
+			tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo
 			cache.Fields = append(cache.Fields, tagField)
@@ -719,7 +719,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
-			tagField := flow_tag.AcquireFlowTag()
+			tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo
 			cache.Fields = append(cache.Fields, tagField)

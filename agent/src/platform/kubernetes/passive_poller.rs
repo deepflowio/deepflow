@@ -408,19 +408,19 @@ impl Poller for PassivePoller {
         let mut info = InterfaceInfo {
             tap_idx: entries[0].tap_index,
             mac: entries[0].mac,
-            ips: vec![entries[0].ip],
+            ips: vec![entries[0].ip.into()],
             device_id: "1".to_string(),
             ..Default::default()
         };
         for entry in entries.iter().skip(1) {
             if entry.tap_index == info.tap_idx && entry.mac == info.mac {
-                info.ips.push(entry.ip);
+                info.ips.push(entry.ip.into());
             } else {
                 info_slice.push(info.clone());
                 info = InterfaceInfo {
                     tap_idx: entry.tap_index,
                     mac: entry.mac,
-                    ips: vec![entry.ip],
+                    ips: vec![entry.ip.into()],
                     device_id: "1".to_string(),
                     ..Default::default()
                 };

@@ -19,6 +19,7 @@
 #include <sched.h>
 #include <sys/utsname.h>
 #include <sys/prctl.h>
+#include <linux/version.h>
 #include <sys/epoll.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
@@ -35,7 +36,9 @@
 #include "load.h"
 #include "mem.h"
 
-int major, minor;		// Linux kernel主版本，次版本
+uint32_t k_version;
+// Linux kernel major version, minor version, revision version, and revision number.
+int major, minor, revision, rev_num;
 char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint32_t *tracers_lock;
@@ -106,17 +109,28 @@ int check_kernel_version(int maj_limit, int min_limit)
 		return ETR_INVAL;
 	}
 
-	int patch;
-	if (fetch_kernel_version(&major, &minor, &patch) != ETR_OK) {
+	if (fetch_kernel_version(&major, &minor, &revision, &rev_num) != ETR_OK) {
 		return ETR_INVAL;
 	}
 
-	ebpf_info("%s Linux %d.%d.%d\n", __func__, major, minor, patch);
+	ebpf_info("%s Linux %d.%d.%d-%d\n", __func__, major, minor, revision, rev_num);
+
+	/*
+	 * Redhat/CentOS 7 introduced support for eBPF tracing features starting
+	 * from version 7.6 (3.10.0-940.el7.x86_64).
+	 */
+	if (major == 3 && minor == 10 && revision == 0 &&
+	    rev_num >= LINUX_3_10_MIN_REV_NUM)
+		return ETR_OK;
 
 	if (major < maj_limit || (major == maj_limit && minor < min_limit)) {
-		ebpf_info
-		    ("Current kernel version is %s, but need > %d.%d, eBPF not support.\n",
-		     uts.release, maj_limit, min_limit);
+		ebpf_warning
+		    ("[eBPF Kernel Adapt] The current kernel version (%s) does not support"
+		     " eBPF. It requires  kernel version of %d.%d+ or 3.10.0-%d+ (for "
+		     "linux 3.10.0 kernel, the revision number must be greater than or "
+		     "equal to %d).\n",
+		     uts.release, maj_limit, min_limit, LINUX_3_10_MIN_REV_NUM,
+		     LINUX_3_10_MIN_REV_NUM);
 		return ETR_INVAL;
 	}
 
@@ -670,11 +684,27 @@ static struct ebpf_link *exec_attach_uprobe(struct ebpf_prog *prog,
 	if (ret != ETR_OK)
 		return NULL;
 
+	char c_id[65];
+	memset(c_id, 0, sizeof(c_id));
+	fetch_container_id(pid, c_id, sizeof(c_id));
+	const char *container_flag = "false";
+	if (strlen(c_id) > 0)
+		container_flag = "true";
+
 	ret = program__attach_uprobe(prog, isret, pid, bin_path, addr, ev_name,
 				     (void **)&link);
 	if (ret != 0) {
-		ebpf_info("program__attach_uprobe failed, ev_name:%s.\n",
-			  ev_name);
+		const char *reason = "";
+		if (strstr(ev_name, "libssl")) {
+			reason = "It may be due to a low Linux kernel version. "
+				 "When hooking containerized OpenSSL-related "
+				 "library files, the required version is Linux 4.17+.";
+		} else {
+			reason = "Requires kernel version Linux 4.16+";
+		}
+
+		ebpf_warning("program__attach_uprobe failed, container %s ev_name:%s, %s\n",
+			     container_flag, ev_name, reason);
 	}
 
 	return link;
@@ -1565,7 +1595,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	/* Memory management initialization. */
 	clib_mem_init();
 
+	k_version = fetch_kernel_version_code();
 	fetch_linux_release(linux_release, sizeof(linux_release) - 1);
+	ebpf_info("linux version : %s (version code : %u)\n", linux_release, k_version);
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
 	if (sys_cpus_count <= 0 || sys_cpus_count > MAX_CPU_NR) {

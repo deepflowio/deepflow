@@ -98,6 +98,18 @@ impl L7ProtocolInfoInterface for MqttInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        let endpoint = self.get_endpoint();
+        if endpoint.is_empty() {
+            return None;
+        }
+        Some(endpoint)
+    }
+
+    fn get_request_domain(&self) -> String {
+        self.client_id.clone().unwrap_or_default()
+    }
 }
 
 pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>
@@ -129,6 +141,30 @@ impl Default for MqttInfo {
 }
 
 impl MqttInfo {
+    fn get_endpoint(&self) -> String {
+        let mut topic_str = String::new();
+        match self.pkt_type {
+            PacketKind::Publish { .. } => {
+                if let Some(t) = &self.publish_topic {
+                    return t.clone();
+                }
+            }
+            PacketKind::Unsubscribe | PacketKind::Subscribe => {
+                if let Some(s) = &self.subscribe_topics {
+                    for i in s {
+                        topic_str.push_str(format!("{},", i.name).as_str());
+                    }
+                    if !topic_str.is_empty() {
+                        topic_str.pop();
+                    }
+                    return topic_str;
+                }
+            }
+            _ => {}
+        };
+        return topic_str;
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
@@ -163,30 +199,13 @@ impl MqttInfo {
 impl From<MqttInfo> for L7ProtocolSendLog {
     fn from(f: MqttInfo) -> Self {
         let version = Some(String::from(f.get_version_str()));
-        let mut topic_str = String::new();
+        let topic_str = f.get_endpoint();
         let flags = if f.is_tls {
             EbpfFlags::TLS.bits()
         } else {
             EbpfFlags::NONE.bits()
         };
-        match f.pkt_type {
-            PacketKind::Publish { .. } => {
-                if let Some(t) = f.publish_topic {
-                    topic_str.push_str(t.as_str());
-                }
-            }
-            PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                if let Some(s) = f.subscribe_topics {
-                    for i in s {
-                        topic_str.push_str(format!("{},", i.name).as_str());
-                    }
-                    if !topic_str.is_empty() {
-                        topic_str.pop();
-                    }
-                }
-            }
-            _ => {}
-        };
+
         L7ProtocolSendLog {
             version: version,
             req_len: f.req_msg_size,
@@ -194,7 +213,8 @@ impl From<MqttInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: f.pkt_type.to_string(),
                 domain: f.client_id.unwrap_or_default(),
-                resource: topic_str,
+                resource: topic_str.clone(),
+                endpoint: topic_str,
                 ..Default::default()
             },
             resp: L7Response {
@@ -850,13 +870,21 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
 
             let infos = mqtt.parse(payload, param).unwrap();
             let is_mqtt = MqttLog::check_protocol(payload, param);
             for i in infos.iter() {
                 if let L7ProtocolInfo::MqttInfo(info) = i {
-                    output.push_str(&format!("{:?} is_mqtt: {}\r\n", info, is_mqtt));
+                    output.push_str(&format!("{:?} is_mqtt: {}\n", &info, is_mqtt));
                 } else {
                     unreachable!()
                 }
@@ -1082,7 +1110,15 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = mqtt.parse_payload(
                     packet.get_l4_payload().unwrap(),
-                    &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
+                    &ParseParam::new(
+                        &*packet,
+                        rrt_cache.clone(),
+                        Default::default(),
+                        #[cfg(any(target_os = "linux", target_os = "android"))]
+                        Default::default(),
+                        true,
+                        true,
+                    ),
                 );
                 mqtt.reset();
             }

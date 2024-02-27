@@ -68,6 +68,9 @@ enum traffic_protocol {
 	PROTO_MONGO = 81,
 	PROTO_KAFKA = 100,
 	PROTO_MQTT = 101,
+	PROTO_AMQP = 102,
+	PROTO_OPENWIRE = 103,
+	PROTO_NATS = 104,
 	PROTO_DNS = 120,
 	PROTO_TLS = 121,
 	PROTO_CUSTOM = 127,
@@ -81,6 +84,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_OPENSSL_UPROBE,
 	DATA_SOURCE_IO_EVENT,
 	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
+	DATA_SOURCE_CLOSE,
 };
 
 struct protocol_message_t {

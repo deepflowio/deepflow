@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -40,11 +41,11 @@ const (
 	//		_CLOSE_TYPE_METERS[flowType].ServerRstFlow = 1
 	//	...
 	// 流统计指标量和数据库字段名之间的对应关系，见
-	// droplet-libs/zerodoc/basic_meter.go: Anomaly结构体定义
+	// droplet-libs/flow-metrics/basic_meter.go: Anomaly结构体定义
 	//	ClientRstFlow       uint64 `db:"client_rst_flow"`
 	//	...
 	// 数据库字段名和页面文案之间的对应关系，见
-	// droplet-libs/zerodoc/basic_meter.go: AnomalyColumns函数
+	// droplet-libs/flow-metrics/basic_meter.go: AnomalyColumns函数
 	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 	//	...
 
@@ -147,22 +148,26 @@ const (
 type L7Protocol uint8
 
 const (
-	L7_PROTOCOL_UNKNOWN L7Protocol = 0
-	L7_PROTOCOL_HTTP_1  L7Protocol = 20
-	L7_PROTOCOL_HTTP_2  L7Protocol = 21
-	L7_PROTOCOL_DUBBO   L7Protocol = 40
-	L7_PROTOCOL_GRPC    L7Protocol = 41
-	L7_PROTOCOL_SOFARPC L7Protocol = 43
-	L7_PROTOCOL_FASTCGI L7Protocol = 44
-	L7_PROTOCOL_MYSQL   L7Protocol = 60
-	L7_PROTOCOL_POSTGRE L7Protocol = 61
-	L7_PROTOCOL_ORACLE  L7Protocol = 62
-	L7_PROTOCOL_REDIS   L7Protocol = 80
-	L7_PROTOCOL_MONGODB L7Protocol = 81
-	L7_PROTOCOL_KAFKA   L7Protocol = 100
-	L7_PROTOCOL_MQTT    L7Protocol = 101
-	L7_PROTOCOL_DNS     L7Protocol = 120
-	L7_PROTOCOL_CUSTOM  L7Protocol = 127
+	L7_PROTOCOL_UNKNOWN  L7Protocol = 0
+	L7_PROTOCOL_HTTP_1   L7Protocol = 20
+	L7_PROTOCOL_HTTP_2   L7Protocol = 21
+	L7_PROTOCOL_DUBBO    L7Protocol = 40
+	L7_PROTOCOL_GRPC     L7Protocol = 41
+	L7_PROTOCOL_SOFARPC  L7Protocol = 43
+	L7_PROTOCOL_FASTCGI  L7Protocol = 44
+	L7_PROTOCOL_MYSQL    L7Protocol = 60
+	L7_PROTOCOL_POSTGRE  L7Protocol = 61
+	L7_PROTOCOL_ORACLE   L7Protocol = 62
+	L7_PROTOCOL_REDIS    L7Protocol = 80
+	L7_PROTOCOL_MONGODB  L7Protocol = 81
+	L7_PROTOCOL_KAFKA    L7Protocol = 100
+	L7_PROTOCOL_MQTT     L7Protocol = 101
+	L7_PROTOCOL_AMQP     L7Protocol = 102
+	L7_PROTOCOL_OPENWIRE L7Protocol = 103
+	L7_PROTOCOL_NATS     L7Protocol = 104
+	L7_PROTOCOL_DNS      L7Protocol = 120
+	L7_PROTOCOL_TLS      L7Protocol = 121
+	L7_PROTOCOL_CUSTOM   L7Protocol = 127
 )
 
 // size = 9 * 4B = 36B
@@ -617,11 +622,29 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "HTTP2"
 		}
-	case L7_PROTOCOL_DNS:
+	case L7_PROTOCOL_DUBBO:
 		if isTLS {
-			return "DNS_TLS"
+			return "Dubbo_TLS"
 		} else {
-			return "DNS"
+			return "Dubbo"
+		}
+	case L7_PROTOCOL_GRPC:
+		if isTLS {
+			return "gRPC_TLS"
+		} else {
+			return "gRPC"
+		}
+	case L7_PROTOCOL_SOFARPC:
+		if isTLS {
+			return "SofaRPC_TLS"
+		} else {
+			return "SofaRPC"
+		}
+	case L7_PROTOCOL_FASTCGI:
+		if isTLS {
+			return "FastCGI_TLS"
+		} else {
+			return "FastCGI"
 		}
 	case L7_PROTOCOL_MYSQL:
 		if isTLS {
@@ -653,30 +676,6 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "MongoDB"
 		}
-	case L7_PROTOCOL_DUBBO:
-		if isTLS {
-			return "Dubbo_TLS"
-		} else {
-			return "Dubbo"
-		}
-	case L7_PROTOCOL_GRPC:
-		if isTLS {
-			return "gRPC_TLS"
-		} else {
-			return "gRPC"
-		}
-	case L7_PROTOCOL_SOFARPC:
-		if isTLS {
-			return "SofaRPC_TLS"
-		} else {
-			return "SofaRPC"
-		}
-	case L7_PROTOCOL_FASTCGI:
-		if isTLS {
-			return "FastCGI_TLS"
-		} else {
-			return "FastCGI"
-		}
 	case L7_PROTOCOL_KAFKA:
 		if isTLS {
 			return "Kafka_TLS"
@@ -689,6 +688,32 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "MQTT"
 		}
+	case L7_PROTOCOL_AMQP:
+		if isTLS {
+			return "AMQP_TLS"
+		} else {
+			return "AMQP"
+		}
+	case L7_PROTOCOL_OPENWIRE:
+		if isTLS {
+			return "OpenWire_TLS"
+		} else {
+			return "OpenWire"
+		}
+	case L7_PROTOCOL_NATS:
+		if isTLS {
+			return "NATS_TLS"
+		} else {
+			return "NATS"
+		}
+	case L7_PROTOCOL_DNS:
+		if isTLS {
+			return "DNS_TLS"
+		} else {
+			return "DNS"
+		}
+	case L7_PROTOCOL_TLS:
+		return "TLS"
 	case L7_PROTOCOL_CUSTOM:
 		if isTLS {
 			return "Custom_TLS"
@@ -701,16 +726,26 @@ func (p L7Protocol) String(isTLS bool) string {
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	L7_PROTOCOL_HTTP_1.String(false):  L7_PROTOCOL_HTTP_1,
-	L7_PROTOCOL_HTTP_2.String(false):  L7_PROTOCOL_HTTP_2,
-	L7_PROTOCOL_DNS.String(false):     L7_PROTOCOL_DNS,
-	L7_PROTOCOL_MYSQL.String(false):   L7_PROTOCOL_MYSQL,
-	L7_PROTOCOL_REDIS.String(false):   L7_PROTOCOL_REDIS,
-	L7_PROTOCOL_DUBBO.String(false):   L7_PROTOCOL_DUBBO,
-	L7_PROTOCOL_GRPC.String(false):    L7_PROTOCOL_GRPC,
-	L7_PROTOCOL_KAFKA.String(false):   L7_PROTOCOL_KAFKA,
-	L7_PROTOCOL_MQTT.String(false):    L7_PROTOCOL_MQTT,
-	L7_PROTOCOL_UNKNOWN.String(false): L7_PROTOCOL_UNKNOWN,
+	strings.ToLower(L7_PROTOCOL_HTTP_1.String(false)):   L7_PROTOCOL_HTTP_1,
+	strings.ToLower(L7_PROTOCOL_HTTP_2.String(false)):   L7_PROTOCOL_HTTP_2,
+	strings.ToLower(L7_PROTOCOL_DUBBO.String(false)):    L7_PROTOCOL_DUBBO,
+	strings.ToLower(L7_PROTOCOL_GRPC.String(false)):     L7_PROTOCOL_GRPC,
+	strings.ToLower(L7_PROTOCOL_SOFARPC.String(false)):  L7_PROTOCOL_SOFARPC,
+	strings.ToLower(L7_PROTOCOL_FASTCGI.String(false)):  L7_PROTOCOL_FASTCGI,
+	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):    L7_PROTOCOL_MYSQL,
+	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):  L7_PROTOCOL_POSTGRE,
+	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):   L7_PROTOCOL_ORACLE,
+	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):    L7_PROTOCOL_REDIS,
+	strings.ToLower(L7_PROTOCOL_MONGODB.String(false)):  L7_PROTOCOL_MONGODB,
+	strings.ToLower(L7_PROTOCOL_KAFKA.String(false)):    L7_PROTOCOL_KAFKA,
+	strings.ToLower(L7_PROTOCOL_MQTT.String(false)):     L7_PROTOCOL_MQTT,
+	strings.ToLower(L7_PROTOCOL_AMQP.String(false)):     L7_PROTOCOL_AMQP,
+	strings.ToLower(L7_PROTOCOL_OPENWIRE.String(false)): L7_PROTOCOL_OPENWIRE,
+	strings.ToLower(L7_PROTOCOL_NATS.String(false)):     L7_PROTOCOL_NATS,
+	strings.ToLower(L7_PROTOCOL_DNS.String(false)):      L7_PROTOCOL_DNS,
+	strings.ToLower(L7_PROTOCOL_TLS.String(false)):      L7_PROTOCOL_TLS,
+	strings.ToLower(L7_PROTOCOL_CUSTOM.String(false)):   L7_PROTOCOL_CUSTOM,
+	strings.ToLower(L7_PROTOCOL_UNKNOWN.String(false)):  L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {

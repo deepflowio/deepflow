@@ -172,8 +172,6 @@ controller:
       # recorder更新数据库的时间间隔，单位：秒
       resource_recorder_interval: 60
       cloud:
-        # cloud定时获取数据的时间间隔，单位：秒
-        cloud_gather_interval: 30
         # Kubernetes数据获取的时间间隔，单位：秒
         kubernetes_gather_interval: 30
         # 阿里公有云API获取区域列表时，需要指定一个区域
@@ -289,9 +287,9 @@ controller:
     synchronizer_cache_refresh_interval: 60
     # encoder cache refresh interval, unit: second
     encoder_cache_refresh_interval: 3600
-    # time interval for regularly clearing prometheus expired data, unit: hour
-    # time interval should be less than or equal to ingester: prometheus-label-cache-expiration configuration
-    data_clean_interval: 24
+    # time interval for regularly clearing prometheus expired data, unit: minute, default: 60 * 24
+    # time interval should be greater than or equal to ingester: prometheus-label-cache-expiration configuration
+    data_clean_interval: 1440
 
 querier:
   # querier http listenport
@@ -336,7 +334,8 @@ querier:
       response-cache: false
       cache-item-size: 512000 # max size of cache item, unit: byte
       cache-max-count: 1024 # max capacity of cache list
-      cache-max-allow-deviation: 3600 # unit:s 
+      cache-first-timeout: 10 # time out for first cache item load, uint: s
+      cache-clean-interval: 3600 # clean interval for cache, unit: s
 
   auto-custom-tag:
     tag-name: 

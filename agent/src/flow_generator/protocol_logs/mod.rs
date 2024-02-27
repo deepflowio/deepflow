@@ -29,9 +29,12 @@ pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
 
 pub use dns::{DnsInfo, DnsLog};
-pub use mq::{KafkaInfo, KafkaLog, MqttInfo, MqttLog};
+pub use mq::{
+    AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog, NatsInfo, NatsLog, OpenWireInfo,
+    OpenWireLog,
+};
 use num_enum::TryFromPrimitive;
-pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
+pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, DubboInfo, DubboLog, SofaRpcInfo, SofaRpcLog,
     SOFA_NEW_RPC_TRACE_CTX_KEY,
@@ -51,6 +54,7 @@ use std::{
     str,
 };
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use prost::Message;
 use serde::{Serialize, Serializer};
 
@@ -463,7 +467,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
 }
 
 fn decode_base64_to_string(value: &str) -> String {
-    let bytes = match base64::decode(value) {
+    let bytes = match BASE64_STANDARD.decode(value) {
         Ok(v) => v,
         Err(_) => return value.to_string(),
     };

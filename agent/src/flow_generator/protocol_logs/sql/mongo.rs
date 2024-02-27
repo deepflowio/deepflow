@@ -634,20 +634,28 @@ mod tests {
             };
 
             let mut mongo = MongoDBLog::default();
-            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            let param = &ParseParam::new(
+                packet as &MetaPacket,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
 
             let is_mongo = mongo.check_payload(payload, param);
             let info = mongo.parse_payload(payload, param);
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::MongoDBInfo(i) => {
-                        output.push_str(&format!("{:?} is_mongo: {}\r\n", i, is_mongo));
+                        output.push_str(&format!("{:?} is_mongo: {}\n", i, is_mongo));
                     }
                     _ => unreachable!(),
                 }
             } else {
                 output.push_str(&format!(
-                    "{:?} is_mongo: {}\r\n",
+                    "{:?} is_mongo: {}\n",
                     MongoDBInfo::default(),
                     is_mongo
                 ));

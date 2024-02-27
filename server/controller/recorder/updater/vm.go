@@ -26,21 +26,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VM struct {
-	UpdaterBase[cloudmodel.VM, mysql.VM, *diffbase.VM]
+	UpdaterBase[
+		cloudmodel.VM,
+		mysql.VM,
+		*diffbase.VM,
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMUpdate,
+		message.VMUpdate,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete]
 }
 
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	updater := &VM{
-		UpdaterBase[cloudmodel.VM, mysql.VM, *diffbase.VM]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVM(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VMs,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VM,
+			mysql.VM,
+			*diffbase.VM,
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMUpdate,
+			message.VMUpdate,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VM_EN,
+			wholeCache,
+			db.NewVM(),
+			wholeCache.DiffBaseDataSet.VMs,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -60,6 +83,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		))
 		return nil, false
 	}
+	hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
 	cloudTags := map[string]string{}
 	if cloudItem.CloudTags != nil {
 		cloudTags = cloudItem.CloudTags
@@ -67,10 +91,13 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	dbItem := &mysql.VM{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
+		IP:           cloudItem.IP,
+		Hostname:     cloudItem.Hostname,
 		UID:          cloudItem.Label,
 		State:        cloudItem.State,
 		HType:        cloudItem.HType,
 		LaunchServer: cloudItem.LaunchServer,
+		HostID:       hostID,
 		Domain:       m.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
@@ -84,8 +111,9 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	return dbItem, true
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.VMFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.VMFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
@@ -93,30 +121,52 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 			))
-			return nil, false
+			return nil, nil, false
 		}
-		updateInfo["epc_id"] = vpcID
+		mapInfo["epc_id"] = vpcID
+		structInfo.VPCID.SetNew(vpcID) // TODO is old value needed?
+		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
+	}
+	if diffBase.IP != cloudItem.IP {
+		mapInfo["ip"] = cloudItem.IP
+		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+	}
+	if diffBase.Hostname != cloudItem.Hostname {
+		mapInfo["hostname"] = cloudItem.Hostname
+		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
 	if diffBase.State != cloudItem.State {
-		updateInfo["state"] = cloudItem.State
+		mapInfo["state"] = cloudItem.State
+		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
 	if diffBase.HType != cloudItem.HType {
-		updateInfo["htype"] = cloudItem.HType
+		mapInfo["htype"] = cloudItem.HType
+		structInfo.HType.Set(diffBase.HType, cloudItem.HType)
 	}
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
-		updateInfo["launch_server"] = cloudItem.LaunchServer
+		mapInfo["launch_server"] = cloudItem.LaunchServer
+		structInfo.LaunchServer.Set(diffBase.LaunchServer, cloudItem.LaunchServer)
+	}
+	hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+	if diffBase.HostID != hostID {
+		mapInfo["host_id"] = hostID
+		structInfo.HostID.Set(diffBase.HostID, hostID)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
@@ -124,11 +174,9 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 			updateTags = cloudItem.CloudTags
 		}
 		tagsJson, _ := json.Marshal(updateTags)
-		updateInfo["cloud_tags"] = tagsJson
+		mapInfo["cloud_tags"] = tagsJson
+		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return updateInfo, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

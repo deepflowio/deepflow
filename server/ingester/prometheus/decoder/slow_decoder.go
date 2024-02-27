@@ -275,7 +275,6 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, p
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
-
 		if !d.labelTable.QueryLabelNameValue(nameId, valueId) {
 			addLabel(labelReq, l.Name, l.Value)
 			continue

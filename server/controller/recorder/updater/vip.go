@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type VIP struct {
-	UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]
+	UpdaterBase[
+		cloudmodel.VIP,
+		mysql.VIP,
+		*diffbase.VIP,
+		*message.VIPAdd,
+		message.VIPAdd,
+		*message.VIPUpdate,
+		message.VIPUpdate,
+		*message.VIPFieldsUpdate,
+		message.VIPFieldsUpdate,
+		*message.VIPDelete,
+		message.VIPDelete]
 }
 
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	updater := &VIP{
-		UpdaterBase[cloudmodel.VIP, mysql.VIP, *diffbase.VIP]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VIP_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewVIP(),
-			diffBaseData: wholeCache.DiffBaseDataSet.VIP,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.VIP,
+			mysql.VIP,
+			*diffbase.VIP,
+			*message.VIPAdd,
+			message.VIPAdd,
+			*message.VIPUpdate,
+			message.VIPUpdate,
+			*message.VIPFieldsUpdate,
+			message.VIPFieldsUpdate,
+			*message.VIPDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
+			wholeCache,
+			db.NewVIP(),
+			wholeCache.DiffBaseDataSet.VIP,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -59,17 +82,17 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysql.VIP, bool) 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (*message.VIPFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.VIPFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
-		updateInfo["ip"] = cloudItem.IP
+		mapInfo["ip"] = cloudItem.IP
+		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.VTapID != cloudItem.VTapID {
-		updateInfo["vtap_id"] = cloudItem.VTapID
+		mapInfo["vtap_id"] = cloudItem.VTapID
+		structInfo.VTapID.Set(diffBase.VTapID, cloudItem.VTapID)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

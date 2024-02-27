@@ -24,7 +24,8 @@ target/
 /server/libs/kubernetes/watcher.gen.go
 /cli/vendor/
 /cli/bin/
-/server/libs/zerodoc/pb/metric.proto
+/server/libs/flow-metrics/pb/metric.proto
+/server/libs/flow-metrics/pb/metric.pb.go
 /server/libs/datatype/pb/flow_log.proto
 /server/libs/stats/pb/stats.proto
 /server/libs/stats/pb/stats.pb.go

@@ -25,7 +25,7 @@ package datatype
 // in the IDC.
 //
 // Note: For historical reasons, we use the confusing term VTAP to refer
-// to deepflow-agent, and vtap_id to represent the id of a deepflow-agent.
+// to deepflow-agent, and agent_id to represent the id of a deepflow-agent.
 type TapType uint16
 
 const (

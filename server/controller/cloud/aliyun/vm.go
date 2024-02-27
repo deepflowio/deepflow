@@ -83,6 +83,17 @@ func (a *Aliyun) getVMs(region model.Region) (
 			}
 			createdAt, _ := time.Parse(common.GO_BIRTHDAY, createdTime)
 			vmLcuuidToVPCLcuuid[vmLcuuid] = VPCLcuuid
+
+			var pIP string
+			networks := vm.GetPath("NetworkInterfaces", "NetworkInterface")
+			for n := range networks.MustArray() {
+				network := networks.GetIndex(n)
+				if network.Get("Type").MustString() == "Primary" {
+					pIP = network.Get("PrimaryIpAddress").MustString()
+					break
+				}
+			}
+
 			retVM := model.VM{
 				Lcuuid:       vmLcuuid,
 				Name:         vmName,
@@ -90,7 +101,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 				HType:        common.VM_HTYPE_VM_C,
 				VPCLcuuid:    VPCLcuuid,
 				State:        vmState,
-				LaunchServer: "",
+				IP:           pIP,
 				CreatedAt:    createdAt,
 				AZLcuuid:     common.GenerateUUID(a.uuidGenerate + "_" + zoneId),
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),

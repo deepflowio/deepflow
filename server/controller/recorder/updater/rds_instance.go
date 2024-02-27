@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type RDSInstance struct {
-	UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]
+	UpdaterBase[
+		cloudmodel.RDSInstance,
+		mysql.RDSInstance,
+		*diffbase.RDSInstance,
+		*message.RDSInstanceAdd,
+		message.RDSInstanceAdd,
+		*message.RDSInstanceUpdate,
+		message.RDSInstanceUpdate,
+		*message.RDSInstanceFieldsUpdate,
+		message.RDSInstanceFieldsUpdate,
+		*message.RDSInstanceDelete,
+		message.RDSInstanceDelete]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
-		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *diffbase.RDSInstance]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewRDSInstance(),
-			diffBaseData: wholeCache.DiffBaseDataSet.RDSInstances,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.RDSInstance,
+			mysql.RDSInstance,
+			*diffbase.RDSInstance,
+			*message.RDSInstanceAdd,
+			message.RDSInstanceAdd,
+			*message.RDSInstanceUpdate,
+			message.RDSInstanceUpdate,
+			*message.RDSInstanceFieldsUpdate,
+			message.RDSInstanceFieldsUpdate,
+			*message.RDSInstanceDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
+			wholeCache,
+			db.NewRDSInstance(),
+			wholeCache.DiffBaseDataSet.RDSInstances,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -75,29 +98,33 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.RDSInstanceFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.RDSInstanceFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.State != cloudItem.State {
-		updateInfo["state"] = cloudItem.State
+		mapInfo["state"] = cloudItem.State
+		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
 	if diffBase.Series != cloudItem.Series {
-		updateInfo["series"] = cloudItem.Series
+		mapInfo["series"] = cloudItem.Series
+		structInfo.Series.Set(diffBase.Series, cloudItem.Series)
 	}
 	if diffBase.Model != cloudItem.Model {
-		updateInfo["model"] = cloudItem.Model
+		mapInfo["model"] = cloudItem.Model
+		structInfo.Model.Set(diffBase.Model, cloudItem.Model)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
+		mapInfo["az"] = cloudItem.AZLcuuid
+		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

@@ -27,14 +27,14 @@ message MiniField {
     uint32 protocol = 11;
     uint32 acl_gid = 12;
 
-    uint32 server_port = 13;
+    uint32 server_port = 13; // tunnel_ip_id also uses this field
     uint32 vtap_id = 14;
     uint64 tap_port = 15;
     uint32 tap_type = 16;
     uint32 l7_protocol = 17;
 
-    uint32 tag_type = 18;
-    uint32 tag_value = 19;
+    // Deprecated in v6.4.9: uint32 tag_type = 18;
+    // Deprecated in v6.4.9: uint32 tag_value = 19;
 
     uint32 gpid = 20;
     uint32 gpid1 = 21;

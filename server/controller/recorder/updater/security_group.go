@@ -23,21 +23,44 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type SecurityGroup struct {
-	UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *diffbase.SecurityGroup]
+	UpdaterBase[
+		cloudmodel.SecurityGroup,
+		mysql.SecurityGroup,
+		*diffbase.SecurityGroup,
+		*message.SecurityGroupAdd,
+		message.SecurityGroupAdd,
+		*message.SecurityGroupUpdate,
+		message.SecurityGroupUpdate,
+		*message.SecurityGroupFieldsUpdate,
+		message.SecurityGroupFieldsUpdate,
+		*message.SecurityGroupDelete,
+		message.SecurityGroupDelete]
 }
 
 func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGroup) *SecurityGroup {
 	updater := &SecurityGroup{
-		UpdaterBase[cloudmodel.SecurityGroup, mysql.SecurityGroup, *diffbase.SecurityGroup]{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
-			cache:        wholeCache,
-			dbOperator:   db.NewSecurityGroup(),
-			diffBaseData: wholeCache.DiffBaseDataSet.SecurityGroups,
-			cloudData:    cloudData,
-		},
+		newUpdaterBase[
+			cloudmodel.SecurityGroup,
+			mysql.SecurityGroup,
+			*diffbase.SecurityGroup,
+			*message.SecurityGroupAdd,
+			message.SecurityGroupAdd,
+			*message.SecurityGroupUpdate,
+			message.SecurityGroupUpdate,
+			*message.SecurityGroupFieldsUpdate,
+			message.SecurityGroupFieldsUpdate,
+			*message.SecurityGroupDelete,
+		](
+			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
+			wholeCache,
+			db.NewSecurityGroup(),
+			wholeCache.DiffBaseDataSet.SecurityGroups,
+			cloudData,
+		),
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -70,20 +93,21 @@ func (g *SecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroup)
 	return dbItem, true
 }
 
-func (g *SecurityGroup) generateUpdateInfo(diffBase *diffbase.SecurityGroup, cloudItem *cloudmodel.SecurityGroup) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
+func (g *SecurityGroup) generateUpdateInfo(diffBase *diffbase.SecurityGroup, cloudItem *cloudmodel.SecurityGroup) (*message.SecurityGroupFieldsUpdate, map[string]interface{}, bool) {
+	structInfo := new(message.SecurityGroupFieldsUpdate)
+	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
-		updateInfo["name"] = cloudItem.Name
+		mapInfo["name"] = cloudItem.Name
+		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	if diffBase.Label != cloudItem.Label {
-		updateInfo["label"] = cloudItem.Label
+		mapInfo["label"] = cloudItem.Label
+		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
-		updateInfo["region"] = cloudItem.RegionLcuuid
+		mapInfo["region"] = cloudItem.RegionLcuuid
+		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+	return structInfo, mapInfo, len(mapInfo) > 0
 }

@@ -110,6 +110,9 @@ static void datadump_help(void)
 	fprintf(stderr, "    80:  PROTO_REDIS\n");
 	fprintf(stderr, "    100: PROTO_KAFKA\n");
 	fprintf(stderr, "    101: PROTO_MQTT\n");
+	fprintf(stderr, "    102: PROTO_AMQP\n");
+	fprintf(stderr, "    103: PROTO_OPENWIRE\n");
+	fprintf(stderr, "    104: PROTO_NATS\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
 	fprintf(stderr, "    121: PROTO_TLS\n");
 	fprintf(stderr, "PID:\n");
@@ -419,9 +422,10 @@ static inline void df_bpf_sockopt_msg_free(void *msg)
 
 static inline void get_kernel_version(char *buf)
 {
-	int major, minor, patch;
-	fetch_kernel_version(&major, &minor, &patch);
-	snprintf(buf, LINUX_VER_LEN, "Linux %d.%d.%d\n", major, minor, patch);
+	int major, minor, rev, num;
+	fetch_kernel_version(&major, &minor, &rev, &num);
+	snprintf(buf, LINUX_VER_LEN, "Linux %d.%d.%d-%d\n",
+		 major, minor, rev, num);
 }
 
 static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,

@@ -32,10 +32,13 @@ func (b *DataSet) AddVM(dbItem *mysql.VM, seq int, toolDataSet *tool.DataSet) {
 		},
 		Name:         dbItem.Name,
 		Label:        dbItem.Label,
+		IP:           dbItem.IP,
+		Hostname:     dbItem.Hostname,
 		VPCLcuuid:    vpcLcuuid,
 		State:        dbItem.State,
 		HType:        dbItem.HType,
 		LaunchServer: dbItem.LaunchServer,
+		HostID:       dbItem.HostID,
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 		CloudTags:    dbItem.CloudTags,
@@ -53,18 +56,23 @@ type VM struct {
 	DiffBase
 	Name         string            `json:"name"`
 	Label        string            `json:"label"`
+	IP           string            `json:"ip"`
+	Hostname     string            `json:"hostname"`
 	State        int               `json:"state"`
 	HType        int               `json:"htype"`
 	LaunchServer string            `json:"launch_server"`
+	HostID       int               `json:"host_id"`
 	VPCLcuuid    string            `json:"vpc_lcuuid"`
 	RegionLcuuid string            `json:"region_lcuuid"`
 	AZLcuuid     string            `json:"az_lcuuid"`
 	CloudTags    map[string]string `json:"cloud_tags"`
 }
 
-func (v *VM) Update(cloudItem *cloudmodel.VM) {
+func (v *VM) Update(cloudItem *cloudmodel.VM, toolDataSet *tool.DataSet) {
 	v.Name = cloudItem.Name
 	v.Label = cloudItem.Label
+	v.IP = cloudItem.IP
+	v.Hostname = cloudItem.Hostname
 	v.State = cloudItem.State
 	v.HType = cloudItem.HType
 	v.LaunchServer = cloudItem.LaunchServer
@@ -72,5 +80,9 @@ func (v *VM) Update(cloudItem *cloudmodel.VM) {
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.AZLcuuid = cloudItem.AZLcuuid
 	v.CloudTags = cloudItem.CloudTags
+	hostID, exists := toolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+	if exists {
+		v.HostID = hostID
+	}
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, v))
 }

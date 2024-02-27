@@ -1,0 +1,26 @@
+version: '3.2'
+services:
+  deepflow-agent:
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-agent:latest
+    container_name: deepflow-agent
+    restart: always
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYSLOG
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 768M
+        reservations:
+          cpus: '1'
+          memory: 768M
+    volumes:
+      - /etc/deepflow-agent.yaml:/etc/deepflow-agent/deepflow-agent.yaml:ro
+      - /sys/kernel/debug:/sys/kernel/debug:ro
+    network_mode: "host"

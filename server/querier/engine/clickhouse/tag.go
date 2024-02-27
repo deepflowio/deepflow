@@ -145,7 +145,10 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		}
 	} else {
-		if name == "metrics" {
+		// Only vtap_acl translate policy_id
+		if strings.Trim(name, "`") == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			stmts = append(stmts, &SelectTag{Value: selectTag})
+		} else if name == "metrics" {
 			tagTranslator := ""
 			if db == "flow_log" {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
@@ -277,7 +280,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		m.AddCallback(strings.Trim(t.Value, "`"), ColumnNameSwap([]interface{}{strings.Trim(t.Value, "`")}))
 	} else {
 		m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-		if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+		if common.IsValueInSliceString(t.Value, []string{"tap_port", "capture_nic", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
 			alias := t.Value
 			if t.Alias != "" {
 				alias = t.Alias

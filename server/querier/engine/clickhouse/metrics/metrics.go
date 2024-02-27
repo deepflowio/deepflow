@@ -180,6 +180,9 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 						continue
 					}
 					name := tagSlice[0].(string)
+					if name == "lb_listener" || name == "pod_ingress" {
+						continue
+					}
 					clientName := tagSlice[1].(string)
 					serverName := tagSlice[2].(string)
 					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
@@ -266,15 +269,15 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -331,15 +334,15 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -659,19 +662,19 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			metrics = VTAP_FLOW_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
-		case "vtap_flow_edge_port":
+		case "network_map":
 			metrics = VTAP_FLOW_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
-		case "vtap_app_port":
+		case "application":
 			metrics = VTAP_APP_PORT_METRICS
 			replaceMetrics = VTAP_APP_PORT_METRICS_REPLACE
-		case "vtap_app_edge_port":
+		case "application_map":
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
-		case "vtap_acl":
+		case "traffic_policy":
 			metrics = VTAP_ACL_METRICS
 			replaceMetrics = VTAP_ACL_METRICS_REPLACE
 		}

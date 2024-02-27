@@ -22,18 +22,18 @@ import (
 )
 
 type ChGProcess struct {
-	UpdaterBase[mysql.ChGProcess, IDKey]
+	UpdaterComponent[mysql.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	updater := &ChGProcess{
-		UpdaterBase[mysql.ChGProcess, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_GPROCESS,
-		},
+		newUpdaterComponent[mysql.ChGProcess, IDKey](
+			RESOURCE_TYPE_CH_GPROCESS,
+		),
 		resourceTypeToIconID,
 	}
-	updater.dataGenerator = updater
+	updater.updaterDG = updater
 	return updater
 }
 
@@ -52,7 +52,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				Name:    process.Name + " (deleted)",
 				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID: process.VMID,
-				VPCID:   process.VPCID,
+				L3EPCID: process.VPCID,
 			}
 		} else {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
@@ -60,7 +60,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				Name:    process.Name,
 				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID: process.VMID,
-				VPCID:   process.VPCID,
+				L3EPCID: process.VPCID,
 			}
 		}
 	}
@@ -76,14 +76,14 @@ func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysql.ChGProcess) (map[
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
 	}
-	if oldItem.IconID != newItem.IconID {
+	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
 	}
 	if oldItem.CHostID != newItem.CHostID {
 		updateInfo["chost_id"] = newItem.CHostID
 	}
-	if oldItem.VPCID != newItem.VPCID {
-		updateInfo["vpc_id"] = newItem.VPCID
+	if oldItem.L3EPCID != newItem.L3EPCID {
+		updateInfo["l3_epc_id"] = newItem.L3EPCID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

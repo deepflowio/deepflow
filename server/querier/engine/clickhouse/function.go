@@ -160,15 +160,19 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 
 	fieldsLen := len(fields)
 	dbFields := make([]string, fieldsLen)
+	conditions := make([]string, 0, fieldsLen)
 
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
+
 		field = strings.Trim(field, "`")
 		metricStruct, ok = metrics.GetAggMetrics(field, db, table, ctx)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
 		dbFields[i] = metricStruct.DBField
+		condition := metricStruct.Condition
+
 		// enum tag
 		tagEnum := strings.TrimSuffix(field, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
@@ -185,6 +189,11 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 			}
 		}
 
+		if condition == "" {
+			condition = dbFields[i] + " != ''"
+			conditions = append(conditions, condition)
+		}
+
 		// 判断算子是否支持单层
 		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
 			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
@@ -195,10 +204,13 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	}
 
 	metricStructCopy := *metricStruct
+	metricStructCopy.DBField = strings.Join(dbFields, ", ")
+	metricStructCopy.Condition = strings.Join(conditions, " AND ")
 	if fieldsLen > 1 {
-		metricStructCopy.DBField = "(" + strings.Join(dbFields, ", ") + ")"
-	} else {
-		metricStructCopy.DBField = strings.Join(dbFields, ", ")
+		metricStructCopy.DBField = "(" + metricStructCopy.DBField + ")"
+		if metricStructCopy.Condition != "" {
+			metricStructCopy.Condition = "(" + strings.Join(conditions, " AND ") + ")"
+		}
 	}
 
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
@@ -312,10 +324,15 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		var innerFunction view.DefaultFunction
 		// Inner layer derivative
 		if f.IsDerivative {
+			args := []string{}
+			if len(f.DerivativeArgs) > 1 {
+				args = append(args, f.DerivativeArgs[1:]...)
+			}
 			innerFunction = view.DefaultFunction{
 				Name:           view.FUNCTION_DERIVATIVE,
 				Fields:         []view.Node{&view.Field{Value: f.Metrics.DBField}},
 				DerivativeArgs: f.DerivativeArgs,
+				Args:           args,
 			}
 		} else {
 			innerFunction = view.DefaultFunction{
@@ -335,11 +352,49 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			IgnoreZero: true,
 		}
-		// When using avg, max, and min operators. The inner layer uses itself
-		if slices.Contains([]string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+		// When using max, and min operators. The inner layer uses itself
+		if slices.Contains([]string{view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
 			innerFunction = view.DefaultFunction{
-				Name:   f.Name,
-				Fields: []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Name:       f.Name,
+				Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				IgnoreZero: true,
+			}
+		}
+		if f.Name == view.FUNCTION_AVG {
+			// delay class, inner structure is sum (x)/sum (y)
+			if strings.Contains(f.Metrics.DBField, "/") {
+				divFields := strings.Split(f.Metrics.DBField, "/")
+				divField_0 := view.DefaultFunction{
+					Name:   view.FUNCTION_SUM,
+					Fields: []view.Node{&view.Field{Value: divFields[0]}},
+				}
+				divField_1 := view.DefaultFunction{
+					Name:   view.FUNCTION_SUM,
+					Fields: []view.Node{&view.Field{Value: divFields[1]}},
+				}
+				innerFunction := view.DivFunction{
+					DefaultFunction: view.DefaultFunction{
+						Name:   view.FUNCTION_DIV,
+						Fields: []view.Node{&divField_0, &divField_1},
+					},
+					DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+				}
+				innerAlias = innerFunction.SetAlias("", true)
+				innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+				innerFunction.Init()
+				m.AddTag(&innerFunction)
+				return innerAlias
+			} else {
+				innerFunction := view.DefaultFunction{
+					Name:       f.Name,
+					Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+					IgnoreZero: true,
+				}
+				innerAlias = innerFunction.SetAlias("", true)
+				innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+				innerFunction.Init()
+				m.AddTag(&innerFunction)
+				return innerAlias
 			}
 		}
 		innerAlias = innerFunction.SetAlias("", true)
@@ -640,7 +695,7 @@ func (t *Time) Format(m *view.Model) {
 		m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
 	}
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
-	if m.Time.Fill != "" && m.Time.Interval > 0 {
+	if (m.Time.Fill == "0" || m.Time.Fill == "none" || m.Time.Fill == "null") && m.Time.Interval > 0 {
 		m.AddCallback("time", TimeFill([]interface{}{m}))
 	}
 }

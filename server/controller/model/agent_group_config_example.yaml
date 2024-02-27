@@ -391,23 +391,20 @@ vtap_group_id: g-xxxxxx
 ## collection. This configuration also applies to tcp_sequence and pcap data in
 ## the Enterprise Edition.
 ## Supported values:
-## - 0 (Rest)
-## - 1 (Client)
-## - 2 (Server)
-## - 4 (Local)
-## - 9 (ClientNode)
-## - 10 (ServerNode)
-## - 17 (ClientHypervisor)
-## - 18 (ServerHypervisor)
-## - 25 (ClientGatewayHypervisor)
-## - 26 (ServerGatewayHypervisor)
-## - 33 (ClientGateway)
-## - 34 (ServerGateway)
-## - 41 (ClientProcess)
-## - 42 (ServerProcess)
-## - 48 (App)
-## - 49 (ClientApp)
-## - 50 (ServerApp)
+## - 0 (rest: Other NIC)
+## - 1 (c: Client NIC)
+## - 2 (s: Server NIC)
+## - 4 (local: Local NIC)
+## - 9 (c-nd: Client K8s Node)
+## - 10 (s-nd: Server K8s Node)
+## - 17 (c-hv: Client VM Hypervisor)
+## - 18 (s-hv: Server VM Hypervisor)
+## - 25 (c-gw-hv: Client-side Gateway Hypervisor)
+## - 26 (s-gw-hv: Server-side Gateway Hypervisor)
+## - 33 (c-gw: Client-side Gateway)
+## - 34 (s-gw: Server-side Gateway)
+## - 41 (c-p: Client Process)
+## - 42 (s-p: Server Process)
 #l4_log_ignore_tap_sides: []
 
 ## L7 flow log ignored tap sides
@@ -945,8 +942,8 @@ vtap_group_id: g-xxxxxx
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
   #l7-protocol-enabled:
-  #- HTTP ## for both HTTP and HTTP_TLS
-  #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- HTTP
+  #- HTTP2 ## for both HTTP2 and gRPC
   #- SofaRPC
   #- FastCGI
   #- Dubbo
@@ -956,6 +953,9 @@ vtap_group_id: g-xxxxxx
   #- MongoDB
   #- Kafka
   #- MQTT
+  #- AMQP
+  #- OpenWire
+  #- NATS
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin
@@ -967,9 +967,8 @@ vtap_group_id: g-xxxxxx
   ## Note: HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
   ##   All data obtained through Uprobe is not subject to port restrictions.
   #l7-protocol-ports:
-    #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
-    #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
-    #"Custom": "1-65535" # plugins
+    #"HTTP": "1-65535"
+    #"HTTP2": "1-65535" # for both HTTP2 and gRPC
     #"SofaRPC": "1-65535"
     #"FastCGI": "1-65535"
     #"Dubbo": "1-65535"
@@ -979,8 +978,10 @@ vtap_group_id: g-xxxxxx
     #"MongoDB": "1-65535"
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
+    #"OpenWire": "1-65535"
     #"DNS": "53,5353"
     #"TLS": "443"
+    #"Custom": "1-65535" # plugins
 
   ## L7 Protocol Advanced Features
   #l7-protocol-advanced-features:
@@ -1235,17 +1236,6 @@ vtap_group_id: g-xxxxxx
       ## Sampling process name
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
-
-      ## The maximum limit space in the root directory of each Java process. deepflow-agent will
-      ## automatically create a `/deepflow/` directory to temporarily store the symbol files of the
-      ## Java process. The space occupied by the files written by deepflow-agent will not exceed this
-      ## configured value. All files are stored temporarily and are immediately cleared once the Java
-      ## symbol files are obtained.
-      ## Default: 10. Range: [2, 100]
-      ## Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
-      ## this range, the default value of 10(10Mi), will be used.
-      #java-symbol-file-max-space-limit: 10
-
 
       ## When deepflow-agent finds that an unresolved function name appears in the function call stack
       ## of a Java process, it will trigger the regeneration of the symbol file of the process.

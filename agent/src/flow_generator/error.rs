@@ -47,9 +47,18 @@ pub enum Error {
     MqttLogParseFailed,
     #[error("mqtt perf parse failed")]
     MqttPerfParseFailed,
+    #[error("openwire log parse failed")]
+    OpenwireLogParseFailed,
+    // openwire log parse unimplemented is acceptable
+    #[error("openwire log parse unimplemented")]
+    OpenwireLogParseUnimplemented,
+    #[error("openwire perf parse failed")]
+    OpenwirePerfParseFailed,
     #[error("redis log parse failed")]
     RedisLogParseFailed,
     #[error("redis perf parse failed")]
+    RedisLogParsePartial,
+    #[error("redis perf parse partial result")]
     RedisPerfParseFailed,
     #[error("mysql log parse failed")]
     MysqlLogParseFailed,

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -130,7 +131,7 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "os.app.")
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
-			filter = fmt.Sprintf("(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
+			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
 
 		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
 			resourceNoSuffix == "host" || resourceNoSuffix == "service" {
@@ -149,6 +150,15 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (101,102)"}, "")
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
+			}
+		} else if resourceInfo, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]; ok {
+			deviceTypeValue = resourceInfo.ResourceType
+			deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
+
+			if deviceTypeValue == tag.VIF_DEVICE_TYPE_VM {
+				filter = "l3_device_id" + suffix + "!=0 AND l3_device_type" + suffix + "=" + deviceTypeValueStr
+			} else {
+				filter = resourceInfo.ResourceName + "_id" + suffix + "!=0"
 			}
 		}
 	}
@@ -184,6 +194,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			op = "not ilike"
 		}
 	} else if strings.ToLower(op) == "regexp" || strings.ToLower(op) == "not regexp" {
+		// check regexp format
+		// 检查正则表达式格式
+		_, err := regexp.Compile(strings.Trim(t.Value, "'"))
+		if err != nil {
+			error := fmt.Errorf("%s : %s", err, t.Value)
+			return nil, error
+		}
 		if strings.ToLower(op) == "regexp" {
 			op = "match"
 		} else {
@@ -191,9 +208,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 	}
 	if db == "flow_tag" {
+		if t.Tag == "vpc" || t.Tag == "vpc_id" {
+			t.Tag = strings.Replace(t.Tag, "vpc", "l3_epc", 1)
+		}
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "type", "1":
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "type", "1", "user_id":
 			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 		case "key", "table":
 			filter = fmt.Sprintf("`%s` %s %s", t.Tag, op, t.Value)
@@ -447,6 +467,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		return &view.Expr{Value: filter}, nil
 	} else {
+		if t.Tag == "tap_port" {
+			t.Tag = "capture_nic"
+		}
 		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 		filter := ""
 		if !ok {
@@ -478,7 +501,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 							filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 						}
-					case "tap_port":
+					case "tap_port", "capture_nic":
 						macValue := strings.TrimLeft(t.Value, "(")
 						macValue = strings.TrimRight(macValue, ")")
 						macSlice := strings.Split(macValue, ",")
@@ -675,7 +698,10 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 						}
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 					}
-				case "tap_port":
+				case "tap_port", "capture_nic":
+					if t.Tag == "tap_port" {
+						t.Tag = "capture_nic"
+					}
 					macValue := strings.TrimLeft(t.Value, "(")
 					macValue = strings.TrimRight(macValue, ")")
 					macSlice := strings.Split(macValue, ",")
@@ -860,6 +886,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				}
 				return &view.Expr{Value: filter}, nil
 			}
+		}
+		// Only vtap_acl translate policy_id
+		if strings.Trim(t.Tag, "`") == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
+			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			return &view.Expr{Value: filter}, nil
 		}
 		whereFilter := tagItem.WhereTranslator
 		if whereFilter != "" {
@@ -1242,14 +1273,23 @@ func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, 
 		}
 		time = int64(timeValue.(float64))
 	}
+	newTime := time
 	if compareExpr.Operator == ">=" || compareExpr.Operator == ">" {
-		w.time.AddTimeStart(time)
+		// Derivative operator start time forward
+		if e.IsDerivative && w.time.Interval > 0 {
+			newTime -= int64(w.time.Interval)
+		}
+		w.time.AddTimeStart(newTime)
 		w.time.TimeStartOperator = compareExpr.Operator
 	} else if compareExpr.Operator == "<=" || compareExpr.Operator == "<" {
 		w.time.AddTimeEnd(time)
 		w.time.TimeEndOperator = compareExpr.Operator
 	}
-	return &view.Expr{Value: sqlparser.String(compareExpr)}, nil
+	newValue := sqlparser.String(compareExpr)
+	if newTime != time {
+		newValue = strings.Replace(newValue, strconv.FormatInt(time, 10), strconv.FormatInt(newTime, 10), 1)
+	}
+	return &view.Expr{Value: newValue}, nil
 }
 
 type WhereFunction struct {
@@ -1275,6 +1315,13 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				// check regexp format
+				// 检查正则表达式格式
+				_, err := regexp.Compile(strings.Trim(f.Value, "'"))
+				if err != nil {
+					error := fmt.Errorf("%s : %s", err, f.Value)
+					return nil, error
+				}
 				if strings.ToLower(opName) == "regexp" {
 					opName = "match"
 				} else {
@@ -1318,6 +1365,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		if isStringEnumOK {
 			isIntEnum = false
 		}
+		if tagName == "tap_side" {
+			tagName = "observation_point"
+		} else if tagName == "tap_port_type" {
+			tagName = "capture_nic_type"
+		}
 		tagItem, ok := tag.GetTag(tagName, db, table, "enum")
 		if !ok {
 			right = view.Expr{Value: f.Value}
@@ -1331,6 +1383,13 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				// check regexp format
+				// 检查正则表达式格式
+				_, err := regexp.Compile(strings.Trim(f.Value, "'"))
+				if err != nil {
+					error := fmt.Errorf("%s : %s", err, f.Value)
+					return nil, error
+				}
 				if strings.ToLower(opName) == "regexp" {
 					opName = "match"
 				} else {
@@ -1367,6 +1426,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
 							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + "dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						} else {
+
 							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}
 					} else {

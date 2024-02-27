@@ -51,6 +51,8 @@ message Flow {
     repeated uint32 acl_gids = 24;
 
     uint32 direction_score = 25;
+
+    string request_domain = 26;
 }
 
 message FlowKey {

@@ -73,9 +73,6 @@ pub(super) fn bench(c: &mut Criterion) {
                 panic!("unable to load pcap file");
             }
 
-            let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
-            let req_param = ParseParam::new(&packets[0], rrt_cache.clone(), true, true);
-            let resp_param = ParseParam::new(&packets[1], rrt_cache.clone(), true, true);
             let mut parser = HttpLog::new_v1();
 
             let first_dst_port = packets[0].lookup_key.dst_port;
@@ -86,6 +83,26 @@ pub(super) fn bench(c: &mut Criterion) {
                     packet.lookup_key.direction = PacketDirection::ServerToClient;
                 }
             }
+
+            let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
+            let req_param = ParseParam::new(
+                &packets[0],
+                rrt_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
+            let resp_param = ParseParam::new(
+                &packets[1],
+                rrt_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
 
             let start = Instant::now();
             for _ in 0..iters {

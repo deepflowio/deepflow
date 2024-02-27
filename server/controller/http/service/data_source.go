@@ -34,9 +34,9 @@ import (
 )
 
 var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
-	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.vtap_flow*
+	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.network*
 	"网络-流日志",                  // flow_log.l4_flow_log
-	"应用-指标（秒级）", "应用-指标（分钟级）", // flow_metrics.vtap_app*
+	"应用-指标（秒级）", "应用-指标（分钟级）", // flow_metrics.application*
 	"应用-调用日志",       // flow_log.l7_flow_log
 	"网络-TCP 时序数据",   // flow_log.l4_packet
 	"网络-PCAP 数据",    // flow_log.l7_packet
@@ -47,6 +47,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-IO 事件",      // event.perf_event
 	"事件-告警事件",       // event.alarm_event
 	"应用-性能剖析",       // profile.in_process
+	"网络-网络策略",       // flow_metrics.traffic_policy
 }
 
 func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
@@ -61,16 +62,18 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 	if t, ok := filter["type"]; ok {
 		var collection string
 		switch t {
-		case "app":
-			collection = "flow_metrics.vtap_app*"
-		case "flow":
-			collection = "flow_metrics.vtap_flow*"
+		case "application":
+			collection = "flow_metrics.application*"
+		case "network":
+			collection = "flow_metrics.network*"
 		case "deepflow_system":
 			collection = "deepflow_system.*"
 		case "ext_metrics":
 			collection = "ext_metrics.*"
 		case "prometheus":
 			collection = "prometheus.*"
+		case "traffic_policy":
+			collection = "flow_metrics.traffic_policy"
 		default:
 			return nil, fmt.Errorf("not support type(%s)", t)
 		}
@@ -486,7 +489,7 @@ func convertNameToInterval(name string) (interval int) {
 
 func getTableName(collection string) string {
 	name := collection
-	if collection == common.DATA_SOURCE_APP || collection == common.DATA_SOURCE_FLOW {
+	if collection == common.DATA_SOURCE_APPLICATION || collection == common.DATA_SOURCE_NETWORK || collection == common.DATA_SOURCE_TRAFFIC_POLICY {
 		name = strings.TrimPrefix(name, "flow_metrics.")
 		name = strings.TrimSuffix(name, "*")
 	}
