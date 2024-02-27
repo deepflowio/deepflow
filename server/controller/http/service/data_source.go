@@ -19,8 +19,10 @@ package service
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -51,6 +53,9 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 }
 
 func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
+	t1 := time.Now()
+	process_id := os.Getpid()
+	log.Infof("weiqiang process id is: %d", process_id)
 	var response []model.DataSource
 	var dataSources []mysql.DataSource
 	var baseDataSources []mysql.DataSource
@@ -86,18 +91,24 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 			Db = Db.Where("`interval` = ?", interval)
 		}
 	}
+	log.Infof("weiqiang filter, time since %v", time.Since(t1))
+	t2 := time.Now()
 	if err := Db.Find(&dataSources).Error; err != nil {
 		return nil, err
 	}
+	log.Infof("weiqiang find data source, time since %v", time.Since(t2))
 
+	t3 := time.Now()
 	if err := mysql.Db.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
+	log.Infof("weiqiang find base data source, time since %v", time.Since(t3))
 	idToDisplayName := make(map[int]string)
 	for _, baseDataSource := range baseDataSources {
 		idToDisplayName[baseDataSource.ID] = baseDataSource.DisplayName
 	}
 
+	t4 := time.Now()
 	for _, dataSource := range dataSources {
 		name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 		if err != nil {
@@ -143,6 +154,7 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 
 		response = append(response, dataSourceResp)
 	}
+	log.Infof("weiqiang range data source, time since %v", time.Since(t4))
 	return response, nil
 }
 
