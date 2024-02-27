@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::io::{Error as IoError, ErrorKind, Result as IoResult};
+
 use public::utils::net::{
     get_adapters_addresses, is_global, is_link_local_multicast, is_link_local_unicast, Error,
     LinkFlags, Result,
@@ -57,8 +59,8 @@ pub fn get_ip_address() -> Result<String, Error> {
     Ok(link_info)
 }
 
-pub fn get_hostname() -> Result<String> {
+pub fn get_hostname() -> IoResult<String> {
     hostname::get()?
         .into_string()
-        .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
+        .map_err(|_| IoError::new(ErrorKind::Other, "get hostname failed"))
 }
