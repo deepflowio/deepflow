@@ -37,6 +37,7 @@ use super::{
 };
 use crate::{
     common::{
+        endpoint::EPC_INTERNET,
         enums::{EthernetType, IpProtocol},
         flow::{L7Protocol, SignalSource},
     },
@@ -841,20 +842,22 @@ fn get_single_tagger(
             }
         }
         RunningMode::Managed => {
-            if !is_active_host && !config.inactive_ip_enabled {
-                unspecified_ip(is_ipv6)
+            if !config.inactive_ip_enabled {
+                if !is_active_host {
+                    unspecified_ip(is_ipv6)
+                } else {
+                    side.nat_real_ip
+                }
             } else if ep == FLOW_METRICS_PEER_SRC {
-                if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+                if flow.peers[0].l3_epc_id != EPC_INTERNET
+                    || flow.signal_source == SignalSource::OTel
+                {
                     flow.peers[0].nat_real_ip
                 } else {
                     unspecified_ip(is_ipv6)
                 }
             } else {
-                if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-                    flow.peers[1].nat_real_ip
-                } else {
-                    unspecified_ip(is_ipv6)
-                }
+                flow.peers[1].nat_real_ip
             }
         }
     };
@@ -946,11 +949,10 @@ fn get_edge_tagger(
                 // except for otel data
                 // =======================================
                 // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
-                if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
+                if flow.peers[0].l3_epc_id == EPC_INTERNET
+                    && flow.signal_source != SignalSource::OTel
+                {
                     src_ip = unspecified_ip(is_ipv6);
-                }
-                if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                    dst_ip = unspecified_ip(is_ipv6);
                 }
             }
 
