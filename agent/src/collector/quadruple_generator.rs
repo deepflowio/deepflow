@@ -36,7 +36,7 @@ use super::{
 };
 
 use crate::common::{
-    endpoint::EPC_FROM_INTERNET,
+    endpoint::EPC_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
     flow::{CloseType, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
@@ -850,7 +850,7 @@ impl QuadrupleGenerator {
             let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
             if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
                 || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
-                    && side.l3_epc_id != EPC_FROM_INTERNET)
+                    && side.l3_epc_id != EPC_INTERNET)
             {
                 no_endpoint_flag = false;
                 break;

@@ -19,8 +19,10 @@ use std::{net::IpAddr, net::Ipv4Addr, sync::Arc};
 
 use super::platform_data::PlatformData;
 
-pub const EPC_FROM_DEEPFLOW: i32 = -1;
-pub const EPC_FROM_INTERNET: i32 = -2;
+pub const EPC_UNKNOWN: i32 = 0;
+pub const EPC_ANY: i32 = -1;
+pub const EPC_INTERNET: i32 = -2;
+pub const EPC_DEEPFLOW: i32 = -3;
 pub const GROUP_INTERNET: i32 = -2;
 
 bitflags! {
@@ -52,7 +54,7 @@ impl EndpointInfo {
         self.l3_end = ends.1;
         // L3和L2都是TRUE的时候, 更新L3EpcId
         if self.l2_end && self.l3_end {
-            if self.l2_epc_id != 0 && self.l3_epc_id == EPC_FROM_INTERNET {
+            if self.l2_epc_id != 0 && self.l3_epc_id == EPC_INTERNET {
                 self.l3_epc_id = self.l2_epc_id;
             }
         }

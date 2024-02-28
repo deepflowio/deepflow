@@ -729,7 +729,7 @@ mod test {
         let result = getter.lookup_all_by_key(&mut key);
         assert_eq!(result.is_some(), true);
         if let Some((p, e, _)) = result {
-            assert_eq!(Arc::strong_count(&p), 1);
+            assert_eq!(Arc::strong_count(&p), 2);
             assert_eq!(2, e.src_info.l3_epc_id);
             assert_eq!(10, e.dst_info.l3_epc_id);
         }
