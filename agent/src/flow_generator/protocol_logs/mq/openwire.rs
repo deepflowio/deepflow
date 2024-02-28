@@ -11,10 +11,10 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            decode_base64_to_string,
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
@@ -407,44 +407,55 @@ fn parse_command_type(payload: &[u8]) -> Result<(&[u8], OpenWireCommand)> {
     let command_type = OpenWireCommand::try_from(command_type[0])?;
     Ok((payload, command_type))
 }
-fn parse_sw8_trace_id(payload: &[u8]) -> Result<String> {
-    // header pattern: "sw8\x09<length in short type>1-<trace id>-"
+fn parse_trace_and_span(
+    payload: &[u8],
+    config: &L7LogDynamicConfig,
+) -> Result<(Option<String>, Option<String>)> {
+    // header pattern: "<TraceType>\x09<length in short type><values>"
+    // now only skywalking supports activemq
+    let trace_type = TraceType::Sw8;
+    let trace_parsable = config.trace_types.contains(&trace_type);
+    let span_parsable = config.span_types.contains(&trace_type);
+    if !span_parsable && !trace_parsable {
+        return Ok((None, None));
+    }
     let header_pattern = b"sw8\x09";
     let mut next_payload = payload;
     while next_payload.len() > header_pattern.len() {
         let payload = next_payload;
-        next_payload = next_payload.get(1..).unwrap_or_default();
-        // match "sw8\x09"
+        // match header_pattern
         let payload = match payload
             .windows(header_pattern.len())
             .position(|window| window == header_pattern)
         {
-            Some(index) => &payload[index + header_pattern.len()..],
-            None => continue,
+            Some(index) => {
+                next_payload = &payload[index + header_pattern.len()..];
+                &payload[index + header_pattern.len()..]
+            }
+            None => break,
         };
-        // parse length
-        let payload = match parse_short(payload) {
-            Ok((payload, _)) => payload,
+        // parse values length
+        let values = match parse_short(payload) {
+            Ok((payload, length)) => payload
+                .get(..length as usize)
+                .ok_or(Error::OpenwireLogParseFailed)?,
             Err(_) => continue,
         };
-        // match "1-"
-        if payload.get(0..2) != Some(b"1-") {
-            continue;
-        }
-        let payload = &payload[2..];
-        // find next "-"
-        let trace_id = match payload.iter().position(|&c| c == b'-') {
-            Some(index) => &payload[..index],
-            None => continue,
-        };
-        // parse trace_id
-        let trace_id = match std::str::from_utf8(&trace_id) {
-            Ok(trace_id) => trace_id,
+        let values = match std::str::from_utf8(values) {
+            Ok(values) => values,
             Err(_) => continue,
         };
-        // base64 decode
-        let trace_id = decode_base64_to_string(trace_id);
-        return Ok(trace_id);
+        let trace_id = if trace_parsable {
+            trace_type.decode_trace_id(values).map(|s| s.to_string())
+        } else {
+            None
+        };
+        let span_id = if span_parsable {
+            trace_type.decode_span_id(values).map(|s| s.to_string())
+        } else {
+            None
+        };
+        return Ok((trace_id, span_id));
     }
     Err(Error::OpenwireLogParseFailed)
 }
@@ -1507,6 +1518,8 @@ pub struct OpenWireInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    direction: PacketDirection,
 
     is_tight_encoding_enabled: bool,
     is_size_prefix_disabled: bool,
@@ -1539,6 +1552,8 @@ pub struct OpenWireInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub correlation_id: Option<String>,
 
     rtt: u64,
@@ -1549,6 +1564,7 @@ impl Default for OpenWireInfo {
         OpenWireInfo {
             msg_type: Default::default(),
             is_tls: false,
+            direction: PacketDirection::ClientToServer,
             is_tight_encoding_enabled: DEFAULT_TIGHT_ENCODING_ENABLED,
             is_size_prefix_disabled: DEFAULT_SIZE_PREFIX_DISABLED,
             is_cache_enabled: DEFAULT_CACHE_ENABLED,
@@ -1565,6 +1581,7 @@ impl Default for OpenWireInfo {
             status: L7ResponseStatus::Ok,
             err_msg: None,
             trace_id: None,
+            span_id: None,
             correlation_id: None,
             rtt: 0,
         }
@@ -1633,22 +1650,22 @@ impl From<OpenWireInfo> for L7ProtocolSendLog {
             },
             trace_info: Some(TraceInfo {
                 trace_id: f.trace_id,
+                span_id: f.span_id,
                 ..Default::default()
             }),
             version: Some(f.version.to_string()),
             flags,
-            ext_info: match f.msg_type {
-                LogMessageType::Request | LogMessageType::Session => Some(ExtendedInfo {
+            ext_info: match f.direction {
+                PacketDirection::ClientToServer => Some(ExtendedInfo {
                     request_id: Some(f.command_id),
                     x_request_id_0: f.correlation_id,
                     ..Default::default()
                 }),
-                LogMessageType::Response => Some(ExtendedInfo {
+                PacketDirection::ServerToClient => Some(ExtendedInfo {
                     request_id: Some(f.command_id),
                     x_request_id_1: f.correlation_id,
                     ..Default::default()
                 }),
-                _ => None,
             },
             ..Default::default()
         }
@@ -1751,7 +1768,7 @@ impl L7ProtocolParserInterface for OpenWireLog {
 }
 
 impl OpenWireLog {
-    fn do_unmarshal(&mut self, mut payload: &[u8]) -> Result<OpenWireInfo> {
+    fn do_unmarshal(&mut self, mut payload: &[u8], param: &ParseParam) -> Result<OpenWireInfo> {
         let mut info = OpenWireInfo::default();
         let mut msg_size = payload.len();
         if !self.is_size_prefix_disabled {
@@ -1800,8 +1817,11 @@ impl OpenWireLog {
             | OpenWireCommand::MessageDispatchNotification => {
                 info.msg_type = LogMessageType::Request;
                 info.req_msg_size = Some(msg_size as u32);
-                // parse sw8 trace_id
-                info.trace_id = parse_sw8_trace_id(payload).ok();
+                // parse sw8 trace_id and span_id
+                if let Some(config) = param.parse_config {
+                    (info.trace_id, info.span_id) =
+                        parse_trace_and_span(payload, &config.l7_log_dynamic).unwrap_or_default();
+                }
             }
             OpenWireCommand::Response
             | OpenWireCommand::ExceptionResponse
@@ -1838,8 +1858,9 @@ impl OpenWireLog {
         }
     }
     fn parse(&mut self, payload: &[u8], param: &ParseParam) -> Result<OpenWireInfo> {
-        let mut info = self.do_unmarshal(payload)?;
+        let mut info = self.do_unmarshal(payload, param)?;
         info.is_tls = param.is_tls();
+        info.direction = param.direction;
         // set status
         if info.err_msg.is_some() {
             if param.direction == PacketDirection::ClientToServer {
@@ -1922,7 +1943,7 @@ impl OpenWireLog {
         }
         // only parse the initial WIREFORMAT_INFO command to check the protocol
         let mut parser = Self::default();
-        match parser.do_unmarshal(payload) {
+        match parser.do_unmarshal(payload, param) {
             Ok(res) => res.command_type == OpenWireCommand::WireFormatInfo,
             Err(_) => false,
         }
@@ -1938,6 +1959,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::config::handler::LogParserConfig;
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -1967,7 +1989,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -1976,6 +1998,18 @@ mod tests {
                 true,
                 true,
             );
+
+            let config = L7LogDynamicConfig::new(
+                "".to_owned(),
+                vec![],
+                vec![TraceType::Sw8, TraceType::TraceParent],
+                vec![TraceType::Sw8, TraceType::TraceParent],
+            );
+            let parse_config = &LogParserConfig {
+                l7_log_dynamic: config.clone(),
+                ..Default::default()
+            };
+            param.set_log_parse_config(parse_config);
 
             let is_openwire = OpenWireLog::check_protocol(payload, param);
             match openwire.parse(payload, param) {
@@ -2034,8 +2068,15 @@ mod tests {
 
     #[test]
     fn check_parse_sw8_header() {
-        let payload = b"\x00\x03sw8\x09\x01\x291-dGVzdA==-";
-        let trace_id = parse_sw8_trace_id(payload).unwrap();
-        assert_eq!(trace_id, "test");
+        let payload = b"\x00\x03sw8\x09\x00\x1E1-VFJBQ0VJRA==-U0VHTUVOVElE-3-";
+        let config = L7LogDynamicConfig::new(
+            "".to_owned(),
+            vec![],
+            vec![TraceType::Sw8, TraceType::TraceParent],
+            vec![TraceType::Sw8, TraceType::TraceParent],
+        );
+        let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
+        assert_eq!(trace_id, Some("TRACEID".to_string()));
+        assert_eq!(span_id, Some("SEGMENTID-3".to_string()));
     }
 }
