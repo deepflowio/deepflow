@@ -238,11 +238,13 @@ impl L7ProtocolParserInterface for MqttLog {
 
         for info in infos.iter_mut() {
             if let L7ProtocolInfo::MqttInfo(info) = info {
-                // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
-                info.cal_rrt(param, None).map(|rrt| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
+                if self.msg_type != LogMessageType::Session {
+                    // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
+                    info.cal_rrt(param, None).map(|rrt| {
+                        info.rrt = rrt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                    });
+                }
 
                 info.msg_type = self.msg_type;
                 info.is_tls = param.is_tls();
