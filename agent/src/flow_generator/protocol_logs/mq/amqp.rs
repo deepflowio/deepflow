@@ -898,10 +898,12 @@ impl L7ProtocolParserInterface for AmqpLog {
         }
         for info in &mut vec {
             if let L7ProtocolInfo::AmqpInfo(info) = info {
-                info.cal_rrt(param, None).map(|rtt| {
-                    info.rtt = rtt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                });
+                if info.msg_type != LogMessageType::Session {
+                    info.cal_rrt(param, None).map(|rtt| {
+                        info.rtt = rtt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                    });
+                }
                 info.is_tls = param.is_tls();
 
                 match info.msg_type {

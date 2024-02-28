@@ -467,10 +467,12 @@ impl L7ProtocolParserInterface for TlsLog {
             });
             info.session_id = None;
         }
-        info.cal_rrt(param, None).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
+        if info.msg_type != LogMessageType::Session {
+            info.cal_rrt(param, None).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::TlsInfo(info)))
         } else {

@@ -1736,10 +1736,12 @@ impl L7ProtocolParserInterface for OpenWireLog {
 
         let mut info = self.parse(payload, param)?;
 
-        info.cal_rrt(param, None).map(|rtt| {
-            info.rtt = rtt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-        });
+        if info.msg_type != LogMessageType::Session {
+            info.cal_rrt(param, None).map(|rtt| {
+                info.rtt = rtt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+            });
+        }
 
         match param.direction {
             PacketDirection::ClientToServer => {
