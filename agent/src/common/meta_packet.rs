@@ -880,7 +880,7 @@ impl<'a> MetaPacket<'a> {
     // but the application protocols are inconsistent.
     pub fn generate_ebpf_flow_id(&self) -> u64 {
         let source: u8 = self.ebpf_type.into();
-        let socket_id = self.socket_id & !(0xff as u64) << 48;
+        let socket_id = self.socket_id & !((0xff as u64) << 48);
         (source as u64) << 48 | socket_id
     }
 
