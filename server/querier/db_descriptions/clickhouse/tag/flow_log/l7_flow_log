@@ -123,3 +123,4 @@ capture_nic_name          , capture_nic_name          , capture_nic_name        
 capture_nic_type          , capture_nic_type          , capture_nic_type           , int_enum       , capture_nic_type      , Capture Info      , 111          , 0
 tap_side                  , tap_side                  , tap_side                   , string_enum    , observation_point     , Capture Info      , 111          , 1
 observation_point         , observation_point         , observation_point          , string_enum    , observation_point     , Capture Info      , 111          , 0
+biz_type                  , biz_type                  , biz_type                   , int            ,                       , Capture Info      , 111          , 0

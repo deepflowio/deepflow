@@ -64,3 +64,4 @@ vtap                       , DeepFlow Agent                , Deprecated，please
 agent                      , DeepFlow Agent                ,
 signal_source              , Signal Source                 ,
 role                       , Role                          ,
+biz_type                   , Business Type                 ,
