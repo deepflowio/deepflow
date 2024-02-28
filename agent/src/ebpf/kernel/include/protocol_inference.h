@@ -2049,10 +2049,12 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 
 check:
 	/*
-	 * Content Type: Handshake (0x16), We are only concerned about the
-	 * handshake protocol.
+	 * Content Type:
+	 * Handshake (0x16); Change Cipher Spec (0x14); Encrypted Alert (0x15)
 	 */
-	if (!(handshake.content_type == 0x16 || handshake.content_type == 0x14))
+	if (!(handshake.content_type == 0x16 ||
+	      handshake.content_type == 0x14 ||
+	      handshake.content_type == 0x15))
 		return MSG_UNKNOWN;
 
 	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
@@ -2061,7 +2063,8 @@ check:
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/* If it has been completed, give up collecting subsequent data. */
-		if (conn_info->socket_info_ptr->tls_end)
+		if (handshake.content_type != 0x15 &&
+		    conn_info->socket_info_ptr->tls_end)
 			return MSG_UNKNOWN;
 	}
 
@@ -2089,8 +2092,10 @@ check:
 	 * (3), (4), and (5) are only the server's responses and are
 	 * not involved in aggregation; they are not the data we need.
 	 */
-	if (handshake.handshake_type == 0xb || handshake.handshake_type == 0xc
-	    || handshake.handshake_type == 0xe)
+	if (handshake.content_type == 0x16 &&
+	    (handshake.handshake_type == 0xb ||
+	     handshake.handshake_type == 0xc ||
+	     handshake.handshake_type == 0xe))
 		return MSG_UNKNOWN;
 
 	/*
