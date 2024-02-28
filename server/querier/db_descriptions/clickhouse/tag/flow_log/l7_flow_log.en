@@ -123,3 +123,4 @@ capture_nic_name          , Capture NIC Name              , When the value of ta
 capture_nic_type          , Capture NIC Type              , Indicates the type of traffic collection location, including OTel (application span), eBPF (socket data), Local NIC (cloud traffic), NFV Gateway NIC (NFV Gateway traffic), Traffic Mirror (traditional IDC traffic), etc.
 tap_side                  , TAP Side                      , Deprecated, please use observation_point.
 observation_point         , Observation Point             , The logical location of the collection location in the traffic path, such as Client APP, Client Process, Cient NIC, Client Node, Server Node, Server NIC, Server Process, Server App, etc.
+biz_type                  , Business Type                 ,

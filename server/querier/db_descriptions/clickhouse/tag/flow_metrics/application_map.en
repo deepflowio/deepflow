@@ -81,3 +81,4 @@ capture_nic_type           , Capture NIC Type              , Indicates the type 
 tap_side                   , TAP Side                      , Deprecated, please use observation_point.
 observation_point          , Observation Point             , The logical location of the collection location in the traffic path, such as Cient NIC, Client Node, Server Node, Server NIC, etc.
 signal_source              , Signal Source                 ,
+biz_type                   , Business Type                 ,

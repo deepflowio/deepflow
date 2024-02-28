@@ -73,6 +73,7 @@ type L7Base struct {
 	EndTime      int64  `json:"end_time"`   // us
 	GPID0        uint32
 	GPID1        uint32
+	BizType      uint8
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -122,6 +123,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("gprocess_id_0", ckdb.UInt32).SetComment("全局客户端进程ID"),
 		ckdb.NewColumn("gprocess_id_1", ckdb.UInt32).SetComment("全局服务端进程ID"),
+		ckdb.NewColumn("biz_type", ckdb.UInt8).SetComment("Business Type"),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -169,6 +171,7 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 		f.EndTime,
 		f.GPID0,
 		f.GPID1,
+		f.BizType,
 
 		int32(f.ProcessID0),
 		int32(f.ProcessID1),
@@ -564,6 +567,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 	b.GPID0 = l.Gpid_0
 	b.GPID1 = l.Gpid_1
+	b.BizType = uint8(l.BizType)
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1

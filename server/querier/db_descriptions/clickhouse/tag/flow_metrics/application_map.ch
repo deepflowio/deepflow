@@ -84,3 +84,4 @@ capture_nic_type           , 采集网卡类型               , 表示流量采�
 tap_side                   , 路径统计位置               , 已废弃，请使用 observation_point。采集位置在流量路径中所处的逻辑位置，例如客户端网卡、客户端容器节点、服务端容器节点、服务端网卡等。
 observation_point          , 观测点                     , 采集位置在流量路径中所处的逻辑位置，例如客户端网卡、客户端容器节点、服务端容器节点、服务端网卡等。
 signal_source              , 信号源                     ,
+biz_type                   , 业务类型                   ,

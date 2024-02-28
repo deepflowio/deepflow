@@ -123,3 +123,4 @@ capture_nic_name          , 采集网卡名称             , 当采集位置类�
 capture_nic_type          , 采集网卡类型             , 表示流量采集位置的类型，包括 OTel（应用 Span）、eBPF（Socket Data）、本地网卡（云内流量）、云网关网卡（云网关流量）、分光镜像（传统 IDC 流量）等。
 tap_side                  , 路径统计位置             , 已废弃，请使用 observation_point。
 observation_point         , 观测点                   , 采集位置在流量路径中所处的逻辑位置，例如客户端应用、客户端进程、客户端网卡、客户端容器节点、服务端容器节点、服务端网卡、服务端进程、服务端应用等。
+biz_type                  , 业务类型                 ,
