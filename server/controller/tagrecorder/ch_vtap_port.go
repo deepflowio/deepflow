@@ -568,8 +568,10 @@ func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{},
 				case common.VIF_DEVICE_TYPE_HOST:
 					vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_VM:
-					if toolDS.vmIDToPodNodeID[vtapVIF.DeviceID] != 0 {
-						vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
+					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
+						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
+						vtapVIF.DeviceID = podNodeID
+						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
 					} else {
 						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
 					}

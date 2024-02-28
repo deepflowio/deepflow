@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -51,20 +52,41 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 func (c *SubscriberManager) Start() {
 	log.Info("tagrecorder subscriber manager started")
 	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
-	subscribers := []Subscriber{
-		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
-		NewChChostCloudTag(),
-		NewChChostCloudTags(),
-	}
+	subscribers := c.getSubscribers()
+	log.Infof("tagrecorder run start")
 	for _, subscriber := range subscribers {
 		subscriber.SetConfig(c.cfg.TagRecorderCfg)
 		subscriber.Subscribe()
 	}
 }
 
+func (c *SubscriberManager) getSubscribers() []Subscriber {
+	subscribers := []Subscriber{
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
+	}
+	return subscribers
+}
+
+func (c *SubscriberManager) HealthCheck() {
+	go func() {
+		subscribers := c.getSubscribers()
+		log.Info("tagrecorder health check data run")
+		t := time.Now()
+		for _, subscriber := range subscribers {
+			if err := subscriber.Check(); err != nil {
+				log.Error(err)
+			}
+		}
+		log.Infof("tagrecorder health check data end, time since: %v", time.Since(t))
+	}()
+}
+
 type Subscriber interface {
 	Subscribe()
 	SetConfig(trconfig.TagRecorderConfig)
+	Check() error
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -120,6 +142,10 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMySQL, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
+}
+
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
+	return check(s)
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go

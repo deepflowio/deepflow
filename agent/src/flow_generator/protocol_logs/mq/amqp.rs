@@ -770,6 +770,10 @@ impl L7ProtocolInfoInterface for AmqpInfo {
             rrt: self.rtt,
         })
     }
+
+    fn get_request_domain(&self) -> String {
+        self.vhost.clone().unwrap_or_default()
+    }
 }
 
 impl L7ProtocolParserInterface for AmqpLog {

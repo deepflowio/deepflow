@@ -29,7 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/datasource"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 )
 
 var log = logging.MustGetLogger("issu")
@@ -441,7 +441,9 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 // called in server/ingester/ingester/ingester.go, executed before Start()
 func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 	err := i.renameTablesV65(ds)
-	log.Info("renameTablesV65", err)
+	if err != nil {
+		log.Warningf("renameTablesV65 err: %s", err)
+	}
 	i.tableRenames = AllTableRenames
 	for _, connection := range i.Connections {
 		oldVersion, err := i.getTableVersion(connection, "flow_log", "l4_flow_log_local")

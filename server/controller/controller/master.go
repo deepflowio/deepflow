@@ -126,6 +126,7 @@ func checkAndStartMasterFunctions(
 
 				// 启动tagrecorder
 				tagRecorder.UpdaterManager.Start()
+				tagRecorder.SubscriberManager.HealthCheck()
 
 				// 控制器检查
 				controllerCheck.Start()

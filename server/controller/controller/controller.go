@@ -34,6 +34,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/grpc"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	"github.com/deepflowio/deepflow/server/controller/http"
 	"github.com/deepflowio/deepflow/server/controller/http/router"
 	"github.com/deepflowio/deepflow/server/controller/manager"
@@ -44,9 +46,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
-
-	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
-	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/debug"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/cache"
