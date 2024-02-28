@@ -26,7 +26,6 @@ import (
 
 type ChChostCloudTags struct {
 	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChChostCloudTags, CloudTagsKey]
-	// UpdaterComponent[mysql.ChChostCloudTags, CloudTagsKey]
 }
 
 func NewChChostCloudTags() *ChChostCloudTags {
@@ -34,12 +33,8 @@ func NewChChostCloudTags() *ChChostCloudTags {
 		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChChostCloudTags, CloudTagsKey](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_VM_CLOUD_TAGS,
 		),
-		// newUpdaterComponent[mysql.ChChostCloudTags, CloudTagsKey](
-		// 	RESOURCE_TYPE_CH_VM_CLOUD_TAGS,
-		// ),
 	}
 	mng.subscriberDG = mng
-	// updater.updaterDG = updater
 	return mng
 }
 
@@ -80,50 +75,3 @@ func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, 
 	}
 	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes)}}
 }
-
-// func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostCloudTags, bool) {
-// 	var vms []mysql.VM
-// 	err := mysql.Db.Unscoped().Find(&vms).Error
-// 	if err != nil {
-// 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err))
-// 		return nil, false
-// 	}
-
-// 	keyToItem := make(map[CloudTagsKey]mysql.ChChostCloudTags)
-// 	for _, vm := range vms {
-// 		cloudTagsMap := map[string]string{}
-// 		for k, v := range vm.CloudTags {
-// 			cloudTagsMap[k] = v
-// 		}
-// 		if len(cloudTagsMap) > 0 {
-// 			cloudTagsStr, err := json.Marshal(cloudTagsMap)
-// 			if err != nil {
-// 				log.Error(err)
-// 				return nil, false
-// 			}
-// 			key := CloudTagsKey{
-// 				ID: vm.ID,
-// 			}
-// 			keyToItem[key] = mysql.ChChostCloudTags{
-// 				ID:        vm.ID,
-// 				CloudTags: string(cloudTagsStr),
-// 			}
-// 		}
-// 	}
-// 	return keyToItem, true
-// }
-
-// func (c *ChChostCloudTags) generateKey(dbItem mysql.ChChostCloudTags) CloudTagsKey {
-// 	return CloudTagsKey{ID: dbItem.ID}
-// }
-
-// func (c *ChChostCloudTags) generateUpdateInfo(oldItem, newItem mysql.ChChostCloudTags) (map[string]interface{}, bool) {
-// 	updateInfo := make(map[string]interface{})
-// 	if oldItem.CloudTags != newItem.CloudTags {
-// 		updateInfo["cloud_tags"] = newItem.CloudTags
-// 	}
-// 	if len(updateInfo) > 0 {
-// 		return updateInfo, true
-// 	}
-// 	return nil, false
-// }
