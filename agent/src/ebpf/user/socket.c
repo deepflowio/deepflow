@@ -35,6 +35,7 @@
 #include "load.h"
 #include "btf_vmlinux.h"
 #include "config.h"
+#include "perf_reader.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_3_10_0.c"
@@ -1721,9 +1722,11 @@ static void poller(void *t)
 #ifndef PERFORMANCE_TEST
 		for (i = 0; i < tracer->perf_readers_count; i++) {
 			perf_reader = &tracer->readers[i];
-			perf_reader_poll(perf_reader->readers_count,
-					 perf_reader->readers,
-					 perf_reader->epoll_timeout);
+			struct epoll_event events[perf_reader->readers_count];
+			int nfds = reader_epoll_wait(perf_reader, events);
+			if (nfds > 0) {
+				reader_event_read(events, nfds);
+			}
 		}
 #else
 		uint64_t data_len, rand_seed;
