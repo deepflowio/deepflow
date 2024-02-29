@@ -112,7 +112,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		return slimitResult, slimitDebug, err
 	}
 	// Parse showSql
-	result, sqlList, isShow, err := e.ParseShowSql(sql)
+	result, sqlList, isShow, err := e.ParseShowSql(sql, args)
 	if isShow {
 		if err != nil {
 			return nil, nil, err
@@ -163,6 +163,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			debug.Sql = chSql
 			params := &client.QueryParams{
 				Sql:             chSql,
+				UseQueryCache:   args.UseQueryCache,
+				QueryCacheTTL:   args.QueryCacheTTL,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
 			}
@@ -210,6 +212,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	params := &client.QueryParams{
 		Sql:             chSql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: ColumnSchemaMap,
@@ -221,7 +225,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	return rst, debug.Get(), err
 }
 
-func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, error) {
+func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
@@ -254,7 +258,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
-			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
+			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.UseQueryCache, e.Context)
 			if err != nil {
 				return nil, []string{}, true, err
 			}
@@ -352,16 +356,16 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.UseQueryCache)
 			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, e.Context)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.UseQueryCache, e.Context)
 		return data, []string{}, true, err
 	case "tables":
-		return GetTables(e.DB, e.Context), []string{}, true, nil
+		return GetTables(e.DB, args.QueryCacheTTL, args.UseQueryCache, e.Context), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	}
@@ -449,7 +453,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 
 	showTagsSql := "show tags from " + table
-	tags, _, _, err := e.ParseShowSql(showTagsSql)
+	tags, _, _, err := e.ParseShowSql(showTagsSql, args)
 	if err != nil {
 		log.Error(err)
 		return nil, nil, err
@@ -706,6 +710,8 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 	params := &client.QueryParams{
 		Sql:             outerSql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: ColumnSchemaMap,
@@ -745,6 +751,8 @@ func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common
 	}
 	params := &client.QueryParams{
 		Sql:             sql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: columnSchemaMap,

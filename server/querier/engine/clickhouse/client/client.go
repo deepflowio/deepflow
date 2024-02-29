@@ -39,6 +39,8 @@ var log = logging.MustGetLogger("clickhouse.client")
 
 type QueryParams struct {
 	Sql             string
+	UseQueryCache   bool
+	QueryCacheTTL   string
 	Callbacks       map[string]func(result *common.Result) error
 	QueryUUID       string
 	ColumnSchemaMap map[string]*common.ColumnSchema
@@ -104,6 +106,14 @@ func (c *Client) Close() error {
 
 func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error) {
 	sqlstr, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
+	queryCacheStr := ""
+	if params.UseQueryCache {
+		queryCacheStr = " SETTINGS use_query_cache = true, query_cache_store_results_of_queries_with_nondeterministic_functions = 1"
+		if params.QueryCacheTTL != "" {
+			queryCacheStr += fmt.Sprintf(", query_cache_ttl = %s", params.QueryCacheTTL)
+		}
+		sqlstr += queryCacheStr
+	}
 	err = c.init(query_uuid)
 	if err != nil {
 		return nil, err

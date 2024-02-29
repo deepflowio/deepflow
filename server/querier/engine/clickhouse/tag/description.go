@@ -582,7 +582,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response = &common.Result{
@@ -621,7 +621,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		Context:  ctx,
 	}
 	k8sLabelSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_service_k8s_label_map UNION ALL SELECT key FROM flow_tag.pod_k8s_label_map) GROUP BY key"
-	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql})
+	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +643,10 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 
 	// 查询 k8s_annotation
 	k8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key"})
+		Sql:           "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key",
+		UseQueryCache: useQueryCache,
+		QueryCacheTTL: queryCacheTTL,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -665,7 +668,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 
 	// 查询 k8s_env
 	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key"})
+		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key", UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +690,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 
 	// 查询cloud.tag
 	cloudTagSql := "SELECT key FROM (SELECT key FROM flow_tag.chost_cloud_tag_map UNION ALL SELECT key FROM flow_tag.pod_ns_cloud_tag_map) GROUP BY key"
-	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql})
+	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -709,7 +712,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 
 	// 查询 os.app
 	osAPPTagSql := "SELECT key FROM flow_tag.os_app_tag_map GROUP BY key"
-	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql})
+	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -774,7 +777,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	} else {
 		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
-	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql})
+	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -832,7 +835,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
+func GetTagValues(db, table, sql, queryCacheTTL string, useQueryCache bool) (*common.Result, []string, error) {
 	var sqlList []string
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
@@ -858,7 +861,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 
 	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "k8s.env.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
-		return GetTagResourceValues(db, table, sql)
+		return GetTagResourceValues(db, table, sql, queryCacheTTL, useQueryCache)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "tag.") || strings.HasPrefix(tag, "attribute.") {
@@ -880,7 +883,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
-		return GetTagResourceValues(db, table, sql)
+		return GetTagResourceValues(db, table, sql, queryCacheTTL, useQueryCache)
 	}
 
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
@@ -930,7 +933,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 
 }
 
-func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
+func GetTagResourceValues(db, table, rawSql, queryCacheTTL string, useQueryCache bool) (*common.Result, []string, error) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -1003,7 +1006,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 				if err != nil {
 					return results, sqlList, err
 				}
