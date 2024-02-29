@@ -314,7 +314,8 @@ struct bpf_perf_reader {
 	perf_reader_raw_cb raw_cb;		// Used for perf ring-buffer receive callback.
 	perf_reader_lost_cb lost_cb;		// Callback for perf ring-buffer data loss.
 	int epoll_timeout;			// perf poll timeout (ms)
-	int epoll_fd;
+	int epoll_fds[MAX_CPU_NR];
+	int epoll_fds_count;
 	struct bpf_tracer *tracer;
 };
 
@@ -348,14 +349,14 @@ struct bpf_tracer {
 	int sample_freq; // sample frequency, Hertz.
 
 	/*
-	 * 数据分发处理worker，queues
+	 * Data distribution processing worker, queues
 	 */
-	pthread_t perf_worker[MAX_CPU_NR];	// 用户态接收perf-buffer数据主线程
-	pthread_t dispatch_workers[MAX_CPU_NR];	// 分发线程
-	int dispatch_workers_nr;		// 分发线程数量
-	struct queue queues[MAX_CPU_NR];	// 分发队列，每个分发线程都有其对应的队列。
-	void *process_fn;			// 回调应用传递过来的接口, 进行数据处理
-	void (*datadump)(void *data);		// eBPF data dump handle
+	pthread_t perf_worker[MAX_CPU_NR];      // Main thread for user-space receiving perf-buffer data
+	pthread_t dispatch_workers[MAX_CPU_NR]; // Dispatch threads
+	int dispatch_workers_nr;                // Number of dispatch threads
+	struct queue queues[MAX_CPU_NR];        // Dispatch queues, each dispatch thread has its corresponding queue.
+	void *process_fn;                       // Callback interface passed from the application for data processing
+	void (*datadump) (void *data);          // eBPF data dump handle
 
 	/*
 	 * perf ring-buffer from kernel to user.
@@ -448,6 +449,11 @@ struct bpf_tracer_param {
 struct bpf_tracer_param_array {
 	int count;
 	struct bpf_tracer_param tracers[0];
+};
+
+struct reader_forward_info {
+	uint64_t queue_id;
+	int cpu_id;
 };
 
 extern volatile uint32_t *tracers_lock;
@@ -572,8 +578,8 @@ int tracer_uprobes_update(struct bpf_tracer *tracer);
  * @lost_cb perf reader data lost callback
  * @pages_cnt How many memory pages are used for ring-buffer
  *            (system page size * pages_cnt)
+ * @thread_nr The number of threads required for the reader's work 
  * @epoll_timeout perf epoll timeout
- *
  * @returns perf_reader address on success, NULL on error
  */
 struct bpf_perf_reader*
@@ -582,11 +588,12 @@ create_perf_buffer_reader(struct bpf_tracer *t,
 			  perf_reader_raw_cb raw_cb,
 			  perf_reader_lost_cb lost_cb,
 			  unsigned int pages_cnt,
+			  int thread_nr,
 			  int epoll_timeout);
 void free_perf_buffer_reader(struct bpf_perf_reader *reader);
 int release_bpf_tracer(const char *name);
 void free_all_readers(struct bpf_tracer *t);
-int enable_tracer_reader_work(const char *name,
+int enable_tracer_reader_work(const char *name, int idx,
 			      struct bpf_tracer *tracer,
 			      void *fn);
 #endif /* DF_USER_TRACER_H */
