@@ -306,13 +306,19 @@ static void reader_lost_cb_b(void *t, u64 lost)
 	perf_buf_lost_b_count++;
 }
 
-static void reader_raw_cb(void *t, void *raw, int raw_size)
+static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
 	if (unlikely(profiler_stop == 1))
 		return;
 
+	struct reader_forward_info *fwd_info = cookie;
+	if (unlikely(fwd_info->queue_id != 0)) {
+		ebpf_warning("cookie(%d) error", (u64)cookie);
+		return;
+	}
+
 	struct stack_trace_key_t *v;
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_tracer *tracer = profiler_tracer;
 	v = (struct stack_trace_key_t *)raw;
 
 	int ret = VEC_OK;
@@ -908,7 +914,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	    using_map_set_a ? SAMPLE_CNT_A_IDX : SAMPLE_CNT_B_IDX;
 
 	struct epoll_event events[r->readers_count];
-	int nfds = reader_epoll_wait(r, events);
+	int nfds = reader_epoll_wait(r, events, 0);
 
 	transfer_count++;
 	/* update map MAP_PROFILER_STATE_MAP */
@@ -998,7 +1004,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 					sample_count_idx,
 					(void *)&sample_cnt_val)) {
 			if (sample_cnt_val > count) {
-				nfds = reader_epoll_short_wait(r, events);
+				nfds = reader_epoll_short_wait(r, events, 0);
 				if (nfds > 0)
 					goto check_again;
 			}
@@ -1031,7 +1037,7 @@ static void java_syms_update_work(void *arg)
 static void cp_reader_work(void *arg)
 {
 	thread_index = THREAD_PROFILER_READER_IDX;
-	struct bpf_tracer *t = (struct bpf_tracer *)arg;
+	struct bpf_tracer *t = profiler_tracer;
 	struct bpf_perf_reader *reader_a, *reader_b;
 	reader_a = &t->readers[0];
 	reader_b = &t->readers[1];
@@ -1121,7 +1127,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     MAP_PERF_PROFILER_BUF_A_NAME,
 					     reader_raw_cb,
 					     reader_lost_cb_a,
-					     PROFILE_PG_CNT_DEF,
+					     PROFILE_PG_CNT_DEF, 1,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_a == NULL)
 		return ETR_NORESOURCE;
@@ -1130,7 +1136,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     MAP_PERF_PROFILER_BUF_B_NAME,
 					     reader_raw_cb,
 					     reader_lost_cb_b,
-					     PROFILE_PG_CNT_DEF,
+					     PROFILE_PG_CNT_DEF, 1,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_b == NULL) {
 		free_perf_buffer_reader(reader_a);
@@ -1156,7 +1162,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
 	 */
-	ret = enable_tracer_reader_work("cp_reader", tracer,
+	ret = enable_tracer_reader_work("cp_reader", 0, tracer,
 					(void *)&cp_reader_work);
 
 	if (ret) {

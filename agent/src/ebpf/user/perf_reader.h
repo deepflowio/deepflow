@@ -36,10 +36,11 @@ struct perf_reader {
 
 static inline int
 __reader_epoll_wait(struct bpf_perf_reader *r,
-		    struct epoll_event *events, int timeout)
+		    struct epoll_event *events,
+		    int epoll_id, int timeout)
 {
-	int nfds = epoll_wait(r->epoll_fd, events, r->readers_count,
-			      timeout);
+	int nfds = epoll_wait(r->epoll_fds[epoll_id], events,
+			      r->readers_count, timeout);
 	if (nfds == -1) {
 		ebpf_warning("epoll_wait() failed\n");
 		return ETR_EPOLL;
@@ -50,16 +51,20 @@ __reader_epoll_wait(struct bpf_perf_reader *r,
 
 static inline int
 reader_epoll_wait(struct bpf_perf_reader *r,
-		  struct epoll_event *events)
+		  struct epoll_event *events,
+		  int epoll_id)
 {
-	return __reader_epoll_wait(r, events, r->epoll_timeout);
+	return __reader_epoll_wait(r, events, epoll_id,
+				   r->epoll_timeout);
 }
 
 static inline bool
 reader_epoll_short_wait(struct bpf_perf_reader *r,
-			struct epoll_event *events)
+			struct epoll_event *events,
+			int epoll_id)
 {
-	return __reader_epoll_wait(r, events, EPOLL_SHORT_TIMEOUT);
+	return __reader_epoll_wait(r, events, epoll_id,
+				   EPOLL_SHORT_TIMEOUT);
 }
 
 static inline void
