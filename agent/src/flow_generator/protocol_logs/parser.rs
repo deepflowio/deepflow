@@ -195,23 +195,20 @@ impl MetaAppProto {
         if meta_packet.signal_source == SignalSource::EBPF {
             let is_src = meta_packet.lookup_key.l2_end_0;
             let process_name = get_string_from_chars(&meta_packet.process_kname);
-            if is_src {
-                base_info.syscall_coroutine_0 = meta_packet.coroutine_id;
-                base_info.pod_id_0 = meta_packet.pod_id;
-            } else {
-                base_info.syscall_coroutine_1 = meta_packet.coroutine_id;
-                base_info.pod_id_1 = meta_packet.pod_id;
-            }
             match (is_src, meta_packet.lookup_key.direction) {
                 (true, PacketDirection::ClientToServer)
                 | (false, PacketDirection::ServerToClient) => {
                     base_info.process_id_0 = meta_packet.process_id;
                     base_info.process_kname_0 = process_name;
+                    base_info.syscall_coroutine_0 = meta_packet.coroutine_id;
+                    base_info.pod_id_0 = meta_packet.pod_id;
                 }
                 (false, PacketDirection::ClientToServer)
                 | (true, PacketDirection::ServerToClient) => {
                     base_info.process_id_1 = meta_packet.process_id;
                     base_info.process_kname_1 = process_name;
+                    base_info.syscall_coroutine_1 = meta_packet.coroutine_id;
+                    base_info.pod_id_1 = meta_packet.pod_id;
                 }
             }
         }

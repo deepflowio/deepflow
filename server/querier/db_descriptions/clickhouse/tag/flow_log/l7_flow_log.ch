@@ -81,6 +81,7 @@ response_status           , 响应状态                 ,
 response_code             , 响应码                   ,
 response_exception        , 响应异常                 ,
 response_result           , 响应结果                 ,
+events                    , 事件                     ,
 
 app_service               , 应用服务                 ,
 app_instance              , 应用实例                 ,

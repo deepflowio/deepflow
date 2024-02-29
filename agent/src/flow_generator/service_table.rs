@@ -551,25 +551,21 @@ mod tests {
     };
 
     use super::*;
-    use crate::common::endpoint::EPC_FROM_DEEPFLOW;
+    use crate::common::endpoint::EPC_DEEPFLOW;
 
     #[test]
     fn service_key() {
-        let key1 = Ipv4Key::new(Ipv4Addr::new(192, 168, 1, 1), EPC_FROM_DEEPFLOW as i16, 80);
-        let key2 = Ipv4Key::new(
-            Ipv4Addr::new(192, 168, 1, 1),
-            EPC_FROM_DEEPFLOW as i16,
-            8080,
-        );
+        let key1 = Ipv4Key::new(Ipv4Addr::new(192, 168, 1, 1), EPC_DEEPFLOW as i16, 80);
+        let key2 = Ipv4Key::new(Ipv4Addr::new(192, 168, 1, 1), EPC_DEEPFLOW as i16, 8080);
         assert_ne!(key1, key2);
         let key1 = Ipv6Key::new(
             Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee").unwrap(),
-            EPC_FROM_DEEPFLOW as i16,
+            EPC_DEEPFLOW as i16,
             80,
         );
         let key2 = Ipv6Key::new(
             Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee").unwrap(),
-            EPC_FROM_DEEPFLOW as i16,
+            EPC_DEEPFLOW as i16,
             8080,
         );
         assert_ne!(key1, key2);
@@ -583,26 +579,26 @@ mod tests {
                     Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
                         .unwrap()
                         .into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     1234,
                 ),
                 ServiceKey::new(
                     Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
                         .unwrap()
                         .into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     80,
                 ),
             ),
             (
                 ServiceKey::new(
                     Ipv4Addr::new(192, 168, 1, 1).into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     1234,
                 ),
                 ServiceKey::new(
                     Ipv4Addr::new(192, 168, 1, 10).into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     80,
                 ),
             ),
@@ -738,26 +734,26 @@ mod tests {
                     Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
                         .unwrap()
                         .into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     1234,
                 ),
                 ServiceKey::new(
                     Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
                         .unwrap()
                         .into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     53,
                 ),
             ),
             (
                 ServiceKey::new(
                     Ipv4Addr::new(192, 168, 1, 1).into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     1234,
                 ),
                 ServiceKey::new(
                     Ipv4Addr::new(192, 168, 1, 10).into(),
-                    EPC_FROM_DEEPFLOW as i16,
+                    EPC_DEEPFLOW as i16,
                     53,
                 ),
             ),

@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -237,6 +237,8 @@ type L7FlowLog struct {
 
 	MetricsNames  []string
 	MetricsValues []float64
+
+	Events string
 }
 
 func L7FlowLogColumns() []*ckdb.Column {
@@ -282,6 +284,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 		ckdb.NewColumn("metrics_names", ckdb.ArrayLowCardinalityString).SetComment("额外的指标"),
 		ckdb.NewColumn("metrics_values", ckdb.ArrayFloat64).SetComment("额外的指标对应的值"),
+		ckdb.NewColumn("events", ckdb.String).SetComment("OTel events"),
 	)
 	return l7Columns
 }
@@ -327,8 +330,9 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.AttributeNames,
 		h.AttributeValues,
 		h.MetricsNames,
-		h.MetricsValues)
-
+		h.MetricsValues,
+		h.Events,
+	)
 }
 
 func base64ToHexString(str string) string {
