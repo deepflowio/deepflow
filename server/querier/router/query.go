@@ -42,6 +42,8 @@ func executeQuery() gin.HandlerFunc {
 		args := common.QuerierParams{}
 		args.Context = c.Request.Context()
 		args.Debug = c.Query("debug")
+		args.UseQueryCache, _ = strconv.ParseBool(c.DefaultQuery("use_query_cache", "false"))
+		args.QueryCacheTTL = c.Query("query_cache_ttl")
 		args.QueryUUID = c.Query("query_uuid")
 		args.NoPreWhere, _ = strconv.ParseBool(c.DefaultQuery("no_prewhere", "false"))
 		if args.QueryUUID == "" {
