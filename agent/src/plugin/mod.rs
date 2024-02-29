@@ -371,7 +371,7 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
         // biz type
         if off + 1 > buf.len() {
             return Err(Error::WasmSerializeFail(
-                "buf len too short when parse biz type".to_string(),
+                "buf len too short when parse biz_type".to_string(),
             ));
         }
         info.biz_type = buf[off];

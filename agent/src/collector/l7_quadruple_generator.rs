@@ -232,12 +232,16 @@ impl SubQuadGen {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         }
+
         let slot = (((time_in_second - self.window_start).as_secs() / self.slot_interval) as usize)
             .min(self.stashs.len() - 1);
         let stash = &mut self.stashs[slot];
         let value = stash.l7_stats.get_mut(&l7_stats.flow_id);
         if let Some(meters) = value {
-            if let Some(meter) = meters.iter_mut().find(|m| m.endpoint == l7_stats.endpoint) {
+            if let Some(meter) = meters
+                .iter_mut()
+                .find(|m| m.endpoint == l7_stats.endpoint && m.biz_type == l7_stats.biz_type)
+            {
                 // flow L7Protocol of different client ports on the same server port may be inconsistent.
                 // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
                 // so the L7Protocol of the same flow may be different. The principles are as follows:
