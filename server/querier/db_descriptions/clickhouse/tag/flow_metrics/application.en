@@ -23,12 +23,12 @@ pod_group_type             , K8s Workload Type             ,
 pod_group                  , K8s Workload                  , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                        , K8s POD                       ,
 service                    , Service                       ,
-resource_gl0_type          , Type - K8s POD First          , Desperated，please use auto_instance_type.
-resource_gl0               , Instance - K8s POD First      , Desperated，please use auto_instance.
-resource_gl1_type          , Type - K8s Workload First     , Desperated，please use auto_service_type.
-resource_gl1               , Instance - K8s Workload First , Desperated，please use auto_service.
-resource_gl2_type          , Type - K8s Service First      , Desperated，please use auto_service_type.
-resource_gl2               , Instance - K8s Service First  , Desperated，please use auto_service.
+resource_gl0_type          , Type - K8s POD First          , Deprecated，please use auto_instance_type.
+resource_gl0               , Instance - K8s POD First      , Deprecated，please use auto_instance.
+resource_gl1_type          , Type - K8s Workload First     , Deprecated，please use auto_service_type.
+resource_gl1               , Instance - K8s Workload First , Deprecated，please use auto_service.
+resource_gl2_type          , Type - K8s Service First      , Deprecated，please use auto_service_type.
+resource_gl2               , Instance - K8s Service First  , Deprecated，please use auto_service.
 auto_instance_type         , Type - K8s POD First          , The type of 'auto_instance'.
 auto_instance              , Instance - K8s POD First      , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
 auto_service_type          , Type - K8s Service First      , The type of 'auto_service'.
@@ -58,9 +58,9 @@ app_service                , Application Service           ,
 app_instance               , Application Instance          ,
 endpoint                   , Endpoint                      ,
 
-tap                        , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
-capture_network_type       , Capture Network Type          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
-vtap                       , DeepFlow Agent                ,
+tap                        , Traffic Access Point          , Deprecated，please use capture_network_type.
+capture_network_type       , Network Location              , The network location for capturing traffic uses a fixed value (Cloud Network) to represent intra-cloud traffic, while other values indicate traditional IDC traffic (supports up to 254 custom values to represent locations of traffic mirroring).
+vtap                       , DeepFlow Agent                , Deprecated，please use agent.
 agent                      , DeepFlow Agent                ,
 signal_source              , Signal Source                 ,
 role                       , Role                          ,

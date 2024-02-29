@@ -45,7 +45,7 @@ app_instance               , 应用实例                    ,
 trace_id                   , TraceID                    ,
 span_name                  , Span名称                    ,
 
-vtap                       , 采集器                      ,
+vtap                       , 采集器                      , 已废弃，请使用 agent。
 agent                      , 采集器                      ,
 
 profile_value_unit         , 单位                        ,
