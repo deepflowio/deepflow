@@ -111,17 +111,6 @@ impl Default for Labeler {
     }
 }
 
-fn is_link_local(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(addr) => {
-            return addr.is_link_local();
-        }
-        IpAddr::V6(addr) => {
-            return is_unicast_link_local(&addr);
-        }
-    }
-}
-
 fn is_unicast_mac(mac: u64) -> bool {
     return mac != BROADCAST_MAC && mac & MULTICAST_MAC != MULTICAST_MAC;
 }
@@ -537,7 +526,7 @@ impl Labeler {
             info.set_l2_data(&interface);
             info.is_vip_interface = interface.is_vip_interface;
             // IP为0，则取MAC对应的二层数据作为三层数据
-            if l3_end || ip.is_unspecified() || ip.is_loopback() || is_link_local(ip) {
+            if l3_end || ip.is_unspecified() || ip.is_loopback() {
                 info.set_l3_data(&interface);
                 is_wan = interface.if_type == IfType::WAN;
                 return (info, is_wan);
@@ -669,7 +658,7 @@ impl Labeler {
     fn is_intranet_address(ip: &IpAddr) -> bool {
         match ip {
             IpAddr::V4(a) => a.is_link_local() || a.is_private(),
-            IpAddr::V6(a) => (a.segments()[0] & 0xffc0) == 0xfe80,
+            IpAddr::V6(a) => is_unicast_link_local(a),
         }
     }
 

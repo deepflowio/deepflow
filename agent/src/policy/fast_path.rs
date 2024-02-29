@@ -34,6 +34,9 @@ use npb_pcap_policy::PolicyData;
 const MAX_ACL_PROTOCOL: usize = 255;
 const MAX_TAP_TYPE: usize = 256;
 const MAX_FAST_PATH: usize = MAX_TAP_TYPE * (super::MAX_QUEUE_COUNT + 1);
+const NET_IP_MAX: u32 = 32;
+const NET_IP_LEN: u32 = 16;
+const NET_IP_MASK: u32 = u32::MAX << NET_IP_LEN;
 
 type TableLruCache = LruCache<u128, PolicyTableItem>;
 
@@ -47,6 +50,7 @@ pub struct FastPath {
     interest_table: RwLock<Vec<PortRange>>,
     policy_table: Vec<Option<TableLruCache>>,
 
+    // Use the first 16 bits of the IPv4 address to query the table and obtain the corresponding netmask.
     netmask_table: RwLock<Vec<u32>>,
 
     policy_table_flush_flags: [bool; super::MAX_QUEUE_COUNT + 1],
@@ -78,13 +82,13 @@ impl FastPath {
                 match ip.raw_ip {
                     IpAddr::V4(ipv4) => {
                         let ip_int = u32::from_be_bytes(ipv4.octets());
-                        let mask = u32::MAX << (32 - ip.netmask);
+                        let mask = u32::MAX << (NET_IP_MAX - ip.netmask);
                         let net_addr = ip_int & mask;
 
-                        let mut start = net_addr >> 16;
+                        let mut start = net_addr >> NET_IP_LEN;
                         let mut end = start;
-                        if ip.netmask < 16 {
-                            end += (1 << (16 - ip.netmask)) - 1;
+                        if ip.netmask < NET_IP_LEN {
+                            end += (1 << (NET_IP_LEN - ip.netmask)) - 1;
                         }
 
                         while start <= end {
@@ -110,11 +114,11 @@ impl FastPath {
             // internet资源因为匹配所有IP, 不需要加在这里
             return;
         }
-        let mut start = ipv4 >> 16;
+        let mut start = ipv4 >> NET_IP_LEN;
         let mut end = start;
         let mask = u32::from(addr.netmask());
-        if mask_len < 16 {
-            end += (1 << (16 - mask_len)) - 1;
+        if mask_len < NET_IP_LEN as u8 {
+            end += (1 << (NET_IP_LEN as u8 - mask_len)) - 1;
         }
 
         while start <= end {
@@ -175,14 +179,23 @@ impl FastPath {
 
     fn generate_mask_ip(&self, key: &LookupKey) -> (u32, u32) {
         match (key.src_ip, key.dst_ip) {
-            (IpAddr::V4(src), IpAddr::V4(dst)) => {
-                let src = u32::from_be_bytes(src.octets());
-                let dst = u32::from_be_bytes(dst.octets());
+            (IpAddr::V4(src_addr), IpAddr::V4(dst_addr)) => {
+                let src = u32::from_be_bytes(src_addr.octets());
+                let dst = u32::from_be_bytes(dst_addr.octets());
                 let netmask_table = self.netmask_table.read().unwrap();
-                return (
-                    src & netmask_table[(src >> 16) as usize],
-                    dst & netmask_table[(dst >> 16) as usize],
-                );
+                let mut src_mask = netmask_table[(src >> NET_IP_LEN) as usize];
+                let mut dst_mask = netmask_table[(dst >> NET_IP_LEN) as usize];
+                // The EPC of the local link IP and private IP is 0, which needs to be
+                // distinguished from other internet IP to avoid querying incorrect EPC.
+                // The longest netmask between local link IP and private IP is used to
+                // ensure accurate queries.
+                if src_addr.is_link_local() || src_addr.is_private() {
+                    src_mask = src_mask.max(NET_IP_MASK);
+                }
+                if dst_addr.is_link_local() || dst_addr.is_private() {
+                    dst_mask = dst_mask.max(NET_IP_MASK);
+                }
+                return (src & src_mask, dst & dst_mask);
             }
             (IpAddr::V6(src), IpAddr::V6(dst)) => {
                 let src = u128::from_be_bytes(src.octets());
@@ -332,6 +345,7 @@ impl FastPath {
             table.put(key, item);
 
             self.policy_count += 1;
+
             (forward_policy, forward_endpoints)
         };
 
