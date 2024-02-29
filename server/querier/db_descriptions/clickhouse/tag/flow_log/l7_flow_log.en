@@ -25,20 +25,20 @@ pod_group_type            , K8s Workload Type             ,
 pod_group                 , K8s Workload                  , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                       , K8s POD                       ,
 service                   , Service                       , 
-resource_gl0_type         , Type - K8s POD First          , Desperated，please use auto_instance_type.
-resource_gl0              , Instance - K8s POD First      , Desperated，please use auto_instance.
-resource_gl1_type         , Type - K8s Workload First     , Desperated，please use auto_service_type.
-resource_gl1              , Instance - K8s Workload First , Desperated，please use auto_service.
-resource_gl2_type         , Type - K8s Service First      , Desperated，please use auto_service_type.
-resource_gl2              , Instance - K8s Service First  , Desperated，please use auto_service.
+resource_gl0_type         , Type - K8s POD First          , Deprecated，please use auto_instance_type.
+resource_gl0              , Instance - K8s POD First      , Deprecated，please use auto_instance.
+resource_gl1_type         , Type - K8s Workload First     , Deprecated，please use auto_service_type.
+resource_gl1              , Instance - K8s Workload First , Deprecated，please use auto_service.
+resource_gl2_type         , Type - K8s Service First      , Deprecated，please use auto_service_type.
+resource_gl2              , Instance - K8s Service First  , Deprecated，please use auto_service.
 auto_instance_type        , Type - K8s POD First          , The type of 'auto_instance'.
 auto_instance             , Instance - K8s POD First      , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
 auto_service_type         , Type - K8s Service First      , The type of 'auto_service'.
 auto_service              , Instance - K8s Service First  , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
 gprocess                  , Process                       , 
-tap_port_host             , Tap Port Host                 ,
-tap_port_chost            , Tap Port Cloud Host           ,
-tap_port_pod_node         , Tap Port K8s Node             ,
+tap_port_host             , Tap Port Host                 , Deprecated，please use capture_nic_host.
+tap_port_chost            , Tap Port Cloud Host           , Deprecated，please use capture_nic_chost.
+tap_port_pod_node         , Tap Port K8s Node             , Deprecated，please use capture_nic_pod_node.
 capture_nic_host          , Host of Capture NIC           ,
 capture_nic_chost         , Cloud Host of Capture NIC     ,
 capture_nic_pod_node      , K8s Node of Capture NIC       ,
@@ -110,16 +110,16 @@ start_time                , Start Time                    , Unit: microseconds. 
 end_time                  , End Time                      , Unit: microseconds. Start time of response, or end time of response for OpenTelemetry span.
 
 signal_source             , Signal Source                 ,
-tap                       , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
-capture_network_type      , Capture Network Type          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
-vtap                      , DeepFlow Agent                ,
+tap                       , Traffic Access Point          , Deprecated，please use capture_network_type.
+capture_network_type      , Network Location              , The network location for capturing traffic uses a fixed value (Cloud Network) to represent intra-cloud traffic, while other values indicate traditional IDC traffic (supports up to 254 custom values to represent locations of traffic mirroring).
+vtap                      , DeepFlow Agent                , Deprecated, please use agent.
 agent                     , DeepFlow Agent                ,
 nat_source                , NAT Source                    ,
-tap_port                  , TAP Port Identifier           , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.
-tap_port_name             , TAP Port Name                 , When the value of tap_port_type is 'Local NIC', tap_port_name indicates the name of the tap interface.
-tap_port_type             , TAP Port Type                 , Indicates the type of traffic collection location, including OTel (application span), eBPF (socket data), Local NIC (cloud traffic), NFV Gateway NIC (NFV Gateway traffic), Traffic Mirror (traditional IDC traffic), etc.
+tap_port                  , TAP Port Identifier           , Deprecated, please use capture_nic.
+tap_port_name             , TAP Port Name                 , Deprecated, please use capture_nic_name.
+tap_port_type             , TAP Port Type                 , Deprecated, please use capture_nic_type.
 capture_nic               , Capture NIC ID                , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.
 capture_nic_name          , Capture NIC Name              , When the value of tap_port_type is 'Local NIC', tap_port_name indicates the name of the tap interface.
 capture_nic_type          , Capture NIC Type              , Indicates the type of traffic collection location, including OTel (application span), eBPF (socket data), Local NIC (cloud traffic), NFV Gateway NIC (NFV Gateway traffic), Traffic Mirror (traditional IDC traffic), etc.
-tap_side                  , TAP Side                      , The logical location of the collection location in the traffic path, such as Client APP, Client Process, Cient NIC, Client Node, Server Node, Server NIC, Server Process, Server App, etc.
+tap_side                  , TAP Side                      , Deprecated, please use observation_point.
 observation_point         , Observation Point             , The logical location of the collection location in the traffic path, such as Client APP, Client Process, Cient NIC, Client Node, Server Node, Server NIC, Server Process, Server App, etc.

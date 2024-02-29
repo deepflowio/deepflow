@@ -49,5 +49,5 @@ os.app                     , OS APP                     ,
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
 
-vtap                       , 采集器                     ,
+vtap                       , 采集器                     , 已废弃，请使用 agent。
 agent                      , 采集器                     ,
