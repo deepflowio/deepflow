@@ -528,6 +528,7 @@ var (
 func TestGetSql(t *testing.T) {
 	var c *client.Client
 	result := &common.Result{}
+	args := &common.QuerierParams{}
 	monkey.PatchInstanceMethod(reflect.TypeOf(c), "DoQuery", func(*client.Client, *client.QueryParams) (*common.Result, error) {
 		return result, nil
 	})
@@ -557,11 +558,11 @@ func TestGetSql(t *testing.T) {
 		if strings.HasPrefix(pcase.input, "WITH") {
 			out, _, _, err = e.ParseWithSql(pcase.input)
 		} else if strings.Contains(pcase.input, "SLIMIT") || strings.Contains(pcase.input, "slimit") {
-			out, _, _, err = e.ParseSlimitSql(pcase.input)
+			out, _, _, err = e.ParseSlimitSql(pcase.input, args)
 		} else {
 			input := pcase.input
 			if strings.HasPrefix(pcase.input, "SHOW") {
-				_, sqlList, _, err1 := e.ParseShowSql(pcase.input)
+				_, sqlList, _, err1 := e.ParseShowSql(pcase.input, args)
 				err = err1
 				input = sqlList[0]
 			}
