@@ -1632,9 +1632,11 @@ static __inline enum message_type decode_openwire(const char *buf,
 	__u32 command_length = 0;
 	if (!is_size_prefix_disabled) {
 		command_length = __bpf_ntohl(*(__u32 *) cur_buf);
-		if (command_length < min_length - 4
-			|| command_length + 4 != count)
-			return MSG_UNKNOWN;
+		if (strict_check) {
+			if (command_length < min_length - 4
+				|| command_length + 4 != count)
+				return MSG_UNKNOWN;
+		}
 		cur_buf += 4;
 	}
 	__u8 cmd_type = *(__u8 *) (cur_buf++);
