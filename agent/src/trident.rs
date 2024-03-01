@@ -1660,10 +1660,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                l4_flow_aggr_queue_name.to_string(),
-            )],
+            vec![
+                StatsOption::Tag("module", l4_flow_aggr_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let l4_flow_uniform_sender = UniformSenderThread::new(
             l4_flow_aggr_queue_name,
@@ -1683,7 +1683,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", metrics_queue_name.to_string())],
+            vec![
+                StatsOption::Tag("module", metrics_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             metrics_queue_name,
@@ -1771,10 +1774,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                packet_sequence_queue_name.to_string(),
-            )],
+            vec![
+                StatsOption::Tag("module", packet_sequence_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let packet_sequence_uniform_sender = UniformSenderThread::new(
             packet_sequence_queue_name,
@@ -1836,7 +1839,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(pcap_batch_counter)),
-            vec![StatsOption::Tag("module", pcap_batch_queue.to_string())],
+            vec![
+                StatsOption::Tag("module", pcap_batch_queue.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let pcap_batch_uniform_sender = UniformSenderThread::new(
             pcap_batch_queue,
@@ -2095,10 +2101,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                proc_event_queue_name.to_string(),
-            )],
+            vec![
+                StatsOption::Tag("module", proc_event_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let proc_event_uniform_sender = UniformSenderThread::new(
             proc_event_queue_name,
@@ -2118,7 +2124,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
+            vec![
+                StatsOption::Tag("module", profile_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let profile_uniform_sender = UniformSenderThread::new(
             profile_queue_name,
@@ -2251,7 +2260,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", otel_queue_name.to_string())],
+            vec![
+                StatsOption::Tag("module", otel_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let otel_uniform_sender = UniformSenderThread::new(
             otel_queue_name,
@@ -2298,10 +2310,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                prometheus_queue_name.to_string(),
-            )],
+            vec![
+                StatsOption::Tag("module", prometheus_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             prometheus_queue_name,
@@ -2321,7 +2333,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", telegraf_queue_name.to_string())],
+            vec![
+                StatsOption::Tag("module", telegraf_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             telegraf_queue_name,
@@ -2341,10 +2356,10 @@ impl AgentComponents {
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                compressed_otel_queue_name.to_string(),
-            )],
+            vec![
+                StatsOption::Tag("module", compressed_otel_queue_name.to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let compressed_otel_uniform_sender = UniformSenderThread::new(
             compressed_otel_queue_name,
