@@ -181,7 +181,10 @@ impl Collector {
             &s,
             "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", "0-stats-to-sender".to_string())],
+            vec![
+                StatsOption::Tag("module", "0-stats-to-sender".to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         return s;
     }
