@@ -105,7 +105,7 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarge
 			))
 			return nil, false
 		}
-		updateInfo["vpc_id"] = vpcID
+		updateInfo["epc_id"] = vpcID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
