@@ -1364,7 +1364,8 @@ impl Unmarshal for Response {
         // parse commandId and responseRequired
         let payload = BaseCommand::tight_unmarshal(parser, info, bs, payload)?;
         // parse correlationId
-        let (payload, _) = parse_integer(payload)?;
+        let (payload, correlation_id) = parse_integer(payload)?;
+        info.resp_command_id = correlation_id;
         Ok(payload)
     }
     fn loose_unmarshal<'a>(
@@ -1375,7 +1376,8 @@ impl Unmarshal for Response {
         // parse commandId and responseRequired
         let payload = BaseCommand::loose_unmarshal(parser, info, payload)?;
         // parse correlationId
-        let (payload, _) = parse_integer(payload)?;
+        let (payload, correlation_id) = parse_integer(payload)?;
+        info.resp_command_id = correlation_id;
         Ok(payload)
     }
 }
@@ -1540,6 +1542,7 @@ pub struct OpenWireInfo {
     pub command_type: OpenWireCommand,
     pub command_id: u32,
     pub response_required: bool,
+    pub resp_command_id: u32,
 
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: Option<u32>,
@@ -1576,6 +1579,7 @@ impl Default for OpenWireInfo {
             command_type: OpenWireCommand::WireFormatInfo,
             command_id: 0,
             response_required: false,
+            resp_command_id: 0,
             req_msg_size: None,
             res_msg_size: None,
             status: L7ResponseStatus::Ok,
@@ -1602,7 +1606,11 @@ impl OpenWireInfo {
 
 impl L7ProtocolInfoInterface for OpenWireInfo {
     fn session_id(&self) -> Option<u32> {
-        self.session_id.map(|id| id as u32)
+        match self.msg_type {
+            LogMessageType::Request => Some(self.command_id),
+            LogMessageType::Response => Some(self.resp_command_id),
+            _ => None,
+        }
     }
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::OpenWireInfo(other) = other {
@@ -1763,6 +1771,12 @@ impl L7ProtocolParserInterface for OpenWireLog {
     }
     fn parsable_on_udp(&self) -> bool {
         false
+    }
+    fn reset(&mut self) {
+        let mut s = Self::default();
+        s.version = self.version;
+        s.perf_stats = self.perf_stats.take();
+        *self = s;
     }
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
