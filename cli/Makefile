@@ -18,15 +18,16 @@ vendor:
 	cp -r ../message/* vendor/${MESSAGE}/
 	cp -r ../server/go.* vendor/${SERVER}/
 	find vendor -type d -exec chmod +w {} \;
-	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
+	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/flow-metrics/pb
 	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
 	cp vendor/${MESSAGE}/stats.proto vendor/${LIBS}/stats/pb
-	sed -i '6,10s/^...//' vendor/${LIBS}/zerodoc/pb/metric.proto
+	sed -i '6,10s/^...//' vendor/${LIBS}/flow-metrics/pb/metric.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${LIBS} && go generate ./...
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < ../server/patch/clickhouse-go/write_improve.patch
+	patch -p1 -d vendor/github.com/cornelk/hashmap < ../server/patch/cornelk_hashmap/complex128.patch
 
 .PHONY: cli
 cli: vendor
