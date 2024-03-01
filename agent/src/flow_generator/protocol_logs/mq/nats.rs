@@ -15,7 +15,6 @@
  */
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{collections::BTreeMap, str};
 
 const MAX_METHOD_LEN: usize = 8;
@@ -740,32 +739,8 @@ impl L7ProtocolParserInterface for NatsLog {
         if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
-        let (payload, method) = read_field(payload).unwrap_or_default();
-        let method = slice_to_string(method);
-        if !method.eq_ignore_ascii_case("INFO") {
-            return false;
-        }
-        let binding = serde_json::Map::new();
-        let json = read_line(payload)
-            .and_then(|x| Some(x.1))
-            .and_then(|x| str::from_utf8(x).ok())
-            .and_then(|x| serde_json::from_str::<Value>(x).ok())
-            .unwrap_or(Value::Null);
-        let json = json.as_object().unwrap_or(&binding);
-        const REQUIRED_FIELDS: [&str; 9] = [
-            "server_id",
-            "server_name",
-            "version",
-            "go",
-            "host",
-            "port",
-            "headers",
-            "proto",
-            "max_payload",
-        ];
-        REQUIRED_FIELDS
-            .iter()
-            .all(|field| json.contains_key(*field))
+
+        NatsInfo::try_parse(payload, param.parse_config).is_some()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
