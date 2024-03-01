@@ -1701,8 +1701,6 @@ impl Default for WireFormatFlags {
 }
 
 pub struct OpenWireLog {
-    msg_type: LogMessageType,
-    status: L7ResponseStatus,
     client_wireformat_flags: Option<WireFormatFlags>,
     server_wireformat_flags: Option<WireFormatFlags>,
     is_tight_encoding_enabled: bool,
@@ -1718,8 +1716,6 @@ pub struct OpenWireLog {
 impl Default for OpenWireLog {
     fn default() -> Self {
         OpenWireLog {
-            msg_type: Default::default(),
-            status: Default::default(),
             client_wireformat_flags: None,
             server_wireformat_flags: None,
             is_tight_encoding_enabled: DEFAULT_TIGHT_ENCODING_ENABLED,
@@ -1773,10 +1769,7 @@ impl L7ProtocolParserInterface for OpenWireLog {
         false
     }
     fn reset(&mut self) {
-        let mut s = Self::default();
-        s.version = self.version;
-        s.perf_stats = self.perf_stats.take();
-        *self = s;
+        self.perf_stats = None;
     }
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
