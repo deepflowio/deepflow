@@ -131,7 +131,7 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
 		Example: "deepflow-ctl agent-upgrade list\n" +
-			"deepflow-ctl agent-upgrade vtap-name --image-name=deepflow-agent\n",
+			"deepflow-ctl agent-upgrade agent-name --image-name=deepflow-agent\n",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
 				if args[0] == "list" {
@@ -298,7 +298,7 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 
 	vtapName, ok := updateMap["name"]
 	if !ok {
-		fmt.Fprintln(os.Stderr, "must specify vtap name")
+		fmt.Fprintln(os.Stderr, "must specify agent name")
 		return
 	}
 
@@ -339,8 +339,16 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 	}
 
 	// update vtap_group_id
-	if vtapGroupID, ok := updateMap["vtap_group_id"]; ok {
-		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?short_uuid=%s", server.IP, server.Port, vtapGroupID)
+	var agentGroupID interface{}
+	if id, ok := updateMap["vtap_group_id"]; ok {
+		agentGroupID = id
+		printutil.WarnWithColor("use agent_group_id instead of vtap_group_id")
+	}
+	if id, ok := updateMap["agent_group_id"]; ok {
+		agentGroupID = id
+	}
+	if agentGroupID != nil {
+		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?short_uuid=%s", server.IP, server.Port, agentGroupID)
 		// call vtap-group api, get lcuuid
 		response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 		if err != nil {
@@ -349,12 +357,12 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 		}
 
 		if len(response.Get("DATA").MustArray()) == 0 {
-			fmt.Fprintln(os.Stderr, "agent-group (%s) not exist\n")
+			fmt.Fprintf(os.Stderr, "agent-group (%s) not exist\n", agentGroupID)
 		}
 		group := response.Get("DATA").GetIndex(0)
 		groupLcuuid := group.Get("LCUUID").MustString()
 		updateMap["VTAP_GROUP_LCUUID"] = groupLcuuid
-		delete(updateMap, "vtap_group_id")
+		delete(updateMap, "agent_group_id")
 	}
 
 	// enable/disable
@@ -530,9 +538,9 @@ func printDetail(resp *simplejson.Json) {
 		ipMaxSize, "IP",
 		azMaxSize, "AZ",
 		stateMaxSize, "STATE",
-		beforeVTapNumMaxSize, "BEFORE_VTAP_NUM",
-		afertVTapNumMaxSize, "AFTER_VTAP_NUM",
-		switchVTapNumMaxSize, "SWITCH_VTAP_NUM")
+		beforeVTapNumMaxSize, "BEFORE_AGENT_NUM",
+		afertVTapNumMaxSize, "AFTER_AGENT_NUM",
+		switchVTapNumMaxSize, "SWITCH_AGENT_NUM")
 
 	for i := range details.MustArray() {
 		detail := resp.Get("DATA").Get("DETAILS").GetIndex(i)

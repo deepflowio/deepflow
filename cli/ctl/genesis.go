@@ -25,9 +25,10 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/deepflowio/deepflow/cli/ctl/common"
 )
 
 func RegisterGenesisCommand() *cobra.Command {
@@ -73,7 +74,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or vtap_id]",
+		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or agent_id]",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInfo(cmd, args)
 		},
@@ -82,7 +83,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	storageInfo := &cobra.Command{
 		Use:     "storage",
 		Short:   "genesis storage info",
-		Example: "deepflow-ctl genesis storage vtap_id",
+		Example: "deepflow-ctl genesis storage agent_id",
 		Run: func(cmd *cobra.Command, args []string) {
 			storageInfo(cmd, args)
 		},
@@ -308,7 +309,7 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVip(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"IP", "VTAP_ID"})
+	table.SetHeader([]string{"IP", "AGENT_ID"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -324,7 +325,7 @@ func tableVip(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "AGENT_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -356,7 +357,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"PID", "VTAP_ID", "NETNS_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
+	table.SetHeader([]string{"PID", "AGENT_ID", "NETNS_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -423,7 +424,7 @@ func prometheusInfo(cmd *cobra.Command, args []string) {
 
 func storageInfo(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify vtap id.\nExample: %s\n", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify agent id.\nExample: %s\n", cmd.Example)
 		return
 	}
 
