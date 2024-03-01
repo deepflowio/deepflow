@@ -133,7 +133,7 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarge
 			))
 			return nil, nil, false
 		}
-		mapInfo["vpc_id"] = vpcID
+		mapInfo["epc_id"] = vpcID
 		structInfo.VPCID.SetNew(vpcID)
 		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}

@@ -94,7 +94,7 @@ func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface
 	dbItem := new(MT)
 	err := mysql.Db.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
-		log.Errorf("update %s (lcuuid: %s, detail: %+v) failed", o.resourceTypeName, lcuuid, updateInfo, err)
+		log.Errorf("update %s (lcuuid: %s, detail: %+v) failed: %s", o.resourceTypeName, lcuuid, updateInfo, err.Error())
 		return dbItem, false
 	}
 	log.Infof("update %s (lcuuid: %s, detail: %+v) success", o.resourceTypeName, lcuuid, updateInfo)
