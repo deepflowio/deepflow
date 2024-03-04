@@ -2679,6 +2679,8 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     `name`            VARCHAR(256),
     `host_id`         INTEGER,
     `l3_epc_id`       INTEGER,
+    `ip`              CHAR(64),
+    `hostname`        VARCHAR(256),
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;
