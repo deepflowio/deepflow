@@ -654,7 +654,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `host_id` UInt64,\n" +
-		"    `l3_epc_id` UInt64\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `hostname` String,\n" +
+		"    `ip` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +

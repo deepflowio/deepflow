@@ -486,10 +486,12 @@ type ChPodService struct {
 }
 
 type ChChost struct {
-	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name    string `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
-	HostID  int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name     string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	L3EPCID  int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
+	HostID   int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+	Hostname string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP       string `gorm:"column:ip;type:varchar(64)" json:"IP"`
 }
 
 type ChPolicy struct {
