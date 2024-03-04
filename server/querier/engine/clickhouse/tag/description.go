@@ -1294,9 +1294,14 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				}
 
 				if resourceInfo.ResourceType == VIF_DEVICE_TYPE_VM {
+					if whereSql != "" {
+						whereSql += " AND display_name!=''"
+					} else {
+						whereSql = " WHERE display_name!=''"
+					}
 					sql = strings.Join([]string{
 						"SELECT id AS value,", resourceInfo.FieldName, "AS display_name",
-						"FROM chost_map", whereSql, "AND display_name!=''",
+						"FROM chost_map", whereSql,
 						"GROUP BY value, display_name",
 						"ORDER BY", orderBy, "ASC", limitSql,
 					}, " ")
