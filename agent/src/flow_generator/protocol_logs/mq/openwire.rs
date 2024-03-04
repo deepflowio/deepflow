@@ -1840,10 +1840,7 @@ impl OpenWireLog {
                 info.msg_type = LogMessageType::Response;
                 info.res_msg_size = Some(msg_size as u32);
             }
-            _ => {
-                info.msg_type = LogMessageType::Other;
-                info.res_msg_size = Some(msg_size as u32);
-            }
+            _ => return Err(Error::OpenwireLogParseFailed),
         };
 
         if self.is_tight_encoding_enabled && command_type != OpenWireCommand::WireFormatInfo {
