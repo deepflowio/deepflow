@@ -44,7 +44,7 @@ var DB_TABLE_MAP = map[string][]string{
 }
 
 var SHOW_TAG_VALUE_MAP = map[string][]string{
-	"ip_resource_map": []string{"ip", "subnet", "region", "az", "host", "chost", "l3_epc", "router", "dhcpgw", "lb", "lb_listener", "natgw", "redis", "rds", "pod_cluster", "pod_ns", "pod_node", "pod_ingress", "pod_service", "pod_group", "pod"},
+	"ip_resource_map": []string{"ip", "subnet", "region", "az", "host", "chost", "l3_epc", "router", "dhcpgw", "lb", "lb_listener", "natgw", "redis", "rds", "pod_cluster", "pod_ns", "pod_node", "pod_ingress", "pod_service", "pod_group", "pod", "resource_gl0", "resource_gl1", "resource_gl2", "auto_service", "auto_instance"},
 	"pod_ns_map":      []string{"pod_ns", "pod_cluster"},
 	"pod_group_map":   []string{"pod_group", "pod_cluster", "pod_ns"},
 	"pod_service_map": []string{"pod_service", "pod_cluster", "pod_ns"},
