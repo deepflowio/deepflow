@@ -878,7 +878,7 @@ func GetTagValues(db, table, sql, queryCacheTTL string, useQueryCache bool) (*co
 
 	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "k8s.env.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
-		return GetTagResourceValues(db, table, sql, queryCacheTTL, useQueryCache)
+		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "tag.") || strings.HasPrefix(tag, "attribute.") {
@@ -900,7 +900,7 @@ func GetTagValues(db, table, sql, queryCacheTTL string, useQueryCache bool) (*co
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
-		return GetTagResourceValues(db, table, sql, queryCacheTTL, useQueryCache)
+		return GetTagResourceValues(db, table, sql)
 	}
 
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
@@ -950,14 +950,7 @@ func GetTagValues(db, table, sql, queryCacheTTL string, useQueryCache bool) (*co
 
 }
 
-func GetTagResourceValues(db, table, rawSql, queryCacheTTL string, useQueryCache bool) (*common.Result, []string, error) {
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-	}
+func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
 	sqlSplit := strings.Fields(rawSql)
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -1023,11 +1016,7 @@ func GetTagResourceValues(db, table, rawSql, queryCacheTTL string, useQueryCache
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
-				if err != nil {
-					return results, sqlList, err
-				}
-				results.Values = append(results.Values, rst.Values...)
+				sqlList = append(sqlList, sql)
 			}
 			autoMap := map[string]map[string]int{
 				"resource_gl0":  AutoPodMap,
