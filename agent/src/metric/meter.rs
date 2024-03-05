@@ -341,8 +341,8 @@ impl From<Performance> for metric::Performance {
 pub struct Anomaly {
     pub client_rst_flow: u64,
     pub server_rst_flow: u64,
-    pub client_syn_repeat: u64,
-    pub server_synack_repeat: u64,
+    pub client_ack_miss: u64,
+    pub server_syn_miss: u64,
     pub client_half_close_flow: u64,
     pub server_half_close_flow: u64,
 
@@ -362,8 +362,8 @@ impl Anomaly {
     pub fn sequential_merge(&mut self, other: &Anomaly) {
         self.client_rst_flow += other.client_rst_flow;
         self.server_rst_flow += other.server_rst_flow;
-        self.client_syn_repeat += other.client_syn_repeat;
-        self.server_synack_repeat += other.server_synack_repeat;
+        self.client_ack_miss += other.client_ack_miss;
+        self.server_syn_miss += other.server_syn_miss;
         self.client_half_close_flow += other.client_half_close_flow;
         self.server_half_close_flow += other.server_half_close_flow;
 
@@ -385,8 +385,8 @@ impl From<Anomaly> for metric::Anomaly {
         metric::Anomaly {
             client_rst_flow: m.client_rst_flow,
             server_rst_flow: m.server_rst_flow,
-            client_syn_repeat: m.client_syn_repeat,
-            server_synack_repeat: m.server_synack_repeat,
+            client_ack_miss: m.client_ack_miss,
+            server_syn_miss: m.server_syn_miss,
             client_half_close_flow: m.client_half_close_flow,
             server_half_close_flow: m.server_half_close_flow,
 
