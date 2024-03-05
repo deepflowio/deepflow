@@ -48,12 +48,12 @@ pub enum Error {
     #[error("mqtt perf parse failed")]
     MqttPerfParseFailed,
     #[error("openwire log parse failed")]
-    OpenwireLogParseFailed,
+    OpenWireLogParseFailed,
     // openwire log parse unimplemented is acceptable
     #[error("openwire log parse unimplemented")]
-    OpenwireLogParseUnimplemented,
-    #[error("openwire perf parse failed")]
-    OpenwirePerfParseFailed,
+    OpenWireLogParseUnimplemented,
+    #[error("openwire log parse EOF")]
+    OpenWireLogParseEOF,
     #[error("redis log parse failed")]
     RedisLogParseFailed,
     #[error("redis perf parse failed")]
