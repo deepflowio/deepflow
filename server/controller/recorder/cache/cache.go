@@ -61,13 +61,11 @@ func NewCacheManager(ctx context.Context, cfg config.RecorderConfig, domainLcuui
 }
 
 func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *Cache {
-	cache, exists := m.SubDomainCacheMap[subDomainLcuuid]
-	if exists {
-		return cache
+	if _, exists := m.SubDomainCacheMap[subDomainLcuuid]; !exists {
+		log.Infof("new subdomain cache (lcuuid: %s) because not exists", subDomainLcuuid)
+		m.SubDomainCacheMap[subDomainLcuuid] = NewCache(m.ctx, m.DomainCache.DomainLcuuid, subDomainLcuuid, m.cacheSetSelfHealInterval)
 	}
-	log.Infof("new subdomain cache (lcuuid: %s) because not exists", subDomainLcuuid)
-	m.SubDomainCacheMap[subDomainLcuuid] = NewCache(m.ctx, m.DomainCache.DomainLcuuid, subDomainLcuuid, m.cacheSetSelfHealInterval)
-	return cache
+	return m.SubDomainCacheMap[subDomainLcuuid]
 }
 
 type Cache struct {
