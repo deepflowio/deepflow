@@ -937,10 +937,10 @@ impl QuadrupleGenerator {
                 match tagged_flow.flow.close_type {
                     CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
                     CloseType::Timeout => flow_meter.anomaly.tcp_timeout = 1,
-                    CloseType::ClientSynRepeat => flow_meter.anomaly.client_syn_repeat = 1,
+                    CloseType::ClientSynRepeat => flow_meter.anomaly.server_syn_miss = 1,
                     CloseType::ServerHalfClose => flow_meter.anomaly.server_half_close_flow = 1,
                     CloseType::TcpClientRst => flow_meter.anomaly.client_rst_flow = 1,
-                    CloseType::ServerSynAckRepeat => flow_meter.anomaly.server_synack_repeat = 1,
+                    CloseType::ServerSynAckRepeat => flow_meter.anomaly.client_ack_miss = 1,
                     CloseType::ClientHalfClose => flow_meter.anomaly.client_half_close_flow = 1,
                     CloseType::ClientSourcePortReuse => {
                         flow_meter.anomaly.client_source_port_reuse = 1

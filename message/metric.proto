@@ -132,8 +132,8 @@ message Performance {
 message Anomaly {
     uint64 client_rst_flow = 1;
     uint64 server_rst_flow = 2;
-    uint64 client_syn_repeat = 3;
-    uint64 server_synack_repeat = 4;
+    uint64 server_syn_miss = 3; // Modified on v6.5.2: uint64 client_syn_repeat = 3;
+    uint64 client_ack_miss = 4; // Modified on v6.5.2: uint64 server_synack_repeat = 4;
     uint64 client_half_close_flow = 5;
     uint64 server_half_close_flow = 6;
 

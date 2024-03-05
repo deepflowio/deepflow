@@ -82,10 +82,10 @@ pub enum CloseType {
 
 impl CloseType {
     pub fn is_client_error(self) -> bool {
-        self == CloseType::ClientSynRepeat
-            || self == CloseType::TcpClientRst
+        self == CloseType::TcpClientRst
             || self == CloseType::ClientHalfClose
             || self == CloseType::ClientSourcePortReuse
+            || self == CloseType::ServerSynAckRepeat
             || self == CloseType::ClientEstablishReset
     }
 
@@ -93,10 +93,10 @@ impl CloseType {
         self == CloseType::TcpServerRst
             || self == CloseType::Timeout
             || self == CloseType::ServerHalfClose
-            || self == CloseType::ServerSynAckRepeat
             || self == CloseType::ServerReset
             || self == CloseType::ServerQueueLack
             || self == CloseType::ServerEstablishReset
+            || self == CloseType::ClientSynRepeat
     }
 }
 
