@@ -18,15 +18,21 @@ package genesis
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	"gorm.io/gorm/clause"
 )
 
 type SyncStorage struct {
@@ -305,6 +311,8 @@ func (s *SyncStorage) Stop() {
 }
 
 type KubernetesStorage struct {
+	listenPort     int
+	listenNodePort int
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
@@ -313,9 +321,11 @@ type KubernetesStorage struct {
 	mutex          sync.Mutex
 }
 
-func NewKubernetesStorage(cfg config.GenesisConfig, kChan chan map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
+func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
+		listenPort:     port,
+		listenNodePort: nPort,
 		cfg:            cfg,
 		kCtx:           kCtx,
 		kCancel:        kCancel,
@@ -334,21 +344,84 @@ func (k *KubernetesStorage) Clear() {
 
 func (k *KubernetesStorage) Add(newInfo KubernetesInfo) {
 	k.mutex.Lock()
+	triggerFlag := false
 	// 上报消息中version未变化时，只更新epoch和error_msg
 	if oldInfo, ok := k.kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
 		oldInfo.Epoch = newInfo.Epoch
 		oldInfo.ErrorMSG = newInfo.ErrorMSG
 		k.kubernetesData[newInfo.ClusterID] = oldInfo
 	} else {
+		triggerFlag = true
 		k.kubernetesData[newInfo.ClusterID] = newInfo
 	}
 	k.mutex.Unlock()
 
 	k.channel <- k.fetch()
+
+	if triggerFlag {
+		err := k.triggerCloudRrefresh(newInfo.ClusterID, newInfo.Version)
+		if err != nil {
+			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()))
+		}
+	}
 }
 
 func (k *KubernetesStorage) fetch() map[string]KubernetesInfo {
 	return k.kubernetesData
+}
+
+func (k *KubernetesStorage) triggerCloudRrefresh(clusterID string, version uint64) error {
+	var controllerIP, domainLcuuid, subDomainLcuuid string
+
+	var subDomains []mysql.SubDomain
+	err := mysql.Db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
+	if err != nil {
+		return err
+	}
+	var domain mysql.Domain
+	switch len(subDomains) {
+	case 0:
+		err = mysql.Db.Where("cluster_id = ? AND type = ?", clusterID, common.KUBERNETES).First(&domain).Error
+		if err != nil {
+			return err
+		}
+		controllerIP = domain.ControllerIP
+		domainLcuuid = domain.Lcuuid
+		subDomainLcuuid = domain.Lcuuid
+	case 1:
+		err = mysql.Db.Where("lcuuid = ? AND type = ?", subDomains[0].Domain, common.KUBERNETES).First(&domain).Error
+		if err != nil {
+			return err
+		}
+		controllerIP = domain.ControllerIP
+		domainLcuuid = domain.Lcuuid
+		subDomainLcuuid = subDomains[0].Lcuuid
+	default:
+		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in mysql table sub_domain", clusterID))
+	}
+
+	var controller mysql.Controller
+	err = mysql.Db.Where("ip = ? AND state <> ?", controllerIP, common.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
+	if err != nil {
+		return err
+	}
+	requestIP := controllerIP
+	requestPort := k.listenNodePort
+	if controller.PodIP != "" {
+		requestIP = controller.PodIP
+		requestPort = k.listenPort
+	}
+
+	requestUrl := "http://" + net.JoinHostPort(requestIP, strconv.Itoa(requestPort)) + "/v1/kubernetes-refresh/"
+	queryStrings := map[string]string{
+		"domain_lcuuid":     domainLcuuid,
+		"sub_domain_lcuuid": subDomainLcuuid,
+		"version":           strconv.Itoa(int(version)),
+	}
+
+	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version)
+
+	return gcommon.RequestGet(requestUrl, 30, queryStrings)
 }
 
 func (k *KubernetesStorage) run() {

@@ -17,19 +17,22 @@
 package cloud
 
 import (
+	"time"
+
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
-func (c *Cloud) getKubernetesData() (model.Resource, float64) {
+func (c *Cloud) getKubernetesData() model.Resource {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
 		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
 		return model.Resource{
 			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
-		}, 0
+		}
 	}
 	kubernetesGatherResource := k8sGatherTask.GetResource()
 
@@ -40,7 +43,7 @@ func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 		return model.Resource{
 			ErrorState:   kubernetesGatherResource.ErrorState,
 			ErrorMessage: kubernetesGatherResource.ErrorMessage,
-		}, 0
+		}
 	}
 
 	// 合并网络
@@ -104,8 +107,20 @@ func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 		})
 	}
 
+	if len(vms) == 0 {
+		return model.Resource{
+			ErrorState:   kubernetesGatherResource.ErrorState,
+			ErrorMessage: "invalid vm count (0). " + kubernetesGatherResource.ErrorMessage,
+		}
+	}
+
+	if kubernetesGatherResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+		c.sendStatsd(k8sGatherTask.GetGatherCost())
+	}
+
 	return model.Resource{
 		Verified:               true,
+		SyncAt:                 time.Now(),
 		AZs:                    []model.AZ{kubernetesGatherResource.AZ},
 		VPCs:                   []model.VPC{kubernetesGatherResource.VPC},
 		PodClusters:            []model.PodCluster{kubernetesGatherResource.PodCluster},
@@ -130,5 +145,5 @@ func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 		Networks:               networks,
 		VInterfaces:            vinterfaces,
 		VMPodNodeConnections:   vmPodNodeConnections,
-	}, k8sGatherTask.GetGatherCost()
+	}
 }
