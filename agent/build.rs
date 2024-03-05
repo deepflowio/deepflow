@@ -158,8 +158,17 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn compile_wasm_plugin_proto() -> Result<(), Box<dyn Error>> {
+    tonic_build::configure()
+        .build_server(false)
+        .out_dir("src/plugin/wasm")
+        .compile(&["./src/plugin/WasmPluginApi.proto"], &["./src/plugin"])?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     set_build_info()?;
+    compile_wasm_plugin_proto()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     if target_os.as_str() == "linux" {
         set_build_libtrace()?;

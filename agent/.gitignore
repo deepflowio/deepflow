@@ -6,6 +6,7 @@
 !src/integration/mod.rs
 src/proto/*.rs
 src/proto/integration/*.rs
+src/plugin/wasm/wasm_plugin.rs
 
 src/ebpf/data
 src/ebpf/.data_done

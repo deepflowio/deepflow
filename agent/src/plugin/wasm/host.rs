@@ -21,21 +21,22 @@ use std::{
 
 use anyhow::Result;
 use log::error;
+use prost::Message as ProstMessage;
 use wasmtime::{Engine, Linker, Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
 
 use crate::{
     common::l7_protocol_log::ParseParam,
     flow_generator::protocol_logs::HttpInfo,
-    plugin::{CustomInfo, PluginCounterInfo},
+    plugin::{CustomInfo, L7Protocol, PluginCounterInfo},
     wasm_error,
 };
 
 use super::{
     abi_export::{InstanceWrap, VmParser},
     abi_import::get_linker,
-    VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, HOOK_POINT_HTTP_REQ, HOOK_POINT_HTTP_RESP,
-    HOOK_POINT_PAYLOAD_PARSE,
+    VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmOnCustomMessageCtx, VmParseCtx, HOOK_POINT_HTTP_REQ,
+    HOOK_POINT_HTTP_RESP, HOOK_POINT_ON_CUSTOM_MESSAGE, HOOK_POINT_PAYLOAD_PARSE,
 };
 
 pub(super) const WASM_MODULE_NAME: &str = "deepflow";
@@ -44,13 +45,16 @@ pub(super) const EXPORT_FUNC_CHECK_PAYLOAD: &str = "check_payload";
 pub(super) const EXPORT_FUNC_PARSE_PAYLOAD: &str = "parse_payload";
 pub(super) const EXPORT_FUNC_ON_HTTP_REQ: &str = "on_http_req";
 pub(super) const EXPORT_FUNC_ON_HTTP_RESP: &str = "on_http_resp";
+pub(super) const EXPORT_FUNC_ON_CUSTOM_MESSAGE: &str = "on_custom_message";
 pub(super) const EXPORT_FUNC_GET_HOOK_BITMAP: &str = "get_hook_bitmap";
+pub(super) const EXPORT_FUNC_GET_CUSTOM_MESSAGE_HOOK: &str = "get_custom_message_hook";
 
 pub(super) const IMPORT_FUNC_WASM_LOG: &str = "wasm_log";
 pub(super) const IMPORT_FUNC_VM_READ_CTX_BASE: &str = "vm_read_ctx_base";
 pub(super) const IMPORT_FUNC_VM_READ_PAYLOAD: &str = "vm_read_payload";
 pub(super) const IMPORT_FUNC_VM_READ_HTTP_REQ: &str = "vm_read_http_req_info";
 pub(super) const IMPORT_FUNC_VM_READ_HTTP_RESP: &str = "vm_read_http_resp_info";
+pub(super) const IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE: &str = "vm_read_custom_message_info";
 pub(super) const IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO: &str = "host_read_l7_protocol_info";
 pub(super) const IMPORT_FUNC_HOST_READ_STR_RESULT: &str = "host_read_str_result";
 
@@ -58,11 +62,12 @@ pub(super) const LOG_LEVEL_INFO: i32 = 0;
 pub(super) const LOG_LEVEL_WARN: i32 = 1;
 pub(super) const LOG_LEVEL_ERR: i32 = 2;
 
-pub const WASM_EXPORT_FUNC_NAME: [&'static str; 4] = [
+pub const WASM_EXPORT_FUNC_NAME: [&'static str; 5] = [
     EXPORT_FUNC_CHECK_PAYLOAD,
     EXPORT_FUNC_PARSE_PAYLOAD,
     EXPORT_FUNC_ON_HTTP_REQ,
     EXPORT_FUNC_ON_HTTP_RESP,
+    EXPORT_FUNC_ON_CUSTOM_MESSAGE,
 ];
 
 pub(super) struct StoreDataType {
@@ -75,6 +80,30 @@ pub struct WasmVm {
     linker: Linker<StoreDataType>,
     store: Store<StoreDataType>,
     instance: Vec<InstanceWrap>,
+}
+
+#[repr(u16)]
+#[derive(Debug, Clone, Copy)]
+pub(super) enum HookPoint {
+    ProtocolParse = 0,
+    SessionFilter = 1,
+    Sampling = 2,
+}
+
+pub struct WasmData {
+    pub(super) hook_point: HookPoint,
+    pub(super) type_code: u32,
+    pub(super) protobuf: Vec<u8>,
+}
+
+impl WasmData {
+    pub fn from_request<T: ProstMessage + Sized>(protocol: L7Protocol, message: T) -> WasmData {
+        WasmData {
+            hook_point: HookPoint::ProtocolParse,
+            type_code: protocol as u32,
+            protobuf: message.encode_to_vec(),
+        }
+    }
 }
 
 impl WasmVm {
@@ -434,6 +463,110 @@ impl WasmVm {
             }
 
             ins.on_http_resp_counter.exe_duration.swap(
+                {
+                    let end_time = SystemTime::now();
+                    let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                    // Local timestamp may be modified
+                    if end_time > start_time {
+                        (end_time - start_time).as_micros() as u64
+                    } else {
+                        0
+                    }
+                },
+                Ordering::Relaxed,
+            );
+
+            if !abort.unwrap() {
+                continue;
+            }
+
+            ret = self
+                .store
+                .data_mut()
+                .parse_ctx
+                .as_mut()
+                .unwrap()
+                .take_l7_info_result()
+                .map_or(None, |mut r| r.pop());
+
+            break;
+        }
+
+        // clean the ctx
+        drop(self.store.data_mut().parse_ctx.take());
+        ret
+    }
+
+    pub fn on_custom_message(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        wasm_data: WasmData,
+    ) -> Option<CustomInfo> {
+        if self.instance.len() == 0 {
+            return None;
+        }
+
+        let wasm_data_hook_point = wasm_data.hook_point as u16;
+        let wasm_data_type_code = wasm_data.type_code;
+
+        let _ = self
+            .store
+            .data_mut()
+            .parse_ctx
+            .insert(VmParseCtx::OnCustomMessageCtx(VmOnCustomMessageCtx::from(
+                (param, payload, wasm_data),
+            )));
+
+        let mut ret = None;
+        for ins in self.instance.iter() {
+            if ins.hook_point_bitmap.skip(HOOK_POINT_ON_CUSTOM_MESSAGE) {
+                continue;
+            }
+            if ins.vm_func_on_custom_message.is_none() {
+                continue;
+            }
+            let Some(hook) = ins.custom_message_hook else {
+                continue;
+            };
+            let hook_point = (hook >> 32 & 0xffff) as u16;
+            let type_code = (hook & 0xffff_ffff) as u32;
+            let hook_all = (hook >> 48 & 0xffff) as u16;
+            if hook_all == 0 {
+                if hook_point != wasm_data_hook_point || type_code != wasm_data_type_code {
+                    continue;
+                }
+            }
+
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
+            self.store
+                .data_mut()
+                .parse_ctx
+                .as_mut()
+                .unwrap()
+                .set_ins_name(ins.name.clone());
+
+            let abort = ins.on_custom_message(&mut self.store);
+
+            ins.on_custom_message_counter
+                .mem_size
+                .swap(ins.get_mem_size(&mut self.store) as u64, Ordering::Relaxed);
+
+            if abort.is_err() {
+                wasm_error!(
+                    ins.name,
+                    "wasm on custom message fail: {}",
+                    abort.unwrap_err()
+                );
+                ins.on_custom_message_counter
+                    .fail_cnt
+                    .fetch_add(1, Ordering::Relaxed);
+                continue;
+            }
+
+            ins.on_custom_message_counter.exe_duration.swap(
                 {
                     let end_time = SystemTime::now();
                     let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();

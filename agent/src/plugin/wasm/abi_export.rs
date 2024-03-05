@@ -22,7 +22,8 @@ use wasmtime::{
 
 use super::{
     HookPointBitmap, StoreDataType, WasmCounter, EXPORT_FUNC_CHECK_PAYLOAD,
-    EXPORT_FUNC_GET_HOOK_BITMAP, EXPORT_FUNC_ON_HTTP_REQ, EXPORT_FUNC_ON_HTTP_RESP,
+    EXPORT_FUNC_GET_CUSTOM_MESSAGE_HOOK, EXPORT_FUNC_GET_HOOK_BITMAP,
+    EXPORT_FUNC_ON_CUSTOM_MESSAGE, EXPORT_FUNC_ON_HTTP_REQ, EXPORT_FUNC_ON_HTTP_RESP,
     EXPORT_FUNC_PARSE_PAYLOAD,
 };
 use crate::{
@@ -33,16 +34,18 @@ use crate::{
     plugin::PluginCounterInfo,
 };
 use public::{
-    bytes::read_u128_be,
+    bytes::{read_u128_be, read_u64_be},
     counter::{Countable, RefCountable},
 };
 
 pub(super) trait VmParser {
     fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    fn on_custom_message(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8>;
     fn parse_payload(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap>;
+    fn get_custom_message_hook(&self, store: &mut Store<StoreDataType>) -> Result<Option<u64>>;
 }
 
 pub(super) struct InstanceWrap {
@@ -51,12 +54,14 @@ pub(super) struct InstanceWrap {
     pub(super) ins: Instance,
     // the linear memory belong to this instance
     pub(super) memory: Memory,
+    pub(super) custom_message_hook: Option<u64>,
 
     // metric counter
     pub(super) check_payload_counter: Arc<WasmCounter>,
     pub(super) parse_payload_counter: Arc<WasmCounter>,
     pub(super) on_http_req_counter: Arc<WasmCounter>,
     pub(super) on_http_resp_counter: Arc<WasmCounter>,
+    pub(super) on_custom_message_counter: Arc<WasmCounter>,
 
     /*
         correspond go export function:
@@ -76,6 +81,15 @@ pub(super) struct InstanceWrap {
         }
     */
     pub(super) vm_func_on_http_resp: TypedFunc<(), i32>,
+    /*
+        correspond go export function:
+
+        //export on_custom_message
+        func onCustomMessage() bool {
+
+        }
+    */
+    pub(super) vm_func_on_custom_message: Option<TypedFunc<(), i32>>,
     /*
         correspond go export function:
 
@@ -103,6 +117,15 @@ pub(super) struct InstanceWrap {
         }
     */
     pub(super) vm_func_get_hook_bitmap: TypedFunc<(), i32>,
+    /*
+        correspond go export function:
+
+        //export get_custom_message_hook
+        func getCustomMessageHook() *byte {
+
+        }
+    */
+    pub(super) vm_func_get_custom_message_hook: Option<TypedFunc<(), i32>>,
 }
 
 impl VmParser for InstanceWrap {
@@ -187,6 +210,33 @@ impl VmParser for InstanceWrap {
         }
     }
 
+    fn on_custom_message(&self, store: &mut Store<StoreDataType>) -> Result<bool> {
+        let vm_func_on_custom_message =
+            self.vm_func_on_custom_message.as_ref().ok_or_else(|| {
+                WasmVmError(format!(
+                    "vm have no export function {}",
+                    EXPORT_FUNC_ON_CUSTOM_MESSAGE
+                ))
+            })?;
+        let res = vm_func_on_custom_message
+            .call(&mut *store, ())
+            .map_err(|e| {
+                WasmVmError(format!(
+                    "vm call {} fail: {:?}",
+                    EXPORT_FUNC_ON_CUSTOM_MESSAGE, e
+                ))
+            })?;
+
+        match res {
+            0 => Ok(false),
+            1 => Ok(true),
+            v => Err(WasmVmError(format!(
+                "vm call on custom message return unexpect value : {}",
+                v
+            ))),
+        }
+    }
+
     fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap> {
         let bitmap_ptr = self
             .vm_func_get_hook_bitmap
@@ -209,6 +259,28 @@ impl VmParser for InstanceWrap {
         Ok(HookPointBitmap(read_u128_be(
             &data[bitmap_ptr..bitmap_ptr + 16],
         )))
+    }
+
+    fn get_custom_message_hook(&self, store: &mut Store<StoreDataType>) -> Result<Option<u64>> {
+        let Some(func) = self.vm_func_get_custom_message_hook else {
+            return Ok(None);
+        };
+        let ptr = func.call(&mut *store, ()).map_err(|e| {
+            WasmVmError(format!(
+                "vm call {} fail: {:?}",
+                EXPORT_FUNC_GET_CUSTOM_MESSAGE_HOOK, e
+            ))
+        })? as usize;
+
+        if ptr == 0 {
+            return Ok(None);
+        }
+
+        let data = self.memory.data(store);
+        let slice = data.get(ptr..ptr + 8).ok_or(Error::WasmSerializeFail(
+            "get custom message hook fail".to_string(),
+        ))?;
+        Ok(Some(read_u64_be(slice)))
     }
 }
 
@@ -248,11 +320,23 @@ impl InstanceWrap {
             get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_CHECK_PAYLOAD)?;
         let vm_func_parse_payload =
             get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_PARSE_PAYLOAD)?;
+        let vm_func_on_custom_message = get_instance_export_func::<(), i32>(
+            &instance,
+            &mut *store,
+            EXPORT_FUNC_ON_CUSTOM_MESSAGE,
+        )
+        .ok();
         let vm_func_get_hook_bitmap = get_instance_export_func::<(), i32>(
             &instance,
             &mut *store,
             EXPORT_FUNC_GET_HOOK_BITMAP,
         )?;
+        let vm_func_get_custom_message_hook = get_instance_export_func::<(), i32>(
+            &instance,
+            &mut *store,
+            EXPORT_FUNC_GET_CUSTOM_MESSAGE_HOOK,
+        )
+        .ok();
 
         // run _start as main to set the parser
         instance
@@ -266,18 +350,23 @@ impl InstanceWrap {
             hook_point_bitmap: HookPointBitmap(0),
             name: name.to_string(),
             memory,
+            custom_message_hook: None,
             check_payload_counter: Default::default(),
             parse_payload_counter: Default::default(),
             on_http_req_counter: Default::default(),
             on_http_resp_counter: Default::default(),
+            on_custom_message_counter: Default::default(),
             vm_func_on_http_req,
             vm_func_on_http_resp,
+            vm_func_on_custom_message,
             vm_func_check_payload,
             vm_func_parse_payload,
             vm_func_get_hook_bitmap,
+            vm_func_get_custom_message_hook,
         };
 
         ins.hook_point_bitmap = ins.get_hook_bitmap(store)?;
+        ins.custom_message_hook = ins.get_custom_message_hook(store)?;
         Ok(ins)
     }
 
