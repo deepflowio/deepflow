@@ -1293,18 +1293,32 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 					continue
 				}
 
-				deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
-				if whereSql != "" {
-					whereSql += " AND devicetype=" + deviceTypeStr
+				if resourceInfo.ResourceType == VIF_DEVICE_TYPE_VM {
+					if whereSql != "" {
+						whereSql += " AND display_name!=''"
+					} else {
+						whereSql = " WHERE display_name!=''"
+					}
+					sql = strings.Join([]string{
+						"SELECT id AS value,", resourceInfo.FieldName, "AS display_name",
+						"FROM chost_map", whereSql,
+						"GROUP BY value, display_name",
+						"ORDER BY", orderBy, "ASC", limitSql,
+					}, " ")
 				} else {
-					whereSql = " WHERE devicetype=" + deviceTypeStr
+					deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
+					if whereSql != "" {
+						whereSql += " AND devicetype=" + deviceTypeStr
+					} else {
+						whereSql = " WHERE devicetype=" + deviceTypeStr
+					}
+					sql = strings.Join([]string{
+						"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
+						"FROM device_map", whereSql, "AND display_name!=''",
+						"GROUP BY value, display_name",
+						"ORDER BY", orderBy, "ASC", limitSql,
+					}, " ")
 				}
-				sql = strings.Join([]string{
-					"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
-					"FROM device_map", whereSql, "AND display_name!=''",
-					"GROUP BY value, display_name",
-					"ORDER BY", orderBy, "ASC", limitSql,
-				}, " ")
 				break
 			}
 		}

@@ -554,6 +554,7 @@ fn fill_l7_stats(
         l7_protocol,
         signal_source: SignalSource::OTel,
         time_in_second: flow_stat_time.into(),
+        biz_type: 0,
     }
 }
 

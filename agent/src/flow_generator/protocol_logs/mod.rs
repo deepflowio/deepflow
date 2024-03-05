@@ -165,6 +165,7 @@ pub struct AppProtoLogsBaseInfo {
     pub vtap_id: u16,
     pub tap_type: TapType,
     pub tap_side: TapSide,
+    pub biz_type: u8,
     #[serde(flatten)]
     pub head: AppProtoHead,
 
@@ -315,6 +316,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             gpid_1: f.gpid_1,
             pod_id_0: f.pod_id_0,
             pod_id_1: f.pod_id_1,
+            biz_type: f.biz_type as u32,
         }
     }
 }

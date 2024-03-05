@@ -111,6 +111,19 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnNames: []string{"events"},
 		ColumnType:  ckdb.String,
 	},
+	{
+		Dbs: []string{"flow_metrics"},
+		Tables: []string{"application.1m", "application.1m_local", "application_map.1m", "application_map.1m_local",
+			"application.1s", "application.1s_local", "application_map.1s", "application_map.1s_local"},
+		ColumnNames: []string{"biz_type"},
+		ColumnType:  ckdb.UInt8,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local", "l7_flow_log"},
+		ColumnNames: []string{"biz_type"},
+		ColumnType:  ckdb.UInt8,
+	},
 }
 
 var TableRenames65 = []*TableRename{
@@ -230,5 +243,12 @@ var ColumnDatasourceAdd65 = []*ColumnDatasourceAdds{
 		ColumnTypes:    []ckdb.ColumnType{ckdb.LowCardinalityString, ckdb.UInt32, ckdb.UInt8},
 		OnlyMapTable:   true,
 		OnlyAppTable:   false,
+	},
+	{
+		ColumnNames:    []string{"biz_type"},
+		OldColumnNames: []string{""},
+		ColumnTypes:    []ckdb.ColumnType{ckdb.UInt8},
+		OnlyMapTable:   false,
+		OnlyAppTable:   true,
 	},
 }

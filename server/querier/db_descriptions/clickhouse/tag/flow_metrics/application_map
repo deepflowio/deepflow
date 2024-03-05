@@ -81,3 +81,4 @@ capture_nic_type           , capture_nic_type          , capture_nic_type       
 tap_side                   , tap_side                  , tap_side                  , string_enum   , observation_point      , Capture Info    , 111           , 1
 observation_point          , observation_point         , observation_point         , string_enum   , observation_point      , Capture Info    , 111           , 0
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source       , Capture Info    , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int           ,                        , Capture Info    , 111           , 0

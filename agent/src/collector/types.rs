@@ -152,6 +152,7 @@ pub struct AppMeterWithFlow {
     pub l7_protocol: L7Protocol,
     pub endpoint_hash: u32,
     pub endpoint: Option<String>,
+    pub biz_type: u8,
     pub is_active_host0: bool,
     pub is_active_host1: bool,
 

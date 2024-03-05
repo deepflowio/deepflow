@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package migration
+package recorder
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.10"
-)
+import "errors"
+
+var DataNotVerifiedError = errors.New("data is not verified")
+var DataMissingError = errors.New("some data is missing")
+var RefreshConflictError = errors.New("another operation is in progress")

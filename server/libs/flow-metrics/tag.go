@@ -89,7 +89,7 @@ const (
 	TAPSide
 	TAPPort
 	IsKeyService
-	L7Protocol
+	L7Protocol // also represents AppService,AppInstance,EndPoint,BizType
 	SignalSource
 )
 
@@ -310,6 +310,7 @@ type Field struct {
 	AppService   string
 	AppInstance  string
 	Endpoint     string
+	BizType      uint8
 	SignalSource uint16
 
 	TagSource, TagSource1 uint8
@@ -670,6 +671,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",app_service="+t.AppService)
 		offset += copy(b[offset:], ",app_instance="+t.AppInstance)
 		offset += copy(b[offset:], ",endpoint="+t.Endpoint)
+		offset += copy(b[offset:], ",biz_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.BizType), 10))
 	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
@@ -959,6 +962,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.String))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("endpoint", ckdb.String))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("biz_type", ckdb.UInt8).SetComment("Business Type"))
 	}
 
 	if code&MAC != 0 {
@@ -1168,6 +1172,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 		block.Write(t.AppService)
 		block.Write(t.AppInstance)
 		block.Write(t.Endpoint)
+		block.Write(t.BizType)
 	}
 
 	if code&MAC != 0 {
@@ -1355,6 +1360,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.AppService = p.Field.AppService
 	t.AppInstance = p.Field.AppInstance
 	t.Endpoint = p.Field.Endpoint
+	t.BizType = uint8(p.Field.BizType)
 	// In order to be compatible with the old version of Agent data, GPID needs to be set
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath

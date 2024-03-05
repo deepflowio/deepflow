@@ -313,7 +313,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		if version == common.CK_VERSION {
 			continue
 		}
-		if (add.OnlyAppTable && !isMapTable) || (add.OnlyAppTable && !isAppTable) {
+		if (add.OnlyMapTable && !isMapTable) || (add.OnlyAppTable && !isAppTable) {
 			continue
 		}
 		aggTable := d.name + "_agg"

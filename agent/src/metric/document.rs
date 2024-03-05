@@ -303,6 +303,7 @@ pub struct Tagger {
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
     pub endpoint: Option<String>,
+    pub biz_type: u8,
     pub signal_source: SignalSource,
     pub pod_id: u32,
 }
@@ -338,6 +339,7 @@ impl Default for Tagger {
             endpoint: None,
             signal_source: SignalSource::default(),
             pod_id: 0,
+            biz_type: 0,
         }
     }
 }
@@ -393,6 +395,7 @@ impl From<Tagger> for metric::MiniTag {
                 app_instance: t.otel_instance.unwrap_or_default(),
                 endpoint: t.endpoint.unwrap_or_default(),
                 pod_id: t.pod_id,
+                biz_type: t.biz_type as u32,
             }),
         }
     }
