@@ -375,6 +375,10 @@ func (m *PlatformDataManager) NewPlatformInfoTable(moudleName string) (*Platform
 }
 
 func (m *PlatformDataManager) GetMasterPlatformInfoTable() *PlatformInfoTable {
+	if m.masterTable != nil {
+		return m.masterTable
+	}
+	m.NewPlatformInfoTable(MASTER_TABLE_MOUDLE_NANE)
 	return m.masterTable
 }
 

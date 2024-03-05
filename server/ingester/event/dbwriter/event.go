@@ -18,6 +18,7 @@ package dbwriter
 
 import (
 	"net"
+	"sync/atomic"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
@@ -43,6 +44,7 @@ const (
 
 type EventStore struct {
 	Time uint32 // s
+	_id  uint64
 
 	StartTime int64
 	EndTime   int64
@@ -92,6 +94,7 @@ type EventStore struct {
 func (e *EventStore) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(e.Time)
 	block.Write(
+		e._id,
 		e.StartTime,
 		e.EndTime,
 
@@ -152,9 +155,18 @@ func (e *EventStore) Release() {
 	ReleaseEventStore(e)
 }
 
+var EventCounter uint32
+
+func (e *EventStore) SetId(time, analyzerID uint32) {
+	count := atomic.AddUint32(&EventCounter, 1)
+	// The high 32 bits of time, 23-32 bits represent analyzerId, the low 22 bits are counter
+	e._id = uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
+}
+
 func EventColumns(hasMetrics bool) []*ckdb.Column {
 	columns := []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
+		ckdb.NewColumn("_id", ckdb.UInt64),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 
