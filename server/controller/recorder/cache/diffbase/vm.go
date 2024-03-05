@@ -80,9 +80,11 @@ func (v *VM) Update(cloudItem *cloudmodel.VM, toolDataSet *tool.DataSet) {
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.AZLcuuid = cloudItem.AZLcuuid
 	v.CloudTags = cloudItem.CloudTags
-	hostID, exists := toolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
-	if exists {
-		v.HostID = hostID
+	if cloudItem.LaunchServer != "" {
+		hostID, exists := toolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+		if exists {
+			v.HostID = hostID
+		}
 	}
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, v))
 }
