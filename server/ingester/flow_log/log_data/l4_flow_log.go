@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -976,7 +976,7 @@ func (f *L4FlowLog) Release() {
 
 func L4FlowLogColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
-	columns = append(columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
+	columns = append(columns, ckdb.NewColumn("_id", ckdb.UInt64))
 	columns = append(columns, DataLinkLayerColumns...)
 	columns = append(columns, KnowledgeGraphColumns...)
 	columns = append(columns, NetworkLayerColumns...)

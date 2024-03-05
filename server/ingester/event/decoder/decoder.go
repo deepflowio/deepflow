@@ -32,7 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -161,6 +161,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = true
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
 	s.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
 	s.Duration = uint64(e.EndTime - e.StartTime)
@@ -290,6 +291,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = false
 	s.Time = uint32(event.Time)
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = event.TimeMilli * 1000 // convert to microsecond
 	s.EndTime = s.StartTime
 

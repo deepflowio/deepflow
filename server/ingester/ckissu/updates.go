@@ -124,6 +124,12 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnNames: []string{"biz_type"},
 		ColumnType:  ckdb.UInt8,
 	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
+		ColumnNames: []string{"_id"},
+		ColumnType:  ckdb.UInt64,
+	},
 }
 
 var TableRenames65 = []*TableRename{

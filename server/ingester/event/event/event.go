@@ -51,7 +51,7 @@ type Eventor struct {
 
 func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Event, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EVENT_QUEUE)
-	resourceEventor, err := NewResouceEventor(resourceEventQueue, common.RESOURCE_EVENT, config)
+	resourceEventor, err := NewResouceEventor(resourceEventQueue, common.RESOURCE_EVENT, config, platformDataManager.GetMasterPlatformInfoTable())
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 	}, nil
 }
 
-func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config) (*Eventor, error) {
+func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
 	eventWriter, err := dbwriter.NewEventWriter(eventType.TableName(), 0, config)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventT
 		eventType,
 		queue.QueueReader(eventQueue),
 		eventWriter,
-		nil,
+		platformTable,
 		config,
 	)
 	return &Eventor{
