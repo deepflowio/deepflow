@@ -31,10 +31,13 @@ use crate::{
     flow_generator::{
         error::Result,
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            pb_adapter::{
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+            },
             AppProtoHead, LogMessageType,
         },
     },
+    plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -210,6 +213,9 @@ pub struct NatsInfo {
     span_id: Option<String>,
 
     message: NatsMessage,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
 }
 
 #[derive(Default)]
@@ -719,6 +725,16 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                 span_id: info.span_id,
                 ..Default::default()
             }),
+            ext_info: Some(ExtendedInfo {
+                attributes: {
+                    if info.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(info.attributes)
+                    }
+                },
+                ..Default::default()
+            }),
             ..Default::default()
         };
         log
@@ -759,6 +775,55 @@ impl L7ProtocolInfoInterface for NatsInfo {
 
     fn get_request_domain(&self) -> String {
         self.server_name.clone()
+    }
+}
+
+impl NatsLog {
+    fn wasm_hook(&self, param: &ParseParam, payload: &[u8], info: &mut NatsInfo) {
+        let (subject, reply_to, nats_payload) = {
+            match &info.message {
+                NatsMessage::Msg(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Hmsg(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Pub(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Hpub(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                _ => return,
+            }
+        };
+
+        let wasm_nats_message = WasmNatsMessage {
+            subject,
+            reply_to: reply_to.unwrap_or_default(),
+            payload: nats_payload,
+        };
+
+        let mut vm_ref = param.wasm_vm.borrow_mut();
+        let Some(vm) = vm_ref.as_mut() else {
+            return;
+        };
+
+        let wasm_data = WasmData::from_request(self.protocol(), wasm_nats_message);
+
+        if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
+            if !custom.attributes.is_empty() {
+                info.attributes.extend(custom.attributes);
+            }
+        }
     }
 }
 
@@ -805,6 +870,8 @@ impl L7ProtocolParserInterface for NatsLog {
                 info.is_tls = param.is_tls();
                 info.version = self.version.clone();
                 info.server_name = self.server_name.clone();
+
+                self.wasm_hook(param, payload, info);
 
                 match param.direction {
                     PacketDirection::ClientToServer => {
