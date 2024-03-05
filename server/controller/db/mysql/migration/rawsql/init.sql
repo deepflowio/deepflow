@@ -1201,6 +1201,10 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     query_params            TEXT,
     query_conditions        TEXT,
     tag_conditions          TEXT,
+    monitoring_frequency    CHAR(64) DEFAULT "1m",
+    monitoring_interval     CHAR(64) DEFAULT "1m",
+    trigger_info_event      INTEGER DEFAULT 0,
+    trigger_recovery_event  INTEGER DEFAULT 1,
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
