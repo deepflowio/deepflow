@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"gorm.io/gorm"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -37,6 +39,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("cloud")
@@ -50,6 +53,8 @@ type Cloud struct {
 	resource                model.Resource
 	platform                platform.Platform
 	taskCost                statsd.CloudTaskStatsd
+	domainRefreshSignal     *queue.OverwriteQueue
+	subDomainRefreshSignals cmap.ConcurrentMap[string, *queue.OverwriteQueue]
 	kubernetesGatherTaskMap map[string]*KubernetesGatherTask
 }
 
@@ -81,6 +86,8 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 		taskCost: statsd.CloudTaskStatsd{
 			TaskCost: make(map[string][]float64),
 		},
+		domainRefreshSignal:     queue.NewOverwriteQueue(fmt.Sprintf("cloud-task-%s", domain.Name), 1),
+		subDomainRefreshSignals: cmap.New[*queue.OverwriteQueue](),
 	}
 }
 
@@ -91,6 +98,7 @@ func (c *Cloud) Start() {
 
 func (c *Cloud) Stop() {
 	c.platform.ClearDebugLog()
+	c.domainRefreshSignal.Close()
 	if c.cCancel != nil {
 		c.cCancel()
 	}
@@ -102,6 +110,14 @@ func (c *Cloud) UpdateBasicInfoName(name string) {
 
 func (c *Cloud) GetBasicInfo() model.BasicInfo {
 	return c.basicInfo
+}
+
+func (c *Cloud) GetDomainRefreshSignal() *queue.OverwriteQueue {
+	return c.domainRefreshSignal
+}
+
+func (c *Cloud) GetSubDomainRefreshSignals() cmap.ConcurrentMap[string, *queue.OverwriteQueue] {
+	return c.subDomainRefreshSignals
 }
 
 func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource {
@@ -168,6 +184,8 @@ func (c *Cloud) GetResource() model.Resource {
 			cResource.SubDomainResources = c.getSubDomainData(cResource)
 			cResource = c.appendResourceVIPs(cResource)
 		}
+	} else {
+		cResource = c.getKubernetesData()
 	}
 
 	if cResource.Verified {
@@ -235,23 +253,21 @@ func (c *Cloud) getCloudData() {
 				ErrorState:   cResource.ErrorState,
 			}
 		}
-	} else {
-		cResource, cloudCost = c.getKubernetesData()
-	}
-
-	if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
-		cResource = model.Resource{
-			ErrorState:   cResource.ErrorState,
-			ErrorMessage: cResource.ErrorMessage,
+		if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
+			cResource = model.Resource{
+				ErrorState:   cResource.ErrorState,
+				ErrorMessage: "invalid vm count (0). " + cResource.ErrorMessage,
+			}
+		}
+		cResource.SyncAt = time.Now()
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+			c.sendStatsd(cloudCost)
 		}
 	}
 
-	cResource.SyncAt = time.Now()
 	c.resource = cResource
-	if cResource.ErrorState == common.RESOURCE_STATE_CODE_EXCEPTION {
-		return
-	}
-	c.sendStatsd(cloudCost)
+	// trigger recorder refresh domain resource
+	c.domainRefreshSignal.Put(struct{}{})
 }
 
 func (c *Cloud) sendStatsd(cloudCost float64) {
@@ -319,7 +335,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		}
 		c.mutex.Lock()
 		c.kubernetesGatherTaskMap[domain.Lcuuid] = kubernetesGatherTask
-		c.kubernetesGatherTaskMap[domain.Lcuuid].Start()
+		c.kubernetesGatherTaskMap[domain.Lcuuid].Start(c.domainRefreshSignal)
 		c.mutex.Unlock()
 
 	} else {
@@ -350,6 +366,11 @@ func (c *Cloud) runKubernetesGatherTask() {
 			c.mutex.Lock()
 			delete(c.kubernetesGatherTaskMap, lcuuid)
 			c.mutex.Unlock()
+			kGatherQueue, ok := c.subDomainRefreshSignals.Get(lcuuid)
+			if ok {
+				kGatherQueue.Close()
+				c.subDomainRefreshSignals.Remove(lcuuid)
+			}
 		}
 
 		// 对于新增的subDomain，启动Task，并纳入Manger管理
@@ -360,9 +381,12 @@ func (c *Cloud) runKubernetesGatherTask() {
 			if kubernetesGatherTask == nil {
 				continue
 			}
+
+			gatherQueue := queue.NewOverwriteQueue(fmt.Sprintf("sub-domain-task-%s", lcuuid), 1)
+			c.subDomainRefreshSignals.SetIfAbsent(lcuuid, gatherQueue)
 			c.mutex.Lock()
 			c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
-			c.kubernetesGatherTaskMap[lcuuid].Start()
+			c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 			c.mutex.Unlock()
 		}
 
@@ -382,10 +406,15 @@ func (c *Cloud) runKubernetesGatherTask() {
 					continue
 				}
 
+				gatherQueue, ok := c.subDomainRefreshSignals.Get(lcuuid)
+				if !ok {
+					gatherQueue = queue.NewOverwriteQueue(fmt.Sprintf("sub-domain-task-%s", lcuuid), 1)
+					c.subDomainRefreshSignals.Set(lcuuid, gatherQueue)
+				}
 				c.mutex.Lock()
 				delete(c.kubernetesGatherTaskMap, lcuuid)
 				c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
-				c.kubernetesGatherTaskMap[lcuuid].Start()
+				c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 				c.mutex.Unlock()
 			}
 		}

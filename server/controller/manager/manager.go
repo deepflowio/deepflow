@@ -123,6 +123,21 @@ func (m *Manager) GetKubernetesGatherResources(lcuuid string) ([]kubernetes_gath
 	return k8sGatherResources, nil
 }
 
+func (m *Manager) TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid string, version int) error {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	cloudTask, ok := m.taskMap[domainLcuuid]
+	if !ok {
+		return errors.New(fmt.Sprintf("domain (%s) not found", domainLcuuid))
+	}
+	k8sGatherTaskMap := cloudTask.Cloud.GetKubernetesGatherTaskMap()
+	gather, ok := k8sGatherTaskMap[subDomainLcuuid]
+	if !ok {
+		return errors.New(fmt.Sprintf("domain (%s) not found gather (%s)", domainLcuuid, subDomainLcuuid))
+	}
+	return gather.PutRefreshSignal(version)
+}
+
 func (m *Manager) GetRecorder(domainLcuuid string) (recorder.Recorder, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

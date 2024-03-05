@@ -57,6 +57,10 @@ func GetCloudResource(lcuuid string, m *manager.Manager) (resp cloudmodel.Resour
 	}
 }
 
+func TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid string, version int, m *manager.Manager) error {
+	return m.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version)
+}
+
 func GetKubernetesGatherBasicInfos(lcuuid string, m *manager.Manager) (resp []kubernetes_gather_model.KubernetesGatherBasicInfo, err error) {
 	response, err := m.GetKubernetesGatherBasicInfos(lcuuid)
 	return response, err

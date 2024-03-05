@@ -18,10 +18,12 @@ package router
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/manager"
@@ -44,6 +46,7 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
 	e.GET("/v1/agent-stats/:ipOrID/", getAgentStats(d.g))
 	e.GET("/v1/genesis-storage/:vtapID/", getGenesisStorage(d.g))
+	e.GET("/v1/kubernetes-refresh/", triggerKubernetesRefresh(d.m)) // TODO: Move to a better path
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
 	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
@@ -219,5 +222,24 @@ func getGenesisPrometheusData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetGenesisPrometheusData(g, c.Param("clusterID"))
 		JsonResponse(c, data, err)
+	})
+}
+
+func triggerKubernetesRefresh(m *manager.Manager) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		domainLcuuid := c.Query("domain_lcuuid")
+		subDomainLcuuid := c.Query("sub_domain_lcuuid")
+		versionString := c.Query("version")
+		if domainLcuuid == "" || subDomainLcuuid == "" || versionString == "" {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "required parameter missing")
+			return
+		}
+		version, err := strconv.Atoi(versionString)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		err = service.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version, m)
+		JsonResponse(c, struct{}{}, err)
 	})
 }
