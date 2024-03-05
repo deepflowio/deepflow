@@ -216,12 +216,13 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 			char *p = ptr;
 			/*
 			 * If the parsed string contains a semicolon (';'), replace
-			 * it with a space, as the semicolon is a specific delimiter
+			 * it with ':', as the semicolon is a specific delimiter
 			 * we use to separate symbolic strings.
+			 * e.g.: "NioEventLoop;::run" -> "NioEventLoop:::run"
 			 */
 			for (p = ptr; *p != '\0'; p++) {
 				if (*p == ';')
-					*p = ' ';
+					*p = ':';
 			}
 
 			goto finish;
@@ -498,6 +499,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							0, stack_map_name,
 							h, new_cache, info_p,
 							v->timestamp);
+		if (k_trace_str == NULL)
+			return NULL;
 	}
 
 	if (v->userstack >= 0) {
@@ -506,14 +509,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							stack_map_name,
 							h, new_cache, info_p,
 							v->timestamp);
-	}
-
-	/* 
-	 * Handling exceptions (e.g., memory allocation failure) by returning
-	 * a null value.
-	 */
-	if (k_trace_str == NULL || u_trace_str == NULL) {
-		return NULL;
+		if (u_trace_str == NULL)
+			return NULL;
 	}
 
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */

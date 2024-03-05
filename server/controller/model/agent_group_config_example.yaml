@@ -1241,17 +1241,6 @@ vtap_group_id: g-xxxxxx
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
 
-      ## The maximum limit space in the root directory of each Java process. deepflow-agent will
-      ## automatically create a `/deepflow/` directory to temporarily store the symbol files of the
-      ## Java process. The space occupied by the files written by deepflow-agent will not exceed this
-      ## configured value. All files are stored temporarily and are immediately cleared once the Java
-      ## symbol files are obtained.
-      ## Default: 10. Range: [2, 100]
-      ## Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
-      ## this range, the default value of 10(10Mi), will be used.
-      #java-symbol-file-max-space-limit: 10
-
-
       ## When deepflow-agent finds that an unresolved function name appears in the function call stack
       ## of a Java process, it will trigger the regeneration of the symbol file of the process.
       ## Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for

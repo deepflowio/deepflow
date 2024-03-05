@@ -91,6 +91,7 @@ type DataSet struct {
 	podIngressRuleLcuuidToID map[string]int
 
 	podServiceLcuuidToID map[string]int
+	podServiceIDToLcuuid map[int]string
 
 	podGroupLcuuidToID map[string]int
 	podGroupIDToLcuuid map[int]string
@@ -159,6 +160,7 @@ func NewDataSet() *DataSet {
 		podIngressRuleLcuuidToID: make(map[string]int),
 
 		podServiceLcuuidToID: make(map[string]int),
+		podServiceIDToLcuuid: make(map[int]string),
 
 		podGroupLcuuidToID: make(map[string]int),
 		podGroupIDToLcuuid: make(map[int]string),
@@ -803,6 +805,7 @@ func (t *DataSet) DeletePodIngressRule(lcuuid string) {
 
 func (t *DataSet) AddPodService(item *mysql.PodService) {
 	t.podServiceLcuuidToID[item.Lcuuid] = item.ID
+	t.podServiceIDToLcuuid[item.ID] = item.Lcuuid
 	t.podServiceIDToInfo[item.ID] = &podServiceInfo{
 		Name:           item.Name,
 		VPCID:          item.VPCID,
@@ -848,6 +851,7 @@ func (t *DataSet) DeletePodService(lcuuid string) {
 	id, _ := t.GetPodServiceIDByLcuuid(lcuuid)
 	delete(t.podServiceIDToInfo, id)
 	delete(t.podServiceLcuuidToID, lcuuid)
+	delete(t.podServiceIDToLcuuid, id)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 }
 
@@ -1575,6 +1579,23 @@ func (t *DataSet) GetPodServiceIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.podServiceIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id))
+	var podService mysql.PodService
+	result := mysql.Db.Where("lcuuid = ?", id).Find(&podService)
+	if result.RowsAffected == 1 {
+		t.AddPodService(&podService)
+		return podService.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id))
+		return lcuuid, false
 	}
 }
 

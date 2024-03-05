@@ -83,6 +83,10 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		))
 		return nil, false
 	}
+	var hostID int
+	if cloudItem.LaunchServer != "" {
+		hostID, _ = m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+	}
 	cloudTags := map[string]string{}
 	if cloudItem.CloudTags != nil {
 		cloudTags = cloudItem.CloudTags
@@ -96,6 +100,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		State:        cloudItem.State,
 		HType:        cloudItem.HType,
 		LaunchServer: cloudItem.LaunchServer,
+		HostID:       hostID,
 		Domain:       m.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
@@ -152,6 +157,13 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
 		mapInfo["launch_server"] = cloudItem.LaunchServer
 		structInfo.LaunchServer.Set(diffBase.LaunchServer, cloudItem.LaunchServer)
+	}
+	if cloudItem.LaunchServer != "" {
+		hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+		if diffBase.HostID != hostID {
+			mapInfo["host_id"] = hostID
+			structInfo.HostID.Set(diffBase.HostID, hostID)
+		}
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

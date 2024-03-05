@@ -14,156 +14,97 @@
  * limitations under the License.
  */
 
-enum SqlBlock {
-    StringBlock(u8),
-    MultiLineComment,
-    EndComment,
-}
-
-impl SqlBlock {
-    fn is_end_token(&self, t: &[u8]) -> bool {
-        match self {
-            SqlBlock::StringBlock(c) => t.len() == 1 && t[0] == *c,
-            SqlBlock::MultiLineComment => t.len() == 2 && t == b"*/",
-            _ => unreachable!(),
-        }
-    }
-
-    fn token_len(&self) -> usize {
-        match self {
-            SqlBlock::StringBlock(_) => 1,
-            SqlBlock::MultiLineComment => 2,
-            SqlBlock::EndComment => unreachable!(),
-        }
-    }
-
-    fn is_comment_block(&self) -> bool {
-        match self {
-            SqlBlock::StringBlock(_) => false,
-            SqlBlock::MultiLineComment => true,
-            SqlBlock::EndComment => true,
-        }
-    }
-
-    // return (accept, ignore)
-    fn escape_action(&self) -> (bool, bool) {
-        match self {
-            SqlBlock::StringBlock(_) => (true, false),
-            SqlBlock::MultiLineComment => (false, true),
-            SqlBlock::EndComment => unreachable!(),
-        }
-    }
-
-    fn get_block(t: &[u8]) -> Option<Self> {
-        if t.len() == 1 {
-            if t == b"'" || t == b"\"" {
-                return Some(SqlBlock::StringBlock(t[0]));
-            }
-            if t == b"#" {
-                return Some(SqlBlock::EndComment);
-            }
-        }
-
-        if t.len() == 2 {
-            if t == b"/*" {
-                return Some(SqlBlock::MultiLineComment);
-            }
-
-            if t == b"--" {
-                return Some(SqlBlock::EndComment);
-            }
-        }
-
-        return None;
-    }
-}
-
 pub(super) struct MysqlCommentParserIter<'a> {
-    sql: &'a str,
-    offset: usize,
-}
-
-enum Error {
-    End,
-    UnexpectedEscape(usize),
+    sql: &'a [u8],
 }
 
 impl<'a> MysqlCommentParserIter<'a> {
     pub(super) fn new(s: &'a str) -> Self {
-        Self { sql: s, offset: 0 }
+        Self { sql: s.as_bytes() }
     }
+}
 
-    fn read_token(&mut self, accept_escape: bool, ignore_escape: bool) -> Result<&[u8], Error> {
-        let sql_byte = self.sql.as_bytes();
-        while self.offset < self.sql.len() {
-            let c = sql_byte[self.offset];
-            if c == b'\\' {
-                if ignore_escape {
-                    self.offset += 1;
-                    continue;
-                } else if accept_escape {
-                    self.offset += 2;
-                    continue;
-                } else {
-                    return Err(Error::UnexpectedEscape(self.offset));
-                }
-            }
-
-            if c == b'\'' || c == b'"' || c == b'#' {
-                self.offset += 1;
-                return Ok(&sql_byte[self.offset - 1..self.offset]);
-            }
-
-            if self.offset + 1 < self.sql.len() {
-                let c = &sql_byte[self.offset..self.offset + 2];
-                if c == b"--" || c == b"/*" || c == b"*/" {
-                    self.offset += 2;
-                    return Ok(&sql_byte[self.offset - 2..self.offset]);
-                }
-            }
-
-            self.offset += 1;
-        }
-        return Err(Error::End);
-    }
+enum ParserState {
+    PlainText,
+    // with quote type (' or ")
+    Quoted(u8),
+    // with start index
+    MultilineComment(usize),
 }
 
 impl<'a> Iterator for MysqlCommentParserIter<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.read_token(false, false) {
-            Ok(t) => {
-                let Some(b) = SqlBlock::get_block(t) else {
-                    return None;
-                };
-                let offset = self.offset;
-                match b {
-                    SqlBlock::StringBlock(_) | SqlBlock::MultiLineComment => {
-                        let (escape_accept, escape_ignore) = b.escape_action();
-                        while let Ok(t) = self.read_token(escape_accept, escape_ignore) {
-                            if !b.is_end_token(t) {
-                                continue;
-                            }
-                            if b.is_comment_block() {
-                                return Some(&self.sql[offset..self.offset - b.token_len()]);
-                            }
-                            return self.next();
-                        }
-                        None
-                    }
-
-                    SqlBlock::EndComment => {
-                        let c = &self.sql.as_bytes()[self.offset..];
-                        let line_end = c.iter().position(|b| *b == b'\n').unwrap_or(c.len());
-                        let r = Some(&self.sql[self.offset..self.offset + line_end]);
-                        self.offset += line_end + 1;
-                        r
+        let mut state = ParserState::PlainText;
+        let mut offset = 0;
+        while let Some(c) = self.sql.get(offset) {
+            match (&state, c) {
+                (ParserState::PlainText, b'\'') | (ParserState::PlainText, b'"') => {
+                    state = ParserState::Quoted(*c);
+                    offset += 1;
+                }
+                // comment type "# comment" "-- comment" and "/* comment */"
+                (ParserState::PlainText, b'#')
+                | (ParserState::PlainText, b'-')
+                | (ParserState::PlainText, b'/') => {
+                    // line comment: find next \n or end of str
+                    if *c == b'#' || (*c == b'-' && self.sql.get(offset + 1) == Some(&b'-')) {
+                        let start = if *c == b'#' { offset + 1 } else { offset + 2 };
+                        let comment = &self.sql[start..];
+                        let end = comment
+                            .iter()
+                            .position(|b| *b == b'\n')
+                            .unwrap_or(comment.len());
+                        let comment = unsafe {
+                            // SAFTY:
+                            // 1. The contents in self.sql is from &str.to_bytes(), which is valid utf-8
+                            // 2. Offset `end` is at char boundries
+                            std::str::from_utf8_unchecked(&comment[..end])
+                        };
+                        self.sql = &self.sql[start + end..];
+                        return Some(comment.trim());
+                    } else if *c == b'/' && self.sql.get(offset + 1) == Some(&b'*') {
+                        offset += 2;
+                        state = ParserState::MultilineComment(offset);
+                    } else {
+                        offset += 1;
                     }
                 }
+                // escaped character (2B) in quoted text, skip the next character
+                (ParserState::Quoted(_), b'\\') => {
+                    // also check the next character (after '\') to be a valid ascii char
+                    let is_ascii = self
+                        .sql
+                        .get(offset + 1)
+                        .map(|c| c.is_ascii())
+                        .unwrap_or(false);
+                    if !is_ascii {
+                        self.sql = &self.sql[self.sql.len()..];
+                        return None;
+                    }
+                    offset += 2;
+                }
+                (ParserState::Quoted(q), _) if q == c => {
+                    state = ParserState::PlainText;
+                    offset += 1;
+                }
+                (ParserState::MultilineComment(start), b'*')
+                    if self.sql.get(offset + 1) == Some(&b'/') =>
+                {
+                    let comment = unsafe {
+                        // SAFTY:
+                        // 1. The contents in self.sql is from &str.to_bytes(), which is valid utf-8
+                        // 2. Offset `start` and `offset` are at char boundries
+                        std::str::from_utf8_unchecked(&self.sql[*start..offset])
+                    };
+                    self.sql = &self.sql[offset + 2..];
+                    return Some(comment.trim());
+                }
+                _ => offset += 1,
             }
-            Err(_) => None,
         }
+        None
     }
 }
 

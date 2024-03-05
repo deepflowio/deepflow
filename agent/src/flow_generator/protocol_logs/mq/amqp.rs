@@ -251,6 +251,8 @@ pub struct AmqpInfo {
 
     vhost: Option<String>,
 
+    is_protcol_header: bool,
+
     #[serde(rename = "type")]
     frame_type: FrameType,
     #[serde(rename = "channel")]
@@ -412,6 +414,9 @@ fn read_table(payload: &[u8]) -> Option<(&[u8], Value)> {
 
 impl AmqpInfo {
     fn get_packet_type(&self) -> String {
+        if self.is_protcol_header {
+            return "Protocol-Header".to_string();
+        }
         match self.frame_type {
             FrameType::Method => format!("{:?}.{:?}", self.class_id, self.method_id),
             FrameType::Header => "Content-Header".to_string(),
@@ -422,6 +427,9 @@ impl AmqpInfo {
     }
 
     fn get_log_message_type(&self) -> LogMessageType {
+        if self.is_protcol_header {
+            return LogMessageType::Session;
+        }
         match self.frame_type {
             FrameType::Method => {}
             FrameType::Header => return LogMessageType::Session,
@@ -686,9 +694,17 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
         };
-        let endpoint = match (&info.routing_key, &info.queue) {
-            (Some(x), _) if x.len() > 0 => x.clone(),
-            (_, y) => y.clone().unwrap_or_default(),
+        let req_type = info.get_packet_type();
+        let type1_len = info.exchange.as_ref().map_or(0, |r| r.len())
+            + info.routing_key.as_ref().map_or(0, |r| r.len());
+        let endpoint = if type1_len > 0 {
+            format!(
+                "{}.{}",
+                info.exchange.unwrap_or_default(),
+                info.routing_key.unwrap_or_default()
+            )
+        } else {
+            info.queue.unwrap_or_default()
         };
         let log = L7ProtocolSendLog {
             version: Some(std::str::from_utf8(AMQPVERSION).unwrap().to_string()),
@@ -696,7 +712,7 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             req_len: info.req_len,
             resp_len: info.resp_len,
             req: L7Request {
-                req_type: info.get_packet_type(),
+                req_type,
                 domain: info.vhost.unwrap_or_default(),
                 resource: endpoint.clone(),
                 endpoint: endpoint.clone(),
@@ -754,6 +770,10 @@ impl L7ProtocolInfoInterface for AmqpInfo {
             rrt: self.rtt,
         })
     }
+
+    fn get_request_domain(&self) -> String {
+        self.vhost.clone().unwrap_or_default()
+    }
 }
 
 impl L7ProtocolParserInterface for AmqpLog {
@@ -773,10 +793,15 @@ impl L7ProtocolParserInterface for AmqpLog {
         };
 
         let mut offset = 0;
+        let mut vec = Vec::new();
         if payload.starts_with(AMQPHEADER) {
             offset += AMQPHEADER.len();
+            let mut info = AmqpInfo::default();
+            info.is_protcol_header = true;
+            info.is_tls = param.is_tls();
+            info.msg_type = info.get_log_message_type();
+            vec.push(L7ProtocolInfo::AmqpInfo(info));
         }
-        let mut vec = Vec::new();
         loop {
             let offset_begin = offset;
             let mut info = AmqpInfo::default();
@@ -873,10 +898,12 @@ impl L7ProtocolParserInterface for AmqpLog {
         }
         for info in &mut vec {
             if let L7ProtocolInfo::AmqpInfo(info) = info {
-                info.cal_rrt(param, None).map(|rtt| {
-                    info.rtt = rtt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                });
+                if info.msg_type != LogMessageType::Session {
+                    info.cal_rrt(param, None).map(|rtt| {
+                        info.rtt = rtt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                    });
+                }
                 info.is_tls = param.is_tls();
 
                 match info.msg_type {
@@ -973,11 +1000,6 @@ mod tests {
                 first_packet = false;
                 if !amqp.check_payload(payload, param) {
                     output.push_str("not amqp\n");
-                    break;
-                }
-                if let Ok(L7ParseResult::None) = amqp.parse_payload(payload, param) {
-                } else {
-                    output.push_str("parse error\n");
                     break;
                 }
             }

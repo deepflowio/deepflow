@@ -7,4 +7,5 @@ end_time                  , 结束时间               , 单位：微秒。packe
 
 packet_batch              , 压缩包头               ,
 
-vtap                      , 采集器                 ,
+vtap                      , 采集器                 , 已废弃，请使用 agent。
+agent                     , 采集器                 ,

@@ -766,11 +766,13 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x5dc for 4.19.91-23.al7.x86_64, 4.19.91-24.1.al7.x86_64, 4.19.91-25.6.al7.x86_64,
 	//           4.19.91-26.6.al7.x86_64, 4.19.91-26.al7.x86_64, 4.19.91-27.1.al7.x86_64
 	// 0x654 for 4.19.90-2107.6.0.0192.8.oe1.bclinux.x86_64
+	// 0x69c for 4.19.0-91.82.65.uelc20.x86_64
+	// 0x694 for 4.19.0-91.77.112.uelc20.x86_64, 4.19.0-91.82.132.uelc20.x86_64
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
 				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
-				    0x564, 0x56c, 0x574, 0x57c, 0x584,
-				    0x654, 0x5dc, 0x5cc, 0x644, 0x65c,
-				    0x664};
+				    0x564, 0x56c, 0x574, 0x654, 0x5dc,
+				    0x5cc, 0x644, 0x65c, 0x664, 0x69c,
+				    0x694};
 #endif
 
 	// TAG: STRUCT_TCP_SOCK_WRITE_SEQ_OFFSET
@@ -801,11 +803,13 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x74c for 4.19.91-23.al7.x86_64, 4.19.91-24.1.al7.x86_64, 4.19.91-25.6.al7.x86_64
 	//           4.19.91-26.6.al7.x86_64, 4.19.91-26.al7.x86_64, 4.19.91-27.1.al7.x86_64
 	// 0x7c4 for 4.19.90-2107.6.0.0192.8.oe1.bclinux.x86_64
+	// 0x80c for 4.19.0-91.82.65.uelc20.x86_64
+	// 0x804 for 4.19.0-91.77.112.uelc20.x86_64, 4.19.0-91.82.132.uelc20.x86_64
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
 				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
 				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
-				   0x704, 0x7c4, 0x71c, 0x73c, 0x74c, 0x7b4,
-				   0x7d4, 0x7dc};
+				   0x7c4, 0x73c, 0x74c, 0x7b4, 0x7d4, 0x7dc,
+				   0x80c, 0x804};
 #endif
 
 	int i, snd_nxt_offset = 0;
@@ -1912,11 +1916,13 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)fd);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
 		if (socket_info_ptr != NULL) {
-			struct data_args_t read_args = {};
-			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-			read_args.data_seq = socket_info_ptr->seq;
-			read_args.socket_id = socket_info_ptr->uid;
-			active_read_args_map__update(&id, &read_args);
+			if (socket_info_ptr->uid) {
+				struct data_args_t read_args = {};
+				__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+				read_args.data_seq = socket_info_ptr->seq;
+				read_args.socket_id = socket_info_ptr->uid;
+				active_read_args_map__update(&id, &read_args);
+			}
 			delete_socket_info(conn_key, socket_info_ptr);
 		}
 

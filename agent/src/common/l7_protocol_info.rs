@@ -101,6 +101,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         None
     }
 
+    fn get_biz_type(&self) -> u8 {
+        0
+    }
+
     fn skip_send(&self) -> bool {
         false
     }
@@ -408,6 +412,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     fn tcp_seq_offset(&self) -> u32 {
         return 0;
+    }
+
+    fn get_request_domain(&self) -> String {
+        String::default()
     }
 }
 

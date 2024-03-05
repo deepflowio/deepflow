@@ -185,6 +185,7 @@ type VM struct {
 	CreateMethod   int               `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int               `gorm:"column:htype;type:int;default:1" json:"HTYPE" mapstructure:"HTYPE"`                         // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string            `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER" mapstructure:"LAUNCH_SERVER"`
+	HostID         int               `gorm:"column:host_id;type:int;default:0" json:"HOST_ID" mapstructure:"HOST_ID"`
 	VPCID          int               `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
 	Domain         string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	AZ             string            `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
@@ -826,6 +827,7 @@ type Pod struct {
 	ContainerIDs    string `gorm:"column:container_ids;type:text;default:''" json:"CONTAINER_IDS" mapstructure:"CONTAINER_IDS"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID" mapstructure:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
+	PodServiceID    int    `gorm:"column:pod_service_id;type:int;default:0" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodNodeID       int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`

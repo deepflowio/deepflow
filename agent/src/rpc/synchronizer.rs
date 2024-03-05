@@ -47,7 +47,7 @@ use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
-use crate::common::endpoint::EPC_FROM_INTERNET;
+use crate::common::endpoint::EPC_INTERNET;
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
@@ -168,7 +168,7 @@ impl Default for Status {
             ntp_min_interval: Duration::from_secs(10),
             ntp_max_interval: Duration::from_secs(300),
 
-            local_epc: EPC_FROM_INTERNET,
+            local_epc: EPC_INTERNET,
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,

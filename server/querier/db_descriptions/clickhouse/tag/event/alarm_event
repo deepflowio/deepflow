@@ -1,21 +1,21 @@
-# Name                     , ClientName                , ServerName                , Type           , EnumFile              , Category        , Permission
-time_str                   , time_str                  , time_str                  , time           ,                       , Timestamp       , 111
-time                       , time                      , time                      , time           ,                       , Flow Info       , 111
+# Name                     , ClientName                , ServerName                , Type           , EnumFile              , Category        , Permission   , Deprecated
+time_str                   , time_str                  , time_str                  , time           ,                       , Timestamp       , 111          , 0
+time                       , time                      , time                      , time           ,                       , Flow Info       , 111          , 0
 
-region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110
+region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110          , 0
 
-user                       , user                      , user                      , string         ,                       , Alarm Info      , 111
-policy_id                  , policy_id                 , policy_id                 , int            ,                       , Alarm Info      , 111
-policy_name                , policy_name               , policy_name               , string         ,                       , Alarm Info      , 111
-policy_level               , policy_level              , policy_level              , int_enum       , policy_level          , Alarm Info      , 111
-policy_app_type            , policy_app_type           , policy_app_type           , int_enum       , policy_app_type       , Alarm Info      , 111
-policy_target_uid          , policy_target_uid         , policy_target_uid         , string         ,                       , Alarm Info      , 111
-policy_target_name         , policy_target_name        , policy_target_name        , string         ,                       , Alarm Info      , 111
-policy_target_field        , policy_target_field       , policy_target_field       , string         ,                       , Alarm Info      , 111
-event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info      , 111
-alarm_target               , alarm_target              , alarm_target              , string         ,                       , Alarm Info      , 111
-policy_query_url           , policy_query_url          , policy_query_url          , string         ,                       , Alarm Info      , 111
-policy_query_conditions    , policy_query_conditions   , policy_query_conditions   , string         ,                       , Alarm Info      , 111
-policy_threshold_critical  , policy_threshold_critical , policy_threshold_critical , string         ,                       , Alarm Info      , 111
-policy_threshold_error     , policy_threshold_error    , policy_threshold_error    , string         ,                       , Alarm Info      , 111
-policy_threshold_warning   , policy_threshold_warning  , policy_threshold_warning  , string         ,                       , Alarm Info      , 111
+user                       , user                      , user                      , string         ,                       , Alarm Info      , 111          , 0
+policy_id                  , policy_id                 , policy_id                 , int            ,                       , Alarm Info      , 111          , 0
+policy_name                , policy_name               , policy_name               , string         ,                       , Alarm Info      , 111          , 0
+policy_level               , policy_level              , policy_level              , int_enum       , policy_level          , Alarm Info      , 111          , 0
+policy_app_type            , policy_app_type           , policy_app_type           , int_enum       , policy_app_type       , Alarm Info      , 111          , 0
+policy_target_uid          , policy_target_uid         , policy_target_uid         , string         ,                       , Alarm Info      , 111          , 0
+policy_target_name         , policy_target_name        , policy_target_name        , string         ,                       , Alarm Info      , 111          , 0
+policy_target_field        , policy_target_field       , policy_target_field       , string         ,                       , Alarm Info      , 111          , 0
+event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info      , 111          , 0
+alarm_target               , alarm_target              , alarm_target              , string         ,                       , Alarm Info      , 111          , 0
+policy_query_url           , policy_query_url          , policy_query_url          , string         ,                       , Alarm Info      , 111          , 0
+policy_query_conditions    , policy_query_conditions   , policy_query_conditions   , string         ,                       , Alarm Info      , 111          , 0
+policy_threshold_critical  , policy_threshold_critical , policy_threshold_critical , string         ,                       , Alarm Info      , 111          , 0
+policy_threshold_error     , policy_threshold_error    , policy_threshold_error    , string         ,                       , Alarm Info      , 111          , 0
+policy_threshold_warning   , policy_threshold_warning  , policy_threshold_warning  , string         ,                       , Alarm Info      , 111          , 0

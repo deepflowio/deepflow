@@ -91,6 +91,8 @@ func (c *Cloud) getKubernetesData() (model.Resource, float64) {
 			Label:        node.Lcuuid,
 			HType:        common.VM_HTYPE_VM_C,
 			State:        state,
+			IP:           node.IP,
+			Hostname:     node.Hostname,
 			VPCLcuuid:    node.VPCLcuuid,
 			AZLcuuid:     node.AZLcuuid,
 			RegionLcuuid: node.RegionLcuuid,

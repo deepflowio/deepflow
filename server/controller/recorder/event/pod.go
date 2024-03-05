@@ -64,6 +64,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagPodGroupID(item.PodGroupID),
+			eventapi.TagPodServiceID(item.PodServiceID),
 			eventapi.TagPodNodeID(item.PodNodeID),
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)

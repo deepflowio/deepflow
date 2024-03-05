@@ -24,8 +24,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 	"github.com/prometheus/common/model"
 )
 
@@ -49,7 +49,7 @@ type PrometheusSampleInterface interface {
 
 type PrometheusSample struct {
 	PrometheusSampleMini
-	UniversalTag zerodoc.UniversalTag
+	UniversalTag flow_metrics.UniversalTag
 }
 
 type PrometheusSampleMini struct {
@@ -185,7 +185,7 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 		}
 		fieldName := strings.Clone(label.Name)
 
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = m.Timestamp
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		tagFieldValue.FlowTagInfo.FieldName = fieldName
@@ -203,7 +203,7 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 				*old = m.Timestamp
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = m.Timestamp
 		tagField.FlowTagInfo = *flowTagInfo
 		tagField.FlowTagInfo.FieldName = fieldName
@@ -232,7 +232,7 @@ func (m *PrometheusSample) WriteBlock(block *ckdb.Block) {
 // Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *PrometheusSample) Columns(appLabelColumnCount int) []*ckdb.Column {
 	columns := m.PrometheusSampleMini.Columns(appLabelColumnCount)
-	columns = zerodoc.GenUniversalTagColumns(columns)
+	columns = flow_metrics.GenUniversalTagColumns(columns)
 	return columns
 }
 
@@ -284,7 +284,7 @@ func AcquirePrometheusSample() *PrometheusSample {
 	return prometheusSamplePool.Get().(*PrometheusSample)
 }
 
-var emptyUniversalTag = zerodoc.UniversalTag{}
+var emptyUniversalTag = flow_metrics.UniversalTag{}
 
 func ReleasePrometheusSample(p *PrometheusSample) {
 	p.UniversalTag = emptyUniversalTag

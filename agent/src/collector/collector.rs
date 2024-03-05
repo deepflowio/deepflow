@@ -37,6 +37,7 @@ use super::{
 };
 use crate::{
     common::{
+        endpoint::EPC_INTERNET,
         enums::{EthernetType, IpProtocol},
         flow::{L7Protocol, SignalSource},
     },
@@ -132,6 +133,7 @@ struct StashKey {
     src_gpid: u32,
     dst_gpid: u32,
     endpoint_hash: u32,
+    biz_type: u8,
 }
 
 impl Default for StashKey {
@@ -143,6 +145,7 @@ impl Default for StashKey {
             src_gpid: 0,
             dst_gpid: 0,
             endpoint_hash: 0,
+            biz_type: 0,
         }
     }
 }
@@ -314,6 +317,7 @@ impl StashKey {
             src_gpid: tagger.gpid,
             dst_gpid: tagger.gpid_1,
             endpoint_hash,
+            biz_type: tagger.biz_type,
         }
     }
 }
@@ -515,6 +519,7 @@ impl Stash {
                     is_active_host,
                     config,
                     None,
+                    0,
                     acc_flow.l7_protocol,
                     self.context.agent_mode,
                 );
@@ -528,6 +533,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
+                0,
                 acc_flow.l7_protocol,
                 self.context.agent_mode,
             );
@@ -552,6 +558,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
+                0,
                 acc_flow.l7_protocol,
                 self.context.agent_mode,
             );
@@ -680,6 +687,7 @@ impl Stash {
                     is_active_host,
                     config,
                     meter.endpoint.clone(),
+                    meter.biz_type,
                     meter.l7_protocol,
                     self.context.agent_mode,
                 );
@@ -694,6 +702,7 @@ impl Stash {
                 meter.is_active_host1,
                 config,
                 meter.endpoint.clone(),
+                meter.biz_type,
                 meter.l7_protocol,
                 self.context.agent_mode,
             );
@@ -719,6 +728,7 @@ impl Stash {
                 meter.is_active_host1,
                 config,
                 meter.endpoint.clone(),
+                meter.biz_type,
                 meter.l7_protocol,
                 self.context.agent_mode,
             );
@@ -823,6 +833,7 @@ fn get_single_tagger(
     is_active_host: bool,
     config: &CollectorConfig,
     endpoint: Option<String>,
+    biz_type: u8,
     l7_protocol: L7Protocol,
     agent_mode: RunningMode,
 ) -> Tagger {
@@ -841,20 +852,22 @@ fn get_single_tagger(
             }
         }
         RunningMode::Managed => {
-            if !is_active_host && !config.inactive_ip_enabled {
-                unspecified_ip(is_ipv6)
+            if !config.inactive_ip_enabled {
+                if !is_active_host {
+                    unspecified_ip(is_ipv6)
+                } else {
+                    side.nat_real_ip
+                }
             } else if ep == FLOW_METRICS_PEER_SRC {
-                if flow.peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
+                if flow.peers[0].l3_epc_id != EPC_INTERNET
+                    || flow.signal_source == SignalSource::OTel
+                {
                     flow.peers[0].nat_real_ip
                 } else {
                     unspecified_ip(is_ipv6)
                 }
             } else {
-                if flow.peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel {
-                    flow.peers[1].nat_real_ip
-                } else {
-                    unspecified_ip(is_ipv6)
-                }
+                flow.peers[1].nat_real_ip
             }
         }
     };
@@ -906,6 +919,7 @@ fn get_single_tagger(
         otel_service: flow.otel_service.clone(),
         otel_instance: flow.otel_instance.clone(),
         endpoint,
+        biz_type,
         pod_id: flow.pod_id,
         ..Default::default()
     }
@@ -919,6 +933,7 @@ fn get_edge_tagger(
     is_active_host1: bool,
     config: &CollectorConfig,
     endpoint: Option<String>,
+    biz_type: u8,
     l7_protocol: L7Protocol,
     agent_mode: RunningMode,
 ) -> Tagger {
@@ -946,11 +961,10 @@ fn get_edge_tagger(
                 // except for otel data
                 // =======================================
                 // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
-                if flow.peers[0].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
+                if flow.peers[0].l3_epc_id == EPC_INTERNET
+                    && flow.signal_source != SignalSource::OTel
+                {
                     src_ip = unspecified_ip(is_ipv6);
-                }
-                if flow.peers[1].l3_epc_id <= 0 && flow.signal_source != SignalSource::OTel {
-                    dst_ip = unspecified_ip(is_ipv6);
                 }
             }
 
@@ -1017,6 +1031,7 @@ fn get_edge_tagger(
         otel_instance: flow.otel_instance.clone(),
         endpoint,
         pod_id: flow.pod_id,
+        biz_type,
         ..Default::default()
     }
 }

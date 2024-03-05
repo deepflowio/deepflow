@@ -327,6 +327,28 @@ static __inline int get_fd_from_tls_conn_struct(void *conn,
 	return get_fd_from_tcp_conn_interface(conn + offset_conn_conn, info);
 }
 
+static __inline int
+get_fd_from_go_proxyproto_interface(void *conn,
+				    struct ebpf_proc_info *info)
+{
+	/* conn = {tab = 0x770a10 
+	 * <go:itab.*github.com/armon/go-proxyproto.Conn,net.Conn>, data = 0xc0001963c0}
+	 * (gdb) x/16xg 0xc0001963c0
+	 * 0xc0001963c0:   0x000000c0001947e0      0x0000000000770ac0
+	 * 0xc0001963d0:   0x000000c0001bc090      0x0000000000000000
+	 *
+	 * struct github.com/armon/go-proxyproto.Conn {
+	 *       bufio.Reader *             bufReader; (0x000000c0001947e0)         
+	 *       net.Conn                   conn; (tab net.TCPConn,net.Conn,
+	 *                                         data 0x000000c0001bc090)
+	 */
+	struct go_interface i = {};
+	bpf_probe_read(&i, sizeof(i), conn);
+	void *proxyproto_conn = i.ptr + 8;
+	// proxyproto_conn is 'net.TCPConn,net.Conn'
+	return get_fd_from_tcp_conn_interface(proxyproto_conn, info);
+}
+
 static __inline bool is_tls_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
@@ -344,7 +366,14 @@ static __inline int get_fd_from_tls_conn_interface(void *conn,
 	struct go_interface i = {};
 
 	bpf_probe_read(&i, sizeof(i), conn);
-	return get_fd_from_tls_conn_struct(i.ptr, info);
+	int fd = get_fd_from_tls_conn_struct(i.ptr, info);
+	if (fd > 0)
+		return fd;
+	fd = get_fd_from_go_proxyproto_interface(i.ptr, info);
+	if (fd > 0) {
+		return fd;
+	}
+	return -1;
 }
 
 static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
@@ -364,15 +393,9 @@ static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
 	 * +0xc000128290:   0x0000000000000004      0x00007fdaac18f6e8
 	 */
 
-	struct go_interface i = {}, net_conn = {};
+	struct go_interface i = {};
 	bpf_probe_read(&i, sizeof(i), conn);
-	void *net_fd;
-	bpf_probe_read(&net_conn, sizeof(net_conn), i.ptr);
-	bpf_probe_read(&net_fd, sizeof(net_fd), net_conn.ptr);
-	int fd;
-	bpf_probe_read(&fd, sizeof(fd), net_fd +
-		       info->offsets[OFFSET_IDX_SYSFD_POLL_FD]);
-	return fd;
+	return get_fd_from_tcp_conn_interface(i.ptr, info);
 }
 
 static __inline int
@@ -392,6 +415,10 @@ get_fd_from_tcp_or_tls_conn_interface(void *conn, struct ebpf_proc_info *info)
 		return fd;
 	}
 	fd = get_fd_from_tcp_conn_interface(conn, info);
+	if (fd > 0) {
+		return fd;
+	}
+	fd = get_fd_from_go_proxyproto_interface(conn, info);
 	if (fd > 0) {
 		return fd;
 	}

@@ -690,7 +690,6 @@ static bool __is_process(int pid, bool is_user)
 
 	memset(buff, 0, 4096);
 	if (read(fd, buff, sizeof(buff)) <= 0) {
-		ebpf_warning("Read file '%s' failed, errno %d\n", file, errno);
 		close(fd);
 		return false;
 	}

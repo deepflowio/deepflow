@@ -37,7 +37,7 @@ use super::{
 };
 
 use crate::{
-    common::{endpoint::EPC_FROM_INTERNET, timestamp_to_micros, Timestamp},
+    common::{endpoint::EPC_INTERNET, timestamp_to_micros, Timestamp},
     metric::document::Direction,
 };
 use crate::{
@@ -545,6 +545,7 @@ pub struct L7Stats {
     pub l7_protocol: L7Protocol,
     pub signal_source: SignalSource,
     pub time_in_second: Duration,
+    pub biz_type: u8,
 }
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq, Eq)]
@@ -957,8 +958,11 @@ pub struct Flow {
     pub otel_instance: Option<String>,
     #[serde(skip)]
     pub last_endpoint: Option<String>,
+    #[serde(skip)]
+    pub last_biz_type: u8,
     pub direction_score: u8,
     pub pod_id: u32,
+    pub request_domain: String,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
@@ -1028,6 +1032,10 @@ impl Flow {
         let nat_source = other.flow_key.tap_port.get_nat_source();
         if nat_source > self.flow_key.tap_port.get_nat_source() {
             self.flow_key.tap_port.set_nat_source(nat_source);
+        }
+
+        if !other.request_domain.is_empty() {
+            self.request_domain = other.request_domain.clone();
         }
     }
 
@@ -1157,14 +1165,14 @@ impl fmt::Display for Flow {
             "flow_id:{} signal_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
         syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_stat_time:{:?} \
         \t start_time:{:?} end_time:{:?} duration:{:?} \
-        \t vlan:{} eth_type:{:?} reversed:{} otel_service:{:?} otel_instance:{:?} flow_key:{} \
+        \t vlan:{} eth_type:{:?} reversed:{} otel_service:{:?} otel_instance:{:?} request_domain:{:?} flow_key:{} \
         \n\t flow_metrics_peers_src:{:?} \
         \n\t flow_metrics_peers_dst:{:?} \
         \n\t flow_perf_stats:{:?}",
             self.flow_id, self.signal_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
             self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_stat_time,
             self.start_time, self.end_time, self.duration,
-            self.vlan, self.eth_type, self.reversed, self.otel_service, self.otel_instance, self.flow_key,
+            self.vlan, self.eth_type, self.reversed, self.otel_service, self.otel_instance, self.request_domain, self.flow_key,
             self.flow_metrics_peers[0],
             self.flow_metrics_peers[1],
             self.flow_perf_stats
@@ -1208,6 +1216,7 @@ impl From<Flow> for flow_log::Flow {
             last_keepalive_ack: f.last_keepalive_ack,
             acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
             direction_score: f.direction_score as u32,
+            request_domain: f.request_domain,
         }
     }
 }
@@ -1271,7 +1280,7 @@ pub fn get_direction(
             TridentType::TtDedicatedPhysicalMachine => {
                 //  接入网络
                 if tap_type != TapType::Cloud {
-                    if l3_epc_id != EPC_FROM_INTERNET {
+                    if l3_epc_id != EPC_INTERNET {
                         return (Direction::ClientToServer, Direction::ServerToClient);
                     }
                 } else {

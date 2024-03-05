@@ -131,7 +131,7 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "os.app.")
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
-			filter = fmt.Sprintf("(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
+			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
 
 		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
 			resourceNoSuffix == "host" || resourceNoSuffix == "service" {
@@ -213,8 +213,31 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "type", "1":
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id":
 			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+		case "type":
+			if table == "vtap_map" {
+				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			} else {
+				tagItem, ok := tag.GetTag("value", db, table, "default")
+				if ok {
+					switch strings.ToLower(op) {
+					case "match":
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+					case "not match":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+					case "not ilike":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+					case "not in":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+					case "!=":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+					default:
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+					}
+					return &view.Expr{Value: filter}, nil
+				}
+			}
 		case "key", "table":
 			filter = fmt.Sprintf("`%s` %s %s", t.Tag, op, t.Value)
 		case "display_name":
@@ -282,27 +305,53 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			case "ip_resource_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
-					tagItem, ok := tag.GetTag("ip_resource_name", db, table, "default")
-					if strings.HasSuffix(t.Tag, "_id") {
-						tagItem, ok = tag.GetTag("other_id", db, table, "default")
-					}
-					if ok {
-						switch strings.ToLower(op) {
-						case "match":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value)
-						case "not match":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
+					switch checkTag {
+					case "resource_gl0", "resource_gl1", "resource_gl2", "auto_service", "auto_instance":
+						tagItem, ok := tag.GetTag("display_name", db, table, "default")
+						if strings.HasSuffix(t.Tag, "_id") {
+							tagItem, ok = tag.GetTag("value", db, table, "default")
 						}
-						return &view.Expr{Value: filter}, nil
+						if ok {
+							switch strings.ToLower(op) {
+							case "match":
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+							case "not match":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+							case "not ilike":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+							case "not in":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+							case "!=":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+							default:
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
+					default:
+						tagItem, ok := tag.GetTag("ip_resource_name", db, table, "default")
+						if strings.HasSuffix(t.Tag, "_id") {
+							tagItem, ok = tag.GetTag("other_id", db, table, "default")
+						}
+						if ok {
+							switch strings.ToLower(op) {
+							case "match":
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value)
+							case "not match":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Tag, t.Value) + ")"
+							case "not ilike":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "ilike", t.Value) + ")"
+							case "not in":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "in", t.Value) + ")"
+							case "!=":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, "=", t.Value) + ")"
+							default:
+								filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
 					}
+
 				} else {
 					error := errors.New(fmt.Sprintf("show tag %s values not support filter tag: %s", strings.TrimSuffix(table, "_map"), t.Tag))
 					return nil, error
@@ -467,6 +516,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		return &view.Expr{Value: filter}, nil
 	} else {
+		if t.Tag == "tap_port" {
+			t.Tag = "capture_nic"
+		}
 		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 		filter := ""
 		if !ok {
@@ -498,7 +550,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 							filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 						}
-					case "tap_port":
+					case "tap_port", "capture_nic":
 						macValue := strings.TrimLeft(t.Value, "(")
 						macValue = strings.TrimRight(macValue, ")")
 						macSlice := strings.Split(macValue, ",")
@@ -695,7 +747,10 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 						}
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 					}
-				case "tap_port":
+				case "tap_port", "capture_nic":
+					if t.Tag == "tap_port" {
+						t.Tag = "capture_nic"
+					}
 					macValue := strings.TrimLeft(t.Value, "(")
 					macValue = strings.TrimRight(macValue, ")")
 					macSlice := strings.Split(macValue, ",")
@@ -1358,6 +1413,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		_, isStringEnumOK := tag.TAG_STRING_ENUMS[tagDescription.EnumFile]
 		if isStringEnumOK {
 			isIntEnum = false
+		}
+		if tagName == "tap_side" {
+			tagName = "observation_point"
+		} else if tagName == "tap_port_type" {
+			tagName = "capture_nic_type"
 		}
 		tagItem, ok := tag.GetTag(tagName, db, table, "enum")
 		if !ok {

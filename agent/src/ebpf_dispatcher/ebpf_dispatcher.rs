@@ -15,7 +15,7 @@
  */
 
 use std::ffi::{CStr, CString};
-use std::ptr::null_mut;
+use std::ptr::{self, null_mut};
 use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -306,8 +306,9 @@ impl EbpfCollector {
                 return;
             }
 
-            let container_id = Self::convert_to_string((*sd).container_id.as_ptr());
-            let event_type = EventType::from((*sd).source);
+            let container_id =
+                Self::convert_to_string(ptr::addr_of!((*sd).container_id) as *const u8);
+            let event_type = EventType::from(ptr::addr_of!((*sd).source).read_unaligned());
             if event_type != EventType::OtherEvent {
                 // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
                 let event = ProcEvent::from_ebpf(sd, event_type);

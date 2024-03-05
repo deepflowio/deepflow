@@ -22,7 +22,7 @@ pod_service                , K8s 容器服务               ,
 pod_group_type             , K8s 工作负载类型           ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
-service                    , 服务                       , 
+service                    , 服务                       ,
 resource_gl0_type          , 类型-容器 POD 优先         , 已废弃，请使用 auto_instance_type。
 resource_gl0               , 资源-容器 POD 优先         , 已废弃，请使用 auto_instance。
 resource_gl1_type          , 类型-工作负载优先          , 已废弃，请使用 auto_service_type。
@@ -47,4 +47,5 @@ os.app                     , OS APP                     ,
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
 
-vtap                       , 采集器                     ,
+vtap                       , 采集器                     , 已废弃，请使用 agent。
+agent                      , 采集器                     ,

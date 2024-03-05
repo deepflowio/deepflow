@@ -26,10 +26,11 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	flowlogCfg "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
+	json "github.com/goccy/go-json"
 	"github.com/google/gopacket/layers"
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -328,6 +329,10 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.L7Base.StartTime)
 	}
 
+	if eventsJSON, err := json.Marshal(l.Events); err == nil {
+		h.Events = string(eventsJSON)
+	}
+
 	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
@@ -351,7 +356,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	}
 	h.L7Base.KnowledgeGraph.FillOTel(h, platformData)
 	// only show data for services as 'server side'
-	if h.TapSide == zerodoc.ServerApp.String() && h.ServerPort == 0 {
+	if h.TapSide == flow_metrics.ServerApp.String() && h.ServerPort == 0 {
 		h.ServerPort = 65535
 	}
 }
@@ -383,7 +388,7 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		l.GPID0, l.GPID1,
 		0, 0, 0,
 		uint16(l.ServerPort),
-		zerodoc.Rest,
+		flow_metrics.Rest,
 		layers.IPProtocol(l.Protocol),
 	)
 

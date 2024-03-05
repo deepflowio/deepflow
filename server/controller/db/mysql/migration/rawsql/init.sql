@@ -304,6 +304,7 @@ CREATE TABLE IF NOT EXISTS vm (
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     htype               INTEGER DEFAULT 1 COMMENT '1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s',
     launch_server       CHAR(64) DEFAULT '',
+    host_id             INTEGER DEFAULT 0,
     cloud_tags          TEXT COMMENT 'separated by ,',
     epc_id              INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
@@ -810,6 +811,7 @@ CREATE TABLE IF NOT EXISTS pod (
     state               INTEGER NOT NULL COMMENT '0.Exception 1.Running',
     pod_rs_id           INTEGER DEFAULT NULL,
     pod_group_id        INTEGER DEFAULT NULL,
+    pod_service_id      INTEGER DEFAULT 0,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_node_id         INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -1690,7 +1692,7 @@ CREATE TABLE IF NOT EXISTS tap_type (
 TRUNCATE TABLE tap_type;
 
 set @lcuuid = (select uuid());
-INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('虚拟网络', 3, 768, '', @lcuuid);
+INSERT INTO tap_type(name, value, vlan, description, lcuuid) values('云网络', 3, 768, '', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS genesis_host (
     lcuuid      CHAR(64),
@@ -2253,19 +2255,19 @@ TRUNCATE TABLE data_source;
 
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (1, '网络-指标（秒级）', 'flow_metrics.vtap_flow*', 1, 1*24, @lcuuid);
+                 VALUES (1, '网络-指标（秒级）', 'flow_metrics.network*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-                 VALUES (3, '网络-指标（分钟级）', 'flow_metrics.vtap_flow*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+                 VALUES (3, '网络-指标（分钟级）', 'flow_metrics.network*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (7, '应用-指标（秒级）', 'flow_metrics.vtap_app*', 1, 1*24, @lcuuid);
+                 VALUES (7, '应用-指标（秒级）', 'flow_metrics.application*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-                 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.vtap_app*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+                 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.application*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
@@ -2298,7 +2300,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (19, '网络-网络策略', 'flow_metrics.vtap_acl', 60, 3*24, @lcuuid);
+                 VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
 
 
 CREATE TABLE IF NOT EXISTS license (
@@ -2678,6 +2680,8 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     `name`            VARCHAR(256),
     `host_id`         INTEGER,
     `l3_epc_id`       INTEGER,
+    `ip`              CHAR(64),
+    `hostname`        VARCHAR(256),
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;
@@ -2698,3 +2702,11 @@ CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_npb_tunnel;
+
+CREATE TABLE IF NOT EXISTS ch_alarm_policy (
+    `id`              INTEGER NOT NULL PRIMARY KEY,
+    `name`            VARCHAR(256),
+    `user_id`         INTEGER,
+    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_alarm_policy;

@@ -880,13 +880,13 @@ impl<'a> MetaPacket<'a> {
     // but the application protocols are inconsistent.
     pub fn generate_ebpf_flow_id(&self) -> u64 {
         let source: u8 = self.ebpf_type.into();
-        let socket_id = self.socket_id & !(0xff as u64) << 48;
+        let socket_id = self.socket_id & !((0xff as u64) << 48);
         (source as u64) << 48 | socket_id
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
-        let data = &mut (*data);
+        let data = &mut data.read_unaligned();
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
                 {

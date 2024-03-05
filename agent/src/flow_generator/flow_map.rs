@@ -54,9 +54,7 @@ use super::{
 use crate::{
     common::{
         ebpf::EbpfType,
-        endpoint::{
-            EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
-        },
+        endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
         enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
         flow::{
             CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7Protocol,
@@ -1512,22 +1510,16 @@ impl FlowMap {
     fn collect_l7_stats(
         &mut self,
         node: &mut FlowNode,
-        meta_packet: &MetaPacket,
         new_endpoint: Option<String>,
+        new_biz_type: u8,
     ) {
-        // endpoint as long as it can be parsed in the request packet
-        if meta_packet.lookup_key.direction == PacketDirection::ServerToClient {
-            return;
-        }
-
         let flow_id = &node.tagged_flow.flow.flow_id;
+        let last_biz_type = node.tagged_flow.flow.last_biz_type;
         // The original endpoint is inconsistent with new_endpoint
-        if let (Some(flow_perf_stats), Some(last_endpoint), Some(new_endpoint)) = (
-            node.tagged_flow.flow.flow_perf_stats.as_mut(),
-            &node.tagged_flow.flow.last_endpoint,
-            &new_endpoint,
-        ) {
-            if last_endpoint.ne(new_endpoint) {
+        if let Some(flow_perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
+            if node.tagged_flow.flow.last_endpoint.eq(&new_endpoint)
+                || last_biz_type.ne(&new_biz_type)
+            {
                 let l7_timeout_count = self
                     .perf_cache
                     .borrow_mut()
@@ -1547,7 +1539,8 @@ impl FlowMap {
                 let l7_stats = L7Stats {
                     flow: None,
                     stats: l7_perf_stats,
-                    endpoint: Some(last_endpoint.clone()),
+                    endpoint: node.tagged_flow.flow.last_endpoint.clone(),
+                    biz_type: last_biz_type,
                     flow_id: *flow_id,
                     time_in_second: node.tagged_flow.flow.flow_stat_time.into(),
                     signal_source: node.tagged_flow.flow.signal_source,
@@ -1562,6 +1555,7 @@ impl FlowMap {
         if new_endpoint.is_some() {
             node.tagged_flow.flow.last_endpoint = new_endpoint;
         }
+        node.tagged_flow.flow.last_biz_type = new_biz_type;
     }
 
     fn collect_metric(
@@ -1608,12 +1602,12 @@ impl FlowMap {
                     }
                     match info {
                         crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
-                            self.collect_l7_stats(node, &meta_packet, s.get_endpoint());
+                            self.collect_l7_stats(node, s.get_endpoint(), s.get_biz_type());
                             self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
                         }
                         crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
                             for i in m.into_iter() {
-                                self.collect_l7_stats(node, &meta_packet, i.get_endpoint());
+                                self.collect_l7_stats(node, i.get_endpoint(), i.get_biz_type());
                                 self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
                             }
                         }
@@ -1995,6 +1989,11 @@ impl FlowMap {
         if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
             self.flush_app_protolog();
         }
+        let domain = l7_info.get_request_domain();
+        if !domain.is_empty() {
+            node.tagged_flow.flow.request_domain = domain;
+        }
+
         if let Some(head) = l7_info.app_proto_head() {
             node.tagged_flow
                 .flow
@@ -2471,7 +2470,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
             is_local_mac: false,
             is_local_ip: false,
 
-            l2_epc_id: EPC_FROM_DEEPFLOW,
+            l2_epc_id: EPC_DEEPFLOW,
             l3_epc_id: 1,
         },
         dst_info: EndpointInfo {
@@ -2484,8 +2483,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
             is_local_mac: false,
             is_local_ip: false,
 
-            l2_epc_id: EPC_FROM_DEEPFLOW,
-            l3_epc_id: EPC_FROM_INTERNET,
+            l2_epc_id: EPC_DEEPFLOW,
+            l3_epc_id: EPC_INTERNET,
         },
     })));
     packet

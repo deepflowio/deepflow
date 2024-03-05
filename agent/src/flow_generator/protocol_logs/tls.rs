@@ -284,6 +284,10 @@ impl L7ProtocolInfoInterface for TlsInfo {
     fn is_tls(&self) -> bool {
         true
     }
+
+    fn get_request_domain(&self) -> String {
+        self.request_domain.clone()
+    }
 }
 
 impl TlsInfo {
@@ -463,10 +467,12 @@ impl L7ProtocolParserInterface for TlsLog {
             });
             info.session_id = None;
         }
-        info.cal_rrt(param, None).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
+        if info.msg_type != LogMessageType::Session {
+            info.cal_rrt(param, None).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::TlsInfo(info)))
         } else {
@@ -515,102 +521,120 @@ impl TlsLog {
 
         match param.direction {
             PacketDirection::ClientToServer => {
-                if tls_headers.len() > 0 {
-                    tls_headers.iter().for_each(|h| {
-                        if h.is_client_hello() {
+                match Version::from(tls_headers[0].version()) {
+                    Version::Unknown(v) => {
+                        return Err(Error::TlsLogParseFailed(format!(
+                            "Unknown tls version 0x{:x}",
+                            v
+                        )))
+                    }
+                    v => info.version = v,
+                }
+                info.msg_type = LogMessageType::Request;
+                tls_headers.iter().for_each(|h| {
+                    if h.is_client_hello() {
+                        info.session_id = Some(0xff);
+                    }
+                    if h.is_alert() {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                        info.status = L7ResponseStatus::ServerError;
+                        info.msg_type = LogMessageType::Session;
+                    }
+                    if h.is_change_cipher_spec() {
+                        self.change_cipher_spec_count += 1;
+                        if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
+                            self.change_cipher_spec_count = 0;
                             info.session_id = Some(0xff);
                         }
-                        if h.is_alert() {
-                            self.perf_stats
-                                .as_mut()
-                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                            info.status = L7ResponseStatus::ServerError;
-                        }
-                        if h.is_change_cipher_spec() {
-                            self.change_cipher_spec_count += 1;
-                            if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
-                                self.change_cipher_spec_count = 0;
-                                info.session_id = Some(0xff);
-                            }
-                        }
+                    }
 
-                        if info.handshake_protocol.is_empty() && h.handshake_headers.len() > 0 {
-                            info.handshake_protocol = h.handshake_headers[0].to_string();
-                        }
+                    if info.handshake_protocol.is_empty() && h.handshake_headers.len() > 0 {
+                        info.handshake_protocol = h.handshake_headers[0].to_string();
+                    }
 
-                        if let Some(server_name) = h.domain_name() {
-                            info.request_domain = server_name;
-                        }
+                    if let Some(server_name) = h.domain_name() {
+                        info.request_domain = server_name;
+                    }
 
-                        if info.request_type.is_empty() || h.is_change_cipher_spec() {
-                            info.request_type = h.to_string();
-                        }
+                    if info.request_type.is_empty() || h.is_change_cipher_spec() {
+                        info.request_type = h.to_string();
+                    }
 
-                        if let Some(v) = h.validity() {
-                            if info.client_cert_not_after.is_zero() {
-                                info.client_cert_not_before = Timestamp::from(v.0);
-                                info.client_cert_not_after = Timestamp::from(v.1);
-                            }
+                    if let Some(v) = h.validity() {
+                        if info.client_cert_not_after.is_zero() {
+                            info.client_cert_not_before = Timestamp::from(v.0);
+                            info.client_cert_not_after = Timestamp::from(v.1);
                         }
-                    });
-                    info.version = Version::from(tls_headers[0].version());
-                    info.request_resource = tls_headers
-                        .iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<String>>()
-                        .join("|")
-                        .to_string();
-                    info.msg_type = LogMessageType::Request;
+                    }
+                });
 
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
+                info.request_resource = tls_headers
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("|")
+                    .to_string();
+
+                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
-                if tls_headers.len() > 0 {
-                    tls_headers.iter().for_each(|h| {
-                        if h.is_alert() {
-                            self.perf_stats
-                                .as_mut()
-                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                            info.status = L7ResponseStatus::ServerError;
-                        }
+                info.msg_type = LogMessageType::Response;
 
-                        if let Some(v) = h.supported_version() {
-                            info.version = Version::from(v);
+                if info.version.is_empty() {
+                    match Version::from(tls_headers[0].version()) {
+                        Version::Unknown(v) => {
+                            return Err(Error::TlsLogParseFailed(format!(
+                                "Unknown tls version 0x{:x}",
+                                v
+                            )))
                         }
-
-                        if h.is_change_cipher_spec() {
-                            self.change_cipher_spec_count += 1;
-                            if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
-                                self.change_cipher_spec_count = 0;
-                                info.session_id = Some(0xff);
-                            }
-                        }
-
-                        if h.cipher_suite().is_some() && info.cipher_suite.is_none() {
-                            info.cipher_suite = h.cipher_suite().map(|c| CipherSuite::from(c));
-                        }
-
-                        if let Some(v) = h.validity() {
-                            if info.server_cert_not_after.is_zero() {
-                                info.server_cert_not_before = Timestamp::from(v.0);
-                                info.server_cert_not_after = Timestamp::from(v.1);
-                            }
-                        }
-                    });
-                    if info.version.is_empty() {
-                        info.version = Version::from(tls_headers[0].version());
+                        v => info.version = v,
                     }
-                    info.response_result = tls_headers
-                        .iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<String>>()
-                        .join("|")
-                        .to_string();
-                    info.msg_type = LogMessageType::Response;
-
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
+
+                tls_headers.iter().for_each(|h| {
+                    if h.is_alert() {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                        info.status = L7ResponseStatus::ServerError;
+                        info.msg_type = LogMessageType::Session;
+                    }
+
+                    if let Some(v) = h.supported_version() {
+                        info.version = Version::from(v);
+                    }
+
+                    if h.is_change_cipher_spec() {
+                        self.change_cipher_spec_count += 1;
+                        if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
+                            self.change_cipher_spec_count = 0;
+                            info.session_id = Some(0xff);
+                        }
+                    }
+
+                    if h.cipher_suite().is_some() && info.cipher_suite.is_none() {
+                        info.cipher_suite = h.cipher_suite().map(|c| CipherSuite::from(c));
+                    }
+
+                    if let Some(v) = h.validity() {
+                        if info.server_cert_not_after.is_zero() {
+                            info.server_cert_not_before = Timestamp::from(v.0);
+                            info.server_cert_not_after = Timestamp::from(v.1);
+                        }
+                    }
+                });
+
+                info.response_result = tls_headers
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("|")
+                    .to_string();
+
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())
@@ -674,8 +698,6 @@ mod tests {
                     }
                     _ => unreachable!(),
                 }
-            } else {
-                output.push_str(&format!("{:?} is_tls: {}\r\n", TlsInfo::default(), is_tls));
             }
         }
         output

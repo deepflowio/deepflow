@@ -146,7 +146,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Process"),
 
 		// universal tag
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
 		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID"),
@@ -450,7 +450,7 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldValueCache.Add(*flowTagInfo, p.Time)
 			}
 		}
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = p.Time
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -464,7 +464,7 @@ func (p *InProcessProfile) GenerateFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldCache.Add(*flowTagInfo, p.Time)
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = p.Time
 		tagField.FlowTagInfo = *flowTagInfo
 		cache.Fields = append(cache.Fields, tagField)

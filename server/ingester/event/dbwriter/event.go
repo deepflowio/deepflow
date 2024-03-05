@@ -180,7 +180,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetComment("采集器ID"),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("采集器ID"),
 		ckdb.NewColumn("subnet_id", ckdb.UInt16),
 		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
 		ckdb.NewColumn("ip4", ckdb.IPv4),
@@ -260,7 +260,7 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldValueCache.Add(*flowTagInfo, e.Time)
 			}
 		}
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = e.Time
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -274,7 +274,7 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldCache.Add(*flowTagInfo, e.Time)
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = e.Time
 		tagField.FlowTagInfo = *flowTagInfo
 		cache.Fields = append(cache.Fields, tagField)

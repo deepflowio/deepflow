@@ -16,6 +16,8 @@
 
 mod comment_parser;
 
+use std::str;
+
 use log::{debug, trace};
 use serde::Serialize;
 
@@ -193,10 +195,20 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
-        let context = attempt_obfuscation(obfuscate_cache, payload)
-            .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
-                String::from_utf8_lossy(&m).to_string()
-            });
+        let context = match attempt_obfuscation(obfuscate_cache, payload) {
+            Some(mut m) => {
+                let valid_len = match str::from_utf8(&m) {
+                    Ok(_) => m.len(),
+                    Err(e) => e.valid_up_to(),
+                };
+                m.truncate(valid_len);
+                unsafe {
+                    // SAFTY: str in m is checked to be valid utf8 up to `valid_len`
+                    String::from_utf8_unchecked(m)
+                }
+            }
+            _ => String::from_utf8_lossy(payload).to_string(),
+        };
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
         }
@@ -354,10 +366,12 @@ impl L7ProtocolParserInterface for MysqlLog {
             // ignore greeting
             return Ok(L7ParseResult::None);
         }
-        info.cal_rrt(param, None).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
+        if info.msg_type != LogMessageType::Session {
+            info.cal_rrt(param, None).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {

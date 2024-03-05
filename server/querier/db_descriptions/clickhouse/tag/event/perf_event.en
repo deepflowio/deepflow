@@ -51,5 +51,6 @@ event_desc            , Event Message                ,
 
 process_kname         , Kernel Thread Name           ,
 app_instance          , Application Instance         ,
-vtap                  , DeepFlow Agent               ,
+vtap                  , DeepFlow Agent               , Deprecated，please use agent.
+agent                 , DeepFlow Agent               ,
 signal_source         , Signal Source                ,

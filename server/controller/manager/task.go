@@ -53,7 +53,6 @@ func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, re
 }
 
 func (t *Task) Start() {
-	t.Recorder.Start()
 	t.Cloud.Start()
 
 	go func() {
@@ -64,7 +63,7 @@ func (t *Task) Start() {
 			case <-ticker.C:
 				cd := t.Cloud.GetResource()
 				log.Debugf("domain (%s) cloud data: %+v", t.DomainName, cd)
-				t.Recorder.Refresh(cd)
+				t.Recorder.Refresh(recorder.RefreshTargetDomain, cd)
 			case <-t.tCtx.Done():
 				break LOOP
 			}

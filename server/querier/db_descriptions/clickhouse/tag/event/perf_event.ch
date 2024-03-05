@@ -50,5 +50,6 @@ event_type                 , 事件类型                   ,
 
 process_kname              , 内核线程名                 ,
 app_instance               , 应用实例                   ,
-vtap                       , 采集器                     ,
+vtap                       , 采集器                     , 已废弃，请使用 agent。
+agent                      , 采集器                     ,
 signal_source              , 信号源                     ,

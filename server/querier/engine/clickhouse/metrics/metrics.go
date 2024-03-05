@@ -269,15 +269,15 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -298,7 +298,7 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 	return map[string]*Metrics{}, err
 }
 
-func GetMetricsByDBTable(db string, table string, where string, ctx context.Context) (map[string]*Metrics, error) {
+func GetMetricsByDBTable(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
@@ -312,7 +312,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
-			exts, err := GetExtMetrics(db, table, where, ctx)
+			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
 			for k, v := range loads {
 				if _, ok := metrics[k]; !ok {
 					metrics[k] = v
@@ -334,15 +334,15 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -360,16 +360,16 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			return GetInProcessMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
-		return GetExtMetrics(db, table, where, ctx)
+		return GetExtMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
-		return GetPrometheusMetrics(db, table, where, ctx)
+		return GetPrometheusMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
 	}
 
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx context.Context) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table, where, ctx)
+func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) ([]interface{}, error) {
+	allMetrics, err := GetMetricsByDBTable(db, table, where, queryCacheTTL, useQueryCache, ctx)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
@@ -396,14 +396,14 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (*common.Result, error) {
+func GetMetricsDescriptions(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
 	if table == "" && db != ckcommon.DB_NAME_PROMETHEUS {
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if db == "deepflow_system" {
-			for _, extTables := range ckcommon.GetExtTables(db, ctx) {
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, useQueryCache, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -416,14 +416,14 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, ctx)
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, queryCacheTTL, useQueryCache, ctx)
 			if err != nil {
 				return nil, err
 			}
 			values = append(values, metrics...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, ctx)
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, useQueryCache, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -662,19 +662,19 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			metrics = VTAP_FLOW_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
-		case "vtap_flow_edge_port":
+		case "network_map":
 			metrics = VTAP_FLOW_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
-		case "vtap_app_port":
+		case "application":
 			metrics = VTAP_APP_PORT_METRICS
 			replaceMetrics = VTAP_APP_PORT_METRICS_REPLACE
-		case "vtap_app_edge_port":
+		case "application_map":
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
-		case "vtap_acl":
+		case "traffic_policy":
 			metrics = VTAP_ACL_METRICS
 			replaceMetrics = VTAP_ACL_METRICS_REPLACE
 		}

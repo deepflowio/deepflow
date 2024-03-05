@@ -93,10 +93,10 @@ func GetDatasources(db string, table string) ([]string, error) {
 	switch db {
 	case "flow_metrics":
 		var tsdbType string
-		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
-			tsdbType = "flow"
-		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
-			tsdbType = "app"
+		if table == "network" || table == "network_map" {
+			tsdbType = "network"
+		} else if table == "application" || table == "application_map" {
+			tsdbType = "application"
 		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
@@ -142,11 +142,11 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 				name = tableSlice[1]
 			}
 		}
-		if strings.HasPrefix(table, "vtap_flow") {
-			tsdbType = "flow"
-		} else if strings.HasPrefix(table, "vtap_app") {
-			tsdbType = "app"
-		} else if table == "vtap_acl" {
+		if strings.HasPrefix(table, "network") {
+			tsdbType = "network"
+		} else if strings.HasPrefix(table, "application") {
+			tsdbType = "application"
+		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
 	case DB_NAME_DEEPFLOW_SYSTEM, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:
@@ -181,7 +181,7 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
-func GetExtTables(db string, ctx context.Context) (values []interface{}) {
+func GetExtTables(db, queryCacheTTL string, useQueryCache bool, ctx context.Context) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -200,7 +200,7 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		log.Error(err)
 		return nil
@@ -215,7 +215,7 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	return values
 }
 
-func GetPrometheusTables(db string, ctx context.Context) (values []interface{}) {
+func GetPrometheusTables(db, queryCacheTTL string, useQueryCache bool, ctx context.Context) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -231,7 +231,7 @@ func GetPrometheusTables(db string, ctx context.Context) (values []interface{}) 
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
 	if err != nil {
 		log.Error(err)
 		return nil

@@ -20,8 +20,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (
@@ -32,7 +32,7 @@ type ExtMetrics struct {
 	Timestamp uint32 // s
 	MsgType   datatype.MessageType
 
-	UniversalTag zerodoc.UniversalTag
+	UniversalTag flow_metrics.UniversalTag
 
 	// in deepflow_system: table name
 	// in ext_metrids: virtual_table_name
@@ -86,7 +86,7 @@ func (m *ExtMetrics) Columns() []*ckdb.Column {
 
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
 	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
-		columns = zerodoc.GenUniversalTagColumns(columns)
+		columns = flow_metrics.GenUniversalTagColumns(columns)
 	}
 	columns = append(columns,
 		ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名"),
@@ -166,7 +166,7 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldValueCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
-		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
 		tagFieldValue.Timestamp = m.Timestamp
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
@@ -180,7 +180,7 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = m.Timestamp
 		tagField.FlowTagInfo = *flowTagInfo
 		cache.Fields = append(cache.Fields, tagField)
@@ -198,7 +198,7 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 				cache.FieldCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
-		tagField := flow_tag.AcquireFlowTag()
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
 		tagField.Timestamp = m.Timestamp
 		tagField.FlowTagInfo = *flowTagInfo
 		cache.Fields = append(cache.Fields, tagField)
@@ -213,7 +213,7 @@ func AcquireExtMetrics() *ExtMetrics {
 	return extMetricsPool.Get().(*ExtMetrics)
 }
 
-var emptyUniversalTag = zerodoc.UniversalTag{}
+var emptyUniversalTag = flow_metrics.UniversalTag{}
 
 func ReleaseExtMetrics(m *ExtMetrics) {
 	m.UniversalTag = emptyUniversalTag

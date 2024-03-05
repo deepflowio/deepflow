@@ -28,13 +28,13 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("flow_metrics.unmarshaller")
@@ -79,7 +79,7 @@ type Unmarshaller struct {
 	dbwriters          []dbwriter.DbWriter
 	queueBatchCache    QueueCache
 	counter            *Counter
-	tableCounter       [zerodoc.VTAP_TABLE_ID_MAX + 1]int64
+	tableCounter       [flow_metrics.METRICS_TABLE_ID_MAX + 1]int64
 	utils.Closable
 }
 
@@ -137,12 +137,12 @@ func (u *Unmarshaller) GetCounter() interface{} {
 		counter.MinDelay = 0
 	}
 
-	counter.FlowPortCount, u.tableCounter[zerodoc.VTAP_FLOW_PORT_1M] = u.tableCounter[zerodoc.VTAP_FLOW_PORT_1M], 0
-	counter.FlowPort1sCount, u.tableCounter[zerodoc.VTAP_FLOW_PORT_1S] = u.tableCounter[zerodoc.VTAP_FLOW_PORT_1S], 0
-	counter.FlowEdgePortCount, u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1M] = u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1M], 0
-	counter.FlowEdgePort1sCount, u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S] = u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S], 0
-	counter.AclCount, u.tableCounter[zerodoc.VTAP_ACL_1M] = u.tableCounter[zerodoc.VTAP_ACL_1M], 0
-	counter.OtherCount, u.tableCounter[zerodoc.VTAP_TABLE_ID_MAX] = u.tableCounter[zerodoc.VTAP_TABLE_ID_MAX], 0
+	counter.FlowPortCount, u.tableCounter[flow_metrics.NETWORK_1M] = u.tableCounter[flow_metrics.NETWORK_1M], 0
+	counter.FlowPort1sCount, u.tableCounter[flow_metrics.NETWORK_1S] = u.tableCounter[flow_metrics.NETWORK_1S], 0
+	counter.FlowEdgePortCount, u.tableCounter[flow_metrics.NETWORK_MAP_1M] = u.tableCounter[flow_metrics.NETWORK_MAP_1M], 0
+	counter.FlowEdgePort1sCount, u.tableCounter[flow_metrics.NETWORK_MAP_1S] = u.tableCounter[flow_metrics.NETWORK_MAP_1S], 0
+	counter.AclCount, u.tableCounter[flow_metrics.TRAFFIC_POLICY_1M] = u.tableCounter[flow_metrics.TRAFFIC_POLICY_1M], 0
+	counter.OtherCount, u.tableCounter[flow_metrics.METRICS_TABLE_ID_MAX] = u.tableCounter[flow_metrics.METRICS_TABLE_ID_MAX], 0
 
 	return counter
 }
