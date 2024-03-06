@@ -49,9 +49,9 @@ tcp_transfer_fail_ratio     , 传输-失败比例           , %    , 传输-失�
 tcp_rst_fail                , 重置次数                , 连接 , TCP 连接被 RST 的次数，包含建连、传输、断连阶段的 RST
 tcp_rst_fail_ratio          , 重置比例                , %    , 重置比例，通过 `TCP 重置次数 / 所有的关闭连接` 计算得，即 `tcp_rst_fail / close_flow`
 client_source_port_reuse    , 建连-客户端端口复用     , 连接 , TCP 建连失败的场景之一，见文档描述
-client_syn_repeat           , 建连-客户端 SYN 结束    , 连接 , TCP 建连失败的场景之一，见文档描述
+server_syn_miss             , 建连-服务端 SYN 缺失    , 连接 , TCP 建连失败的场景之一，见文档描述
 client_establish_other_rst  , 建连-客户端其他重置     , 连接 , TCP 建连失败的场景之一，见文档描述
-server_syn_ack_repeat       , 建连-服务端 SYN 结束    , 连接 , TCP 建连失败的场景之一，见文档描述
+client_ack_miss             , 建连-客户端 ACK 缺失    , 连接 , TCP 建连失败的场景之一，见文档描述
 server_reset                , 建连-服务端直接重置     , 连接 , TCP 建连失败的场景之一，见文档描述
 server_establish_other_rst  , 建连-服务端其他重置     , 连接 , TCP 建连失败的场景之一，见文档描述
 client_rst_flow             , 传输-客户端重置         , 连接 , TCP 传输失败的场景之一，见文档描述
