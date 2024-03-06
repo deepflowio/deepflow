@@ -315,7 +315,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 							if err != nil {
 								return nil, []string{}, true, err
 							}
-							if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+							if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
 								if serverName == clientName {
 									clientNameMetric := []interface{}{
 										clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
