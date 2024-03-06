@@ -215,6 +215,9 @@ static int (*bpf_skb_pull_data)(void *, int len) =
 #elif defined(__TARGET_ARCH_sparc)
 	#define bpf_target_sparc
 	#define bpf_target_defined
+#elif defined(__TARGET_ARCH_loongarch)
+	#define bpf_target_loongarch
+	#define bpf_target_defined
 #else
 	#undef bpf_target_defined
 #endif
@@ -233,6 +236,8 @@ static int (*bpf_skb_pull_data)(void *, int len) =
 	#define bpf_target_powerpc
 #elif defined(__sparc__)
 	#define bpf_target_sparc
+#elif defined(__loongarch__)
+        #define bpf_target_loongarch
 #endif
 #endif
 
@@ -309,6 +314,18 @@ static int (*bpf_skb_pull_data)(void *, int len) =
 #define PT_REGS_RET(x) ((x)->u_regs[UREG_I7])
 #define PT_REGS_RC(x) ((x)->u_regs[UREG_I0])
 #define PT_REGS_SP(x) ((x)->u_regs[UREG_FP])
+
+#elif defined(bpf_target_loongarch)
+
+#define PT_REGS_PARM1(x) ((x)->regs[4])
+#define PT_REGS_PARM2(x) ((x)->regs[5])
+#define PT_REGS_PARM3(x) ((x)->regs[6])
+#define PT_REGS_PARM4(x) ((x)->regs[7])
+#define PT_REGS_PARM5(x) ((x)->regs[8])
+#define PT_REGS_RET(x) ((x)->regs[1])
+#define PT_REGS_RC(x) ((x)->regs[4])
+#define PT_REGS_SP(x) ((x)->regs[3])
+#define PT_REGS_IP(x) ((x)->csr_era)
 
 /* Should this also be a bpf_target check for the sparc case? */
 #if defined(__arch64__)
