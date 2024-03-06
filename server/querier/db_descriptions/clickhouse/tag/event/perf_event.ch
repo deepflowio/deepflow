@@ -1,5 +1,6 @@
 # Name                     , DisplayName                , Description
 time_str                   , 时间                       ,
+_id                        , UID                        ,
 time                       , 时间                       , 将 end_time 取整到秒。
 start_time                 , 开始时间                   , 单位: 微秒。表示事件开始的时间。
 end_time                   , 结束时间                   , 单位: 微秒。表示事件结束的时间，

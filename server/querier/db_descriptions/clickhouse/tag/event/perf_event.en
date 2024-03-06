@@ -1,5 +1,6 @@
 # Name                , DisplayName                  , Description
 time_str              , Time                         ,
+_id                   , UID                          ,
 time                  , Time                         , Round end_time to seconds.
 start_time            , Start Time                   , Unit: microseconds. Start time of event.
 end_time              , End Time                     , Unit: microseconds. End time of event.

@@ -19,7 +19,6 @@ package ctl
 import (
 	"bytes"
 	"context"
-	. "encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,14 +29,15 @@ import (
 	"strconv"
 	"time"
 
+	. "encoding/binary"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
-	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type ParamData struct {
@@ -212,10 +212,10 @@ func RegisterTrisolarisCommand() *cobra.Command {
 		Use:   "trisolaris.check",
 		Short: "pull grpc data from deepflow-server",
 	}
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "vtap ctrl ip")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "vtap ctrl mac")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "vtap group ID")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "vtap k8s cluster ID")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "agent ctrl ip")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "agent ctrl mac")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "agent group ID")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "agent k8s cluster ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginName, "pname", "", "", "request plugin name")
@@ -536,7 +536,7 @@ func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
 	format := "Id: %d Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
 		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, " +
-		"PodNsId: %d, PodId: %d, PodClusterId: %d, PodGroupType: %d, NetnsId: %d, VtapId: %d, IsVipInterface: %t "
+		"PodNsId: %d, PodId: %d, PodClusterId: %d, PodGroupType: %d, NetnsId: %d, AgentId: %d, IsVipInterface: %t "
 	buffer.WriteString(fmt.Sprintf(format, data.GetId(), Uint64ToMac(data.GetMac()),
 		data.GetEpcId(), data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
@@ -633,7 +633,7 @@ func containers(response *trident.SyncResponse) {
 }
 
 func vpcIP(response *trident.SyncResponse) {
-	fmt.Println("vtap_ip:")
+	fmt.Println("agent_ip:")
 	for index, vtapIP := range response.GetVtapIps() {
 		JsonFormat(index+1, vtapIP)
 	}

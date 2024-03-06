@@ -522,6 +522,11 @@ var (
 		db:     "flow_metrics",
 		input:  "SHOW tag chost_ip values from network",
 		output: "SELECT id AS `value`, ip AS `display_name` FROM flow_tag.`chost_map` WHERE not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_show_chost_ip_where",
+		db:     "flow_metrics",
+		input:  "SHOW tag chost_ip values from vtap_flow_port where chost_ip_id != 1",
+		output: "SELECT id AS `value`, ip AS `display_name` FROM flow_tag.`chost_map` WHERE (not(value = 1)) AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
 	}}
 )
 
