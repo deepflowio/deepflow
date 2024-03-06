@@ -494,7 +494,6 @@ impl LocalPlusModeDispatcherListener {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub fn netns(&self) -> &public::netns::NsFile {
         &self.base.netns
     }
