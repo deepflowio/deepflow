@@ -112,6 +112,7 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewPlugin(),
 		router.NewMail(),
 		router.NewPrometheus(),
+		router.NewDatabase(s.controllerConfig),
 
 		// resource
 		resource.NewDomain(s.controllerConfig),

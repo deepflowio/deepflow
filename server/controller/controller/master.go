@@ -63,8 +63,8 @@ func IsMasterController(cfg *config.ControllerConfig) bool {
 
 // migrate db by master region master controller
 func migrateMySQL(cfg *config.ControllerConfig) {
-	ok := migrator.MigrateMySQL(cfg.MySqlCfg)
-	if !ok {
+	err := migrator.MigrateMySQL(cfg.MySqlCfg)
+	if err != nil {
 		log.Error("migrate mysql failed")
 		time.Sleep(time.Second)
 		os.Exit(0)

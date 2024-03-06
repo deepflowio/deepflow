@@ -39,7 +39,7 @@ var DbConfig MySqlConfig
 
 func InitMySQL(cfg MySqlConfig) error {
 	DbConfig = cfg
-	Db = Gorm(cfg)
+	Db, _ = Gorm(cfg)
 	if Db == nil {
 		return errors.New("connect mysql failed")
 	}
@@ -54,7 +54,7 @@ func InitMySQL(cfg MySqlConfig) error {
 	return nil
 }
 
-func Gorm(cfg MySqlConfig) *gorm.DB {
+func Gorm(cfg MySqlConfig) (*gorm.DB, error) {
 	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut, false)
 	return GetGormDB(dsn)
 }
@@ -63,12 +63,12 @@ func GetResultSetMax() int {
 	return int(DbConfig.ResultSetMax)
 }
 
-func GetConnectionWithoutDatabase(cfg MySqlConfig) *gorm.DB {
+func GetConnectionWithoutDatabase(cfg MySqlConfig) (*gorm.DB, error) {
 	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
 	return GetGormDB(dsn)
 }
 
-func GetConnectionWithDatabase(cfg MySqlConfig) *gorm.DB {
+func GetConnectionWithDatabase(cfg MySqlConfig) (*gorm.DB, error) {
 	// set multiStatements=true in dsn only when migrating MySQL
 	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut*2, true)
 	return GetGormDB(dsn)
@@ -90,7 +90,7 @@ func GetDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bo
 	return dsn
 }
 
-func GetGormDB(dsn string) *gorm.DB {
+func GetGormDB(dsn string) (*gorm.DB, error) {
 	Db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN:                       dsn,   // DSN data source name
 		DefaultStringSize:         256,   // string 类型字段的默认长度
@@ -110,8 +110,9 @@ func GetGormDB(dsn string) *gorm.DB {
 			}), // 配置log
 	})
 	if err != nil {
-		log.Errorf("Mysql Connection failed with error: %v", err.Error())
-		return nil
+		err = errors.New(fmt.Sprintf("MySQL Connection failed with error: %v", err.Error()))
+		log.Error(err.Error())
+		return nil, err
 	}
 
 	sqlDB, _ := Db.DB()
@@ -119,5 +120,5 @@ func GetGormDB(dsn string) *gorm.DB {
 	sqlDB.SetMaxIdleConns(50)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
-	return Db
+	return Db, nil
 }
