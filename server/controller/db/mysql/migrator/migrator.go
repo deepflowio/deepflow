@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,18 +17,18 @@
 package migrator
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/op/go-logging"
-	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table"
 )
 
-var log = logging.MustGetLogger("db.migrator.mysql")
+var log = logging.MustGetLogger("db.mysql.migrator")
 
 // if configured database does not exist, it is considered a new deployment, will create database and init tables;
 // if configured database exists, but db_version table does not exist, it is also considered a new deployment,
@@ -38,89 +38,40 @@ var log = logging.MustGetLogger("db.migrator.mysql")
 // if configured database exists, and db_version table exists, check whether db_version is the latest version
 //
 //	and upgrade based the result.
-func MigrateMySQL(cfg MySqlConfig) bool {
-	db := mysql.GetConnectionWithoutDatabase(cfg)
-	if db == nil {
-		return false
+func MigrateMySQL(cfg config.MySqlConfig) error {
+	if databaseExisted, err := CreateDatabase(cfg); err != nil {
+		return err
+	} else if databaseExisted {
+		return table.UpgradeDatabase(cfg)
 	}
-	databaseExisted, err := CreateDatabaseIfNotExists(db, cfg.Database)
-	if err != nil {
-		log.Errorf("database: %s is not ready: %v", cfg.Database, err)
-		return false
-	}
+	return nil
+}
 
-	db = mysql.GetConnectionWithDatabase(cfg)
-	if db == nil {
-		return false
+func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
+	db, err := mysql.GetConnectionWithoutDatabase(cfg)
+	if err != nil {
+		return
+	}
+	databaseExisted, err = common.CreateDatabaseIfNotExists(db, cfg.Database)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("database: %s is not ready: %v", cfg.Database, err))
+		log.Error(err.Error())
+		return
 	}
 	if !databaseExisted {
-		return DropDatabaseIfInitTablesFailed(db, cfg.Database)
-	} else {
-		var dbVersionTable string
-		err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migration.DB_VERSION_TABLE)).Scan(&dbVersionTable).Error
+		db, err = mysql.GetConnectionWithDatabase(cfg)
 		if err != nil {
-			log.Errorf("check db_version table failed: %v", err)
-			return false
+			return
 		}
-		if dbVersionTable == "" {
-			return InitTablesWithoutRollBack(db, cfg.Database)
-		} else {
-			return UpgradeIfDBVersionNotLatest(db, cfg)
-		}
+		err = table.DropDatabaseIfInitTablesFailed(db, cfg.Database)
 	}
+	return
 }
 
-func InitTablesWithoutRollBack(db *gorm.DB, database string) bool {
-	log.Info("init db tables without rollback")
-	err := InitTables(db)
+func DropDatabase(cfg config.MySqlConfig) error {
+	db, err := mysql.GetConnectionWithDatabase(cfg)
 	if err != nil {
-		return false
+		return err
 	}
-	return true
-}
-
-func UpgradeIfDBVersionNotLatest(db *gorm.DB, cfg MySqlConfig) bool {
-	log.Info("upgrade if db version is not the latest")
-	var version string
-	err := db.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
-	if err != nil {
-		log.Errorf("check db version failed: %v", err)
-		return false
-	}
-	log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
-	if version == "" {
-		if cfg.DropDatabaseEnabled {
-			return RecreateDatabaseAndInitTables(db, cfg)
-		} else {
-			log.Errorf("current db version is null, need manual handling")
-			return false
-		}
-	} else if version != migration.DB_VERSION_EXPECTED {
-		err = ExecuteIssus(db, version)
-		if err != nil {
-			return false
-		}
-		return true
-	}
-	return true
-}
-
-func RecreateDatabaseAndInitTables(db *gorm.DB, cfg MySqlConfig) bool {
-	log.Info("recreate database and init tables")
-	DropDatabase(db, cfg.Database)
-	db = mysql.GetConnectionWithoutDatabase(cfg)
-	if db == nil {
-		return false
-	}
-	err := CreateDatabase(db, cfg.Database)
-	if err != nil {
-		log.Errorf("created database %s failed: %v", cfg.Database, err)
-		return false
-	}
-
-	db = mysql.GetConnectionWithDatabase(cfg)
-	if db == nil {
-		return false
-	}
-	return DropDatabaseIfInitTablesFailed(db, cfg.Database)
+	return common.DropDatabase(db, cfg.Database)
 }
