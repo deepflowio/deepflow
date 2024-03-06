@@ -54,9 +54,9 @@ tcp_transfer_fail_ratio     ,                      , percentage , TCP Error     
 tcp_rst_fail                ,                      , counter    , TCP Error      , 111
 tcp_rst_fail_ratio          ,                      , percentage , TCP Error      , 111
 client_source_port_reuse    ,                      , counter    , TCP Error      , 111
-client_syn_repeat           ,                      , counter    , TCP Error      , 111
+server_syn_miss           ,                        , counter    , TCP Error      , 111
 client_establish_other_rst  ,                      , counter    , TCP Error      , 111
-server_syn_ack_repeat       ,                      , counter    , TCP Error      , 111
+client_ack_miss       ,                            , counter    , TCP Error      , 111
 server_reset                ,                      , counter    , TCP Error      , 111
 server_establish_other_rst  ,                      , counter    , TCP Error      , 111
 client_rst_flow             ,                      , counter    , TCP Error      , 111

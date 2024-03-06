@@ -44,8 +44,8 @@ var DB_FIELD_TCP_RST_FAIL = fmt.Sprintf(
 var DB_FIELD_CLIENT_SOURCE_PORT_REUSE = fmt.Sprintf(
 	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_PORT_REUSE,
 )
-var DB_FIELD_CLIENT_SYN_REPEAT = fmt.Sprintf(
-	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_SYN_REPEAT,
+var DB_FIELD_SERVER_SYN_MISS = fmt.Sprintf(
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_SYN_MISS,
 )
 var DB_FIELD_CLIENT_ESTABLISH_OTHER_RST = fmt.Sprintf(
 	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_ESTABLISH_RST,
@@ -53,8 +53,8 @@ var DB_FIELD_CLIENT_ESTABLISH_OTHER_RST = fmt.Sprintf(
 var DB_FIELD_SERVER_RESET = fmt.Sprintf(
 	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_RST,
 )
-var DB_FIELD_SERVER_SYN_ACK_REPEAT = fmt.Sprintf(
-	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_SYNACK_REPEAT,
+var DB_FIELD_CLIENT_ACK_MISS = fmt.Sprintf(
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_ACK_MISS,
 )
 var DB_FIELD_SERVER_ESTABLISH_OTHER_RST = fmt.Sprintf(
 	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_ESTABLISH_RST,
@@ -116,10 +116,10 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"tcp_rst_fail":               NewReplaceMetrics(DB_FIELD_TCP_RST_FAIL, ""),
 	"tcp_rst_fail_ratio":         NewReplaceMetrics(DB_FIELD_TCP_RST_FAIL+"/"+DB_FIELD_CLOSED_FLOW, DB_FIELD_CLOSED_FLOW+">0"),
 	"client_source_port_reuse":   NewReplaceMetrics(DB_FIELD_CLIENT_SOURCE_PORT_REUSE, ""),
-	"client_syn_repeat":          NewReplaceMetrics(DB_FIELD_CLIENT_SYN_REPEAT, ""),
+	"server_syn_miss":            NewReplaceMetrics(DB_FIELD_SERVER_SYN_MISS, ""),
 	"client_establish_other_rst": NewReplaceMetrics(DB_FIELD_CLIENT_ESTABLISH_OTHER_RST, ""),
 	"server_reset":               NewReplaceMetrics(DB_FIELD_SERVER_RESET, ""),
-	"server_syn_ack_repeat":      NewReplaceMetrics(DB_FIELD_SERVER_SYN_ACK_REPEAT, ""),
+	"client_ack_miss":            NewReplaceMetrics(DB_FIELD_CLIENT_ACK_MISS, ""),
 	"server_establish_other_rst": NewReplaceMetrics(DB_FIELD_SERVER_ESTABLISH_OTHER_RST, ""),
 	"client_rst_flow":            NewReplaceMetrics(DB_FIELD_CLIENT_RST_FLOW, ""),
 	"server_queue_lack":          NewReplaceMetrics(DB_FIELD_SERVER_QUEUE_LACK, ""),

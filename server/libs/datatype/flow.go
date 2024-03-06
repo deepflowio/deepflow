@@ -55,10 +55,10 @@ const (
 	_                              //  4: 【废弃】CloseTypeFlood
 	CloseTypeForcedReport          //  5: 周期性上报
 	_                              //  6: 【废弃】CloseTypeFoecedClose
-	CloseTypeClientSYNRepeat       //  7: 建连-客户端SYN结束
+	CloseTypeServerSynMiss         //  7: 建连-服务端 SYN 缺失
 	CloseTypeServerHalfClose       //  8: 断连-服务端半关
 	CloseTypeTCPClientRst          //  9: 传输-客户端重置
-	CloseTypeServerSYNACKRepeat    // 10: 建连-服务端SYN结束
+	CloseTypeClientAckMiss         // 10: 建连-客户端 ACK 缺失
 	CloseTypeClientHalfClose       // 11: 断连-客户端半关
 	_                              // 12: 【废弃】CloseTypeClientNoResponse
 	CloseTypeClientSourcePortReuse // 13: 建连-客户端端口复用
@@ -73,14 +73,14 @@ const (
 )
 
 func (t CloseType) IsClientError() bool {
-	return t == CloseTypeClientSYNRepeat || t == CloseTypeTCPClientRst ||
+	return t == CloseTypeClientAckMiss || t == CloseTypeTCPClientRst ||
 		t == CloseTypeClientHalfClose || t == CloseTypeClientSourcePortReuse ||
 		t == CloseTypeClientEstablishReset
 }
 
 func (t CloseType) IsServerError() bool {
 	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
-		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat ||
+		t == CloseTypeServerHalfClose || t == CloseTypeServerSynMiss ||
 		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
 }
 
