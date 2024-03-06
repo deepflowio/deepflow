@@ -203,7 +203,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					if err != nil {
 						return nil, false
 					}
-					if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+					if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
 						if serverName == clientName {
 							clientNameMetric := NewMetrics(
 								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
