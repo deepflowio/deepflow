@@ -90,7 +90,6 @@ func (c *UpdaterManager) refresh() {
 		NewChPrometheusMetricAPPLabelLayout(),
 		NewChTapType(c.resourceTypeToIconID),
 		NewChVTap(c.resourceTypeToIconID),
-		NewChPod(c.resourceTypeToIconID),
 		NewChLbListener(c.resourceTypeToIconID),
 
 		NewChPodK8sAnnotation(),

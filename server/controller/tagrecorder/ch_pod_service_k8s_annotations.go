@@ -41,8 +41,8 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 	updateInfo := make(map[string]interface{})
 	var annotations string
 	var chItem mysql.ChPodServiceK8sAnnotations
-	if fieldsUpdate.Label.IsDifferent() {
-		annotations = convertAnnotations(fieldsUpdate.Label.GetNew())
+	if fieldsUpdate.Annotation.IsDifferent() {
+		annotations = common.StrToJsonstr(fieldsUpdate.Annotation.GetNew())
 		if annotations != "" {
 			updateInfo["annotations"] = annotations
 		}
@@ -71,10 +71,6 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(item *mysql.PodService) (key
 
 	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sAnnotations{{
 		ID:          item.ID,
-		Annotations: convertAnnotations(item.Annotation),
+		Annotations: common.StrToJsonstr(item.Annotation),
 	}}
-}
-
-func convertAnnotations(annotation string) (result string) {
-	return convertLabel(annotation)
 }
