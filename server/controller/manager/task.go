@@ -111,11 +111,11 @@ func (t *Task) startDomainRefreshMonitor() {
 
 func (t *Task) startSubDomainRefreshMonitor() {
 	go func() {
+		ticker := time.NewTicker(time.Millisecond * 200)
+		defer ticker.Stop()
+
 	LOOP:
 		for {
-			ticker := time.NewTicker(time.Millisecond * 200)
-			defer ticker.Stop()
-
 			select {
 			case <-ticker.C:
 				for item := range t.subDomainRefreshSignals.IterBuffered() {
@@ -153,11 +153,11 @@ func (t *Task) startSubDomainChangeMonitor() {
 		t.createSubDomainSignalIfNotExists(lcuuid)
 	}
 	go func() {
+		ticker := time.NewTicker(time.Duration(t.cfg.ResourceRecorderInterval) * time.Second)
+		defer ticker.Stop()
+
 	LOOP:
 		for {
-			ticker := time.NewTicker(time.Duration(t.cfg.ResourceRecorderInterval) * time.Second)
-			defer ticker.Stop()
-
 			select {
 			case <-ticker.C:
 				gatherTasks := t.Cloud.GetKubernetesGatherTaskMap()
