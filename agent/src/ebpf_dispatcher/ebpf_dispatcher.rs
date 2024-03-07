@@ -28,11 +28,12 @@ use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
 
 use super::{Error, Result};
+use crate::common::ebpf::EbpfType;
 use crate::common::flow::L7Stats;
 use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
-use crate::common::meta_packet::MetaPacket;
+use crate::common::meta_packet::{MetaPacket, SegmentFlags};
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::{FlowAclListener, FlowAclListenerId, TaggedFlow};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
@@ -42,18 +43,20 @@ use crate::exception::ExceptionHandler;
 use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::policy::PolicyGetter;
+use crate::rpc::get_timestamp;
 use crate::utils::stats;
 
 use public::{
     buffer::BatchedBox,
     counter::{Countable, Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
-    l7_protocol::L7Protocol,
+    l7_protocol::{L7Protocol, L7ProtocolChecker},
     leaky_bucket::LeakyBucket,
     proto::{common::TridentType, metric, trident::Exception},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
+use reorder::{Reorder, ReorderCounter, StatsReorderCounter};
 
 pub struct EbpfCounter {
     rx: AtomicU64,
@@ -199,9 +202,97 @@ struct EbpfDispatcher {
 }
 
 impl EbpfDispatcher {
-    const FLOW_MAP_SIZE: usize = 1 << 14;
+    const MERGE_COUNT_MAX: usize = 2;
+
+    fn segmentation_reassembly<'a>(
+        packets: &'a mut Vec<Box<MetaPacket<'a>>>,
+    ) -> Vec<Box<MetaPacket<'a>>> {
+        let mut merge_packets: Vec<Box<MetaPacket<'a>>> = vec![];
+        let mut count = 0;
+        for mut p in packets.drain(..) {
+            if p.segment_flags != SegmentFlags::Seg {
+                count = 1;
+                merge_packets.push(p);
+                continue;
+            }
+
+            let Some(last) = merge_packets.last_mut() else {
+                count = 1;
+                merge_packets.push(p);
+                continue;
+            };
+
+            if last.generate_ebpf_flow_id() == p.generate_ebpf_flow_id()
+                && last.segment_flags == SegmentFlags::Start
+                && last.cap_seq + 1 == p.cap_seq
+                && count < Self::MERGE_COUNT_MAX
+            {
+                last.merge(&mut p);
+                count += 1;
+            } else {
+                count = 1;
+                merge_packets.push(p);
+            }
+        }
+
+        merge_packets
+    }
+
+    fn inject_flush_ticker(
+        timestamp: Duration,
+        flow_map: &mut FlowMap,
+        config: &Config,
+        reorder: &mut Reorder,
+    ) {
+        flow_map.inject_flush_ticker(config, Duration::ZERO);
+        let mut packets = reorder.flush(timestamp.as_secs());
+        let mut packets = packets
+            .drain(..)
+            .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+            .collect::<Vec<Box<MetaPacket>>>();
+        let packets = Self::segmentation_reassembly(&mut packets);
+        for mut packet in packets {
+            flow_map.inject_meta_packet(&config, &mut packet);
+        }
+    }
+
+    fn inject_meta_packet(
+        mut packet: Box<MetaPacket<'static>>,
+        flow_map: &mut FlowMap,
+        config: &Config,
+        reorder: &mut Reorder,
+    ) {
+        let mut packets = match packet.ebpf_type {
+            EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
+                flow_map.inject_meta_packet(config, &mut packet);
+                reorder.flush(packet.lookup_key.timestamp.as_secs())
+            }
+            _ => reorder.inject_item(packet),
+        };
+        let mut packets = packets
+            .drain(..)
+            .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+            .collect::<Vec<Box<MetaPacket>>>();
+        let packets = Self::segmentation_reassembly(&mut packets);
+        for mut packet in packets {
+            flow_map.inject_meta_packet(config, &mut packet);
+        }
+    }
 
     fn run(&self, counter: Arc<EbpfCounter>, exception_handler: ExceptionHandler) {
+        let ebpf_config = self.config.load();
+        let out_of_order_reassembly_bitmap =
+            L7ProtocolBitmap::from(&ebpf_config.ebpf.syscall_out_of_order_reassembly);
+        let reorder_counter = Arc::new(ReorderCounter::default());
+        self.stats_collector.register_countable(
+            &stats::NoTagModule("ebpf-collector-reorder"),
+            Countable::Owned(Box::new(StatsReorderCounter::new(reorder_counter.clone()))),
+        );
+        let mut reorder = Reorder::new(
+            Box::new(out_of_order_reassembly_bitmap),
+            reorder_counter,
+            ebpf_config.ebpf.syscall_out_of_order_cache_size,
+        );
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
             self.flow_output.clone(),
@@ -214,7 +305,6 @@ impl EbpfDispatcher {
             self.stats_collector.clone(),
             true, // from_ebpf
         );
-        let ebpf_config = self.config.load();
         let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.global_ebpf_pps_threshold));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
@@ -231,7 +321,12 @@ impl EbpfDispatcher {
                 .recv_all(&mut batch, Some(Duration::from_secs(1)))
                 .is_err()
             {
-                flow_map.inject_flush_ticker(&config, Duration::ZERO);
+                Self::inject_flush_ticker(
+                    get_timestamp(self.time_diff.load(Ordering::Relaxed)),
+                    &mut flow_map,
+                    &config,
+                    &mut reorder,
+                );
                 continue;
             }
 
@@ -250,7 +345,7 @@ impl EbpfDispatcher {
 
                 packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
                 packet.set_loopback_mac(ebpf_config.ctrl_mac);
-                flow_map.inject_meta_packet(&config, &mut packet);
+                Self::inject_meta_packet(packet, &mut flow_map, &config, &mut reorder);
             }
         }
     }
@@ -472,6 +567,18 @@ impl EbpfCollector {
                 if l7_protocol_enabled_bitmap.is_enabled(i.protocol()) {
                     info!("l7 protocol {:?} parse enabled", i.protocol());
                     ebpf::enable_ebpf_protocol(i.protocol() as ebpf::c_int);
+                }
+            }
+
+            let segmentation_reassembly_bitmap =
+                L7ProtocolBitmap::from(&config.ebpf.syscall_segmentation_reassembly);
+            for i in get_all_protocol().into_iter() {
+                if segmentation_reassembly_bitmap.is_enabled(i.protocol()) {
+                    info!(
+                        "l7 protocol {:?} segmentation reassembly enabled",
+                        i.protocol()
+                    );
+                    ebpf::enable_ebpf_seg_reasm_protocol(i.protocol() as ebpf::c_int);
                 }
             }
 

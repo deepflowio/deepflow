@@ -27,7 +27,7 @@ use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
-pub const CAP_LEN_MAX: usize = 8192;
+pub const CAP_LEN_MAX: usize = 16384;
 
 // process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
 pub const PACKET_KNAME_MAX_PADDING: usize = 15;
