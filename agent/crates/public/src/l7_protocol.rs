@@ -150,3 +150,8 @@ impl L7ProtocolEnum {
         }
     }
 }
+
+pub trait L7ProtocolChecker {
+    fn is_disabled(&self, p: L7Protocol) -> bool;
+    fn is_enabled(&self, p: L7Protocol) -> bool;
+}
