@@ -17,9 +17,6 @@
 package tagrecorder
 
 import (
-	"encoding/json"
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -44,7 +41,7 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 	updateInfo := make(map[string]interface{})
 	var labels string
 	if fieldsUpdate.Label.IsDifferent() {
-		labels = convertLabel(fieldsUpdate.Label.GetNew())
+		labels = common.StrToJsonstr(fieldsUpdate.Label.GetNew())
 		if labels != "" {
 			updateInfo["labels"] = labels
 		}
@@ -71,29 +68,6 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(item *mysql.PodService) (keys []K
 
 	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sLabels{{
 		ID:     item.ID,
-		Labels: convertLabel(item.Label),
+		Labels: common.StrToJsonstr(item.Label),
 	}}
-}
-
-func convertLabel(label string) (result string) {
-	if label == "" {
-		return
-	}
-	labelsMap := map[string]string{}
-	splitLabel := strings.Split(label, ", ")
-	for _, singleLabel := range splitLabel {
-		splitSingleLabel := strings.Split(singleLabel, ":")
-		if len(splitSingleLabel) == 2 {
-			labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
-		}
-	}
-	if len(labelsMap) == 0 {
-		return
-	}
-	labelsStr, err := json.Marshal(labelsMap)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	return string(labelsStr)
 }
