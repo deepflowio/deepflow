@@ -288,6 +288,10 @@ impl L7ProtocolInfoInterface for TlsInfo {
     fn get_request_domain(&self) -> String {
         self.request_domain.clone()
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.request_resource.len()
+    }
 }
 
 impl TlsInfo {

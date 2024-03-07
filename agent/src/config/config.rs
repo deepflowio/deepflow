@@ -499,6 +499,7 @@ pub struct YamlConfig {
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
     pub kubernetes_namespace: String,
@@ -637,6 +638,10 @@ impl YamlConfig {
         // L7Log Session timeout must more than or equal 10s to keep window
         if c.l7_log_session_aggr_timeout.as_secs() < 10 {
             c.l7_log_session_aggr_timeout = Duration::from_secs(10);
+        }
+
+        if c.l7_log_session_slot_capacity < 1024 {
+            c.l7_log_session_slot_capacity = 1024;
         }
 
         if c.external_metrics_sender_queue_size == 0 {
@@ -881,6 +886,7 @@ impl Default for YamlConfig {
             analyzer_ip: "".into(),
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
+            l7_log_session_slot_capacity: 1024,
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
             kubernetes_namespace: "".into(),
