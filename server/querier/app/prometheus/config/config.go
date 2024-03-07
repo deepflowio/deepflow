@@ -37,4 +37,5 @@ type PrometheusCache struct {
 	CacheMaxCount      int    `default:"1024" yaml:"cache-max-count"`      // cache-max-count for list of cache size
 	CacheFirstTimeout  int    `default:"10" yaml:"cache-first-timeout"`    // time out for first cache item load, unit: s, default: 10s
 	CacheCleanInterval int    `default:"3600" yaml:"cache-clean-interval"` // clean interval for cache, unit: s, default: 1h
+	CacheAllowTimeGap  int    `default:"1" yaml:"cache-allow-time-gap"`    // when query end time - cache end time <= allow gap: not update cache, unit: s, default: 1s
 }

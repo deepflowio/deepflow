@@ -19,6 +19,8 @@ package cache
 import (
 	"strings"
 
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/op/go-logging"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
@@ -59,6 +61,10 @@ func promRequestToCacheKey(q *prompb.Query) string {
 		matcher.WriteString(q.Matchers[i].GetName() + q.Matchers[i].Type.String() + q.Matchers[i].GetValue())
 		matcher.WriteByte('-')
 	}
+	if common.IsValueInSliceString(q.Hints.Func, model.RelabelFunctions) {
+		// for all relabel functions, use label_index in query, will append the same cache
+		matcher.WriteString("RELABEL_FUNC_CACHE")
+	}
 	return matcher.String()
 }
 
@@ -84,26 +90,12 @@ func promLabelsEqual(new *labels.Labels, old *labels.Labels) bool {
 	return true
 }
 
-func pbLabelsToMap(labels *[]prompb.Label) map[string]string {
-	if labels == nil {
-		return nil
-	}
-	m := make(map[string]string, len(*labels))
-	for _, v := range *labels {
-		m[v.Name] = v.Value
-	}
-	return m
-}
-
-func pbLabelsEqual(new *[]prompb.Label, old map[string]string) bool {
-	if new == nil || old == nil || len(*new) != len(old) {
-		return false
-	}
-
-	for _, v := range *new {
-		if value, ok := old[v.Name]; !ok || value != v.Value {
-			return false
+func getpbLabelString(labels *[]prompb.Label, key string) string {
+	// __cache_labels__string__ mostly append in last index, reverse scan avoid useless loop
+	for i := len(*labels) - 1; i >= 0; i-- {
+		if (*labels)[i].Name == key {
+			return (*labels)[i].Value
 		}
 	}
-	return true
+	return ""
 }
