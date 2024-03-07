@@ -281,6 +281,12 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
 			}
 		}
+
+		defer func() {
+			if result == nil || err != nil || result.Error != "" || result.Data == nil {
+				p.cacher.Remove(cachedKey)
+			}
+		}()
 	}
 
 	var queriable model.Querierable
@@ -414,6 +420,12 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
 			}
 		}
+
+		defer func() {
+			if result == nil || err != nil || result.Error != "" || result.Data == nil {
+				p.cacher.Remove(cachedKey)
+			}
+		}()
 	}
 
 	var queriable model.Querierable

@@ -24,14 +24,15 @@ import (
 	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/libs/lru"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"github.com/prometheus/prometheus/prompb"
 )
 
 type CacheItem struct {
-	startTime int64 // unit: ms, cache item start time
-	endTime   int64 // unit: ms, cache item end time
+	startTime int64 // unit: s, cache item start time
+	endTime   int64 // unit: s, cache item end time
 	data      *prompb.ReadResponse
 
 	loadCompleted chan struct{}
@@ -111,7 +112,11 @@ func (c *CacheItem) Hit(start int64, end int64) CacheHit {
 
 	// deviation: fix up end time, cache hit left
 	if start < c.endTime && start >= c.startTime && end > c.endTime {
-		return CacheHitPart
+		if end-c.endTime <= int64(config.Cfg.Prometheus.Cache.CacheAllowTimeGap) {
+			return CacheHitFull
+		} else {
+			return CacheHitPart
+		}
 	}
 	return CacheMiss
 }
@@ -142,7 +147,7 @@ func (c *CacheItem) FixupQueryTime(start int64, end int64) (int64, int64) {
 
 func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) *prompb.ReadResponse {
 	log.Debugf("cache merged, query range: [%d-%d], cache range: [%d-%d]", start, end, c.startTime, c.endTime)
-	if query == nil || len(query.Results) == 0 || len(query.Results[0].Timeseries) == 0 {
+	if query == nil || len(query.Results) == 0 {
 		log.Debugf("query data is nil")
 		return c.data
 	}
@@ -195,16 +200,11 @@ func (c *CacheItem) mergeResponse(start, end int64, query *prompb.ReadResponse) 
 		c.endTime = end
 	}
 
-	cacheLabelsMap := make(map[*prompb.TimeSeries](map[string]string), len(cachedTs))
-	var cachedLabels map[string]string
-	var ok bool
 	for _, ts := range queryTs {
+		newTsLabelString := getpbLabelString(&ts.Labels, model.CACHE_LABEL_STRING_TAG)
 		for _, existsTs := range cachedTs {
-			if cachedLabels, ok = cacheLabelsMap[existsTs]; !ok {
-				cachedLabels = pbLabelsToMap(&existsTs.Labels)
-				cacheLabelsMap[existsTs] = cachedLabels
-			}
-			if pbLabelsEqual(&ts.Labels, cachedLabels) {
+			cachedLabelString := getpbLabelString(&existsTs.Labels, model.CACHE_LABEL_STRING_TAG)
+			if cachedLabelString == newTsLabelString {
 				existsSamples := existsTs.Samples
 				existsSamplesStart := existsSamples[0].Timestamp
 				existsSamplesEnd := existsSamples[len(existsSamples)-1].Timestamp
@@ -370,8 +370,25 @@ func copyResponse(cached *prompb.ReadResponse) *prompb.ReadResponse {
 		nR := &prompb.QueryResult{}
 		nR.Timeseries = make([]*prompb.TimeSeries, 0, len(r.Timeseries))
 		for j := 0; j < len(r.Timeseries); j++ {
+			// remove CACHE_LABEL_STRING_TAG
+			// CACHE_LABEL_STRING_TAG mostly appear in last index (len-1)
+			// but for robustness should check when cacheLabelIndex<len-1
+			cacheLabelIndex := -1
+			newLabels := make([]prompb.Label, 0, len(r.Timeseries[j].Labels)-1)
+			for k := len(r.Timeseries[j].Labels) - 1; k >= 0; k-- {
+				if r.Timeseries[j].Labels[k].Name == model.CACHE_LABEL_STRING_TAG {
+					cacheLabelIndex = k
+					break
+				}
+			}
+			if cacheLabelIndex > 0 {
+				newLabels = append(newLabels, r.Timeseries[j].Labels[:cacheLabelIndex]...)
+			}
+			if cacheLabelIndex < len(r.Timeseries[j].Labels)-1 {
+				newLabels = append(newLabels, r.Timeseries[j].Labels[cacheLabelIndex+1:]...)
+			}
 			nR.Timeseries = append(nR.Timeseries, &prompb.TimeSeries{
-				Labels:  r.Timeseries[j].Labels,
+				Labels:  newLabels,
 				Samples: r.Timeseries[j].Samples,
 			})
 		}
@@ -389,7 +406,10 @@ func (s *RemoteReadQueryCache) Remove(req *prompb.ReadRequest) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.cache.Remove(key)
+	if item, ok := s.cache.Peek(key); ok && item.isZero() {
+		// when item is not zero, means contain other query's data, don't clean up
+		s.cache.Remove(key)
+	}
 }
 
 func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64) (*CacheItem, CacheHit, int64, int64) {
@@ -426,7 +446,11 @@ func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64) (*
 		return nil, CacheMiss, start, end
 	case CacheHitFull:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
-		return item, CacheHitFull, start, end
+		return &CacheItem{
+			startTime: item.startTime,
+			endTime:   item.endTime,
+			data:      copyResponse(item.data),
+		}, CacheHitFull, start, end
 	case CacheHitPart:
 		atomic.AddUint64(&s.counter.Stats.CacheHit, 1)
 		query_start, query_end := item.FixupQueryTime(start, end)

@@ -45,7 +45,6 @@ const (
 	PROMETHEUS_NATIVE_TAG_NAME = "tag"
 	PROMETHEUS_TIME_COLUMNS    = "timestamp"
 	PROMETHEUS_METRIC_VALUE    = "value"
-	PROMETHEUS_LABELS_INDEX    = "__labels_index__"
 	ENUM_TAG_SUFFIX            = "_enum"
 
 	FUNCTION_TOPK    = "topk"
@@ -114,12 +113,6 @@ var aggFunctions = map[string]string{
 }
 
 var _match_fullmatch_reg = regexp.MustCompile(`^[\w\|]+$`)
-
-var _relabelFunctions = []string{"sum", "avg", "count", "min", "max", "group", "stddev", "stdvar", "count_values", "quantile"}
-
-var _matrixCallFunctions = []string{"topk", "bottomk",
-	"avg_over_time", "count_over_time", "last_over_time", "max_over_time", "min_over_time", "stddev_over_time", "sum_over_time", "present_over_time", "quantile_over_time",
-	"idelta", "delta", "increase", "irate", "rate"}
 
 // define `showtag` flag, it passed when and only [api/v1/series] been called
 type CtxKeyShowTag struct{}
@@ -269,14 +262,14 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		// append metricName `value`
 		metricsArray = append(metricsArray, metricAlias)
 		// append `tag` only for prometheus & ext_metrics & deepflow_system
-		if !common.IsValueInSliceString(q.Hints.Func, _relabelFunctions) {
+		if !common.IsValueInSliceString(q.Hints.Func, model.RelabelFunctions) {
 			// `tag` should be append into `Select` with:
 			// 1. not any aggregations, try get all `tag`
 			// 2. topk(n)/bottomk(n) get all `tag`
 			// 3. when argTypes == Matrix, get all `tag`. i.e.: irate/rate/x_over_time
 			metricsArray = append(metricsArray, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		} else {
-			metricsArray = append(metricsArray, fmt.Sprintf("FastTrans(%s) as %s", PROMETHEUS_NATIVE_TAG_NAME, PROMETHEUS_LABELS_INDEX))
+			metricsArray = append(metricsArray, fmt.Sprintf("FastTrans(%s) as %s", PROMETHEUS_NATIVE_TAG_NAME, model.PROMETHEUS_LABELS_INDEX))
 			for _, g := range q.Hints.Grouping {
 				tagName, tagAlias, _ := p.parsePromQLTag(prefixType, db, g)
 
@@ -589,6 +582,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	if result == nil || len(result.Values) == 0 {
 		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
 	}
+	cacheEnabled := config.Cfg.Prometheus.Cache.RemoteReadCache && !strings.Contains(metricsName, "__")
 	log.Debugf("resTransToProm: result length: %d", len(result.Values))
 	columnIndexes := []int{-1, -1, -1, -1, -1, -1, -1}
 	otherTagCount := 0
@@ -603,7 +597,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			columnIndexes[METRICS_INDEX] = i
 		} else if tag == PROMETHEUS_TIME_COLUMNS {
 			columnIndexes[TIME_INDEX] = i
-		} else if tag == PROMETHEUS_LABELS_INDEX {
+		} else if tag == model.PROMETHEUS_LABELS_INDEX {
 			columnIndexes[LABELS_INDEX] = i
 		} else if tag == PROMETHEUS_WINDOW_FIRST_VALUE {
 			columnIndexes[WINDOW_FIRST_VALUE_INDEX] = i
@@ -681,6 +675,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 				promTagStrList = append(promTagStrList, k)
 			}
 			promJsonMap[promTagJson] = filterTagMap
+			// IMPORTANT: tags needed to be sorted, it will be compare both in cache and seriesIndexMap
 			sort.Strings(promTagStrList)
 			for i := 0; i < len(promTagStrList); i++ {
 				promTagWriter.WriteString(promTagStrList[i])
@@ -703,7 +698,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			}
 			deepflowNativeTagString = labelString.String()
 			filterTagMap = make(map[string]string, len(tagsFieldIndex)+1)
-			filterTagMap[PROMETHEUS_LABELS_INDEX] = deepflowNativeTagString
+			filterTagMap[model.PROMETHEUS_LABELS_INDEX] = deepflowNativeTagString
 			// agg prometheus query, directly get tag.x
 			for idx := range tagsFieldIndex {
 				name := removePrometheusTagPrefix(result.Columns[idx].(string))
@@ -799,6 +794,14 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			if filterTagMap[PROMETHEUS_METRICS_NAME] == "" {
 				pairs = append(pairs, prompb.Label{Name: PROMETHEUS_METRICS_NAME, Value: metricsName})
 			}
+
+			if cacheEnabled {
+				// pre-sorted labels string
+				// if cache enabled, it will append in cache and remove it in return
+				// only when remote read, because only `remote read cache` need use label string to compare
+				pairs = append(pairs, prompb.Label{Name: model.CACHE_LABEL_STRING_TAG, Value: deepflowNativeTagString})
+			}
+
 			series = &prompb.TimeSeries{Labels: pairs}
 			seriesArray = append(seriesArray, series)
 
@@ -930,6 +933,9 @@ func parseValue(valueType string, val interface{}) (v float64, b bool) {
 }
 
 func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq model.QueryRequest, queryType model.QueryType) string {
+	if queryReq == nil {
+		return ""
+	}
 	// get funcs
 	funcs := queryReq.GetFunc()
 	f0, f1 := "", ""
@@ -1032,7 +1038,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 			groupBy = groupBy[:len(groupBy)-1]
 
 			if f1 != FUNCTION_TOPK && f1 != FUNCTION_BOTTOMK {
-				lastQuery = fmt.Sprintf("Derivative(%s,%s)", metricAlias, PROMETHEUS_LABELS_INDEX)
+				lastQuery = fmt.Sprintf("Derivative(%s,%s)", metricAlias, model.PROMETHEUS_LABELS_INDEX)
 			}
 
 			call_agg := QueryFuncCall[f1]
@@ -1040,14 +1046,14 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 				call_agg(lastQuery, &selection, &orderBy, &groupBy, queryReq, queryType, handleTagFunc)
 			}
 		}
-	} else if common.IsValueInSliceString(f0, _matrixCallFunctions) && common.IsValueInSliceString(f1, _relabelFunctions) {
+	} else if common.IsValueInSliceString(f0, model.MatrixCallFunctions) && common.IsValueInSliceString(f1, model.RelabelFunctions) {
 		if len(selection) > 2 {
 			// for `_matrixCallFunctions`, [1] MUST storage query `tag`
-			selection[1] = fmt.Sprintf("%s as %s", _prometheus_tag_key, PROMETHEUS_LABELS_INDEX)
+			selection[1] = fmt.Sprintf("%s as %s", _prometheus_tag_key, model.PROMETHEUS_LABELS_INDEX)
 		}
 		if len(groupBy) > 0 {
 			// for `_matrixCallFunctions`, [0] MUST add query `tag`
-			groupBy[0] = PROMETHEUS_LABELS_INDEX
+			groupBy[0] = model.PROMETHEUS_LABELS_INDEX
 		}
 
 		// add grouping tags for aggregation in the next function calculation
@@ -1102,6 +1108,8 @@ func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
 		// for regex like 'a|b', convert to 'tag=a OR tag=b'
 		if _match_fullmatch_reg.MatchString(v) {
 			return "=", strings.Split(v, "|")
+		} else if v == "" {
+			return "=", []string{v}
 		} else {
 			return "REGEXP", []string{appendRegexRules(v)}
 		}
@@ -1109,6 +1117,8 @@ func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
 		// for regex like 'a|b', convert to 'tag!=a OR tag!=b'
 		if _match_fullmatch_reg.MatchString(v) {
 			return "!=", strings.Split(v, "|")
+		} else if v == "" {
+			return "!=", []string{v}
 		} else {
 			return "NOT REGEXP", []string{appendRegexRules(v)}
 		}
