@@ -40,7 +40,7 @@ import (
 
 var log = logging.MustGetLogger("stats")
 
-var remoteType = REMOTE_TYPE_INFLUXDB
+var remoteType = REMOTE_TYPE_DFSTATSD
 
 type StatSource struct {
 	modulePrefix string
@@ -151,8 +151,7 @@ func counterToFields(counter interface{}) models.Fields {
 	return fields
 }
 
-func collectBatchPoints() client.BatchPoints {
-	timestamp := time.Now()
+func collectBatchPoints(timestamp time.Time) client.BatchPoints {
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{Precision: "s"})
 	lock.Lock()
 	statSources.Remove(func(x interface{}) bool {
@@ -300,8 +299,8 @@ func nextRemote() error {
 	return nil
 }
 
-func runOnce() {
-	bp := collectBatchPoints()
+func runOnce(timestamp time.Time) {
+	bp := collectBatchPoints(timestamp)
 
 	if len(remotes) == 0 && len(dfRemote) == 0 {
 		return
@@ -333,6 +332,7 @@ func runOnce() {
 func run() {
 	time.Sleep(time.Second) // wait logger init
 
+	var lastTick int64
 	for range time.NewTicker(TICK_CYCLE).C {
 		lock.Lock()
 		hooks := preHooks
@@ -342,7 +342,16 @@ func run() {
 		}
 
 		if statSources.Len() > 0 {
-			runOnce()
+			now := time.Now()
+			nowTick := now.Unix() / TICK_COUNT
+			// Prevent the time interval between two executions from being too small, causing two pieces of data to appear in one time period, and causing abnormal query aggregation results.
+			if nowTick == lastTick {
+				log.Warningf("the running interval is too short, cancel this execution. now time: %s", now)
+				continue
+			}
+
+			runOnce(now)
+			lastTick = nowTick
 		}
 	}
 }
