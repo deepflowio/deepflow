@@ -95,6 +95,10 @@ impl L7ProtocolInfoInterface for DnsInfo {
         }
         Some(self.query_name.clone())
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.query_name.len()
+    }
 }
 
 impl DnsInfo {

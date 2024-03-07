@@ -688,6 +688,7 @@ impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub http_endpoint_disabled: bool,
@@ -700,6 +701,7 @@ impl Default for LogParserConfig {
         Self {
             l7_log_collect_nps_threshold: 0,
             l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_session_slot_capacity: 1024,
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
             http_endpoint_disabled: false,
@@ -719,6 +721,10 @@ impl fmt::Debug for LogParserConfig {
             .field(
                 "l7_log_session_aggr_timeout",
                 &self.l7_log_session_aggr_timeout,
+            )
+            .field(
+                "l7_log_session_slot_capacity",
+                &self.l7_log_session_slot_capacity,
             )
             .field("l7_log_dynamic", &self.l7_log_dynamic)
             .field(
@@ -1385,6 +1391,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
+                l7_log_session_slot_capacity: conf.yaml_config.l7_log_session_slot_capacity,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
                     conf.http_log_x_request_id

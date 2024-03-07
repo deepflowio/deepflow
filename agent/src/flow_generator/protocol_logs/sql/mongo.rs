@@ -98,6 +98,10 @@ impl L7ProtocolInfoInterface for MongoDBInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.request.len()
+    }
 }
 
 // 协议文档: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/
