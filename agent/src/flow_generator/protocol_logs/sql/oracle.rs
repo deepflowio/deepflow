@@ -110,6 +110,10 @@ impl L7ProtocolInfoInterface for OracleInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.sql.len()
+    }
 }
 
 impl From<OracleInfo> for L7ProtocolSendLog {

@@ -130,6 +130,10 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.context.len()
+    }
 }
 
 impl From<PostgreInfo> for L7ProtocolSendLog {
