@@ -385,6 +385,9 @@ pub struct EbpfYamlConfig {
     pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
     pub off_cpu_profile: OffCpuProfile,
+    pub syscall_out_of_order_cache_size: usize,
+    pub syscall_out_of_order_reassembly: Vec<String>,
+    pub syscall_segmentation_reassembly: Vec<String>,
 }
 
 impl Default for EbpfYamlConfig {
@@ -409,6 +412,9 @@ impl Default for EbpfYamlConfig {
             java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
+            syscall_out_of_order_reassembly: vec![],
+            syscall_segmentation_reassembly: vec![],
+            syscall_out_of_order_cache_size: 16,
         }
     }
 }
@@ -796,6 +802,9 @@ impl YamlConfig {
             .off_cpu_profile
             .min_block
             .clamp(Duration::from_micros(0), Duration::from_micros(3600000000));
+        if !(8..=128).contains(&c.ebpf.syscall_out_of_order_cache_size) {
+            c.ebpf.syscall_out_of_order_cache_size = 16;
+        }
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {

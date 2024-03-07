@@ -45,6 +45,7 @@ use crate::{
     utils::bytes,
 };
 use public::bytes::read_u32_le;
+use public::l7_protocol::L7ProtocolChecker;
 
 const SERVER_STATUS_CODE_MIN: u16 = 1000;
 const CLIENT_STATUS_CODE_MIN: u16 = 2000;

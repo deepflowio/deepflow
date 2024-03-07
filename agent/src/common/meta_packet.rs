@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::any::Any;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
@@ -47,8 +48,9 @@ use crate::error;
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
-        MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
-        SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
+        MSG_REASM_SEG, MSG_REASM_START, MSG_REQUEST_END, MSG_RESPONSE_END,
+        PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV,
+        SOCK_DIR_SND,
     },
 };
 use crate::{
@@ -61,6 +63,7 @@ use public::{
     buffer::BatchedBuffer,
     utils::net::{is_unicast_link_local, MacAddr},
 };
+use reorder::{CacheItem, Downcast};
 
 #[derive(Clone, Debug)]
 pub enum RawPacket<'a> {
@@ -105,6 +108,32 @@ bitflags! {
     pub struct EbpfFlags: u32 {
         const NONE = 0;
         const TLS = 1;
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[derive(PartialEq, Clone, Debug)]
+pub enum SegmentFlags {
+    None,
+    Start,
+    Seg,
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl Default for SegmentFlags {
+    fn default() -> Self {
+        SegmentFlags::None
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl From<u8> for SegmentFlags {
+    fn from(value: u8) -> Self {
+        match value {
+            MSG_REASM_START => SegmentFlags::Start,
+            MSG_REASM_SEG => SegmentFlags::Seg,
+            _ => SegmentFlags::None,
+        }
     }
 }
 
@@ -168,6 +197,8 @@ pub struct MetaPacket<'a> {
     pub is_request_end: bool,
     pub is_response_end: bool,
     pub ebpf_flags: EbpfFlags,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub segment_flags: SegmentFlags,
 
     pub process_id: u32,
     pub pod_id: u32,
@@ -902,6 +933,14 @@ impl<'a> MetaPacket<'a> {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn merge(&mut self, packet: &mut MetaPacket) {
+        self.raw_from_ebpf.append(&mut packet.raw_from_ebpf);
+        self.packet_len += packet.packet_len - 54;
+        self.payload_len += packet.payload_len;
+        self.l4_payload_len += packet.l4_payload_len;
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut data.read_unaligned();
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
@@ -991,6 +1030,7 @@ impl<'a> MetaPacket<'a> {
         } else {
             EbpfFlags::NONE
         };
+        packet.segment_flags = SegmentFlags::from(data.msg_type);
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
         if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {
@@ -1102,6 +1142,34 @@ impl<'a> fmt::Display for MetaPacket<'a> {
             }
         }
         write!(f, "")
+    }
+}
+
+impl Downcast for MetaPacket<'static> {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+impl CacheItem for MetaPacket<'static> {
+    fn get_id(&self) -> u64 {
+        self.generate_ebpf_flow_id()
+    }
+
+    fn get_seq(&self) -> u64 {
+        self.cap_seq
+    }
+
+    fn get_timestmap(&self) -> u64 {
+        self.lookup_key.timestamp.as_secs()
+    }
+
+    fn get_l7_protocol(&self) -> L7Protocol {
+        self.l7_protocol_from_ebpf
     }
 }
 
