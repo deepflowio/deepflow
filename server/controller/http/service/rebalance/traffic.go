@@ -128,10 +128,12 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 		// update counter
 		updateCounter(vtapIDToName, vTapIDToChangeInfo)
 	}
-	log.Infof("vtap rebalance result switch_total_num(%v)", response.TotalSwitchVTapNum)
-	for _, detail := range response.Details {
-		log.Infof("vtap rebalance result az(%v) ip(%v) state(%v) before_vtap_num(%v) after_vtap_num(%v), switch_vtap_num(%v) before_vtap_weight(%v) after_vtap_weight(%v)",
-			detail.AZ, detail.IP, detail.State, detail.BeforeVTapNum, detail.AfterVTapNum, detail.SwitchVTapNum, detail.BeforeVTapWeights, detail.AfterVTapWeights)
+	if response.TotalSwitchVTapNum != 0 {
+		log.Infof("vtap rebalance result switch_total_num(%v)", response.TotalSwitchVTapNum)
+		for _, detail := range response.Details {
+			log.Infof("vtap rebalance result az(%v) ip(%v) state(%v) before_vtap_num(%v) after_vtap_num(%v), switch_vtap_num(%v) before_vtap_weight(%v) after_vtap_weight(%v)",
+				detail.AZ, detail.IP, detail.State, detail.BeforeVTapNum, detail.AfterVTapNum, detail.SwitchVTapNum, detail.BeforeVTapWeights, detail.AfterVTapWeights)
+		}
 	}
 
 	return response, nil
@@ -542,8 +544,8 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 				log.Error(err)
 			}
 		} else {
-			log.Infof("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
-			log.Infof("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
+			log.Debugf("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Debugf("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
 			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
 			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
 		}

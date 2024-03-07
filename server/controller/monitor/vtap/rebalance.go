@@ -143,8 +143,9 @@ func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 	}
 	if result.TotalSwitchVTapNum != 0 {
 		log.Infof("need rebalance, total switch vtap num(%d)", result.TotalSwitchVTapNum)
-		_, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration)
-		log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+		if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration); err != nil {
+			log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+		}
 		return
 	}
 }
