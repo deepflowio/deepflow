@@ -728,8 +728,8 @@ func AnomalyColumns() []*ckdb.Column {
 func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 	clientFail := a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
-	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-客户端半关, 传输-服务端半关, 传输-连接超时次数
-	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.ClientHalfCloseFlow + a.ServerHalfCloseFlow + a.TCPTimeout
+	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-连接超时次数
+	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.TCPTimeout
 	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
 	rstFail := a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
 
