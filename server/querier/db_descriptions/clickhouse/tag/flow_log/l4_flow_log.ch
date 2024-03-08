@@ -93,7 +93,7 @@ flow_id               , 流日志 ID                    ,
 start_time            , 开始时间                     , 单位: 微秒。表示当前自然分钟内流的开始时间，对于新建流表示首包时间。
 end_time              , 结束时间                     , 单位: 微秒。表示当前自然分钟内流的结束时间，若流在该分钟内 close，则为尾包时间或流状态机超时的时间。
 close_type            , 流结束类型                   ,
-status                , 状态                         , 由 close_type（流结束类型）与 protocol（协议）决定：正常结束/周期性上报/非TCP超时=正常，客户端XX=客户端异常，服务端XX/TCP超时=服务端异常，其他结束方式=未知。
+status                , 状态                         , 由 close_type（流结束类型）与 protocol（协议）决定：正常结束/周期性上报/非TCP超时/断连-XX=正常，客户端XX=客户端异常，服务端XX/TCP超时=服务端异常，其他结束方式=未知。
 is_new_flow           , 新建流                       ,
 
 signal_source         , 信号源                       ,

@@ -93,7 +93,7 @@ flow_id               , Flow ID                           ,
 start_time            , Start Time                        , Unit: microseconds. Indicates the start time of the flow within the current natural minute, and indicates the first packet time for a newly created flow.
 end_time              , End Time                          , Unit: microseconds. Indicates the end time of the flow within the current natural minute. If the flow is closed within this minute, it is the end packet time or the timeout time of the flow state machine.
 close_type            , Flow Close Type                   ,
-status                , Status                            , Determined by the close_type and protocol: Normal/ForceReport/Non-TCP timeout = Normal, Client* = Client Error, Server*/TCP Timeout = Server Error, others = Unknown.
+status                , Status                            , Determined by the close_type and protocol: Normal/ForceReport/Non-TCP timeout/Disconnected* = Normal, Client* = Client Error, Server*/TCP Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,
 
 signal_source         , Signal Source                     ,

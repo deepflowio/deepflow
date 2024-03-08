@@ -44,7 +44,7 @@ server_establish_fail       , 建连-服务端失败次数     , 次   , TCP 建
 tcp_establish_fail_ratio    , 建连-失败比例           , %    , 建连-失败比例，通过 `TCP 建连-失败次数 / 所有的关闭连接`计算得，即 `tcp_establish_fail / close_flow`
 client_establish_fail_ratio , 建连-客户端失败比例     , %    , 建连-客户端失败比例，通过 `TCP 建连-客户端失败次数 / 所有的关闭连接 ` 计算得，即 `client_establish_fail / close_flow`
 server_establish_fail_ratio , 建连-服务端失败比例     , %    , 建连-服务端失败比例，通过 `TCP 建连-服务端失败次数 / 所有的关闭连接` 计算得，即 `server_establish_fail / close_flow`
-tcp_transfer_fail           , 传输-失败次数           , 次   , TCP 传输过程中失败的次数，传输失败场景见文档描述，包含传输和断连的所有错误
+tcp_transfer_fail           , 传输-失败次数           , 次   , TCP 传输过程中失败的次数，传输失败场景见文档描述，包含传输的所有错误
 tcp_transfer_fail_ratio     , 传输-失败比例           , %    , 传输-失败比例，通过 `TCP 传输-失败次数 / 所有的关闭连接`计算得，即 `tcp_transfer_fail / close_flow`
 tcp_rst_fail                , 重置次数                , 连接 , TCP 连接被 RST 的次数，包含建连、传输、断连阶段的 RST
 tcp_rst_fail_ratio          , 重置比例                , %    , 重置比例，通过 `TCP 重置次数 / 所有的关闭连接` 计算得，即 `tcp_rst_fail / close_flow`

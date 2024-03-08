@@ -45,7 +45,7 @@ server_establish_fail       , Server Error                     , Flow ,
 tcp_establish_fail_ratio    , Error %                          , %    ,
 client_establish_fail_ratio , Client Error %                   , %    ,
 server_establish_fail_ratio , Client Error %                   , %    ,
-tcp_transfer_fail           , Transfer Error                   , Flow , All transfer and close errors.
+tcp_transfer_fail           , Transfer Error                   , Flow , All transfer errors.
 tcp_transfer_fail_ratio     , Transfer Error %                 , %    ,
 tcp_rst_fail                , RST                              , Flow , All RST errors.
 tcp_rst_fail_ratio          , RST %                            , %    ,
