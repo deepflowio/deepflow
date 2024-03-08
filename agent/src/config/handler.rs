@@ -43,7 +43,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::OracleParseConfig;
+use super::config::{ExtraLogFields, OracleParseConfig};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -1069,6 +1069,7 @@ pub struct L7LogDynamicConfig {
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
+    pub extra_log_fields: ExtraLogFields,
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -1088,6 +1089,7 @@ impl L7LogDynamicConfig {
         x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
+        mut extra_log_fields: ExtraLogFields,
     ) -> Self {
         proxy_client.make_ascii_lowercase();
 
@@ -1114,6 +1116,15 @@ impl L7LogDynamicConfig {
             span_set.insert(t.to_owned());
         }
 
+        extra_log_fields.deduplicate();
+
+        for f in extra_log_fields.http2.iter() {
+            expected_headers_set.insert(f.field_name.as_bytes().to_vec());
+        }
+        for f in extra_log_fields.grpc.iter() {
+            expected_headers_set.insert(f.field_name.as_bytes().to_vec());
+        }
+
         Self {
             proxy_client,
             x_request_id: x_request_id_set,
@@ -1122,6 +1133,7 @@ impl L7LogDynamicConfig {
             trace_set,
             span_set,
             expected_headers_set: Arc::new(expected_headers_set),
+            extra_log_fields,
         }
     }
 
@@ -1406,6 +1418,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
+                    conf.yaml_config
+                        .l7_protocol_advanced_features
+                        .extra_log_fields
+                        .clone(),
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
