@@ -2055,18 +2055,9 @@ impl OpenWireLog {
         }
         // set oneway request as session
         if info.msg_type == LogMessageType::Request && !info.response_required {
-            if info.command_type == OpenWireCommand::WireFormatInfo {
-                if param.direction == PacketDirection::ClientToServer {
-                    info.msg_type = LogMessageType::Request;
-                } else {
-                    info.msg_type = LogMessageType::Response;
-                    (info.res_msg_size, info.req_msg_size) = (info.req_msg_size, info.res_msg_size);
-                }
-            } else {
-                info.msg_type = LogMessageType::Session;
-                if param.direction == PacketDirection::ServerToClient {
-                    (info.res_msg_size, info.req_msg_size) = (info.req_msg_size, info.res_msg_size);
-                }
+            info.msg_type = LogMessageType::Session;
+            if param.direction == PacketDirection::ServerToClient {
+                info.res_msg_size = info.req_msg_size.take()
             }
         }
         if info.command_type == OpenWireCommand::WireFormatInfo {
