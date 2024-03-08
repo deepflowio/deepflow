@@ -437,9 +437,40 @@ pub struct HttpEndpointExtraction {
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFieldsInfo {
+    pub field_name: String,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFields {
+    pub http: Vec<ExtraLogFieldsInfo>,
+    pub http2: Vec<ExtraLogFieldsInfo>,
+    pub grpc: Vec<ExtraLogFieldsInfo>,
+}
+
+impl ExtraLogFields {
+    pub fn deduplicate(&mut self) {
+        fn deduplicate_fields(fields: &mut Vec<ExtraLogFieldsInfo>) {
+            fields
+                .iter_mut()
+                .for_each(|f| f.field_name.make_ascii_lowercase());
+            fields.sort_by(|a, b| a.field_name.cmp(&b.field_name));
+            fields.dedup_by(|a, b| a.field_name == b.field_name);
+        }
+
+        deduplicate_fields(&mut self.http);
+        deduplicate_fields(&mut self.http2);
+        deduplicate_fields(&mut self.grpc);
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
     pub obfuscate_enabled_protocols: Vec<String>,
+    pub extra_log_fields: ExtraLogFields,
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]

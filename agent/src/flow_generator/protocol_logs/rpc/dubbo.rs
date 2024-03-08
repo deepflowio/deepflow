@@ -687,7 +687,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
-    use crate::config::handler::LogParserConfig;
+    use crate::config::{handler::LogParserConfig, ExtraLogFields};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -729,6 +729,7 @@ mod tests {
                         TraceType::Customize("EagleEye-SpanID".to_string()),
                         TraceType::Sw8,
                     ],
+                    ExtraLogFields::default(),
                 ),
                 ..Default::default()
             };
@@ -826,6 +827,7 @@ mod tests {
                     TraceType::Customize("EagleEye-SpanID".to_string()),
                     TraceType::Sw8,
                 ],
+                ExtraLogFields::default(),
             ),
             ..Default::default()
         };

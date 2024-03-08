@@ -219,9 +219,21 @@ type HttpEndpointExtraction struct {
 	MatchRules []MatchRule `yaml:"match-rules,omitempty"`
 }
 
+type ExtraLogFieldsInfo struct {
+	FieldName string `yaml:"field-name,omitempty"`
+	// SubFieldNames []string `yaml:"sub-field-names,omitempty"` // Future version support
+}
+
+type ExtraLogFields struct {
+	Http  []ExtraLogFieldsInfo `yaml:"http,omitempty"`
+	Http2 []ExtraLogFieldsInfo `yaml:"http2,omitempty"`
+	Grpc  []ExtraLogFieldsInfo `yaml:"grpc,omitempty"`
+}
+
 type L7ProtocolAdvancedFeatures struct {
 	HttpEndpointExtraction    *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
 	ObfuscateEnabledProtocols []string                `yaml:"obfuscate-enabled-protocols,omitempty"`
+	ExtraLogFields            *ExtraLogFields         `yaml:"extra-log-fields,omitempty"`
 }
 
 type OracleConfig struct {

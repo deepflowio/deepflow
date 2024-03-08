@@ -676,7 +676,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::handler::TraceType,
+        config::{handler::TraceType, ExtraLogFields},
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -914,6 +914,7 @@ mod tests {
                 TraceType::Customize("TraceID".to_owned()),
             ],
             vec![TraceType::TraceParent],
+            ExtraLogFields::default(),
         );
         for (input, tid, sid) in testcases {
             info.trace_id = None;
