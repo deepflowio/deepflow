@@ -203,7 +203,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 
 	}
 	// format root node
-	rootNode := NewProfileTreeNode("root", "", 0)
+	rootNode := NewProfileTreeNode(args.AppService, "", 0)
 	rootNode.ParentNodeID = "-1"
 	rootNode.TotalValue = rootTotalValue
 
