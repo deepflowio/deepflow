@@ -49,7 +49,7 @@ server_establish_fail       , 建连-服务端失败次数     , 次   ,
 tcp_establish_fail_ratio    , 建连-失败比例           , %    ,
 client_establish_fail_ratio , 建连-客户端失败比例     , %    ,
 server_establish_fail_ratio , 建连-服务端失败比例     , %    ,
-tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输和断连错误。
+tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输错误。
 tcp_transfer_fail_ratio     , 传输-失败比例           , %    ,
 tcp_rst_fail                , 重置次数                , 连接 , 所有重置错误。
 tcp_rst_fail_ratio          , 重置比例                , %    ,
@@ -63,8 +63,8 @@ client_rst_flow             , 传输-客户端重置         , 连接 ,
 server_rst_flow             , 传输-服务端重置         , 连接 ,
 server_queue_lack           , 传输-服务端队列溢出     , 连接 ,
 tcp_timeout                 , 传输-TCP 连接超时       , 连接 ,
-client_half_close_flow      , 断连-客户端半关         , 连接 ,
-server_half_close_flow      , 断连-服务端半关         , 连接 ,
+client_half_close_flow      , 断连-客户端半关         , 连接 , TCP 断连异常的场景之一，见文档描述。
+server_half_close_flow      , 断连-服务端半关         , 连接 , TCP 断连异常的场景之一，见文档描述。
 
 rtt                         , 平均 TCP 建连时延       , 微秒 ,
 tls_rtt                     , 平均 TLS 建连时延       , 微秒 ,

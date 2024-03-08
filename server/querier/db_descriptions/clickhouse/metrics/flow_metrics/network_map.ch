@@ -45,7 +45,7 @@ server_establish_fail       , 建连-服务端失败次数     , 次   ,
 tcp_establish_fail_ratio    , 建连-失败比例           , %    ,
 client_establish_fail_ratio , 建连-客户端失败比例     , %    ,
 server_establish_fail_ratio , 建连-服务端失败比例     , %    ,
-tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输和断连错误。
+tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输错误。
 tcp_transfer_fail_ratio     , 传输-失败比例           , %    ,
 tcp_rst_fail                , 重置次数                , 连接 , 所有重置错误。
 tcp_rst_fail_ratio          , 重置比例                , %    ,
