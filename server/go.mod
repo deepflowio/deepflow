@@ -7,7 +7,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand => ./controller/cloud/kubernetes_gather/expand
 	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand => ./controller/cloud/tencent/expand
-	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table => ./controller/db/mysql/migrator/table
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
@@ -40,7 +40,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000

@@ -34,8 +34,6 @@ import (
 
 var log = logging.MustGetLogger("db.mysql.common")
 
-const SQL_FILE_DIR = "/etc/mysql"
-
 func DropDatabase(db *gorm.DB, database string) error {
 	log.Infof("drop database %s", database)
 	return db.Exec(fmt.Sprintf("DROP DATABASE %s", database)).Error
@@ -57,21 +55,8 @@ func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	}
 }
 
-func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) bool {
-	log.Info("drop database if init tables failed")
-	err := InitTables(db)
-	if err != nil {
-		err := DropDatabase(db, database)
-		if err != nil {
-			log.Errorf("drop database %s failed: %v", database, err)
-		}
-		return false
-	}
-	return true
-}
-
-func InitTables(db *gorm.DB) error {
-	log.Info("init db tables start")
+func InitEETables(db *gorm.DB) error {
+	log.Info("init CE tables start")
 	initSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql file failed: %v", err)
@@ -82,12 +67,15 @@ func InitTables(db *gorm.DB) error {
 		log.Errorf("init db tables failed: %v", err)
 		return err
 	}
-	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
+	log.Info("init CE tables success")
+	return err
+}
+
+func InitDBVersion(db *gorm.DB) error {
+	err := db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
 	if err != nil {
 		log.Errorf("init db version failed: %v", err)
-		return err
 	}
-	log.Info("init db tables success")
 	return err
 }
 
@@ -180,4 +168,9 @@ func list1GreaterList2(strList1, strList2 []string) bool {
 		}
 	}
 	return false
+}
+
+// OrganizationIDToDatabaseName convert organization id to database name, format: 0002_deepflow
+func OrganizationIDToDatabaseName(id int) string {
+	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + DATABASE_SUFFIX
 }

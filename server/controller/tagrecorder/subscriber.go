@@ -71,6 +71,7 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChGProcess(c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
 		NewChPodCluster(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
 		NewChPodGroup(c.resourceTypeToIconID),
 		NewChPodIngress(),
 		NewChPodNode(c.resourceTypeToIconID),
