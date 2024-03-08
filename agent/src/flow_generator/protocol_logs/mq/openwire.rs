@@ -2057,7 +2057,7 @@ impl OpenWireLog {
         if info.msg_type == LogMessageType::Request && !info.response_required {
             info.msg_type = LogMessageType::Session;
             if param.direction == PacketDirection::ServerToClient {
-                info.res_msg_size = info.req_msg_size.take()
+                info.res_msg_size = info.req_msg_size.take();
             }
         }
         if info.command_type == OpenWireCommand::WireFormatInfo {
