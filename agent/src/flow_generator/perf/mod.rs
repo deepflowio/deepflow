@@ -382,8 +382,10 @@ impl FlowLog {
                             packet.lookup_key.direction = PacketDirection::ClientToServer;
                         }
                     } else {
-                        self.server_port = packet.lookup_key.dst_port;
-                        packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        if self.server_port == 0 {
+                            self.server_port = packet.lookup_key.dst_port;
+                            packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        }
                     }
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
