@@ -419,6 +419,27 @@ func (ACL) TableName() string {
 	return "acl"
 }
 
+type GroupACL struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	GroupID int    `gorm:"column:group_id;type:int;not null" json:"GROUP_ID"`
+	ACLID   int    `gorm:"column:acl_id;type:int;not null" json:"ACL_ID"`
+	Lcuuid  string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+}
+
+func (GroupACL) TableName() string {
+	return "group_acl"
+}
+
+type PolicyACLGroup struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ACLIDs string `gorm:"column:acl_ids;type:text;not null" json:"ACL_IDS"` // separated by ,
+	COUNT  int    `gorm:"column:count;type:int;not null" json:"COUNT"`
+}
+
+func (PolicyACLGroup) TableName() string {
+	return "policy_acl_group"
+}
+
 // ResourceGroupExtraInfo [...]
 type ResourceGroupExtraInfo struct {
 	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
