@@ -1306,7 +1306,24 @@ impl FlowMap {
                     },
                 )
             } else {
-                (L7ProtocolEnum::default(), 0, false, 0, None)
+                if meta_packet.signal_source == SignalSource::EBPF {
+                    // server port can be determined by ebpf socket role and l2_end
+                    let server_port =
+                        if meta_packet.socket_role == 1 && meta_packet.lookup_key.l2_end_0 {
+                            meta_packet.lookup_key.dst_port
+                        } else if meta_packet.socket_role == 1 && meta_packet.lookup_key.l2_end_1 {
+                            meta_packet.lookup_key.src_port
+                        } else if meta_packet.socket_role == 2 && meta_packet.lookup_key.l2_end_1 {
+                            meta_packet.lookup_key.dst_port
+                        } else if meta_packet.socket_role == 2 && meta_packet.lookup_key.l2_end_0 {
+                            meta_packet.lookup_key.src_port
+                        } else {
+                            0
+                        };
+                    (L7ProtocolEnum::default(), server_port, false, 0, None)
+                } else {
+                    (L7ProtocolEnum::default(), 0, false, 0, None)
+                }
             };
 
         let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
