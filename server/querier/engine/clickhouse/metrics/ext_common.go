@@ -70,7 +70,7 @@ func GetExtMetrics(db, table, where, queryCacheTTL string, useQueryCache bool, c
 			metricName := fmt.Sprintf("metrics.%s", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
-				"metrics", []bool{true, true, true}, "", tableName, "",
+				"metrics", []bool{true, true, true}, "", tableName, "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
@@ -125,7 +125,7 @@ func GetPrometheusMetrics(db, table, where, queryCacheTTL string, useQueryCache 
 			}
 			lm := NewMetrics(
 				index, metric.DBField, metric.DisplayName, "", metricType,
-				"metrics", []bool{true, true, true}, "", tableName, "",
+				"metrics", []bool{true, true, true}, "", tableName, "", "",
 			)
 			lm.IsAgg = isAgg
 			loadMetrics[strings.Join([]string{field, strconv.Itoa(index)}, "-")] = lm
