@@ -108,8 +108,10 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 		for _, item := range newItems {
 			addItems = append(addItems, item)
 		}
-		if err := tx.Create(&addItems).Error; err != nil {
-			return fmt.Errorf("add data(len:%d) to table(%s) failed, %v", len(newItems), tableName, err)
+		if len(addItems) > 0 {
+			if err := tx.Create(&addItems).Error; err != nil {
+				return fmt.Errorf("add data(len:%d) to table(%s) failed, %v", len(newItems), tableName, err)
+			}
 		}
 		return nil
 	})
