@@ -1278,53 +1278,44 @@ impl FlowMap {
             ebpf will pass the server port to FlowPerf use for adjuest packet direction.
             non ebpf not need this field, FlowPerf::server_port always 0.
         */
-        let (l7_proto_enum, port, is_skip, l7_failed_count, last) =
-            if let Some((proto, port, l7_failed_count, last)) = match meta_packet.signal_source {
-                SignalSource::EBPF => {
-                    let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
-                        (local_epc_id, 0)
-                    } else {
-                        (0, local_epc_id)
-                    };
-                    self.app_table
-                        .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
-                }
-                _ => self
-                    .app_table
-                    .get_protocol(meta_packet)
-                    .map(|(proto, fail_count, last)| (proto, 0u16, fail_count, last)),
-            } {
-                (
-                    proto.clone(),
-                    port,
-                    proto.get_l7_protocol() == L7Protocol::Unknown,
-                    l7_failed_count,
-                    if proto.get_l7_protocol() == L7Protocol::Unknown {
-                        Some(last)
-                    } else {
-                        None
-                    },
-                )
-            } else {
-                if meta_packet.signal_source == SignalSource::EBPF {
-                    // server port can be determined by ebpf socket role and l2_end
-                    let server_port =
-                        if meta_packet.socket_role == 1 && meta_packet.lookup_key.l2_end_0 {
-                            meta_packet.lookup_key.dst_port
-                        } else if meta_packet.socket_role == 1 && meta_packet.lookup_key.l2_end_1 {
-                            meta_packet.lookup_key.src_port
-                        } else if meta_packet.socket_role == 2 && meta_packet.lookup_key.l2_end_1 {
-                            meta_packet.lookup_key.dst_port
-                        } else if meta_packet.socket_role == 2 && meta_packet.lookup_key.l2_end_0 {
-                            meta_packet.lookup_key.src_port
-                        } else {
-                            0
-                        };
-                    (L7ProtocolEnum::default(), server_port, false, 0, None)
+        let (l7_proto_enum, port, is_skip, l7_failed_count, last) = match meta_packet.signal_source
+        {
+            SignalSource::EBPF => {
+                let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
+                    (local_epc_id, 0)
                 } else {
-                    (L7ProtocolEnum::default(), 0, false, 0, None)
-                }
-            };
+                    (0, local_epc_id)
+                };
+                self.app_table
+                    .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
+                    .map(|(proto, port, fail_count, last)| {
+                        let is_skip = proto.get_l7_protocol() == L7Protocol::Unknown;
+                        (proto, port, is_skip, fail_count, is_skip.then_some(last))
+                    })
+                    .unwrap_or_else(|| {
+                        let server_port = match (
+                            meta_packet.socket_role,
+                            meta_packet.lookup_key.l2_end_0,
+                            meta_packet.lookup_key.l2_end_1,
+                        ) {
+                            (1, true, false) => meta_packet.lookup_key.dst_port,
+                            (1, false, true) => meta_packet.lookup_key.src_port,
+                            (2, false, true) => meta_packet.lookup_key.dst_port,
+                            (2, true, false) => meta_packet.lookup_key.src_port,
+                            _ => 0,
+                        };
+                        (L7ProtocolEnum::default(), server_port, false, 0, None)
+                    })
+            }
+            _ => self
+                .app_table
+                .get_protocol(meta_packet)
+                .map(|(proto, fail_count, last)| {
+                    let is_skip = proto.get_l7_protocol() == L7Protocol::Unknown;
+                    (proto, 0u16, is_skip, fail_count, is_skip.then_some(last))
+                })
+                .unwrap_or((L7ProtocolEnum::default(), 0, false, 0, None)),
+        };
 
         let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
             && Self::l4_metrics_enabled(flow_config);
