@@ -319,9 +319,11 @@ impl MongoDBLog {
                     .map_err(|_| Error::L7ProtocolUnknown)?
                     .to_string_lossy()
                     .into_owned();
-                let update = Document::from_reader(&payload[24 + info.exception.len() + 1..])
-                    .unwrap_or(Document::default());
-                info.request = update.to_string();
+                if payload.len() > 24 + info.exception.len() + 1 {
+                    let update = Document::from_reader(&payload[24 + info.exception.len() + 1..])
+                        .unwrap_or(Document::default());
+                    info.request = update.to_string();
+                }
             }
             _OP_INSERT if payload.len() > 20 => {
                 // OP_INSERT
@@ -329,9 +331,11 @@ impl MongoDBLog {
                     .map_err(|_| Error::L7ProtocolUnknown)?
                     .to_string_lossy()
                     .into_owned();
-                let insert = Document::from_reader(&payload[20 + info.exception.len() + 1..])
-                    .unwrap_or(Document::default());
-                info.request = insert.to_string();
+                if payload.len() > 20 + info.exception.len() + 1 {
+                    let insert = Document::from_reader(&payload[20 + info.exception.len() + 1..])
+                        .unwrap_or(Document::default());
+                    info.request = insert.to_string();
+                }
             }
             _OP_QUERY if payload.len() > 28 => {
                 // "OP_QUERY"
@@ -341,11 +345,13 @@ impl MongoDBLog {
                         .to_string_lossy()
                         .into_owned();
 
-                let query = Document::from_reader(
-                    &payload[_QUERY_DOC_OFFSET + collection_name.len() + 1..],
-                )
-                .unwrap_or(Document::default());
-                info.request = query.to_string();
+                if payload.len() > _QUERY_DOC_OFFSET + collection_name.len() + 1 {
+                    let query = Document::from_reader(
+                        &payload[_QUERY_DOC_OFFSET + collection_name.len() + 1..],
+                    )
+                    .unwrap_or(Document::default());
+                    info.request = query.to_string();
+                }
             }
             _OP_GET_MORE | _OP_DELETE if payload.len() > 20 => {
                 // OP_GET_MORE
