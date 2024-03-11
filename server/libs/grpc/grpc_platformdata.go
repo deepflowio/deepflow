@@ -1115,9 +1115,9 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 	t.counter.UpdateServiceTime += serviceTime
 
 	newVersion := response.GetVersionPlatformData()
+	isUnmarshalSuccess := false
 	if newVersion != t.versionPlatformData {
 		platformData := trident.PlatformData{}
-		isUnmarshalSuccess := false
 		if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
 			if err := platformData.Unmarshal(plarformCompressed); err != nil {
 				log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
@@ -1129,7 +1129,6 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 		if isUnmarshalSuccess {
 			log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
 			t.updatePlatformData(&platformData)
-			t.versionPlatformData = newVersion
 			t.otherRegionCount = 0
 		}
 	}
@@ -1137,6 +1136,13 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 	t.counter.UpdatePlatformTime += platformTime
 
 	t.updateOthers(response)
+
+	// the versionPlatformData needs to be updated at the end, otherwise the Slave may have updated the Master's map.
+	//  at this time, updateOthers()->updatePodIps() of Master and QueryPodInfo() of Slave will cause concurrent map write and read panic.
+	if isUnmarshalSuccess {
+		t.versionPlatformData = newVersion
+	}
+
 	return nil
 }
 
