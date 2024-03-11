@@ -382,7 +382,9 @@ impl FlowLog {
                             packet.lookup_key.direction = PacketDirection::ClientToServer;
                         }
                     } else {
-                        if self.server_port == 0 {
+                        // If the `server_port` can not be determined in `FlowMap::init_flow`,
+                        // use the first packet's `dst_port` as `server_port`
+                        if packet.signal_source == SignalSource::EBPF && self.server_port == 0 {
                             self.server_port = packet.lookup_key.dst_port;
                             packet.lookup_key.direction = PacketDirection::ClientToServer;
                         }

@@ -1286,6 +1286,12 @@ impl FlowMap {
                 } else {
                     (0, local_epc_id)
                 };
+                /*
+                    For eBPF, `server_port` is determined in the following order:
+                    1. Look it up in the `app_table` if the protocol parsed before
+                    2. Try to use eBPF `socket_role` and `direction` to determine the `server_port`
+                    3. If all above failed, use the first packet's `dst_port` as `server_port`
+                */
                 self.app_table
                     .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
                     .map(|(proto, port, fail_count, last)| {
