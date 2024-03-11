@@ -1701,6 +1701,7 @@ impl FlowMap {
         self.update_flow_direction(&mut node, meta_packet);
 
         let mut flow = &mut node.tagged_flow.flow;
+        flow.set_tap_side(config.trident_type, config.cloud_gateway_traffic);
         if flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
