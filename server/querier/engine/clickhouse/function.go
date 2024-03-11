@@ -189,7 +189,7 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 			}
 		}
 
-		if condition == "" {
+		if condition == "" && metricStruct.TagType != "int" {
 			condition = dbFields[i] + " != ''"
 			conditions = append(conditions, condition)
 		}
