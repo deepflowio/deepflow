@@ -592,8 +592,12 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 				payloadSlice = *npbPolicy.PayloadSlice
 			}
 			direction := trident.Direction(npbPolicy.Direction)
+			var tunnelID *uint32
+			if npbPolicy.Vni != nil {
+				tunnelID = proto.Uint32(uint32(*npbPolicy.Vni))
+			}
 			npbAction := &trident.NpbAction{
-				TunnelId:      proto.Uint32(uint32(npbPolicy.Vni)),
+				TunnelId:      tunnelID,
 				TunnelIp:      proto.String(npbTunnel.IP),
 				TapSide:       &tapSideSRC,
 				TunnelType:    &tunnelType,
