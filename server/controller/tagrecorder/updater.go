@@ -73,6 +73,7 @@ func (c *UpdaterManager) refresh() {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []Updater{
 		NewChDevice(c.resourceTypeToIconID),
+		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChIPRelation(),
 		NewChPodK8sLabel(),
 		NewChPodK8sLabels(),

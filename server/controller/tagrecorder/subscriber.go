@@ -66,7 +66,6 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChChostCloudTag(),
 		NewChChostCloudTags(),
 		NewChNetwork(c.resourceTypeToIconID),
-		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChChost(),
 		NewChGProcess(c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
