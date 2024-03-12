@@ -390,6 +390,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     fn tcp_seq_offset(&self) -> u32 {
         return 0;
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        0
+    }
 }
 
 impl L7ProtocolInfo {
