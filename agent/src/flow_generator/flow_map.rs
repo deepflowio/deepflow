@@ -1925,6 +1925,8 @@ impl FlowMap {
             if !config.collector_enabled {
                 return;
             }
+            flow.set_tap_side(config.trident_type, config.cloud_gateway_traffic);
+
             let mut l7_stats = L7Stats::default();
             let mut collect_stats = false;
             if flow.flow_key.proto == IpProtocol::TCP
