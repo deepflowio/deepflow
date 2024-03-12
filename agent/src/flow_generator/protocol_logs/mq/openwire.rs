@@ -1735,6 +1735,9 @@ impl L7ProtocolInfoInterface for OpenWireInfo {
     fn get_request_domain(&self) -> String {
         self.broker_url.clone().unwrap_or_default()
     }
+    fn get_endpoint(&self) -> Option<String> {
+        self.topic.clone()
+    }
 }
 
 impl From<OpenWireInfo> for L7ProtocolSendLog {
