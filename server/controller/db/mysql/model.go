@@ -399,10 +399,10 @@ type ACL struct {
 	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	BusinessID   int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	Name         string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	Type         int       `gorm:"column:type;type:int;default:null;default:2" json:"TYPE"`         // 1-epc; 2-custom
-	TapType      int       `gorm:"column:tap_type;type:int;default:null;default:3" json:"TAP_TYPE"` // 1-WAN; 3-LAN
-	State        int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"`       // 0-disable; 1-enable
-	Applications string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"`  // separated by , (1-performance analysis; 2-backpacking; 6-npb)
+	Type         int       `gorm:"column:type;type:int;default:2" json:"TYPE"`                     // 1-epc; 2-custom
+	TapType      int       `gorm:"column:tap_type;type:int;default:3" json:"TAP_TYPE"`             // 1-WAN; 3-LAN
+	State        int       `gorm:"column:state;type:int;default:null;default:0" json:"STATE"`      // 0-disable; 1-enable
+	Applications string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"` // separated by , (1-performance analysis; 2-backpacking; 6-npb)
 	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
 	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
 	DstGroupIDs  string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
@@ -456,12 +456,12 @@ func (ResourceGroupExtraInfo) TableName() string {
 type NpbPolicy struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	State            int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"` // 0-disable; 1-enable
+	State            int       `gorm:"column:state;type:int;default:0" json:"STATE"` // 0-disable; 1-enable
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	Direction        int       `gorm:"column:direction;type:int;default:1" json:"DIRECTION"` // 1-two way; 2-server to client
-	Vni              int       `gorm:"column:vni;type:int;default:null" json:"VNI"`
+	Vni              *int      `gorm:"column:vni;type:int;default:null" json:"VNI"`
 	NpbTunnelID      int       `gorm:"column:npb_tunnel_id;type:int;default:null" json:"NPB_TUNNEL_ID"`
-	Distribute       int       `gorm:"column:distribute;type:int;default:null" json:"distribute"` // 0-drop, 1-distribute
+	Distribute       int       `gorm:"column:distribute;type:int;default:0" json:"distribute"` // 0-drop, 1-distribute
 	PayloadSlice     *int      `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
 	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
@@ -480,7 +480,7 @@ type NpbTunnel struct {
 	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name         string    `gorm:"column:name;type:char(64);not null" json:"NAME"`
 	IP           string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Type         int       `gorm:"column:type;type:int;default:null" json:"TYPE"`                         // (0-VXLAN；1-ERSPAN)
+	Type         int       `gorm:"column:type;type:int;default:0" json:"TYPE"`                            // (0-VXLAN；1-ERSPAN)
 	VNIInputType int       `gorm:"column:vni_input_type;type:tinyint(1);default:1" json:"VNI_INPUT_TYPE"` // 1: entire one, 2: two parts
 	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -495,7 +495,7 @@ func (NpbTunnel) TableName() string {
 type PcapPolicy struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	State            int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"` // 0-disable; 1-enable
+	State            int       `gorm:"column:state;type:int;default:0" json:"STATE"` // 0-disable; 1-enable
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
 	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"` // separated by ,
