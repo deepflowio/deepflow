@@ -45,14 +45,14 @@ server_establish_fail       , 建连-服务端失败次数     , 次   ,
 tcp_establish_fail_ratio    , 建连-失败比例           , %    ,
 client_establish_fail_ratio , 建连-客户端失败比例     , %    ,
 server_establish_fail_ratio , 建连-服务端失败比例     , %    ,
-tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输和断连错误。
+tcp_transfer_fail           , 传输-失败次数           , 次   , 所有传输错误。
 tcp_transfer_fail_ratio     , 传输-失败比例           , %    ,
 tcp_rst_fail                , 重置次数                , 连接 , 所有重置错误。
 tcp_rst_fail_ratio          , 重置比例                , %    ,
 client_source_port_reuse    , 建连-客户端端口复用     , 连接 ,
-client_syn_repeat           , 建连-客户端 SYN 结束    , 连接 ,
+server_syn_miss             , 建连-服务端 SYN 缺失    , 连接 ,
 client_establish_other_rst  , 建连-客户端其他重置     , 连接 ,
-server_syn_ack_repeat       , 建连-服务端 SYN 结束    , 连接 ,
+client_ack_miss             , 建连-客户端 ACK 缺失    , 连接 ,
 server_reset                , 建连-服务端直接重置     , 连接 ,
 server_establish_other_rst  , 建连-服务端其他重置     , 连接 ,
 client_rst_flow             , 传输-客户端重置         , 连接 ,

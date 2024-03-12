@@ -113,6 +113,10 @@ impl L7ProtocolInfoInterface for KafkaInfo {
             Some(self.topic_name.clone())
         }
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.topic_name.len()
+    }
 }
 
 impl KafkaInfo {

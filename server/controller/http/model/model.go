@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-package common
+package model
 
-const (
-	CK_VERSION = "v6.5.1.6" // 用于表示clickhouse的表版本号
-)
+type DatabaseCreate struct {
+	OrganizationID int `json:"ORGANIZATION_ID" binding:"required"`
+}

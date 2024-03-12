@@ -539,8 +539,8 @@ func (a *Performance) WriteBlock(block *ckdb.Block) {
 type Anomaly struct {
 	ClientRstFlow       uint64 `db:"client_rst_flow"`
 	ServerRstFlow       uint64 `db:"server_rst_flow"`
-	ClientSynRepeat     uint64 `db:"client_syn_repeat"`
-	ServerSYNACKRepeat  uint64 `db:"server_syn_ack_repeat"`
+	ServerSynMiss       uint64 `db:"server_syn_miss"`
+	ClientAckMiss       uint64 `db:"client_ack_miss"`
 	ClientHalfCloseFlow uint64 `db:"client_half_close_flow"`
 	ServerHalfCloseFlow uint64 `db:"server_half_close_flow"`
 
@@ -563,8 +563,8 @@ func (_ *Anomaly) Reverse() {
 func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 	p.ClientRstFlow = a.ClientRstFlow
 	p.ServerRstFlow = a.ServerRstFlow
-	p.ClientSynRepeat = a.ClientSynRepeat
-	p.ServerSynackRepeat = a.ServerSYNACKRepeat
+	p.ServerSynMiss = a.ServerSynMiss
+	p.ClientAckMiss = a.ClientAckMiss
 	p.ClientHalfCloseFlow = a.ClientHalfCloseFlow
 	p.ServerHalfCloseFlow = a.ServerHalfCloseFlow
 
@@ -583,8 +583,8 @@ func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.ClientRstFlow = p.ClientRstFlow
 	a.ServerRstFlow = p.ServerRstFlow
-	a.ClientSynRepeat = p.ClientSynRepeat
-	a.ServerSYNACKRepeat = p.ServerSynackRepeat
+	a.ServerSynMiss = p.ServerSynMiss
+	a.ClientAckMiss = p.ClientAckMiss
 	a.ClientHalfCloseFlow = p.ClientHalfCloseFlow
 	a.ServerHalfCloseFlow = p.ServerHalfCloseFlow
 
@@ -603,8 +603,8 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.ClientRstFlow += other.ClientRstFlow
 	a.ServerRstFlow += other.ServerRstFlow
-	a.ClientSynRepeat += other.ClientSynRepeat
-	a.ServerSYNACKRepeat += other.ServerSYNACKRepeat
+	a.ServerSynMiss += other.ServerSynMiss
+	a.ClientAckMiss += other.ClientAckMiss
 	a.ClientHalfCloseFlow += other.ClientHalfCloseFlow
 	a.ServerHalfCloseFlow += other.ServerHalfCloseFlow
 
@@ -627,7 +627,7 @@ func (a *Anomaly) SequentialMerge(other *Anomaly) {
 func (a *Anomaly) MarshalTo(b []byte) int {
 	fields := []string{
 		"client_rst_flow=", "server_rst_flow=",
-		"client_syn_repeat=", "server_syn_ack_repeat=",
+		"server_syn_miss=", "client_ack_miss=",
 		"client_half_close_flow=", "server_half_close_flow=",
 		"client_source_port_reuse=", "server_reset=", "server_queue_lack=",
 		"client_establish_other_rst=", "server_establish_other_rst=",
@@ -635,11 +635,11 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
 		"l7_client_error=", "l7_server_error=", "l7_timeout=", "l7_error=",
 	}
-	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
-	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
+	clientFail := a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
+	serverFail := a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
 	values := []uint64{
 		a.ClientRstFlow, a.ServerRstFlow,
-		a.ClientSynRepeat, a.ServerSYNACKRepeat,
+		a.ServerSynMiss, a.ClientAckMiss,
 		a.ClientHalfCloseFlow, a.ServerHalfCloseFlow,
 		a.ClientSourcePortReuse, a.ServerReset, a.ServerQueueLack,
 		a.ClientEstablishReset, a.ServerEstablishReset,
@@ -654,8 +654,8 @@ const (
 	ANOMALY_CLIENT_RST_FLOW = iota
 	ANOMALY_SERVER_RST_FLOW
 
-	ANOMALY_CLIENT_SYN_REPEAT
-	ANOMALY_SERVER_SYN_ACK_REPEAT
+	ANOMALY_SERVER_SYN_MISS
+	ANOMALY_CLIENT_ACK_MISS
 
 	ANOMALY_CLIENT_HALF_CLOSE_FLOW
 	ANOMALY_SERVER_HALF_CLOSE_FLOW
@@ -690,8 +690,8 @@ func AnomalyColumns() []*ckdb.Column {
 			ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 			ANOMALY_SERVER_RST_FLOW: {"server_rst_flow", "传输-服务端重置"},
 
-			ANOMALY_CLIENT_SYN_REPEAT:     {"client_syn_repeat", "建连-客户端SYN结束"},
-			ANOMALY_SERVER_SYN_ACK_REPEAT: {"server_syn_ack_repeat", "建连-服务端SYN结束"},
+			ANOMALY_SERVER_SYN_MISS: {"server_syn_miss", "建连-服务端 SYN 缺失"},
+			ANOMALY_CLIENT_ACK_MISS: {"client_ack_miss", "建连-客户端 ACK 缺失"},
 
 			ANOMALY_CLIENT_HALF_CLOSE_FLOW: {"client_half_close_flow", "传输-客户端半关"},
 			ANOMALY_SERVER_HALF_CLOSE_FLOW: {"server_half_close_flow", "传输-服务端半关"},
@@ -726,10 +726,10 @@ func AnomalyColumns() []*ckdb.Column {
 
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
 func (a *Anomaly) WriteBlock(block *ckdb.Block) {
-	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
-	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
-	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-客户端半关, 传输-服务端半关, 传输-连接超时次数
-	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.ClientHalfCloseFlow + a.ServerHalfCloseFlow + a.TCPTimeout
+	clientFail := a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
+	serverFail := a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
+	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-连接超时次数
+	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.TCPTimeout
 	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
 	rstFail := a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
 
@@ -737,8 +737,8 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 		a.ClientRstFlow,
 		a.ServerRstFlow,
 
-		a.ClientSynRepeat,
-		a.ServerSYNACKRepeat,
+		a.ServerSynMiss,
+		a.ClientAckMiss,
 
 		a.ClientHalfCloseFlow,
 		a.ServerHalfCloseFlow,

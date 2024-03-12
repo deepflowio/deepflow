@@ -17,71 +17,62 @@
 package tagrecorder
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChVPC struct {
-	UpdaterComponent[mysql.ChVPC, IDKey]
+	SubscriberComponent[*message.VPCFieldsUpdate, message.VPCFieldsUpdate, mysql.VPC, mysql.ChVPC, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
-	updater := &ChVPC{
-		newUpdaterComponent[mysql.ChVPC, IDKey](
-			RESOURCE_TYPE_CH_VPC,
+	mng := &ChVPC{
+		newSubscriberComponent[*message.VPCFieldsUpdate, message.VPCFieldsUpdate, mysql.VPC, mysql.ChVPC, IDKey](
+			common.RESOURCE_TYPE_VPC_EN, RESOURCE_TYPE_CH_VPC,
 		),
 		resourceTypeToIconID,
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
-	var vpcs []mysql.VPC
-	err := mysql.Db.Unscoped().Find(&vpcs).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChVPC) sourceToTarget(source *mysql.VPC) (keys []IDKey, targets []mysql.ChVPC) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_VPC,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChVPC)
-	for _, vpc := range vpcs {
-		if vpc.DeletedAt.Valid {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name + " (deleted)",
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
-			}
-		} else {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name,
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChVPC{
+		ID:     source.ID,
+		Name:   sourceName,
+		UID:    source.UID,
+		IconID: iconID,
+	})
+	return
 }
 
-func (v *ChVPC) generateKey(dbItem mysql.ChVPC) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (v *ChVPC) generateUpdateInfo(oldItem, newItem mysql.ChVPC) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChVPC) onResourceUpdated(sourceID int, fieldsUpdate *message.VPCFieldsUpdate) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
-		updateInfo["icon_id"] = newItem.IconID
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if oldItem.UID != newItem.UID {
-		updateInfo["uid"] = newItem.UID
-	}
+	// if oldItem.IconID != newItem.IconID { // TODO need icon id
+	// 	updateInfo["icon_id"] = newItem.IconID
+	// }
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChVPC
+		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
 	}
-	return nil, false
 }

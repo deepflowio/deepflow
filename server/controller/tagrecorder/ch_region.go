@@ -19,116 +19,63 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChRegion struct {
-	UpdaterComponent[mysql.ChRegion, IDKey]
+	SubscriberComponent[*message.RegionFieldsUpdate, message.RegionFieldsUpdate, mysql.Region, mysql.ChRegion, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChRegion {
-	updater := &ChRegion{
-		newUpdaterComponent[mysql.ChRegion, IDKey](
-			RESOURCE_TYPE_CH_REGION,
+	mng := &ChRegion{
+		newSubscriberComponent[*message.RegionFieldsUpdate, message.RegionFieldsUpdate, mysql.Region, mysql.ChRegion, IDKey](
+			common.RESOURCE_TYPE_REGION_EN, RESOURCE_TYPE_CH_REGION,
 		),
 		domainLcuuidToIconID,
 		resourceTypeToIconID,
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
-	log.Infof("generate data for %s", r.resourceTypeName)
-	var regions []mysql.Region
-	var azs []mysql.AZ
-	var vpcs []mysql.VPC
-	err := mysql.Db.Unscoped().Find(&regions).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Find(&azs).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Find(&vpcs).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChRegion) sourceToTarget(source *mysql.Region) (keys []IDKey, targets []mysql.ChRegion) {
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	regionLcuuidToDomainLcuuids := make(map[string]map[string]bool)
-	for _, az := range azs {
-		_, ok := regionLcuuidToDomainLcuuids[az.Region]
-		if !ok {
-			regionLcuuidToDomainLcuuids[az.Region] = map[string]bool{}
-		}
-		if az.Domain != "" && az.Domain != common.DEFAULT_REGION && az.Region != "" {
-			regionLcuuidToDomainLcuuids[az.Region][az.Domain] = true
-		}
-	}
-	for _, vpc := range vpcs {
-		_, ok := regionLcuuidToDomainLcuuids[vpc.Region]
-		if !ok {
-			regionLcuuidToDomainLcuuids[vpc.Region] = map[string]bool{}
-		}
-		if vpc.Domain != "" && vpc.Domain != common.DEFAULT_REGION && vpc.Region != "" {
-			regionLcuuidToDomainLcuuids[vpc.Region][vpc.Domain] = true
-		}
-	}
-	keyToItem := make(map[IDKey]mysql.ChRegion)
-	for _, region := range regions {
-		domainLcuuids, _ := regionLcuuidToDomainLcuuids[region.Lcuuid]
-		domainIconIDs := []int{}
-		for domainLcuuid, _ := range domainLcuuids {
-			domainIconId := r.domainLcuuidToIconID[domainLcuuid]
-			if domainIconId != 0 {
-				domainIconIDs = append(domainIconIDs, domainIconId)
-			}
-		}
-		var iconID int
-		if len(domainIconIDs) == 1 {
-			iconID = domainIconIDs[0]
-		}
-		// TODO icon id为0，应该不需要特殊处理，可以直接存储？
-		if iconID == 0 {
-			iconID = r.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REGION}]
-		}
+	// TODO require special handling
+	iconId := c.generateIconId(source)
 
-		if region.DeletedAt.Valid {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
-				ID:     region.ID,
-				Name:   region.Name + " (deleted)",
-				IconID: iconID,
-			}
-		} else {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
-				ID:     region.ID,
-				Name:   region.Name,
-				IconID: iconID,
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChRegion{
+		ID:     source.ID,
+		Name:   sourceName,
+		IconID: iconId,
+	})
+	return
 }
 
-func (r *ChRegion) generateKey(dbItem mysql.ChRegion) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (r *ChRegion) generateUpdateInfo(oldItem, newItem mysql.ChRegion) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChRegion) onResourceUpdated(sourceID int, fieldsUpdate *message.RegionFieldsUpdate) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
-		updateInfo["icon_id"] = newItem.IconID
-	}
+	// if oldItem.IconID != newItem.IconID { // TODO need icon id
+	// 	updateInfo["icon_id"] = newItem.IconID
+	// }
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChRegion
+		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
 	}
-	return nil, false
+}
+
+// TODO
+func (c *ChRegion) generateIconId(source *mysql.Region) int {
+	return c.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REGION}]
 }

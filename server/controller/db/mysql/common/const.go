@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +16,8 @@
 
 package common
 
+const SQL_FILE_DIR = "/etc/mysql"
 const (
-	CK_VERSION = "v6.5.1.6" // 用于表示clickhouse的表版本号
+	DATABASE_SUFFIX           = "_deepflow"
+	DATABASE_PREFIX_ALIGNMENT = "%04d"
 )

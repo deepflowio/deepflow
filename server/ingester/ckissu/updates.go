@@ -233,6 +233,16 @@ var ColumnRename65 = []*ColumnRenames{
 		NewColumnNames: []string{"agent_id", "capture_network_type_id", "observation_point", "capture_nic", "capture_nic_type"},
 		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16, ckdb.UInt8, ckdb.LowCardinalityString, ckdb.UInt32, ckdb.UInt8},
 	},
+	{
+		Db: "flow_metrics",
+		Tables: []string{
+			"network.1m_local", "network.1s_local", "network.1m", "network.1s",
+			"network_map.1m_local", "network_map.1s_local", "network_map.1m", "network_map.1s",
+		},
+		OldColumnNames: []string{"client_syn_repeat", "server_syn_ack_repeat"},
+		NewColumnNames: []string{"server_syn_miss", "client_ack_miss"},
+		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt64, ckdb.UInt64},
+	},
 }
 
 var ColumnDatasourceAdd65 = []*ColumnDatasourceAdds{

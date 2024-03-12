@@ -60,12 +60,12 @@ func TestMarshalFlowMeter(t *testing.T) {
 			ClosedFlow: 7,
 		},
 		Anomaly: Anomaly{
-			ClientRstFlow:      1,
-			ServerSYNACKRepeat: 1,
+			ClientRstFlow: 1,
+			ClientAckMiss: 1,
 		},
 	}
 	l = m3.MarshalTo(buffer[:])
-	expected := "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i,server_establish_fail=1i,tcp_establish_fail=1i"
+	expected := "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,client_ack_miss=1i,server_establish_fail=1i,tcp_establish_fail=1i"
 	if string(buffer[:l]) != expected {
 		t.Error("MarshalTo()实现不正确", "\nactual is:", string(buffer[:l]), "\nexpected is:", expected)
 	}

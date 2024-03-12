@@ -194,8 +194,8 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host
 | ------------------------| ------------------------------------- | ------------ | ---- |
 | client_rst_flow         | close_type: client other reset        | 1m, 1s       | 个   |
 | server_rst_flow         | close_type: server other reset        | 1m, 1s       | 个   |
-| client_syn_repeat       | close_type: client syn repeat         | 1m, 1s       | 个   |
-| server_syn_ack_repeat   | close_type: server syn/ack repeat     | 1m, 1s       | 个   |
+| server_syn_miss         | close_type: server syn miss           | 1m, 1s       | 个   |
+| client_ack_miss         | close_type: client ack miss           | 1m, 1s       | 个   |
 | client_half_close_flow  | close_type: client half close         | 1m, 1s       | 个   |
 | server_half_close_flow  | close_type: server half close         | 1m, 1s       | 个   |
 | client_source_port_reuse| close_type: client source port reuse  | 1m, 1s       | 个   |
