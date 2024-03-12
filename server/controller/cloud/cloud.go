@@ -248,6 +248,9 @@ func (c *Cloud) getCloudData() {
 
 	cResource.SyncAt = time.Now()
 	c.resource = cResource
+	if cResource.ErrorState == common.RESOURCE_STATE_CODE_EXCEPTION {
+		return
+	}
 	c.sendStatsd(cloudCost)
 }
 
