@@ -634,6 +634,17 @@ vtap_group_id: g-xxxxxx
   ## Format: $number$time_unit
   ## Example: 1s, 2m, 10h
   #l7-log-session-aggr-timeout: 120s
+  
+  ## The capacity of each l7_flow_log session slot
+  ## Default: 1024. Range: [1024, +oo)
+  ## If the number of data cached by session slot exceeds it's capacity,
+  ## the following impact will have:
+  ## - l7_flow_log cannot be aggregated into session, and flush l7_flow_log will be forced to lose data.
+  ## - Indicator: deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource 
+  ##   is used to record the cache request-resource occupation space, the unit is B
+  ## - Indicator: deepflow_system.deepflow_agent_l7_session_aggr.over-limit 
+  ##   is used to record the number of logs that exceed the limit to the forced flush
+  #l7-log-session-slot-capacity: 1024
 
   ##########
   ## PCAP ##

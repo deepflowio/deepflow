@@ -462,6 +462,7 @@ impl fmt::Debug for FlowConfig {
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub l7_log_dynamic: L7LogDynamicConfig,
 }
 
@@ -991,6 +992,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
+                l7_log_session_slot_capacity: conf.yaml_config.l7_log_session_slot_capacity,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
                     conf.http_log_x_request_id.to_string().to_ascii_lowercase(),

@@ -69,6 +69,7 @@ type StaticConfig struct {
 	IngressFlavour                   *string                `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                   `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout          *string                `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
+	L7LogSessionQueueSize            *int                   `yaml:"l7-log-session-queue-size,omitempty"`
 	TapMacScript                     *string                `yaml:"tap-mac-script,omitempty"`
 	BpfDisabled                      *bool                  `yaml:"bpf-disabled,omitempty"`
 	L7ProtocolInferenceMaxFailCount  *uint64                `yaml:"l7-protocol-inference-max-fail-count,omitempty"`

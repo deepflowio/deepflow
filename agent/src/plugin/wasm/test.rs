@@ -141,6 +141,7 @@ fn test_wasm_http_req() {
         l7_log_collect_nps_threshold: 0,
         l7_log_session_aggr_timeout: Duration::ZERO,
         l7_log_dynamic: L7LogDynamicConfig::default(),
+        l7_log_session_slot_capacity: 1024,
     };
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
@@ -200,6 +201,7 @@ fn test_wasm_http_resp() {
         l7_log_collect_nps_threshold: 0,
         l7_log_session_aggr_timeout: Duration::ZERO,
         l7_log_dynamic: L7LogDynamicConfig::default(),
+        l7_log_session_slot_capacity: 1024,
     };
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
