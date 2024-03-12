@@ -381,13 +381,15 @@ impl FlowLog {
                         } else {
                             packet.lookup_key.direction = PacketDirection::ClientToServer;
                         }
-                    } else {
-                        // If the `server_port` can not be determined in `FlowMap::init_flow`,
-                        // use the first packet's `dst_port` as `server_port`
-                        if packet.signal_source == SignalSource::EBPF && self.server_port == 0 {
-                            self.server_port = packet.lookup_key.dst_port;
-                            packet.lookup_key.direction = PacketDirection::ClientToServer;
-                        }
+                    } else if packet.signal_source != SignalSource::EBPF || self.server_port == 0 {
+                        /*
+                            1. non-eBPF: Set the first packet's `dst_port` as `server_port` and
+                                its direction as c2s.
+                            2. eBPF: If the `server_port` can not be determined in `FlowMap::init_flow`,
+                                use the first packet's `dst_port` as `server_port`.
+                        */
+                        self.server_port = packet.lookup_key.dst_port;
+                        packet.lookup_key.direction = PacketDirection::ClientToServer;
                     }
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
