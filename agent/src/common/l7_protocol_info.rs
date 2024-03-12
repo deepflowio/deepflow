@@ -417,6 +417,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     fn get_request_domain(&self) -> String {
         String::default()
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        0
+    }
 }
 
 impl L7ProtocolInfo {

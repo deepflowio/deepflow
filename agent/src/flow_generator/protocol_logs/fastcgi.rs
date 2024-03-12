@@ -139,6 +139,10 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
     fn get_endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
+    }
 }
 
 impl FastCGIInfo {
