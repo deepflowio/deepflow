@@ -18,7 +18,7 @@
 use std::mem::swap;
 use std::{
     cmp::min,
-    collections::HashMap,
+    num::NonZeroUsize,
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc, Mutex,
@@ -30,6 +30,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{info, warn};
+use lru::LruCache;
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::{
@@ -189,8 +190,10 @@ pub struct SessionAggrCounter {
     send_before_window: AtomicU64,
     receive: AtomicU64,
     merge: AtomicU64,
-    cached: AtomicU64,
+    cached: AtomicU64, // It is used to record the number of logs that exist in session queue
+    cached_request_resource: AtomicU64, // It is used to record the cache request-resource occupation space, the unit is B
     throttle_drop: AtomicU64,
+    over_limit: AtomicU64, // It is used to record the number of logs that exceed the limit to the forced flush
 }
 
 // FIXME: counter not registered
@@ -218,9 +221,19 @@ impl RefCountable for SessionAggrCounter {
                 CounterValue::Unsigned(self.cached.load(Ordering::Relaxed)),
             ),
             (
+                "cached-request-resource",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.cached_request_resource.load(Ordering::Relaxed)),
+            ),
+            (
                 "throttle-drop",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.throttle_drop.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "over-limit",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.over_limit.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -281,7 +294,8 @@ struct SessionQueue {
     last_flush_time: Duration,
 
     window_size: usize,
-    time_window: Option<Vec<HashMap<u64, Box<AppProtoLogsData>>>>,
+    l7_log_session_slot_capacity: usize,
+    time_window: Option<Vec<LruCache<u64, Box<AppProtoLogsData>>>>,
 
     throttle: Throttle,
 
@@ -298,10 +312,14 @@ impl SessionQueue {
         config: LogParserAccess,
         ntp_diff: Arc<AtomicI64>,
     ) -> Self {
+        let conf = config.load();
         //l7_log_session_timeout 20s-300s ，window_size = 4-60，所以 SessionQueue.time_window 预分配内存
-        let window_size =
-            (config.load().l7_log_session_aggr_timeout.as_secs() / SLOT_WIDTH) as usize;
-        let time_window = vec![HashMap::new(); window_size];
+        let window_size = (conf.l7_log_session_aggr_timeout.as_secs() / SLOT_WIDTH) as usize;
+        let slot_capacity = conf.l7_log_session_slot_capacity;
+        let mut time_window = Vec::new();
+        for _ in 0..window_size {
+            time_window.push(LruCache::new(NonZeroUsize::new(slot_capacity).unwrap()));
+        }
         let throttle = Throttle::new(config.clone(), SLOT_WIDTH);
         Self {
             aggregate_start_time: Duration::ZERO,
@@ -310,6 +328,7 @@ impl SessionQueue {
             config,
             ntp_diff,
             window_size,
+            l7_log_session_slot_capacity: slot_capacity,
 
             throttle,
 
@@ -383,20 +402,21 @@ impl SessionQueue {
             return;
         }
 
-        let mut slot = ((slot_time - self.aggregate_start_time.as_secs()) / SLOT_WIDTH) as usize;
+        let mut slot_index =
+            ((slot_time - self.aggregate_start_time.as_secs()) / SLOT_WIDTH) as usize;
         let mut time_window = match self.time_window.take() {
             Some(t) => t,
             None => return,
         };
         // 使time window维持在固定的长度
-        if slot >= self.window_size {
+        if slot_index >= self.window_size {
             // flush过期的几个slot的数据
-            self.flush_window(slot - self.window_size + 1, &mut time_window);
-            slot = self.window_size - 1;
+            self.flush_window(slot_index - self.window_size + 1, &mut time_window);
+            slot_index = self.window_size - 1;
         }
 
         // 因为数组提前分配hashmap, slot < self.window_size 所以必然存在
-        let map = time_window.get_mut(slot).unwrap();
+        let slot = time_window.get_mut(slot_index).unwrap();
         let key = if item.base_info.signal_source == SignalSource::EBPF {
             // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
             item.ebpf_flow_session_id()
@@ -405,10 +425,10 @@ impl SessionQueue {
         };
         match item.base_info.head.msg_type {
             LogMessageType::Request => {
-                self.on_request_log(map, item, key);
+                self.on_request_log(slot, item, key);
             }
             LogMessageType::Response => {
-                self.on_response_log(map, item, key);
+                self.on_response_log(slot, item, key);
             }
             LogMessageType::Session => self.send(item),
             _ => (),
@@ -419,24 +439,32 @@ impl SessionQueue {
 
     fn on_request_log(
         &mut self,
-        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
+        slot: &mut LruCache<u64, Box<AppProtoLogsData>>,
         mut item: Box<AppProtoLogsData>,
         key: u64,
     ) {
-        if let Some(mut p) = map.remove(&key) {
+        if let Some(mut p) = slot.pop(&key) {
             if item.need_protocol_merge() {
                 let _ = p.session_merge(*item);
                 if p.special_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.counter.cached_request_resource.fetch_sub(
+                        p.special_info.get_request_resource_length() as u64,
+                        Ordering::Relaxed,
+                    );
                     self.send(p);
                 } else {
-                    map.insert(key, p);
+                    slot.put(key, p);
                 }
             } else {
                 // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
                 // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
                 if p.is_response() && p.base_info.start_time > item.base_info.start_time {
                     // if can not merge, send req and resp directly.
+                    self.counter.cached_request_resource.fetch_sub(
+                        p.special_info.get_request_resource_length() as u64,
+                        Ordering::Relaxed,
+                    );
                     if let Err(L7LogCanNotMerge(p)) = item.session_merge(*p) {
                         self.send(Box::new(p));
                     }
@@ -447,10 +475,18 @@ impl SessionQueue {
                     // If p is req or resp time lt req time, p is not item corresponding response, send the earlier log and save the later log
                     if p.base_info.start_time > item.base_info.start_time {
                         self.send(item);
-                        map.insert(key, p);
+                        slot.put(key, p);
                     } else {
+                        self.counter.cached_request_resource.fetch_sub(
+                            p.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
                         self.send(p);
-                        map.insert(key, item);
+                        self.counter.cached_request_resource.fetch_add(
+                            item.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
+                        slot.put(key, item);
                     }
                 }
             }
@@ -462,34 +498,51 @@ impl SessionQueue {
                     return;
                 }
             }
-
-            if self.counter.cached.load(Ordering::Relaxed)
-                >= self.window_size as u64 * SLOT_CACHED_COUNT
-            {
-                self.send(item); // Prevent too many logs from being cached
-            } else {
-                map.insert(key, item);
-                self.counter.cached.fetch_add(1, Ordering::Relaxed);
+            self.counter.cached_request_resource.fetch_add(
+                item.special_info.get_request_resource_length() as u64,
+                Ordering::Relaxed,
+            );
+            if slot.len() >= self.l7_log_session_slot_capacity {
+                let flush_size = (self.l7_log_session_slot_capacity / 10) as u64;
+                // Prevent too many logs from being cached
+                for _ in 0..flush_size {
+                    if let Some((_, p)) = slot.pop_lru() {
+                        self.counter.cached_request_resource.fetch_sub(
+                            p.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
+                        self.send(p);
+                    }
+                }
+                self.counter.cached.fetch_sub(flush_size, Ordering::Relaxed);
+                self.counter.over_limit.fetch_add(1, Ordering::Relaxed);
             }
+            self.counter.cached.fetch_add(1, Ordering::Relaxed);
+
+            slot.put(key, item);
         }
     }
 
     fn on_response_log(
         &mut self,
-        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
+        slot: &mut LruCache<u64, Box<AppProtoLogsData>>,
         item: Box<AppProtoLogsData>,
         key: u64,
     ) {
         // response, 需要找到request并merge
-        if let Some(mut p) = map.remove(&key) {
+        if let Some(mut p) = slot.pop(&key) {
             if item.need_protocol_merge() {
                 let _ = p.session_merge(*item);
 
                 if p.special_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.counter.cached_request_resource.fetch_sub(
+                        p.special_info.get_request_resource_length() as u64,
+                        Ordering::Relaxed,
+                    );
                     self.send(p);
                 } else {
-                    map.insert(key, p);
+                    slot.put(key, p);
                 }
             } else {
                 if p.is_request() && item.base_info.start_time > p.base_info.start_time {
@@ -497,17 +550,29 @@ impl SessionQueue {
                     if let Err(L7LogCanNotMerge(item)) = p.session_merge(*item) {
                         self.send(Box::new(item));
                     }
+                    self.counter.cached_request_resource.fetch_sub(
+                        p.special_info.get_request_resource_length() as u64,
+                        Ordering::Relaxed,
+                    );
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
                     self.send(p);
                 } else {
                     // If p is resp or resp time lt req time, p is not the item corresponding req, send the earlier log and save the later log
                     if p.base_info.start_time < item.base_info.start_time {
+                        self.counter.cached_request_resource.fetch_sub(
+                            p.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
                         self.send(p);
-                        map.insert(key, item);
+                        self.counter.cached_request_resource.fetch_add(
+                            item.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
+                        slot.put(key, item);
                     } else {
                         self.send(item);
-                        map.insert(key, p);
+                        slot.put(key, p);
                     }
                 }
             }
@@ -521,14 +586,27 @@ impl SessionQueue {
                 }
             }
 
-            if self.counter.cached.load(Ordering::Relaxed)
-                >= self.window_size as u64 * SLOT_CACHED_COUNT
-            {
-                self.send(item); // Prevent too many logs from being cached
-            } else {
-                map.insert(key, item);
-                self.counter.cached.fetch_add(1, Ordering::Relaxed);
+            self.counter.cached_request_resource.fetch_add(
+                item.special_info.get_request_resource_length() as u64,
+                Ordering::Relaxed,
+            );
+            if slot.len() >= self.l7_log_session_slot_capacity {
+                let flush_size = (self.l7_log_session_slot_capacity / 10) as u64;
+                // Prevent too many logs from being cached
+                for _ in 0..flush_size {
+                    if let Some((_, p)) = slot.pop_lru() {
+                        self.counter.cached_request_resource.fetch_sub(
+                            p.special_info.get_request_resource_length() as u64,
+                            Ordering::Relaxed,
+                        );
+                        self.send(p);
+                    }
+                }
+                self.counter.cached.fetch_sub(flush_size, Ordering::Relaxed);
+                self.counter.over_limit.fetch_add(1, Ordering::Relaxed);
             }
+            self.counter.cached.fetch_add(1, Ordering::Relaxed);
+            slot.put(key, item);
         }
     }
 
@@ -538,11 +616,11 @@ impl SessionQueue {
             None => return,
         };
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
-        'outer: for map in time_window.drain(..) {
+        'outer: for mut slot in time_window.drain(..) {
             self.counter
                 .cached
-                .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            for item in map.into_values() {
+                .fetch_sub(slot.len() as u64, Ordering::Relaxed);
+            while let Some((_, item)) = slot.pop_lru() {
                 if batch.len() >= QUEUE_BATCH_SIZE {
                     if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                         warn!("output queue terminated");
@@ -550,8 +628,14 @@ impl SessionQueue {
                         break 'outer;
                     }
                 }
+                self.counter.cached_request_resource.fetch_sub(
+                    item.special_info.get_request_resource_length() as u64,
+                    Ordering::Relaxed,
+                );
                 batch.push(BoxAppProtoLogsData(item));
             }
+            // shrink
+            slot.resize(NonZeroUsize::new(self.l7_log_session_slot_capacity).unwrap());
         }
         if !batch.is_empty() {
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
@@ -577,16 +661,23 @@ impl SessionQueue {
     fn flush_window(
         &mut self,
         n: usize,
-        time_window: &mut Vec<HashMap<u64, Box<AppProtoLogsData>>>,
+        time_window: &mut Vec<LruCache<u64, Box<AppProtoLogsData>>>,
     ) {
         let delete_num = min(n, self.window_size);
         for i in 0..delete_num {
-            let map = time_window.get_mut(i).unwrap();
+            let slot = time_window.get_mut(i).unwrap();
             self.counter
                 .cached
-                .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            self.send_all(map.drain().map(|(_, item)| item).collect());
-            map.shrink_to_fit();
+                .fetch_sub(slot.len() as u64, Ordering::Relaxed);
+            while let Some((_, item)) = slot.pop_lru() {
+                self.counter.cached_request_resource.fetch_sub(
+                    item.special_info.get_request_resource_length() as u64,
+                    Ordering::Relaxed,
+                );
+                self.send(item);
+            }
+            // shrink
+            slot.resize(NonZeroUsize::new(self.l7_log_session_slot_capacity).unwrap());
         }
         let mut maps = time_window.drain(0..delete_num).collect();
         time_window.append(&mut maps);

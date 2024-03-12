@@ -224,6 +224,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn tcp_seq_offset(&self) -> u32 {
         self.headers_offset
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
+    }
 }
 
 impl HttpInfo {

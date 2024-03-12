@@ -149,6 +149,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
             None
         }
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.method_name.len()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
