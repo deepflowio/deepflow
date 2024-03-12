@@ -94,6 +94,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.context.len()
+    }
 }
 
 impl MysqlInfo {

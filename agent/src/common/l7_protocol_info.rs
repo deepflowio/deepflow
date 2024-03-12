@@ -175,8 +175,8 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
                     f.l7_timeout_cache_len
                         .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
-
                 });
+
                 return None;
             };
 
@@ -269,6 +269,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             error!("flow_id: {}, packet time 0", param.flow_id);
             None
         }
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        0
     }
 }
 

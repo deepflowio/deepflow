@@ -509,7 +509,8 @@ impl FlowMap {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = self.new_flow_node(config, meta_packet);
                     if let Some(node) = node {
-                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                            .insert(pkt_key);
                         nodes.push(node);
                         max_depth += 1;
                     }
@@ -1983,6 +1984,7 @@ pub fn _new_flow_map_and_receiver(
             l7_log_collect_nps_threshold: 0,
             l7_log_session_aggr_timeout: Duration::new(0, 0),
             l7_log_dynamic: L7LogDynamicConfig::default(),
+            l7_log_session_slot_capacity: 1024,
         },
         ..Default::default()
     };

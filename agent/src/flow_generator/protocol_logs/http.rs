@@ -139,6 +139,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn is_req_resp_end(&self) -> (bool, bool) {
         (self.is_req_end, self.is_resp_end)
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
+    }
 }
 
 impl HttpInfo {
@@ -1240,6 +1244,7 @@ mod tests {
             l7_log_collect_nps_threshold: 10,
             l7_log_session_aggr_timeout: Duration::from_secs(10),
             l7_log_dynamic: config,
+            l7_log_session_slot_capacity: 1024,
         };
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
@@ -1325,6 +1330,7 @@ mod tests {
             l7_log_collect_nps_threshold: 0,
             l7_log_session_aggr_timeout: Duration::default(),
             l7_log_dynamic: L7LogDynamicConfig::default(),
+            l7_log_session_slot_capacity: 1024,
         };
         let param = &ParseParam {
             l4_protocol: IpProtocol::Tcp,
@@ -1515,6 +1521,7 @@ mod tests {
             l7_log_collect_nps_threshold: 0,
             l7_log_session_aggr_timeout: Duration::ZERO,
             l7_log_dynamic: L7LogDynamicConfig::default(),
+            l7_log_session_slot_capacity: 1024,
         };
 
         for packet in packets.iter_mut() {

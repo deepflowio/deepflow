@@ -119,6 +119,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.method_name.len()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
@@ -639,6 +643,7 @@ mod tests {
                         TraceType::Sw8,
                     ],
                 ),
+                l7_log_session_slot_capacity: 1024,
             };
             let mut dubbo = DubboLog::default();
             let param =
@@ -720,6 +725,7 @@ mod tests {
                     TraceType::Sw8,
                 ],
             ),
+            l7_log_session_slot_capacity: 1024,
         };
 
         let first_dst_port = packets[0].lookup_key.dst_port;
