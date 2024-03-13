@@ -22,6 +22,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -74,7 +75,10 @@ func (c *ControllerCheck) Start() {
 	go func() {
 		for {
 			excludeIP := <-c.ch
-			c.vtapControllerAlloc(excludeIP)
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				c.vtapControllerAlloc(db, excludeIP)
+				return nil
+			})
 			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
@@ -143,7 +147,9 @@ func (c *ControllerCheck) healthCheck() {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					if c.exceptionControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionControllerDict, controller.IP)
-						mysql.Db.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION)
+						mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+							return db.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION).Error
+						})
 						exceptionIPs = append(exceptionIPs, controller.IP)
 						log.Infof("set controller (%s) state to exception", controller.IP)
 						// 根据exceptionIP，重新分配对应采集器的控制器
@@ -164,7 +170,9 @@ func (c *ControllerCheck) healthCheck() {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
 					if c.normalControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalControllerDict, controller.IP)
-						mysql.Db.Model(&controller).Update("state", common.HOST_STATE_COMPLETE)
+						mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+							return db.Model(&controller).Update("state", common.HOST_STATE_COMPLETE).Error
+						})
 						log.Infof("set controller (%s) state to normal", controller.IP)
 						delete(checkExceptionControllers, controller.IP)
 					}
@@ -185,8 +193,12 @@ func (c *ControllerCheck) healthCheck() {
 	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			mysql.Db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip)
-			err := mysql.Db.Delete(mysql.Controller{}, "ip = ?", ip).Error
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip).Error
+			})
+			err := mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Delete(mysql.Controller{}, "ip = ?", ip).Error
+			})
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
 			} else {
@@ -221,7 +233,9 @@ func (c *ControllerCheck) vtapControllerCheck() {
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
 			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name)
 			vtap.ControllerIP = ""
-			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "")
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error
+			})
 		}
 
 		if vtap.ControllerIP == "" {
@@ -229,7 +243,9 @@ func (c *ControllerCheck) vtapControllerCheck() {
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 			// 检查是否存在已分配控制器，但异常未清除的采集器
 			exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-			mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Model(&vtap).Update("exceptions", exceptions).Error
+			})
 		}
 	}
 	// 如果存在没有控制器的采集器，触发控制器重新分配
@@ -239,7 +255,7 @@ func (c *ControllerCheck) vtapControllerCheck() {
 	log.Info("vtap controller check end")
 }
 
-func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
+func (c *ControllerCheck) vtapControllerAlloc(db *gorm.DB, excludeIP string) {
 	var vtaps []mysql.VTap
 	var controllers []mysql.Controller
 	var azs []mysql.AZ
@@ -247,8 +263,8 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 
 	log.Info("vtap controller alloc start")
 
-	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
-	mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
+	db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取控制器当前已分配的采集器个数
@@ -273,7 +289,7 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 	}
 
 	// 根据可用区查询region信息
-	mysql.Db.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
+	db.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
 	regionToAZLcuuids := make(map[string][]string)
 	regionLcuuids := mapset.NewSet()
 	for _, az := range azs {
@@ -282,7 +298,7 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 	}
 
 	// 获取可用区中的控制器IP
-	mysql.Db.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azControllerConns)
+	db.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azControllerConns)
 	azToControllerIPs := make(map[string][]string)
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
@@ -316,7 +332,7 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 			if len(controllerAvailableVTapNum) == 0 {
 				log.Warningf("no available controller for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				db.Model(&vtap).Update("exceptions", exceptions)
 				continue
 			}
 			sort.Slice(controllerAvailableVTapNum, func(i, j int) bool {
@@ -334,10 +350,10 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
 			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
+			db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				db.Model(&vtap).Update("exceptions", exceptions)
 			}
 		}
 	}
@@ -357,14 +373,23 @@ func (c *ControllerCheck) azConnectionCheck() {
 	}
 
 	mysql.Db.Find(&azControllerConns)
+	var delConns []mysql.AZControllerConnection
+	var delControllerIP, delAZName []string
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
 			continue
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
-			mysql.Db.Delete(&conn)
-			log.Infof("delete controller (%s) az (%s) connection", conn.ControllerIP, name)
+			delConns = append(delConns, conn)
+			delControllerIP = append(delControllerIP, conn.ControllerIP)
+			delAZName = append(delAZName, name)
 		}
+	}
+	mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+		return db.Delete(&delConns).Error
+	})
+	for i, ip := range delControllerIP {
+		log.Infof("delete controller (%s) az (%s) connection", ip, delAZName[i])
 	}
 	log.Info("az connection check end")
 }
@@ -375,7 +400,9 @@ func (c *ControllerCheck) cleanExceptionControllerData(controllerIPs []string) {
 	}
 
 	// delete genesis vinterface on invalid controller
-	err := mysql.Db.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisVinterface{}).Error
+	err := mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+		return db.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisVinterface{}).Error
+	})
 	if err != nil {
 		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err)
 	} else {

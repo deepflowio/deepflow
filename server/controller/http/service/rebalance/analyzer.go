@@ -17,13 +17,15 @@
 package rebalance
 
 import (
+	"gorm.io/gorm"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 // //go:generate mockgen -source=analyzer.go -destination=./mocks/mock_analyzer.go -package=mocks DB
 type DB interface {
-	Get() error
+	Get(db *gorm.DB) error
 }
 
 type DBInfo struct {
@@ -52,24 +54,24 @@ func NewAnalyzerInfo() *AnalyzerInfo {
 	}
 }
 
-func (r *DBInfo) Get() error {
-	if err := mysql.Db.Find(&r.AZs).Error; err != nil {
+func (r *DBInfo) Get(db *gorm.DB) error {
+	if err := db.Find(&r.AZs).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.Analyzers).Error; err != nil {
+	if err := db.Find(&r.Analyzers).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.AZAnalyzerConns).Error; err != nil {
+	if err := db.Find(&r.AZAnalyzerConns).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&r.VTaps).Error; err != nil {
+	if err := db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&r.VTaps).Error; err != nil {
 		return err
 	}
 
-	if err := mysql.Db.Find(&r.Controllers).Error; err != nil {
+	if err := db.Find(&r.Controllers).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.AZControllerConns).Error; err != nil {
+	if err := db.Find(&r.AZControllerConns).Error; err != nil {
 		return err
 	}
 	return nil

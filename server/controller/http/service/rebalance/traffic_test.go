@@ -311,7 +311,7 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 				vtaps:           tt.fields.vtaps,
 				analyzers:       tt.fields.analyzers,
 			}
-			got, got1 := p.rebalanceAnalyzer(tt.arg.ifCheck)
+			got, got1 := p.rebalanceAnalyzer(nil, tt.arg.ifCheck)
 			if !tt.isAllNewVTaps {
 				assert.EqualValues(t, tt.want, got)
 			}

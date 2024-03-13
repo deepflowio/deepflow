@@ -21,7 +21,10 @@ import (
 	"encoding/json"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
@@ -135,15 +138,20 @@ func (r *RebalanceCheck) analyzerRebalance() {
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 	log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration)
+	var db *gorm.DB
+	for _, item := range mysql.DBMap.GetDBMap() {
+		db = item
+		break
+	}
 	analyzerInfo := rebalance.NewAnalyzerInfo()
-	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
+	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
 	if err != nil {
 		log.Errorf("fail to rebalance analyzer by data(if check: true): %v", err)
 		return
 	}
 	if result.TotalSwitchVTapNum != 0 {
 		log.Infof("need rebalance, total switch vtap num(%d)", result.TotalSwitchVTapNum)
-		if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration); err != nil {
+		if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, false, dataDuration); err != nil {
 			log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
 		}
 		return

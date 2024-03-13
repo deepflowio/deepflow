@@ -22,6 +22,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -76,9 +77,15 @@ func (c *AnalyzerCheck) Start() {
 			excludeIPs := <-c.ch
 
 			if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-				c.vtapAnalyzerAlloc(excludeIPs)
+				mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+					c.vtapAnalyzerAlloc(db, excludeIPs)
+					return nil
+				})
 			} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-				rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(false, cfg.DataDuration)
+				mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+					_, err := rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(db, false, cfg.DataDuration)
+					return err
+				})
 			} else {
 				log.Errorf("algorithm(%s) is not supported, only supports: %s, %s", cfg.Algorithm,
 					common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
@@ -141,7 +148,9 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					if c.exceptionAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionAnalyzerDict, analyzer.IP)
-						mysql.Db.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION)
+						mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+							return db.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION).Error
+						})
 						exceptionIPs = append(exceptionIPs, analyzer.IP)
 						log.Infof("set analyzer (%s) state to exception", analyzer.IP)
 						// 根据exceptionIP，重新分配对应采集器的数据节点
@@ -162,7 +171,9 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {
 					if c.normalAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalAnalyzerDict, analyzer.IP)
-						mysql.Db.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE)
+						mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+							return db.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE).Error
+						})
 						log.Infof("set analyzer (%s) state to normal", analyzer.IP)
 						delete(checkExceptionAnalyzers, analyzer.IP)
 					}
@@ -181,8 +192,12 @@ func (c *AnalyzerCheck) healthCheck() {
 	}
 	for ip, dfhostCheck := range checkExceptionAnalyzers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			mysql.Db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip)
-			err := mysql.Db.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip).Error
+			})
+			err := mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
+			})
 			if err != nil {
 				log.Errorf("delete analyzer(%s) failed, err:%s", ip, err)
 			} else {
@@ -215,7 +230,9 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
 			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name)
 			vtap.AnalyzerIP = ""
-			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "").Error
+			})
 		}
 
 		if vtap.AnalyzerIP == "" {
@@ -223,7 +240,9 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 			// 检查是否存在已分配数据节点，但异常未清除的采集器
 			exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-			mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+			mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+				return db.Model(&vtap).Update("exceptions", exceptions).Error
+			})
 		}
 	}
 	// 如果存在没有数据节点的采集器，触发数据节点重新分配
@@ -233,7 +252,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 	log.Info("vtap analyzer check end")
 }
 
-func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
+func (c *AnalyzerCheck) vtapAnalyzerAlloc(db *gorm.DB, excludeIP string) {
 	var vtaps []mysql.VTap
 	var analyzers []mysql.Analyzer
 	var azs []mysql.AZ
@@ -241,8 +260,8 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 	log.Info("vtap analyzer alloc start")
 
-	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
-	mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
+	db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取数据节点当前已分配的采集器个数
@@ -267,7 +286,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	}
 
 	// 根据可用区查询region信息
-	mysql.Db.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
+	db.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
 	regionToAZLcuuids := make(map[string][]string)
 	regionLcuuids := mapset.NewSet()
 	for _, az := range azs {
@@ -276,7 +295,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	}
 
 	// 获取可用区中的数据节点IP
-	mysql.Db.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azAnalyzerConns)
+	db.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azAnalyzerConns)
 	azToAnalyzerIPs := make(map[string][]string)
 	for _, conn := range azAnalyzerConns {
 		if conn.AZ == "ALL" {
@@ -310,7 +329,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 			if len(analyzerAvailableVTapNum) == 0 {
 				log.Warningf("no available analyzer for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				db.Model(&vtap).Update("exceptions", exceptions)
 				continue
 			}
 			sort.Slice(analyzerAvailableVTapNum, func(i, j int) bool {
@@ -328,10 +347,10 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
 			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
+			db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				db.Model(&vtap).Update("exceptions", exceptions)
 			}
 		}
 	}
@@ -354,15 +373,26 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 
 	analyzerIPToConn := make(map[string]mysql.AZAnalyzerConnection)
 	mysql.Db.Find(&azAnalyzerConns)
+	var delConns []mysql.AZAnalyzerConnection
+	var delAnalyerIP, delAZName []string
 	for _, conn := range azAnalyzerConns {
 		analyzerIPToConn[conn.AnalyzerIP] = conn
 		if conn.AZ == "ALL" {
 			continue
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
-			mysql.Db.Delete(&conn)
-			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
+			delConns = append(delConns, conn)
+			delAnalyerIP = append(delAnalyerIP, conn.AnalyzerIP)
+			delAZName = append(delAZName, name)
+
 		}
+	}
+
+	mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+		return db.Delete(&delConns).Error
+	})
+	for i, ip := range delAnalyerIP {
+		log.Infof("delete analyzer (%s) az (%s) connection", ip, delAZName[i])
 	}
 
 	mysql.Db.Find(&regions)
@@ -374,8 +404,10 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 				deleteAnalyzers = append(deleteAnalyzers, analyzer)
 			}
 		}
+		mysql.DBMap.DoTransactionOnAllDBs(func(db *gorm.DB) error {
+			return db.Delete(&deleteAnalyzers).Error
+		})
 		for _, deleteAnalyzer := range deleteAnalyzers {
-			mysql.Db.Delete(&deleteAnalyzer)
 			log.Infof("delete analyzer (%s) because no az_analyzer_conn", deleteAnalyzer.IP)
 		}
 	}
