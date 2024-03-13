@@ -17,15 +17,27 @@
 package cache
 
 import (
-	"sync"
+	"fmt"
+
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
+type StringInt int
+
+func (si StringInt) String() string {
+	return fmt.Sprintf("%d", si)
+}
+
 type LabelKey struct {
 	Name  string
 	Value string
+}
+
+func (k LabelKey) String() string {
+	return k.Name + "_" + k.Value
 }
 
 func NewLabelKey(name, value string) LabelKey {
@@ -36,24 +48,27 @@ func NewLabelKey(name, value string) LabelKey {
 }
 
 type label struct {
-	idToKey sync.Map
-	keyToID sync.Map
+	idToKey cmap.ConcurrentMap[StringInt, LabelKey]
+	keyToID cmap.ConcurrentMap[LabelKey, int]
 }
 
 func newLabel() *label {
-	return &label{}
+	return &label{
+		idToKey: cmap.NewStringer[StringInt, LabelKey](),
+		keyToID: cmap.NewStringer[LabelKey, int](),
+	}
 }
 
 func (l *label) GetIDByKey(key LabelKey) (int, bool) {
-	if item, ok := l.keyToID.Load(key); ok {
-		return item.(int), true
+	if item, ok := l.keyToID.Get(key); ok {
+		return item, true
 	}
 	return 0, false
 }
 
 func (l *label) GetKeyByID(id int) (LabelKey, bool) {
-	if item, ok := l.idToKey.Load(id); ok {
-		return item.(LabelKey), true
+	if item, ok := l.idToKey.Get(StringInt(id)); ok {
+		return item, true
 	}
 	return LabelKey{}, false
 }
@@ -61,20 +76,20 @@ func (l *label) GetKeyByID(id int) (LabelKey, bool) {
 func (l *label) Add(batch []*controller.PrometheusLabel) {
 	for _, item := range batch {
 		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.keyToID.Store(k, int(item.GetId()))
-		l.idToKey.Store(int(item.GetId()), k)
+		l.keyToID.Set(k, int(item.GetId()))
+		l.idToKey.Set(StringInt(item.GetId()), k)
 	}
 }
 
-func (l *label) refresh(args ...interface{}) error {
+func (l *label) refresh() error {
 	ls, err := l.load()
 	if err != nil {
 		return err
 	}
 	for _, item := range ls {
 		k := NewLabelKey(item.Name, item.Value)
-		l.keyToID.Store(k, item.ID)
-		l.idToKey.Store(item.ID, k)
+		l.keyToID.Set(k, item.ID)
+		l.idToKey.Set(StringInt(item.ID), k)
 	}
 	return nil
 }

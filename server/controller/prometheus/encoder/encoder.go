@@ -36,6 +36,10 @@ var (
 	encoder     *Encoder
 )
 
+type encoderRefresher interface {
+	refresh() error
+}
+
 type Encoder struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -115,16 +119,32 @@ func (e *Encoder) Stop() {
 
 func (e *Encoder) refresh() error {
 	log.Info("prometheus encoder refresh started")
-	e.label.refresh()
-	eg := &errgroup.Group{}
-	AppendErrGroup(eg, e.metricName.refresh)
-	AppendErrGroup(eg, e.labelName.refresh)
-	AppendErrGroup(eg, e.labelValue.refresh)
-	AppendErrGroup(eg, e.LabelLayout.refresh)
-	AppendErrGroup(eg, e.metricLabel.refresh)
-	AppendErrGroup(eg, e.metricTarget.refresh)
-	AppendErrGroup(eg, e.target.refresh)
-	err := eg.Wait()
+	var err error
+	for _, r := range []encoderRefresher{
+		e.label,
+		e.metricName,
+		e.labelName,
+		e.labelValue,
+		e.LabelLayout,
+		e.metricLabel,
+		e.metricTarget,
+		e.target,
+	} {
+		err = r.refresh()
+		if err != nil {
+			log.Errorf("prometheus encoder refresh failed: %v", err)
+		}
+	}
+	// e.label.refresh()
+	// eg := &errgroup.Group{}
+	// AppendErrGroup(eg, e.metricName.refresh)
+	// AppendErrGroup(eg, e.labelName.refresh)
+	// AppendErrGroup(eg, e.labelValue.refresh)
+	// AppendErrGroup(eg, e.LabelLayout.refresh)
+	// AppendErrGroup(eg, e.metricLabel.refresh)
+	// AppendErrGroup(eg, e.metricTarget.refresh)
+	// AppendErrGroup(eg, e.target.refresh)
+	// err := eg.Wait()
 	log.Info("prometheus encoder refresh completed")
 	return err
 }

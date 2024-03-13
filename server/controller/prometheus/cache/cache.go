@@ -25,10 +25,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/op/go-logging"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
+	// . "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
@@ -38,6 +37,10 @@ var (
 	cacheOnce sync.Once
 	cacheIns  *Cache
 )
+
+type cacheRefresher interface {
+	refresh() error
+}
 
 type Cache struct {
 	ctx context.Context
@@ -57,15 +60,15 @@ type Cache struct {
 
 func GetSingleton() *Cache {
 	cacheOnce.Do(func() {
-		mn := new(metricName)
+		mn := newMetricName()
 		l := newLabel()
 		t := newTarget()
 		cacheIns = &Cache{
 			canRefresh:              make(chan bool, 1),
 			MetricName:              mn,
-			LabelName:               new(labelName),
-			LabelValue:              new(labelValue),
-			MetricAndAPPLabelLayout: new(metricAndAPPLabelLayout),
+			LabelName:               newLabelName(),
+			LabelValue:              newLabelValue(),
+			MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(),
 			Target:                  t,
 			Label:                   l,
 			MetricLabel:             newMetricLabel(mn, l),
@@ -118,21 +121,37 @@ LOOP:
 
 func (c *Cache) refresh() error {
 	log.Info("refresh cache started")
-	egRunAhead := &errgroup.Group{}
-	AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	AppendErrGroup(egRunAhead, c.Label.refresh)
-	AppendErrGroup(egRunAhead, c.Target.refresh)
-	egRunAhead.Wait()
-	eg := &errgroup.Group{}
-	AppendErrGroup(eg, c.LabelName.refresh)
-	AppendErrGroup(eg, c.LabelValue.refresh)
-	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
-	AppendErrGroup(eg, c.MetricLabel.refresh)
-	AppendErrGroup(eg, c.MetricTarget.refresh)
-	err := eg.Wait()
+	var err error
+	for _, r := range []cacheRefresher{
+		c.MetricName,
+		c.Label,
+		c.Target,
+		c.LabelName,
+		c.LabelValue,
+		c.MetricAndAPPLabelLayout,
+		c.MetricLabel,
+		c.MetricTarget,
+	} {
+		if e := r.refresh(); e != nil {
+			log.Errorf("refresh cache failed: %s", e)
+			err = e
+		}
+	}
+	// egRunAhead := &errgroup.Group{}
+	// AppendErrGroup(egRunAhead, c.MetricName.refresh)
+	// AppendErrGroup(egRunAhead, c.Label.refresh)
+	// AppendErrGroup(egRunAhead, c.Target.refresh)
+	// egRunAhead.Wait()
+	// eg := &errgroup.Group{}
+	// c.Label.refresh()
+	// AppendErrGroup(eg, c.LabelName.refresh)
+	// AppendErrGroup(eg, c.LabelValue.refresh)
+	// AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
+	// AppendErrGroup(eg, c.MetricLabel.refresh)
+	// AppendErrGroup(eg, c.MetricTarget.refresh)
+	// err := eg.Wait()
 	log.Info("refresh cache completed")
 	return err
-
 }
 
 func GetDebugCache(t controller.PrometheusCacheType) []byte {
@@ -150,10 +169,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"name_to_id": make(map[string]interface{}),
 		}
-		tempCache.MetricName.nameToID.Range(func(key, value any) bool {
-			temp["name_to_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		for iter := range tempCache.MetricName.nameToID.Iter() {
+			temp["name_to_id"].(map[string]interface{})[iter.Key] = iter.Val
+		}
 		if len(temp["name_to_id"].(map[string]interface{})) > 0 {
 			content["metric_name"] = temp
 		}
@@ -162,10 +180,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"name_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelName.nameToID.Range(func(key, value any) bool {
-			temp["name_to_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		for iter := range tempCache.LabelName.nameToID.Iter() {
+			temp["name_to_id"].(map[string]interface{})[iter.Key] = iter.Val
+		}
 		if len(temp["name_to_id"].(map[string]interface{})) > 0 {
 			content["label_name"] = temp
 		}
@@ -174,10 +191,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"value_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelValue.valueToID.Range(func(key, value any) bool {
-			temp["value_to_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		for iter := range tempCache.LabelValue.valueToID.Iter() {
+			temp["value_to_id"].(map[string]interface{})[iter.Key] = iter.Val
+		}
 		if len(temp["value_to_id"].(map[string]interface{})) > 0 {
 			content["label_value"] = temp
 		}
@@ -186,10 +202,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"layout_key_to_index": make(map[string]interface{}),
 		}
-		tempCache.MetricAndAPPLabelLayout.layoutKeyToIndex.Range(func(key, value any) bool {
-			temp["layout_key_to_index"].(map[string]interface{})[marshal(key)] = value
-			return true
-		})
+		for iter := range tempCache.MetricAndAPPLabelLayout.layoutKeyToIndex.Iter() {
+			temp["layout_key_to_index"].(map[string]interface{})[iter.Key.String()] = iter.Val
+		}
 		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 {
 			content["metric_and_app_label_layout"] = temp
 		}
@@ -218,16 +233,14 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	getLabel := func() {
 		temp := map[string]interface{}{
 			"key_to_id": make(map[string]interface{}),
-			"id_to_key": make(map[int]interface{}),
+			"id_to_key": make(map[StringInt]interface{}),
 		}
-		tempCache.Label.keyToID.Range(func(key, value any) bool {
-			temp["key_to_id"].(map[string]interface{})[marshal(key)] = value
-			return true
-		})
-		tempCache.Label.idToKey.Range(func(key, value any) bool {
-			temp["id_to_key"].(map[int]interface{})[key.(int)] = value
-			return true
-		})
+		for iter := range tempCache.Label.keyToID.Iter() {
+			temp["key_to_id"].(map[string]interface{})[iter.Key.String()] = iter.Val
+		}
+		for iter := range tempCache.Label.idToKey.Iter() {
+			temp["id_to_key"].(map[StringInt]interface{})[iter.Key] = iter.Val
+		}
 
 		if len(temp["key_to_id"].(map[string]interface{})) > 0 ||
 			len(temp["id_to_key"].(map[int]interface{})) > 0 {

@@ -75,7 +75,7 @@ func (ml *metricLabel) Add(batch []*controller.PrometheusMetricLabel) {
 	}
 }
 
-func (ml *metricLabel) refresh(args ...interface{}) error {
+func (ml *metricLabel) refresh() error {
 	metricLabels, err := ml.load()
 	if err != nil {
 		return err

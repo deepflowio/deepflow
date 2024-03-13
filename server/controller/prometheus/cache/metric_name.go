@@ -17,50 +17,57 @@
 package cache
 
 import (
-	"sync"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type metricName struct {
-	nameToID sync.Map
-	idToName sync.Map
+	nameToID cmap.ConcurrentMap[string, int]
+	idToName cmap.ConcurrentMap[StringInt, string]
 }
 
-func (mn *metricName) Get() *sync.Map {
-	return &mn.nameToID
+func newMetricName() *metricName {
+	return &metricName{
+		nameToID: cmap.New[int](),
+		idToName: cmap.NewStringer[StringInt, string](),
+	}
+}
+
+func (mn *metricName) GetNameToID() cmap.ConcurrentMap[string, int] {
+	return mn.nameToID
 }
 
 func (mn *metricName) GetIDByName(n string) (int, bool) {
-	if id, ok := mn.nameToID.Load(n); ok {
-		return id.(int), true
+	if id, ok := mn.nameToID.Get(n); ok {
+		return id, true
 	}
 	return 0, false
 }
 
 func (mn *metricName) GetNameByID(id int) (string, bool) {
-	if name, ok := mn.idToName.Load(id); ok {
-		return name.(string), true
+	if name, ok := mn.idToName.Get(StringInt(id)); ok {
+		return name, true
 	}
 	return "", false
 }
 
 func (mn *metricName) Add(batch []*controller.PrometheusMetricName) {
 	for _, item := range batch {
-		mn.nameToID.Store(item.GetName(), int(item.GetId()))
-		mn.idToName.Store(int(item.GetId()), item.GetName())
+		mn.nameToID.Set(item.GetName(), int(item.GetId()))
+		mn.idToName.Set(StringInt(item.GetId()), item.GetName())
 	}
 }
 
-func (mn *metricName) refresh(args ...interface{}) error {
+func (mn *metricName) refresh() error {
 	metricNames, err := mn.load()
 	if err != nil {
 		return err
 	}
 	for _, item := range metricNames {
-		mn.nameToID.Store(item.Name, item.ID)
-		mn.idToName.Store(item.ID, item.Name)
+		mn.nameToID.Set(item.Name, item.ID)
+		mn.idToName.Set(StringInt(item.ID), item.Name)
 	}
 	return nil
 }

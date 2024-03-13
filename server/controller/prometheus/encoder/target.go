@@ -22,6 +22,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/protobuf/proto"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -33,13 +34,14 @@ import (
 type target struct {
 	lock         sync.Mutex
 	resourceType string
-	keyToID      sync.Map
+	keyToID      cmap.ConcurrentMap[cache.TargetKey, int]
 	descIDAllocator
 }
 
 func newTarget(max int) *target {
 	ln := &target{
 		resourceType: "target",
+		keyToID:      cmap.NewStringer[cache.TargetKey, int](),
 	}
 	// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
 	// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
@@ -49,13 +51,13 @@ func newTarget(max int) *target {
 }
 
 func (ln *target) getID(key cache.TargetKey) (int, bool) {
-	if item, ok := ln.keyToID.Load(key); ok {
-		return item.(int), true
+	if item, ok := ln.keyToID.Get(key); ok {
+		return item, true
 	}
 	return 0, false
 }
 
-func (ln *target) refresh(args ...interface{}) error {
+func (ln *target) refresh() error {
 	ln.lock.Lock()
 	defer ln.lock.Unlock()
 
@@ -74,9 +76,9 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 		ins := t.GetInstance()
 		job := t.GetJob()
 		podClusterID := int(t.GetPodClusterId())
-		if id, ok := ln.keyToID.Load(cache.NewTargetKey(ins, job, podClusterID)); ok {
+		if id, ok := ln.keyToID.Get(cache.NewTargetKey(ins, job, podClusterID)); ok {
 			resp = append(resp, &controller.PrometheusTarget{
-				Id:           proto.Uint32(uint32(id.(int))),
+				Id:           proto.Uint32(uint32(id)),
 				Instance:     &ins,
 				Job:          &job,
 				PodClusterId: proto.Uint32(uint32(podClusterID)),
@@ -112,7 +114,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
 		k := cache.NewTargetKey(dbToAdd[i].Instance, dbToAdd[i].Job, dbToAdd[i].PodClusterID)
-		ln.keyToID.Store(k, id)
+		ln.keyToID.Set(k, id)
 		resp = append(resp, &controller.PrometheusTarget{
 			Id:           proto.Uint32(uint32(id)),
 			Instance:     &k.Instance,
@@ -134,7 +136,7 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 	inUseIDSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDSet.Add(item.ID)
-		ln.keyToID.Store(cache.NewTargetKey(item.Instance, item.Job, item.PodClusterID), item.ID)
+		ln.keyToID.Set(cache.NewTargetKey(item.Instance, item.Job, item.PodClusterID), item.ID)
 	}
 	return inUseIDSet, nil
 }
