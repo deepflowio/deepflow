@@ -215,30 +215,30 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
  * F : first_iov
  * F_S : first_iov_size
  */
-#define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {				\
-	struct iovec iov_cpy;							\
-	bpf_probe_read(&iov_cpy, sizeof(struct iovec), (I));			\
-	if (iov_cpy.iov_base == NULL || iov_cpy.iov_len == 0) continue;		\
-	if (!(F)) {								\
-		F = iov_cpy.iov_base;						\
-		F_S = iov_cpy.iov_len;						\
-	}									\
-	const int bytes_remaining = (L_T) - (L_C);				\
-        __u32 iov_size =							\
-            iov_cpy.iov_len <							\
-            bytes_remaining ? iov_cpy.iov_len : bytes_remaining;		\
-        __u32 len = (O) + (L_C);						\
-        struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
-	if (len > (sizeof((B)) - sizeof(*cp)))					\
-		break;								\
-	if (iov_size >= sizeof(cp->data)) {					\
-		bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);	\
-		iov_size = sizeof(cp->data);					\
-	} else {								\
-		iov_size = iov_size & (sizeof(cp->data) - 1);			\
-		bpf_probe_read(cp->data, iov_size + 1, iov_cpy.iov_base);	\
-	}									\
-	L_C = (L_C) + iov_size;							\
+#define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {					\
+	struct iovec iov_cpy;								\
+	bpf_probe_read_user(&iov_cpy, sizeof(struct iovec), (I));			\
+	if (iov_cpy.iov_base == NULL || iov_cpy.iov_len == 0) continue;			\
+	if (!(F)) {									\
+		F = iov_cpy.iov_base;							\
+		F_S = iov_cpy.iov_len;							\
+	}										\
+	const int bytes_remaining = (L_T) - (L_C);					\
+        __u32 iov_size =								\
+            iov_cpy.iov_len <								\
+            bytes_remaining ? iov_cpy.iov_len : bytes_remaining;			\
+        __u32 len = (O) + (L_C);							\
+        struct copy_data_s *cp = (struct copy_data_s *)((B) + len);			\
+	if (len > (sizeof((B)) - sizeof(*cp)))						\
+		break;									\
+	if (iov_size >= sizeof(cp->data)) {						\
+		bpf_probe_read_user(cp->data, sizeof(cp->data), iov_cpy.iov_base);	\
+		iov_size = sizeof(cp->data);						\
+	} else {									\
+		iov_size = iov_size & (sizeof(cp->data) - 1);				\
+		bpf_probe_read_user(cp->data, iov_size + 1, iov_cpy.iov_base);		\
+	}										\
+	L_C = (L_C) + iov_size;								\
 } while (0)
 
 static __inline int iovecs_copy(struct __socket_data *v,
@@ -1591,7 +1591,7 @@ KPROG(__sys_sendmsg) (struct pt_regs* ctx) {
 	if (msghdr_ptr != NULL) {
 		// Stash arguments.
 		struct user_msghdr *msghdr, __msghdr;
-		bpf_probe_read(&__msghdr, sizeof(__msghdr), msghdr_ptr);
+		bpf_probe_read_user(&__msghdr, sizeof(__msghdr), msghdr_ptr);
 		msghdr = &__msghdr;
 		// Stash arguments.
 		struct data_args_t write_args = {};
@@ -1632,7 +1632,7 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 
 	if (msgvec_ptr != NULL && vlen >= 1) {
 		struct mmsghdr *msgvec, __msgvec;
-		bpf_probe_read(&__msgvec, sizeof(__msgvec), msgvec_ptr);
+		bpf_probe_read_user(&__msgvec, sizeof(__msgvec), msgvec_ptr);
 		msgvec = &__msgvec;
 		// Stash arguments.
 		struct data_args_t write_args = {};
@@ -1659,7 +1659,7 @@ TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL && num_msgs > 0) {
 		ssize_t bytes_count;
-		bpf_probe_read(&bytes_count, sizeof(write_args->msg_len), write_args->msg_len);
+		bpf_probe_read_user(&bytes_count, sizeof(write_args->msg_len), write_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
 	}
 	active_write_args_map__delete(&id);
@@ -1681,7 +1681,7 @@ KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
 	int sockfd = (int) PT_REGS_PARM1(ctx);
 
 	if (msghdr != NULL) {
-		bpf_probe_read(&__msg, sizeof(__msg), (void *)msghdr);
+		bpf_probe_read_user(&__msg, sizeof(__msg), (void *)msghdr);
 		msghdr = &__msg;
 		// Stash arguments.
 		struct data_args_t read_args = {};
@@ -1735,12 +1735,12 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
 				offsetof(typeof(struct user_msghdr), msg_iov);
 
-		bpf_probe_read(&read_args.iov, sizeof(read_args.iov), (void *)msgvec + offset);
+		bpf_probe_read_user(&read_args.iov, sizeof(read_args.iov), (void *)msgvec + offset);
 
 		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
 				offsetof(typeof(struct user_msghdr), msg_iovlen);
 
-		bpf_probe_read(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
+		bpf_probe_read_user(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
 
 		read_args.msg_len = (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
 		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
@@ -1758,7 +1758,7 @@ TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL && num_msgs > 0) {
 		ssize_t bytes_count;
-		bpf_probe_read(&bytes_count, sizeof(read_args->msg_len), read_args->msg_len);
+		bpf_probe_read_user(&bytes_count, sizeof(read_args->msg_len), read_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
 	}
 	active_read_args_map__delete(&id);
@@ -2041,8 +2041,16 @@ static __inline int output_data_common(void *ctx) {
 		len = iovecs_copy(v, v_buff, args, v->syscall_len, len);
 	} else {
 		if (__len >= sizeof(v->data)) {
-			if (unlikely(bpf_probe_read(v->data, sizeof(v->data), buffer) != 0))
-				goto clear_args_map_1;
+			if (v->source != DATA_SOURCE_IO_EVENT) {
+				if (unlikely(bpf_probe_read_user(v->data, sizeof(v->data),
+								 buffer) != 0))
+					goto clear_args_map_1;
+			} else {
+				if (unlikely(bpf_probe_read(v->data, sizeof(v->data),
+							    buffer) != 0))
+					goto clear_args_map_1;
+			}
+
 			len = sizeof(v->data);
 		} else {
 			/*
@@ -2054,10 +2062,17 @@ static __inline int output_data_common(void *ctx) {
 			 * "invalid access to map value, value_size=10888 off=135 size=0"
 			 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
 			 */
-			if (unlikely(bpf_probe_read(v->data,
-						    len + 1,
-						    buffer) != 0))
-				goto clear_args_map_1;
+			if (v->source != DATA_SOURCE_IO_EVENT) {
+				if (unlikely(bpf_probe_read_user(v->data,
+							    	 len + 1,
+							    	 buffer) != 0))
+					goto clear_args_map_1;
+			} else {
+				if (unlikely(bpf_probe_read(v->data,
+							    len + 1,
+							    buffer) != 0))
+					goto clear_args_map_1;
+			}
 		}
 	}
 

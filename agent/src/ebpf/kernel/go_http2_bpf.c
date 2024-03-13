@@ -26,7 +26,8 @@ static __inline void *get_the_first_parameter(struct pt_regs *ctx,
 	if (is_register_based_call(info)) {
 		ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&ptr, sizeof(ptr), (void *)(PT_REGS_SP(ctx) + 8));
+		bpf_probe_read_user(&ptr, sizeof(ptr),
+				    (void *)(PT_REGS_SP(ctx) + 8));
 	}
 	return ptr;
 }
@@ -35,7 +36,7 @@ static __inline bool is_grpc_syscallConn_interface(void *ptr,
 						   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), ptr);
+	bpf_probe_read_user(&i, sizeof(i), ptr);
 	return info ? i.type == info->credentials_syscallConn_itab : false;
 }
 
@@ -73,8 +74,8 @@ get_fd_from_grpc_http2Client_ctx(struct pt_regs *ctx,
 	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
-		bpf_probe_read(&i, sizeof(i), ptr);
-		bpf_probe_read(&i, sizeof(i), i.ptr);
+		bpf_probe_read_user(&i, sizeof(i), ptr);
+		bpf_probe_read_user(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
 	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
@@ -90,8 +91,8 @@ get_fd_from_grpc_http2Server_ctx(struct pt_regs *ctx,
 	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
-		bpf_probe_read(&i, sizeof(i), ptr);
-		bpf_probe_read(&i, sizeof(i), i.ptr);
+		bpf_probe_read_user(&i, sizeof(i), ptr);
+		bpf_probe_read_user(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
 	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
@@ -104,7 +105,7 @@ static __inline int get_side_from_grpc_loopyWriter(struct pt_regs *ctx,
 
 	ptr += info->offsets[OFFSET_IDX_SIDE_GRPC_TRANSPORT_LOOPY_WRITER];
 	int side = 0;
-	bpf_probe_read(&side, sizeof(side), ptr);
+	bpf_probe_read_user(&side, sizeof(side), ptr);
 	return side;
 }
 
@@ -115,16 +116,16 @@ static __inline int get_fd_from_grpc_loopyWriter(struct pt_regs *ctx,
 	void *ptr = get_the_first_parameter(ctx, info);
 
 	ptr += info->offsets[OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER];
-	bpf_probe_read(&ptr, sizeof(ptr), ptr);
+	bpf_probe_read_user(&ptr, sizeof(ptr), ptr);
 	ptr += info->offsets[OFFSET_IDX_WRITER_GRPC_TRANSPORT_FRAMER];
-	bpf_probe_read(&ptr, sizeof(ptr), ptr);
+	bpf_probe_read_user(&ptr, sizeof(ptr), ptr);
 	ptr += info->offsets[OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER];
 
 	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
-		bpf_probe_read(&i, sizeof(i), ptr);
-		bpf_probe_read(&i, sizeof(i), i.ptr);
+		bpf_probe_read_user(&i, sizeof(i), ptr);
+		bpf_probe_read_user(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
 	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
@@ -141,7 +142,7 @@ static __inline void *get_http2ClientConn_from_http2clientConnReadLoop_ctx(
 {
 	void *ptr = get_the_first_parameter(ctx, info);
 	ptr += info->offsets[OFFSET_IDX_CC_HTTP2_CLIENT_CONN_READ_LOOP];
-	bpf_probe_read(&ptr, sizeof(ptr), ptr);
+	bpf_probe_read_user(&ptr, sizeof(ptr), ptr);
 	return ptr;
 }
 
@@ -419,8 +420,8 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 	// Useless range  checking. Make the eBPF validator happy
 	if (buffer->header_len >= 0) {
 		if (buffer->header_len < HTTP2_BUFFER_INFO_SIZE) {
-			bpf_probe_read(buffer->info, 1 + buffer->header_len,
-				       data->name.ptr);
+			bpf_probe_read_user(buffer->info, 1 + buffer->header_len,
+				   	    data->name.ptr);
 		}
 	}
 
@@ -428,7 +429,7 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 	if (buffer->header_len >= 0) {
 		if (buffer->header_len < HTTP2_BUFFER_INFO_SIZE) {
 			if (buffer->value_len < HTTP2_BUFFER_INFO_SIZE) {
-				bpf_probe_read(
+				bpf_probe_read_user(
 					buffer->info + buffer->header_len,
 					1 + buffer->value_len, data->value.ptr);
 			}
@@ -481,7 +482,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers,
 			break;
 
 		tmp = headers->fields->ptr;
-		bpf_probe_read(&field, sizeof(field), tmp + idx);
+		bpf_probe_read_user(&field, sizeof(field), tmp + idx);
 		data.name = field.name;
 		data.value = field.value;
 		http2_fill_buffer_and_send(&data, buffer, send_buffer);
@@ -501,10 +502,10 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers,
 static __inline __u32
 get_stream_from_http2MetaHeadersFrame(void *ptr, struct ebpf_proc_info *info)
 {
-	bpf_probe_read(&ptr, sizeof(ptr), ptr);
+	bpf_probe_read_user(&ptr, sizeof(ptr), ptr);
 	ptr += info->offsets[OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER];
 	__u32 stream;
-	bpf_probe_read(&stream, sizeof(stream), ptr);
+	bpf_probe_read_user(&stream, sizeof(stream), ptr);
 	return stream;
 }
 
@@ -564,7 +565,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 
 	void *ptr = get_the_first_parameter(ctx, info);
 	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
-	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
+	bpf_probe_read_user(&(data.stream), sizeof(data.stream), ptr);
 
 	if (info->version >= GO_VERSION(1, 16, 0)) {
 		data.stream -= 2;
@@ -586,14 +587,14 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 		data.value.ptr = (void *)PT_GO_REGS_PARM4(ctx);
 		data.value.len = PT_GO_REGS_PARM5(ctx);
 	} else {
-		bpf_probe_read(&data.name.ptr, sizeof(data.name.ptr),
-			       (void *)(PT_REGS_SP(ctx) + 16));
-		bpf_probe_read(&data.name.len, sizeof(data.name.len),
-			       (void *)(PT_REGS_SP(ctx) + 24));
-		bpf_probe_read(&data.value.ptr, sizeof(data.value.ptr),
-			       (void *)(PT_REGS_SP(ctx) + 32));
-		bpf_probe_read(&data.value.len, sizeof(data.value.len),
-			       (void *)(PT_REGS_SP(ctx) + 40));
+		bpf_probe_read_user(&data.name.ptr, sizeof(data.name.ptr),
+				    (void *)(PT_REGS_SP(ctx) + 16));
+		bpf_probe_read_user(&data.name.len, sizeof(data.name.len),
+				    (void *)(PT_REGS_SP(ctx) + 24));
+		bpf_probe_read_user(&data.value.ptr, sizeof(data.value.ptr),
+				    (void *)(PT_REGS_SP(ctx) + 32));
+		bpf_probe_read_user(&data.value.len, sizeof(data.value.len),
+				    (void *)(PT_REGS_SP(ctx) + 40));
 	}
 	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	return 0;
@@ -620,8 +621,8 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		data.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&(data.stream), sizeof(data.stream),
-			       (void *)(PT_REGS_SP(ctx) + 16));
+		bpf_probe_read_user(&(data.stream), sizeof(data.stream),
+				    (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	data.read = false;
@@ -666,11 +667,11 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
+		bpf_probe_read_user(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
-	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
+	bpf_probe_read_user(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
@@ -722,15 +723,15 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		ptr = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
-		bpf_probe_read(&ptr, sizeof(ptr), (void *)(PT_REGS_SP(ctx) + 24));
+		bpf_probe_read_user(&ptr, sizeof(ptr), (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
-	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr + 0x0);
+	bpf_probe_read_user(&(data.stream), sizeof(data.stream), ptr + 0x0);
 
 	char status[] = ":status";
 	char status_value[3];
 	unsigned int code;
-	bpf_probe_read(&code, sizeof(code), ptr + 0x8);
+	bpf_probe_read_user(&code, sizeof(code), ptr + 0x8);
 	if (code) {
 		status_value[0] = '0' + (code % 1000) / 100;
 		status_value[1] = '0' + (code % 100) / 10;
@@ -745,7 +746,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	char date[] = "date";
 	data.name.ptr = (char *)&date;
 	data.name.len = 4;
-	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x38);
+	bpf_probe_read_user(&(data.value), sizeof(data.value), ptr + 0x38);
 	if (data.value.len) {
 		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
@@ -753,7 +754,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	char content_type[] = "content-type";
 	data.name.ptr = (char *)&content_type;
 	data.name.len = 12;
-	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x48);
+	bpf_probe_read_user(&(data.value), sizeof(data.value), ptr + 0x48);
 	if (data.value.len) {
 		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
@@ -761,7 +762,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	char content_length[] = "content-length";
 	data.name.ptr = (char *)content_length;
 	data.name.len = 14;
-	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x58);
+	bpf_probe_read_user(&(data.value), sizeof(data.value), ptr + 0x58);
 	if (data.value.len) {
 		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
@@ -796,11 +797,11 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 24));
+		bpf_probe_read_user(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
-	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
+	bpf_probe_read_user(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
@@ -836,7 +837,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 		fields.cap = PT_GO_REGS_PARM6(ctx);
 	} else {
 		// 8 + 8 + 4 + 4
-		bpf_probe_read(&fields, sizeof(fields),
+		bpf_probe_read_user(&fields, sizeof(fields),
 			       (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
@@ -849,7 +850,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		headers.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&headers.stream, sizeof(headers.stream),
+		bpf_probe_read_user(&headers.stream, sizeof(headers.stream),
 			       (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
@@ -880,11 +881,11 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
+		bpf_probe_read_user(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
-	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
+	bpf_probe_read_user(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
@@ -920,11 +921,11 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
+		bpf_probe_read_user(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
-	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
+	bpf_probe_read_user(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
@@ -945,16 +946,16 @@ get_fd_from_grpc_http2_Framer_ctx(struct pt_regs *ctx,
 	void *ptr = get_the_first_parameter(ctx, info);
 
 	struct go_interface io_writer_interface;
-	bpf_probe_read(&io_writer_interface, sizeof(io_writer_interface),
-		       ptr + info->offsets[OFFSET_IDX_HTTP2_FRAMER_W]);
+	bpf_probe_read_user(&io_writer_interface, sizeof(io_writer_interface),
+			    ptr + info->offsets[OFFSET_IDX_HTTP2_FRAMER_W]);
 
 	struct go_interface conn_intf;
-	bpf_probe_read(&conn_intf, sizeof(conn_intf),
-		       io_writer_interface.ptr +
+	bpf_probe_read_user(&conn_intf, sizeof(conn_intf),
+			    io_writer_interface.ptr +
 			       info->offsets[OFFSET_IDX_BUFWRITTER_CONN]);
 
 	if (is_grpc_syscallConn_interface(&conn_intf, info)) {
-		bpf_probe_read(&conn_intf, sizeof(conn_intf), conn_intf.ptr);
+		bpf_probe_read_user(&conn_intf, sizeof(conn_intf), conn_intf.ptr);
 	}
 
 	return get_fd_from_tcp_or_tls_conn_interface(&conn_intf, info);
@@ -1075,12 +1076,12 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 	if (len < HTTP2_DATAFRAME_DATA_SIZE) {
 		// Make old eBPF validator happy
 		if (len > 0) {
-			bpf_probe_read(dataframe->data, len + 1, buffer);
+			bpf_probe_read_user(dataframe->data, len + 1, buffer);
 			dataframe->data_len = len;
 		}
 	} else {
-		bpf_probe_read(dataframe->data, HTTP2_DATAFRAME_DATA_SIZE,
-			       buffer);
+		bpf_probe_read_user(dataframe->data, HTTP2_DATAFRAME_DATA_SIZE,
+				    buffer);
 		dataframe->data_len = HTTP2_DATAFRAME_DATA_SIZE;
 	}
 

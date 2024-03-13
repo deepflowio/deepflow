@@ -173,7 +173,7 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 {
 	static const char magic[] = "PRI * HTTP/2";
 	char buffer[sizeof(magic)] = { 0 };
-	bpf_probe_read(buffer, sizeof(buffer) - 1, buf_src);
+	bpf_probe_read_user(buffer, sizeof(buffer) - 1, buf_src);
 	for (int idx = 0; idx < sizeof(magic); ++idx) {
 		if (magic[idx] == buffer[idx])
 			continue;
@@ -279,7 +279,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 			break;
 
 		conn_info->tcpseq_offset = offset;
-		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
+		bpf_probe_read_user(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
 			HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
@@ -693,7 +693,7 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 
 	// Payload length check
 	__u32 length;
-	bpf_probe_read(&length, sizeof(length), s_buf + 1);
+	bpf_probe_read_user(&length, sizeof(length), s_buf + 1);
 	length = __bpf_ntohl(length);
 	if (length < min_payload_len || length > max_payload_len) {
 		return MSG_UNKNOWN;
@@ -703,7 +703,7 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	// check the last character.
 	if (length + 1 <= (__u32)count) {
 		char last_char = ' '; //Non-zero initial value
-		bpf_probe_read(&last_char, sizeof(last_char), s_buf + length);
+		bpf_probe_read_user(&last_char, sizeof(last_char), s_buf + length);
 		if (last_char != '\0')
 			return MSG_UNKNOWN;
 	}
@@ -727,7 +727,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	}
 
 	char infer_buf[POSTGRE_INFER_BUF_SIZE];
-	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
+	bpf_probe_read_user(infer_buf, sizeof(infer_buf), buf);
 	
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
@@ -1010,7 +1010,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	// bpf_probe_read_str() returns the length including '\0'.
 	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
 	if (len > 0 && len < sizeof(tmp_buf)) {
-		bpf_probe_read(tmp_buf, 2, queries_start + len);
+		bpf_probe_read_user(tmp_buf, 2, queries_start + len);
 		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
 	}
 
@@ -1704,7 +1704,8 @@ infer_protocol(struct ctx_info_s *ctx,
 		if (syscall_infer_len > count)
 			syscall_infer_len = count;
 	} else {
-		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
+		bpf_probe_read_user(__infer_buf->data,
+				    sizeof(__infer_buf->data), buf);
 		syscall_infer_ptr = (char *)buf;
 		syscall_infer_len = count;
 	}

@@ -58,8 +58,12 @@ static long (*bpf_perf_event_output) (void *ctx, void *map, __u64 flags,
 				      void *data, __u64 size) = (void *)25;
 static long (*bpf_probe_read_str) (void *dst, __u32 size,
 				   const void *unsafe_ptr) = (void *)45;
+#if defined(__aarch64__) && defined(LINUX_VER_KYLIN)
+static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)112;
+#else
 // bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
-static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4;	// real value is 112
+static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4; // real value is 112
+#endif
 
 static int (*bpf_get_stackid)(void *ctx, void *map, int flags) = (void *)27;
 
