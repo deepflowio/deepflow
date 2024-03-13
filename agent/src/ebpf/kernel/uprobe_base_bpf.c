@@ -292,7 +292,7 @@ static __inline bool is_tcp_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return info ? i.type == info->net_TCPConn_itab : false;
 }
 
@@ -311,9 +311,9 @@ static __inline int get_fd_from_tcp_conn_interface(void *conn,
 	void *ptr;
 	int fd;
 
-	bpf_probe_read(&i, sizeof(i), conn);
-	bpf_probe_read(&ptr, sizeof(ptr), i.ptr);
-	bpf_probe_read(&fd, sizeof(fd), ptr + offset_fd_sysfd);
+	bpf_probe_read_user(&i, sizeof(i), conn);
+	bpf_probe_read_user(&ptr, sizeof(ptr), i.ptr);
+	bpf_probe_read_user(&fd, sizeof(fd), ptr + offset_fd_sysfd);
 	return fd;
 }
 
@@ -343,7 +343,7 @@ get_fd_from_go_proxyproto_interface(void *conn,
 	 *                                         data 0x000000c0001bc090)
 	 */
 	struct go_interface i = {};
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	void *proxyproto_conn = i.ptr + 8;
 	// proxyproto_conn is 'net.TCPConn,net.Conn'
 	return get_fd_from_tcp_conn_interface(proxyproto_conn, info);
@@ -353,7 +353,7 @@ static __inline bool is_tls_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return info ? i.type == info->crypto_tls_Conn_itab : false;
 }
 
@@ -365,7 +365,7 @@ static __inline int get_fd_from_tls_conn_interface(void *conn,
 	}
 	struct go_interface i = {};
 
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	int fd = get_fd_from_tls_conn_struct(i.ptr, info);
 	if (fd > 0)
 		return fd;
@@ -394,7 +394,7 @@ static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
 	 */
 
 	struct go_interface i = {};
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return get_fd_from_tcp_conn_interface(i.ptr, info);
 }
 
@@ -469,11 +469,11 @@ int runtime_execute(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
+		bpf_probe_read_user(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	bpf_map_update_elem(&goroutines_map, &pid_tgid, &goid, BPF_ANY);
 
 	return 0;
@@ -522,16 +522,16 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 		}
 	} else {
 		if (info->version >= GO_VERSION(1, 18, 0)) {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr),
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
 				       (void *)(PT_REGS_SP(ctx) + 16));
 		} else {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr),
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
 				       (void *)(PT_REGS_SP(ctx) + 32));
 		}
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	if (!goid) {
 		return 0;
 	}
@@ -585,14 +585,14 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
 		if (info->version >= GO_VERSION(1, 18, 0)) {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 32);
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr), caller->sp + 32);
 		} else {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 48);
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr), caller->sp + 48);
 		}
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	if (!goid) {
 		bpf_map_delete_elem(&pid_tgid_callerid_map, &pid_tgid);
 		return 0;

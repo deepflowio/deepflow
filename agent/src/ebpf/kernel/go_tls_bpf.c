@@ -48,7 +48,7 @@ do { \
   dbg_data.fun = (F); \
   dbg_data.num = (N); \
   __builtin_memset(dbg_data.buf, 0, sizeof(dbg_data.buf)); \
-  bpf_probe_read(dbg_data.buf, sizeof(dbg_data.buf), (P)); \
+  bpf_probe_read_user(dbg_data.buf, sizeof(dbg_data.buf), (P)); \
   bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU, &dbg_data, sizeof(dbg_data)); \
 } while(0)
 #else
@@ -89,10 +89,10 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
-		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
+		bpf_probe_read_user(&conn, sizeof(conn), (void *)(c.sp + 8));
 		c.fd = get_fd_from_tcp_or_tls_conn_interface(conn, info);
-		bpf_probe_read(&c.buffer, sizeof(c.buffer),
-			       (void *)(c.sp + 16));
+		bpf_probe_read_user(&c.buffer, sizeof(c.buffer),
+				    (void *)(c.sp + 16));
 	}
 
 	if (c.fd < 0) {
@@ -139,8 +139,8 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&bytes_count, sizeof(bytes_count),
-			       (void *)(c->sp + 40));
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+				    (void *)(c->sp + 40));
 	}
 
 	if (bytes_count == 0) {
@@ -212,10 +212,10 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
-		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
+		bpf_probe_read_user(&conn, sizeof(conn), (void *)(c.sp + 8));
 		c.fd = get_fd_from_tcp_or_tls_conn_interface(conn, info);
-		bpf_probe_read(&c.buffer, sizeof(c.buffer),
-			       (void *)(c.sp + 16));
+		bpf_probe_read_user(&c.buffer, sizeof(c.buffer),
+				    (void *)(c.sp + 16));
 	}
 
 	if (c.fd < 0) {
@@ -273,8 +273,8 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&bytes_count, sizeof(bytes_count),
-			       (void *)(c->sp + 40));
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+				    (void *)(c->sp + 40));
 	}
 
 	if (bytes_count == 0) {
