@@ -14,35 +14,9 @@
  * limitations under the License.
  */
 
-package flow_metrics
+package db_descriptions
 
-import (
-	"github.com/deepflowio/deepflow/server/libs/ckdb"
-)
+import "embed"
 
-type Tagger interface {
-	SetID(string)
-	GetCode() uint64
-	SetCode(uint64)
-	GetTAPType() uint8
-	ToKVString() string
-	MarshalTo([]byte) int
-	String() string
-	Clone() Tagger
-	Release()
-}
-
-type Meter interface {
-	ID() uint8
-	Name() string
-	VTAPName() string
-	ConcurrentMerge(Meter)
-	SequentialMerge(Meter)
-	ToKVString() string
-	MarshalTo([]byte) int
-	SortKey() uint64
-	Release()
-	Reverse()
-	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) // 写入clickhouse的block
-}
+//go:embed clickhouse/tag/enum/*
+var EnumFiles embed.FS

@@ -24,14 +24,14 @@ import (
 )
 
 type UsageMeter struct {
-	PacketTx uint64 `db:"packet_tx"`
-	PacketRx uint64 `db:"packet_rx"`
-	ByteTx   uint64 `db:"byte_tx"`
-	ByteRx   uint64 `db:"byte_rx"`
-	L3ByteTx uint64 `db:"l3_byte_tx"`
-	L3ByteRx uint64 `db:"l3_byte_rx"`
-	L4ByteTx uint64 `db:"l4_byte_tx"`
-	L4ByteRx uint64 `db:"l4_byte_rx"`
+	PacketTx uint64 `json:"packet_tx" category:"$metrics" sub:"NPB"`
+	PacketRx uint64 `json:"packet_rx" category:"$metrics" sub:"NPB"`
+	ByteTx   uint64 `json:"byte_tx" category:"$metrics" sub:"NPB"`
+	ByteRx   uint64 `json:"byte_rx" category:"$metrics" sub:"NPB"`
+	L3ByteTx uint64 `json:"l3_byte_tx" category:"$metrics" sub:"NPB"`
+	L3ByteRx uint64 `json:"l3_byte_rx" category:"$metrics" sub:"NPB"`
+	L4ByteTx uint64 `json:"l4_byte_tx" category:"$metrics" sub:"NPB"`
+	L4ByteRx uint64 `json:"l4_byte_rx" category:"$metrics" sub:"NPB"`
 }
 
 func (m *UsageMeter) Reverse() {

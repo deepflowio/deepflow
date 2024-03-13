@@ -17,14 +17,15 @@
 package app
 
 import (
-	"errors"
 	"fmt"
+	"reflect"
+	"time"
+	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/codec"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (
@@ -34,141 +35,201 @@ const (
 
 type DocumentFlag uint32
 
-type Document struct {
-	pool.ReferenceCount
-
-	Timestamp uint32
-	flow_metrics.Tagger
-	flow_metrics.Meter
-	Flags DocumentFlag
-}
-
 const (
 	FLAG_PER_SECOND_METRICS DocumentFlag = 1 << iota
 )
 
-func (d Document) String() string {
-	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
-		d.Timestamp, d.Flags, d.Tagger, d.Meter)
+type Document interface {
+	Tags() *flow_metrics.Tag
+	Time() uint32
+	Flag() DocumentFlag
+	Meter() flow_metrics.Meter
+	Release()
+	WriteBlock(block *ckdb.Block)
+	OrgID() uint16
+	TableID() (uint8, error)
+	String() string
+	AddReferenceCount()
+	AddReferenceCountN(n int32)
+	DataSource() uint32
+	GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{}
+	TimestampUs() int64
 }
 
-var poolDocument = pool.NewLockFreePool(func() interface{} {
-	return &Document{}
+type DocumentBase struct {
+	pool.ReferenceCount
+	Timestamp uint32 `json:"time" category:"$tag" sub:"flow_info"`
+	Flags     DocumentFlag
+	flow_metrics.Tag
+}
+
+func (b *DocumentBase) Tags() *flow_metrics.Tag {
+	return &b.Tag
+}
+
+func (b *DocumentBase) Time() uint32 {
+	return b.Timestamp
+}
+
+func (b *DocumentBase) Flag() DocumentFlag {
+	return b.Flags
+}
+
+func (b *DocumentBase) TableID() (uint8, error) {
+	return b.Tag.TableID((b.Flags & FLAG_PER_SECOND_METRICS) == 1)
+}
+
+func (b *DocumentBase) OrgID() uint16 {
+	return b.Tag.OrgId
+}
+
+func (b *DocumentBase) DataSource() uint32 {
+	dataSourceId, _ := b.TableID()
+	return uint32(dataSourceId)
+}
+
+func (e *DocumentBase) TimestampUs() int64 {
+	return int64(time.Duration(e.Timestamp) * time.Second / time.Microsecond)
+}
+
+type DocumentFlow struct {
+	DocumentBase
+	flow_metrics.FlowMeter
+}
+
+type DocumentApp struct {
+	DocumentBase
+	flow_metrics.AppMeter
+}
+
+type DocumentUsage struct {
+	DocumentBase
+	flow_metrics.UsageMeter
+}
+
+func (d *DocumentFlow) String() string {
+	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %+v\n\tmeter: %#v\n}\n",
+		d.Timestamp, d.Flags, d.Tag, d.FlowMeter)
+}
+
+var poolDocumentFlow = pool.NewLockFreePool(func() interface{} {
+	return &DocumentFlow{}
 })
 
-func AcquireDocument() *Document {
-	d := poolDocument.Get().(*Document)
+func AcquireDocumentFlow() *DocumentFlow {
+	d := poolDocumentFlow.Get().(*DocumentFlow)
 	d.ReferenceCount.Reset()
 	return d
 }
 
-func ReleaseDocument(doc *Document) {
+func ReleaseDocumentFlow(doc *DocumentFlow) {
 	if doc == nil || doc.SubReferenceCount() {
 		return
 	}
 
-	if doc.Tagger != nil {
-		doc.Tagger.Release()
-	}
-	if doc.Meter != nil {
-		doc.Meter.Release()
-	}
-	*doc = Document{}
-	poolDocument.Put(doc)
+	*doc = DocumentFlow{}
+	poolDocumentFlow.Put(doc)
 }
 
-func CloneDocument(doc *Document) *Document {
-	newDoc := AcquireDocument()
-	newDoc.Timestamp = doc.Timestamp
-	newDoc.Tagger = doc.Tagger.Clone()
-	newDoc.Meter = doc.Meter.Clone()
-	newDoc.Flags = doc.Flags
-	return newDoc
+func (d *DocumentFlow) Release() {
+	ReleaseDocumentFlow(d)
 }
 
-func PseudoCloneDocument(doc *Document) {
-	doc.AddReferenceCount()
+func (d *DocumentFlow) WriteBlock(block *ckdb.Block) {
+	d.Tag.WriteBlock(block, d.Timestamp)
+	d.FlowMeter.WriteBlock(block)
 }
 
-func (d *Document) Release() {
-	ReleaseDocument(d)
+func (d *DocumentFlow) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
 
-func (d *Document) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
-	p, ok := i.(*pb.Document)
-	if !ok {
-		return fmt.Errorf("invalid interface type, should be *pb.Document")
-	}
-	if p.Meter == nil {
-		p.Meter = &pb.Meter{}
-	}
-	flow := p.Meter.Flow
-	app := p.Meter.App
-	usage := p.Meter.Usage
-
-	if err := d.WriteToPB(p); err != nil {
-		return err
-	}
-	encoder.WritePB(p)
-	if p.Meter.Flow == nil {
-		p.Meter.Flow = flow
-	}
-	if p.Meter.App == nil {
-		p.Meter.App = app
-	}
-	if p.Meter.Usage == nil {
-		p.Meter.Usage = usage
-	}
-	return nil
+func (d *DocumentFlow) GetStringValue(offset uintptr, kind reflect.Kind) string {
+	return ""
 }
 
-func (d *Document) WriteToPB(p *pb.Document) error {
-	p.Timestamp = d.Timestamp
-	if p.Tag == nil {
-		p.Tag = &pb.MiniTag{}
-	}
-	d.Tagger.(*flow_metrics.MiniTag).WriteToPB(p.Tag)
-	if p.Meter == nil {
-		p.Meter = &pb.Meter{}
-	}
-	p.Meter.MeterId = uint32(d.Meter.ID())
-	switch d.Meter.ID() {
-	case flow_metrics.FLOW_ID:
-		if p.Meter.Flow == nil {
-			p.Meter.Flow = &pb.FlowMeter{}
-		}
-		d.Meter.(*flow_metrics.FlowMeter).WriteToPB(p.Meter.Flow)
-		p.Meter.Usage, p.Meter.App = nil, nil
-	case flow_metrics.ACL_ID:
-		if p.Meter.Usage == nil {
-			p.Meter.Usage = &pb.UsageMeter{}
-		}
-		d.Meter.(*flow_metrics.UsageMeter).WriteToPB(p.Meter.Usage)
-		p.Meter.Flow, p.Meter.App = nil, nil
-	case flow_metrics.APP_ID:
-		if p.Meter.App == nil {
-			p.Meter.App = &pb.AppMeter{}
-		}
-		d.Meter.(*flow_metrics.AppMeter).WriteToPB(p.Meter.App)
-		p.Meter.Usage, p.Meter.Flow = nil, nil
-	default:
-		return errors.New(fmt.Sprintf("unknown meter id %d", d.Meter.ID()))
-	}
-
-	p.Flags = uint32(d.Flags)
-	return nil
+func (d *DocumentFlow) Meter() flow_metrics.Meter {
+	return &d.FlowMeter
 }
 
-func (d *Document) WriteBlock(block *ckdb.Block) {
-	d.Tagger.(*flow_metrics.Tag).WriteBlock(block, d.Timestamp)
-	d.Meter.WriteBlock(block)
+func (d *DocumentApp) String() string {
+	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %+v\n\tmeter: %#v\n}\n",
+		d.Timestamp, d.Flags, d.Tag, d.AppMeter)
 }
 
-func (d *Document) OrgID() uint16 {
-	return d.Tagger.(*flow_metrics.Tag).OrgId
+var poolDocumentApp = pool.NewLockFreePool(func() interface{} {
+	return &DocumentApp{}
+})
+
+func AcquireDocumentApp() *DocumentApp {
+	d := poolDocumentApp.Get().(*DocumentApp)
+	d.ReferenceCount.Reset()
+	return d
 }
 
-func (d *Document) TableID() (uint8, error) {
-	tag, _ := d.Tagger.(*flow_metrics.Tag)
-	return tag.TableID((d.Flags & FLAG_PER_SECOND_METRICS) == 1)
+func ReleaseDocumentApp(doc *DocumentApp) {
+	if doc == nil || doc.SubReferenceCount() {
+		return
+	}
+
+	*doc = DocumentApp{}
+	poolDocumentApp.Put(doc)
+}
+
+func (d *DocumentApp) Release() {
+	ReleaseDocumentApp(d)
+}
+
+func (d *DocumentApp) WriteBlock(block *ckdb.Block) {
+	d.Tag.WriteBlock(block, d.Timestamp)
+	d.AppMeter.WriteBlock(block)
+}
+
+func (d *DocumentApp) Meter() flow_metrics.Meter {
+	return &d.AppMeter
+}
+
+func (d *DocumentApp) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
+}
+
+func (d *DocumentUsage) String() string {
+	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %+v\n\tmeter: %#v\n}\n",
+		d.Timestamp, d.Flags, d.Tag, d.UsageMeter)
+}
+
+var poolDocumentUsage = pool.NewLockFreePool(func() interface{} {
+	return &DocumentUsage{}
+})
+
+func AcquireDocumentUsage() *DocumentUsage {
+	d := poolDocumentUsage.Get().(*DocumentUsage)
+	d.ReferenceCount.Reset()
+	return d
+}
+
+func ReleaseDocumentUsage(doc *DocumentUsage) {
+	if doc == nil || doc.SubReferenceCount() {
+		return
+	}
+
+	*doc = DocumentUsage{}
+	poolDocumentUsage.Put(doc)
+}
+
+func (d *DocumentUsage) Release() {
+	ReleaseDocumentUsage(d)
+}
+
+func (d *DocumentUsage) WriteBlock(block *ckdb.Block) {
+	d.Tag.WriteBlock(block, d.Timestamp)
+	d.UsageMeter.WriteBlock(block)
+}
+
+func (d *DocumentUsage) Meter() flow_metrics.Meter {
+	return &d.UsageMeter
+}
+
+func (d *DocumentUsage) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
