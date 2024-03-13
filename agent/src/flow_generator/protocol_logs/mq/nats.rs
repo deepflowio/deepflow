@@ -619,6 +619,40 @@ impl NatsInfo {
         Some((payload, info))
     }
 
+    fn get_subject(&self) -> Option<&str> {
+        match &self.message {
+            NatsMessage::Info(_)
+            | NatsMessage::Connect(_)
+            | NatsMessage::Unsub(_)
+            | NatsMessage::Ping(_)
+            | NatsMessage::Pong(_)
+            | NatsMessage::Ok(_)
+            | NatsMessage::Err(_) => None,
+            NatsMessage::Pub(x) => Some(x.subject.as_str()),
+            NatsMessage::Hpub(x) => Some(x.subject.as_str()),
+            NatsMessage::Sub(x) => Some(x.subject.as_str()),
+            NatsMessage::Msg(x) => Some(x.subject.as_str()),
+            NatsMessage::Hmsg(x) => Some(x.subject.as_str()),
+        }
+    }
+
+    fn get_name(&self) -> &'static str {
+        match self.message {
+            NatsMessage::Info(_) => "INFO",
+            NatsMessage::Connect(_) => "CONNECT",
+            NatsMessage::Pub(_) => "PUB",
+            NatsMessage::Hpub(_) => "HPUB",
+            NatsMessage::Sub(_) => "SUB",
+            NatsMessage::Unsub(_) => "UNSUB",
+            NatsMessage::Msg(_) => "MSG",
+            NatsMessage::Hmsg(_) => "HMSG",
+            NatsMessage::Ping(_) => "PING",
+            NatsMessage::Pong(_) => "PONG",
+            NatsMessage::Ok(_) => "OK",
+            NatsMessage::Err(_) => "ERR",
+        }
+    }
+
     fn parse_trace_span(&self, config: &L7LogDynamicConfig) -> (Option<String>, Option<String>) {
         let headers = match &self.message {
             NatsMessage::Hpub(x) => &x.headers,
@@ -659,21 +693,12 @@ impl From<NatsInfo> for L7ProtocolSendLog {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
         };
-        let (name, subject) = match info.message {
-            NatsMessage::Info(_) => ("INFO", "".into()),
-            NatsMessage::Connect(_) => ("CONNECT", "".into()),
-            NatsMessage::Pub(x) => ("PUB", x.subject),
-            NatsMessage::Hpub(x) => ("HPUB", x.subject),
-            NatsMessage::Sub(x) => ("SUB", x.subject),
-            NatsMessage::Unsub(_) => ("UNSUB", "".into()),
-            NatsMessage::Msg(x) => ("MSG", x.subject),
-            NatsMessage::Hmsg(x) => ("HMSG", x.subject),
-            NatsMessage::Ping(_) => ("PING", "".into()),
-            NatsMessage::Pong(_) => ("PONG", "".into()),
-            NatsMessage::Ok(_) => ("OK", "".into()),
-            NatsMessage::Err(_) => ("ERR", "".into()),
-        };
-        let endpoint = subject.split('.').next().unwrap_or_default().to_string();
+        let name = info.get_name();
+        let subject = info
+            .get_subject()
+            .map(|x| x.to_string())
+            .unwrap_or_default();
+        let endpoint = info.get_endpoint().unwrap_or_default();
         let log = L7ProtocolSendLog {
             flags,
             version: Some(info.version),
@@ -707,6 +732,12 @@ impl L7ProtocolInfoInterface for NatsInfo {
 
     fn session_id(&self) -> Option<u32> {
         None
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        self.get_subject()
+            .and_then(|x| x.split('.').next())
+            .map(|x| x.to_string())
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {

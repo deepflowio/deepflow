@@ -154,6 +154,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
     fn get_request_domain(&self) -> String {
         self.service_name.clone()
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.method_name.len()
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {

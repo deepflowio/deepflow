@@ -1735,6 +1735,9 @@ impl L7ProtocolInfoInterface for OpenWireInfo {
     fn get_request_domain(&self) -> String {
         self.broker_url.clone().unwrap_or_default()
     }
+    fn get_endpoint(&self) -> Option<String> {
+        self.topic.clone()
+    }
 }
 
 impl From<OpenWireInfo> for L7ProtocolSendLog {
@@ -2055,18 +2058,9 @@ impl OpenWireLog {
         }
         // set oneway request as session
         if info.msg_type == LogMessageType::Request && !info.response_required {
-            if info.command_type == OpenWireCommand::WireFormatInfo {
-                if param.direction == PacketDirection::ClientToServer {
-                    info.msg_type = LogMessageType::Request;
-                } else {
-                    info.msg_type = LogMessageType::Response;
-                    (info.res_msg_size, info.req_msg_size) = (info.req_msg_size, info.res_msg_size);
-                }
-            } else {
-                info.msg_type = LogMessageType::Session;
-                if param.direction == PacketDirection::ServerToClient {
-                    (info.res_msg_size, info.req_msg_size) = (info.req_msg_size, info.res_msg_size);
-                }
+            info.msg_type = LogMessageType::Session;
+            if param.direction == PacketDirection::ServerToClient {
+                info.res_msg_size = info.req_msg_size.take();
             }
         }
         if info.command_type == OpenWireCommand::WireFormatInfo {

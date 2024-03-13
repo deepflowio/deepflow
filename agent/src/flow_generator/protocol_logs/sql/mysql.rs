@@ -114,6 +114,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.context.len()
+    }
 }
 
 impl MysqlInfo {
@@ -339,6 +343,8 @@ pub struct MysqlLog {
     pub protocol_version: u8,
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
+
+    has_request: bool,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -588,8 +594,16 @@ impl MysqlLog {
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => msg_type = self.request(config, &payload[offset..], info)?,
-            LogMessageType::Response => self.response(&payload[offset..], info)?,
+            LogMessageType::Request => {
+                msg_type = self.request(config, &payload[offset..], info)?;
+                if msg_type == LogMessageType::Request {
+                    self.has_request = true;
+                }
+            }
+            LogMessageType::Response if self.has_request => {
+                self.response(&payload[offset..], info)?;
+                self.has_request = false;
+            }
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
                 return Ok(true);
@@ -807,7 +821,7 @@ mod tests {
                 "mysql.pcap",
                 L7PerfStats {
                     request_count: 6,
-                    response_count: 7,
+                    response_count: 5,
                     err_client_count: 0,
                     err_server_count: 0,
                     err_timeout: 0,
@@ -821,7 +835,7 @@ mod tests {
                 "mysql-error.pcap",
                 L7PerfStats {
                     request_count: 4,
-                    response_count: 4,
+                    response_count: 3,
                     err_client_count: 0,
                     err_server_count: 1,
                     err_timeout: 0,

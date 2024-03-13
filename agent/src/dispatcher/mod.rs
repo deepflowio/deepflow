@@ -287,6 +287,34 @@ impl DispatcherListener {
         }
     }
 
+    // When interfaces.len() is greater than local_dispatcher_count, interfaces is evenly distributed among each dispatcher;
+    // otherwise interfaces is evenly distributed among the preceding dispatcher, and the following dispatcher does not work
+    fn get_interfaces<'a>(&self, interfaces: &'a [Link]) -> &'a [Link] {
+        let id = self.id();
+        if interfaces.len() < self.local_dispatcher_count() {
+            if id < interfaces.len() {
+                return &interfaces[id..id + 1];
+            } else {
+                return &interfaces[0..0];
+            }
+        }
+        let width = interfaces.len() / self.local_dispatcher_count();
+        let remain = interfaces.len() % self.local_dispatcher_count();
+        let (start, width) = if id >= remain {
+            ((id * width) + remain, width)
+        } else {
+            (id * width + id, width + 1)
+        };
+
+        let interfaces = if id == self.local_dispatcher_count() - 1 {
+            &interfaces[start..]
+        } else {
+            &interfaces[start..start + width]
+        };
+
+        interfaces
+    }
+
     pub fn on_tap_interface_change(
         &self,
         interfaces: &[Link],
@@ -295,40 +323,18 @@ impl DispatcherListener {
         blacklist: &Vec<u64>,
     ) {
         match self {
-            Self::LocalPlus(l) => {
-                let id = self.id();
-                let width = interfaces.len() / self.local_dispatcher_count();
-                let remain = interfaces.len() % self.local_dispatcher_count();
-                let (start, width) = if id >= remain {
-                    ((id * width) + remain, width)
-                } else {
-                    (id * width + id, width + 1)
-                };
-
-                let interfaces = if id == self.local_dispatcher_count() - 1 {
-                    &interfaces[start..]
-                } else {
-                    &interfaces[start..start + width]
-                };
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
-            }
-            Self::Local(l) => {
-                let id = self.id();
-                let width = interfaces.len() / self.local_dispatcher_count();
-                let remain = interfaces.len() % self.local_dispatcher_count();
-                let (start, width) = if id >= remain {
-                    ((id * width) + remain, width)
-                } else {
-                    (id * width + id, width + 1)
-                };
-
-                let interfaces = if id == self.local_dispatcher_count() - 1 {
-                    &interfaces[start..]
-                } else {
-                    &interfaces[start..start + width]
-                };
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
-            }
+            Self::LocalPlus(l) => l.on_tap_interface_change(
+                self.get_interfaces(interfaces),
+                if_mac_source,
+                trident_type,
+                blacklist,
+            ),
+            Self::Local(l) => l.on_tap_interface_change(
+                self.get_interfaces(interfaces),
+                if_mac_source,
+                trident_type,
+                blacklist,
+            ),
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source);

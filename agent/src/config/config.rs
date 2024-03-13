@@ -24,7 +24,6 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
-use public::l7_protocol::{DEFAULT_DNS_PORT, DEFAULT_TLS_PORT};
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -531,6 +530,7 @@ pub struct YamlConfig {
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
     pub kubernetes_namespace: String,
@@ -594,6 +594,9 @@ pub struct YamlConfig {
 }
 
 impl YamlConfig {
+    const DEFAULT_DNS_PORTS: &'static str = "53,5353";
+    const DEFAULT_TLS_PORTS: &'static str = "443,6443";
+
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
         Self::load(&contents, tap_mode)
@@ -666,6 +669,10 @@ impl YamlConfig {
         // L7Log Session timeout must more than or equal 10s to keep window
         if c.l7_log_session_aggr_timeout.as_secs() < 10 {
             c.l7_log_session_aggr_timeout = Duration::from_secs(10);
+        }
+
+        if c.l7_log_session_slot_capacity < 1024 {
+            c.l7_log_session_slot_capacity = 1024;
         }
 
         if c.external_metrics_sender_queue_size == 0 {
@@ -827,14 +834,14 @@ impl YamlConfig {
         let mut new = self.l7_protocol_ports.clone();
 
         let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
-        // dns default only parse 53 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
+        // dns default only parse 53,5353 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
         if !self.l7_protocol_ports.contains_key(dns_str) {
-            new.insert(dns_str.to_string(), DEFAULT_DNS_PORT.to_string());
+            new.insert(dns_str.to_string(), Self::DEFAULT_DNS_PORTS.to_string());
         }
         let tls_str = L7ProtocolParser::TLS(TlsLog::default()).as_str();
-        // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+        // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
         if !self.l7_protocol_ports.contains_key(tls_str) {
-            new.insert(tls_str.to_string(), DEFAULT_TLS_PORT.to_string());
+            new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
         }
 
         new
@@ -910,6 +917,7 @@ impl Default for YamlConfig {
             analyzer_ip: "".into(),
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
+            l7_log_session_slot_capacity: 1024,
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
             kubernetes_namespace: "".into(),
@@ -944,8 +952,8 @@ impl Default for YamlConfig {
 
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([
-                (String::from("DNS"), String::from("53,5353")),
-                (String::from("TLS"), String::from("443")),
+                (String::from("DNS"), String::from(Self::DEFAULT_DNS_PORTS)),
+                (String::from("TLS"), String::from(Self::DEFAULT_TLS_PORTS)),
             ]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
