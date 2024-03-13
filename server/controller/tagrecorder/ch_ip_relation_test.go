@@ -276,13 +276,13 @@ func (t *SuiteTest) TestGenerateFromNATGateway() {
 
 	assert.Equal(t.T(), 3, len(keyToDBItem))
 	expectedKeys := []IPRelationKey{
-		{VPCID: nat.VPCID, IP: vmWANIP.IP}, {VPCID: nat.VPCID, IP: natLANIP.IP}, {VPCID: nat.VPCID, IP: natRule.FixedIP},
+		{L3EPCID: nat.VPCID, IP: vmWANIP.IP}, {L3EPCID: nat.VPCID, IP: natLANIP.IP}, {L3EPCID: nat.VPCID, IP: natRule.FixedIP},
 	}
 	for key, value := range keyToDBItem {
 		assert.Equal(t.T(), nat.ID, value.NATGWID)
 		assert.Equal(t.T(), nat.Name, value.NATGWName)
 		assert.Contains(t.T(), expectedKeys, key)
-		assert.Equal(t.T(), nat.VPCID, value.VPCID)
+		assert.Equal(t.T(), nat.VPCID, value.L3EPCID)
 		assert.NotNil(t.T(), value.IP)
 		assert.Equal(t.T(), 0, value.LBID)
 		assert.Equal(t.T(), 0, value.PodServiceID)
@@ -326,8 +326,8 @@ func (t *SuiteTest) TestGenerateFromLB() {
 
 	assert.Equal(t.T(), 5, len(keyToDBItem))
 	expectedKeys := []IPRelationKey{
-		{VPCID: lb.VPCID, IP: lbLANIP.IP}, {VPCID: lb.VPCID, IP: lbListener.IPs}, {VPCID: tsVM.VPCID, IP: vmLBTS.IP},
-		{VPCID: lb.VPCID, IP: vmWANIP.IP}, {VPCID: lb.VPCID, IP: ipLBTS.IP},
+		{L3EPCID: lb.VPCID, IP: lbLANIP.IP}, {L3EPCID: lb.VPCID, IP: lbListener.IPs}, {L3EPCID: tsVM.VPCID, IP: vmLBTS.IP},
+		{L3EPCID: lb.VPCID, IP: vmWANIP.IP}, {L3EPCID: lb.VPCID, IP: ipLBTS.IP},
 	}
 	for key, value := range keyToDBItem {
 		if value.IP == lbLANIP.IP || value.IP == vmWANIP.IP {
@@ -343,7 +343,7 @@ func (t *SuiteTest) TestGenerateFromLB() {
 			assert.Equal(t.T(), lbListener.Name, value.LBListenerName)
 		}
 		assert.Contains(t.T(), expectedKeys, key)
-		assert.Contains(t.T(), []int{lb.VPCID, tsVM.VPCID}, value.VPCID)
+		assert.Contains(t.T(), []int{lb.VPCID, tsVM.VPCID}, value.L3EPCID)
 		assert.NotNil(t.T(), value.IP)
 		assert.Equal(t.T(), 0, value.NATGWID)
 		assert.Equal(t.T(), 0, value.PodServiceID)
@@ -378,7 +378,7 @@ func (t *SuiteTest) TestGenerateFromPodService() {
 
 	assert.Equal(t.T(), 2, len(keyToDBItem))
 	expectedKeys := []IPRelationKey{
-		{VPCID: podService.VPCID, IP: podLANIP.IP}, {VPCID: podService.VPCID, IP: podServiceWANIP.IP},
+		{L3EPCID: podService.VPCID, IP: podLANIP.IP}, {L3EPCID: podService.VPCID, IP: podServiceWANIP.IP},
 	}
 	for key, value := range keyToDBItem {
 		assert.Equal(t.T(), podService.ID, value.PodServiceID)
@@ -386,7 +386,7 @@ func (t *SuiteTest) TestGenerateFromPodService() {
 		assert.Equal(t.T(), podIngress.ID, value.PodIngressID)
 		assert.Equal(t.T(), podIngress.Name, value.PodIngressName)
 		assert.Contains(t.T(), expectedKeys, key)
-		assert.Equal(t.T(), podService.VPCID, value.VPCID)
+		assert.Equal(t.T(), podService.VPCID, value.L3EPCID)
 		assert.Contains(t.T(), []string{podLANIP.IP, podServiceWANIP.IP}, value.IP)
 		assert.Equal(t.T(), 0, value.NATGWID)
 		assert.Equal(t.T(), 0, value.LBID)
@@ -395,8 +395,8 @@ func (t *SuiteTest) TestGenerateFromPodService() {
 }
 
 func (t *SuiteTest) TestGenerateIPRelationUpdateInfo() {
-	newIPRelation := mysql.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
-	oldIPRelation := mysql.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
+	newIPRelation := mysql.ChIPRelation{L3EPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
+	oldIPRelation := mysql.ChIPRelation{L3EPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
 	updater := NewChIPRelation()
 	updateInfo, _ := updater.generateUpdateInfo(newIPRelation, oldIPRelation)
 	assert.Equal(t.T(), 0, len(updateInfo))
