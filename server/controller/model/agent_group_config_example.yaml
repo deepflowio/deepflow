@@ -734,15 +734,26 @@ vtap_group_id: g-xxxxxx
   ## Example: 1s, 2m, 10h
   #l7-log-session-aggr-timeout: 120s
 
-  ## The capacity of each l7_flow_log session slot
-  ## Default: 1024. Range: [1024, +oo)
-  ## If the number of data cached by session slot exceeds it's capacity,
-  ## the following impact will have:
-  ## - l7_flow_log cannot be aggregated into session, and flush l7_flow_log will be forced to lose data.
-  ## - Indicator: deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource 
-  ##   is used to record the cache request-resource occupation space, the unit is B
-  ## - Indicator: deepflow_system.deepflow_agent_l7_session_aggr.over-limit 
-  ##   is used to record the number of logs that exceed the limit to the forced flush
+  ## Capacity of Each l7_flow_log Aggregation Time Slot
+  ## Default: 1024. Range: [1024, +∞)
+  ## Note: By default, unidirectional l7_flow_log is aggregated into bidirectional
+  ##   request_log (session) with a caching time window of 2 minutes. During this
+  ##   period, every 5 seconds is considered as a time slot (i.e., a LRU). This
+  ##   configuration is used to specify the maximum number of unidirectional l7_flow_log
+  ##   entries that can be cached in each time slot.
+  ##       If the number of l7_flow_log entries cached in a time slot exceeds this
+  ##   configuration, 10% of the data in that time slot will be evicted based on the
+  ##   LRU strategy to reduce memory consumption. Note that the evicted data will not be
+  ##   discarded; instead, they will be sent to the deepflow-server as unidirectional
+  ##   request_log.
+  ##       The following metrics can be used as reference data for adjusting this
+  ##   configuration:
+  ##   - Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+  ##     Used to record the total memory occupied by the request_resource field of the
+  ##     unidirectional l7_flow_log cached in all time slots at the current moment, in bytes
+  ##   - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+  ##     Used to record the number of times eviction is triggered due to reaching the
+  ##     LRU capacity limit
   #l7-log-session-slot-capacity: 1024
 
   ##########
