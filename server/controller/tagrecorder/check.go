@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"reflect"
+	"sort"
 
 	"gorm.io/gorm"
 
@@ -67,35 +68,15 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 		return nil
 	}
 
-	newStr := make([]string, len(newItems))
-	oldStr := make([]string, len(oldItems))
-	newStrByte, err := json.Marshal(newStr)
+	oldHash, newHash, err := genH64(oldItems, newItems)
 	if err != nil {
-		return fmt.Errorf("marshal new ch data failed, %v", err)
+		return err
 	}
-	oldStrByte, err := json.Marshal(oldStr)
-	if err != nil {
-		return fmt.Errorf("marshal old ch data failed, %v", err)
-	}
-
-	var oldHash, newHash uint64
-	h64 := fnv.New64()
-	h64.Write(newStrByte)
-	newHash = h64.Sum64()
-	h64 = fnv.New64()
-	h64.Write(oldStrByte)
-	oldHash = h64.Sum64()
-
-	if oldHash == newHash {
-		return nil
-	}
-
 	var t CT
 	tableName := reflect.TypeOf(t)
-	log.Infof("truncate table %v, old len(%v) hash(%v), new len(%v) hash(%v)", tableName, len(oldItems), oldHash, len(newItems), newHash)
-	var deleteItems []*CT
-	for _, item := range oldItems {
-		deleteItems = append(deleteItems, &item)
+	log.Infof("check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)", tableName, len(oldItems), oldHash, len(newItems), newHash)
+	if oldHash == newHash {
+		return nil
 	}
 
 	err = mysql.Db.Transaction(func(tx *gorm.DB) error {
@@ -115,5 +96,48 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 		}
 		return nil
 	})
+	log.Infof("truncate table(%v)", tableName)
 	return err
+}
+
+func genH64[CT MySQLChModel](oldItems, newItems []CT) (oldHash, newHash uint64, err error) {
+	var newStrByte []byte
+	newStr := make([]string, len(newItems))
+	for i, item := range newItems {
+		newStrByte, err = json.Marshal(item)
+		if err != nil {
+			err = fmt.Errorf("marshal new ch data failed, %v", err)
+			return
+		}
+		newStr[i] = string(newStrByte)
+	}
+	sort.Strings(newStr)
+	newData, err := json.Marshal(newStr)
+	if err != nil {
+		return
+	}
+
+	var oldStrByte []byte
+	oldStr := make([]string, len(oldItems))
+	for i, item := range oldItems {
+		oldStrByte, err = json.Marshal(item)
+		if err != nil {
+			err = fmt.Errorf("marshal old ch data failed, %v", err)
+			return
+		}
+		oldStr[i] = string(oldStrByte)
+	}
+	sort.Strings(oldStr)
+	oldData, err := json.Marshal(oldStr)
+	if err != nil {
+		return
+	}
+
+	h64 := fnv.New64()
+	h64.Write(newData)
+	newHash = h64.Sum64()
+	h64 = fnv.New64()
+	h64.Write(oldData)
+	oldHash = h64.Sum64()
+	return
 }
