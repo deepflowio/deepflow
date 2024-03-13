@@ -55,6 +55,7 @@ type Metrics struct {
 	Permissions []bool // 指标量的权限控制
 	Table       string // 所属表
 	Description string // 描述
+	TagType     string // Tag type of metric's tag type
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -74,7 +75,7 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 
 func NewMetrics(
 	index int, dbField string, displayname string, unit string, metricType int, category string,
-	permissions []bool, condition string, table string, description string,
+	permissions []bool, condition string, table string, description string, tagType string,
 ) *Metrics {
 	return &Metrics{
 		Index:       index,
@@ -87,6 +88,7 @@ func NewMetrics(
 		Condition:   condition,
 		Table:       table,
 		Description: description,
+		TagType:     tagType,
 	}
 }
 
@@ -126,7 +128,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table, "",
+					"metrics", []bool{true, true, true}, "", table, "", "",
 				)
 				newAllMetrics[field] = metric
 			}
@@ -135,7 +137,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
-			"metrics", []bool{true, true, true}, "", table, "",
+			"metrics", []bool{true, true, true}, "", table, "", "",
 		)
 		newAllMetrics[field] = metric
 	}
@@ -207,7 +209,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 						if serverName == clientName {
 							clientNameMetric := NewMetrics(
 								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							newAllMetrics[clientName] = clientNameMetric
 						} else {
@@ -229,11 +231,11 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 							}
 							serverNameMetric := NewMetrics(
 								0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							clientNameMetric := NewMetrics(
 								0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							newAllMetrics[serverName] = serverNameMetric
 							newAllMetrics[clientName] = clientNameMetric
@@ -241,7 +243,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					} else {
 						nameMetric := NewMetrics(
 							0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", permissions, "", table, "",
+							"Tag", permissions, "", table, "", tagType,
 						)
 						newAllMetrics[name] = nameMetric
 					}
@@ -328,7 +330,7 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL string, useQueryCache b
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "",
+				"metrics", []bool{true, true, true}, "", table, "", "",
 			)
 			return metrics, err
 		}
@@ -630,7 +632,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				description := metricsLanguage[3].(string)
 				lm := NewMetrics(
 					i, metrics[1].(string), displayName, unit, metricType,
-					metrics[3].(string), permissions, "", table, description,
+					metrics[3].(string), permissions, "", table, description, "",
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}

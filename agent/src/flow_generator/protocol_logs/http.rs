@@ -325,6 +325,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn get_request_domain(&self) -> String {
         self.host.clone()
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
+    }
 }
 
 impl HttpInfo {

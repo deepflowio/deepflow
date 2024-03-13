@@ -88,6 +88,17 @@ impl L7ProtocolInfoInterface for DnsInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.query_name.is_empty() {
+            return None;
+        }
+        Some(self.query_name.clone())
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.query_name.len()
+    }
 }
 
 impl DnsInfo {
