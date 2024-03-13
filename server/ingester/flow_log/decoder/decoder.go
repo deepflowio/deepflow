@@ -28,8 +28,8 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -298,7 +298,7 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 
 func (d *Decoder) export(l *log_data.L7FlowLog) {
 	if d.exporters != nil {
-		d.exporters.Put(l, d.index)
+		// d.exporters.Put(d.index, l)
 	}
 }
 

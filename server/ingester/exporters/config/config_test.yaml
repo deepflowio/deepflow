@@ -1,0 +1,58 @@
+ingester:
+  exporters:
+  - protocol: opentelemetry
+    endpoints: [127.0.0.1:4317, 1.1.1.1:4317]  # [protocol://]ip:port,随机选择一个可以发送成功的地址
+    data-source: # $db_name.$table_name
+    - flow_log.l4_flow_log
+    - flow_log.l7_flow_log
+    extra-headers: [key1:value1, key2:value2]  # type: map[string]string, extra http request headers
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024       # 不同协议的 batch-size 不同
+    flush-timeout: 10
+    tag-filters:
+    - field-name: signal_source
+      operator: "="        # 支持的操作符见 PS 正文
+      field-values: []     # 仅当操作符是 IN 或 NOT IN 时，才支持填写长度大于 1 的列表
+    export-fields: # $field_name 等
+    - @flow-info          # @$category
+    - @universal-tag      # @$category
+    - ip_0                # $field_name
+    - k8s.label           # $field_name
+    - k8s.annotation.app  # $field_name.$sub_field_name
+    - ~k8s.env.(a.*|abc)  # $field_name.$sub_field_name_regex
+    - @merics             # @$category
+    - @metrics.delay      # @$category.$sub_category
+    - rtt                 # $field_name
+    # 私有配置
+    extra-headers: [key1:value1, key2:value2]  # type: map[string]string, extra http request headers
+  - protocol: prometheus
+    endpoint: http://1.2.3.4:9091  # [protocol://]ip:port
+    data-source:
+    - flow_metrics.network.1s
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filter: "" # 默认为空
+    export-fields: [] # 不允许为空
+    # 私有配置
+    extra-headers: [key1:value1, key2:value2]  # type: map[string]string, extra http request headers
+  - protocol: kafka
+    endpoint: http://1.2.3.4:9091  # [protocol://]ip:port
+    data-source:
+    - flow_metrics.network.1m
+    - flow_metrics.network.1s
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filter: "" # 默认为空
+    export-fields: [] # 不允许为空
+    # 私有配置
+    sasl:
+      enabled: false # 默认为 False
+      security-protocol: SASL_SSL  # 目前只支持 SASL_SSL
+      sasl-mechanism: PLAIN # 目前只支持 PLAIN
+      username: aaa
+      password: aaa

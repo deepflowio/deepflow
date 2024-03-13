@@ -46,12 +46,12 @@ type L7Base struct {
 	KnowledgeGraph
 
 	// 网络层
-	IP40     uint32 `json:"ip4_0"`
-	IP41     uint32 `json:"ip4_1"`
-	IP60     net.IP `json:"ip6_0"`
-	IP61     net.IP `json:"ip6_1"`
-	IsIPv4   bool   `json:"is_ipv4"`
-	Protocol uint8
+	IP40     uint32 `json:"ip4_0" category:"tag" sub:"network_layer"`
+	IP41     uint32 `json:"ip4_1" category:"tag" sub:"network_layer"`
+	IP60     net.IP `json:"ip6_0" category:"network_layer"`
+	IP61     net.IP `json:"ip6_1" category:"network_layer"`
+	IsIPv4   bool   `json:"is_ipv4" category:"network_layer"`
+	Protocol uint8  `json:"protocol" category:"network_layer"`
 
 	// 传输层
 	ClientPort uint16 `json:"client_port"`
@@ -71,7 +71,7 @@ type L7Base struct {
 	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
 	StartTime    int64  `json:"start_time"` // us
 	EndTime      int64  `json:"end_time"`   // us
-	GPID0        uint32
+	GPID0        uint32 `json:"gprocess_0" category:"tag" sub:"network_layer" translate:"1"`
 	GPID1        uint32
 	BizType      uint8
 
@@ -227,7 +227,7 @@ type L7FlowLog struct {
 	AppInstance     string
 
 	ResponseDuration uint64
-	RequestLength    *int64
+	RequestLength    *int64 `json:"request_length" category:"metrics" sub_category:"throughput"`
 	requestLength    int64
 	ResponseLength   *int64
 	responseLength   int64

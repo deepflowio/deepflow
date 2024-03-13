@@ -252,7 +252,7 @@ type Field struct {
 	//   - ingester写入clickhouse，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 
-	IP6              net.IP // FIXME: 合并IP6和IP
+	IP6              net.IP `json:"ip6" map_json:"ip6_0" category:"tag" sub:"network"` // FIXME: 合并IP6和IP
 	MAC              uint64
 	IP               uint32
 	L3EpcID          int32 // (8B)
@@ -275,7 +275,7 @@ type Field struct {
 	GPID             uint32
 
 	MAC1              uint64
-	IP61              net.IP // FIXME: 合并IP61和IP1
+	IP61              net.IP `json:"ip6_1" category:"tag" sub:"network"` // FIXME: 合并IP61和IP1
 	IP1               uint32
 	L3EpcID1          int32 // (8B)
 	L3DeviceID1       uint32

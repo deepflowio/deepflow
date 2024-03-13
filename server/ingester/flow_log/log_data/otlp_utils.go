@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package otlp_exporter
+package log_data
 
 import (
 	"bytes"

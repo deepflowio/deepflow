@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
@@ -65,12 +65,10 @@ type Logger struct {
 	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
-func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowLog, error) {
+func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*FlowLog, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_FLOW_LOG_QUEUE)
 
 	if config.Base.StorageDisabled {
-		exporters := exporters.NewExporters(config)
-
 		l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, nil, exporters)
 		if err != nil {
 			return nil, err
@@ -92,7 +90,6 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	}
 	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
 
-	exporters := exporters.NewExporters(config)
 	l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, exporters)
 	if err != nil {
 		return nil, err
