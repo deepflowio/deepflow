@@ -135,9 +135,9 @@ func (m *AppMeter) WriteBlock(block *ckdb.Block) {
 }
 
 type AppTraffic struct {
-	Request        uint32 `db:"request"`
-	Response       uint32 `db:"response"`
-	DirectionScore uint8  `db:"direction_score"`
+	Request        uint32 `json:"request" category:"$metrics" sub:"throughput"`
+	Response       uint32 `json:"response" category:"$metrics" sub:"throughput"`
+	DirectionScore uint8  `json:"direction_score" category:"$metrics" sub:"throughput"`
 }
 
 func (_ *AppTraffic) Reverse() {
@@ -195,9 +195,9 @@ func (t *AppTraffic) WriteBlock(block *ckdb.Block) {
 }
 
 type AppLatency struct {
-	RRTMax   uint32 `db:"rrt_max"` // us
-	RRTSum   uint64 `db:"rrt_sum"` // us
-	RRTCount uint32 `db:"rrt_count"`
+	RRTMax   uint32 `json:"rrt_max" category:"$metrics" sub:"delay"` // us
+	RRTSum   uint64 `json:"rrt_sum" category:"$metrics" sub:"delay"` // us
+	RRTCount uint32 `json:"rrt_count" category:"$metrics" sub:"delay"`
 }
 
 func (_ *AppLatency) Reverse() {
@@ -255,9 +255,9 @@ func (l *AppLatency) WriteBlock(block *ckdb.Block) {
 }
 
 type AppAnomaly struct {
-	ClientError uint32 `db:"client_error"`
-	ServerError uint32 `db:"server_error"`
-	Timeout     uint32 `db:"timeout"`
+	ClientError uint32 `json:"client_error" category:"$metrics" sub:"error"`
+	ServerError uint32 `json:"server_error" category:"$metrics" sub:"error"`
+	Timeout     uint32 `json:"timeout" category:"$metrics" sub:"error"`
 }
 
 func (_ *AppAnomaly) Reverse() {

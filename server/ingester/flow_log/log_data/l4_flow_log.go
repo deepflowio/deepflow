@@ -42,7 +42,7 @@ const (
 
 type L4FlowLog struct {
 	pool.ReferenceCount
-	_id uint64 // 用来标记全局(多节点)唯一的记录
+	_id uint64 `json:"_id" category:"$tag" sub:"flow_info"` // 用来标记全局(多节点)唯一的记录
 
 	DataLinkLayer
 	NetworkLayer
@@ -55,10 +55,10 @@ type L4FlowLog struct {
 }
 
 type DataLinkLayer struct {
-	MAC0    uint64 `json:"mac_0"`
-	MAC1    uint64 `json:"mac_1"`
-	EthType uint16 `json:"eth_type"`
-	VLAN    uint16 `json:"vlan,omitempty"`
+	MAC0    uint64 `json:"mac_0" category:"$tag" sub:"data_link_layer" to_string:"MacString"`
+	MAC1    uint64 `json:"mac_1" category:"$tag" to_string:"MacString"`
+	EthType uint16 `json:"eth_type" category:"$tag" sub:"data_link_layer"`
+	VLAN    uint16 `json:"vlan" category:"$tag" sub:"data_link_layer"`
 }
 
 var DataLinkLayerColumns = []*ckdb.Column{
@@ -76,30 +76,39 @@ func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) {
 		f.VLAN)
 }
 
+func DF_IPv4String(ip4 uint32) string {
+	ip := make(net.IP, 4)
+	ip[0] = byte(ip4 >> 24)
+	ip[1] = byte(ip4 >> 16)
+	ip[2] = byte(ip4 >> 8)
+	ip[3] = byte(ip4)
+	return ip.String()
+}
+
 type NetworkLayer struct {
-	IP40         uint32 `json:"ip4_0"`
-	IP41         uint32 `json:"ip4_1"`
-	IP60         net.IP `json:"ip6_0"`
-	IP61         net.IP `json:"ip6_1"`
-	IsIPv4       bool   `json:"is_ipv4"`
-	Protocol     uint8  `json:"protocol"`
-	TunnelTier   uint8  `json:"tunnel_tier,omitempty"`
-	TunnelType   uint16 `json:"tunnel_type,omitempty"`
-	TunnelTxID   uint32 `json:"tunnel_tx_id,omitempty"`
-	TunnelRxID   uint32 `json:"tunnel_rx_id,omitempty"`
-	TunnelTxIP40 uint32 `json:"tunnel_tx_ip4_0,omitempty"`
-	TunnelTxIP41 uint32 `json:"tunnel_tx_ip4_1,omitempty"`
-	TunnelRxIP40 uint32 `json:"tunnel_rx_ip4_0,omitempty"`
-	TunnelRxIP41 uint32 `json:"tunnel_rx_ip4_1,omitempty"`
-	TunnelTxIP60 net.IP `json:"tunnel_tx_ip6_0,omitempty"`
-	TunnelTxIP61 net.IP `json:"tunnel_tx_ip6_1,omitempty"`
-	TunnelRxIP60 net.IP `json:"tunnel_rx_ip6_0,omitempty"`
-	TunnelRxIP61 net.IP `json:"tunnel_rx_ip6_1,omitempty"`
-	TunnelIsIPv4 bool   `json:"tunnel_is_ipv4"`
-	TunnelTxMac0 uint32 `json:"tunnel_tx_mac_0,omitempty"`
-	TunnelTxMac1 uint32 `json:"tunnel_tx_mac_1,omitempty"`
-	TunnelRxMac0 uint32 `json:"tunnel_rx_mac_0,omitempty"`
-	TunnelRxMac1 uint32 `json:"tunnel_rx_mac_1,omitempty"`
+	IP40         uint32 `json:"ip4_0" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	IP41         uint32 `json:"ip4_1" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	IP60         net.IP `json:"ip6_0" category:"$tag" sub:"network_layer"`
+	IP61         net.IP `json:"ip6_1" category:"$tag" sub:"network_layer"`
+	IsIPv4       bool   `json:"is_ipv4" category:"$tag" sub:"network_layer"`
+	Protocol     uint8  `json:"protocol" category:"$tag"  sub:"network_layer" enumfile:"protocol" tranlate:"tunnel_tier"`
+	TunnelTier   uint8  `json:"tunnel_tier" category:"$tag" sub:"tunnel_info" tranlate:"tunnel_type"`
+	TunnelType   uint16 `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
+	TunnelTxID   uint32 `json:"tunnel_tx_id" category:"$tag" sub:"tunnel_info"`
+	TunnelRxID   uint32 `json:"tunnel_rx_id" category:"$tag" sub:"tunnel_info"`
+	TunnelTxIP40 uint32 `json:"tunnel_tx_ip4_0" category:"$tag" sub:"tunnel_info" to_string:"IPv4String"`
+	TunnelTxIP41 uint32 `json:"tunnel_tx_ip4_1" category:"$tag" sub:"tunnel_info" to_string:"IPv4String"`
+	TunnelRxIP40 uint32 `json:"tunnel_rx_ip4_0" category:"$tag" sub:"tunnel_info" to_string:"IPv4String"`
+	TunnelRxIP41 uint32 `json:"tunnel_rx_ip4_1" category:"$tag" sub:"tunnel_info" to_string:"IPv4String"`
+	TunnelTxIP60 net.IP `json:"tunnel_tx_ip6_0" category:"$tag" sub:"tunnel_info" to_string:"IPv6String"`
+	TunnelTxIP61 net.IP `json:"tunnel_tx_ip6_1" category:"$tag" sub:"tunnel_info" to_string:"IPv6String"`
+	TunnelRxIP60 net.IP `json:"tunnel_rx_ip6_0" category:"$tag" sub:"tunnel_info" to_string:"IPv6String"`
+	TunnelRxIP61 net.IP `json:"tunnel_rx_ip6_1" category:"$tag" sub:"tunnel_info" to_string:"IPv6String"`
+	TunnelIsIPv4 bool   `json:"tunnel_is_ipv4" category:"$tag" sub:"tunnel_info"`
+	TunnelTxMac0 uint32 `json:"tunnel_tx_mac_0" category:"$tag" sub:"tunnel_info"`
+	TunnelTxMac1 uint32 `json:"tunnel_tx_mac_1" category:"$tag" sub:"tunnel_info"`
+	TunnelRxMac0 uint32 `json:"tunnel_rx_mac_0" category:"$tag" sub:"tunnel_info"`
+	TunnelRxMac1 uint32 `json:"tunnel_rx_mac_1" category:"$tag" sub:"tunnel_info"`
 }
 
 var NetworkLayerColumns = []*ckdb.Column{
@@ -161,14 +170,14 @@ func (n *NetworkLayer) WriteBlock(block *ckdb.Block) {
 }
 
 type TransportLayer struct {
-	ClientPort       uint16 `json:"client_port"`
-	ServerPort       uint16 `json:"server_port"`
-	TCPFlagsBit0     uint16 `json:"tcp_flags_bit_0,omitempty"`
-	TCPFlagsBit1     uint16 `json:"tcp_flags_bit_1,omitempty"`
-	SynSeq           uint32 `json:"syn_seq"`
-	SynAckSeq        uint32 `json:"syn_ack_seq"`
-	LastKeepaliveSeq uint32 `json:"last_keepalive_seq"`
-	LastKeepaliveAck uint32 `json:"last_keepalive_ack"`
+	ClientPort       uint16 `json:"client_port" category:"$tag" sub:"transport_layer"`
+	ServerPort       uint16 `json:"server_port" category:"$tag" sub:"transport_layer"`
+	TCPFlagsBit0     uint16 `json:"tcp_flags_bit_0" category:"$tag" sub:"transport_layer"`
+	TCPFlagsBit1     uint16 `json:"tcp_flags_bit_1" category:"$tag" sub:"transport_layer"`
+	SynSeq           uint32 `json:"syn_seq" category:"$tag" sub:"transport_layer"`
+	SynAckSeq        uint32 `json:"syn_ack_seq" category:"$tag" sub:"transport_layer"`
+	LastKeepaliveSeq uint32 `json:"last_keepalive_seq" category:"$tag" sub:"transport_layer"`
+	LastKeepaliveAck uint32 `json:"last_keepalive_ack" category:"$tag" sub:"transport_layer"`
 }
 
 var TransportLayerColumns = []*ckdb.Column{
@@ -196,7 +205,7 @@ func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
 }
 
 type ApplicationLayer struct {
-	L7Protocol uint8 `json:"l7_protocol,omitempty"` // HTTP, DNS, others
+	L7Protocol uint8 `json:"l7_protocol"` // HTTP, DNS, others
 }
 
 var ApplicationLayerColumns = []*ckdb.Column{
@@ -209,8 +218,8 @@ func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) {
 }
 
 type Internet struct {
-	Province0 string `json:"province_0"`
-	Province1 string `json:"province_1"`
+	Province0 string `json:"province_0" category:"$tag" sub:"network_layer"`
+	Province1 string `json:"province_1" category:"$tag" sub:"network_layer"`
 }
 
 var InternetColumns = []*ckdb.Column{
@@ -224,46 +233,46 @@ func (i *Internet) WriteBlock(block *ckdb.Block) {
 }
 
 type KnowledgeGraph struct {
-	RegionID0     uint16 `json:"region_id_0"`
-	RegionID1     uint16 `json:"region_id_1"`
-	AZID0         uint16 `json:"az_id_0"`
-	AZID1         uint16 `json:"az_id_1"`
-	HostID0       uint16 `json:"host_id_0"`
-	HostID1       uint16 `json:"host_id_1"`
-	L3DeviceType0 uint8  `json:"l3_device_type_0"`
-	L3DeviceType1 uint8  `json:"l3_device_type_1"`
-	L3DeviceID0   uint32 `json:"l3_device_id_0"`
-	L3DeviceID1   uint32 `json:"l3_device_id_1"`
-	PodNodeID0    uint32 `json:"pod_node_id_0"`
-	PodNodeID1    uint32 `json:"pod_node_id_1"`
-	PodNSID0      uint16 `json:"pod_ns_id_0"`
-	PodNSID1      uint16 `json:"pod_ns_id_1"`
-	PodGroupID0   uint32 `json:"pod_group_id_0"`
-	PodGroupID1   uint32 `json:"pod_group_id_1"`
-	PodGroupType0 uint8  `json:"pod_group_type_0"` // no need to store
-	PodGroupType1 uint8  `json:"pod_group_type_1"` // no need to store
-	PodID0        uint32 `json:"pod_id_0"`
-	PodID1        uint32 `json:"pod_id_1"`
-	PodClusterID0 uint16 `json:"pod_cluster_id_0"`
-	PodClusterID1 uint16 `json:"pod_cluster_id_1"`
-	L3EpcID0      int32  `json:"l3_epc_id_0"`
-	L3EpcID1      int32  `json:"l3_epc_id_1"`
-	EpcID0        int32  `json:"epc_id_0"`
-	EpcID1        int32  `json:"epc_id_1"`
-	SubnetID0     uint16 `json:"subnet_id_0"`
-	SubnetID1     uint16 `json:"subnet_id_1"`
-	ServiceID0    uint32 `json:"service_id_0"`
-	ServiceID1    uint32 `json:"service_id_1"`
+	RegionID0     uint16 `json:"region_id_0" category:"$tag" sub:"universal_tag"`
+	RegionID1     uint16 `json:"region_id_1" category:"$tag" sub:"universal_tag"`
+	AZID0         uint16 `json:"az_id_0" category:"$tag" sub:"universal_tag"`
+	AZID1         uint16 `json:"az_id_1" category:"$tag" sub:"universal_tag"`
+	HostID0       uint16 `json:"host_id_0" category:"$tag" sub:"universal_tag"`
+	HostID1       uint16 `json:"host_id_1" category:"$tag" sub:"universal_tag"`
+	L3DeviceType0 uint8  `json:"l3_device_type_0" category:"$tag" sub:"universal_tag"`
+	L3DeviceType1 uint8  `json:"l3_device_type_1" category:"$tag" sub:"universal_tag"`
+	L3DeviceID0   uint32 `json:"l3_device_id_0" category:"$tag" sub:"universal_tag"`
+	L3DeviceID1   uint32 `json:"l3_device_id_1" category:"$tag" sub:"universal_tag"`
+	PodNodeID0    uint32 `json:"pod_node_id_0" category:"$tag" sub:"universal_tag"`
+	PodNodeID1    uint32 `json:"pod_node_id_1" category:"$tag" sub:"universal_tag"`
+	PodNSID0      uint16 `json:"pod_ns_id_0" category:"$tag" sub:"universal_tag"`
+	PodNSID1      uint16 `json:"pod_ns_id_1" category:"$tag" sub:"universal_tag"`
+	PodGroupID0   uint32 `json:"pod_group_id_0" category:"$tag" sub:"universal_tag"`
+	PodGroupID1   uint32 `json:"pod_group_id_1" category:"$tag" sub:"universal_tag"`
+	PodGroupType0 uint8  `json:"pod_group_type_0" category:"$tag" sub:"universal_tag" enumfile:"pod_group_type"` // no need to store
+	PodGroupType1 uint8  `json:"pod_group_type_1" category:"$tag" sub:"universal_tag" enumfile:"pod_group_type"` // no need to store
+	PodID0        uint32 `json:"pod_id_0" category:"$tag" sub:"universal_tag"`
+	PodID1        uint32 `json:"pod_id_1" category:"$tag" sub:"universal_tag"`
+	PodClusterID0 uint16 `json:"pod_cluster_id_0" category:"$tag" sub:"universal_tag"`
+	PodClusterID1 uint16 `json:"pod_cluster_id_1" category:"$tag" sub:"universal_tag"`
+	L3EpcID0      int32  `json:"l3_epc_id_0" category:"$tag" sub:"universal_tag"`
+	L3EpcID1      int32  `json:"l3_epc_id_1" category:"$tag" sub:"universal_tag"`
+	EpcID0        int32  `json:"epc_id_0" category:"$tag" sub:"universal_tag"`
+	EpcID1        int32  `json:"epc_id_1" category:"$tag" sub:"universal_tag"`
+	SubnetID0     uint16 `json:"subnet_id_0" category:"$tag" sub:"universal_tag"`
+	SubnetID1     uint16 `json:"subnet_id_1" category:"$tag" sub:"universal_tag"`
+	ServiceID0    uint32 `json:"service_id_0" category:"$tag" sub:"universal_tag"`
+	ServiceID1    uint32 `json:"service_id_1" category:"$tag" sub:"universal_tag"`
 
-	AutoInstanceID0   uint32
-	AutoInstanceType0 uint8
-	AutoServiceID0    uint32
-	AutoServiceType0  uint8
+	AutoInstanceID0   uint32 `json:"auto_instance_id_0" category:"$tag" sub:"universal_tag"`
+	AutoInstanceType0 uint8  `json:"auto_instance_type_0" category:"$tag" sub:"universal_tag" enumfile:"auto_instance_type"`
+	AutoServiceID0    uint32 `json:"auto_service_id_0" category:"$tag" sub:"universal_tag"`
+	AutoServiceType0  uint8  `json:"auto_service_type_0" category:"$tag" sub:"universal_tag" enumfile:"auto_service_type"`
 
-	AutoInstanceID1   uint32
-	AutoInstanceType1 uint8
-	AutoServiceID1    uint32
-	AutoServiceType1  uint8
+	AutoInstanceID1   uint32 `json:"auto_instance_id_1" category:"$tag" sub:"universal_tag"`
+	AutoInstanceType1 uint8  `json:"auto_instance_type_1" category:"$tag" sub:"universal_tag" enumfile:"auto_instance_type"`
+	AutoServiceID1    uint32 `json:"auto_service_id_1" category:"$tag" sub:"universal_tag"`
+	AutoServiceType1  uint8  `json:"auto_service_type_1" category:"$tag" sub:"universal_tag" enumfile:"auto_service_type"`
 
 	TagSource0 uint8
 	TagSource1 uint8
@@ -367,35 +376,36 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
 }
 
 type FlowInfo struct {
-	CloseType    uint16 `json:"close_type"`
-	SignalSource uint16 `json:"signal_source"`
-	FlowID       uint64 `json:"flow_id"`
-	TapType      uint8  `json:"capture_network_type_id"`
-	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort      uint32 `json:"capture_nic"`
-	TapSide      string `json:"observation_point"`
-	VtapID       uint16 `json:"agent_id"`
-	L2End0       bool   `json:"l2_end_0"`
-	L2End1       bool   `json:"l2_end_1"`
-	L3End0       bool   `json:"l3_end_0"`
-	L3End1       bool   `json:"l3_end_1"`
-	StartTime    int64  `json:"start_time"` // us
-	EndTime      int64  `json:"end_time"`   // us
-	Duration     uint64 `json:"duration"`   // us
-	IsNewFlow    uint8  `json:"is_new_flow"`
-	Status       uint8  `json:"status"`
-	AclGids      []uint16
-	GPID0        uint32
-	GPID1        uint32
+	Time         uint32   `json:"time" category:"$tag" sub:"flow_info"` // s
+	CloseType    uint16   `json:"close_type" category:"$tag" sub:"flow_info" enumfile:"close_type"`
+	SignalSource uint16   `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l4_signal_source"`
+	FlowID       uint64   `json:"flow_id" category:"$tag" sub:"flow_info"`
+	TapType      uint8    `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource    uint8    `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType  uint8    `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort      uint32   `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide      string   `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	VtapID       uint16   `json:"agent_id" category:"$tag" sub:"capture_info"`
+	L2End0       bool     `json:"l2_end_0" category:"$tag" sub:"capture_info"`
+	L2End1       bool     `json:"l2_end_1" category:"$tag" sub:"capture_info"`
+	L3End0       bool     `json:"l3_end_0" category:"$tag" sub:"capture_info"`
+	L3End1       bool     `json:"l3_end_1" category:"$tag" sub:"capture_info"`
+	StartTime    int64    `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime      int64    `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	Duration     uint64   `json:"duration" category:"$metrics" sub:"delay"`   // us
+	IsNewFlow    uint8    `json:"is_new_flow" category:"$tag" sub:"flow_info"`
+	Status       uint8    `json:"status" category:"$tag" sub:"flow_info" enumfile:"status"`
+	AclGids      []uint16 `json:"acl_gids" category:"$tag" sub:"flow_info"`
+	GPID0        uint32   `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1        uint32   `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
 
-	NatRealIP0   uint32
-	NatRealIP1   uint32
-	NatRealPort0 uint16
-	NatRealPort1 uint16
+	NatRealIP0   uint32 `json:"nat_real_ip_0" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
+	NatRealIP1   uint32 `json:"nat_real_ip_1" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
+	NatRealPort0 uint16 `json:"nat_real_port_0" category:"$tag" sub:"capture_info"`
+	NatRealPort1 uint16 `json:"nat_real_port_1" category:"$tag" sub:"capture_info"`
 
-	DirectionScore uint8
-	RequestDomain  string
+	DirectionScore uint8  `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
+	RequestDomain  string `json:"request_domain" category:"$tag" sub:"application_layer"`
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -431,7 +441,7 @@ var FlowInfoColumns = []*ckdb.Column{
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR))
+	block.WriteDateTime(f.Time)
 	block.Write(
 		f.CloseType,
 		f.SignalSource,
@@ -462,54 +472,54 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
 }
 
 type Metrics struct {
-	PacketTx      uint64 `json:"packet_tx,omitempty"`
-	PacketRx      uint64 `json:"packet_rx,omitempty"`
-	ByteTx        uint64 `json:"byte_tx,omitempty"`
-	ByteRx        uint64 `json:"byte_rx,omitempty"`
-	L3ByteTx      uint64 `json:"l3_byte_tx,omitempty"`
-	L3ByteRx      uint64 `json:"l3_byte_rx,omitempty"`
-	L4ByteTx      uint64 `json:"l4_byte_tx,omitempty"`
-	L4ByteRx      uint64 `json:"l4_byte_rx,omitempty"`
-	TotalPacketTx uint64 `json:"total_packet_tx,omitempty"`
-	TotalPacketRx uint64 `json:"total_packet_rx,omitempty"`
-	TotalByteTx   uint64 `json:"total_byte_tx,omitempty"`
-	TotalByteRx   uint64 `json:"total_byte_rx,omitempty"`
-	L7Request     uint32 `json:"l7_request,omitempty"`
-	L7Response    uint32 `json:"l7_response,omitempty"`
-	L7ParseFailed uint32 `json:"l7_parse_failed,omitempty"`
+	PacketTx      uint64 `json:"packet_tx" category:"$metrics" sub:"l3_throughput"`
+	PacketRx      uint64 `json:"packet_rx" category:"$metrics" sub:"l3_throughput"`
+	ByteTx        uint64 `json:"byte_tx" category:"$metrics" sub:"l3_throughput"`
+	ByteRx        uint64 `json:"byte_rx" category:"$metrics" sub:"l3_throughput"`
+	L3ByteTx      uint64 `json:"l3_byte_tx" category:"$metrics" sub:"l3_throughput"`
+	L3ByteRx      uint64 `json:"l3_byte_rx" category:"$metrics" sub:"l3_throughput"`
+	L4ByteTx      uint64 `json:"l4_byte_tx" category:"$metrics" sub:"l4_throughput"`
+	L4ByteRx      uint64 `json:"l4_byte_rx" category:"$metrics" sub:"l4_throughput"`
+	TotalPacketTx uint64 `json:"total_packet_tx" category:"$metrics" sub:"l3_throughput"`
+	TotalPacketRx uint64 `json:"total_packet_rx" category:"$metrics" sub:"l3_throughput"`
+	TotalByteTx   uint64 `json:"total_byte_tx" category:"$metrics" sub:"l3_throughput"`
+	TotalByteRx   uint64 `json:"total_byte_rx" category:"$metrics" sub:"l3_throughput"`
+	L7Request     uint32 `json:"l7_request" category:"$metrics" sub:"application"`
+	L7Response    uint32 `json:"l7_response" category:"$metrics" sub:"application"`
+	L7ParseFailed uint32 `json:"l7_parse_failed" category:"$metrics" sub:"application"`
 
-	RTT       uint32 `json:"rtt,omitempty"`         // us
-	RTTClient uint32 `json:"rtt_client,omitempty"`  // us
-	RTTServer uint32 `json:"rtt_server,omitempty"`  // us
-	TLSRTT    uint32 `json:"tls_rtt_sum,omitempty"` // us
+	RTT       uint32 `json:"rtt" category:"$metrics" sub:"delay"`         // us
+	RTTClient uint32 `json:"rtt_client" category:"$metrics" sub:"delay"`  // us
+	RTTServer uint32 `json:"rtt_server" category:"$metrics" sub:"delay"`  // us
+	TLSRTT    uint32 `json:"tls_rtt_sum" category:"$metrics" sub:"delay"` // us
 
-	SRTSum uint32 `json:"srt_sum,omitempty"`
-	ARTSum uint32 `json:"art_sum,omitempty"`
-	RRTSum uint64 `json:"rrt_sum,omitempty"`
-	CITSum uint32 `json:"cit_sum,omitempty"`
+	SRTSum uint32 `json:"srt_sum" category:"$metrics" sub:"delay"`
+	ARTSum uint32 `json:"art_sum" category:"$metrics" sub:"delay"`
+	RRTSum uint64 `json:"rrt_sum" category:"$metrics" sub:"delay"`
+	CITSum uint32 `json:"cit_sum" category:"$metrics" sub:"delay"`
 
-	SRTCount uint32 `json:"srt_count,omitempty"`
-	ARTCount uint32 `json:"art_count,omitempty"`
-	RRTCount uint32 `json:"rrt_count,omitempty"`
-	CITCount uint32 `json:"cit_count,omitempty"`
+	SRTCount uint32 `json:"srt_count" category:"$metrics" sub:"delay"`
+	ARTCount uint32 `json:"art_count" category:"$metrics" sub:"delay"`
+	RRTCount uint32 `json:"rrt_count" category:"$metrics" sub:"delay"`
+	CITCount uint32 `json:"cit_count" category:"$metrics" sub:"delay"`
 
-	SRTMax uint32 `json:"srt_max,omitempty"` // us
-	ARTMax uint32 `json:"art_max,omitempty"` // us
-	RRTMax uint32 `json:"rrt_max,omitempty"` // us
-	CITMax uint32 `json:"cit_max,omitempty"` // us
+	SRTMax uint32 `json:"srt_max" category:"$metrics" sub:"delay"` // us
+	ARTMax uint32 `json:"art_max" category:"$metrics" sub:"delay"` // us
+	RRTMax uint32 `json:"rrt_max" category:"$metrics" sub:"delay"` // us
+	CITMax uint32 `json:"cit_max" category:"$metrics" sub:"delay"` // us
 
-	RetransTx       uint32 `json:"retrans_tx,omitempty"`
-	RetransRx       uint32 `json:"retrans_rx,omitempty"`
-	ZeroWinTx       uint32 `json:"zero_win_tx,omitempty"`
-	ZeroWinRx       uint32 `json:"zero_win_rx,omitempty"`
-	SynCount        uint32 `json:"syn_count,omitempty"`
-	SynackCount     uint32 `json:"synack_count,omitempty"`
-	RetransSyn      uint32 `json:"retrans_syn,omitempty"`
-	RetransSynack   uint32 `json:"retrans_synack,omitempty"`
-	L7ClientError   uint32 `json:"l7_client_error,omitempty"`
-	L7ServerError   uint32 `json:"l7_server_error,omitempty"`
-	L7ServerTimeout uint32 `json:"l7_server_timeout,omitempty"`
-	L7Error         uint32 `json:"l7_error,omitempty"`
+	RetransTx       uint32 `json:"retrans_tx" category:"$metrics" sub:"tcp_slow"`
+	RetransRx       uint32 `json:"retrans_rx" category:"$metrics" sub:"tcp_slow"`
+	ZeroWinTx       uint32 `json:"zero_win_tx" category:"$metrics" sub:"tcp_slow"`
+	ZeroWinRx       uint32 `json:"zero_win_rx" category:"$metrics" sub:"tcp_slow"`
+	SynCount        uint32 `json:"syn_count" category:"$metrics" sub:"l4_throughput"`
+	SynackCount     uint32 `json:"synack_count" category:"$metrics" sub:"l4_throughput"`
+	RetransSyn      uint32 `json:"retrans_syn" category:"$metrics" sub:"tcp_slow"`
+	RetransSynack   uint32 `json:"retrans_synack" category:"$metrics" sub:"tcp_slow"`
+	L7ClientError   uint32 `json:"l7_client_error" category:"$metrics" sub:"application"`
+	L7ServerError   uint32 `json:"l7_server_error" category:"$metrics" sub:"application"`
+	L7ServerTimeout uint32 `json:"l7_server_timeout" category:"$metrics" sub:"application"`
+	L7Error         uint32 `json:"l7_error" category:"$metrics" sub:"application"`
 }
 
 var MetricsColumns = []*ckdb.Column{
@@ -897,6 +907,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 
 	i.StartTime = int64(f.StartTime) / int64(time.Microsecond)
 	i.EndTime = int64(f.EndTime) / int64(time.Microsecond)
+	i.Time = uint32(f.EndTime / uint64(time.Second))
 	i.Duration = f.Duration / uint64(time.Microsecond)
 	i.IsNewFlow = uint8(f.IsNewFlow)
 	i.Status = uint8(getStatus(datatype.CloseType(i.CloseType), layers.IPProtocol(f.FlowKey.Proto)))

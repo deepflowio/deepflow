@@ -24,23 +24,23 @@ import (
 )
 
 type Traffic struct {
-	PacketTx   uint64 `db:"packet_tx"`
-	PacketRx   uint64 `db:"packet_rx"`
-	ByteTx     uint64 `db:"byte_tx"`
-	ByteRx     uint64 `db:"byte_rx"`
-	L3ByteTx   uint64 `db:"l3_byte_tx"`
-	L3ByteRx   uint64 `db:"l3_byte_rx"`
-	L4ByteTx   uint64 `db:"l4_byte_tx"`
-	L4ByteRx   uint64 `db:"l4_byte_rx"`
-	NewFlow    uint64 `db:"new_flow"`
-	ClosedFlow uint64 `db:"closed_flow"`
+	PacketTx   uint64 `json:"packet_tx" category:"$metrics" sub:"l3_throughput"`
+	PacketRx   uint64 `json:"packet_rx" category:"$metrics" sub:"l3_throughput"`
+	ByteTx     uint64 `json:"byte_tx" category:"$metrics" sub:"l3_throughput"`
+	ByteRx     uint64 `json:"byte_rx" category:"$metrics" sub:"l3_throughput"`
+	L3ByteTx   uint64 `json:"l3_byte_tx" category:"$metrics" sub:"l3_throughput"`
+	L3ByteRx   uint64 `json:"l3_byte_rx" category:"$metrics" sub:"l3_throughput"`
+	L4ByteTx   uint64 `json:"l4_byte_tx" category:"$metrics" sub:"l4_throughput"`
+	L4ByteRx   uint64 `json:"l4_byte_rx" category:"$metrics" sub:"l4_throughput"`
+	NewFlow    uint64 `json:"new_flow" category:"$metrics" sub:"l4_throughput"`
+	ClosedFlow uint64 `json:"closed_flow" category:"$metrics" sub:"l4_throughput"`
 
-	L7Request   uint32 `db:"l7_request"`
-	L7Response  uint32 `db:"l7_response"`
-	SynCount    uint32 `db:"syn_count"`
-	SynackCount uint32 `db:"synack_count"`
+	L7Request   uint32 `json:"l7_request" category:"$metrics" sub:"application"`
+	L7Response  uint32 `json:"l7_response" category:"$metrics" sub:"application"`
+	SynCount    uint32 `json:"syn_count" category:"$metrics" sub:"l4_throughput"`
+	SynackCount uint32 `json:"synack_count" category:"$metrics" sub:"l4_throughput"`
 
-	DirectionScore uint8 `db:"direction_score"`
+	DirectionScore uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 }
 
 func (t *Traffic) Reverse() {
@@ -221,29 +221,29 @@ func (t *Traffic) WriteBlock(block *ckdb.Block) {
 }
 
 type Latency struct {
-	RTTMax       uint32 `db:"rtt_max"`        // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
-	RTTClientMax uint32 `db:"rtt_client_max"` // us
-	RTTServerMax uint32 `db:"rtt_server_max"` // us
-	SRTMax       uint32 `db:"srt_max"`        // us
-	ARTMax       uint32 `db:"art_max"`        // us
-	RRTMax       uint32 `db:"rrt_max"`        // us
-	CITMax       uint32 `db:"cit_max"`        // client idle time max
+	RTTMax       uint32 `json:"rtt_max" category:"$metrics" sub:"delay"`        // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
+	RTTClientMax uint32 `json:"rtt_client_max" category:"$metrics" sub:"delay"` // us
+	RTTServerMax uint32 `json:"rtt_server_max" category:"$metrics" sub:"delay"` // us
+	SRTMax       uint32 `json:"srt_max" category:"$metrics" sub:"delay"`        // us
+	ARTMax       uint32 `json:"art_max" category:"$metrics" sub:"delay"`        // us
+	RRTMax       uint32 `json:"rrt_max" category:"$metrics" sub:"delay"`        // us
+	CITMax       uint32 `json:"cit_max" category:"$metrics" sub:"delay"`        // client idle time max
 
-	RTTSum       uint64 `db:"rtt_sum"`        // us
-	RTTClientSum uint64 `db:"rtt_client_sum"` // us
-	RTTServerSum uint64 `db:"rtt_server_sum"` // us
-	SRTSum       uint64 `db:"srt_sum"`        // us
-	ARTSum       uint64 `db:"art_sum"`        // us
-	RRTSum       uint64 `db:"rrt_sum"`        // us
-	CITSum       uint64 `db:"cit_sum"`
+	RTTSum       uint64 `json:"rtt_sum" category:"$metrics" sub:"delay"`        // us
+	RTTClientSum uint64 `json:"rtt_client_sum" category:"$metrics" sub:"delay"` // us
+	RTTServerSum uint64 `json:"rtt_server_sum" category:"$metrics" sub:"delay"` // us
+	SRTSum       uint64 `json:"srt_sum" category:"$metrics" sub:"delay"`        // us
+	ARTSum       uint64 `json:"art_sum" category:"$metrics" sub:"delay"`        // us
+	RRTSum       uint64 `json:"rrt_sum" category:"$metrics" sub:"delay"`        // us
+	CITSum       uint64 `json:"cit_sum" category:"$metrics" sub:"delay"`
 
-	RTTCount       uint32 `db:"rtt_count"`
-	RTTClientCount uint32 `db:"rtt_client_count"`
-	RTTServerCount uint32 `db:"rtt_server_count"`
-	SRTCount       uint32 `db:"srt_count"`
-	ARTCount       uint32 `db:"art_count"`
-	RRTCount       uint32 `db:"rrt_count"`
-	CITCount       uint32 `db:"cit_count"`
+	RTTCount       uint32 `json:"rtt_count" category:"$metrics" sub:"delay"`
+	RTTClientCount uint32 `json:"rtt_client_count" category:"$metrics" sub:"delay"`
+	RTTServerCount uint32 `json:"rtt_server_count" category:"$metrics" sub:"delay"`
+	SRTCount       uint32 `json:"srt_count" category:"$metrics" sub:"delay"`
+	ARTCount       uint32 `json:"art_count" category:"$metrics" sub:"delay"`
+	RRTCount       uint32 `json:"rrt_count" category:"$metrics" sub:"delay"`
+	CITCount       uint32 `json:"cit_count" category:"$metrics" sub:"delay"`
 }
 
 func (_ *Latency) Reverse() {
@@ -443,12 +443,12 @@ func (l *Latency) WriteBlock(block *ckdb.Block) {
 }
 
 type Performance struct {
-	RetransTx     uint64 `db:"retrans_tx"`
-	RetransRx     uint64 `db:"retrans_rx"`
-	ZeroWinTx     uint64 `db:"zero_win_tx"`
-	ZeroWinRx     uint64 `db:"zero_win_rx"`
-	RetransSyn    uint32 `db:"retrans_syn"`
-	RetransSynack uint32 `db:"retrans_synack"`
+	RetransTx     uint64 `json:"retrans_tx" category:"$metrics"`
+	RetransRx     uint64 `json:"retrans_rx" category:"$metrics"`
+	ZeroWinTx     uint64 `json:"zero_win_tx" category:"$metrics"`
+	ZeroWinRx     uint64 `json:"zero_win_rx" category:"$metrics"`
+	RetransSyn    uint32 `json:"retrans_syn" category:"$metrics"`
+	RetransSynack uint32 `json:"retrans_synack" category:"$metrics"`
 }
 
 func (a *Performance) Reverse() {
@@ -537,23 +537,23 @@ func (a *Performance) WriteBlock(block *ckdb.Block) {
 }
 
 type Anomaly struct {
-	ClientRstFlow       uint64 `db:"client_rst_flow"`
-	ServerRstFlow       uint64 `db:"server_rst_flow"`
-	ServerSynMiss       uint64 `db:"server_syn_miss"`
-	ClientAckMiss       uint64 `db:"client_ack_miss"`
-	ClientHalfCloseFlow uint64 `db:"client_half_close_flow"`
-	ServerHalfCloseFlow uint64 `db:"server_half_close_flow"`
+	ClientRstFlow       uint64 `json:"client_rst_flow" category:"$metrics" sub:"tcp_error"`
+	ServerRstFlow       uint64 `json:"server_rst_flow" category:"$metrics" sub:"tcp_error"`
+	ServerSynMiss       uint64 `json:"server_syn_miss" category:"$metrics" sub:"tcp_error"`
+	ClientAckMiss       uint64 `json:"client_ack_miss" category:"$metrics" sub:"tcp_error"`
+	ClientHalfCloseFlow uint64 `json:"client_half_close_flow" category:"$metrics" sub:"tcp_error"`
+	ServerHalfCloseFlow uint64 `json:"server_half_close_flow" category:"$metrics" sub:"tcp_error"`
 
-	ClientSourcePortReuse uint64 `db:"client_source_port_reuse"`
-	ClientEstablishReset  uint64 `db:"client_establish_other_rst"`
-	ServerReset           uint64 `db:"server_reset"`
-	ServerQueueLack       uint64 `db:"server_queue_lack"`
-	ServerEstablishReset  uint64 `db:"server_establish_other_rst"`
-	TCPTimeout            uint64 `db:"tcp_timeout"`
+	ClientSourcePortReuse uint64 `json:"client_source_port_reuse" category:"$metrics" sub:"tcp_error"`
+	ClientEstablishReset  uint64 `json:"client_establish_other_rst" category:"$metrics" sub:"tcp_error"`
+	ServerReset           uint64 `json:"server_reset" category:"$metrics" sub:"tcp_error"`
+	ServerQueueLack       uint64 `json:"server_queue_lack" category:"$metrics" sub:"tcp_error"`
+	ServerEstablishReset  uint64 `json:"server_establish_other_rst" category:"$metrics" sub:"tcp_error"`
+	TCPTimeout            uint64 `json:"tcp_timeout" category:"$metrics" sub:"tcp_error"`
 
-	L7ClientError uint32 `db:"l7_client_error"`
-	L7ServerError uint32 `db:"l7_server_error"`
-	L7Timeout     uint32 `db:"l7_timeout"`
+	L7ClientError uint32 `json:"l7_client_error" category:"$metrics" sub:"application"`
+	L7ServerError uint32 `json:"l7_server_error" category:"$metrics" sub:"application"`
+	L7Timeout     uint32 `json:"l7_timeout" category:"$metrics" sub:"application"`
 }
 
 func (_ *Anomaly) Reverse() {
@@ -767,7 +767,7 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 }
 
 type FlowLoad struct {
-	Load uint64 `db:"flow_load"`
+	Load uint64 `json:"flow_load" category:"$metrics"`
 }
 
 func (l *FlowLoad) Reverse() {

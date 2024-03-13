@@ -30,6 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
+	exporterscommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
@@ -55,11 +57,13 @@ type Counter struct {
 }
 
 type Decoder struct {
+	index             int
 	eventType         common.EventType
 	resourceInfoTable *ResourceInfoTable
 	platformData      *grpc.PlatformInfoTable
 	inQueue           queue.QueueReader
 	eventWriter       *dbwriter.EventWriter
+	exporters         *exporters.Exporters
 	debugEnabled      bool
 	config            *config.Config
 
@@ -68,10 +72,12 @@ type Decoder struct {
 }
 
 func NewDecoder(
+	index int,
 	eventType common.EventType,
 	inQueue queue.QueueReader,
 	eventWriter *dbwriter.EventWriter,
 	platformData *grpc.PlatformInfoTable,
+	exporters *exporters.Exporters,
 	config *config.Config,
 ) *Decoder {
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
@@ -92,6 +98,7 @@ func NewDecoder(
 		inQueue:           inQueue,
 		debugEnabled:      log.IsEnabledFor(logging.DEBUG),
 		eventWriter:       eventWriter,
+		exporters:         exporters,
 		config:            config,
 		counter:           &Counter{},
 	}
@@ -116,6 +123,7 @@ func (d *Decoder) Run() {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
 			if buffer[i] == nil {
+				d.export(nil)
 				continue
 			}
 			d.counter.InCount++
@@ -247,7 +255,15 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
 
+	d.export(s)
 	d.eventWriter.Write(s)
+}
+
+func (d *Decoder) export(item exporterscommon.ExportItem) {
+	if d.exporters == nil {
+		return
+	}
+	d.exporters.Put(d.eventType.DataSource(), d.index, item)
 }
 
 func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {

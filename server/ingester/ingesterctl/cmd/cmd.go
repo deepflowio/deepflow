@@ -59,9 +59,9 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Use:   "prometheus",
 		Short: "Prometheus label debug commands",
 	}
-	otlpCmd := &cobra.Command{
-		Use:   "otlp",
-		Short: "otlp exporter debug commands",
+	exportersCmd := &cobra.Command{
+		Use:   "exporters",
+		Short: "exporters debug commands",
 	}
 	profileCmd := &cobra.Command{
 		Use:   "profile",
@@ -69,7 +69,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	}
 
 	root.AddCommand(ingesterCmd)
-	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd, otlpCmd, profileCmd)
+	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd, exportersCmd, profileCmd)
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
@@ -103,8 +103,10 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		"2-decode-to-slow-decode-prometheus",
 	}))
 
-	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"stats", "show otlp exporter stats"}, nil))
-	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
+	exportersCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"otlp", "show otlp exporter stats"}, nil))
+	exportersCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
+	exportersCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_KAFKA_EXPORTER, debug.CmdHelper{Cmd: "kafka", Helper: "show kafka exporter stats"}, nil))
+	exportersCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, debug.CmdHelper{Cmd: "prometheus", Helper: "show prometheus exporter stats"}, nil))
 
 	profileCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROFILE, debug.CmdHelper{"platformData [filter]", "show profile platform data statistics"}, nil))
 

@@ -48,7 +48,7 @@ type Config struct {
 }
 
 type IngesterConfig struct {
-	Exporters ExportersConfig `yaml:"exporters"`
+	Exporters []ExportersConfig `yaml:"exporters"`
 }
 
 type ExportersConfig struct {
@@ -64,6 +64,13 @@ func ExportersEnabled(configPath string) bool {
 	config := Config{}
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
+		return false
 	}
-	return config.Ingester.Exporters.Enabled
+	for _, v := range config.Ingester.Exporters {
+		if v.Enabled {
+			log.Info("exporters enabled")
+			return true
+		}
+	}
+	return false
 }

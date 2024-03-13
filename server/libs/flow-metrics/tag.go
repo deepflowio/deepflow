@@ -252,70 +252,71 @@ type Field struct {
 	//   - ingester写入clickhouse，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 
-	IP6              net.IP // FIXME: 合并IP6和IP
+	// structTag  "datasource":"n|nm|a|am" means datasource: network, network_map, application, application_map
+	IP6              net.IP `json:"ip6" map_json:"ip6_0" category:"$tag" sub:"network_layer" to_string:"IPv6String" ` // FIXME: 合并IP6和IP
 	MAC              uint64
-	IP               uint32
-	L3EpcID          int32 // (8B)
-	L3DeviceID       uint32
-	L3DeviceType     DeviceType
-	RegionID         uint16
-	SubnetID         uint16
-	HostID           uint16
-	PodNodeID        uint32
-	AZID             uint16
-	PodGroupID       uint32
-	PodNSID          uint16
-	PodID            uint32
-	PodClusterID     uint16
-	ServiceID        uint32
-	AutoInstanceID   uint32
-	AutoInstanceType uint8
-	AutoServiceID    uint32
-	AutoServiceType  uint8
-	GPID             uint32
+	IP               uint32     `json:"ip4" map_json:"ip4_0" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	L3EpcID          int32      `json:"l3_epc_id" map_json:"l3_epc_id_0" category:"$tag" sub:"universal_tag"`
+	L3DeviceID       uint32     `json:"l3_device_id" map_json:"l3_device_id_0" category:"$tag" sub:"universal_tag"`
+	L3DeviceType     DeviceType `json:"l3_device_type" map_json:"l3_device_type_0" category:"$tag" sub:"universal_tag"`
+	RegionID         uint16     `json:"region_id" map_json:"region_id_0" category:"$tag" sub:"universal_tag"`
+	SubnetID         uint16     `json:"subnet_id" map_json:"subnet_id_0" category:"$tag" sub:"universal_tag"`
+	HostID           uint16     `json:"host_id" map_json:"host_id_0" category:"$tag" sub:"universal_tag"`
+	PodNodeID        uint32     `json:"pod_node_id" map_json:"pod_node_id_0" category:"$tag" sub:"universal_tag"`
+	AZID             uint16     `json:"az_id" map_json:"az_id_0" category:"$tag" sub:"universal_tag"`
+	PodGroupID       uint32     `json:"pod_group_id" map_json:"pod_group_id_0" category:"$tag" sub:"universal_tag"`
+	PodNSID          uint16     `json:"pod_ns_id" map_json:"pod_ns_id_0" category:"$tag" sub:"universal_tag"`
+	PodID            uint32     `json:"pod_id" map_json:"pod_id_0" category:"$tag" sub:"universal_tag"`
+	PodClusterID     uint16     `json:"pod_cluster_id" map_json:"pod_cluster_id_0" category:"$tag" sub:"universal_tag"`
+	ServiceID        uint32     `json:"service_id" map_json:"service_id_0" category:"$tag" sub:"universal_tag"`
+	AutoInstanceID   uint32     `json:"auto_instance_id" map_json:"auto_instance_id_0" category:"$tag" sub:"universal_tag"`
+	AutoInstanceType uint8      `json:"auto_instance_type" map_json:"auto_instance_type_0" category:"$tag" sub:"universal_tag"`
+	AutoServiceID    uint32     `json:"auto_service_id" map_json:"auto_service_id_0" category:"$tag" sub:"universal_tag"`
+	AutoServiceType  uint8      `json:"auto_service_type" map_json:"auto_service_type_0" category:"$tag" sub:"universal_tag"`
+	GPID             uint32     `json:"gprocess_id" map_json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
 
 	MAC1              uint64
-	IP61              net.IP // FIXME: 合并IP61和IP1
-	IP1               uint32
-	L3EpcID1          int32 // (8B)
-	L3DeviceID1       uint32
-	L3DeviceType1     DeviceType // (+1B=8B)
-	RegionID1         uint16
-	SubnetID1         uint16 // (8B)
-	HostID1           uint16
-	PodNodeID1        uint32
-	AZID1             uint16
-	PodGroupID1       uint32
-	PodNSID1          uint16
-	PodID1            uint32
-	PodClusterID1     uint16
-	ServiceID1        uint32
-	AutoInstanceID1   uint32
-	AutoInstanceType1 uint8
-	AutoServiceID1    uint32
-	AutoServiceType1  uint8
-	GPID1             uint32
+	IP61              net.IP     `json:"ip6_1" category:"$tag" sub:"network_layer" to_string:"IPv6String" datasource:"nm|am"` // FIXME: 合并IP61和IP1
+	IP1               uint32     `json:"ip4_1" category:"$tag" sub:"network_layer" to_string:"IPv4String" datasource:"nm|am"`
+	L3EpcID1          int32      `json:"l3_epc_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	L3DeviceID1       uint32     `json:"l3_device_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	L3DeviceType1     DeviceType `json:"l3_device_type_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	RegionID1         uint16     `json:"region_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	SubnetID1         uint16     `json:"subnet_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	HostID1           uint16     `json:"host_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	PodNodeID1        uint32     `json:"pod_node_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	AZID1             uint16     `json:"az_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	PodGroupID1       uint32     `json:"pod_group_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	PodNSID1          uint16     `json:"pod_ns_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	PodID1            uint32     `json:"pod_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	PodClusterID1     uint16     `json:"pod_cluster_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	ServiceID1        uint32     `json:"service_id_0" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	AutoInstanceID1   uint32     `json:"auto_instance_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	AutoInstanceType1 uint8      `json:"auto_instance_type_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	AutoServiceID1    uint32     `json:"auto_service_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	AutoServiceType1  uint8      `json:"auto_service_type_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	GPID1             uint32     `json:"gprocess_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 
 	ACLGID     uint16
-	Direction  DirectionEnum
-	Protocol   layers.IPProtocol
-	ServerPort uint16
-	VTAPID     uint16
+	Direction  DirectionEnum     `json:"role" category:"$tag" sub:"capture_info" datasource:"n|a"`
+	Protocol   layers.IPProtocol `json:"protocol" category:"$tag" sub:"network_layer" enumfile:"protocol"`
+	ServerPort uint16            `json:"server_port" category:"$tag" sub:"network_layer"`
+	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_metrics', otherwise stored in '<OrgId>_flow_metrics'.
 	OrgId        uint16
 	TeamID       uint16
-	TAPPort      datatype.TapPort
-	TAPSide      TAPSideEnum
-	TAPType      TAPTypeEnum
-	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
+	TAPPort      datatype.TapPort `json:"tap_port" category:"$tag" sub:"capture_info" datasource:"nm|am"`
+	TAPSide      TAPSideEnum      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
+	TAPType      TAPTypeEnum      `json:"capture_netwok_type" category:"$tag" sub:"capture_info"`
+	IsIPv4       uint8            `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
-	L7Protocol   datatype.L7Protocol
-	AppService   string
-	AppInstance  string
-	Endpoint     string
-	BizType      uint8
-	SignalSource uint16
+	L7Protocol   datatype.L7Protocol `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol" datasource:"a|am"`
+	AppService   string              `json:"app_service" category:"$tag" sub:"application_layer" datasource:"a|am"`
+	AppInstance  string              `json:"app_instance" category:"$tag" sub:"application_layer" datasource:"a|am"`
+	Endpoint     string              `json:"endpoint" category:"$tag" sub:"application_layer" datasource:"a|am"`
+	BizType      uint8               `json:"biz_type" category:"$tag" sub:"application_layer" datasource:"a|am"`
+	SignalSource uint16              `json:"signal_source" category:"$tag" sub:"application_layer" enumfile:"l7_signal_source"` // FIXME: network,network_1m should use l4_signal_source for translate
 
 	TagSource, TagSource1 uint8
 
@@ -487,7 +488,7 @@ var metricsTableCodes = []Code{
 }
 
 type Tag struct {
-	*Field
+	Field
 	Code
 	id string
 }
@@ -609,7 +610,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.HostID1), 10))
 	}
 	if t.Code&IP != 0 {
-		if t.IsIPv6 != 0 {
+		if t.IsIPv4 == 0 {
 			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_version=6")
@@ -620,7 +621,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 		}
 	}
 	if t.Code&IPPath != 0 {
-		if t.IsIPv6 != 0 {
+		if t.IsIPv4 == 0 {
 			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_1=")
@@ -1143,7 +1144,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	if code&IP != 0 {
 		block.WriteIPv4(t.IP)
 		block.WriteIPv6(t.IP6)
-		block.Write(1 - t.IsIPv6)
+		block.Write(t.IsIPv4)
 		block.Write(t.TagSource)
 	}
 	if code&IPPath != 0 {
@@ -1151,7 +1152,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 		block.WriteIPv4(t.IP1)
 		block.WriteIPv6(t.IP6)
 		block.WriteIPv6(t.IP61)
-		block.Write(1 - t.IsIPv6)
+		block.Write(t.IsIPv4)
 		block.Write(t.TagSource)
 		block.Write(t.TagSource1)
 	}
@@ -1333,8 +1334,8 @@ func (t *Tag) String() string {
 
 func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.Code = Code(p.Code)
-	t.IsIPv6 = uint8(p.Field.IsIpv6)
-	if t.IsIPv6 != 0 {
+	t.IsIPv4 = 1 - uint8(p.Field.IsIpv6)
+	if t.IsIPv4 == 0 {
 		if t.IP6 == nil {
 			t.IP6 = make([]byte, 16)
 		}
@@ -1495,9 +1496,6 @@ func ReleaseTag(tag *Tag) {
 	if tag == nil {
 		return
 	}
-	if tag.Field != nil {
-		ReleaseField(tag.Field)
-	}
 	*tag = Tag{}
 	tagPool.Put(tag)
 }
@@ -1505,7 +1503,7 @@ func ReleaseTag(tag *Tag) {
 // CloneTag 需要复制Tag拥有的Field
 func CloneTag(tag *Tag) *Tag {
 	newTag := AcquireTag()
-	newTag.Field = CloneField(tag.Field)
+	newTag.Field = tag.Field
 	newTag.Code = tag.Code
 	newTag.id = tag.id
 	return newTag
@@ -1521,7 +1519,7 @@ func (t *Tag) Release() {
 
 func (f *Field) NewTag(c Code) *Tag {
 	tag := AcquireTag()
-	tag.Field = CloneField(f)
+	tag.Field = *f
 	tag.Code = c
 	tag.id = ""
 	return tag

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package otlp_exporter
+package log_data
 
 import (
 	crand "crypto/rand"
@@ -32,9 +32,8 @@ import (
 	"github.com/google/gopacket/layers"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/config"
-	utag "github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/universal_tag"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/ingester/exporters/config"
+	utag "github.com/deepflowio/deepflow/server/ingester/exporters/universal_tag"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -51,56 +50,57 @@ func putIntWithoutZero(attrs pcommon.Map, key string, value int64) {
 	}
 }
 
-func putUniversalTags(attrs pcommon.Map, tags0, tags1 *utag.UniversalTags, dataTypeBits uint32) {
-	if dataTypeBits&config.CLIENT_UNIVERSAL_TAG != 0 {
-		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
-		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
-		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
-		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_0", tags0.L3Epc)
-		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_0", tags0.Subnet)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0.PodCluster)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0.PodNS)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0.PodNode)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_0", tags0.PodGroup)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_0", tags0.Pod)
-		putStrWithoutEmpty(attrs, "df.universal_tag.service_0", tags0.Service)
-		putStrWithoutEmpty(attrs, "df.universal_tag.chost_0", tags0.CHost)
-		putStrWithoutEmpty(attrs, "df.universal_tag.router_0", tags0.Router)
-		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_0", tags0.DhcpGW)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_0", tags0.PodService)
-		putStrWithoutEmpty(attrs, "df.universal_tag.redis_0", tags0.Redis)
-		putStrWithoutEmpty(attrs, "df.universal_tag.rds_0", tags0.RDS)
-		putStrWithoutEmpty(attrs, "df.universal_tag.lb_0", tags0.LB)
-		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_0", tags0.NatGW)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_0", tags0.AutoInstanceType)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_0", tags0.AutoInstance)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_0", tags0.AutoServiceType)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_0", tags0.AutoService)
-	}
-	if dataTypeBits&config.SERVER_UNIVERSAL_TAG != 0 {
-		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
-		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
-		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
-		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_1", tags1.L3Epc)
-		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_1", tags1.Subnet)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1.PodCluster)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1.PodNS)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1.PodNode)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_1", tags1.PodGroup)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_1", tags1.Pod)
-		putStrWithoutEmpty(attrs, "df.universal_tag.service_1", tags1.Service)
-		putStrWithoutEmpty(attrs, "df.universal_tag.chost_1", tags1.CHost)
-		putStrWithoutEmpty(attrs, "df.universal_tag.router_1", tags1.Router)
-		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_1", tags1.DhcpGW)
-		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_1", tags1.PodService)
-		putStrWithoutEmpty(attrs, "df.universal_tag.redis_1", tags1.Redis)
-		putStrWithoutEmpty(attrs, "df.universal_tag.rds_1", tags1.RDS)
-		putStrWithoutEmpty(attrs, "df.universal_tag.lb_1", tags1.LB)
-		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_1", tags1.NatGW)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_1", tags1.AutoInstanceType)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_1", tags1.AutoInstance)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_1", tags1.AutoServiceType)
-		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_1", tags1.AutoService)
+func putUniversalTags(attrs pcommon.Map, tags0, tags1 *utag.UniversalTags, dataTypeBits uint64) {
+	if dataTypeBits&config.UNIVERSAL_TAG != 0 {
+		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0[utag.Region])
+		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0[utag.AZ])
+		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0[utag.Host])
+		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_0", tags0[utag.L3Epc])
+		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_0", tags0[utag.Subnet])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0[utag.PodCluster])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0[utag.PodNS])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0[utag.PodNode])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_0", tags0[utag.PodGroup])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_0", tags0[utag.Pod])
+		putStrWithoutEmpty(attrs, "df.universal_tag.service_0", tags0[utag.Service])
+
+		putStrWithoutEmpty(attrs, "df.universal_tag.chost_0", tags0[utag.CHost])
+		putStrWithoutEmpty(attrs, "df.universal_tag.router_0", tags0[utag.Router])
+		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_0", tags0[utag.DhcpGW])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_0", tags0[utag.PodService])
+		putStrWithoutEmpty(attrs, "df.universal_tag.redis_0", tags0[utag.Redis])
+		putStrWithoutEmpty(attrs, "df.universal_tag.rds_0", tags0[utag.RDS])
+		putStrWithoutEmpty(attrs, "df.universal_tag.lb_0", tags0[utag.LB])
+
+		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_0", tags0[utag.NatGW])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_0", tags0[utag.AutoInstanceType])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_0", tags0[utag.AutoInstance])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_0", tags0[utag.AutoServiceType])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_0", tags0[utag.AutoService])
+
+		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1[utag.Region])
+		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1[utag.AZ])
+		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1[utag.Host])
+		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_1", tags1[utag.L3Epc])
+		putStrWithoutEmpty(attrs, "df.universal_tag.subnet_1", tags1[utag.Subnet])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1[utag.PodCluster])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1[utag.PodNS])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1[utag.PodNode])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_1", tags1[utag.PodGroup])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_1", tags1[utag.Pod])
+		putStrWithoutEmpty(attrs, "df.universal_tag.service_1", tags1[utag.Service])
+		putStrWithoutEmpty(attrs, "df.universal_tag.chost_1", tags1[utag.CHost])
+		putStrWithoutEmpty(attrs, "df.universal_tag.router_1", tags1[utag.Router])
+		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_1", tags1[utag.DhcpGW])
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_1", tags1[utag.PodService])
+		putStrWithoutEmpty(attrs, "df.universal_tag.redis_1", tags1[utag.Redis])
+		putStrWithoutEmpty(attrs, "df.universal_tag.rds_1", tags1[utag.RDS])
+		putStrWithoutEmpty(attrs, "df.universal_tag.lb_1", tags1[utag.LB])
+		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_1", tags1[utag.NatGW])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_type_1", tags1[utag.AutoInstanceType])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_instance_1", tags1[utag.AutoInstance])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_type_1", tags1[utag.AutoServiceType])
+		putStrWithoutEmpty(attrs, "df.universal_tag.auto_service_1", tags1[utag.AutoService])
 	}
 }
 
@@ -121,16 +121,17 @@ func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *utag.Un
 	}
 }
 
-func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager *utag.UniversalTagsManager, dataTypeBits uint32, resSpan ptrace.ResourceSpans) {
-	tags0, tags1 := universalTagsManager.QueryUniversalTags(l7)
-
+func (l7 *L7FlowLog) EncodeToOtlp(utags *utag.UniversalTagsManager, dataTypeBits uint64) interface{} {
+	spanSlice := ptrace.NewResourceSpansSlice()
+	resSpan := spanSlice.AppendEmpty()
+	tags0, tags1 := l7.QueryUniversalTags(utags)
 	resAttrs := resSpan.Resource().Attributes()
 	putUniversalTags(resAttrs, tags0, tags1, dataTypeBits)
 	if dataTypeBits&config.K8S_LABEL != 0 && l7.PodID0 != 0 {
-		putK8sLabels(resAttrs, l7.PodID0, universalTagsManager, "_0")
+		putK8sLabels(resAttrs, l7.PodID0, utags, "_0")
 	}
 	if dataTypeBits&config.K8S_LABEL != 0 && l7.PodID1 != 0 {
-		putK8sLabels(resAttrs, l7.PodID1, universalTagsManager, "_1")
+		putK8sLabels(resAttrs, l7.PodID1, utags, "_1")
 	}
 
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
@@ -181,11 +182,11 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 
 	if dataTypeBits&config.SERVICE_INFO != 0 {
 		if isClientSide(l7.TapSide) {
-			putStrWithoutEmpty(resAttrs, "service.name", tags0.AutoService)
-			putStrWithoutEmpty(resAttrs, "service.instance.id", tags0.AutoInstance)
+			putStrWithoutEmpty(resAttrs, "service.name", tags0[utag.AutoService])
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags0[utag.AutoInstance])
 		} else {
-			putStrWithoutEmpty(resAttrs, "service.name", tags1.AutoService)
-			putStrWithoutEmpty(resAttrs, "service.instance.id", tags1.AutoInstance)
+			putStrWithoutEmpty(resAttrs, "service.name", tags1[utag.AutoService])
+			putStrWithoutEmpty(resAttrs, "service.instance.id", tags1[utag.AutoInstance])
 		}
 		// if l7.AppService/l7.AppInstance is not empty, overwrite the value
 		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
@@ -210,9 +211,10 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic", datatype.TapPort(l7.TapPort).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_type", tapPortTypeToString(l7.TapPortType))
-		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_name", tags0.TapPortName)
+		// todo suport TapPortName
+		// putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_name", tags0.TapPortName)
 		putStrWithoutEmpty(resAttrs, "df.capture_info.observation_point", tapSideToName(l7.TapSide))
-		putStrWithoutEmpty(resAttrs, "df.capture_info.agent", tags0.Vtap)
+		putStrWithoutEmpty(resAttrs, "df.capture_info.agent", tags0[utag.Vtap])
 	}
 
 	if dataTypeBits&config.NETWORK_LAYER != 0 {
@@ -220,6 +222,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 		resAttrs.PutBool("df.network.is_internet_0", l7.L3EpcID0 == datatype.EPC_FROM_INTERNET)
 		resAttrs.PutBool("df.network.is_internet_1", l7.L3EpcID1 == datatype.EPC_FROM_INTERNET)
 		if l7.IsIPv4 {
+			// resAttrs.PutStr("df.network.ip_0", utils.IpFromUint32(l7.IP40).String())
 			resAttrs.PutStr("df.network.ip_0", utils.IpFromUint32(l7.IP40).String())
 			resAttrs.PutStr("df.network.ip_1", utils.IpFromUint32(l7.IP41).String())
 		} else {
@@ -293,6 +296,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 			spanAttrs.PutDouble(l7.MetricsNames[i], l7.MetricsValues[i])
 		}
 	}
+	return spanSlice
 }
 
 func getTraceID(traceID string, id uint64) pcommon.TraceID {
@@ -333,11 +337,11 @@ func newSpanId() pcommon.SpanID {
 }
 
 // use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
-func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *utag.UniversalTags) {
-	if tags1.CHost != "" {
-		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.CHost)
+func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *L7FlowLog, tags0, tags1 *utag.UniversalTags) {
+	if tags1[utag.CHost] != "" {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1[utag.CHost])
 	} else {
-		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.PodNode)
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1[utag.PodNode])
 	}
 	putIntWithoutZero(spanAttrs, "net.host.port", int64(l7.ServerPort))
 	if l7.IsIPv4 {
@@ -350,10 +354,10 @@ func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog,
 		}
 	}
 
-	if tags0.CHost != "" {
-		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0.CHost)
+	if tags0[utag.CHost] != "" {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0[utag.CHost])
 	} else {
-		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0.PodNode)
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0[utag.PodNode])
 	}
 	putIntWithoutZero(spanAttrs, "net.peer.port", int64(l7.ClientPort))
 	if l7.IsIPv4 {
@@ -368,11 +372,11 @@ func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog,
 }
 
 // use client info (_0) to fill in 'host' information, use server info (_1) to fill in 'peer' information
-func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *utag.UniversalTags) {
-	if tags0.CHost != "" {
-		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.CHost)
+func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *L7FlowLog, tags0, tags1 *utag.UniversalTags) {
+	if tags0[utag.CHost] != "" {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0[utag.CHost])
 	} else {
-		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.PodNode)
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0[utag.PodNode])
 	}
 	putIntWithoutZero(spanAttrs, "net.host.port", int64(l7.ClientPort))
 	if l7.IsIPv4 {
@@ -385,10 +389,10 @@ func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, 
 		}
 	}
 
-	if tags1.CHost != "" {
-		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1.CHost)
+	if tags1[utag.CHost] != "" {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1[utag.CHost])
 	} else {
-		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1.PodNode)
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1[utag.PodNode])
 	}
 	putIntWithoutZero(spanAttrs, "net.peer.port", int64(l7.ServerPort))
 	if l7.IsIPv4 {
@@ -402,7 +406,7 @@ func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, 
 	}
 }
 
-func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_resource", l7.RequestResource)
 	if l7.RequestId != nil {
@@ -420,7 +424,7 @@ func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "http.flavor", l7.Version)
 	putStrWithoutEmpty(spanAttrs, "http.method", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "net.peer.name", l7.RequestDomain)
@@ -438,7 +442,7 @@ func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	span.SetName(strings.Join([]string{l7.RequestType, l7.RequestResource}, " "))
 }
 
-func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanAttrs.PutStr("rpc.system", "apache_dubbo")
 	putStrWithoutEmpty(spanAttrs, "rpc.service", l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "rpc.method", l7.RequestType)
@@ -457,7 +461,7 @@ func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *log_data.L
 	}
 }
 
-func setGRPC(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setGRPC(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanAttrs.PutStr("rpc.system", "grpc")
 	putStrWithoutEmpty(spanAttrs, "rpc.service", l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "rpc.method", l7.RequestType)
@@ -473,7 +477,7 @@ func setGRPC(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setKafka(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setKafka(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanAttrs.PutStr("messaging.system", "kafka")
 	span.SetName(l7.RequestResource)
 
@@ -491,7 +495,7 @@ func setKafka(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 	}
 }
 
-func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanAttrs.PutStr("messaging.system", "mqtt")
 	span.SetName(l7.RequestResource)
 
@@ -506,7 +510,7 @@ func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanName, operation := getSQLSpanNameAndOperation(l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "db.system", "mysql")
 	putStrWithoutEmpty(spanAttrs, "db.operation", operation)
@@ -519,7 +523,7 @@ func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 	span.SetName(spanName)
 }
 
-func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	spanName, operation := getSQLSpanNameAndOperation(l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "db.system", "postgresql")
 	putStrWithoutEmpty(spanAttrs, "db.operation", operation)
@@ -531,7 +535,7 @@ func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7Flow
 	span.SetName(spanName)
 }
 
-func setRedis(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setRedis(span *ptrace.Span, spanAttrs pcommon.Map, l7 *L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "db.system", "redis")
 	putStrWithoutEmpty(spanAttrs, "db.operation", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "db.statement", l7.RequestResource)

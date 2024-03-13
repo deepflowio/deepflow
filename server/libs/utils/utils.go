@@ -284,3 +284,194 @@ func GetTraceIdIndex(traceId string, indexTypeIsIncremetalId, formatIsHex bool, 
 	// the lowest 16 bits are set as the hash value of traceId to reduce duplication when filtering data
 	return num<<16 | (hash & 0xffff), nil
 }
+
+type DataType uint8
+
+// DataType is extensions to reflect.Kind
+const (
+	DATATYPE_INVALID DataType = iota
+	DATATYPE_IntPtr
+	DATATYPE_Int8Ptr
+	DATATYPE_Int16Ptr
+	DATATYPE_Int32Ptr
+	DATATYPE_Int64Ptr
+	DATATYPE_UintPtr
+	DATATYPE_Uint8Ptr
+	DATATYPE_Uint16Ptr
+	DATATYPE_Uint32Ptr
+	DATATYPE_Uint64Ptr
+	DATATYPE_StringSlice
+	DATATYPE_Float64Slice
+	DATATYPE_IP
+)
+
+func ToDataType(str string) DataType {
+	switch str {
+	case "*uint":
+		return DATATYPE_UintPtr
+	case "*uint8":
+		return DATATYPE_Uint8Ptr
+	case "*uint16":
+		return DATATYPE_Uint16Ptr
+	case "*uint32":
+		return DATATYPE_Uint32Ptr
+	case "*uint64":
+		return DATATYPE_Uint64Ptr
+	case "*int":
+		return DATATYPE_IntPtr
+	case "*int8":
+		return DATATYPE_Int8Ptr
+	case "*int16":
+		return DATATYPE_Int16Ptr
+	case "*int32":
+		return DATATYPE_Int32Ptr
+	case "*int64":
+		return DATATYPE_Int32Ptr
+	case "[]string":
+		return DATATYPE_StringSlice
+	case "[]float64":
+		return DATATYPE_Float64Slice
+	case "net.IP":
+		return DATATYPE_IP
+	default:
+		return DATATYPE_INVALID
+	}
+}
+
+func GetValueByOffsetAndKind(ptr, offset uintptr, kind reflect.Kind, dataType DataType) interface{} {
+	fieldAddr := unsafe.Pointer(ptr + offset)
+
+	switch kind {
+	case reflect.String:
+		return *(*string)(fieldAddr)
+	case reflect.Bool:
+		return *(*bool)(fieldAddr)
+	case reflect.Int:
+		return *(*int)(fieldAddr)
+	case reflect.Int8:
+		return *(*int8)(fieldAddr)
+	case reflect.Int16:
+		return *(*int16)(fieldAddr)
+	case reflect.Int32:
+		return *(*int32)(fieldAddr)
+	case reflect.Int64:
+		return *(*int64)(fieldAddr)
+	case reflect.Uint:
+		return *(*uint)(fieldAddr)
+	case reflect.Uint8:
+		return *(*uint8)(fieldAddr)
+	case reflect.Uint16:
+		return *(*uint16)(fieldAddr)
+	case reflect.Uint32:
+		return *(*uint32)(fieldAddr)
+	case reflect.Uint64:
+		return *(*uint64)(fieldAddr)
+	case reflect.Float32:
+		return *(*float32)(fieldAddr)
+	case reflect.Float64:
+		return *(*float64)(fieldAddr)
+	case reflect.Pointer:
+		switch dataType {
+		case DATATYPE_Int8Ptr:
+			return *(**int8)(fieldAddr)
+		case DATATYPE_Int16Ptr:
+			return *(**int16)(fieldAddr)
+		case DATATYPE_Int32Ptr:
+			return *(**int32)(fieldAddr)
+		case DATATYPE_Int64Ptr:
+			return *(**int64)(fieldAddr)
+		case DATATYPE_Uint8Ptr:
+			return *(**uint8)(fieldAddr)
+		case DATATYPE_Uint16Ptr:
+			return *(**uint16)(fieldAddr)
+		case DATATYPE_Uint32Ptr:
+			return *(**uint32)(fieldAddr)
+		case DATATYPE_Uint64Ptr:
+			return *(**uint64)(fieldAddr)
+		default:
+			return nil
+
+		}
+	case reflect.Slice:
+		switch dataType {
+		case DATATYPE_IP:
+			return *(*net.IP)(fieldAddr)
+		case DATATYPE_StringSlice:
+			return *(*[]string)(fieldAddr)
+		case DATATYPE_Float64Slice:
+			return *(*[]float64)(fieldAddr)
+		default:
+			return nil
+		}
+	default:
+		return nil
+	}
+}
+
+func ConvertToFloat64(data interface{}) (float64, bool) {
+	switch v := data.(type) {
+	case uint:
+		return float64(v), true
+	case uint8:
+		return float64(v), true
+	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case uintptr:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int8:
+		return float64(v), true
+	case int16:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case float64:
+		return v, true
+	case bool:
+		if v {
+			return 1, true
+		} else {
+			return 0, true
+		}
+	case *uint:
+		return float64(*v), true
+	case *uint8:
+		return float64(*v), true
+	case *uint16:
+		return float64(*v), true
+	case *uint32:
+		return float64(*v), true
+	case *uint64:
+		return float64(*v), true
+	case *int:
+		return float64(*v), true
+	case *int8:
+		return float64(*v), true
+	case *int16:
+		return float64(*v), true
+	case *int32:
+		return float64(*v), true
+	case *int64:
+		return float64(*v), true
+	default:
+		return 0, false
+	}
+}
+
+func IsNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	vi := reflect.ValueOf(i)
+	if vi.Kind() == reflect.Ptr {
+		return vi.IsNil()
+	}
+	return false
+}

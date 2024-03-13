@@ -17,6 +17,7 @@
 package common
 
 import (
+	exportconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	logging "github.com/op/go-logging"
 )
 
@@ -57,5 +58,14 @@ func (e EventType) TableName() string {
 		return "alarm_event"
 	default:
 		return "unknown_event"
+	}
+}
+
+func (e EventType) DataSource() uint32 {
+	switch e {
+	case PERF_EVENT:
+		return uint32(exportconfig.PERF_EVENT)
+	default:
+		return uint32(exportconfig.MAX_DATASOURCE_ID)
 	}
 }
