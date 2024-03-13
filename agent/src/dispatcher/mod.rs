@@ -261,6 +261,7 @@ impl DispatcherListener {
     fn local_dispatcher_count(&self) -> usize {
         match self {
             Self::Local(a) => a.local_dispatcher_count(),
+            Self::LocalPlus(a) => a.local_dispatcher_count(),
             _ => 1,
         }
     }
