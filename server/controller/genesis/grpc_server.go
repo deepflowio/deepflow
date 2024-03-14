@@ -195,6 +195,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		stats.SyncVersion = version
 		stats.SyncTridentType = tType
 		stats.SyncLastSeen = time.Now()
+		stats.K8sClusterID = k8sClusterID
 		stats.GenesisSyncProcessDataOperation = request.GetProcessData()
 		stats.GenesisSyncDataOperation = platformData
 		g.tridentStatsMap.Store(vtapID, stats)

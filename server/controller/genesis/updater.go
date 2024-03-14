@@ -246,15 +246,27 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			Name: iface.GetName(),
 			Mac:  genesiscommon.Uint64ToMac(iface.GetMac()).String(),
 		}
-		hasNetMask := false
+		var hasNetMask bool
+		var validIPs []string
 		for _, addr := range iface.Ip {
 			hasNetMask = strings.Contains(addr, `/`)
-			sIP := strings.Split(addr, `/`)[0]
-			netIP, err := netaddr.ParseIP(sIP)
-			if err != nil {
-				log.Errorf(err.Error())
-				return []model.GenesisVinterface{}
+			var netIP netaddr.IP
+			if hasNetMask {
+				ipPrefix, err := netaddr.ParseIPPrefix(addr)
+				if err != nil {
+					log.Error(err.Error())
+					continue
+				}
+				netIP = ipPrefix.IP()
+			} else {
+				ipAddr, err := netaddr.ParseIP(addr)
+				if err != nil {
+					log.Error(err.Error())
+					continue
+				}
+				netIP = ipAddr
 			}
+
 			excludeFlag := false
 			for _, ipRange := range v.excludeIPRanges {
 				if ipRange.Contains(netIP) {
@@ -265,12 +277,9 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			if excludeFlag {
 				continue
 			}
-			if vIF.IPs == "" {
-				vIF.IPs = netIP.String()
-			} else {
-				vIF.IPs += ("," + netIP.String())
-			}
+			validIPs = append(validIPs, addr)
 		}
+		vIF.IPs = strings.Join(validIPs, ",")
 		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)), uuid.Nil)
 		ifaceNSName := iface.GetNetns()
 		if gIF, ok := ifIndexToInterface[fmt.Sprintf("%v%v", ifaceNSName, iface.GetTapIndex())]; ok && isContainer {
