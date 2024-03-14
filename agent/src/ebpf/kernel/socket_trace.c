@@ -184,8 +184,8 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__write_seq_offset);
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
+			      sock + offset->tcp_sock__write_seq_offset);
 	return tcp_seq;
 }
 
@@ -201,8 +201,8 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__copied_seq_offset);
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
+			      sock + offset->tcp_sock__copied_seq_offset);
 	return tcp_seq;
 }
 
@@ -367,7 +367,7 @@ static __inline unsigned int __retry_get_sock_flags(void *sk,
 						    int offset)
 {
 	unsigned int flags = 0;
-	bpf_probe_read(&flags, sizeof(flags), (void *)sk + offset);
+	bpf_probe_read_kernel(&flags, sizeof(flags), (void *)sk + offset);
 	return flags;
 }
 
@@ -436,8 +436,8 @@ static __inline void get_sock_flags(void *sk,
 
 	unsigned int flags = 0;
 	struct sock_flags_t *sk_flags = (struct sock_flags_t *)&flags;
-	bpf_probe_read(&flags, sizeof(flags), (void *)sk +
-		       offset->sock__flags_offset);
+	bpf_probe_read_kernel(&flags, sizeof(flags), (void *)sk +
+			      offset->sock__flags_offset);
 
 	conn_info->sk_type = sk_flags->sk_type;
 }
@@ -465,7 +465,7 @@ static __inline void get_sock_flags(void *sk,
 #define ipv4_mapped_on_ipv6_confirm(s, f, o)				\
 do {									\
 	char __addr[16];						\
-	bpf_probe_read(__addr, 16, 					\
+	bpf_probe_read_kernel(__addr, 16, 				\
 		(s) + o->struct_sock_ip6saddr_offset);			\
 	__u32 __feature = *(__u32 *)&__addr[8];				\
 	if (__feature == 0xffff0000)					\
@@ -484,10 +484,10 @@ static __inline int is_tcp_udp_data(void *sk,
 	};
 
 	struct skc_flags_t skc_flags;
-	bpf_probe_read(&skc_flags, sizeof(skc_flags),
-		       sk + offset->struct_sock_common_ipv6only_offset);
+	bpf_probe_read_kernel(&skc_flags, sizeof(skc_flags),
+			      sk + offset->struct_sock_common_ipv6only_offset);
 	conn_info->skc_ipv6only = skc_flags.skc_ipv6only;
-	bpf_probe_read(&conn_info->skc_family, sizeof(conn_info->skc_family),
+	bpf_probe_read_kernel(&conn_info->skc_family, sizeof(conn_info->skc_family),
 		       sk + offset->struct_sock_family_offset);
 	/*
 	 * Without thinking about PF_UNIX.
@@ -515,8 +515,8 @@ static __inline int is_tcp_udp_data(void *sk,
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
-	bpf_probe_read(&conn_info->skc_state, sizeof(conn_info->skc_state),
-		       (void *)sk + offset->struct_sock_skc_state_offset);
+	bpf_probe_read_kernel(&conn_info->skc_state, sizeof(conn_info->skc_state),
+			      (void *)sk + offset->struct_sock_skc_state_offset);
 
 	/*
 	 * If the connection has not been established yet, and it is not in the
@@ -536,8 +536,10 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 {
 	__be16 inet_dport;
 	__u16 inet_sport;
-	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + offset->struct_sock_dport_offset);
-	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + offset->struct_sock_sport_offset);
+	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+			      sk + offset->struct_sock_dport_offset);
+	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+			      sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
 	conn_info->correlation_id = -1; // 当前用于kafka协议推断
@@ -564,20 +566,20 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-		bpf_probe_read(v->tuple.rcv_saddr, 4,
-			       sk + offset->struct_sock_saddr_offset);
-		bpf_probe_read(v->tuple.daddr, 4,
-			       sk + offset->struct_sock_daddr_offset);
+		bpf_probe_read_kernel(v->tuple.rcv_saddr, 4,
+				      sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read_kernel(v->tuple.daddr, 4,
+				      sk + offset->struct_sock_daddr_offset);
 		v->tuple.addr_len = 4;
 		break;
 	case PF_INET6:
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
-			bpf_probe_read(
+			bpf_probe_read_kernel(
 				v->tuple.rcv_saddr, 16,
 				sk + offset->struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
-			bpf_probe_read(
+			bpf_probe_read_kernel(
 				v->tuple.daddr, 16,
 				sk + offset->struct_sock_ip6daddr_offset);
 		}
@@ -645,8 +647,10 @@ static __inline __u32 retry_get_write_seq(void *sk,
 	 */
 	__u32 snd_nxt, write_seq;
 
-	bpf_probe_read(&write_seq, sizeof(write_seq), (void *)sk + offset);
-	bpf_probe_read(&snd_nxt, sizeof(snd_nxt), (void *)sk + snd_nxt_offset);
+	bpf_probe_read_kernel(&write_seq, sizeof(write_seq),
+			      (void *)sk + offset);
+	bpf_probe_read_kernel(&snd_nxt, sizeof(snd_nxt),
+			      (void *)sk + snd_nxt_offset);
 
 	if (snd_nxt == write_seq && snd_nxt != 0 && write_seq != 0) {
 		return write_seq;
@@ -682,10 +686,11 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	__u32 rcv_nxt, rcv_wup, copied_seq;
 	__u16 tcp_header_len;
 
-	bpf_probe_read(&copied_seq, sizeof(copied_seq), (void *)sk + offset);
-	bpf_probe_read(&rcv_nxt, sizeof(rcv_nxt), (void *)sk + offset - 4);
-	bpf_probe_read(&rcv_wup, sizeof(rcv_wup), (void *)sk + offset + 4);
-	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 28);
+	bpf_probe_read_kernel(&copied_seq, sizeof(copied_seq), (void *)sk + offset);
+	bpf_probe_read_kernel(&rcv_nxt, sizeof(rcv_nxt), (void *)sk + offset - 4);
+	bpf_probe_read_kernel(&rcv_wup, sizeof(rcv_wup), (void *)sk + offset + 4);
+	bpf_probe_read_kernel(&tcp_header_len, sizeof(tcp_header_len),
+			      (void *)sk + offset - 28);
 
 	if (!(tcp_header_len >= 20 && tcp_header_len <= 60 && copied_seq != 0))
 		return 0;
@@ -1125,7 +1130,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
-			bpf_probe_read(sk_info.prev_data, sizeof(sk_info.prev_data), conn_info->prev_buf);
+			bpf_probe_read_kernel(sk_info.prev_data, sizeof(sk_info.prev_data),
+					      conn_info->prev_buf);
 			sk_info.prev_data_len = conn_info->prev_count;
 			sk_info.uid = 0;
 		}
@@ -1283,7 +1289,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
-		bpf_probe_read(v->extra_data, sizeof(v->extra_data), conn_info->prev_buf);
+		bpf_probe_read_kernel(v->extra_data, sizeof(v->extra_data),
+				      conn_info->prev_buf);
 		v->extra_data_count = conn_info->prev_count;
 		v->tcp_seq -= conn_info->prev_count; // 客户端和服务端的tcp_seq匹配
 	} else
@@ -2046,8 +2053,8 @@ static __inline int output_data_common(void *ctx) {
 								 buffer) != 0))
 					goto clear_args_map_1;
 			} else {
-				if (unlikely(bpf_probe_read(v->data, sizeof(v->data),
-							    buffer) != 0))
+				if (unlikely(bpf_probe_read_kernel(v->data, sizeof(v->data),
+								   buffer) != 0))
 					goto clear_args_map_1;
 			}
 
@@ -2068,9 +2075,9 @@ static __inline int output_data_common(void *ctx) {
 							    	 buffer) != 0))
 					goto clear_args_map_1;
 			} else {
-				if (unlikely(bpf_probe_read(v->data,
-							    len + 1,
-							    buffer) != 0))
+				if (unlikely(bpf_probe_read_kernel(v->data,
+								   len + 1,
+								   buffer) != 0))
 					goto clear_args_map_1;
 			}
 		}
@@ -2274,7 +2281,7 @@ static __inline void trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-	bpf_probe_read_str(buffer->filename, sizeof(buffer->filename), name);
+	bpf_probe_read_kernel_str(buffer->filename, sizeof(buffer->filename), name);
 	buffer->filename[sizeof(buffer->filename) - 1] = '\0';
 
 	struct __socket_data_buffer *v_buff =

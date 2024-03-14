@@ -440,8 +440,8 @@ static __inline void save_prev_data(const char *buf,
 				    struct conn_info_t *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
-			       buf);
+		bpf_probe_read_kernel(conn_info->socket_info_ptr->prev_data, count,
+				      buf);
 		conn_info->socket_info_ptr->prev_data_len = count;
 		/*
 		 * This piece of data needs to be merged with subsequent data, so
@@ -451,7 +451,7 @@ static __inline void save_prev_data(const char *buf,
 		    conn_info->socket_info_ptr->direction;
 		conn_info->socket_info_ptr->direction = conn_info->direction;
 	} else {
-		bpf_probe_read(conn_info->prev_buf, count, buf);
+		bpf_probe_read_kernel(conn_info->prev_buf, count, buf);
 		conn_info->prev_count = count;
 	}
 }
@@ -467,9 +467,9 @@ static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 		 */
 		if (conn_info->direction ==
 		    conn_info->socket_info_ptr->direction) {
-			bpf_probe_read(conn_info->prev_buf,
-				       sizeof(conn_info->prev_buf),
-				       conn_info->socket_info_ptr->prev_data);
+			bpf_probe_read_kernel(conn_info->prev_buf,
+					      sizeof(conn_info->prev_buf),
+					      conn_info->socket_info_ptr->prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -1007,8 +1007,8 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	conn_info->dns_q_type = 0;
 	__u8 tmp_buf[128];
 	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
-	// bpf_probe_read_str() returns the length including '\0'.
-	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
+	// bpf_probe_read_user_str() returns the length including '\0'.
+	const int len = bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf), queries_start);
 	if (len > 0 && len < sizeof(tmp_buf)) {
 		bpf_probe_read_user(tmp_buf, 2, queries_start + len);
 		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
