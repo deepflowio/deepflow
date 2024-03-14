@@ -29,15 +29,15 @@ var (
 )
 
 type Resource struct {
-	Cleaner   *Cleaner
-	IDManager *idmng.IDManager
+	Cleaner    *Cleaner
+	IDManagers *idmng.IDManagers
 }
 
 func GetSingletonResource() *Resource {
 	resourceOnce.Do(func() {
 		resource = &Resource{
-			Cleaner:   GetSingletonCleaner(),
-			IDManager: idmng.GetSingleton(),
+			Cleaner:    GetSingletonCleaner(),
+			IDManagers: idmng.GetSingleton(),
 		}
 	})
 	return resource
@@ -45,6 +45,6 @@ func GetSingletonResource() *Resource {
 
 func (r *Resource) Init(cfg *config.RecorderConfig) *Resource {
 	r.Cleaner.Init(cfg)
-	r.IDManager.Init(cfg)
+	r.IDManagers.Init(cfg)
 	return r
 }

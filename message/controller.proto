@@ -181,6 +181,7 @@ message EncryptKeyResponse {
 message GetResourceIDRequest {
     required string type = 1;
     required uint32 count = 2;
+    optional uint32 org_id =3;
 }
 
 message GetResourceIDResponse {
@@ -190,6 +191,7 @@ message GetResourceIDResponse {
 message ReleaseResourceIDRequest {
     required string type = 1;
     repeated uint32 ids = 2;
+    optional uint32 org_id =3;
 }
 
 message ReleaseResourceIDResponse {
