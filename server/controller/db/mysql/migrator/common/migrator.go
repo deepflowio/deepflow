@@ -32,7 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
 )
 
-var log = logging.MustGetLogger("db.mysql.common")
+var log = logging.MustGetLogger("db.mysql.migrator.common")
 
 func DropDatabase(db *gorm.DB, database string) error {
 	log.Infof("drop database %s", database)
@@ -168,9 +168,4 @@ func list1GreaterList2(strList1, strList2 []string) bool {
 		}
 	}
 	return false
-}
-
-// OrganizationIDToDatabaseName convert organization id to database name, format: 0002_deepflow
-func OrganizationIDToDatabaseName(id int) string {
-	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + DATABASE_SUFFIX
 }

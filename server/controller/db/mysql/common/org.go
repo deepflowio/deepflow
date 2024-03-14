@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,23 @@
 
 package common
 
-const (
-	DATABASE_SUFFIX           = "_deepflow"
-	DATABASE_PREFIX_ALIGNMENT = "%04d"
+import (
+	"fmt"
+
+	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 )
 
-const (
-	DEFAULT_ORG_ID = 1
-)
+var log = logging.MustGetLogger("db.mysql.common")
+
+// ORGIDToDatabaseName convert organization id to database name, format: 0002_deepflow
+func ORGIDToDatabaseName(id int) string {
+	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + DATABASE_SUFFIX
+}
+
+func ReplaceConfigDatabaseName(cfg config.MySqlConfig, orgID int) config.MySqlConfig {
+	copiedCfg := cfg
+	copiedCfg.Database = ORGIDToDatabaseName(orgID)
+	return copiedCfg
+}
