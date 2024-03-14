@@ -198,6 +198,7 @@ impl Config {
             let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
                 kubernetes_cluster_name: kubernetes_cluster_name.map(Clone::clone),
+                team_id: Some(String::new()),
             };
 
             match session

@@ -683,6 +683,7 @@ impl PlatformSynchronizer {
             vtap_id: Some(vtap_id as u32),
             kubernetes_cluster_id: Some(kubernetes_cluster_id),
             nat_ip: None,
+            team_id: Some(String::new()),
         };
 
         process_args
@@ -790,6 +791,7 @@ impl PlatformSynchronizer {
                     platform_data: None,
                     process_data: Some(process_data),
                     nat_ip: None,
+                    team_id: Some(String::new()),
                 };
 
                 match args

@@ -96,6 +96,7 @@ message SyncRequest {
     optional string vtap_group_id_request = 26;  // 支持采集器自动加入组
     optional bool kubernetes_force_watch = 27 [default = false];
     optional AgentIdentifier agent_unique_identifier = 28 [default = IP_AND_MAC];
+    optional string team_id = 29;   // agent team identity
 
     repeated CommunicationVtap communication_vtaps = 31;  // 仅对数据节点有意义
 
@@ -526,8 +527,9 @@ message PodIp {
 message VtapIp {
     optional uint32 vtap_id = 1;
     optional uint32 epc_id = 2;
-    optional string ip = 3;  // 采集器运行环境的IP
+    optional string ip = 3;             // 采集器运行环境的IP
     optional uint32 pod_cluster_id = 4;
+    optional uint32 team_id = 5;        // agent team id for ingester
 }
 
 message SkipInterface {
@@ -579,6 +581,7 @@ message SyncResponse {
 message UpgradeRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 3;
+    optional string team_id = 4;    // agent team identity
 }
 message UpgradeResponse {
     optional Status status = 1;     // 调用是否成功
@@ -613,6 +616,7 @@ message PluginRequest {
     optional string ctrl_mac = 2;
     optional PluginType plugin_type = 3;
     optional string plugin_name = 4;
+    optional string team_id = 5;  // agent team identity
 }
 
 message PluginResponse {
@@ -707,6 +711,7 @@ message GenesisSyncRequest {
     optional string kubernetes_cluster_id = 5;  // 仅对容器类型的采集器有意义
 
     optional string nat_ip = 6;
+    optional string team_id = 7;  // agent team identity
 
     optional GenesisPlatformData platform_data = 9;
     optional GenesisProcessData process_data = 10;
@@ -722,6 +727,7 @@ message KubernetesAPISyncRequest {
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
     optional string source_ip = 5;
+    optional string team_id = 6;  // agent team identity
     repeated common.KubernetesAPIInfo entries = 10;
 }
 
@@ -735,6 +741,7 @@ message PrometheusAPISyncRequest {
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
     optional string source_ip = 5;
+    optional string team_id = 6;  // agent team identity
     repeated common.PrometheusAPIInfo entries = 10;
 }
 
@@ -744,6 +751,7 @@ message PrometheusAPISyncResponse {
 
 message KubernetesClusterIDRequest {
     optional string ca_md5 = 1;                    // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
+    optional string team_id = 2;                   // agent team identity
     optional string kubernetes_cluster_name = 46;  // get that from deepflow-agent.yaml
 }
 
@@ -814,6 +822,7 @@ message GPIDSyncRequest {
     optional string ctrl_mac = 2;
     optional uint32 vtap_id = 3;
     optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 4 [default = COMPRESS_ALRO_NONE];
+    optional string team_id = 5;  // agent team identity
     repeated GPIDSyncEntry entries = 10;
 }
 
@@ -892,6 +901,7 @@ message GPIDVTapData {
 message AgentCacheRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 2;
+    optional string team_id = 3; // agent team identity
 }
 
 message AgentCacheResponse {

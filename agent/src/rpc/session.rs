@@ -425,6 +425,7 @@ impl Session {
                 ctrl_mac: Some(agent_id.mac.to_string()),
                 plugin_type: Some(plugin_type as i32),
                 plugin_name: Some(name.into()),
+                team_id: Some(String::new()),
             })
             .await?;
 
