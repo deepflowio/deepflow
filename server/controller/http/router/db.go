@@ -17,6 +17,8 @@
 package router
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
@@ -40,7 +42,7 @@ func NewDatabase(cfg *config.ControllerConfig) *Database {
 
 func (d *Database) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/databases/", d.Create)
-	e.DELETE("/v1/databases/:organization-id/", d.Delete)
+	e.DELETE("/v1/databases/:org-id/", d.Delete)
 }
 
 func (d *Database) Create(c *gin.Context) {
@@ -57,7 +59,11 @@ func (d *Database) Create(c *gin.Context) {
 }
 
 func (d *Database) Delete(c *gin.Context) {
-	oID := c.Param("organization-id")
-	err := service.DeleteDatabase(oID, d.mysqlCfg)
+	orgID, err := strconv.Atoi(c.Param("org-id"))
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		return
+	}
+	err = service.DeleteDatabase(orgID, d.mysqlCfg)
 	common.JsonResponse(c, nil, err)
 }

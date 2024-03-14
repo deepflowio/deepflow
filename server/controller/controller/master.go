@@ -119,7 +119,7 @@ func checkAndStartMasterFunctions(
 				// 启动资源ID管理器
 				err := recorderResource.IDManager.Start()
 				if err != nil {
-					log.Error("resource id mananger start failed")
+					log.Errorf("resource id manager start failed: %s", err.Error())
 					time.Sleep(time.Second)
 					os.Exit(0)
 				}
