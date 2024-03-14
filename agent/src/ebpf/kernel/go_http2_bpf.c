@@ -280,14 +280,14 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 		unsigned char skc_net_refcnt : 1;
 	};
 	struct skc_flags_t skc_flags;
-	bpf_probe_read(&skc_flags, sizeof(skc_flags),
-		       sk + offset->struct_sock_common_ipv6only_offset);
-	bpf_probe_read(&skc_family, sizeof(skc_family),
-		       sk + offset->struct_sock_family_offset);
-	bpf_probe_read(&inet_dport, sizeof(inet_dport),
-		       sk + offset->struct_sock_dport_offset);
-	bpf_probe_read(&inet_sport, sizeof(inet_sport),
-		       sk + offset->struct_sock_sport_offset);
+	bpf_probe_read_kernel(&skc_flags, sizeof(skc_flags),
+			      sk + offset->struct_sock_common_ipv6only_offset);
+	bpf_probe_read_kernel(&skc_family, sizeof(skc_family),
+			      sk + offset->struct_sock_family_offset);
+	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+			      sk + offset->struct_sock_dport_offset);
+	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+			      sk + offset->struct_sock_sport_offset);
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
@@ -299,18 +299,18 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 	}
 
 	if (skc_family == PF_INET) {
-		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
-			       sk + offset->struct_sock_saddr_offset);
-		bpf_probe_read(send_buffer->tuple.daddr, 4,
-			       sk + offset->struct_sock_daddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.rcv_saddr, 4,
+				      sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.daddr, 4,
+				      sk + offset->struct_sock_daddr_offset);
 		send_buffer->tuple.addr_len = 4;
 	}
 
 	if (skc_family == PF_INET6) {
-		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
-			       sk + offset->struct_sock_ip6saddr_offset);
-		bpf_probe_read(send_buffer->tuple.daddr, 16,
-			       sk + offset->struct_sock_ip6daddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.rcv_saddr, 16,
+				      sk + offset->struct_sock_ip6saddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.daddr, 16,
+				      sk + offset->struct_sock_ip6daddr_offset);
 		send_buffer->tuple.addr_len = 16;
 	}
 	send_buffer->tgid = tgid;
@@ -996,14 +996,14 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 		unsigned char skc_net_refcnt : 1;
 	};
 	struct skc_flags_t skc_flags;
-	bpf_probe_read(&skc_flags, sizeof(skc_flags),
-		       sk + offset->struct_sock_common_ipv6only_offset);
-	bpf_probe_read(&skc_family, sizeof(skc_family),
-		       sk + offset->struct_sock_family_offset);
-	bpf_probe_read(&inet_dport, sizeof(inet_dport),
-		       sk + offset->struct_sock_dport_offset);
-	bpf_probe_read(&inet_sport, sizeof(inet_sport),
-		       sk + offset->struct_sock_sport_offset);
+	bpf_probe_read_kernel(&skc_flags, sizeof(skc_flags),
+			      sk + offset->struct_sock_common_ipv6only_offset);
+	bpf_probe_read_kernel(&skc_family, sizeof(skc_family),
+			      sk + offset->struct_sock_family_offset);
+	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+			      sk + offset->struct_sock_dport_offset);
+	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+			      sk + offset->struct_sock_sport_offset);
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
@@ -1015,18 +1015,18 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	}
 
 	if (skc_family == PF_INET) {
-		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
-			       sk + offset->struct_sock_saddr_offset);
-		bpf_probe_read(send_buffer->tuple.daddr, 4,
-			       sk + offset->struct_sock_daddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.rcv_saddr, 4,
+				      sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.daddr, 4,
+				      sk + offset->struct_sock_daddr_offset);
 		send_buffer->tuple.addr_len = 4;
 	}
 
 	if (skc_family == PF_INET6) {
-		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
-			       sk + offset->struct_sock_ip6saddr_offset);
-		bpf_probe_read(send_buffer->tuple.daddr, 16,
-			       sk + offset->struct_sock_ip6daddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.rcv_saddr, 16,
+				      sk + offset->struct_sock_ip6saddr_offset);
+		bpf_probe_read_kernel(send_buffer->tuple.daddr, 16,
+				      sk + offset->struct_sock_ip6daddr_offset);
 		send_buffer->tuple.addr_len = 16;
 	}
 
