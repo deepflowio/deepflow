@@ -256,6 +256,7 @@ impl TargetsWatcher {
             version: pb_version,
             vtap_id: Some(config_guard.vtap_id as u32),
             source_ip: Some(agent_id.read().ip.to_string()),
+            team_id: Some(String::new()),
             error_msg: Some(err_msgs.join(";")),
             entries: total_entries,
         };
