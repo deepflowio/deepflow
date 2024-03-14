@@ -49,7 +49,7 @@ type ResourceGroup struct {
 	IPs           string    `gorm:"column:ips;type:text;default:null" json:"IPS"`         // ips separated by ,
 	VMIDs         string    `gorm:"column:vm_ids;type:text;default:null" json:"VM_IDS"`   // vm ids separated by ,
 	NetworkIDs    string    `gorm:"column:vl2_ids;type:text;default:null" json:"VL2_IDS"` // vl2 ids separated by ,
-	VPCID         int       `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
+	VPCID         *int      `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
 	PodClusterID  int       `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	PodGroupIDs   string    `gorm:"column:pod_group_ids;type:text;default:null" json:"POD_GROUP_IDS"`     // pod group ids separated by ,
 	PodServiceIDs string    `gorm:"column:pod_service_ids;type:text;default:null" json:"POD_SERVICE_IDS"` // pod service ids separated by ,
