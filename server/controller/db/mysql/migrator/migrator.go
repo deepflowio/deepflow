@@ -63,8 +63,11 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 		if err != nil {
 			return
 		}
-		err = table.DropDatabaseIfInitTablesFailed(db, cfg.Database)
+		if err = table.DropDatabaseIfInitTablesFailed(db, cfg.Database); err != nil {
+			return
+		}
 	}
+	mysql.DBMap.Add(cfg.Database, db)
 	return
 }
 

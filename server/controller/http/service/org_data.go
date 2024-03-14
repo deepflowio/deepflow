@@ -21,25 +21,50 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"gorm.io/gorm"
 )
 
-func CreateDatabase(dataCreate model.DatabaseCreate, mysqlCfg mysqlcfg.MySqlConfig) (database string, err error) {
-	log.Infof("create organization (id: %s) databases", dataCreate.OrganizationID)
+func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig) (database string, err error) {
+	log.Infof("create organization (id: %d) databases", dataCreate.OrganizationID)
+	defaultDatabase := mysqlCfg.Database
 	database = common.OrganizationIDToDatabaseName(dataCreate.OrganizationID)
 	cfg := mysqlCfg
 	cfg.Database = database
 	existed, err := migrator.CreateDatabase(cfg)
 	if existed {
 		err = errors.New(fmt.Sprintf("database (name: %s) already exists", database))
+		return
 	}
-	return
+
+	var controllers []mysql.ControllerPtr
+	var analyzers []mysql.AnalyzerPtr
+	if err := mysql.Db.Unscoped().Find(&controllers).Error; err != nil {
+		return defaultDatabase, err
+	}
+	if err := mysql.Db.Unscoped().Find(&analyzers).Error; err != nil {
+		return defaultDatabase, err
+	}
+
+	db, err := mysql.DBMap.Get(database)
+	if err != nil {
+		return
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(controllers, len(controllers)).Error; err != nil {
+			return err
+		}
+
+		return tx.CreateInBatches(analyzers, len(analyzers)).Error
+	})
+	return database, err
 }
 
-func DeleteDatabase(organizationID string, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
+func DeleteORGData(organizationID string, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	log.Infof("delete organization (id: %s) databases", organizationID)
 	id, _ := strconv.Atoi(organizationID)
 	cfg := mysqlCfg

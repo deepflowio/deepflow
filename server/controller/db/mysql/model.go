@@ -111,6 +111,34 @@ type Controller struct {
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
+type ControllerPtr struct {
+	ID                 *int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	State              *int       `gorm:"column:state;type:int;default:null" json:"STATE"` // 0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception
+	Name               *string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Description        *string    `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
+	IP                 *string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	NATIP              *string    `gorm:"column:nat_ip;type:char(64);default:null" json:"NAT_IP"`
+	CPUNum             *int       `gorm:"column:cpu_num;type:int;default:0" json:"CPU_NUM"` // logical number of cpu
+	MemorySize         *int64     `gorm:"column:memory_size;type:bigint;default:0" json:"MEMORY_SIZE"`
+	Arch               *string    `gorm:"column:arch;type:varchar(256);default:null" json:"ARCH"`
+	Os                 *string    `gorm:"column:os;type:varchar(256);default:null" json:"OS"`
+	KernelVersion      *string    `gorm:"column:kernel_version;type:varchar(256);default:null" json:"KERNEL_VERSION"`
+	VTapMax            *int       `gorm:"column:vtap_max;type:int;default:2000" json:"VTAP_MAX"`
+	SyncedAt           *time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
+	NATIPEnabled       *int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
+	NodeType           *int       `gorm:"column:node_type;type:int;default:2" json:"NODE_TYPE"`  // region node type 1.master 2.slave
+	RegionDomainPrefix *string    `gorm:"column:region_domain_prefix;type:varchar(256);default:''" json:"REGION_DOMAIN_PREFIX"`
+	NodeName           *string    `gorm:"column:node_name;type:char(64);default:null" json:"NODE_NAME"`
+	PodIP              *string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
+	PodName            *string    `gorm:"column:pod_name;type:char(64);default:null" json:"POD_NAME"`
+	CAMD5              *string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
+	Lcuuid             *string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+}
+
+func (ControllerPtr) TableName() string {
+	return "controller"
+}
+
 type AZControllerConnection struct {
 	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	AZ           string `gorm:"column:az;type:char(64);default:ALL" json:"AZ"`
@@ -145,6 +173,34 @@ type Analyzer struct {
 	PodName           string    `gorm:"column:pod_name;type:char(64);default:null" json:"pod_name"`
 	CAMD5             string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
 	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+}
+
+type AnalyzerPtr struct {
+	ID                *int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	State             *int       `gorm:"column:state;type:int;default:null" json:"STATE"`    // 0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception
+	HaState           *int       `gorm:"column:ha_state;type:int;default:1" json:"HA_STATE"` // 1.master 2.backup
+	Name              *string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Description       *string    `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
+	IP                *string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	NATIP             *string    `gorm:"column:nat_ip;type:char(64);default:null" json:"NAT_IP"`
+	Agg               *int       `gorm:"column:agg;type:int;default:1" json:"AGG"`
+	CPUNum            *int       `gorm:"column:cpu_num;type:int;default:0" json:"CPU_NUM"` // logical number of cpu
+	MemorySize        *int64     `gorm:"column:memory_size;type:bigint;default:0" json:"MEMORY_SIZE"`
+	Arch              *string    `gorm:"column:arch;type:varchar(256);default:null" json:"ARCH"`
+	Os                *string    `gorm:"column:os;type:varchar(256);default:null" json:"OS"`
+	KernelVersion     *string    `gorm:"column:kernel_version;type:varchar(256);default:null" json:"KERNEL_VERSION"`
+	PcapDataMountPath *string    `gorm:"column:pcap_data_mount_path;type:varchar(256);default:null" json:"PCAP_DATA_MOUNT_PATH"`
+	VTapMax           *int       `gorm:"column:vtap_max;type:int;default:200" json:"VTAP_MAX"`
+	SyncedAt          *time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
+	NATIPEnabled      *int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
+	PodIP             *string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
+	PodName           *string    `gorm:"column:pod_name;type:char(64);default:null" json:"pod_name"`
+	CAMD5             *string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
+	Lcuuid            *string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+}
+
+func (AnalyzerPtr) TableName() string {
+	return "analyzer"
 }
 
 type AZAnalyzerConnection struct {
