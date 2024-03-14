@@ -365,7 +365,10 @@ func (g *GroupDataOP) generateGroupRawData() {
 						log.Error(err)
 						continue
 					}
-					if vpcData, ok := rawData.vpcIDToDeviceIPs[resourceGroup.VPCID]; ok {
+					if resourceGroup.VPCID == nil {
+						continue
+					}
+					if vpcData, ok := rawData.vpcIDToDeviceIPs[*resourceGroup.VPCID]; ok {
 						typeIDKey := TypeIDKey{
 							Type: VIF_DEVICE_TYPE_VM,
 							ID:   id,
@@ -378,7 +381,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 						// Keep data in order
 						sort.Strings(ips)
 					}
-					if vpcData, ok := rawData.vpcIDToVmidFips[resourceGroup.VPCID]; ok {
+					if vpcData, ok := rawData.vpcIDToVmidFips[*resourceGroup.VPCID]; ok {
 						if vpcIPs, ok := vpcData[id]; ok {
 							for _, ip := range vpcIPs {
 								ips = append(ips, ip)
@@ -514,9 +517,13 @@ func (g *GroupDataOP) generateResourceGroupData(groups []*models.ResourceGroup) 
 
 			groupType = anonymous
 		}
+		vpcID := ANY_EPC_ID_UINT32
+		if group.VPCID != nil {
+			vpcID = *group.VPCID
+		}
 		rg := &trident.Group{
 			Id:       proto.Uint32(uint32(group.ID)),
-			EpcId:    proto.Uint32(uint32(group.VPCID)),
+			EpcId:    proto.Uint32(uint32(vpcID)),
 			Type:     &groupType,
 			IpRanges: groupIP.ipRanges,
 			Ips:      groupIP.cidrs,

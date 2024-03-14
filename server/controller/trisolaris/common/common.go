@@ -87,6 +87,7 @@ const (
 
 	INTERNET_RESOURCE_GROUP_ID_UINT32 = -2 & 0xffffffff
 	INTERNET_EPC_ID_UINT32            = -2 & 0xffffffff
+	ANY_EPC_ID_UINT32                 = -1 & 0xffffffff
 	RESOURCE_GROUP_TYPE_NONE          = 0
 	RESOURCE_GROUP_TYPE_ANONYMOUS_IP  = 4
 
