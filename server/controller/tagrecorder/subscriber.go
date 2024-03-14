@@ -36,6 +36,8 @@ type SubscriberManager struct {
 	cfg                  config.ControllerConfig
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
+
+	subscribers []Subscriber
 }
 
 func GetSubscriberManager() *SubscriberManager {
@@ -52,12 +54,22 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 func (c *SubscriberManager) Start() {
 	log.Info("tagrecorder subscriber manager started")
 	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
-	subscribers := c.getSubscribers()
+	c.subscribers = c.getSubscribers()
 	log.Infof("tagrecorder run start")
-	for _, subscriber := range subscribers {
+	for _, subscriber := range c.subscribers {
 		subscriber.SetConfig(c.cfg.TagRecorderCfg)
 		subscriber.Subscribe()
 	}
+}
+
+func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
+	ss := make([]Subscriber, 0)
+	for _, s := range m.subscribers {
+		if s.GetSubResourceType() == subResourceType {
+			ss = append(ss, s)
+		}
+	}
+	return ss
 }
 
 func (c *SubscriberManager) getSubscribers() []Subscriber {
@@ -89,10 +101,9 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 
 func (c *SubscriberManager) HealthCheck() {
 	go func() {
-		subscribers := c.getSubscribers()
 		log.Info("tagrecorder health check data run")
 		t := time.Now()
-		for _, subscriber := range subscribers {
+		for _, subscriber := range c.subscribers {
 			if err := subscriber.Check(); err != nil {
 				log.Error(err)
 			}
@@ -105,6 +116,10 @@ type Subscriber interface {
 	Subscribe()
 	SetConfig(trconfig.TagRecorderConfig)
 	Check() error
+	GetSubResourceType() string
+	pubsub.ResourceBatchAddedSubscriber
+	pubsub.ResourceUpdatedSubscriber
+	pubsub.ResourceBatchDeletedSubscriber
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -130,6 +145,10 @@ func newSubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgcons
 	}
 	s.initDBOperator()
 	return s
+}
+
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) GetSubResourceType() string {
+	return s.subResourceTypeName
 }
 
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) initDBOperator() {
