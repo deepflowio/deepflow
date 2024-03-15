@@ -18,6 +18,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -56,15 +57,35 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 		nextToken = *result.NextToken
 	}
 
+	// eks node vinterface just neet primary ip
+	// get ec2 instance id of eks node
+	// because aws api does not specify, judge by description for now
+	// for example:
+	// types.NetworkInterface.Description: aws-K8S-i-01994fbd5e2d8xxxx
+	eksNodeInstanceIDs := map[string]bool{}
+	for _, vData := range retVinterfaces {
+		vDescription := a.getStringPointerValue(vData.Description)
+		if !strings.HasPrefix(vDescription, EKS_NODE_DESCRIPTION_PREFIX) {
+			continue
+		}
+		eksNodeInstanceID := vDescription[len(EKS_NODE_DESCRIPTION_PREFIX):]
+		if eksNodeInstanceID == "" {
+			continue
+		}
+		eksNodeInstanceIDs[eksNodeInstanceID] = false
+	}
+
 	for _, vData := range retVinterfaces {
 		mac := a.getStringPointerValue(vData.MacAddress)
 		if vData.Attachment == nil {
 			log.Debugf("vinterface (%s) not binding device", mac)
 			continue
 		}
+		description := a.getStringPointerValue(vData.Description)
 		if vData.Attachment.InstanceId != nil {
+			instanceID := *vData.Attachment.InstanceId
+			deviceLcuuid := common.GetUUID(instanceID, uuid.Nil)
 			vinterfaceLcuuid := common.GetUUID(a.getStringPointerValue(vData.NetworkInterfaceId), uuid.Nil)
-			deviceLcuuid := common.GetUUID(a.getStringPointerValue(vData.Attachment.InstanceId), uuid.Nil)
 			networkLcuuid := common.GetUUID(a.getStringPointerValue(vData.SubnetId), uuid.Nil)
 			vpcLcuuid := common.GetUUID(a.getStringPointerValue(vData.VpcId), uuid.Nil)
 			vinterface := model.VInterface{
@@ -81,23 +102,38 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 			for _, ip := range vData.PrivateIpAddresses {
 				privateIP := a.getStringPointerValue(ip.PrivateIpAddress)
 				netPrivateIP, err := netaddr.ParseIP(privateIP)
-				if err == nil && netPrivateIP.Is4() {
-					ips = append(ips, model.IP{
-						Lcuuid:           common.GetUUID(vinterfaceLcuuid+privateIP, uuid.Nil),
-						VInterfaceLcuuid: vinterfaceLcuuid,
-						IP:               privateIP,
-						SubnetLcuuid:     common.GetUUID(networkLcuuid, uuid.Nil),
-						RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
-					})
-				} else {
-					log.Infof("ip (%s) not support", privateIP)
-				}
-
-				if vData.Association == nil {
-					log.Debug("association is nil")
+				if err != nil || !netPrivateIP.Is4() {
+					log.Infof("ip (%s) not support or (%s)", privateIP, err.Error())
 					continue
 				}
-				publicIP := a.getStringPointerValue(vData.Association.PublicIp)
+				primary := a.getBoolPointerValue(ip.Primary)
+				if _, ok := eksNodeInstanceIDs[instanceID]; ok {
+					if primary {
+						if description == "" {
+							a.instanceIDToPrimaryIP[instanceID] = privateIP
+						}
+					} else {
+						log.Debugf("eks node (%s) don't need secondary ip (%s)", instanceID, privateIP)
+						continue
+					}
+				} else {
+					if primary && description == "Primary network interface" {
+						a.instanceIDToPrimaryIP[instanceID] = privateIP
+					}
+				}
+				ips = append(ips, model.IP{
+					Lcuuid:           common.GetUUID(vinterfaceLcuuid+privateIP, uuid.Nil),
+					VInterfaceLcuuid: vinterfaceLcuuid,
+					IP:               privateIP,
+					SubnetLcuuid:     common.GetUUID(networkLcuuid, uuid.Nil),
+					RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
+				})
+
+				if ip.Association == nil {
+					log.Debugf("ip (%s) association is nil", privateIP)
+					continue
+				}
+				publicIP := a.getStringPointerValue(ip.Association.PublicIp)
 				netPublicIP, err := netaddr.ParseIP(publicIP)
 				if err == nil && netPublicIP.Is4() {
 					vLcuuid := common.GetUUID(vinterfaceLcuuid, uuid.Nil)
