@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,28 +14,35 @@
  * limitations under the License.
  */
 
-package event
+package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
-	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-type Domain struct {
-	SubDomain
+var log = logging.MustGetLogger("recorder.common")
+
+type ORG struct {
+	ID     int       // org id
+	DB     *mysql.DB // org database connection
+	Logger *Logger   // org log controller
 }
 
-func NewDomain(domainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Domain {
-	return &Domain{
-		SubDomain{
-			domainLcuuid,
-			"",
-			newEventManagerBase(
-				"",
-				toolDS,
-				eq,
-			),
-			newTool(toolDS),
-		},
+func NewORG(id int) (*ORG, error) {
+	db, err := mysql.GetDB(id)
+	return &ORG{
+		ID:     id,
+		DB:     db,
+		Logger: NewLogger(id),
+	}, err
+}
+
+func ReplaceORGLogger(o *ORG) *ORG {
+	return &ORG{
+		ID:     o.ID,
+		DB:     o.DB,
+		Logger: CopyLogger(o.Logger),
 	}
 }

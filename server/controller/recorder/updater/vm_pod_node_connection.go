@@ -57,7 +57,7 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
-			db.NewVMPodNodeConnection(),
+			db.NewVMPodNodeConnection().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
 			cloudData,
 		),

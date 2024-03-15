@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
@@ -42,6 +43,8 @@ const (
 )
 
 type domain struct {
+	org *rcommon.ORG
+
 	eventQueue *queue.OverwriteQueue
 
 	domainLcuuid string
@@ -51,16 +54,21 @@ type domain struct {
 	subDomains *subDomains
 }
 
-func newDomain(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, domainLcuuid, domainName string) *domain {
-	cacheMng := cache.NewCacheManager(ctx, cfg, domainLcuuid)
+func newDomain(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, org *rcommon.ORG, domainLcuuid, domainName string) *domain {
+	org.Logger.AppendDomainName(domainName)
+	org.Logger.AppendDomainLcuuid(domainLcuuid)
+
+	cacheMng := cache.NewCacheManager(ctx, cfg, org, domainLcuuid)
 	return &domain{
+		org: org,
+
 		eventQueue: eventQueue,
 
 		domainLcuuid: domainLcuuid,
 		domainName:   domainName,
 		cache:        cacheMng.DomainCache,
 
-		subDomains: newSubDomains(ctx, cfg, eventQueue, domainLcuuid, domainName, cacheMng),
+		subDomains: newSubDomains(ctx, cfg, eventQueue, org, domainLcuuid, domainName, cacheMng),
 	}
 }
 
@@ -111,7 +119,7 @@ func (r *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 	var domain *mysql.Domain
-	result := mysql.Db.Where("lcuuid = ?", d.domainLcuuid).First(&domain)
+	result := d.org.DB.Where("lcuuid = ?", d.domainLcuuid).First(&domain)
 	if result.RowsAffected != int64(1) {
 		err := errors.New(fmt.Sprintf("db domain (lcuuid: %s) not found", d.domainLcuuid))
 		log.Errorf(err.Error())
@@ -280,37 +288,37 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 		return
 	}
 	var domain mysql.Domain
-	err := mysql.Db.Where("lcuuid = ?", d.domainLcuuid).First(&domain).Error
+	err := d.org.DB.Where("lcuuid = ?", d.domainLcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain (lcuuid: %s) from db failed: %s", d.domainLcuuid, err)
 		return
 	}
 	domain.SyncedAt = &syncAt
-	mysql.Db.Save(&domain)
+	d.org.DB.Save(&domain)
 	log.Debugf("update domain (%+v)", domain)
 }
 
-func (r *domain) updateStateInfo(cloudData cloudmodel.Resource) {
+func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	var domain mysql.Domain
-	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
+	err := d.org.DB.Where("lcuuid = ?", d.domainLcuuid).First(&domain).Error
 	if err != nil {
-		log.Errorf("get domain (lcuuid: %s) from db failed: %s", r.domainLcuuid, err)
+		log.Errorf("get domain (lcuuid: %s) from db failed: %s", d.domainLcuuid, err)
 		return
 	}
-	domain.State, domain.ErrorMsg = r.formatStateInfo(cloudData)
-	mysql.Db.Save(&domain)
+	domain.State, domain.ErrorMsg = d.formatStateInfo(cloudData)
+	d.org.DB.Save(&domain)
 	log.Debugf("update domain (%+v)", domain)
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
 		var subDomain mysql.SubDomain
-		err := mysql.Db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		err := d.org.DB.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err)
 			continue
 		}
 		subDomain.State = subDomainResource.ErrorState
 		subDomain.ErrorMsg = subDomainResource.ErrorMessage
-		mysql.Db.Save(&subDomain)
+		d.org.DB.Save(&subDomain)
 		log.Debugf("update sub_domain (%+v)", subDomain)
 	}
 }

@@ -33,11 +33,11 @@ type DHCPPort struct {
 
 func NewDHCPPort(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *DHCPPort {
 	mng := &DHCPPort{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT,
 	}
 	return mng

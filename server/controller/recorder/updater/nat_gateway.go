@@ -57,7 +57,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,
-			db.NewNATGateway(),
+			db.NewNATGateway().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.NATGateways,
 			cloudData,
 		),

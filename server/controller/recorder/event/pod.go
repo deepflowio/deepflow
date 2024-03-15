@@ -31,16 +31,18 @@ import (
 type Pod struct {
 	EventManagerBase
 	deviceType int
+	tool       *IPTool
 }
 
 func NewPod(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_POD_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD,
+		newTool(toolDS),
 	}
 	return mng
 }
@@ -69,7 +71,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
 
-		l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, item.PodNodeID)
+		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(item.PodNodeID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
 			p.createAndEnqueue(

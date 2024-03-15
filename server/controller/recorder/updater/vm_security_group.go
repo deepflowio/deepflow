@@ -57,7 +57,7 @@ func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecuri
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			wholeCache,
-			db.NewVMSecurityGroup(),
+			db.NewVMSecurityGroup().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VMSecurityGroups,
 			cloudData,
 		),

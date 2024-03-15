@@ -57,7 +57,7 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			wholeCache,
-			db.NewPodGroup(),
+			db.NewPodGroup().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodGroups,
 			cloudData,
 		),

@@ -57,7 +57,7 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewNATVMConnection(),
+			db.NewNATVMConnection().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.NATVMConnections,
 			cloudData,
 		),

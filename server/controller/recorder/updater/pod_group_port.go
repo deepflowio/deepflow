@@ -57,7 +57,7 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			wholeCache,
-			db.NewPodGroupPort(),
+			db.NewPodGroupPort().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodGroupPorts,
 			cloudData,
 		),

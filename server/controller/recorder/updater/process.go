@@ -58,7 +58,7 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
-			db.NewProcess(),
+			db.NewProcess().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.Process,
 			cloudData,
 		),

@@ -29,9 +29,21 @@ import (
 )
 
 type EventManagerBase struct {
+	org *ORG
+
 	resourceType string
 	ToolDataSet  *tool.DataSet
 	Queue        *queue.OverwriteQueue
+}
+
+func newEventManagerBase(rt string, toolDS *tool.DataSet, q *queue.OverwriteQueue) EventManagerBase {
+	return EventManagerBase{
+		org: toolDS.GetORG(),
+
+		resourceType: rt,
+		ToolDataSet:  toolDS,
+		Queue:        q,
+	}
 }
 
 type ResourceEventToMySQL struct {
@@ -107,7 +119,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 			Domain:  domainLcuuid,
 			Content: string(content),
 		}
-		err = mysql.Db.Create(&dbItem).Error
+		err = e.org.DB.Create(&dbItem).Error
 		if err != nil {
 			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error())
 		} else {

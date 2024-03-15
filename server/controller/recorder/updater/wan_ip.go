@@ -61,7 +61,7 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
-			db.NewWANIP(),
+			db.NewWANIP().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.WANIPs,
 			nil,
 		),

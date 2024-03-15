@@ -59,7 +59,7 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,
-			db.NewLANIP(),
+			db.NewLANIP().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.LANIPs,
 			nil,
 		),

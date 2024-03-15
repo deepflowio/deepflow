@@ -57,7 +57,7 @@ func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.Prometh
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
 			wholeCache,
-			db.NewPrometheusTarget(),
+			db.NewPrometheusTarget().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PrometheusTarget,
 			cloudData,
 		),

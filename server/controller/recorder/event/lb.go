@@ -33,11 +33,11 @@ type LB struct {
 
 func NewLB(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LB {
 	mng := &LB{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_LB_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_LB,
 	}
 	return mng

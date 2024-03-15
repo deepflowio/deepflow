@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
@@ -69,6 +70,8 @@ type UpdaterBase[
 	MDPT msg.DeletePtr[MDT],
 	MDT msg.Delete,
 ] struct {
+	org *common.ORG
+
 	resourceType string
 
 	cache             *cache.Cache                           // 基于 Domain 或者 SubDomain 范围构造
@@ -102,6 +105,8 @@ func newUpdaterBase[
 	resourceType string, cache *cache.Cache, dbOperator db.Operator[MT], diffBaseData map[string]BT, cloudData []CT,
 ) UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT] {
 	u := UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]{
+		org: cache.GetORG(),
+
 		resourceType: resourceType,
 		cache:        cache,
 		dbOperator:   dbOperator,

@@ -44,11 +44,11 @@ type VM struct {
 
 func NewVM(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_VM_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 	}
 	return mng

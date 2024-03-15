@@ -58,7 +58,7 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,
-			db.NewSubnet(),
+			db.NewSubnet().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.Subnets,
 			cloudData,
 		),

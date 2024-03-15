@@ -33,11 +33,11 @@ type RedisInstance struct {
 
 func NewRedisInstance(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *RedisInstance {
 	mng := &RedisInstance{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 	}
 	return mng
