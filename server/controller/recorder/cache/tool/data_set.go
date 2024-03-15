@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -2095,19 +2096,39 @@ func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
 	}
 }
 
-func (t *DataSet) GetPodIDByContainerID(containerID string) (int, bool) {
+func (t *DataSet) GetPodIDByContainerIDWithoutLog(containerID string) (int, bool) {
+	if len(containerID) == 0 {
+		return 0, false
+	}
 	podID, exists := t.containerIDToPodID[containerID]
 	if exists {
 		return podID, true
 	}
-	log.Warningf("cache pod id (container id: %s) not found", containerID)
 	var pod *mysql.Pod
-	result := mysql.Db.Where("container_ids like ", "%s"+containerID+"%s").Find(&pod)
+	result := mysql.Db.Where("container_ids like ?", "%"+containerID+"%").Find(&pod)
 	if result.RowsAffected == 1 {
 		t.AddPod(pod)
 		return t.containerIDToPodID[containerID], true
 	}
 	return 0, false
+}
+
+func (t *DataSet) GetProcessDeviceTypeAndID(containerID string, vtapID uint32) (deviceType, deviceID int) {
+	podID, exists := t.GetPodIDByContainerIDWithoutLog(containerID)
+	if len(containerID) != 0 && exists {
+		deviceType = common.VIF_DEVICE_TYPE_POD
+		deviceID = podID
+	} else {
+		var vtap *mysql.VTap
+		if err := mysql.Db.Where("id = ?", vtapID).First(&vtap).Error; err != nil {
+			log.Error(err)
+		}
+		if vtap != nil {
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtap.Type]
+			deviceID = vtap.LaunchServerID
+		}
+	}
+	return
 }
 
 func (t *DataSet) SetPublicNetworkID(id int) {
