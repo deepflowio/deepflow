@@ -158,7 +158,10 @@ type PlatformInfoTable struct {
 
 	gprocessInfos      map[uint32]uint64
 	vtapIDProcessInfos map[uint64]uint32
-	podIDInfos         map[uint32]*Info
+
+	podIDInfosPlatformData map[uint32]*Info
+	// podIPInfos is first obtained from podIDInfosPlatformData and needs to be supplemented by podIPs information.
+	podIDInfos map[uint32]*Info
 
 	bootTime            uint32
 	moduleName          string
@@ -970,7 +973,7 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	t.containerHitCount = make(map[string]*uint64)
 	t.containerMissCount = make(map[string]*uint64)
 
-	t.podIDInfos = newEpcIDPodInfos
+	t.podIDInfosPlatformData = newEpcIDPodInfos
 }
 
 func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
@@ -1560,8 +1563,12 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	containerInfos := make(map[string][]*PodInfo)
 
 	podIDInfos := make(map[uint32]*Info)
-	// save t.podIDInfos first to prevent panic when reading and writing t.podIDInfos at the same time.
-	podIDInfos, t.podIDInfos = t.podIDInfos, podIDInfos
+	if t.podIDInfosPlatformData != nil {
+		podIDInfos = t.podIDInfosPlatformData
+	} else {
+		// save t.podIDInfos first to prevent panic when reading and writing t.podIDInfos at the same time.
+		podIDInfos, t.podIDInfos = t.podIDInfos, podIDInfos
+	}
 	for _, podIp := range podIps {
 		podName := podIp.GetPodName()
 		// podIp.GetEpcId() in range [0,64000], convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
@@ -1633,6 +1640,7 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	t.podNameInfos = podNameInfos
 	t.containerInfos = containerInfos
 	t.podIDInfos = podIDInfos
+	t.podIDInfosPlatformData = nil
 }
 
 func (t *PlatformInfoTable) podsString() string {
