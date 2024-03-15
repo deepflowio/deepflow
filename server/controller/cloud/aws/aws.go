@@ -38,7 +38,8 @@ import (
 var log = logging.MustGetLogger("cloud.aws")
 
 const (
-	REGION_NAME = "cn-north-1"
+	REGION_NAME                 = "cn-north-1"
+	EKS_NODE_DESCRIPTION_PREFIX = "aws-K8S-"
 )
 
 type Aws struct {
