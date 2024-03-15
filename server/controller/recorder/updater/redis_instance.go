@@ -57,7 +57,7 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,
-			db.NewRedisInstance(),
+			db.NewRedisInstance().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.RedisInstances,
 			cloudData,
 		),

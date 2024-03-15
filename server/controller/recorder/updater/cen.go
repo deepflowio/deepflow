@@ -58,7 +58,7 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
-			db.NewCEN(),
+			db.NewCEN().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.CENs,
 			cloudData,
 		),

@@ -57,7 +57,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
-			db.NewLB(),
+			db.NewLB().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.LBs,
 			cloudData,
 		),

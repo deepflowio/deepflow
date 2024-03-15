@@ -57,7 +57,7 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,
-			db.NewNetwork(),
+			db.NewNetwork().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.Networks,
 			cloudData,
 		),

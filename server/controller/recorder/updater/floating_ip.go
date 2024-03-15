@@ -58,7 +58,7 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,
-			db.NewFloatingIP(),
+			db.NewFloatingIP().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.FloatingIPs,
 			cloudData,
 		),

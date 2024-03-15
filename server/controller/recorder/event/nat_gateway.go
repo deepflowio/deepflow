@@ -33,11 +33,11 @@ type NATGateway struct {
 
 func NewNATGateway(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *NATGateway {
 	mng := &NATGateway{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY,
 	}
 	return mng

@@ -57,7 +57,7 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,
-			db.NewLBListener(),
+			db.NewLBListener().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.LBListeners,
 			cloudData,
 		),

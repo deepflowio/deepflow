@@ -35,6 +35,8 @@ type DataSet struct {
 	// 仅资源变更事件所需的数据
 	EventDataSet
 
+	org *rcommon.ORG
+
 	// process device data
 	containerIDToPodID map[string]int
 
@@ -103,8 +105,10 @@ type DataSet struct {
 	podLcuuidToID map[string]int
 }
 
-func NewDataSet() *DataSet {
+func NewDataSet(org *rcommon.ORG) *DataSet {
 	return &DataSet{
+		org: org,
+
 		EventDataSet:       NewEventDataSet(),
 		containerIDToPodID: make(map[string]int),
 
@@ -173,6 +177,10 @@ func NewDataSet() *DataSet {
 	}
 }
 
+func (t *DataSet) GetORG() *rcommon.ORG {
+	return t.org
+}
+
 func (t *DataSet) AddAZ(item *mysql.AZ) {
 	t.azLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_AZ_EN, item.Lcuuid))
@@ -190,7 +198,7 @@ func (t *DataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_AZ_EN, lcuuid))
 	var az mysql.AZ
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&az)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&az)
 	if result.RowsAffected == 1 {
 		t.AddAZ(&az)
 		return az.ID, true
@@ -963,7 +971,7 @@ func (t *DataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid))
 	var region mysql.Region
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&region)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&region)
 	if result.RowsAffected == 1 {
 		t.AddRegion(&region)
 		return region.ID, true
@@ -980,7 +988,7 @@ func (t *DataSet) GetRegionLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, id))
 	var region mysql.Region
-	result := mysql.Db.Where("id = ?", id).Find(&region)
+	result := t.org.DB.Where("id = ?", id).Find(&region)
 	if result.RowsAffected == 1 {
 		t.AddRegion(&region)
 		return region.Lcuuid, true
@@ -997,7 +1005,7 @@ func (t *DataSet) GetHostIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid))
 	var host mysql.Host
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&host)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&host)
 	if result.RowsAffected == 1 {
 		t.AddHost(&host)
 		return host.ID, true
@@ -1014,7 +1022,7 @@ func (t *DataSet) GetHostIDByIP(ip string) (int, bool) {
 	}
 	log.Warningf("cache %s id (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip)
 	var host mysql.Host
-	result := mysql.Db.Where("ip = ?", ip).Find(&host)
+	result := t.org.DB.Where("ip = ?", ip).Find(&host)
 	if result.RowsAffected == 1 {
 		t.AddHost(&host)
 		return host.ID, true
@@ -1031,7 +1039,7 @@ func (t *DataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid))
 	var vm mysql.VM
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vm)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&vm)
 	if result.RowsAffected == 1 {
 		t.AddVM(&vm)
 		return vm.ID, true
@@ -1048,7 +1056,7 @@ func (t *DataSet) GetVPCIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid))
 	var vpc mysql.VPC
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vpc)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.ID, true
@@ -1065,7 +1073,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id))
 	var vpc mysql.VPC
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&vpc)
+	result := t.org.DB.Where("lcuuid = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.Lcuuid, true
@@ -1085,7 +1093,7 @@ func (t *DataSet) GetNetworkIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid))
 	var network mysql.Network
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&network)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.ID, true
@@ -1102,7 +1110,7 @@ func (t *DataSet) GetSubnetIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid))
 	var subnet mysql.Subnet
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&subnet)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.ID, true
@@ -1119,7 +1127,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id))
 	var subnet mysql.Subnet
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&subnet)
+	result := t.org.DB.Where("lcuuid = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.Lcuuid, true
@@ -1136,7 +1144,7 @@ func (t *DataSet) GetNetworkIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	result := t.org.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
 		return vif.NetworkID, true
@@ -1153,7 +1161,7 @@ func (t *DataSet) GetDeviceTypeByVInterfaceLcuuid(vifLcuuid string) (int, bool) 
 	}
 	log.Warningf("cache device type (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	result := t.org.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
 		return vif.DeviceType, true
@@ -1170,7 +1178,7 @@ func (t *DataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 	}
 	log.Warningf("cache device id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	result := t.org.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
 		return vif.DeviceID, true
@@ -1187,7 +1195,7 @@ func (t *DataSet) GetMacByVInterfaceLcuuid(vifLcuuid string) (string, bool) {
 	}
 	log.Warningf("cache mac (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	result := t.org.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
 		return vif.Mac, true
@@ -1207,7 +1215,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id))
 	var network mysql.Network
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&network)
+	result := t.org.DB.Where("lcuuid = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Lcuuid, true
@@ -1224,7 +1232,7 @@ func (t *DataSet) GetVRouterIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid))
 	var vrouter mysql.VRouter
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vrouter)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&vrouter)
 	if result.RowsAffected == 1 {
 		t.AddVRouter(&vrouter)
 		return vrouter.ID, true
@@ -1241,7 +1249,7 @@ func (t *DataSet) GetDHCPPortIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
 	var dhcpPort mysql.DHCPPort
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&dhcpPort)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&dhcpPort)
 	if result.RowsAffected == 1 {
 		t.AddDHCPPort(&dhcpPort)
 		return dhcpPort.ID, true
@@ -1258,7 +1266,7 @@ func (t *DataSet) GetVInterfaceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 	var vinterface mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vinterface)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&vinterface)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vinterface)
 		return vinterface.ID, true
@@ -1275,7 +1283,7 @@ func (t *DataSet) GetVInterfaceTypeByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warningf("cache %s type (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
 	var vinterface mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vinterface)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&vinterface)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vinterface)
 		return vinterface.Type, true
@@ -1349,7 +1357,7 @@ func (t *DataSet) GetSecurityGroupIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
 	var securityGroup mysql.SecurityGroup
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&securityGroup)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&securityGroup)
 	if result.RowsAffected == 1 {
 		t.AddSecurityGroup(&securityGroup)
 		return securityGroup.ID, true
@@ -1366,7 +1374,7 @@ func (t *DataSet) GetNATGatewayIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
 	var natGateway mysql.NATGateway
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&natGateway)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&natGateway)
 	if result.RowsAffected == 1 {
 		t.AddNATGateway(&natGateway)
 		return natGateway.ID, true
@@ -1383,7 +1391,7 @@ func (t *DataSet) GetLBIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid))
 	var lb mysql.LB
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lb)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&lb)
 	if result.RowsAffected == 1 {
 		t.AddLB(&lb)
 		return lb.ID, true
@@ -1400,7 +1408,7 @@ func (t *DataSet) GetLBListenerIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
 	var lbListener mysql.LBListener
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lbListener)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&lbListener)
 	if result.RowsAffected == 1 {
 		t.AddLBListener(&lbListener)
 		return lbListener.ID, true
@@ -1417,7 +1425,7 @@ func (t *DataSet) GetRDSInstanceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
 	var rdsInstance mysql.RDSInstance
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&rdsInstance)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&rdsInstance)
 	if result.RowsAffected == 1 {
 		t.AddRDSInstance(&rdsInstance)
 		return rdsInstance.ID, true
@@ -1434,7 +1442,7 @@ func (t *DataSet) GetRedisInstanceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
 	var redisInstance mysql.RedisInstance
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&redisInstance)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&redisInstance)
 	if result.RowsAffected == 1 {
 		t.AddRedisInstance(&redisInstance)
 		return redisInstance.ID, true
@@ -1451,7 +1459,7 @@ func (t *DataSet) GetPodClusterIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
 	var podCluster mysql.PodCluster
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podCluster)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podCluster)
 	if result.RowsAffected == 1 {
 		t.AddPodCluster(&podCluster)
 		return podCluster.ID, true
@@ -1471,7 +1479,7 @@ func (t *DataSet) GetPodNodeIDByLcuuid(lcuuid string) int {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
 	var podNode mysql.PodNode
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podNode)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&podNode)
 		return podNode.ID
@@ -1488,7 +1496,7 @@ func (t *DataSet) GetPodNodeLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, id))
 	var podNode mysql.PodNode
-	result := mysql.Db.Where("id = ?", id).Find(&podNode)
+	result := t.org.DB.Where("id = ?", id).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&podNode)
 		return podNode.Lcuuid, true
@@ -1505,7 +1513,7 @@ func (t *DataSet) GetPodNamespaceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid))
 	var podNamespace mysql.PodNamespace
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podNamespace)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podNamespace)
 	if result.RowsAffected == 1 {
 		t.AddPodNamespace(&podNamespace)
 		return podNamespace.ID, true
@@ -1522,7 +1530,7 @@ func (t *DataSet) GetPodIngressIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
 	var podIngress mysql.PodIngress
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podIngress)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podIngress)
 	if result.RowsAffected == 1 {
 		t.AddPodIngress(&podIngress)
 		return podIngress.ID, true
@@ -1539,7 +1547,7 @@ func (t *DataSet) GetPodIngressLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, id))
 	var podIngress mysql.PodIngress
-	result := mysql.Db.Where("id = ?", id).Find(&podIngress)
+	result := t.org.DB.Where("id = ?", id).Find(&podIngress)
 	if result.RowsAffected == 1 {
 		t.AddPodIngress(&podIngress)
 		return podIngress.Lcuuid, true
@@ -1556,7 +1564,7 @@ func (t *DataSet) GetPodIngressRuleIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
 	var podIngressRule mysql.PodIngressRule
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podIngressRule)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podIngressRule)
 	if result.RowsAffected == 1 {
 		t.AddPodIngressRule(&podIngressRule)
 		return podIngressRule.ID, true
@@ -1573,7 +1581,7 @@ func (t *DataSet) GetPodServiceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 	var podService mysql.PodService
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podService)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podService)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&podService)
 		return podService.ID, true
@@ -1590,7 +1598,7 @@ func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id))
 	var podService mysql.PodService
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&podService)
+	result := t.org.DB.Where("lcuuid = ?", id).Find(&podService)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&podService)
 		return podService.Lcuuid, true
@@ -1607,7 +1615,7 @@ func (t *DataSet) GetPodGroupIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 	var podGroup mysql.PodGroup
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podGroup)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podGroup)
 	if result.RowsAffected == 1 {
 		t.AddPodGroup(&podGroup)
 		return podGroup.ID, true
@@ -1624,7 +1632,7 @@ func (t *DataSet) GetPodGroupLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id))
 	var podGroup mysql.PodGroup
-	result := mysql.Db.Where("id = ?", id).Find(&podGroup)
+	result := t.org.DB.Where("id = ?", id).Find(&podGroup)
 	if result.RowsAffected == 1 {
 		t.AddPodGroup(&podGroup)
 		return podGroup.Lcuuid, true
@@ -1641,7 +1649,7 @@ func (t *DataSet) GetPodReplicaSetIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
 	var podReplicaSet mysql.PodReplicaSet
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podReplicaSet)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&podReplicaSet)
 	if result.RowsAffected == 1 {
 		t.AddPodReplicaSet(&podReplicaSet)
 		return podReplicaSet.ID, true
@@ -1658,7 +1666,7 @@ func (t *DataSet) GetPodReplicaSetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, id))
 	var podReplicaSet mysql.PodReplicaSet
-	result := mysql.Db.Where("id = ?", id).Find(&podReplicaSet)
+	result := t.org.DB.Where("id = ?", id).Find(&podReplicaSet)
 	if result.RowsAffected == 1 {
 		t.AddPodReplicaSet(&podReplicaSet)
 		return podReplicaSet.Lcuuid, true
@@ -1675,7 +1683,7 @@ func (t *DataSet) GetPodIDByLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid))
 	var pod mysql.Pod
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&pod)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&pod)
 	if result.RowsAffected == 1 {
 		t.AddPod(&pod)
 		return pod.ID, true
@@ -1693,7 +1701,7 @@ func (t *DataSet) GetHostInfoByID(id int) (*hostInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, id))
 	var dbItem mysql.Host
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddHost(&dbItem)
 		return t.hostIDtoInfo[dbItem.ID], nil
@@ -1717,7 +1725,7 @@ func (t *DataSet) GetVMInfoByID(id int) (*vmInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 	var dbItem mysql.VM
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVM(&dbItem)
 		return t.vmIDToInfo[dbItem.ID], nil
@@ -1740,7 +1748,7 @@ func (t *DataSet) GetNetworkNameByID(id int) (string, bool) {
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id))
 	var network mysql.Network
-	result := mysql.Db.Where("id = ?", id).Find(&network)
+	result := t.org.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Name, true
@@ -1758,7 +1766,7 @@ func (t *DataSet) GetVRouterInfoByID(id int) (*vrouterInfo, error) {
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, id))
 
 	var vRouter mysql.VRouter
-	result := mysql.Db.Where("id = ?", id).Find(&vRouter)
+	result := t.org.DB.Where("id = ?", id).Find(&vRouter)
 	if result.RowsAffected == 1 {
 		t.AddVRouter(&vRouter)
 		return t.vrouterIDToInfo[vRouter.ID], nil
@@ -1781,7 +1789,7 @@ func (t *DataSet) GetDHCPPortInfoByID(id int) (*dhcpPortInfo, error) {
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, id))
 	var dbItem mysql.DHCPPort
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddDHCPPort(&dbItem)
 		return t.dhcpPortIDToInfo[id], nil
@@ -1805,7 +1813,7 @@ func (t *DataSet) GetLBInfoByID(id int) (*lbInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, id))
 	var dbItem mysql.LB
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddLB(&dbItem)
 		return t.lbIDToInfo[dbItem.ID], nil
@@ -1829,7 +1837,7 @@ func (t *DataSet) GetNATGatewayInfoByID(id int) (*natGatewayInfo, error) {
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, id))
 
 	var dbItem mysql.NATGateway
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddNATGateway(&dbItem)
 		return t.natGatewayIDToInfo[dbItem.ID], nil
@@ -1853,7 +1861,7 @@ func (t *DataSet) GetRDSInstanceInfoByID(id int) (*rdsInstanceInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, id))
 	var dbItem mysql.RDSInstance
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRDSInstance(&dbItem)
 		return t.rdsInstanceIDToInfo[dbItem.ID], nil
@@ -1877,7 +1885,7 @@ func (t *DataSet) GetRedisInstanceInfoByID(id int) (*redisInstanceInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, id))
 	var dbItem mysql.RedisInstance
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRedisInstance(&dbItem)
 		return t.redisInstanceIDToInfo[dbItem.ID], nil
@@ -1901,7 +1909,7 @@ func (t *DataSet) GetPodNodeInfoByID(id int) (*podNodeInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, id))
 	var dbItem mysql.PodNode
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&dbItem)
 		return t.podNodeIDToInfo[dbItem.ID], nil
@@ -1925,7 +1933,7 @@ func (t *DataSet) GetPodServiceInfoByID(id int) (*podServiceInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id))
 	var dbItem mysql.PodService
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&dbItem)
 		return t.podServiceIDToInfo[dbItem.ID], nil
@@ -1949,7 +1957,7 @@ func (t *DataSet) GetPodInfoByID(id int) (*podInfo, error) {
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, id))
 	var dbItem mysql.Pod
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	result := t.org.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPod(&dbItem)
 		return t.podIDToInfo[dbItem.ID], nil
@@ -1972,7 +1980,7 @@ func (t *DataSet) GetVInterfaceLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, id))
 	var vif mysql.VInterface
-	result := mysql.Db.Where("id = ?", id).Find(&vif)
+	result := t.org.DB.Where("id = ?", id).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
 		return vif.Lcuuid, true
@@ -1989,7 +1997,7 @@ func (t *DataSet) GetVInterfaceIDByWANIPLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid)
 	var wanIP mysql.WANIP
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&wanIP)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&wanIP)
 	if result.RowsAffected == 1 {
 		t.AddWANIP(&wanIP)
 		vifID, exists = t.wanIPLcuuidToVInterfaceID[lcuuid]
@@ -2007,7 +2015,7 @@ func (t *DataSet) GetWANIPByLcuuid(lcuuid string) (string, bool) {
 	}
 	log.Warning(cacheIPByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 	var wanIP mysql.WANIP
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&wanIP)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&wanIP)
 	if result.RowsAffected == 1 {
 		t.AddWANIP(&wanIP)
 		return wanIP.IP, true
@@ -2024,7 +2032,7 @@ func (t *DataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 	var lanIP mysql.LANIP
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lanIP)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
 		t.AddLANIP(&lanIP)
 		vifID, exists = t.lanIPLcuuidToVInterfaceID[lcuuid]
@@ -2042,7 +2050,7 @@ func (t *DataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 	}
 	log.Warning(cacheIPByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 	var lanIP mysql.LANIP
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lanIP)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
 		t.AddLANIP(&lanIP)
 		return lanIP.IP, true
@@ -2059,7 +2067,7 @@ func (t *DataSet) GetVMIDByPodNodeID(podNodeID int) (int, bool) {
 	}
 	log.Warningf("cache %s id (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VM_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, podNodeID)
 	var conn mysql.VMPodNodeConnection
-	result := mysql.Db.Where("pod_node_id = ?", podNodeID).Find(&conn)
+	result := t.org.DB.Where("pod_node_id = ?", podNodeID).Find(&conn)
 	if result.RowsAffected == 1 {
 		t.AddVMPodNodeConnection(&conn)
 		return conn.VMID, true
@@ -2076,7 +2084,7 @@ func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, b
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid)
 	var conn mysql.VMPodNodeConnection
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&conn)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&conn)
 	if result.RowsAffected == 1 {
 		t.AddVMPodNodeConnection(&conn)
 		return conn.PodNodeID, true
@@ -2107,7 +2115,7 @@ func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid))
 	var process *mysql.Process
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&process)
+	result := t.org.DB.Where("lcuuid = ?", lcuuid).Find(&process)
 	if result.RowsAffected == 1 {
 		t.AddProcess(process)
 		return t.processLcuuidToInfo[lcuuid], true
@@ -2126,7 +2134,7 @@ func (t *DataSet) GetPodIDByContainerIDWithoutLog(containerID string) (int, bool
 		return podID, true
 	}
 	var pod *mysql.Pod
-	result := mysql.Db.Where("container_ids like ?", "%"+containerID+"%").Find(&pod)
+	result := t.org.DB.Where("container_ids like ?", "%"+containerID+"%").Find(&pod)
 	if result.RowsAffected == 1 {
 		t.AddPod(pod)
 		return t.containerIDToPodID[containerID], true
@@ -2141,7 +2149,7 @@ func (t *DataSet) GetProcessDeviceTypeAndID(containerID string, vtapID uint32) (
 		deviceID = podID
 	} else {
 		var vtap *mysql.VTap
-		if err := mysql.Db.Where("id = ?", vtapID).First(&vtap).Error; err != nil {
+		if err := t.org.DB.Where("id = ?", vtapID).First(&vtap).Error; err != nil { // TODO @weiqiang 放入缓存
 			log.Error(err)
 		}
 		if vtap != nil {

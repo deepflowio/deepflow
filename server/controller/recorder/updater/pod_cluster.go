@@ -57,7 +57,7 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			wholeCache,
-			db.NewPodCluster(),
+			db.NewPodCluster().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodClusters,
 			cloudData,
 		),

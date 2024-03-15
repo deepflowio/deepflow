@@ -58,7 +58,7 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,
-			db.NewVRouter(),
+			db.NewVRouter().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VRouters,
 			cloudData,
 		),

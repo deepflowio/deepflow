@@ -60,7 +60,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
-			db.NewVM(),
+			db.NewVM().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VMs,
 			cloudData,
 		),

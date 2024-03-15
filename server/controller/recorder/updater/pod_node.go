@@ -57,7 +57,7 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			wholeCache,
-			db.NewPodNode(),
+			db.NewPodNode().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodNodes,
 			cloudData,
 		),

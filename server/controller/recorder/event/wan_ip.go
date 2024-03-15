@@ -30,15 +30,17 @@ import (
 
 type WANIP struct {
 	EventManagerBase
+	tool *IPTool
 }
 
 func NewWANIP(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *WANIP {
 	mng := &WANIP{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
+			toolDS,
+			eq,
+		),
+		newTool(toolDS),
 	}
 	return mng
 }
@@ -75,7 +77,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 			if err != nil {
 				log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
-			deviceRelatedOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
+			deviceRelatedOpts, err = i.tool.GetDeviceOptionsByDeviceID(deviceType, deviceID)
 			if err != nil {
 				log.Errorf("releated options for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
@@ -105,7 +107,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 			if err != nil {
 				log.Error(err)
 			} else {
-				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, deviceID)
+				l3DeviceOpts, ok := i.tool.getL3DeviceOptionsByPodNodeID(deviceID)
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
@@ -126,7 +128,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 			if err != nil {
 				log.Error(err)
 			} else {
-				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, podInfo.PodNodeID)
+				l3DeviceOpts, ok := i.tool.getL3DeviceOptionsByPodNodeID(podInfo.PodNodeID)
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
@@ -188,7 +190,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if err != nil {
 					log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
-					deviceName = getDeviceNameFromAllByID(deviceType, deviceID)
+					deviceName = i.tool.getDeviceNameFromAllByID(deviceType, deviceID)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {

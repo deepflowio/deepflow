@@ -57,7 +57,7 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,
-			db.NewLBTargetServer(),
+			db.NewLBTargetServer().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.LBTargetServers,
 			cloudData,
 		),

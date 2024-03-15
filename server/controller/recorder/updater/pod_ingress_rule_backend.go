@@ -57,7 +57,7 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			wholeCache,
-			db.NewPodIngressRuleBackend(),
+			db.NewPodIngressRuleBackend().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
 			cloudData,
 		),

@@ -57,7 +57,7 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
-			db.NewRDSInstance(),
+			db.NewRDSInstance().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.RDSInstances,
 			cloudData,
 		),

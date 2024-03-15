@@ -60,7 +60,7 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			wholeCache,
-			db.NewPodNamespace(),
+			db.NewPodNamespace().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodNamespaces,
 			cloudData,
 		),
