@@ -322,14 +322,16 @@ func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformDat
 				// fill ip from Vtap first, can be overwritten by podInfo later
 				IP4 := utils.IpToUint32(ip4)
 				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, IP4)
-				if p.IP4 == 0 && p.IsIPv4 {
+				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP4 = IP4
+					p.IsIPv4 = true
 				}
 			} else {
 				IP6 := vtapIP
 				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, IP6)
-				if (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) && !p.IsIPv4 {
+				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP6 = IP6
+					p.IsIPv4 = false
 				}
 			}
 		}
