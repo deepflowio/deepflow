@@ -63,6 +63,7 @@ enum Exception {
     NPB_SOCKET_ERROR = 131072;
     INTEGRATION_SOCKET_ERROR = 262144;
     CGROUPS_CONFIG_ERROR = 524288;
+    SYSTEM_LOAD_CIRCUIT_BREAKER = 1048576;
     // 2^31及以下由采集器使用，采集器最大可用异常是2^31，顺序从前往后
     // 2^32及以上由控制器使用，顺序从后往前
 }
@@ -182,6 +183,12 @@ enum DecapType {
     DECAP_TYPE_GENEVE = 4;
 }
 
+enum SystemLoadMetric {
+    Load1 = 0;
+    Load5 = 1;
+    Load15 = 2;
+}
+
 message Config {
     optional bool enabled = 1 [default = true];
     optional uint32 max_cpus = 2 [default = 1];
@@ -283,6 +290,8 @@ message Config {
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size = 502 [default = 1000];
     optional TapMode tap_mode = 503 [default = LOCAL];
+    optional float system_load_circuit_breaker_threshold = 504 [default = 1.0];
+    optional SystemLoadMetric system_load_circuit_breaker_metric = 505 [default = Load15];
 
     optional string local_config = 510;  // 全量的配置文件内容
 }
