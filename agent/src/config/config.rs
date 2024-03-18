@@ -1155,6 +1155,12 @@ pub struct RuntimeConfig {
     #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
     #[serde(skip)]
+    pub system_load_circuit_breaker_threshold: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_recover: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
+    #[serde(skip)]
     pub server_tx_bandwidth_threshold: u64,
     #[serde(skip)]
     pub bandwidth_probe_interval: Duration,
@@ -1281,6 +1287,9 @@ impl RuntimeConfig {
             collector_enabled: true,
             l4_log_store_tap_types: vec![0],
             platform_enabled: false,
+            system_load_circuit_breaker_threshold: 1.0,
+            system_load_circuit_breaker_recover: 0.9,
+            system_load_circuit_breaker_metric: trident::SystemLoadMetric::Load15,
             server_tx_bandwidth_threshold: 1,
             bandwidth_probe_interval: Duration::from_secs(60),
             npb_vlan_mode: trident::VlanMode::None,
@@ -1461,6 +1470,9 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                 })
                 .collect(),
             platform_enabled: conf.platform_enabled(),
+            system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold(),
+            system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover(),
+            system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
             bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
             npb_vlan_mode: conf.npb_vlan_mode(),
