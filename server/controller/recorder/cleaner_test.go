@@ -35,7 +35,7 @@ func (t *SuiteTest) TestForceDelete() {
 	if addedVM.ID == 0 {
 		fmt.Println("addedVM should not be null")
 	}
-	forceDelete[mysql.VM](time.Now().Add(time.Duration(-1) * time.Hour))
+	deleteExpired[mysql.VM](time.Now().Add(time.Duration(-1) * time.Hour))
 	mysql.Db.Unscoped().Where("lcuuid = ?", vm.Lcuuid).Find(&addedVM)
 	if addedVM.ID != 0 {
 		fmt.Println("addedVM should be null")
