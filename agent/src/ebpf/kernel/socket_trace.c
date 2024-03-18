@@ -35,6 +35,7 @@
 #define SUBMIT_INVALID		(-1)
 #define SUBMIT_ABORT		(-2)
 
+/* *INDENT-OFF* */
 /***********************************************************
  * map definitions
  ***********************************************************/
@@ -148,6 +149,7 @@ MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1)
  */
 MAP_ARRAY(proto_infer_cache_map, __u32, struct proto_infer_cache_t, PROTO_INFER_CACHE_SIZE)
 #endif
+/* *INDENT-ON* */
 
 static __inline bool is_protocol_enabled(int protocol)
 {
@@ -167,8 +169,7 @@ static __inline void delete_socket_info(__u64 conn_key,
 		return;
 
 	if (!socket_info_map__delete(&conn_key)) {
-		__sync_fetch_and_add(&trace_stats->
-				     socket_map_count, -1);
+		__sync_fetch_and_add(&trace_stats->socket_map_count, -1);
 	}
 }
 
@@ -184,8 +185,8 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__write_seq_offset);
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
+			      sock + offset->tcp_sock__write_seq_offset);
 	return tcp_seq;
 }
 
@@ -201,8 +202,8 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__copied_seq_offset);
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
+			      sock + offset->tcp_sock__copied_seq_offset);
 	return tcp_seq;
 }
 
@@ -217,35 +218,34 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
  */
 #define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {				\
 	struct iovec iov_cpy;							\
-	bpf_probe_read(&iov_cpy, sizeof(struct iovec), (I));			\
+	bpf_probe_read_user(&iov_cpy, sizeof(struct iovec), (I));		\
 	if (iov_cpy.iov_base == NULL || iov_cpy.iov_len == 0) continue;		\
 	if (!(F)) {								\
 		F = iov_cpy.iov_base;						\
 		F_S = iov_cpy.iov_len;						\
 	}									\
 	const int bytes_remaining = (L_T) - (L_C);				\
-        __u32 iov_size =							\
-            iov_cpy.iov_len <							\
-            bytes_remaining ? iov_cpy.iov_len : bytes_remaining;		\
-        __u32 len = (O) + (L_C);						\
-        struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
+  __u32 iov_size =							\
+iov_cpy.iov_len <							\
+bytes_remaining ? iov_cpy.iov_len : bytes_remaining;			\
+  __u32 len = (O) + (L_C);						\
+  struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
 	if (len > (sizeof((B)) - sizeof(*cp)))					\
 		break;								\
 	if (iov_size >= sizeof(cp->data)) {					\
-		bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);	\
+		bpf_probe_read_user(cp->data, sizeof(cp->data), iov_cpy.iov_base);\
 		iov_size = sizeof(cp->data);					\
 	} else {								\
 		iov_size = iov_size & (sizeof(cp->data) - 1);			\
-		bpf_probe_read(cp->data, iov_size + 1, iov_cpy.iov_base);	\
+		bpf_probe_read_user(cp->data, iov_size + 1, iov_cpy.iov_base);	\
 	}									\
 	L_C = (L_C) + iov_size;							\
 } while (0)
 
 static __inline int iovecs_copy(struct __socket_data *v,
 				struct __socket_data_buffer *v_buff,
-				const struct data_args_t* args,
-				size_t syscall_len,
-				__u32 send_len)
+				const struct data_args_t *args,
+				size_t syscall_len, __u32 send_len)
 {
 #define LOOP_LIMIT 12
 
@@ -284,8 +284,7 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 				      const struct data_args_t *args,
 				      size_t syscall_len,
 				      __u32 copy_len,
-				      char **f_iov,
-				      __u32 *f_iov_len)
+				      char **f_iov, __u32 * f_iov_len)
 {
 #define INFER_COPY_SZ	 32
 #define INFER_LOOP_LIMIT 4
@@ -310,8 +309,8 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 
 #pragma unroll
 	for (unsigned int i = 0;
-	     i < INFER_LOOP_LIMIT && i < args->iovlen && bytes_copy < total_size;
-	     i++) {
+	     i < INFER_LOOP_LIMIT && i < args->iovlen
+	     && bytes_copy < total_size; i++) {
 		COPY_IOV(infer_buf->data, infer_buf->len, &args->iov[i],
 			 total_size, bytes_copy, first_iov, first_iov_size);
 	}
@@ -322,8 +321,7 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 	return bytes_copy;
 }
 
-static __inline struct member_fields_offset *
-retrieve_ready_kern_offset(void)
+static __inline struct member_fields_offset *retrieve_ready_kern_offset(void)
 {
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -341,33 +339,33 @@ retrieve_ready_kern_offset(void)
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-static __inline struct trace_key_t get_trace_key(__u64 timeout, bool is_socket_io)
+static __inline struct trace_key_t get_trace_key(__u64 timeout,
+						 bool is_socket_io)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u64 goid = 0;
 
-	if (timeout){
+	if (timeout) {
 		goid = get_rw_goid(timeout * NS_PER_SEC, is_socket_io);
 	}
 
 	struct trace_key_t key = {};
 
-	key.tgid = (__u32)(pid_tgid >> 32);
+	key.tgid = (__u32) (pid_tgid >> 32);
 
 	if (goid) {
 		key.goid = goid;
 	} else {
-		key.pid = (__u32)pid_tgid;
+		key.pid = (__u32) pid_tgid;
 	}
 
 	return key;
 }
 
-static __inline unsigned int __retry_get_sock_flags(void *sk,
-						    int offset)
+static __inline unsigned int __retry_get_sock_flags(void *sk, int offset)
 {
 	unsigned int flags = 0;
-	bpf_probe_read(&flags, sizeof(flags), (void *)sk + offset);
+	bpf_probe_read_kernel(&flags, sizeof(flags), (void *)sk + offset);
 	return flags;
 }
 
@@ -375,13 +373,13 @@ static __inline void infer_sock_flags(void *sk,
 				      struct member_fields_offset *offset)
 {
 	struct sock_flags_t {
-		unsigned int sk_padding : 1;
-		unsigned int sk_kern_sock : 1;
-		unsigned int sk_no_check_tx : 1;
-		unsigned int sk_no_check_rx : 1;
-		unsigned int sk_userlocks : 4;
-		unsigned int sk_protocol : 8;
-		unsigned int sk_type : 16;
+		unsigned int sk_padding:1;
+		unsigned int sk_kern_sock:1;
+		unsigned int sk_no_check_tx:1;
+		unsigned int sk_no_check_rx:1;
+		unsigned int sk_userlocks:4;
+		unsigned int sk_protocol:8;
+		unsigned int sk_type:16;
 	};
 
 	// TAG: STRUCT_SOCK_FLAGS_OFFSET
@@ -389,15 +387,18 @@ static __inline void infer_sock_flags(void *sk,
 	// 0x220 for 4.19.90-23.15.v2101.ky10.x86_64
 	// 0x238 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
 #ifdef LINUX_VER_KYLIN
-	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x220};
+	int sock_flags_offset_array[] =
+	    { 0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x220 };
 #elif defined LINUX_VER_3_10_0
 	// 0x150 for 3.10.0-957, 3.10.0-1160
 	int sock_flags_offset_array[] = { 0x150 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x230 for OEL7.9 Linux 5.4.17
-	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x230, 0x238};
+	int sock_flags_offset_array[] =
+	    { 0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218, 0x230, 0x238 };
 #else
-	int sock_flags_offset_array[] = {0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218};
+	int sock_flags_offset_array[] =
+	    { 0x1f0, 0x1f8, 0x200, 0x208, 0x210, 0x218 };
 #endif
 
 	unsigned int flags = 0;
@@ -405,18 +406,17 @@ static __inline void infer_sock_flags(void *sk,
 	int i;
 #pragma unroll
 	for (i = 0; i < ARRAY_SIZE(sock_flags_offset_array); i++) {
-		flags  = __retry_get_sock_flags(sk, sock_flags_offset_array[i]);
+		flags = __retry_get_sock_flags(sk, sock_flags_offset_array[i]);
 		/*
 		 * struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
-		 *		      struct proto *prot, int kern)
+		 *                    struct proto *prot, int kern)
 		 *
 		 *       -》sk = sk_prot_alloc(prot, priority | __GFP_ZERO, family);
 		 * 在申请sock时，使用了__GFP_ZERO，为了尽量确保准确性增加一个sk_padding为0判断。
 		 */
 		if ((sk_flags->sk_type == SOCK_DGRAM
 		     || sk_flags->sk_type == SOCK_STREAM)
-		    && sk_flags->sk_kern_sock == 0
-		    && sk_flags->sk_padding == 0) {
+		    && sk_flags->sk_kern_sock == 0 && sk_flags->sk_padding == 0) {
 			offset->sock__flags_offset = sock_flags_offset_array[i];
 			break;
 		}
@@ -428,19 +428,19 @@ static __inline void get_sock_flags(void *sk,
 				    struct conn_info_s *conn_info)
 {
 	struct sock_flags_t {
-		unsigned int sk_padding : 1;
-		unsigned int sk_kern_sock : 1;
-		unsigned int sk_no_check_tx : 1;
-		unsigned int sk_no_check_rx : 1;
-		unsigned int sk_userlocks : 4;
-		unsigned int sk_protocol : 8;
-		unsigned int sk_type : 16;
+		unsigned int sk_padding:1;
+		unsigned int sk_kern_sock:1;
+		unsigned int sk_no_check_tx:1;
+		unsigned int sk_no_check_rx:1;
+		unsigned int sk_userlocks:4;
+		unsigned int sk_protocol:8;
+		unsigned int sk_type:16;
 	};
 
 	unsigned int flags = 0;
 	struct sock_flags_t *sk_flags = (struct sock_flags_t *)&flags;
-	bpf_probe_read(&flags, sizeof(flags), (void *)sk +
-		       offset->sock__flags_offset);
+	bpf_probe_read_kernel(&flags, sizeof(flags), (void *)sk +
+			      offset->sock__flags_offset);
 
 	conn_info->sk_type = sk_flags->sk_type;
 }
@@ -468,7 +468,7 @@ static __inline void get_sock_flags(void *sk,
 #define ipv4_mapped_on_ipv6_confirm(s, f, o)				\
 do {									\
 	char __addr[16];						\
-	bpf_probe_read(__addr, 16, 					\
+	bpf_probe_read_kernel(__addr, 16, 				\
 		(s) + o->struct_sock_ip6saddr_offset);			\
 	__u32 __feature = *(__u32 *)&__addr[8];				\
 	if (__feature == 0xffff0000)					\
@@ -480,18 +480,19 @@ static __inline int is_tcp_udp_data(void *sk,
 				    struct conn_info_s *conn_info)
 {
 	struct skc_flags_t {
-		unsigned char skc_reuse : 4;
-		unsigned char skc_reuseport : 1;
-		unsigned char skc_ipv6only : 1;
-		unsigned char skc_net_refcnt : 1;
+		unsigned char skc_reuse:4;
+		unsigned char skc_reuseport:1;
+		unsigned char skc_ipv6only:1;
+		unsigned char skc_net_refcnt:1;
 	};
 
 	struct skc_flags_t skc_flags;
-	bpf_probe_read(&skc_flags, sizeof(skc_flags),
-		       sk + offset->struct_sock_common_ipv6only_offset);
+	bpf_probe_read_kernel(&skc_flags, sizeof(skc_flags),
+			      sk + offset->struct_sock_common_ipv6only_offset);
 	conn_info->skc_ipv6only = skc_flags.skc_ipv6only;
-	bpf_probe_read(&conn_info->skc_family, sizeof(conn_info->skc_family),
-		       sk + offset->struct_sock_family_offset);
+	bpf_probe_read_kernel(&conn_info->skc_family,
+			      sizeof(conn_info->skc_family),
+			      sk + offset->struct_sock_family_offset);
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
@@ -500,7 +501,8 @@ static __inline int is_tcp_udp_data(void *sk,
 		break;
 	case PF_INET6:
 		if (conn_info->skc_ipv6only == 0) {
-			ipv4_mapped_on_ipv6_confirm(sk, conn_info->skc_family, offset);
+			ipv4_mapped_on_ipv6_confirm(sk, conn_info->skc_family,
+						    offset);
 		}
 		break;
 	default:
@@ -518,8 +520,10 @@ static __inline int is_tcp_udp_data(void *sk,
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
-	bpf_probe_read(&conn_info->skc_state, sizeof(conn_info->skc_state),
-		       (void *)sk + offset->struct_sock_skc_state_offset);
+	bpf_probe_read_kernel(&conn_info->skc_state,
+			      sizeof(conn_info->skc_state),
+			      (void *)sk +
+			      offset->struct_sock_skc_state_offset);
 
 	/*
 	 * If the connection has not been established yet, and it is not in the
@@ -539,17 +543,18 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 {
 	__be16 inet_dport;
 	__u16 inet_sport;
-	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + offset->struct_sock_dport_offset);
-	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + offset->struct_sock_sport_offset);
+	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+			      sk + offset->struct_sock_dport_offset);
+	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+			      sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
 	conn_info->correlation_id = -1; // 当前用于kafka,openwire协议推断
 	conn_info->fd = fd;
 
 	conn_info->sk = sk;
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
-	conn_info->socket_info_ptr =
-			socket_info_map__lookup(&conn_key);
+	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
+	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 }
 
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
@@ -567,22 +572,22 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-		bpf_probe_read(v->tuple.rcv_saddr, 4,
-			       sk + offset->struct_sock_saddr_offset);
-		bpf_probe_read(v->tuple.daddr, 4,
-			       sk + offset->struct_sock_daddr_offset);
+		bpf_probe_read_kernel(v->tuple.rcv_saddr, 4,
+				      sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read_kernel(v->tuple.daddr, 4,
+				      sk + offset->struct_sock_daddr_offset);
 		v->tuple.addr_len = 4;
 		break;
 	case PF_INET6:
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
-			bpf_probe_read(
-				v->tuple.rcv_saddr, 16,
-				sk + offset->struct_sock_ip6saddr_offset);
+			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
+					      sk +
+					      offset->struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
-			bpf_probe_read(
-				v->tuple.daddr, 16,
-				sk + offset->struct_sock_ip6daddr_offset);
+			bpf_probe_read_kernel(v->tuple.daddr, 16,
+					      sk +
+					      offset->struct_sock_ip6daddr_offset);
 		}
 		v->tuple.addr_len = 16;
 		break;
@@ -594,7 +599,8 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 }
 
 #ifdef PROBE_CONN_SUBMIT
-static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v, int act)
+static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v,
+				    int act)
 {
 	switch (act) {
 	case CONN_ADD:
@@ -614,7 +620,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v, 
 
 static __inline int
 infer_l7_class_1(struct ctx_info_s *ctx,
-		 struct conn_info_s* conn_info,
+		 struct conn_info_s *conn_info,
 		 enum traffic_direction direction,
 		 const struct data_args_t *args,
 		 size_t count, __u8 sk_type,
@@ -625,7 +631,7 @@ infer_l7_class_1(struct ctx_info_s *ctx,
 	}
 
 	struct protocol_message_t inferred_protocol =
-		infer_protocol_1(ctx, args, count, conn_info, sk_type, extra);
+	    infer_protocol_1(ctx, args, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -658,8 +664,7 @@ static __inline int infer_l7_class_2(struct tail_calls_context *ctx,
 }
 
 static __inline __u32 retry_get_write_seq(void *sk,
-					  int offset,
-					  int snd_nxt_offset)
+					  int offset, int snd_nxt_offset)
 {
 	/*
 	 * Judgments based:
@@ -667,8 +672,10 @@ static __inline __u32 retry_get_write_seq(void *sk,
 	 */
 	__u32 snd_nxt, write_seq;
 
-	bpf_probe_read(&write_seq, sizeof(write_seq), (void *)sk + offset);
-	bpf_probe_read(&snd_nxt, sizeof(snd_nxt), (void *)sk + snd_nxt_offset);
+	bpf_probe_read_kernel(&write_seq, sizeof(write_seq),
+			      (void *)sk + offset);
+	bpf_probe_read_kernel(&snd_nxt, sizeof(snd_nxt),
+			      (void *)sk + snd_nxt_offset);
 
 	if (snd_nxt == write_seq && snd_nxt != 0 && write_seq != 0) {
 		return write_seq;
@@ -678,8 +685,7 @@ static __inline __u32 retry_get_write_seq(void *sk,
 	return 0;
 }
 
-static __inline __u32 retry_get_copied_seq(void *sk,
-					   int offset)
+static __inline __u32 retry_get_copied_seq(void *sk, int offset)
 {
 	/*
 	 * Judgments based:
@@ -690,41 +696,46 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	 *
 	 * struct tcp_sock {
 	 *     ...
-	 *     u16	tcp_header_len;     -28
+	 *     u16      tcp_header_len;     -28
 	 *     ...
-	 *     u64	bytes_received;     -20
+	 *     u64      bytes_received;     -20
 	 *     ...
-	 *     u32	rcv_nxt;            -4
-	 *     u32	copied_seq;         0
-	 *     u32	rcv_wup;            +4
-	 *     u32      snd_nxt;	    +8
+	 *     u32      rcv_nxt;            -4
+	 *     u32      copied_seq;         0
+	 *     u32      rcv_wup;            +4
+	 *     u32      snd_nxt;            +8
 	 *     ...
 	 * }
 	 *
 	 * But linux 3.10.0 :
 	 * struct tcp_sock {
 	 *     ...
-	 *     u16	tcp_header_len;     -24
+	 *     u16      tcp_header_len;     -24
 	 *     ...
-	 *     u64	bytes_received;     -16
+	 *     u64      bytes_received;     -16
 	 *     ...
-	 *     u32	rcv_nxt;            -4
-	 *     u32	copied_seq;         0
-	 *     u32	rcv_wup;            +4
-	 *     u32      snd_nxt;	    +8
+	 *     u32      rcv_nxt;            -4
+	 *     u32      copied_seq;         0
+	 *     u32      rcv_wup;            +4
+	 *     u32      snd_nxt;            +8
 	 *     ...
 	 * }
 	 */
 	__u32 rcv_nxt, rcv_wup, copied_seq;
 	__u16 tcp_header_len;
 
-	bpf_probe_read(&copied_seq, sizeof(copied_seq), (void *)sk + offset);
-	bpf_probe_read(&rcv_nxt, sizeof(rcv_nxt), (void *)sk + offset - 4);
-	bpf_probe_read(&rcv_wup, sizeof(rcv_wup), (void *)sk + offset + 4);
+	bpf_probe_read_kernel(&copied_seq, sizeof(copied_seq),
+			      (void *)sk + offset);
+	bpf_probe_read_kernel(&rcv_nxt, sizeof(rcv_nxt),
+			      (void *)sk + offset - 4);
+	bpf_probe_read_kernel(&rcv_wup, sizeof(rcv_wup),
+			      (void *)sk + offset + 4);
 #ifdef LINUX_VER_3_10_0
-	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 24);
+	bpf_probe_read_kernel(&tcp_header_len, sizeof(tcp_header_len),
+			      (void *)sk + offset - 24);
 #else
-	bpf_probe_read(&tcp_header_len, sizeof(tcp_header_len), (void *)sk + offset - 28);
+	bpf_probe_read_kernel(&tcp_header_len, sizeof(tcp_header_len),
+			      (void *)sk + offset - 28);
 #endif
 	if (!(tcp_header_len >= 20 && tcp_header_len <= 60 && copied_seq != 0))
 		return 0;
@@ -739,26 +750,31 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 static __inline void infer_tcp_seq_offset(void *sk,
 					  struct member_fields_offset *offset)
 {
+/* *INDENT-OFF* */
 	// TAG: STRUCT_TCP_SOCK_COPIED_SEQ_OFFSET
 	// 成员 copied_seq 在 struct tcp_sock 中的偏移量
 	// 0x644 for EulerOS 4.18.0-147
 	// 0x65c for 4.19.90-23.15.v2101.ky10.x86_64
 	// 0x654 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
-#ifdef LINUX_VER_KYLIN 
-	int copied_seq_offsets[] = {0x514, 0x524, 0x52c, 0x534, 0x53c,
-				    0x544, 0x54c, 0x554, 0x55c, 0x564,
-				    0x56c, 0x574, 0x57c, 0x584, 0x58c,
-				    0x594, 0x59c, 0x5dc, 0x644, 0x65c};
+#ifdef LINUX_VER_KYLIN
+	int copied_seq_offsets[] = {
+		0x514, 0x524, 0x52c, 0x534, 0x53c,
+		0x544, 0x54c, 0x554, 0x55c, 0x564,
+		0x56c, 0x574, 0x57c, 0x584, 0x58c,
+		0x594, 0x59c, 0x5dc, 0x644, 0x65c
+	};
 #elif defined LINUX_VER_3_10_0
 	// 0x560 for 3.10.0-957, 3.10.0-1160
 	int copied_seq_offsets[] = { 0x560 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x63c for OEL7.9 Linux 5.4.17
-	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
-				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
-				    0x564, 0x56c, 0x574, 0x57c, 0x584,
-				    0x58c, 0x594, 0x59c, 0x5dc, 0x644,
-				    0x654, 0x63c};
+	int copied_seq_offsets[] = {
+		0x514, 0x51c, 0x524, 0x52c, 0x534,
+		0x53c, 0x544, 0x54c, 0x554, 0x55c,
+		0x564, 0x56c, 0x574, 0x57c, 0x584,
+		0x58c, 0x594, 0x59c, 0x5dc, 0x644,
+		0x654, 0x63c
+	};
 #else
 	// 0x65c for 4.18.0-372.9.1.15.po1.x86_64
 	// 0x664 for 4.19.90-2107.6.0.0100.oe1.bclinux
@@ -768,11 +784,13 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x654 for 4.19.90-2107.6.0.0192.8.oe1.bclinux.x86_64
 	// 0x69c for 4.19.0-91.82.65.uelc20.x86_64
 	// 0x694 for 4.19.0-91.77.112.uelc20.x86_64, 4.19.0-91.82.132.uelc20.x86_64
-	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
-				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
-				    0x564, 0x56c, 0x574, 0x654, 0x5dc,
-				    0x5cc, 0x644, 0x65c, 0x664, 0x69c,
-				    0x694};
+	int copied_seq_offsets[] = {
+		0x514, 0x51c, 0x524, 0x52c, 0x534,
+		0x53c, 0x544, 0x54c, 0x554, 0x55c,
+		0x564, 0x56c, 0x574, 0x654, 0x5dc,
+		0x5cc, 0x644, 0x65c, 0x664, 0x69c,
+		0x694
+	};
 #endif
 
 	// TAG: STRUCT_TCP_SOCK_WRITE_SEQ_OFFSET
@@ -782,20 +800,24 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// The 0x684 feature code interferes with the inference of write_seq in the Kylin system. It must be removed.
 	// 0x7d4 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
 #ifdef LINUX_VER_KYLIN
-	int write_seq_offsets[] = {0x66c, 0x674, 0x68c, 0x694, 0x69c, 0x6a4,
-				   0x6ac, 0x6b4, 0x6bc, 0x6c4, 0x6cc, 0x6d4,
-				   0x6dc, 0x6ec, 0x6f4, 0x6fc, 0x704, 0x70c,
-				   0x714, 0x71c, 0x74c, 0x7b4, 0x7cc};
+	int write_seq_offsets[] = {
+		0x66c, 0x674, 0x68c, 0x694, 0x69c, 0x6a4,
+		0x6ac, 0x6b4, 0x6bc, 0x6c4, 0x6cc, 0x6d4,
+		0x6dc, 0x6ec, 0x6f4, 0x6fc, 0x704, 0x70c,
+		0x714, 0x71c, 0x74c, 0x7b4, 0x7cc
+	};
 #elif defined LINUX_VER_3_10_0
 	// 0x698 for 3.10.0-957, 3.10.0-1160
 	int write_seq_offsets[] = { 0x698 };
 #elif defined LINUX_VER_5_2_PLUS
 	// 0x7bc for OEL7.9 Linux 5.4.17
-	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
-				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
-				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
-				   0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c,
-				   0x7b4, 0x7d4, 0x7bc};
+	int write_seq_offsets[] = {
+		0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
+		0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
+		0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
+		0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c,
+		0x7b4, 0x7d4, 0x7bc
+	};
 #else
 	// 0x7d4 for 4.19.90-2107.6.0.0100.oe1.bclinux
 	// 0x7dc for 4.18.0-372.9.1.15.po1.x86_64
@@ -805,12 +827,15 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	// 0x7c4 for 4.19.90-2107.6.0.0192.8.oe1.bclinux.x86_64
 	// 0x80c for 4.19.0-91.82.65.uelc20.x86_64
 	// 0x804 for 4.19.0-91.77.112.uelc20.x86_64, 4.19.0-91.82.132.uelc20.x86_64
-	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
-				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
-				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
-				   0x7c4, 0x73c, 0x74c, 0x7b4, 0x7d4, 0x7dc,
-				   0x80c, 0x804};
+	int write_seq_offsets[] = {
+		0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
+		0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
+		0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
+		0x7c4, 0x73c, 0x74c, 0x7b4, 0x7d4, 0x7dc,
+		0x80c, 0x804
+	};
 #endif
+/* *INDENT-ON* */
 
 	int i, snd_nxt_offset = 0;
 
@@ -818,7 +843,8 @@ static __inline void infer_tcp_seq_offset(void *sk,
 #pragma unroll
 		for (i = 0; i < ARRAY_SIZE(copied_seq_offsets); i++) {
 			if (retry_get_copied_seq(sk, copied_seq_offsets[i])) {
-				offset->tcp_sock__copied_seq_offset = copied_seq_offsets[i];
+				offset->tcp_sock__copied_seq_offset =
+				    copied_seq_offsets[i];
 				break;
 			}
 		}
@@ -839,8 +865,10 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	if (!offset->tcp_sock__write_seq_offset) {
 #pragma unroll
 		for (i = 0; i < ARRAY_SIZE(write_seq_offsets); i++) {
-			if (retry_get_write_seq(sk, write_seq_offsets[i], snd_nxt_offset)) {
-				offset->tcp_sock__write_seq_offset = write_seq_offsets[i];
+			if (retry_get_write_seq
+			    (sk, write_seq_offsets[i], snd_nxt_offset)) {
+				offset->tcp_sock__write_seq_offset =
+				    write_seq_offsets[i];
 				break;
 			}
 		}
@@ -898,14 +926,15 @@ do { \
 #define TRACE_MAP_ACT_DEL   2
 
 static __inline void trace_process(struct socket_info_t *socket_info_ptr,
-				   struct conn_info_s* conn_info,
+				   struct conn_info_s *conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_conf_t *trace_conf,
 				   struct trace_stats *trace_stats,
-				   __u64 *thread_trace_id,
+				   __u64 * thread_trace_id,
 				   __u64 time_stamp,
-				   struct trace_key_t *trace_key) {
+				   struct trace_key_t *trace_key)
+{
 	/*
 	 * ==========================================
 	 * Thread-Trace-ID (Single Redirect Trace)
@@ -1002,9 +1031,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			    conn_info->message_type == MSG_RESPONSE &&
 			    conn_info->infer_reliable) {
 				if (!trace_map__delete(trace_key)) {
-					__sync_fetch_and_add(&trace_stats->
-							     trace_map_count,
-							     -1);
+					__sync_fetch_and_add
+					    (&trace_stats->trace_map_count, -1);
 				}
 				return;
 			}
@@ -1026,11 +1054,11 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 		ret = trace_map__update(trace_key, &trace_info);
 		if (!trace_info_ptr) {
 			if (ret == 0) {
-				__sync_fetch_and_add(&trace_stats->
-						     trace_map_count, 1);
+				__sync_fetch_and_add
+				    (&trace_stats->trace_map_count, 1);
 			}
 		}
-	} else { /* direction == T_EGRESS */
+	} else {		/* direction == T_EGRESS */
 		if (trace_info_ptr) {
 			/*
 			 * Skip the scene below:
@@ -1045,12 +1073,11 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				return;
 			}
 
-			*thread_trace_id =
-				    trace_info_ptr->thread_trace_id;
+			*thread_trace_id = trace_info_ptr->thread_trace_id;
 
 			if (!trace_map__delete(trace_key)) {
-				__sync_fetch_and_add(&trace_stats->
-						     trace_map_count, -1);
+				__sync_fetch_and_add
+				    (&trace_stats->trace_map_count, -1);
 			}
 		} else {
 			/*
@@ -1065,8 +1092,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				trace_info.update_time =
 				    time_stamp / NS_PER_SEC;
 				trace_map__update(trace_key, &trace_info);
-				__sync_fetch_and_add(&trace_stats->
-						     trace_map_count, 1);
+				__sync_fetch_and_add
+				    (&trace_stats->trace_map_count, 1);
 			}
 		}
 	}
@@ -1074,9 +1101,9 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 
 static __inline int
 __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
-	      const struct data_args_t *args, const bool vecs, __u32 syscall_len,
-	      struct member_fields_offset *offset, __u64 time_stamp,
-	      const struct process_data_extra *extra)
+	      const struct data_args_t *args, const bool vecs,
+	      __u32 syscall_len, struct member_fields_offset *offset,
+	      __u64 time_stamp, const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
 		return SUBMIT_INVALID;
@@ -1087,7 +1114,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	}
 
 	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
+	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
@@ -1112,8 +1139,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (trace_stats == NULL)
 		return SUBMIT_INVALID;
 
-	struct trace_key_t trace_key = get_trace_key(trace_conf->go_tracing_timeout,
-						     true);
+	struct trace_key_t trace_key =
+	    get_trace_key(trace_conf->go_tracing_timeout,
+			  true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
@@ -1135,12 +1163,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (trace_conf->go_tracing_timeout != 0 || extra->is_go_process == false) &&
-	    !(conn_info->protocol == PROTO_DNS &&
-	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
-		trace_process(socket_info_ptr, conn_info, socket_id, bpf_get_current_pid_tgid(),
-			      trace_info_ptr, trace_conf, trace_stats,
-			      &thread_trace_id, time_stamp, &trace_key);
+	    (trace_conf->go_tracing_timeout != 0
+	     || extra->is_go_process == false)
+	    && !(conn_info->protocol == PROTO_DNS
+		 && conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
+		trace_process(socket_info_ptr, conn_info, socket_id,
+			      bpf_get_current_pid_tgid(), trace_info_ptr,
+			      trace_conf, trace_stats, &thread_trace_id,
+			      time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -1149,7 +1179,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		}
 
 		sk_info.uid = trace_conf->socket_id + 1;
-		trace_conf->socket_id++; // Ensure that socket_id is incremented.
+		trace_conf->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = conn_info->role;
@@ -1162,15 +1192,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
-			bpf_probe_read(sk_info.prev_data, sizeof(sk_info.prev_data), conn_info->prev_buf);
+			bpf_probe_read_kernel(sk_info.prev_data,
+					      sizeof(sk_info.prev_data),
+					      conn_info->prev_buf);
 			sk_info.prev_data_len = conn_info->prev_count;
 			sk_info.uid = 0;
 		}
 
 		int ret = socket_info_map__update(&conn_key, &sk_info);
 		if (socket_info_ptr == NULL && ret == 0) {
-			__sync_fetch_and_add(&trace_stats->
-                        	             socket_map_count, 1);
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
 		}
 	}
 
@@ -1203,22 +1234,28 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
-		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
-			__u64 peer_conn_key = gen_conn_key_id((__u64)tgid,
-							      (__u64)socket_info_ptr->peer_fd);
+		if (socket_info_ptr->peer_fd != 0
+		    && conn_info->direction == T_INGRESS) {
+			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
+							      (__u64)
+							      socket_info_ptr->
+							      peer_fd);
 			struct socket_info_t *peer_socket_info_ptr =
-							socket_info_map__lookup(&peer_conn_key);
+			    socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
-				peer_socket_info_ptr->trace_id = thread_trace_id;
+				peer_socket_info_ptr->trace_id =
+				    thread_trace_id;
 		}
 
-		if (conn_info->direction == T_EGRESS && socket_info_ptr->trace_id != 0) {
+		if (conn_info->direction == T_EGRESS
+		    && socket_info_ptr->trace_id != 0) {
 			thread_trace_id = socket_info_ptr->trace_id;
 			socket_info_ptr->trace_id = 0;
 		}
 	}
 
-	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		return SUBMIT_INVALID;
 
@@ -1249,7 +1286,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// operation. Therefore, the end time of the system call is used for
 	// the read operation.
 	v->timestamp = conn_info->direction == T_INGRESS ? bpf_ktime_get_ns() :
-							   time_stamp;
+	    time_stamp;
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
@@ -1269,18 +1306,21 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		v->tcp_seq = tcp_seq;
 		if (tcp_seq == 0 && conn_info->fd > 0) {
 			if (conn_info->direction == T_INGRESS) {
-				tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
+				tcp_seq =
+				    get_tcp_read_seq_from_fd(conn_info->fd);
 				/*
 				 * If the current state is TCPF_CLOSE_WAIT, the FIN
 				 * frame already has been received.
 				 * Since tcp_sock->copied_seq has done such an operation +1,
 				 * need to fix the value of tcp_seq.
 				 */
-				if ((1 << conn_info->skc_state) & TCPF_CLOSE_WAIT) {
+				if ((1 << conn_info->skc_state) &
+				    TCPF_CLOSE_WAIT) {
 					tcp_seq--;
 				}
 			} else {
-				tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
+				tcp_seq =
+				    get_tcp_write_seq_from_fd(conn_info->fd);
 			}
 
 			v->tcp_seq = tcp_seq - syscall_len;
@@ -1314,9 +1354,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 
 	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
-		bpf_probe_read(v->extra_data, sizeof(v->extra_data), conn_info->prev_buf);
+		bpf_probe_read_kernel(v->extra_data, sizeof(v->extra_data),
+				      conn_info->prev_buf);
 		v->extra_data_count = conn_info->prev_count;
-		v->tcp_seq -= conn_info->prev_count; // 客户端和服务端的tcp_seq匹配
+		v->tcp_seq -= conn_info->prev_count;	// 客户端和服务端的tcp_seq匹配
 	} else
 		v->extra_data_count = 0;
 
@@ -1335,7 +1376,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	}
 #endif
 
-	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
+	struct tail_calls_context *context =
+	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = (bool) vecs;
 	context->is_close = false;
@@ -1374,7 +1416,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	if (unlikely(!offset->ready))
 		return -1;
-	
+
 	void *sk = get_socket_from_fd(args->fd, offset);
 	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
@@ -1451,9 +1493,12 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	return -1;
 }
 
-static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
-					  const enum traffic_direction direction,
-					  const struct data_args_t* args, ssize_t bytes_count) {
+static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
+					  const enum traffic_direction
+					  direction,
+					  const struct data_args_t *args,
+					  ssize_t bytes_count)
+{
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_SYSCALL,
@@ -1469,10 +1514,12 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 	}
 }
 
-static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
-					       const enum traffic_direction direction,
-					       const struct data_args_t* args,
-					       ssize_t bytes_count) {
+static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
+					       const enum traffic_direction
+					       direction,
+					       const struct data_args_t *args,
+					       ssize_t bytes_count)
+{
 	struct process_data_extra extra = {
 		.vecs = true,
 		.source = DATA_SOURCE_SYSCALL,
@@ -1491,7 +1538,7 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 /***********************************************************
  * BPF syscall probe/tracepoint function entry-points
  ***********************************************************/
-TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx *ctx) {
+TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1508,15 +1555,16 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_write/format
-TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
-	struct data_args_t* write_args = active_write_args_map__lookup(&id);
+	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (write_args != NULL && write_args->fd > 2) {
 		write_args->bytes_count = bytes_count;
-		process_syscall_data((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
+		process_syscall_data((struct pt_regs *)ctx, id, T_EGRESS,
+				     write_args, bytes_count);
 	}
 
 	active_write_args_map__delete(&id);
@@ -1524,7 +1572,7 @@ TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t read(int fd, void *buf, size_t count);
-TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx *ctx) {
+TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1541,15 +1589,16 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
-TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (read_args != NULL && read_args->fd > 2) {
 		read_args->bytes_count = bytes_count;
-		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS,
+				     read_args, bytes_count);
 	}
 
 	active_read_args_map__delete(&id);
@@ -1557,8 +1606,8 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
-//		const struct sockaddr *dest_addr, socklen_t addrlen);
-TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
+//              const struct sockaddr *dest_addr, socklen_t addrlen);
+TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1575,7 +1624,7 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendto/format
-TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1585,10 +1634,11 @@ TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx *ctx) {
 	//     dest_addr和addrlen会被忽略(如果不是，可能会返回EISCONN错误空和0)
 	//
 	// Unstash arguments, and process syscall.
-	struct data_args_t* write_args = active_write_args_map__lookup(&id);
+	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
-		process_syscall_data((struct pt_regs*)ctx, id, T_EGRESS, write_args, bytes_count);
+		process_syscall_data((struct pt_regs *)ctx, id, T_EGRESS,
+				     write_args, bytes_count);
 		active_write_args_map__delete(&id);
 	}
 
@@ -1596,8 +1646,8 @@ TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
-//		  struct sockaddr *src_addr, socklen_t *addrlen);
-TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
+//                struct sockaddr *src_addr, socklen_t *addrlen);
+TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
 	// If flags contains MSG_PEEK, it is returned directly.
 	// ref : https://linux.die.net/man/2/recvfrom
 	if (ctx->flags & MSG_PEEK)
@@ -1618,15 +1668,16 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvfrom/format
-TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
 	// Unstash arguments, and process syscall.
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
-		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS,
+				     read_args, bytes_count);
 		active_read_args_map__delete(&id);
 	}
 
@@ -1634,15 +1685,16 @@ TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
-KPROG(__sys_sendmsg) (struct pt_regs* ctx) {
+KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)PT_REGS_PARM1(ctx);
-	struct user_msghdr *msghdr_ptr = (struct user_msghdr *)PT_REGS_PARM2(ctx);
+	struct user_msghdr *msghdr_ptr =
+	    (struct user_msghdr *)PT_REGS_PARM2(ctx);
 
 	if (msghdr_ptr != NULL) {
 		// Stash arguments.
 		struct user_msghdr *msghdr, __msghdr;
-		bpf_probe_read(&__msghdr, sizeof(__msghdr), msghdr_ptr);
+		bpf_probe_read_user(&__msghdr, sizeof(__msghdr), msghdr_ptr);
 		msghdr = &__msghdr;
 		// Stash arguments.
 		struct data_args_t write_args = {};
@@ -1659,14 +1711,15 @@ KPROG(__sys_sendmsg) (struct pt_regs* ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmsg/format
-TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
-	struct data_args_t* write_args = active_write_args_map__lookup(&id);
+	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
+					  write_args, bytes_count);
 		active_write_args_map__delete(&id);
 	}
 
@@ -1675,7 +1728,7 @@ TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx *ctx) {
 
 // int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 //              int flags);
-KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
+KPROG(__sys_sendmmsg) (struct pt_regs * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct mmsghdr *msgvec_ptr = (struct mmsghdr *)PT_REGS_PARM2(ctx);
@@ -1683,7 +1736,7 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 
 	if (msgvec_ptr != NULL && vlen >= 1) {
 		struct mmsghdr *msgvec, __msgvec;
-		bpf_probe_read(&__msgvec, sizeof(__msgvec), msgvec_ptr);
+		bpf_probe_read_user(&__msgvec, sizeof(__msgvec), msgvec_ptr);
 		msgvec = &__msgvec;
 		// Stash arguments.
 		struct data_args_t write_args = {};
@@ -1691,7 +1744,7 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 		write_args.fd = sockfd;
 		write_args.iov = msgvec[0].msg_hdr.msg_iov;
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
-		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len); //&msgvec[0].msg_len;
+		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len);	//&msgvec[0].msg_len;
 		write_args.enter_ts = bpf_ktime_get_ns();
 		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
 		active_write_args_map__update(&id, &write_args);
@@ -1701,17 +1754,19 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmmsg/format
-TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 
 	int num_msgs = ctx->ret;
 
 	// Unstash arguments, and process syscall.
-	struct data_args_t* write_args = active_write_args_map__lookup(&id);
+	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL && num_msgs > 0) {
 		ssize_t bytes_count;
-		bpf_probe_read(&bytes_count, sizeof(write_args->msg_len), write_args->msg_len);
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
+		bpf_probe_read_user(&bytes_count, sizeof(write_args->msg_len),
+				    write_args->msg_len);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
+					  write_args, bytes_count);
 	}
 	active_write_args_map__delete(&id);
 
@@ -1720,19 +1775,20 @@ TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx *ctx) {
 
 // BSD recvmsg interface
 // long __sys_recvmsg(int fd, struct user_msghdr __user *msg, unsigned int flags,
-//		   bool forbid_cmsg_compat)
+//                 bool forbid_cmsg_compat)
 // ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
-	int flags = (int) PT_REGS_PARM3(ctx);
+KPROG(__sys_recvmsg) (struct pt_regs * ctx) {
+	int flags = (int)PT_REGS_PARM3(ctx);
 	if (flags & MSG_PEEK)
 		return 0;
 
 	__u64 id = bpf_get_current_pid_tgid();
-	struct user_msghdr __msg, *msghdr = (struct user_msghdr *)PT_REGS_PARM2(ctx);
-	int sockfd = (int) PT_REGS_PARM1(ctx);
+	struct user_msghdr __msg, *msghdr =
+	    (struct user_msghdr *)PT_REGS_PARM2(ctx);
+	int sockfd = (int)PT_REGS_PARM1(ctx);
 
 	if (msghdr != NULL) {
-		bpf_probe_read(&__msg, sizeof(__msg), (void *)msghdr);
+		bpf_probe_read_user(&__msg, sizeof(__msg), (void *)msghdr);
 		msghdr = &__msg;
 		// Stash arguments.
 		struct data_args_t read_args = {};
@@ -1749,14 +1805,15 @@ KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmsg/format
-TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
+					  read_args, bytes_count);
 		active_read_args_map__delete(&id);
 	}
 
@@ -1764,9 +1821,9 @@ TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
-//		   unsigned int flags, struct timespec *timeout)
-KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
-	int flags = (int) PT_REGS_PARM4(ctx);
+//                 unsigned int flags, struct timespec *timeout)
+KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
+	int flags = (int)PT_REGS_PARM4(ctx);
 	if (flags & MSG_PEEK)
 		return 0;
 
@@ -1774,7 +1831,7 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct mmsghdr *msgvec = (struct mmsghdr *)PT_REGS_PARM2(ctx);
 	unsigned int vlen = (unsigned int)PT_REGS_PARM3(ctx);
-	
+
 	if (msgvec != NULL && vlen >= 1) {
 		int offset;
 		// Stash arguments.
@@ -1784,33 +1841,38 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 		read_args.enter_ts = bpf_ktime_get_ns();
 
 		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
-				offsetof(typeof(struct user_msghdr), msg_iov);
+		    offsetof(typeof(struct user_msghdr), msg_iov);
 
-		bpf_probe_read(&read_args.iov, sizeof(read_args.iov), (void *)msgvec + offset);
+		bpf_probe_read_user(&read_args.iov, sizeof(read_args.iov),
+				    (void *)msgvec + offset);
 
 		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
-				offsetof(typeof(struct user_msghdr), msg_iovlen);
+		    offsetof(typeof(struct user_msghdr), msg_iovlen);
 
-		bpf_probe_read(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
+		bpf_probe_read_user(&read_args.iovlen, sizeof(read_args.iovlen),
+				    (void *)msgvec + offset);
 
-		read_args.msg_len = (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
+		read_args.msg_len =
+		    (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
 		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
 		active_read_args_map__update(&id, &read_args);
 	}
-	
+
 	return 0;
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmmsg/format
-TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int num_msgs = ctx->ret;
 	// Unstash arguments, and process syscall.
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL && num_msgs > 0) {
 		ssize_t bytes_count;
-		bpf_probe_read(&bytes_count, sizeof(read_args->msg_len), read_args->msg_len);
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		bpf_probe_read_user(&bytes_count, sizeof(read_args->msg_len),
+				    read_args->msg_len);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
+					  read_args, bytes_count);
 	}
 	active_read_args_map__delete(&id);
 
@@ -1818,12 +1880,12 @@ TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 //static ssize_t do_writev(unsigned long fd, const struct iovec __user *vec,
-//			 unsigned long vlen, rwf_t flags)
+//                       unsigned long vlen, rwf_t flags)
 // ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 #ifdef LINUX_VER_3_10_0
-KPROG(sys_writev) (struct pt_regs* ctx) {
+KPROG(sys_writev) (struct pt_regs * ctx) {
 #else
-KPROG(do_writev) (struct pt_regs* ctx) {
+KPROG(do_writev) (struct pt_regs * ctx) {
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
@@ -1843,15 +1905,16 @@ KPROG(do_writev) (struct pt_regs* ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_writev/format
-TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
 	// Unstash arguments, and process syscall.
-	struct data_args_t* write_args = active_write_args_map__lookup(&id);
+	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
+					  write_args, bytes_count);
 	}
 
 	active_write_args_map__delete(&id);
@@ -1860,9 +1923,9 @@ TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx *ctx) {
 
 // ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 #ifdef LINUX_VER_3_10_0
-KPROG(sys_readv) (struct pt_regs* ctx) {
+KPROG(sys_readv) (struct pt_regs * ctx) {
 #else
-KPROG(do_readv) (struct pt_regs* ctx) {
+KPROG(do_readv) (struct pt_regs * ctx) {
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)PT_REGS_PARM1(ctx);
@@ -1883,13 +1946,14 @@ KPROG(do_readv) (struct pt_regs* ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_readv/format
-TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
-		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
+					  read_args, bytes_count);
 	}
 
 	active_read_args_map__delete(&id);
@@ -1897,7 +1961,7 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
+TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
 	//Ignore stdin, stdout and stderr
 	if (fd <= 2)
@@ -1910,11 +1974,12 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 
 	CHECK_OFFSET_READY(fd);
 
-	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);
+	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
 	if (sock_addr) {
 		__u64 id = bpf_get_current_pid_tgid();
-		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)fd);
-		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
+		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
+		struct socket_info_t *socket_info_ptr =
+		    socket_info_map__lookup(&conn_key);
 		if (socket_info_ptr != NULL) {
 			if (socket_info_ptr->uid) {
 				struct data_args_t read_args = {};
@@ -1933,7 +1998,7 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
-TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
 	if (read_args == NULL)
@@ -1949,7 +2014,7 @@ TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx *ctx) {
 		goto exit;
 	int data_max_sz = trace_conf->data_limit_max;
 	struct __socket_data_buffer *v_buff =
-		bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		goto exit;
 
@@ -1961,21 +2026,20 @@ TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx *ctx) {
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
 	v->socket_id = read_args->socket_id;
 	v->tgid = (__u32) (pid_tgid >> 32);
-	v->pid = (__u32)pid_tgid;
+	v->pid = (__u32) pid_tgid;
 	v->timestamp = bpf_ktime_get_ns();
 	v->source = DATA_SOURCE_CLOSE;
 	v->syscall_len = 0;
 	v->data_seq = read_args->data_seq;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 	struct tail_calls_context *context =
-		(struct tail_calls_context *)v->data;
+	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = false;
 	context->is_close = true;
 	context->dir = T_INGRESS;
 
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
-		      PROG_OUTPUT_DATA_TP_IDX);
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
 
 exit:
 	active_read_args_map__delete(&pid_tgid);
@@ -1985,16 +2049,22 @@ exit:
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
 // Here, the tracepoint is used to periodically send the data residing in the cache but not
 // yet transmitted to the user-level receiving program for processing.
-TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
+TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
 	int k0 = 0;
-	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (v_buff) {
 		if (v_buff->events_num > 0) {
-			struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) > NS_PER_SEC) {
-				__u32 buf_size = (v_buff->len +
-						  offsetof(typeof(struct __socket_data_buffer), data))
-						 & (sizeof(*v_buff) - 1);
+			struct __socket_data *v =
+			    (struct __socket_data *)&v_buff->data[0];
+			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
+			    NS_PER_SEC) {
+				__u32 buf_size =
+				    (v_buff->len +
+				     offsetof(typeof
+					      (struct __socket_data_buffer),
+					      data))
+				    & (sizeof(*v_buff) - 1);
 				/* 
 				 * Note that when 'buf_size == 0', it indicates that the data being
 				 * sent is at its maximum value (sizeof(*v_buff)), and it should
@@ -2005,17 +2075,23 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
 					 * (Linux 4.14.x) length checks.
 					 */
-					bpf_perf_event_output(ctx, &NAME(socket_data),
-							      BPF_F_CURRENT_CPU, v_buff,
+					bpf_perf_event_output(ctx,
+							      &NAME
+							      (socket_data),
+							      BPF_F_CURRENT_CPU,
+							      v_buff,
 							      buf_size + 1);
 				} else {
-					bpf_perf_event_output(ctx, &NAME(socket_data),
-							      BPF_F_CURRENT_CPU, v_buff,
+					bpf_perf_event_output(ctx,
+							      &NAME
+							      (socket_data),
+							      BPF_F_CURRENT_CPU,
+							      v_buff,
 							      sizeof(*v_buff));
 				}
 
 				v_buff->events_num = 0;
-				v_buff->len = 0;				
+				v_buff->len = 0;
 			}
 		}
 	}
@@ -2024,9 +2100,9 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
-TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
+TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
-	__u64 fd = (__u64)ctx->ret;
+	__u64 fd = (__u64) ctx->ret;
 	char comm[TASK_COMM_LEN];
 	bpf_get_current_comm(comm, sizeof(comm));
 
@@ -2038,10 +2114,10 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	// nginx is not a go process, disable go tracking
 	struct trace_key_t key = get_trace_key(0, true);
 	struct trace_info_t *trace = trace_map__lookup(&key);
-	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
+	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32) fd) {
 		struct socket_info_t sk_info = { 0 };
 		sk_info.peer_fd = trace->peer_fd;
-		sk_info.trace_id = trace->thread_trace_id;	
+		sk_info.trace_id = trace->thread_trace_id;
 		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
 		int ret = socket_info_map__update(&conn_key, &sk_info);
 		__u32 k0 = 0;
@@ -2049,42 +2125,38 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		if (trace_stats == NULL)
 			return 0;
 		if (ret == 0) {
-			__sync_fetch_and_add(&trace_stats->
-					     socket_map_count, 1);
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
 		}
 	}
 
 	return 0;
 }
 
-TPPROG(sys_exit_accept)(struct syscall_comm_exit_ctx *ctx)
-{
+TPPROG(sys_exit_accept) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32)(pid_tgid >> 32);
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) sockfd);
 	__u32 role = ROLE_SERVER;
 	socket_role_map__update(&conn_key, &role);
 	return 0;
 }
 
-TPPROG(sys_exit_accept4)(struct syscall_comm_exit_ctx *ctx)
-{
+TPPROG(sys_exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32)(pid_tgid >> 32);
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) sockfd);
 	__u32 role = ROLE_SERVER;
 	socket_role_map__update(&conn_key, &role);
 	return 0;
 }
 
-TPPROG(sys_enter_connect)(struct syscall_comm_enter_ctx *ctx)
-{
+TPPROG(sys_enter_connect) (struct syscall_comm_enter_ctx * ctx) {
 	int sockfd = ctx->fd;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32)(pid_tgid >> 32);
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)sockfd);
+	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) sockfd);
 	__u32 role = ROLE_CLIENT;
 	socket_role_map__update(&conn_key, &role);
 	return 0;
@@ -2097,7 +2169,8 @@ MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1)
  * This eBPF program is specially used to transmit data to the agent. The purpose
  * of this is to solve the problem that the number of instructions exceeds the limit.
  */
-static __inline int output_data_common(void *ctx) {
+static __inline int output_data_common(void *ctx)
+{
 	__u64 id = bpf_get_current_pid_tgid();
 	enum traffic_direction dir;
 	bool vecs = false;
@@ -2106,7 +2179,8 @@ static __inline int output_data_common(void *ctx) {
 	__u32 k0 = 0;
 	char *buffer = NULL;
 
-	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		goto clear_args_map_2;
 
@@ -2165,8 +2239,17 @@ static __inline int output_data_common(void *ctx) {
 		len = iovecs_copy(v, v_buff, args, v->syscall_len, len);
 	} else {
 		if (__len >= sizeof(v->data)) {
-			if (unlikely(bpf_probe_read(v->data, sizeof(v->data), buffer) != 0))
-				goto clear_args_map_1;
+			if (v->source != DATA_SOURCE_IO_EVENT) {
+				if (unlikely
+				    (bpf_probe_read_user
+				     (v->data, sizeof(v->data), buffer) != 0))
+					goto clear_args_map_1;
+			} else {
+				if (unlikely
+				    (bpf_probe_read_kernel
+				     (v->data, sizeof(v->data), buffer) != 0))
+					goto clear_args_map_1;
+			}
 			len = sizeof(v->data);
 		} else {
 			/*
@@ -2178,23 +2261,34 @@ static __inline int output_data_common(void *ctx) {
 			 * "invalid access to map value, value_size=10888 off=135 size=0"
 			 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
 			 */
-			if (unlikely(bpf_probe_read(v->data,
-						    len + 1,
-						    buffer) != 0))
-				goto clear_args_map_1;
+			if (v->source != DATA_SOURCE_IO_EVENT) {
+				if (unlikely(bpf_probe_read_user(v->data,
+								 len + 1,
+								 buffer) != 0))
+					goto clear_args_map_1;
+			} else {
+				if (unlikely(bpf_probe_read_kernel(v->data,
+								   len + 1,
+								   buffer) !=
+					     0))
+					goto clear_args_map_1;
+			}
 		}
 	}
 
 	v->data_len = len;
 
 skip_copy:
-	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
+	v_buff->len +=
+	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
 	if (v_buff->events_num >= EVENT_BURST_NUM ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
-		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
-				 & (sizeof(*v_buff) - 1);
+		__u32 buf_size =
+		    (v_buff->len +
+		     offsetof(typeof(struct __socket_data_buffer), data))
+		    & (sizeof(*v_buff) - 1);
 		/*
 		 * Note that when 'buf_size == 0', it indicates that the data being
 		 * sent is at its maximum value (sizeof(*v_buff)), and it should
@@ -2232,13 +2326,11 @@ clear_args_map_2:
 	return 0;
 }
 
-PROGTP(output_data) (void *ctx)
-{
+PROGTP(output_data) (void *ctx) {
 	return output_data_common(ctx);
 }
 
-PROGKP(output_data) (void *ctx)
-{
+PROGKP(output_data) (void *ctx) {
 	return output_data_common(ctx);
 }
 
@@ -2246,8 +2338,7 @@ static __inline int data_submit(void *ctx)
 {
 	int ret = 0;
 	__u32 k0 = 0;
-	struct ctx_info_s *ctx_map =
-			bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
 	if (!ctx_map)
 		return SUBMIT_ABORT;
 
@@ -2255,7 +2346,7 @@ static __inline int data_submit(void *ctx)
 	struct conn_info_s *conn_info;
 	struct conn_info_s __conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
-	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 
 	struct data_args_t *args;
@@ -2297,7 +2388,7 @@ static __inline int __proto_infer_2(void *ctx)
 	struct conn_info_s *conn_info, __conn_info;
 	__conn_info = ctx_map->tail_call.conn_info;
 	conn_info = &__conn_info;
-	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 	int act;
 	act = infer_l7_class_2(&ctx_map->tail_call, conn_info);
@@ -2309,7 +2400,6 @@ static __inline int __proto_infer_2(void *ctx)
 		 */
 		goto clear_args_map_1;
 	}
-
 	// When at least one of protocol or message_type is valid,
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
@@ -2345,8 +2435,8 @@ PROGKP(proto_infer_2) (void *ctx) {
 	return 0;
 }
 
-PROGTP(data_submit) (void *ctx)
-{	int ret;
+PROGTP(data_submit) (void *ctx) {
+	int ret;
 	ret = data_submit(ctx);
 	if (ret == SUBMIT_OK) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
@@ -2361,8 +2451,7 @@ PROGTP(data_submit) (void *ctx)
 	return 0;
 }
 
-PROGKP(data_submit) (void *ctx)
-{
+PROGKP(data_submit) (void *ctx) {
 	int ret;
 	ret = data_submit(ctx);
 	if (ret == SUBMIT_OK) {
@@ -2371,7 +2460,7 @@ PROGKP(data_submit) (void *ctx)
 	} else if (ret == SUBMIT_ABORT) {
 		return 0;
 	} else {
-		__u64 id = bpf_get_current_pid_tgid();	
+		__u64 id = bpf_get_current_pid_tgid();
 		active_read_args_map__delete(&id);
 		active_write_args_map__delete(&id);
 	}
@@ -2451,11 +2540,12 @@ static __inline void trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-	bpf_probe_read_str(buffer->filename, sizeof(buffer->filename), name);
+	bpf_probe_read_kernel_str(buffer->filename, sizeof(buffer->filename),
+				  name);
 	buffer->filename[sizeof(buffer->filename) - 1] = '\0';
 
 	struct __socket_data_buffer *v_buff =
-		bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		return;
 
@@ -2467,7 +2557,7 @@ static __inline void trace_io_event_common(void *ctx,
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
 	v->tgid = tgid;
-	v->pid = (__u32)pid_tgid;
+	v->pid = (__u32) pid_tgid;
 	v->coroutine_id = trace_key.goid;
 	v->timestamp = data_args->enter_ts;
 
@@ -2479,19 +2569,17 @@ static __inline void trace_io_event_common(void *ctx,
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
 	struct tail_calls_context *context =
-		(struct tail_calls_context *)v->data;
+	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->vecs = false;
 	context->is_close = false;
 	context->dir = direction;
 
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
-		      PROG_OUTPUT_DATA_TP_IDX);
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
 	return;
 }
 
-PROGTP(io_event)(void *ctx)
-{
+PROGTP(io_event) (void *ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 
 	struct data_args_t *data_args = NULL;
