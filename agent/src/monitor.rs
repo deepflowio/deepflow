@@ -285,11 +285,23 @@ impl RefCountable for SysLoad {
     fn get_counters(&self) -> Vec<Counter> {
         let mut sys = self.0.lock().unwrap();
         sys.refresh_cpu();
-        vec![(
-            "load1",
-            CounterType::Gauged,
-            CounterValue::Float(sys.load_average().one),
-        )]
+        vec![
+            (
+                "load1",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().one),
+            ),
+            (
+                "load5",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().five),
+            ),
+            (
+                "load15",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().fifteen),
+            ),
+        ]
     }
 }
 
