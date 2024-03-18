@@ -1060,9 +1060,11 @@ vtap_group_id: g-xxxxxx
 
     ## Configuration to extract the customized header fields of HTTP, HTTP2, GRPC protocol etc
     #extra-log-fields:
-    #  http: # for HTTP
-    #  - field-name: "user-agent" # such as "user-agent", "referer", case insensitive
-    #  - field-name: "cookie"
+    ## for example:
+    ## http:
+    ## - field-name: "user-agent"
+    ## - field-name: "cookie"
+    #  http: []
     #  http2: []
     #  grpc: []
 
