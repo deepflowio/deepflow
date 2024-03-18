@@ -19,9 +19,11 @@ mod kafka;
 pub mod mqtt;
 mod nats;
 mod openwire;
+mod zmtp;
 
 pub use amqp::{AmqpInfo, AmqpLog};
 pub use kafka::{KafkaInfo, KafkaLog};
 pub use mqtt::{MqttInfo, MqttLog};
 pub use nats::{NatsInfo, NatsLog};
 pub use openwire::{OpenWireInfo, OpenWireLog};
+pub use zmtp::{ZmtpInfo, ZmtpLog};

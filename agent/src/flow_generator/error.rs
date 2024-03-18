@@ -54,6 +54,12 @@ pub enum Error {
     OpenWireLogParseUnimplemented,
     #[error("openwire log parse EOF")]
     OpenWireLogParseEOF,
+    #[error("zmtp log parse failed")]
+    ZmtpLogParseFailed,
+    #[error("zmtp log parse EOF")]
+    ZmtpLogParseEOF,
+    #[error("zmtp perf parse failed")]
+    ZmtpPerfParseFailed,
     #[error("redis log parse failed")]
     RedisLogParseFailed,
     #[error("redis perf parse failed")]
