@@ -999,6 +999,7 @@ vtap_group_id: g-xxxxxx
   #- AMQP
   #- OpenWire
   #- NATS
+  #- Pulsar
   #- ZMTP
   #- DNS
   #- TLS
