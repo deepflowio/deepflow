@@ -95,7 +95,7 @@ func checkAndStartMasterFunctions(
 	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
-	recorderResource := recorder.GetSingletonResource()
+	recorderResource := recorder.GetResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
 	tagRecorder := tagrecorder.GetSingleton()
@@ -146,7 +146,7 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 资源数据清理
-				recorderResource.Cleaner.Start()
+				recorderResource.Cleaners.Start()
 
 				// domain检查及自愈
 				domainChecker.Start()
@@ -177,7 +177,7 @@ func checkAndStartMasterFunctions(
 				// stop vtap license allocation and check
 				vtapLicenseAllocation.Stop()
 
-				recorderResource.Cleaner.Stop()
+				recorderResource.Cleaners.Stop()
 
 				domainChecker.Stop()
 

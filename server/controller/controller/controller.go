@@ -102,7 +102,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	// 启动资源ID管理器
 	router.SetInitStageForHealthChecker("Resource ID manager init")
-	recorderResource := recorder.GetSingletonResource().Init(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
+	recorderResource := recorder.GetResource().Init(ctx, cfg.ManagerCfg.TaskCfg.RecorderCfg)
 	if isMasterController {
 		err := recorderResource.IDManagers.Start()
 		if err != nil {
