@@ -42,9 +42,93 @@ use crate::common::{
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
+use crate::rpc::get_timestamp;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
-use public::proto::trident::{Exception, TapMode};
+use public::proto::trident::{Exception, SystemLoadMetric, TapMode};
+
+struct SystemLoadGuard {
+    system: Arc<Mutex<System>>,
+
+    exception_handler: ExceptionHandler,
+
+    last_exceeded: Duration,
+    last_exceeded_metric: SystemLoadMetric,
+}
+
+impl SystemLoadGuard {
+    const CONTINUOUS_SAFETY_TIME: Duration = Duration::from_secs(300);
+
+    fn new(system: Arc<Mutex<System>>, exception_handler: ExceptionHandler) -> Self {
+        Self {
+            system,
+            exception_handler,
+            last_exceeded: Duration::ZERO,
+            last_exceeded_metric: SystemLoadMetric::Load15,
+        }
+    }
+
+    fn check(
+        &mut self,
+        system_load_circuit_breaker_threshold: f32,
+        system_load_circuit_breaker_recover: f32,
+        system_load_circuit_breaker_metric: SystemLoadMetric,
+    ) {
+        if system_load_circuit_breaker_threshold == 0.0
+            || system_load_circuit_breaker_recover == 0.0
+        {
+            self.last_exceeded = Duration::ZERO;
+            self.exception_handler
+                .clear(Exception::SystemLoadCircuitBreaker);
+            return;
+        }
+        if system_load_circuit_breaker_metric != self.last_exceeded_metric {
+            self.last_exceeded_metric = system_load_circuit_breaker_metric;
+            self.last_exceeded = Duration::ZERO;
+        }
+
+        let mut system = self.system.lock().unwrap();
+        system.refresh_cpu();
+
+        let cpu_count = system.cpus().len() as f32;
+        let system_load = match system_load_circuit_breaker_metric {
+            SystemLoadMetric::Load1 => system.load_average().one,
+            SystemLoadMetric::Load5 => system.load_average().five,
+            SystemLoadMetric::Load15 => system.load_average().fifteen,
+        } as f32;
+
+        if self
+            .exception_handler
+            .has(Exception::SystemLoadCircuitBreaker)
+        {
+            let has_exceeded = system_load / cpu_count >= system_load_circuit_breaker_recover;
+            if has_exceeded {
+                self.last_exceeded = get_timestamp(0);
+            } else {
+                let now = get_timestamp(0);
+                if now > self.last_exceeded + Self::CONTINUOUS_SAFETY_TIME {
+                    info!(
+                        "Current load {:?} is below the recover threshold({:?}), set the agent to enabled.",
+                        system_load_circuit_breaker_metric, system_load_circuit_breaker_recover
+                    );
+                    self.exception_handler
+                        .clear(Exception::SystemLoadCircuitBreaker);
+                }
+            }
+        } else {
+            let has_exceeded = system_load / cpu_count >= system_load_circuit_breaker_threshold;
+            if has_exceeded {
+                error!(
+                    "Current load {:?} exceeds the threshold({:?}), set the agent to disabled.",
+                    system_load_circuit_breaker_metric, system_load_circuit_breaker_threshold
+                );
+                self.last_exceeded = get_timestamp(0);
+                self.exception_handler
+                    .set(Exception::SystemLoadCircuitBreaker);
+            }
+        }
+    }
+}
 
 pub struct Guard {
     config: EnvironmentAccess,
@@ -216,10 +300,12 @@ impl Guard {
         let in_container = running_in_container();
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
+            let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
             loop {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
                 let cpu_limit = config.max_cpus;
+                system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
                         let log_file_size = config.log_file_size; // Log file size limit (unit: M)

@@ -192,7 +192,7 @@ impl fmt::Debug for CollectorConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EnvironmentConfig {
     pub max_memory: u64,
     pub max_cpus: u32,
@@ -201,6 +201,9 @@ pub struct EnvironmentConfig {
     pub sys_free_memory_limit: u32,
     pub log_file_size: u32,
     pub tap_mode: TapMode,
+    pub system_load_circuit_breaker_threshold: f32,
+    pub system_load_circuit_breaker_recover: f32,
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1141,7 +1144,7 @@ pub struct MetricServerConfig {
     pub compressed: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ModuleConfig {
     pub enabled: bool,
     pub tap_mode: TapMode,
@@ -1220,6 +1223,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 sys_free_memory_limit: conf.sys_free_memory_limit,
                 log_file_size: conf.log_file_size,
                 tap_mode: conf.tap_mode,
+                system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold,
+                system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover,
+                system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: Duration::from_secs(conf.sync_interval),
@@ -2239,6 +2245,51 @@ impl ConfigHandler {
                 new_config.environment.log_file_size
             );
             candidate_config.environment.log_file_size = new_config.environment.log_file_size;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_metric
+            != new_config.environment.system_load_circuit_breaker_metric
+        {
+            info!(
+                "system_load_circuit_breaker_metric set to {:?}",
+                new_config.environment.system_load_circuit_breaker_metric
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_metric =
+                new_config.environment.system_load_circuit_breaker_metric;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_recover
+            != new_config.environment.system_load_circuit_breaker_recover
+        {
+            info!(
+                "system_load_circuit_breaker_recover set to {:?}",
+                new_config.environment.system_load_circuit_breaker_recover
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_recover =
+                new_config.environment.system_load_circuit_breaker_recover;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_threshold
+            != new_config.environment.system_load_circuit_breaker_threshold
+        {
+            info!(
+                "system_load_circuit_breaker_threshold set to {}",
+                new_config.environment.system_load_circuit_breaker_threshold
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_threshold =
+                new_config.environment.system_load_circuit_breaker_threshold;
         }
 
         if candidate_config.flow != new_config.flow {
