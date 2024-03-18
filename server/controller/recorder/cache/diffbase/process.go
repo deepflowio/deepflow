@@ -20,6 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func (b *DataSet) AddProcess(dbItem *mysql.Process, seq int) {
@@ -31,6 +32,8 @@ func (b *DataSet) AddProcess(dbItem *mysql.Process, seq int) {
 		Name:        dbItem.Name,
 		OSAPPTags:   dbItem.OSAPPTags,
 		ContainerID: dbItem.ContainerID,
+		DeviceType:  dbItem.DeviceType,
+		DeviceID:    dbItem.DeviceID,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
 }
@@ -45,11 +48,18 @@ type Process struct {
 	Name        string `json:"name"`
 	OSAPPTags   string `json:"os_app_tags"`
 	ContainerID string `json:"container_id"`
+	DeviceType  int    `json:"device_type"`
+	DeviceID    int    `json:"device_id"`
 }
 
-func (p *Process) Update(cloudItem *cloudmodel.Process) {
+func (p *Process) Update(cloudItem *cloudmodel.Process, toolDataSet *tool.DataSet) {
 	p.Name = cloudItem.Name
 	p.OSAPPTags = cloudItem.OSAPPTags
 	p.ContainerID = cloudItem.ContainerID
+	deviceType, deviceID := toolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
+	if p.DeviceType != deviceType || p.DeviceID != deviceID {
+		p.DeviceType = deviceType
+		p.DeviceID = deviceID
+	}
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, p))
 }
