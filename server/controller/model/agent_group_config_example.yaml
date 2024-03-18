@@ -999,6 +999,7 @@ vtap_group_id: g-xxxxxx
   #- AMQP
   #- OpenWire
   #- NATS
+  #- ZMTP
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin
@@ -1022,6 +1023,7 @@ vtap_group_id: g-xxxxxx
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
     #"OpenWire": "1-65535"
+    #"ZMTP": "1-65535"
     #"DNS": "53,5353"
     #"TLS": "443,6443"
     #"Custom": "1-65535" # plugins
