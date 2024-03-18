@@ -130,7 +130,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		id, name, err := v.getVMIDAndNameByLcuuid(lcuuid)
 		if err != nil {
-			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
+			log.Error(v.org.LogPre("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err))
 		}
 
 		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
