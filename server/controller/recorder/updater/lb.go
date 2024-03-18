@@ -74,10 +74,10 @@ func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *diffbas
 func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(l.org.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 

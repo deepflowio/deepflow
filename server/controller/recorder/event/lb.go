@@ -83,7 +83,7 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = l.ToolDataSet.GetLBNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(l.resourceType, lcuuid), err)
+				log.Error(l.org.LogPre("%v, %v", idByLcuuidNotFound(l.resourceType, lcuuid), err))
 			}
 		} else {
 			log.Error(nameByIDNotFound(l.resourceType, id))
