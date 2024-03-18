@@ -336,6 +336,7 @@ querier:
       cache-max-count: 1024 # max capacity of cache list
       cache-first-timeout: 10 # time out for first cache item load, uint: s
       cache-clean-interval: 3600 # clean interval for cache, unit: s
+      cache-allow-time-gap: 1 # when query end - cache end < gap, not update cache, unit: s
 
   auto-custom-tag:
     tag-name: 

@@ -38,25 +38,27 @@ import (
 var log = logging.MustGetLogger("cloud.aws")
 
 const (
-	REGION_NAME = "cn-north-1"
+	REGION_NAME                 = "cn-north-1"
+	EKS_NODE_DESCRIPTION_PREFIX = "aws-K8S-"
 )
 
 type Aws struct {
-	name                 string
-	lcuuid               string
-	regionUUID           string
-	uuidGenerate         string
-	apiDefaultRegion     string
-	includeRegions       []string
-	excludeRegions       []string
-	httpClient           *http.BuildableClient
-	azLcuuidMap          map[string]int
-	vpcOrSubnetToRouter  map[string]string
-	vmIDToPrivateIP      map[string]string
-	vpcIDToLcuuid        map[string]string
-	publicIPToVinterface map[string]model.VInterface
-	credential           awsconfig.LoadOptionsFunc
-	ec2Client            *ec2.Client
+	name                  string
+	lcuuid                string
+	regionUUID            string
+	uuidGenerate          string
+	apiDefaultRegion      string
+	includeRegions        []string
+	excludeRegions        []string
+	httpClient            *http.BuildableClient
+	azLcuuidMap           map[string]int
+	vpcOrSubnetToRouter   map[string]string
+	vmIDToPrivateIP       map[string]string
+	vpcIDToLcuuid         map[string]string
+	instanceIDToPrimaryIP map[string]string
+	publicIPToVinterface  map[string]model.VInterface
+	credential            awsconfig.LoadOptionsFunc
+	ec2Client             *ec2.Client
 }
 
 type awsRegion struct {
@@ -124,11 +126,12 @@ func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 		credential:       awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
 
 		// 以下属性为获取资源所用的关联关系
-		azLcuuidMap:          map[string]int{},
-		vpcOrSubnetToRouter:  map[string]string{},
-		vmIDToPrivateIP:      map[string]string{},
-		vpcIDToLcuuid:        map[string]string{},
-		publicIPToVinterface: map[string]model.VInterface{},
+		azLcuuidMap:           map[string]int{},
+		vpcOrSubnetToRouter:   map[string]string{},
+		vmIDToPrivateIP:       map[string]string{},
+		vpcIDToLcuuid:         map[string]string{},
+		instanceIDToPrimaryIP: map[string]string{},
+		publicIPToVinterface:  map[string]model.VInterface{},
 	}, nil
 }
 
@@ -210,6 +213,7 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 		regionFlag := false
 		a.azLcuuidMap = map[string]int{}
 		a.vpcIDToLcuuid = map[string]string{}
+		a.instanceIDToPrimaryIP = map[string]string{}
 
 		vpcs, err := a.getVPCs(region)
 		if err != nil {
@@ -271,16 +275,6 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 			resource.SecurityGroupRules = append(resource.SecurityGroupRules, sgRules...)
 		}
 
-		vms, vmSGs, err := a.getVMs(region)
-		if err != nil {
-			return model.Resource{}, err
-		}
-		if len(vms) > 0 || len(vmSGs) > 0 {
-			regionFlag = true
-			resource.VMs = append(resource.VMs, vms...)
-			resource.VMSecurityGroups = append(resource.VMSecurityGroups, vmSGs...)
-		}
-
 		vinterfaces, ips, vNatRules, err := a.getVInterfacesAndIPs(region)
 		if err != nil {
 			return model.Resource{}, err
@@ -290,6 +284,16 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 			resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
 			resource.IPs = append(resource.IPs, ips...)
 			resource.NATRules = append(resource.NATRules, vNatRules...)
+		}
+
+		vms, vmSGs, err := a.getVMs(region)
+		if err != nil {
+			return model.Resource{}, err
+		}
+		if len(vms) > 0 || len(vmSGs) > 0 {
+			regionFlag = true
+			resource.VMs = append(resource.VMs, vms...)
+			resource.VMSecurityGroups = append(resource.VMSecurityGroups, vmSGs...)
 		}
 
 		lbs, lbListeners, lbTargetServers, err := a.getLoadBalances(region)

@@ -24,12 +24,14 @@
  * key: struct tls_conn_key {process ID, coroutine ID}
  * value: struct tls_conn
  */
+/* *INDENT-OFF* */
 struct bpf_map_def SEC("maps") tls_conn_map = {
 	.type = BPF_MAP_TYPE_HASH,
 	.key_size = sizeof(struct tls_conn_key),
 	.value_size = sizeof(struct tls_conn),
 	.max_entries = MAX_SYSTEM_THREADS,
 };
+/* *INDENT-ON* */
 
 #ifdef TLS_DEBUG
 #define DEFINE_DBG_DATA(x) struct debug_data x = {}
@@ -48,7 +50,7 @@ do { \
   dbg_data.fun = (F); \
   dbg_data.num = (N); \
   __builtin_memset(dbg_data.buf, 0, sizeof(dbg_data.buf)); \
-  bpf_probe_read(dbg_data.buf, sizeof(dbg_data.buf), (P)); \
+  bpf_probe_read_user(dbg_data.buf, sizeof(dbg_data.buf), (P)); \
   bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU, &dbg_data, sizeof(dbg_data)); \
 } while(0)
 #else
@@ -84,15 +86,16 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
-		c.fd = get_fd_from_tcp_or_tls_conn_interface(
-			(void *)PT_GO_REGS_PARM1(ctx), info);
+		c.fd = get_fd_from_tcp_or_tls_conn_interface((void *)
+							     PT_GO_REGS_PARM1
+							     (ctx), info);
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
-		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
+		bpf_probe_read_user(&conn, sizeof(conn), (void *)(c.sp + 8));
 		c.fd = get_fd_from_tcp_or_tls_conn_interface(conn, info);
-		bpf_probe_read(&c.buffer, sizeof(c.buffer),
-			       (void *)(c.sp + 16));
+		bpf_probe_read_user(&c.buffer, sizeof(c.buffer),
+				    (void *)(c.sp + 16));
 	}
 
 	if (c.fd < 0) {
@@ -139,8 +142,8 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&bytes_count, sizeof(bytes_count),
-			       (void *)(c->sp + 40));
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+				    (void *)(c->sp + 40));
 	}
 
 	if (bytes_count == 0) {
@@ -168,7 +171,7 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	submit_debug_str(2, 4, c->buffer);
 	bpf_map_delete_elem(&tls_conn_map, &key);
 	active_write_args_map__update(&id, &write_args);
-	
+
 	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
 			  bytes_count, &extra)) {
 		submit_debug(2, 5, 0);
@@ -207,15 +210,16 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
-		c.fd = get_fd_from_tcp_or_tls_conn_interface(
-			(void *)PT_GO_REGS_PARM1(ctx), info);
+		c.fd = get_fd_from_tcp_or_tls_conn_interface((void *)
+							     PT_GO_REGS_PARM1
+							     (ctx), info);
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
-		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
+		bpf_probe_read_user(&conn, sizeof(conn), (void *)(c.sp + 8));
 		c.fd = get_fd_from_tcp_or_tls_conn_interface(conn, info);
-		bpf_probe_read(&c.buffer, sizeof(c.buffer),
-			       (void *)(c.sp + 16));
+		bpf_probe_read_user(&c.buffer, sizeof(c.buffer),
+				    (void *)(c.sp + 16));
 	}
 
 	if (c.fd < 0) {
@@ -273,8 +277,8 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&bytes_count, sizeof(bytes_count),
-			       (void *)(c->sp + 40));
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+				    (void *)(c->sp + 40));
 	}
 
 	if (bytes_count == 0) {

@@ -82,6 +82,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 				VPCLcuuid:    common.GetUUID(a.getStringPointerValue(ins.VpcId), uuid.Nil),
 				State:        vmState,
 				HType:        common.VM_HTYPE_VM_C,
+				IP:           a.instanceIDToPrimaryIP[instanceID],
 				CreatedAt:    a.getTimePointerValue(ins.LaunchTime),
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: a.getRegionLcuuid(region.lcuuid),

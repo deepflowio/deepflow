@@ -35,6 +35,23 @@ vtap_group_id: g-xxxxxx
 ## Unit: Mbps. Default: 1000. Range: [1, 100000]
 #max_npb_bps: 1000
 
+## System Load Circuit Breaker Threshold
+## Default: 1.0
+## Range: [0, 10.0]
+## Note: When the load of the Linux system divided by the number of
+##   CPU cores exceeds this value, the agent automatically enters
+##   the disabled state. It will automatically recover if it remains
+##   below 90% of this value for a continuous 5 minutes. Setting it
+##   to 0 disables this feature.
+#system_load_circuit_breaker_threshold: 1.0
+
+## System Load Circuit Breaker Metric
+## Default: load15
+## Supported values: load1, load5, load15
+## Note: The system load circuit breaker mechanism uses this metric,
+##   and the agent will check this metric every minute.
+#system_load_circuit_breaker_metric: load15
+
 ## NPB (Packet Broker) Circuit Breaker Threshold
 ## Unit: Mbps. Default: 0. Range: [0, 100000]
 ## Note: When the outbound direction of the NPB interface

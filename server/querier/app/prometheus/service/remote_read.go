@@ -54,7 +54,9 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	var response *prompb.ReadResponse
 	// clear cache if data not found
 	defer func(r *prompb.ReadRequest) {
-		if response == nil || len(response.Results) == 0 || len(response.Results[0].Timeseries) == 0 {
+		// when error occurs, means query not finished yet, remove the first query placeholder
+		// if error is nil, means query finished, don't clean key
+		if err != nil || response == nil {
 			cache.PromReadResponseCache().Remove(r)
 		}
 	}(req)

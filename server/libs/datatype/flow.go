@@ -74,13 +74,13 @@ const (
 
 func (t CloseType) IsClientError() bool {
 	return t == CloseTypeClientAckMiss || t == CloseTypeTCPClientRst ||
-		t == CloseTypeClientHalfClose || t == CloseTypeClientSourcePortReuse ||
+		t == CloseTypeClientSourcePortReuse ||
 		t == CloseTypeClientEstablishReset
 }
 
 func (t CloseType) IsServerError() bool {
 	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
-		t == CloseTypeServerHalfClose || t == CloseTypeServerSynMiss ||
+		t == CloseTypeServerSynMiss ||
 		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
 }
 

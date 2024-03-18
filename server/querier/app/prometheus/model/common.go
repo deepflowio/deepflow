@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
-package migration
+package model
 
 const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.13"
+	CACHE_LABEL_STRING_TAG  = "__cache_label_string__"
+	PROMETHEUS_LABELS_INDEX = "__labels_index__"
 )
+
+var RelabelFunctions = []string{"sum", "avg", "count", "min", "max", "group", "stddev", "stdvar", "count_values", "quantile"}
+
+var MatrixCallFunctions = []string{"topk", "bottomk",
+	"avg_over_time", "count_over_time", "last_over_time", "max_over_time", "min_over_time", "stddev_over_time", "sum_over_time", "present_over_time", "quantile_over_time",
+	"idelta", "delta", "increase", "irate", "rate"}

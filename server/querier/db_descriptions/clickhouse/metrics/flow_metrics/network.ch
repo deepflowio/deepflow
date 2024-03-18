@@ -58,8 +58,8 @@ client_rst_flow             , 传输-客户端重置         , 连接 , TCP 传�
 server_rst_flow             , 传输-服务端重置         , 连接 , TCP 传输失败的场景之一，见文档描述
 server_queue_lack           , 传输-服务端队列溢出     , 连接 , TCP 传输失败的场景之一，见文档描述
 tcp_timeout                 , 传输-TCP 连接超时       , 连接 , TCP 传输失败的场景之一，见文档描述
-client_half_close_flow      , 断连-客户端半关         , 连接 , TCP 传输失败的场景之一，见文档描述
-server_half_close_flow      , 断连-服务端半关         , 连接 , TCP 传输失败的场景之一，见文档描述
+client_half_close_flow      , 断连-客户端半关         , 连接 , TCP 断连异常的场景之一，见文档描述
+server_half_close_flow      , 断连-服务端半关         , 连接 , TCP 断连异常的场景之一，见文档描述
 
 rtt                         , 平均 TCP 建连时延       , 微秒 , 统计周期内，所有 TCP 建连时延的平均值，一次时延的计算见文档描述
 rtt_client                  , 平均 TCP 建连客户端时延 , 微秒 , 统计周期内，所有 TCP 建连客户端时延的平均值，一次时延的计算见文档描述
