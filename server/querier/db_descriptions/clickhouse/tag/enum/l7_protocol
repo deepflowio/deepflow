@@ -16,6 +16,7 @@
 102     , AMQP            ,
 103     , OpenWire        ,
 104     , NATS            ,
+105     , Pulsar          ,
 106     , ZMTP            ,
 120     , DNS             ,
 121     , TLS             ,
