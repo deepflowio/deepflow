@@ -292,7 +292,7 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 {
 	static const char magic[] = "PRI * HTTP/2";
 	char buffer[sizeof(magic)] = { 0 };
-	bpf_probe_read(buffer, sizeof(buffer) - 1, buf_src);
+	bpf_probe_read_user(buffer, sizeof(buffer) - 1, buf_src);
 	for (int idx = 0; idx < sizeof(magic); ++idx) {
 		if (magic[idx] == buffer[idx])
 			continue;
@@ -408,7 +408,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 			break;
 
 		conn_info->tcpseq_offset = offset;
-		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
+		bpf_probe_read_user(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +
 		    HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
@@ -568,8 +568,8 @@ static __inline void save_prev_data(const char *buf,
 				    struct conn_info_s *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
-			       buf);
+		bpf_probe_read_kernel(conn_info->socket_info_ptr->prev_data,
+				      count, buf);
 		conn_info->socket_info_ptr->prev_data_len = count;
 		/*
 		 * This piece of data needs to be merged with subsequent data, so
@@ -579,7 +579,7 @@ static __inline void save_prev_data(const char *buf,
 		    conn_info->socket_info_ptr->direction;
 		conn_info->socket_info_ptr->direction = conn_info->direction;
 	} else {
-		bpf_probe_read(conn_info->prev_buf, count, buf);
+		bpf_probe_read_kernel(conn_info->prev_buf, count, buf);
 		conn_info->prev_count = count;
 	}
 }
@@ -594,9 +594,10 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		 */
 		if (conn_info->direction ==
 		    conn_info->socket_info_ptr->direction) {
-			bpf_probe_read(conn_info->prev_buf,
-				       sizeof(conn_info->prev_buf),
-				       conn_info->socket_info_ptr->prev_data);
+			bpf_probe_read_kernel(conn_info->prev_buf,
+					      sizeof(conn_info->prev_buf),
+					      conn_info->socket_info_ptr->
+					      prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -819,7 +820,7 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	}
 	// Payload length check
 	__u32 length;
-	bpf_probe_read(&length, sizeof(length), s_buf + 1);
+	bpf_probe_read_user(&length, sizeof(length), s_buf + 1);
 	length = __bpf_ntohl(length);
 	if (length < min_payload_len || length > max_payload_len) {
 		return MSG_UNKNOWN;
@@ -828,7 +829,8 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	// check the last character.
 	if (length + 1 <= (__u32) count) {
 		char last_char = ' ';	//Non-zero initial value
-		bpf_probe_read(&last_char, sizeof(last_char), s_buf + length);
+		bpf_probe_read_user(&last_char, sizeof(last_char),
+				    s_buf + length);
 		if (last_char != '\0')
 			return MSG_UNKNOWN;
 	}
@@ -851,7 +853,7 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	}
 
 	char infer_buf[POSTGRE_INFER_BUF_SIZE];
-	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
+	bpf_probe_read_user(infer_buf, sizeof(infer_buf), buf);
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
@@ -1103,12 +1105,12 @@ struct dns_header {
 static __inline enum message_type infer_dns_message(const char *buf,
 						    size_t count,
 						    const char *ptr,
-						    __u32 infer_len, 
+						    __u32 infer_len,
 						    struct conn_info_s
 						    *conn_info)
 {
 	/*
- 	 * Note: When testing with 'curl' accessing a domain, the following
+	 * Note: When testing with 'curl' accessing a domain, the following
 	 * situations are observed in DNS:
 	 * (1) An 'A' type DNS request is sent.
 	 * (2) An 'A' type response is received.
@@ -1176,7 +1178,6 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (num_rr > max_num_rr) {
 		return MSG_UNKNOWN;
 	}
-
 	// FIXME: Remove this code when the call chain can correctly handle the
 	// Go DNS case.
 	/*
@@ -1187,13 +1188,13 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	conn_info->dns_q_type = 0;
 	__u8 tmp_buf[128];
 	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
-	// bpf_probe_read_str() returns the length including '\0'.
-	const int len = bpf_probe_read_str(tmp_buf, sizeof(tmp_buf), queries_start);
+	// bpf_probe_read_user_str() returns the length including '\0'.
+	const int len =
+	    bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf), queries_start);
 	if (len > 0 && len < sizeof(tmp_buf)) {
-		bpf_probe_read(tmp_buf, 2, queries_start + len);
-		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *)tmp_buf);
+		bpf_probe_read_user(tmp_buf, 2, queries_start + len);
+		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *) tmp_buf);
 	}
-
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
 	// the offset to correct the TCP sequence number.
@@ -2053,8 +2054,7 @@ check:
 	 * Handshake (0x16); Change Cipher Spec (0x14); Encrypted Alert (0x15)
 	 */
 	if (!(handshake.content_type == 0x16 ||
-	      handshake.content_type == 0x14 ||
-	      handshake.content_type == 0x15))
+	      handshake.content_type == 0x14 || handshake.content_type == 0x15))
 		return MSG_UNKNOWN;
 
 	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
@@ -2178,7 +2178,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 * infer_buf:
 	 *     The prepared 32-byte inference data has been placed in the buffer.
 	 * syscall_infer_addr:
-	 *     Just a buffer address needs to call the bpf_probe_read() interface
+	 *     Just a buffer address needs to call the bpf_probe_read_user() interface
 	 *     to read data. Special note is that if extra->vecs is true,
 	 *     its value is the address of the first iov, and syscall_infer_len is
 	 *     the length of the first iov.
@@ -2197,8 +2197,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		if (syscall_infer_len > count)
 			syscall_infer_len = count;
 	} else {
-		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data),
-			       buf);
+		bpf_probe_read_user(__infer_buf->data,
+				    sizeof(__infer_buf->data), buf);
 		syscall_infer_addr = (char *)buf;
 		syscall_infer_len = count;
 	}

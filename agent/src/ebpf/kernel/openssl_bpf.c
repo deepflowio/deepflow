@@ -29,12 +29,14 @@ struct ssl_ctx_struct {
 	// calculated based on the TCP seq at the end and the length of the
 	// message.
 	__u32 tcp_seq;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
+/* *INDENT-OFF* */
 // Save function arguments and use them when the function returns
 // key: pid_tgid
 // value: SSL_* arguments
 BPF_HASH(ssl_ctx_map, __u64, struct ssl_ctx_struct)
+/* *INDENT-ON* */
 
 static int get_fd_from_openssl_ssl(void *ssl)
 {
@@ -48,14 +50,14 @@ static int get_fd_from_openssl_ssl(void *ssl)
 
 	// The openssl library generally does not have debug information, so
 	// here we use constants instead.
-	bpf_probe_read(&rbio, sizeof(rbio), ssl + rbio_ssl_offset);
-	bpf_probe_read(&fd, sizeof(fd), rbio + fd_rbio_offset_v3);
+	bpf_probe_read_user(&rbio, sizeof(rbio), ssl + rbio_ssl_offset);
+	bpf_probe_read_user(&fd, sizeof(fd), rbio + fd_rbio_offset_v3);
 	if (fd > 2)
 		return fd;
-	bpf_probe_read(&fd, sizeof(fd), rbio + fd_rbio_offset_v1_1_1);
+	bpf_probe_read_user(&fd, sizeof(fd), rbio + fd_rbio_offset_v1_1_1);
 	if (fd > 2)
 		return fd;
-	bpf_probe_read(&fd, sizeof(fd), rbio + fd_rbio_offset_v1_1_0);
+	bpf_probe_read_user(&fd, sizeof(fd), rbio + fd_rbio_offset_v1_1_0);
 	return fd;
 }
 
@@ -105,7 +107,7 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 	};
 
 	ssl_ctx_map__delete(&id);
-        active_write_args_map__update(&id, &write_args);
+	active_write_args_map__update(&id, &write_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
 			  size, &extra)) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
@@ -161,7 +163,7 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
 	};
 
 	ssl_ctx_map__delete(&id);
-        active_read_args_map__update(&id, &read_args);
+	active_read_args_map__update(&id, &read_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
 			  size, &extra)) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),

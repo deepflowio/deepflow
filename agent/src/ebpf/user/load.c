@@ -33,12 +33,96 @@
 #include <bcc/libbpf.h>
 #include "load.h"
 #include "btf_vmlinux.h"
+#include "../kernel/include/bpf_base.h"
 
 extern struct btf_ext *btf_ext__new(const uint8_t * data, uint32_t size);
 extern struct btf *btf__new(const void *data, uint32_t size);
 extern void btf__free(struct btf *btf);
 extern void btf_ext__free(struct btf_ext *btf_ext);
 extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
+
+#define FN_ID(F) ((int32_t)((uint64_t)F))
+#define KERN_FEAT_UNKNOWN	0
+#define KERN_FEAT_SUP		1
+#define KERN_FEAT_NOTSUP        2
+
+static int probe_read_kernel_feat;
+
+/*
+ * Feature checks for the Linux kernel, 
+ * `bpf_probe_read{kernel,user}[_str]`, vary across
+ * different versions of the Linux kernel. Using eBPF
+ * instructions to determine whether the currently
+ * running Linux kernel supports this feature.
+ */
+static bool feat_probe_read_kernel(unsigned kern_version)
+{
+	if (probe_read_kernel_feat == KERN_FEAT_SUP)
+		return true;
+	else if (probe_read_kernel_feat == KERN_FEAT_NOTSUP)
+		return false;
+
+	struct bpf_insn insns[] = {
+		BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),	/* r1 = r10 (fp) */
+		BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -8),	/* r1 += -8 */
+		BPF_MOV64_IMM(BPF_REG_2, 8),	/* r2 = 8 */
+		BPF_MOV64_IMM(BPF_REG_3, 0),	/* r3 = 0 */
+		BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+			     FN_ID(bpf_probe_read_kernel)),
+		BPF_EXIT_INSN(),
+	};
+
+	int fd;
+	if ((fd = bcc_prog_load
+	     (BPF_PROG_TYPE_TRACEPOINT, NULL, insns, sizeof(insns), LICENSE_DEF,
+	      kern_version, 0, NULL,
+	      0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ )) >= 0) {
+		close(fd);
+		probe_read_kernel_feat = KERN_FEAT_SUP;
+		ebpf_info
+		    ("Kernel support interfaces `bpf_probe_read{kernel,user}[_str]`\n");
+		return true;
+	}
+
+	probe_read_kernel_feat = KERN_FEAT_NOTSUP;
+	ebpf_info
+	    ("Kernel not support interfaces `bpf_probe_read{kernel,user}[_str]`\n");
+
+	return false;
+}
+
+static bool is_helper_call_insn(struct bpf_insn *insn, int32_t * func_id)
+{
+	if (BPF_CLASS(insn->code) == BPF_JMP &&
+	    BPF_OP(insn->code) == BPF_CALL &&
+	    BPF_SRC(insn->code) == BPF_K &&
+	    insn->src_reg == 0 && insn->dst_reg == 0) {
+		*func_id = insn->imm;
+		return true;
+	}
+	return false;
+}
+
+static void sanitize_prog_instructions(struct ebpf_object *obj,
+				       struct ebpf_prog *prog)
+{
+	struct bpf_insn *insn = prog->insns;
+	int32_t func_id;
+
+	for (int i = 0; i < prog->insns_cnt; i++, insn++) {
+		if (!is_helper_call_insn(insn, &func_id))
+			continue;
+		if (func_id == FN_ID(bpf_probe_read_kernel)
+		    || func_id == FN_ID(bpf_probe_read_user)) {
+			if (!feat_probe_read_kernel(obj->kern_version))
+				insn->imm = FN_ID(bpf_probe_read);
+		} else if (func_id == FN_ID(bpf_probe_read_kernel_str)
+			   || func_id == FN_ID(bpf_probe_read_user_str)) {
+			if (!feat_probe_read_kernel(obj->kern_version))
+				insn->imm = FN_ID(bpf_probe_read_str);
+		}
+	}
+}
 
 static void ebpf_object__release_elf(struct ebpf_object *obj)
 {
@@ -173,7 +257,8 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 	obj->elf_info.obj_buf = (void *)buf;
 	obj->elf_info.obj_buf_sz = buf_sz;
 	obj->kern_version = fetch_kernel_version_code();
-	safe_buf_copy(obj->license, sizeof(obj->license), LICENSE_DEF, sizeof(LICENSE_DEF));
+	safe_buf_copy(obj->license, sizeof(obj->license), LICENSE_DEF,
+		      sizeof(LICENSE_DEF));
 	obj->license[sizeof(obj->license) - 1] = '\0';
 	return obj;
 }
@@ -313,7 +398,7 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 	} else if (!memcmp(desc->name, "perf_event", 10)) {
 		prog_type = BPF_PROG_TYPE_PERF_EVENT;
 	} else {
-		prog_type = BPF_PROG_TYPE_UNSPEC; 
+		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}
 
 	return prog_type;
@@ -407,6 +492,12 @@ static int load_obj__progs(struct ebpf_object *obj)
 		new_prog->obj = obj;
 		new_prog->type = prog_type;
 
+		/*
+		 * Addressing the adaptability issues of bpf_probe_read{kernel,user}[_str]
+		 * helpers in the kernel.
+		 */
+		sanitize_prog_instructions(obj, new_prog);
+
 		new_prog->prog_fd =
 		    bcc_prog_load(new_prog->type, new_prog->name,
 				  new_prog->insns, desc->size, obj->license,
@@ -414,12 +505,14 @@ static int load_obj__progs(struct ebpf_object *obj)
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
 
 		if (new_prog->prog_fd < 0) {
-			ebpf_warning("bcc_prog_load() failed. name: %s, %s errno: %d\n",
-				     new_prog->name, strerror(errno), errno);
+			ebpf_warning
+			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
+			     new_prog->name, strerror(errno), errno);
 			if (new_prog->insns_cnt > BPF_MAXINSNS) {
-				ebpf_warning("The number of EBPF instructions (%d) "
-					     "exceeded the maximum limit (%d).\n",
-					     new_prog->insns_cnt, BPF_MAXINSNS);
+				ebpf_warning
+				    ("The number of EBPF instructions (%d) "
+				     "exceeded the maximum limit (%d).\n",
+				     new_prog->insns_cnt, BPF_MAXINSNS);
 			}
 
 			return ETR_INVAL;
@@ -577,7 +670,8 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		new_map->fd = -1;
 		// Symbol value is offset into ELF maps section data area.
 		new_map->elf_offset = sym.st_value;
-		safe_buf_copy(new_map->name, sizeof(new_map->name), map_name, strlen(map_name));
+		safe_buf_copy(new_map->name, sizeof(new_map->name), map_name,
+			      strlen(map_name));
 		new_map->name[sizeof(new_map->name) - 1] = '\0';
 		def =
 		    (struct bpf_load_map_def *)(map_desc->d_buf +
@@ -698,8 +792,9 @@ int ebpf_obj_load(struct ebpf_object *obj)
 				   map->def.value_size, map->def.max_entries,
 				   0);
 		if (map->fd < 0) {
-			ebpf_warning("bcc_create_map() failed, map name:%s - %s\n",
-				     map->name, strerror(errno));
+			ebpf_warning
+			    ("bcc_create_map() failed, map name:%s - %s\n",
+			     map->name, strerror(errno));
 			goto failed;
 		}
 		ebpf_debug

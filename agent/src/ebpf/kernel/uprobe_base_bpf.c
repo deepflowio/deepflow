@@ -27,6 +27,7 @@ struct http2_tcp_seq_key {
 	__u32 tcp_seq_end;
 };
 
+/* *INDENT-OFF* */
 /*
  * In uprobe_go_tls_read_exit()
  * Save the TCP sequence number before the syscall(read())
@@ -107,6 +108,7 @@ struct bpf_map_def SEC("maps") goroutines_map = {
 	.value_size = sizeof(__u64),
 	.max_entries = MAX_SYSTEM_THREADS,
 };
+/* *INDENT-ON* */
 
 // The first 16 bytes are fixed headers,
 // and the total reported buffer does not exceed 1k
@@ -142,20 +144,21 @@ struct __http2_stack {
 				__u32 __unused_events_num;
 				__u32 __unused_len;
 				char __unused_header[SOCKET_DATA_HEADER];
-				union{
+				union {
 					struct __http2_buffer http2_buffer;
-					struct __http2_dataframe http2_dataframe;
+					struct __http2_dataframe
+					    http2_dataframe;
 				};
-			} __attribute__((packed));
+			} __attribute__ ((packed));
 		};
 		struct {
 			__u32 events_num;
 			__u32 len;
 			struct __socket_data send_buffer;
-		} __attribute__((packed));
+		} __attribute__ ((packed));
 	};
 	bool tls;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1)
 
@@ -226,7 +229,7 @@ static __inline __u64 get_current_goroutine(void)
 static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now,
 				       __u64 timeout)
 {
-	struct go_key key = { .tgid = tgid, .goid = goid };
+	struct go_key key = {.tgid = tgid,.goid = goid };
 
 	__u64 *ts = bpf_map_lookup_elem(&go_rw_ts_map, &key);
 	if (!ts) {
@@ -243,7 +246,7 @@ static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now,
 // If no such coroutine exists, mark itself as a coroutine that can represent the request and return.
 static __inline __u64 get_rw_goid(__u64 timeout, bool is_socket_io)
 {
-	__u32 tgid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 	__u64 ts = bpf_ktime_get_ns();
 	__u64 goid = get_current_goroutine();
 	if (goid == 0) {
@@ -258,9 +261,9 @@ static __inline __u64 get_rw_goid(__u64 timeout, bool is_socket_io)
 		if (is_final_ancestor(tgid, ancestor, ts, timeout)) {
 			return ancestor;
 		}
-		struct go_key key = { .tgid = tgid, .goid = ancestor };
+		struct go_key key = {.tgid = tgid,.goid = ancestor };
 		__u64 *newancestor =
-			bpf_map_lookup_elem(&go_ancerstor_map, &key);
+		    bpf_map_lookup_elem(&go_ancerstor_map, &key);
 		if (!newancestor) {
 			break;
 		}
@@ -271,16 +274,16 @@ static __inline __u64 get_rw_goid(__u64 timeout, bool is_socket_io)
 		return 0;
 	}
 
-	struct go_key key = { .tgid = tgid, .goid = goid };
+	struct go_key key = {.tgid = tgid,.goid = goid };
 	bpf_map_update_elem(&go_rw_ts_map, &key, &ts, BPF_ANY);
 	return goid;
 }
 
 static __inline bool is_current_go_process(void)
 {
-	__u32 tgid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 	struct ebpf_proc_info *info =
-		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	    bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (info && info->version) {
 		return true;
 	} else {
@@ -292,7 +295,7 @@ static __inline bool is_tcp_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return info ? i.type == info->net_TCPConn_itab : false;
 }
 
@@ -311,9 +314,9 @@ static __inline int get_fd_from_tcp_conn_interface(void *conn,
 	void *ptr;
 	int fd;
 
-	bpf_probe_read(&i, sizeof(i), conn);
-	bpf_probe_read(&ptr, sizeof(ptr), i.ptr);
-	bpf_probe_read(&fd, sizeof(fd), ptr + offset_fd_sysfd);
+	bpf_probe_read_user(&i, sizeof(i), conn);
+	bpf_probe_read_user(&ptr, sizeof(ptr), i.ptr);
+	bpf_probe_read_user(&fd, sizeof(fd), ptr + offset_fd_sysfd);
 	return fd;
 }
 
@@ -328,8 +331,7 @@ static __inline int get_fd_from_tls_conn_struct(void *conn,
 }
 
 static __inline int
-get_fd_from_go_proxyproto_interface(void *conn,
-				    struct ebpf_proc_info *info)
+get_fd_from_go_proxyproto_interface(void *conn, struct ebpf_proc_info *info)
 {
 	/* conn = {tab = 0x770a10 
 	 * <go:itab.*github.com/armon/go-proxyproto.Conn,net.Conn>, data = 0xc0001963c0}
@@ -343,7 +345,7 @@ get_fd_from_go_proxyproto_interface(void *conn,
 	 *                                         data 0x000000c0001bc090)
 	 */
 	struct go_interface i = {};
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	void *proxyproto_conn = i.ptr + 8;
 	// proxyproto_conn is 'net.TCPConn,net.Conn'
 	return get_fd_from_tcp_conn_interface(proxyproto_conn, info);
@@ -353,7 +355,7 @@ static __inline bool is_tls_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return info ? i.type == info->crypto_tls_Conn_itab : false;
 }
 
@@ -365,7 +367,7 @@ static __inline int get_fd_from_tls_conn_interface(void *conn,
 	}
 	struct go_interface i = {};
 
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	int fd = get_fd_from_tls_conn_struct(i.ptr, info);
 	if (fd > 0)
 		return fd;
@@ -377,7 +379,8 @@ static __inline int get_fd_from_tls_conn_interface(void *conn,
 }
 
 static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
-						     struct ebpf_proc_info *info)
+						     struct ebpf_proc_info
+						     *info)
 {
 	/*
 	 * The process of inferring the file descriptor (0x0000000000000004)
@@ -394,7 +397,7 @@ static __inline int get_fd_from_h2c_rwConn_interface(void *conn,
 	 */
 
 	struct go_interface i = {};
-	bpf_probe_read(&i, sizeof(i), conn);
+	bpf_probe_read_user(&i, sizeof(i), conn);
 	return get_fd_from_tcp_conn_interface(i.ptr, info);
 }
 
@@ -441,7 +444,7 @@ static __inline bool is_register_based_call(struct ebpf_proc_info *info)
 	// https://groups.google.com/g/golang-checkins/c/SO9OmZYkOXU
 	return info->version >= GO_VERSION(1, 18, 0);
 #else
-_Pragma("error \"Must specify a BPF target arch\"");
+	_Pragma("error \"Must specify a BPF target arch\"");
 #endif
 }
 
@@ -455,7 +458,8 @@ int runtime_execute(struct pt_regs *ctx)
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = pid_tgid >> 32;
 
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
+	struct ebpf_proc_info *info =
+	    bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (!info) {
 		return 0;
 	}
@@ -469,11 +473,12 @@ int runtime_execute(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
+		bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
+				    (void *)(PT_REGS_SP(ctx) + 8));
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	bpf_map_update_elem(&goroutines_map, &pid_tgid, &goid, BPF_ANY);
 
 	return 0;
@@ -496,11 +501,10 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 	__u32 tgid = pid_tgid >> 32;
 
 	struct ebpf_proc_info *info =
-		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	    bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (!info) {
 		return 0;
 	}
-
 	// go less than 1.15 cannot get parent-child coroutine relationship
 	// ~ go1.14: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr)
 	if (info->version < GO_VERSION(1, 15, 0)) {
@@ -522,16 +526,16 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 		}
 	} else {
 		if (info->version >= GO_VERSION(1, 18, 0)) {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr),
-				       (void *)(PT_REGS_SP(ctx) + 16));
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
+					    (void *)(PT_REGS_SP(ctx) + 16));
 		} else {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr),
-				       (void *)(PT_REGS_SP(ctx) + 32));
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
+					    (void *)(PT_REGS_SP(ctx) + 32));
 		}
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	if (!goid) {
 		return 0;
 	}
@@ -560,12 +564,12 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 	__u32 tgid = pid_tgid >> 32;
 
 	struct ebpf_proc_info *info =
-		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	    bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (!info) {
 		return 0;
 	}
 
-	if(info->version < GO_VERSION(1, 15, 0)){
+	if (info->version < GO_VERSION(1, 15, 0)) {
 		return 0;
 	}
 
@@ -575,7 +579,7 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 	}
 
 	struct go_newproc_caller *caller =
-		bpf_map_lookup_elem(&pid_tgid_callerid_map, &pid_tgid);
+	    bpf_map_lookup_elem(&pid_tgid_callerid_map, &pid_tgid);
 	if (!caller) {
 		return 0;
 	}
@@ -585,20 +589,22 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
 		if (info->version >= GO_VERSION(1, 18, 0)) {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 32);
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
+					    caller->sp + 32);
 		} else {
-			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 48);
+			bpf_probe_read_user(&g_ptr, sizeof(g_ptr),
+					    caller->sp + 48);
 		}
 	}
 
 	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	bpf_probe_read_user(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	if (!goid) {
 		bpf_map_delete_elem(&pid_tgid_callerid_map, &pid_tgid);
 		return 0;
 	}
 
-	struct go_key key = { .tgid = tgid, .goid = goid };
+	struct go_key key = {.tgid = tgid,.goid = goid };
 	goid = caller->goid;
 	bpf_map_update_elem(&go_ancerstor_map, &key, &goid, BPF_ANY);
 
@@ -619,7 +625,7 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 
 	id = bpf_get_current_pid_tgid();
 	pid = id >> 32;
-	tid = (__u32)id;
+	tid = (__u32) id;
 
 	// If is a process, clear proc_info_map element and submit event.
 	if (pid == tid) {
@@ -629,8 +635,7 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 		data.meta.event_type = EVENT_TYPE_PROC_EXIT;
 		bpf_get_current_comm(data.name, sizeof(data.name));
 		bpf_perf_event_output(ctx, &NAME(socket_data),
-				      BPF_F_CURRENT_CPU, &data,
-				      sizeof(data));
+				      BPF_F_CURRENT_CPU, &data, sizeof(data));
 	}
 
 	bpf_map_delete_elem(&goroutines_map, &id);
