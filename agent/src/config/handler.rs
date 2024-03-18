@@ -294,6 +294,8 @@ pub struct PlatformConfig {
     pub tap_mode: TapMode,
     pub os_proc_scan_conf: OsProcScanConfig,
     pub agent_enabled: bool,
+    #[cfg(target_os = "linux")]
+    pub extra_netns_regex: String,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -1401,6 +1403,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 os_proc_scan_conf: OsProcScanConfig {},
                 prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
                 agent_enabled: conf.enabled,
+                #[cfg(target_os = "linux")]
+                extra_netns_regex: conf.extra_netns_regex.to_string(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1904,7 +1908,6 @@ impl ConfigHandler {
                         return vec![];
                     }
 
-                    c.platform_synchronizer.set_netns_regex(regex.clone());
                     c.kubernetes_poller.set_netns_regex(regex);
                 }
             }

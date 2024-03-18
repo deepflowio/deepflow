@@ -307,7 +307,10 @@ fn generate_masklen_map_in(map: &mut HashMap<IpAddr, u8>) -> Result<()> {
     Ok(())
 }
 
-pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<InterfaceInfo>>> {
+pub fn interfaces_linked_with<S: AsRef<[NsFile]>>(
+    ns: S,
+) -> Result<HashMap<NsFile, Vec<InterfaceInfo>>> {
+    let ns = ns.as_ref();
     // find all net namespaces
     let mut all_ns = HashMap::new();
     for path in get_named_file_paths().into_iter() {
