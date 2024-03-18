@@ -100,6 +100,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[vtapConfig.SystemLoadCircuitBreakerMetric])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -171,6 +172,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		PodClusterId: &podClusterId,
 
 		Plugins: e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &breakerMetric,
 	}
 
 	cacheTSBIP := c.GetTSDBIP()
@@ -459,6 +464,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[vtapConfig.SystemLoadCircuitBreakerMetric])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -518,6 +524,10 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
 		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		Plugins:             e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &breakerMetric,
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
