@@ -27,7 +27,7 @@ mod api_watcher;
 mod crd;
 mod passive_poller;
 mod sidecar_poller;
-pub use active_poller::ActivePoller;
+pub use active_poller::{ActivePoller, InterfaceInfoStore};
 pub use api_watcher::ApiWatcher;
 pub use passive_poller::PassivePoller;
 pub use sidecar_poller::SidecarPoller;
