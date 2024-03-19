@@ -186,21 +186,20 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(orgID int, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
 	keys, chItems := s.generateKeyTargets(items)
-	// TODO refresh control
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(orgID int, msg interface{}) {
 	updateFields := msg.(MUPT)
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
 	keys, chItems := s.generateKeyTargets(items)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
