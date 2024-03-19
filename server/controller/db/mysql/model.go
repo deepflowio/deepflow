@@ -632,5 +632,6 @@ func (AlarmPolicy) TableName() string {
 }
 
 type Org struct {
-	ID int `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ID     int `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	LoopID int `gorm:"column:loop_id;type:int;default:0" json:"LOOP_ID"`
 }

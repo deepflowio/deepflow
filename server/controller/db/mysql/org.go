@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
 
@@ -32,7 +30,7 @@ func GetOrgIDs() ([]int, error) {
 	var orgTable string
 	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
 	if err != nil {
-		err = errors.New(fmt.Sprintf("check org table failed: %v", err))
+		err = errors.New(fmt.Sprintf("check org table failed: %v", err.Error()))
 		log.Error(err.Error())
 		return ids, err
 	}
@@ -41,14 +39,11 @@ func GetOrgIDs() ([]int, error) {
 	}
 
 	var orgs []*Org
-	if err := DefaultDB.Find(&orgs); err != nil {
-		return ids, errors.New(fmt.Sprintf("failed to get org ids: %v", err))
+	if err := DefaultDB.Where("loop_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
+		return ids, errors.New(fmt.Sprintf("failed to get org ids: %v", err.Error()))
 	}
 	for _, org := range orgs {
-		if slices.Contains(ids, org.ID) {
-			continue
-		}
-		ids = append(ids, org.ID)
+		ids = append(ids, org.LoopID)
 	}
 	return ids, nil
 }
