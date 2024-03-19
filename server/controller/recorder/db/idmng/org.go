@@ -17,9 +17,12 @@
 package idmng
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"sync"
+	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -31,84 +34,120 @@ var (
 )
 
 func GetIDManager(orgID int) (*IDManager, error) {
-	return GetSingleton().NewIDManagerIfNotExists(orgID)
+	return GetIDManagers().NewIDManagerAndInitIfNotExists(orgID)
 }
 
 type IDManagers struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	inUse        bool
 	mux          sync.Mutex
 	orgIDToIDMng map[int]*IDManager
-	recorderCfg  *config.RecorderConfig
+	recorderCfg  config.RecorderConfig
 }
 
-func GetSingleton() *IDManagers {
+func GetIDManagers() *IDManagers {
 	idMngsOnce.Do(func() {
-		idMngs = &IDManagers{
-			orgIDToIDMng: make(map[int]*IDManager),
-		}
+		idMngs = &IDManagers{}
 	})
 	return idMngs
 }
 
-func (m *IDManagers) Init(cfg *config.RecorderConfig) {
+func (m *IDManagers) Init(ctx context.Context, cfg config.RecorderConfig) {
+	m.ctx, m.cancel = context.WithCancel(ctx)
 	m.recorderCfg = cfg
 }
 
 func (m *IDManagers) Start() error {
-	orgIDs, err := mysql.GetOrgIDs()
+	if m.inUse {
+		return nil
+	}
+	m.inUse = true
+
+	// clear before each startup
+	m.orgIDToIDMng = make(map[int]*IDManager)
+
+	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get org ids: %v", err)
 	}
 	for _, id := range orgIDs {
-		if _, err := m.NewIDManagerIfNotExists(id); err != nil {
-			return errors.New(fmt.Sprintf("failed to start id manager for org %d: %v", id, err))
+		if _, err := m.NewIDManagerAndInitIfNotExists(id); err != nil {
+			return fmt.Errorf("failed to start id manager for org %d: %v", id, err)
 		}
 	}
+
+	m.timedRefresh()
 	return nil
 }
 
-func (o *IDManagers) Stop() {
-	for _, idMng := range o.orgIDToIDMng {
-		idMng.Stop()
+func (m *IDManagers) Stop() {
+	if m.cancel != nil {
+		m.cancel()
 	}
+	log.Info("resource id managers stopped")
+	m.inUse = false
 }
 
-func (m *IDManagers) NewIDManagerIfNotExists(orgID int) (*IDManager, error) {
-	if mng, ok := m.get(orgID); ok {
+// 定时刷新所有组织的 ID 池，恢复/修复页面删除 domain/sub_domain、定时永久删除无效资源等操作释放的 ID
+func (m *IDManagers) timedRefresh() {
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				m.refresh()
+			case <-m.ctx.Done():
+				break LOOP
+			}
+		}
+	}()
+}
+
+func (m *IDManagers) NewIDManagerAndInitIfNotExists(orgID int) (*IDManager, error) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	if mng, ok := m.orgIDToIDMng[orgID]; ok {
 		return mng, nil
 	}
 	mng, err := newIDManager(m.recorderCfg, orgID)
 	if err != nil {
 		return nil, err
 	}
-	if err := mng.Start(); err != nil {
+	if err := mng.Refresh(); err != nil {
 		return nil, err
 	}
-	m.set(orgID, mng)
+	m.orgIDToIDMng[orgID] = mng
 	return mng, nil
 }
 
-func (m *IDManagers) Delete(orgID int) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	delete(m.orgIDToIDMng, orgID)
+func (m *IDManagers) refresh() error {
+	if err := m.checkORGs(); err != nil {
+		return err
+	}
+	for _, mng := range m.orgIDToIDMng {
+		mng.Refresh()
+	}
+	return nil
 }
 
-func (m *IDManagers) Create(orgID int) {
-	m.NewIDManagerIfNotExists(orgID)
-}
+func (m *IDManagers) checkORGs() error {
+	orgIDs, err := mysql.GetORGIDs()
+	if err != nil {
+		return fmt.Errorf("failed to get org ids: %v", err)
+	}
 
-func (m *IDManagers) get(orgID int) (*IDManager, bool) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-
-	mng, ok := m.orgIDToIDMng[orgID]
-	return mng, ok
-}
-
-func (m *IDManagers) set(orgID int, idMng *IDManager) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	m.orgIDToIDMng[orgID] = idMng
+	for orgID := range m.orgIDToIDMng {
+		if !slices.Contains(orgIDs, orgID) {
+			delete(m.orgIDToIDMng, orgID)
+		}
+	}
+	return nil
 }
