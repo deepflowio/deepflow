@@ -643,12 +643,13 @@ impl ApiWatcher {
         }
         let mut msg = {
             let config_guard = context.config.load();
+            let id = agent_id.read();
             KubernetesApiSyncRequest {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 vtap_id: Some(config_guard.vtap_id as u32),
-                source_ip: Some(agent_id.read().ip.to_string()),
-                team_id: Some(String::new()),
+                source_ip: Some(id.ip.to_string()),
+                team_id: Some(id.team_id.clone()),
                 error_msg: Some(
                     err_msgs
                         .lock()
@@ -777,15 +778,18 @@ impl ApiWatcher {
                 Ok(r) => break r,
                 Err(e) => {
                     warn!("{}", e);
-                    let config_guard = context.config.load();
-                    let msg = KubernetesApiSyncRequest {
-                        cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
-                        version: Some(context.version.load(Ordering::SeqCst)),
-                        vtap_id: Some(config_guard.vtap_id as u32),
-                        source_ip: Some(agent_id.read().ip.to_string()),
-                        team_id: Some(String::new()),
-                        error_msg: Some(e.to_string()),
-                        entries: vec![],
+                    let msg = {
+                        let config_guard = context.config.load();
+                        let id = agent_id.read();
+                        KubernetesApiSyncRequest {
+                            cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                            version: Some(context.version.load(Ordering::SeqCst)),
+                            vtap_id: Some(config_guard.vtap_id as u32),
+                            source_ip: Some(id.ip.to_string()),
+                            team_id: Some(id.team_id.clone()),
+                            error_msg: Some(e.to_string()),
+                            entries: vec![],
+                        }
                     };
                     if let Err(e) = context
                         .runtime

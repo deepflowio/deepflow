@@ -200,11 +200,16 @@ pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 pub struct AgentId {
     pub ip: IpAddr,
     pub mac: MacAddr,
+    pub team_id: String,
 }
 
 impl fmt::Display for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.ip, self.mac)
+        if self.team_id.is_empty() {
+            write!(f, "{}/{}", self.ip, self.mac)
+        } else {
+            write!(f, "{}/{}/{}", self.ip, self.mac, self.team_id)
+        }
     }
 }
 
@@ -420,6 +425,7 @@ impl Trident {
             AgentId {
                 ip: ctrl_ip.clone(),
                 mac: ctrl_mac,
+                team_id: config_handler.static_config.team_id.clone(),
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
@@ -434,12 +440,17 @@ impl Trident {
             if let Err(e) = netns::reset_netns() {
                 return Err(anyhow!("reset netns error: {}", e));
             };
-            AgentId { ip, mac }
+            AgentId {
+                ip,
+                mac,
+                team_id: config_handler.static_config.team_id.clone(),
+            }
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
         let agent_id = AgentId {
             ip: ctrl_ip.clone(),
             mac: ctrl_mac,
+            team_id: config_handler.static_config.team_id.clone(),
         };
 
         info!(
@@ -482,15 +493,9 @@ impl Trident {
                 .kubernetes_cluster_id
                 .is_empty()
         {
-            config_handler.static_config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
-                &runtime,
-                &session,
-                config_handler
-                    .static_config
-                    .kubernetes_cluster_name
-                    .as_ref(),
-            )
-            .unwrap_or_default();
+            config_handler.static_config.kubernetes_cluster_id =
+                Config::get_k8s_cluster_id(&runtime, &session, &config_handler.static_config)
+                    .unwrap_or_default();
         }
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
@@ -526,6 +531,7 @@ impl Trident {
             session.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            config_handler.static_config.team_id.clone(),
             sidecar_mode,
             agent_id_tx,
         );
@@ -1002,6 +1008,7 @@ pub struct DomainNameListener {
     session: Arc<Session>,
     ips: Vec<String>,
     domain_names: Vec<String>,
+    team_id: String,
 
     sidecar_mode: bool,
 
@@ -1018,6 +1025,7 @@ impl DomainNameListener {
         session: Arc<Session>,
         domain_names: Vec<String>,
         ips: Vec<String>,
+        team_id: String,
         sidecar_mode: bool,
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
@@ -1026,6 +1034,7 @@ impl DomainNameListener {
             session,
             domain_names,
             ips,
+            team_id,
             sidecar_mode,
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -1058,6 +1067,7 @@ impl DomainNameListener {
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
+        let team_id = self.team_id.clone();
         let stopped = self.stopped.clone();
         let agent_id_tx = self.agent_id_tx.clone();
         let session = self.session.clone();
@@ -1111,7 +1121,7 @@ impl DomainNameListener {
                             );
                             #[cfg(target_os = "linux")]
                             let agent_id = if sidecar_mode {
-                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
+                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
                                 if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
@@ -1136,10 +1146,10 @@ impl DomainNameListener {
                                     thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
-                                AgentId { ip, mac }
+                                AgentId { ip, mac, team_id: team_id.clone() }
                             };
                             #[cfg(any(target_os = "windows", target_os = "android"))]
-                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
+                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() };
 
                             session.reset_server_ip(ips.clone());
                             let _ = agent_id_tx.send(agent_id);

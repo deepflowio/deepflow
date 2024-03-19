@@ -575,6 +575,7 @@ impl PlatformSynchronizer {
         vtap_id: u16,
         version: u64,
         ctrl_ip: String,
+        team_id: String,
         trident_type: TridentType,
         platform_enabled: bool,
         kubernetes_cluster_id: String,
@@ -683,7 +684,7 @@ impl PlatformSynchronizer {
             vtap_id: Some(vtap_id as u32),
             kubernetes_cluster_id: Some(kubernetes_cluster_id),
             nat_ip: None,
-            team_id: Some(String::new()),
+            team_id: Some(team_id),
         };
 
         process_args
@@ -739,7 +740,10 @@ impl PlatformSynchronizer {
             let proc_scan_conf = &config_guard.os_proc_scan_conf;
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = args.agent_id.read().ip.to_string();
+            let (ctrl_ip, team_id) = {
+                let id = args.agent_id.read();
+                (id.ip.to_string(), id.team_id.clone())
+            };
             let poll_interval = config_guard.sync_interval;
             let kubernetes_cluster_id = config_guard.kubernetes_cluster_id.clone();
             #[cfg(target_os = "linux")]
@@ -791,7 +795,7 @@ impl PlatformSynchronizer {
                     platform_data: None,
                     process_data: Some(process_data),
                     nat_ip: None,
-                    team_id: Some(String::new()),
+                    team_id: Some(team_id.clone()),
                 };
 
                 match args
@@ -839,6 +843,7 @@ impl PlatformSynchronizer {
                 cur_vtap_id,
                 cur_version,
                 ctrl_ip,
+                team_id,
                 trident_type,
                 platform_enabled,
                 kubernetes_cluster_id.clone(),

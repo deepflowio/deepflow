@@ -251,14 +251,17 @@ impl TargetsWatcher {
         let version = &context.version;
         let pb_version = Some(version.load(Ordering::SeqCst));
 
-        let msg = PrometheusApiSyncRequest {
-            cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
-            version: pb_version,
-            vtap_id: Some(config_guard.vtap_id as u32),
-            source_ip: Some(agent_id.read().ip.to_string()),
-            team_id: Some(String::new()),
-            error_msg: Some(err_msgs.join(";")),
-            entries: total_entries,
+        let msg = {
+            let id = agent_id.read();
+            PrometheusApiSyncRequest {
+                cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                version: pb_version,
+                vtap_id: Some(config_guard.vtap_id as u32),
+                source_ip: Some(id.ip.to_string()),
+                team_id: Some(id.team_id.clone()),
+                error_msg: Some(err_msgs.join(";")),
+                entries: total_entries,
+            }
         };
 
         match context
