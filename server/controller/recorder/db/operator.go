@@ -18,7 +18,6 @@ package db
 
 import (
 	"github.com/op/go-logging"
-	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -36,6 +35,8 @@ type Operator[MT constraint.MySQLModel] interface {
 	Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool)
 	// 批量删除数据
 	DeleteBatch(lcuuids []string) ([]*MT, bool)
+
+	GetSoftDelete() bool
 }
 
 // TODO 使用结构体而非结构体指针作为泛型类型，在需要对结构体value修改时十分不便，
@@ -57,6 +58,10 @@ type OperatorBase[MT constraint.MySQLModel] struct {
 func (o *OperatorBase[MT]) SetORG(org *rcommon.ORG) Operator[MT] {
 	o.org = org
 	return o
+}
+
+func (o *OperatorBase[MT]) GetSoftDelete() bool {
+	return o.softDelete
 }
 
 func (o *OperatorBase[MT]) setFieldsNeededAfterCreate(fs []string) {
@@ -112,7 +117,12 @@ func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface
 
 func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 	var deletedItems []*MT
-	err := o.org.DB.Clauses(clause.Returning{}).Where("lcuuid IN ?", lcuuids).Delete(&deletedItems).Error
+	err := o.org.DB.Where("lcuuid IN ?", lcuuids).Find(&deletedItems).Error
+	if err != nil {
+		log.Errorf("delete %s (lcuuids: %v) failed: %v", o.resourceTypeName, lcuuids, err)
+		return nil, false
+	}
+	err = o.org.DB.Delete(&deletedItems).Error
 	if err != nil {
 		log.Error(o.org.LogPre("delete %s (lcuuids: %v) failed: %v", o.resourceTypeName, lcuuids, err))
 		return nil, false

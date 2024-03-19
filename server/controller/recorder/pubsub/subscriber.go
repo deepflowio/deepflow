@@ -17,17 +17,17 @@
 package pubsub
 
 type ResourceChangedSubscriber interface {
-	OnResourceChanged(msg interface{})
+	OnResourceChanged(orgID int, msg interface{})
 }
 
 type ResourceBatchAddedSubscriber interface {
-	OnResourceBatchAdded(msg interface{})
+	OnResourceBatchAdded(orgID int, msg interface{})
 }
 
 type ResourceUpdatedSubscriber interface {
-	OnResourceUpdated(msg interface{})
+	OnResourceUpdated(orgID int, msg interface{})
 }
 
 type ResourceBatchDeletedSubscriber interface {
-	OnResourceBatchDeleted(msg interface{})
+	OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool)
 }

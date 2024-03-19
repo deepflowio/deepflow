@@ -216,9 +216,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 
 		msgData := MAPT(new(MAT))
 		msgData.SetMySQLItems(dbItems)
-		if u.pubsub != nil {
-			u.pubsub.PublishBatchAdded(msgData)
-		}
+		u.pubsub.PublishBatchAdded(u.org.ID, msgData)
 		u.Changed = true
 	}
 }
@@ -233,9 +231,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		msgData.SetFields(structInfo)
 		msgData.SetDiffBase(diffBase)
 		msgData.SetCloudItem(cloudItem)
-		if u.pubsub != nil {
-			u.pubsub.PublishUpdated(msgData)
-		}
+		u.pubsub.PublishUpdated(u.org.ID, msgData)
 		u.Changed = true
 	}
 }
@@ -264,9 +260,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
 		msgData.SetMySQLItems(dbItems)
-		if u.pubsub != nil {
-			u.pubsub.PublishBatchDeleted(msgData)
-		}
+		u.pubsub.PublishBatchDeleted(u.org.ID, msgData, u.dbOperator.GetSoftDelete())
 		u.Changed = true
 	}
 }
