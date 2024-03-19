@@ -59,7 +59,7 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 		db, err = Gorm(newCfg)
 	}
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("connect mysql failed: %s, organization id: %d", err.Error(), orgID))
+		return nil, errors.New(fmt.Sprintf("connect mysql failed: %s, org id: %d", err.Error(), orgID))
 	}
 	return &DB{db, orgID}, nil
 }
@@ -84,6 +84,9 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	var err error
 	c.cfg = cfg
 	DefaultDB, err = c.NewDBIfNotExists(common.DEFAULT_ORG_ID)
+	if err != nil {
+		return err
+	}
 	orgIDs, err := GetOrgIDs()
 	if err != nil {
 		return err
