@@ -87,7 +87,7 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	if err != nil {
 		return err
 	}
-	orgIDs, err := GetOrgIDs()
+	orgIDs, err := GetORGIDs()
 	if err != nil {
 		return err
 	}

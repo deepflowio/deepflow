@@ -19,10 +19,11 @@ package recorder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -37,8 +38,9 @@ var (
 )
 
 type Cleaners struct {
-	ctx context.Context
-	cfg config.RecorderConfig
+	ctx    context.Context
+	cancel context.CancelFunc
+	cfg    config.RecorderConfig
 
 	mux            sync.Mutex
 	orgIDToCleaner map[int]*Cleaner
@@ -47,36 +49,119 @@ type Cleaners struct {
 func GetCleaners() *Cleaners {
 	cleanersOnce.Do(func() {
 		cleaners = new(Cleaners)
-		cleaners.orgIDToCleaner = make(map[int]*Cleaner)
 	})
 	return cleaners
 }
 
-func (c *Cleaners) Init(ctx context.Context, cfg config.RecorderConfig) error {
-	c.ctx = ctx
+func (c *Cleaners) Init(ctx context.Context, cfg config.RecorderConfig) {
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.cfg = cfg
-	orgIDs, err := mysql.GetOrgIDs()
+	return
+}
+
+func (c *Cleaners) Start() error {
+	log.Info("resource clean started")
+
+	// clear before each startup
+	c.orgIDToCleaner = make(map[int]*Cleaner)
+
+	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
+		log.Errorf("failed to get db for org ids: %s", err.Error())
 		return err
 	}
 
 	for _, id := range orgIDs {
 		if _, err := c.NewCleanerIfNotExists(id); err != nil {
-			return errors.New(fmt.Sprintf("failed to cleaner for org id %d: %s", id, err.Error()))
+			log.Errorf("failed to cleaner for org id %d: %s", id, err.Error())
+			return err
+		}
+	}
+
+	// 定时清理软删除资源数据
+	// timed clean soft deleted resource data
+	c.timedCleanDeletedData()
+	// 定时删除所属上级资源已不存在（被彻底清理或软删除）的资源数据，并记录异常日志
+	// timed clean the resource data of the parent resource that does not exist (means it is completely deleted or soft deleted)
+	// and record error logs
+	c.timedCleanDirtyData()
+
+	return nil
+}
+
+func (c *Cleaners) Stop() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	log.Info("resource clean stopped")
+}
+
+func (c *Cleaners) timedCleanDeletedData() {
+	c.cleanDeletedData()
+	go func() {
+		ticker := time.NewTicker(time.Duration(int(c.cfg.DeletedResourceCleanInterval)) * time.Hour)
+		defer ticker.Stop()
+
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				if err := c.checkORGs(); err != nil {
+					continue
+				}
+				c.cleanDeletedData()
+			case <-c.ctx.Done():
+				break LOOP
+			}
+		}
+	}()
+}
+
+func (c *Cleaners) checkORGs() error {
+	orgIDs, err := mysql.GetORGIDs()
+	if err != nil {
+		log.Errorf("failed to get db for org ids: %s", err.Error())
+		return err
+	}
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	for orgID := range c.orgIDToCleaner {
+		if !slices.Contains(orgIDs, orgID) {
+			delete(c.orgIDToCleaner, orgID)
 		}
 	}
 	return nil
 }
 
-func (c *Cleaners) Start() {
-	for _, cleaner := range c.orgIDToCleaner {
-		cleaner.Start()
+func (c *Cleaners) cleanDeletedData() {
+	for _, cl := range c.orgIDToCleaner {
+		cl.cleanDeletedData(int(c.cfg.DeletedResourceRetentionTime))
 	}
 }
 
-func (c *Cleaners) Stop() {
-	for _, cleaner := range c.orgIDToCleaner {
-		cleaner.Stop()
+func (c *Cleaners) timedCleanDirtyData() {
+	c.cleanDirtyData()
+	go func() {
+		ticker := time.NewTicker(time.Duration(int(c.cfg.CacheRefreshInterval)+50) * time.Minute)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				if err := c.checkORGs(); err != nil {
+					continue
+				}
+				c.cleanDirtyData()
+			case <-c.ctx.Done():
+				break LOOP
+			}
+		}
+	}()
+}
+
+func (c *Cleaners) cleanDirtyData() {
+	for _, cl := range c.orgIDToCleaner {
+		cl.cleanDirtyData()
 	}
 }
 
@@ -85,11 +170,11 @@ func (c *Cleaners) NewCleanerIfNotExists(orgID int) (*Cleaner, error) {
 		return cl, nil
 	}
 
-	cl, err := newCleaner(c.ctx, c.cfg, orgID)
+	cl, err := newCleaner(orgID)
 	if err != nil {
 		return nil, err
 	}
-	cl.Start()
+
 	c.set(orgID, cl)
 	return cl, nil
 }
@@ -102,9 +187,6 @@ func (c *Cleaners) Delete(orgID int) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	if cl, ok := c.orgIDToCleaner[orgID]; ok {
-		cl.Stop()
-	}
 	delete(c.orgIDToCleaner, orgID)
 }
 
@@ -125,68 +207,16 @@ func (c *Cleaners) set(orgID int, cl *Cleaner) {
 
 type Cleaner struct {
 	org *common.ORG
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	cfg    config.RecorderConfig
 }
 
-func newCleaner(ctx context.Context, cfg config.RecorderConfig, orgID int) (*Cleaner, error) {
+func newCleaner(orgID int) (*Cleaner, error) {
 	org, err := common.NewORG(orgID)
 	if err != nil {
 		log.Errorf("failed to create org object: %s", err.Error())
 		return nil, err
 	}
-	c := &Cleaner{org: org, cfg: cfg}
-	c.ctx, c.cancel = context.WithCancel(ctx)
+	c := &Cleaner{org: org}
 	return c, nil
-}
-
-// func GetSingletonCleaner() *Cleaner {
-// 	cleanerOnce.Do(func() {
-// 		cleaner = new(Cleaner)
-// 	})
-// 	return cleaner
-// }
-
-// func (c *Cleaner) Init(cfg *RecorderConfig) {
-// 	c.ctx, c.cancel = context.WithCancel(context.Background())
-// 	c.cfg = cfg
-// }
-
-func (c *Cleaner) Start() {
-	log.Info(c.org.LogPre("resource clean started"))
-	// 定时清理软删除资源数据
-	// timed clean soft deleted resource data
-	c.timedCleanDeletedData(int(c.cfg.DeletedResourceCleanInterval), int(c.cfg.DeletedResourceRetentionTime))
-	// 定时删除所属上级资源已不存在（被彻底清理或软删除）的资源数据，并记录异常日志
-	// timed clean the resource data of the parent resource that does not exist (means it is completely deleted or soft deleted)
-	// and record error logs
-	c.timedCleanDirtyData()
-}
-
-func (c *Cleaner) Stop() {
-	if c.cancel != nil {
-		c.cancel()
-	}
-	log.Info(c.org.LogPre("resource clean stopped"))
-}
-
-func (c *Cleaner) timedCleanDeletedData(cleanInterval, retentionInterval int) {
-	c.cleanDeletedData(retentionInterval)
-	go func() {
-		ticker := time.NewTicker(time.Duration(cleanInterval) * time.Hour)
-		defer ticker.Stop()
-	LOOP:
-		for {
-			select {
-			case <-ticker.C:
-				c.cleanDeletedData(retentionInterval)
-			case <-c.ctx.Done():
-				break LOOP
-			}
-		}
-	}()
 }
 
 func (c *Cleaner) cleanDeletedData(retentionInterval int) {
@@ -219,23 +249,6 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	deleteExpired[mysql.Process](c.org.DB, expiredAt)
 	deleteExpired[mysql.PrometheusTarget](c.org.DB, expiredAt)
 	log.Info(c.org.LogPre("clean soft deleted resources completed"))
-}
-
-func (c *Cleaner) timedCleanDirtyData() {
-	c.cleanDirtyData()
-	go func() {
-		ticker := time.NewTicker(time.Duration(50) * time.Minute)
-		defer ticker.Stop()
-	LOOP:
-		for {
-			select {
-			case <-ticker.C:
-				c.cleanDirtyData()
-			case <-c.ctx.Done():
-				break LOOP
-			}
-		}
-	}()
 }
 
 func (c *Cleaner) cleanDirtyData() {
