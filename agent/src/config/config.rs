@@ -123,6 +123,7 @@ pub struct Config {
     pub agent_unique_identifier: AgentIdType,
     #[cfg(target_os = "linux")]
     pub pid_file: String,
+    pub team_id: String,
 }
 
 impl Config {
@@ -175,10 +176,7 @@ impl Config {
         }
     }
 
-    pub async fn async_get_k8s_cluster_id(
-        session: &Session,
-        kubernetes_cluster_name: Option<&String>,
-    ) -> Option<String> {
+    pub async fn async_get_k8s_cluster_id(session: &Session, config: &Config) -> Option<String> {
         let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
             Ok(c) => Some(
                 Md5::digest(c.as_bytes())
@@ -197,8 +195,8 @@ impl Config {
         loop {
             let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
-                kubernetes_cluster_name: kubernetes_cluster_name.map(Clone::clone),
-                team_id: Some(String::new()),
+                kubernetes_cluster_name: config.kubernetes_cluster_name.clone(),
+                team_id: Some(config.team_id.clone()),
             };
 
             match session
@@ -251,12 +249,9 @@ impl Config {
     pub fn get_k8s_cluster_id(
         runtime: &Runtime,
         session: &Session,
-        kubernetes_cluster_name: Option<&String>,
+        config: &Config,
     ) -> Option<String> {
-        runtime.block_on(Self::async_get_k8s_cluster_id(
-            session,
-            kubernetes_cluster_name,
-        ))
+        runtime.block_on(Self::async_get_k8s_cluster_id(session, config))
     }
 }
 
@@ -278,6 +273,7 @@ impl Default for Config {
             agent_unique_identifier: Default::default(),
             #[cfg(target_os = "linux")]
             pid_file: Default::default(),
+            team_id: "".into(),
         }
     }
 }
@@ -1187,6 +1183,12 @@ pub struct RuntimeConfig {
     #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
     #[serde(skip)]
+    pub system_load_circuit_breaker_threshold: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_recover: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
+    #[serde(skip)]
     pub server_tx_bandwidth_threshold: u64,
     #[serde(skip)]
     pub bandwidth_probe_interval: Duration,
@@ -1313,6 +1315,9 @@ impl RuntimeConfig {
             collector_enabled: true,
             l4_log_store_tap_types: vec![0],
             platform_enabled: false,
+            system_load_circuit_breaker_threshold: 1.0,
+            system_load_circuit_breaker_recover: 0.9,
+            system_load_circuit_breaker_metric: trident::SystemLoadMetric::Load15,
             server_tx_bandwidth_threshold: 1,
             bandwidth_probe_interval: Duration::from_secs(60),
             npb_vlan_mode: trident::VlanMode::None,
@@ -1493,6 +1498,9 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                 })
                 .collect(),
             platform_enabled: conf.platform_enabled(),
+            system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold(),
+            system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover(),
+            system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
             bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
             npb_vlan_mode: conf.npb_vlan_mode(),

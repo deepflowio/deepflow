@@ -16,8 +16,11 @@
 
 package common
 
-const SQL_FILE_DIR = "/etc/mysql"
 const (
 	DATABASE_SUFFIX           = "_deepflow"
 	DATABASE_PREFIX_ALIGNMENT = "%04d"
+)
+
+const (
+	DEFAULT_ORG_ID = 1
 )

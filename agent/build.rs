@@ -166,9 +166,44 @@ fn compile_wasm_plugin_proto() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn make_pulsar_proto() -> Result<(), Box<dyn Error>> {
+    tonic_build::configure()
+        .field_attribute(".", "#[serde(skip_serializing_if = \"Option::is_none\")]")
+        .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
+        .build_server(false)
+        .out_dir("src/flow_generator/protocol_logs/mq")
+        .compile(
+            &["src/flow_generator/protocol_logs/mq/PulsarApi.proto"],
+            &["src/flow_generator/protocol_logs/mq"],
+        )?;
+
+    // remove `#[serde(skip_serializing_if = "Option::is_none")]` for non-optional fields
+    let filename = "src/flow_generator/protocol_logs/mq/pulsar.proto.rs";
+    let content = std::fs::read_to_string(filename)?;
+    let lines = content.lines().collect::<Vec<_>>();
+    let mut new_lines = Vec::new();
+    new_lines.push(*lines.get(0).unwrap());
+    for a in lines.windows(2) {
+        if a[1].contains("skip_serializing_if") && !a[0].contains("optional") {
+            continue;
+        }
+        new_lines.push(a[1]);
+    }
+    std::fs::write(filename, new_lines.join("\n"))?;
+    Command::new("cargo")
+        .args([
+            "fmt",
+            "--",
+            "src/flow_generator/protocol_logs/mq/pulsar.proto.rs",
+        ])
+        .spawn()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     set_build_info()?;
     compile_wasm_plugin_proto()?;
+    make_pulsar_proto()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     if target_os.as_str() == "linux" {
         set_build_libtrace()?;

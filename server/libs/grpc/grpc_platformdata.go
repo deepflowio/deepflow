@@ -1563,12 +1563,11 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	containerInfos := make(map[string][]*PodInfo)
 
 	podIDInfos := make(map[uint32]*Info)
-	if t.podIDInfosPlatformData != nil {
-		podIDInfos = t.podIDInfosPlatformData
-	} else {
-		// save t.podIDInfos first to prevent panic when reading and writing t.podIDInfos at the same time.
-		podIDInfos, t.podIDInfos = t.podIDInfos, podIDInfos
+	// deep copy podIDInfos from t.podIDInfosPlatformData, prevent map read/write panic
+	for k, v := range t.podIDInfosPlatformData {
+		podIDInfos[k] = v
 	}
+
 	for _, podIp := range podIps {
 		podName := podIp.GetPodName()
 		// podIp.GetEpcId() in range [0,64000], convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
@@ -1640,7 +1639,6 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 	t.podNameInfos = podNameInfos
 	t.containerInfos = containerInfos
 	t.podIDInfos = podIDInfos
-	t.podIDInfosPlatformData = nil
 }
 
 func (t *PlatformInfoTable) podsString() string {

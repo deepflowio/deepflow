@@ -821,7 +821,7 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled {
+        if !runtime_config.enabled || exception_handler.has(Exception::SystemLoadCircuitBreaker) {
             *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
@@ -1124,7 +1124,7 @@ impl Synchronizer {
             .grpc_upgrade_with_statsd(tp::UpgradeRequest {
                 ctrl_ip: Some(agent_id.ip.to_string()),
                 ctrl_mac: Some(agent_id.mac.to_string()),
-                team_id: Some(String::new()),
+                team_id: Some(agent_id.team_id.clone()),
             })
             .await;
         if let Err(m) = response {

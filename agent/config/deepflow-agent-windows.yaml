@@ -43,3 +43,6 @@ controller-ips:
 
 ## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
 #agent-unique-identifier: ip-and-mac
+
+## Team identity for server sync, defaults to ""
+#team-id:

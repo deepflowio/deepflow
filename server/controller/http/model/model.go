@@ -17,5 +17,5 @@
 package model
 
 type DatabaseCreate struct {
-	OrganizationID int `json:"ORGANIZATION_ID" binding:"required"`
+	ORGID int `json:"ORGANIZATION_ID" binding:"required"`
 }
