@@ -45,3 +45,6 @@ controller-ips:
 ## Pid file path, defaults to ""
 ## Will create pid file in the path if specified.
 #pid-file:
+
+## Team identity for server sync, defaults to ""
+#team-id:
