@@ -19,7 +19,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
@@ -28,21 +27,17 @@ import (
 )
 
 func CreateDatabase(dataCreate model.DatabaseCreate, mysqlCfg mysqlcfg.MySqlConfig) (database string, err error) {
-	log.Infof("create organization (id: %s) databases", dataCreate.OrganizationID)
-	database = common.OrganizationIDToDatabaseName(dataCreate.OrganizationID)
-	cfg := mysqlCfg
-	cfg.Database = database
-	existed, err := migrator.CreateDatabase(cfg)
+	log.Infof("create org (id: %d) data", dataCreate.ORGID)
+	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, dataCreate.ORGID)
+	existed, err := migrator.CreateDatabase(cfg) // TODO use orgID to create db
 	if existed {
 		err = errors.New(fmt.Sprintf("database (name: %s) already exists", database))
 	}
 	return
 }
 
-func DeleteDatabase(organizationID string, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
-	log.Infof("delete organization (id: %s) databases", organizationID)
-	id, _ := strconv.Atoi(organizationID)
-	cfg := mysqlCfg
-	cfg.Database = common.OrganizationIDToDatabaseName(id)
+func DeleteDatabase(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
+	log.Infof("delete org (id: %d) data", orgID)
+	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	return migrator.DropDatabase(cfg)
 }

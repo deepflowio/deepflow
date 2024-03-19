@@ -630,3 +630,7 @@ type AlarmPolicy struct {
 func (AlarmPolicy) TableName() string {
 	return "alarm_policy"
 }
+
+type Org struct {
+	ID int `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+}
