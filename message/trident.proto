@@ -292,6 +292,7 @@ message Config {
     optional TapMode tap_mode = 503 [default = LOCAL];
     optional float system_load_circuit_breaker_threshold = 504 [default = 1.0];
     optional SystemLoadMetric system_load_circuit_breaker_metric = 505 [default = Load15];
+    optional float system_load_circuit_breaker_recover = 506 [default = 0.9];
 
     optional string local_config = 510;  // 全量的配置文件内容
 }
