@@ -706,6 +706,16 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
 	Containers := gVTapInfo.GetContainers(int(vtapCache.GetVTapID()))
+	log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, "+
+		"(platform data version: %d datalen: %d), "+
+		"(acls version:%d datalen: %d), "+
+		"(groups version:%d datalen:%d), "+
+		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+		ctrlIP, ctrlMac,
+		versionPlatformData, len(platformData),
+		versionPolicy, len(acls),
+		versionGroups, len(groups),
+		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
