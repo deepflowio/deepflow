@@ -51,8 +51,6 @@ type ResourceGroup struct {
 	NetworkIDs    string    `gorm:"column:vl2_ids;type:text;default:null" json:"VL2_IDS"` // vl2 ids separated by ,
 	VPCID         *int      `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
 	PodClusterID  int       `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
-	PodGroupIDs   string    `gorm:"column:pod_group_ids;type:text;default:null" json:"POD_GROUP_IDS"`     // pod group ids separated by ,
-	PodServiceIDs string    `gorm:"column:pod_service_ids;type:text;default:null" json:"POD_SERVICE_IDS"` // pod service ids separated by ,
 	LBID          int       `gorm:"column:lb_id;type:int;default:null" json:"LB_ID"`
 	LBListenerID  int       `gorm:"column:lb_listener_id;type:int;default:null" json:"LB_LISTENER_ID"`
 	ExtraInfoIDs  string    `gorm:"column:extra_info_ids;type:string;default:null" json:"EXTRA_INFO_IDS"`
