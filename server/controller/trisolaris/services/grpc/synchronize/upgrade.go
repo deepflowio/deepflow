@@ -84,16 +84,22 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 
 func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServer) error {
 	vtapCacheKey := r.GetCtrlIp() + "-" + r.GetCtrlMac()
-	log.Infof("vtap(%s) starts to upgrade", vtapCacheKey)
-	gVTapInfo := trisolaris.GetGVTapInfo()
+	teamIDStr := r.GetTeamId()
+	log.Infof("vtap(%s) teamID(%s) starts to upgrade", vtapCacheKey, teamIDStr)
+	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	if gVTapInfo == nil {
+		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d info not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
+		return sendFailed(in)
+	}
 	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
-		log.Errorf("vtap(%s) cache not found", vtapCacheKey)
+		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d cache not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
 		return sendFailed(in)
 	}
 	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage(), vtapCache.GetExpectedRevision())
 	if err != nil {
-		log.Error(err)
+		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
 		return sendFailed(in)
 	}
 	for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {
@@ -110,11 +116,11 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("vtap(%s), err:%s", vtapCacheKey, err)
+			log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
 			break
 		}
 	}
 
-	log.Infof("vtap(%s) finishes the upgrade", vtapCacheKey)
+	log.Infof("vtap(%s) orgID:%s teamID:%s-%d finishes the upgrade", vtapCacheKey, orgID, teamIDStr, teamIDInt)
 	return err
 }

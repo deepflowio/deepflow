@@ -61,7 +61,6 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
-	e.PATCH("/v1/vtaps-tap-mode/", batchUpdateVtapTapMode)
 
 	e.POST("/v1/vtaps-csv/", getVtapCSV)
 
@@ -255,24 +254,6 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		data, err := service.VTapRebalance(args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
 		JsonResponse(c, data, err)
 	})
-}
-
-func batchUpdateVtapTapMode(c *gin.Context) {
-	var err error
-	var vtapUpdateTapMode model.VtapUpdateTapMode
-
-	err = c.ShouldBindBodyWith(&vtapUpdateTapMode, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
-
-	if len(vtapUpdateTapMode.VTapLcuuids) == 0 {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "VTAP_LCUUIDS cannot be empty")
-		return
-	}
-	data, err := service.BatchUpdateVtapTapMode(&vtapUpdateTapMode)
-	JsonResponse(c, data, err)
 }
 
 func getVtapCSV(c *gin.Context) {

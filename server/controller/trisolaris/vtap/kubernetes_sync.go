@@ -71,12 +71,14 @@ type KubernetesCluster struct {
 	sync.RWMutex
 	keyToCache map[string]*CacheKC
 	db         *gorm.DB
+	ORGID
 }
 
-func newKubernetesCluster(db *gorm.DB) *KubernetesCluster {
+func newKubernetesCluster(db *gorm.DB, orgID ORGID) *KubernetesCluster {
 	return &KubernetesCluster{
 		keyToCache: make(map[string]*CacheKC),
 		db:         db,
+		ORGID:      orgID,
 	}
 }
 
@@ -153,11 +155,11 @@ func (k *KubernetesCluster) updateSyncTime(clusterID string) {
 // 定时清理数据库中10分钟前未同步的数据(可配置)
 // 更新缓存同步时间
 func (k *KubernetesCluster) loadAndCheck(clearTime int) {
-	log.Info("check kubernetes cluster data")
+	log.Info(k.Log("check kubernetes cluster data"))
 	mgr := dbmgr.DBMgr[models.KubernetesCluster](k.db)
 	kcs, err := mgr.Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(k.Log(err.Error()))
 		return
 	}
 	now := time.Now()
@@ -173,10 +175,10 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 		checkSyncedAt = MaxTime(cacheKC.getSyncedAt(), dbkc.SyncedAt)
 		if int(now.Sub(checkSyncedAt).Seconds()) > clearTime {
 			deleteIDs = append(deleteIDs, dbkc.ID)
-			log.Infof(
+			log.Infof(k.Logf(
 				"delete kubernetes_cluster(%s, %s) data",
 				dbkc.ClusterID,
-				dbkc.Value)
+				dbkc.Value))
 		} else {
 			dbkc.SyncedAt = checkSyncedAt
 			if cacheKC.syncFlag.IsSet() {
@@ -217,7 +219,7 @@ func (k *KubernetesCluster) getClusterID(clusterID string, value string, force b
 		}
 		err := mgr.InsertIgnore(data)
 		if err != nil {
-			log.Error(err)
+			log.Error(k.Log(err.Error()))
 		}
 		dbKubernetesClusteID, err := mgr.GetFromClusterID(clusterID)
 		if err == nil {

@@ -28,6 +28,7 @@ import (
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/trident"
+	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
@@ -69,7 +70,7 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 			processName)
 	}
 
-	vTapInfo := trisolaris.GetGVTapInfo()
+	vTapInfo := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID)
 	// 只有ingester进入数据节点注册流程，其他节点直接返回数据
 	if processName == TSDB_PROCESS_NAME {
 		log.Infof(
@@ -174,7 +175,7 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		acls = nodeInfo.GetPolicy()
 	}
 	podIPs := nodeInfo.GetPodIPs()
-	vTapIPs := trisolaris.GetGVTapInfo().GetVTapIPs()
+	vTapIPs := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetVTapIPs()
 	localServers := nodeInfo.GetLocalControllers()
 	return &api.SyncResponse{
 		Status:                  &STATUS_SUCCESS,

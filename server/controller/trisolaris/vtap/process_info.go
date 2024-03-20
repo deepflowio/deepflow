@@ -34,7 +34,7 @@ import (
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	libu "github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -172,13 +172,13 @@ const (
 	MAX_SERVICE_TYPE
 )
 
-type EntryData [MAX_SERVICE_TYPE][MAX_IP_TYPE]*utils.U128IDMap
+type EntryData [MAX_SERVICE_TYPE][MAX_IP_TYPE]*U128IDMap
 
 func NewEntryData() EntryData {
 	var entryData EntryData
 	for index, _ := range entryData {
-		entryData[index][NORMAL_IP] = utils.NewU128IDMapNoStats("trisolaris-global-gpid", CACHE_SIZE)
-		entryData[index][LOOP_IP] = utils.NewU128IDMapNoStats("trisolaris-global-gpid", CACHE_SIZE)
+		entryData[index][NORMAL_IP] = NewU128IDMapNoStats("trisolaris-global-gpid", CACHE_SIZE)
+		entryData[index][LOOP_IP] = NewU128IDMapNoStats("trisolaris-global-gpid", CACHE_SIZE)
 	}
 
 	return entryData
@@ -192,7 +192,7 @@ func isLoopbackIP(ip uint32) bool {
 	return false
 }
 
-func (d EntryData) getAggregateMap(entry *trident.GPIDSyncEntry) *utils.U128IDMap {
+func (d EntryData) getAggregateMap(entry *trident.GPIDSyncEntry) *U128IDMap {
 	protocol := entry.GetProtocol()
 	ip := entry.GetIpv4_1()
 	serviceIndex := MAX_SERVICE_TYPE
@@ -562,13 +562,14 @@ type ProcessInfo struct {
 	agentIdAndPIDToGPID    IDToGPID
 	rvData                 RVData
 	globalLocalEntries     EntryData
-	realClientToRealServer *utils.U128IDMap
+	realClientToRealServer *U128IDMap
 	grpcConns              map[string]*grpc.ClientConn
 	db                     *gorm.DB
 	config                 *config.Config
+	ORGID
 }
 
-func NewProcessInfo(db *gorm.DB, cfg *config.Config) *ProcessInfo {
+func NewProcessInfo(db *gorm.DB, cfg *config.Config, orgID int) *ProcessInfo {
 	return &ProcessInfo{
 		sendGPIDReq:            NewAgentIDToReq(),
 		agentIdToLocalGPIDReq:  NewAgentIDToReq(),
@@ -576,10 +577,11 @@ func NewProcessInfo(db *gorm.DB, cfg *config.Config) *ProcessInfo {
 		agentIdAndPIDToGPID:    make(IDToGPID),
 		rvData:                 NewRVData(),
 		globalLocalEntries:     NewEntryData(),
-		realClientToRealServer: utils.NewU128IDMapNoStats("trisolaris-real-pid", CACHE_SIZE),
+		realClientToRealServer: NewU128IDMapNoStats("trisolaris-real-pid", CACHE_SIZE),
 		grpcConns:              make(map[string]*grpc.ClientConn),
 		db:                     db,
 		config:                 cfg,
+		ORGID:                  ORGID(orgID),
 	}
 }
 
@@ -644,7 +646,7 @@ func (p *ProcessInfo) getKey(agentId uint32, entry *trident.GPIDSyncEntry) (key0
 	return
 }
 
-func (p *ProcessInfo) addRealData(agentId uint32, entry *trident.GPIDSyncEntry, toRS *utils.U128IDMap) {
+func (p *ProcessInfo) addRealData(agentId uint32, entry *trident.GPIDSyncEntry, toRS *U128IDMap) {
 	if entry.GetPid_1() > 0 && entry.GetIpv4Real() > 0 && entry.GetRoleReal() == trident.RoleType_ROLE_CLIENT {
 		key0, key1 := p.getKey(agentId, entry)
 		value := &RealServerData{
@@ -712,6 +714,7 @@ func (p *ProcessInfo) GetGPIDShareReqs() *trident.ShareGPIDSyncRequests {
 		return &trident.ShareGPIDSyncRequests{
 			ServerIp:     proto.String(p.config.NodeIP),
 			SyncRequests: shareSyncReqs,
+			OrgId:        proto.Uint32(uint32(p.ORGID)),
 		}
 	}
 	return nil
@@ -721,7 +724,7 @@ func (p *ProcessInfo) updateGlobalLocalEntries(data EntryData) {
 	p.globalLocalEntries = data
 }
 
-func (p *ProcessInfo) updateRealClientToRealServer(data *utils.U128IDMap) {
+func (p *ProcessInfo) updateRealClientToRealServer(data *U128IDMap) {
 	p.realClientToRealServer = data
 }
 
@@ -731,7 +734,7 @@ func (p *ProcessInfo) GetGlobalEntries() []*trident.GlobalGPIDEntry {
 
 func (p *ProcessInfo) generateGlobalLocalEntries() {
 	globalLocalEntries := NewEntryData()
-	realClientToRealServer := utils.NewU128IDMapNoStats("trisolaris-real-pid", CACHE_SIZE)
+	realClientToRealServer := NewU128IDMapNoStats("trisolaris-real-pid", CACHE_SIZE)
 	agentIds := p.agentIdToLocalGPIDReq.getKeys()
 	shareFilter := mapset.NewSet()
 	for _, agentId := range agentIds {
@@ -804,7 +807,7 @@ func (p *ProcessInfo) releaseGlobalLocalEntries(data EntryData) {
 func (p *ProcessInfo) getGPIDInfoFromDB() {
 	processes, err := dbmgr.DBMgr[models.Process](p.db).GetFields([]string{"id", "vtap_id", "pid"})
 	if err != nil {
-		log.Error(err)
+		log.Error(p.Log(err.Error()))
 		return
 	}
 	newVtapIDAndPIDToGPID := make(IDToGPID)
@@ -819,7 +822,7 @@ func (p *ProcessInfo) getRIPToVIPFromDB() {
 	idTolbListener := make(map[int]*models.LBListener)
 	lbListeners, err := dbmgr.DBMgr[models.LBListener](p.db).Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(p.Log(err.Error()))
 		return
 	}
 	for _, lbListener := range lbListeners {
@@ -828,7 +831,7 @@ func (p *ProcessInfo) getRIPToVIPFromDB() {
 
 	lbTargetServers, err := dbmgr.DBMgr[models.LBTargetServer](p.db).Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(p.Log(err.Error()))
 		return
 	}
 	for _, lbTargetServer := range lbTargetServers {
@@ -960,7 +963,7 @@ func (p *ProcessInfo) getLocalControllersConns() map[string]*grpc.ClientConn {
 	localRegion := ""
 	conns, err := dbmgr.DBMgr[models.AZControllerConnection](p.db).Gets()
 	if err != nil {
-		log.Errorf("get az_controller_conn failed, err:%s", err)
+		log.Errorf(p.Logf("get az_controller_conn failed, err:%s", err))
 		return nil
 	}
 	for _, conn := range conns {
@@ -971,7 +974,7 @@ func (p *ProcessInfo) getLocalControllersConns() map[string]*grpc.ClientConn {
 	}
 	dbControllers, err := dbmgr.DBMgr[models.Controller](p.db).Gets()
 	if err != nil {
-		log.Errorf("get controller failed, err:%s", err)
+		log.Errorf(p.Logf("get controller failed, err:%s", err))
 		return nil
 	}
 	localControllers := map[string]struct{}{}
@@ -993,7 +996,7 @@ func (p *ProcessInfo) getLocalControllersConns() map[string]*grpc.ClientConn {
 				conn, err := grpc.Dial(serverAddr, grpc.WithInsecure(),
 					grpc.WithMaxMsgSize(p.config.GetGrpcMaxMessageLength()))
 				if err != nil {
-					log.Error("failed to start gRPC connection(%s): %v", err)
+					log.Error(p.Logf("failed to start gRPC connection(%s): %s", serverAddr, err))
 					continue
 				}
 				p.grpcConns[serverIP] = conn
@@ -1026,7 +1029,7 @@ func (p *ProcessInfo) sendLocalShareEntryData() {
 	}
 	for _, conn := range grpcConns {
 		go func(conn *grpc.ClientConn) {
-			log.Infof("server(%s) send local share req data to server(%s)", p.config.NodeIP, conn.Target())
+			log.Infof(p.Logf("server(%s) send local share req data to server(%s)", p.config.NodeIP, conn.Target()))
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			client := trident.NewSynchronizerClient(conn)
@@ -1038,7 +1041,7 @@ func (p *ProcessInfo) sendLocalShareEntryData() {
 			if len(response.GetSyncRequests()) == 0 {
 				return
 			}
-			log.Infof("receive gpid sync data from server(%s)", response.GetServerIp())
+			log.Infof(p.Logf("receive gpid sync data from server(%s)", response.GetServerIp()))
 			for _, req := range response.GetSyncRequests() {
 				p.agentIdToShareGPIDReq.updateReq(req)
 			}
@@ -1055,18 +1058,4 @@ func (p *ProcessInfo) generateData() {
 	p.sendLocalShareEntryData()
 	p.getDBData()
 	p.generateGlobalLocalEntries()
-}
-
-func (p *ProcessInfo) TimedGenerateGPIDInfo() {
-	p.getDBData()
-	interval := time.Duration(p.config.GPIDRefreshInterval)
-	ticker := time.NewTicker(interval * time.Second).C
-	for {
-		select {
-		case <-ticker:
-			log.Info("start generate gpid data from timed")
-			p.generateData()
-			log.Info("end generate gpid data from timed")
-		}
-	}
 }

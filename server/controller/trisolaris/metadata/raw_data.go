@@ -162,9 +162,11 @@ type PlatformRawData struct {
 	containerIdToPodId   map[string]int
 
 	launchServerToVRouterIDs map[string][]int
+
+	ORGID
 }
 
-func NewPlatformRawData() *PlatformRawData {
+func NewPlatformRawData(orgID ORGID) *PlatformRawData {
 	return &PlatformRawData{
 		idToHost:          make(map[int]*models.Host),
 		idToVM:            make(map[int]*models.VM),
@@ -249,6 +251,8 @@ func NewPlatformRawData() *PlatformRawData {
 		containerIdToPodId:   make(map[string]int),
 
 		launchServerToVRouterIDs: make(map[string][]int),
+
+		ORGID: orgID,
 	}
 }
 
@@ -1043,7 +1047,7 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 				}
 				macU64, err := MacStrToU64(vif.Mac)
 				if err != nil {
-					log.Error(err, vif.Mac)
+					log.Error(r.Logf("%s %s", err, vif.Mac))
 					continue
 				}
 				if skipVifMacs, ok := launchServerToSkipVifMacs[launchServer]; ok {
@@ -1063,7 +1067,7 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 				}
 				macU64, err := MacStrToU64(vif.Mac)
 				if err != nil {
-					log.Error(err, vif.Mac)
+					log.Error(r.Logf("%s %s", err, vif.Mac))
 					continue
 				}
 				if skipVifMacs, ok := launchServerToSkipVifMacs[launchServer]; ok {
@@ -1087,7 +1091,7 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 		}
 	}
 	r.launchServerToSkipInterface = launchServerToSkipInterface
-	log.Debug(r.launchServerToSkipInterface)
+	log.Debug(r.Logf("%s", r.launchServerToSkipInterface))
 }
 
 func (r *PlatformRawData) ConvertDBProcesses(dbDataCache *DBDataCache) {
@@ -1221,7 +1225,7 @@ func (r *PlatformRawData) vInterfaceToProto(
 	}
 	macU64, err := MacStrToU64(vif.Mac)
 	if err != nil {
-		log.Error(err, vif.Mac)
+		log.Error(r.Logf("%s %s", err, vif.Mac))
 	}
 	podGroupType := uint32(0)
 	podGroup := r.idToPodGroup[device.PodGroupID]
@@ -1394,258 +1398,258 @@ func (r *PlatformRawData) GetVTap(vtapID int) *models.VTap {
 
 func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 	if !r.vmIDs.Equal(o.vmIDs) {
-		log.Info("platform vm changed")
+		log.Info(r.Log("platform vm changed"))
 		return false
 	}
 
 	if !r.vRouterIDs.Equal(o.vRouterIDs) {
-		log.Info("platform vrouter changed")
+		log.Info(r.Log("platform vrouter changed"))
 		return false
 	}
 
 	if !r.dhcpPortIDs.Equal(o.dhcpPortIDs) {
-		log.Info("platform dhcp_port changed")
+		log.Info(r.Log("platform dhcp_port changed"))
 		return false
 	}
 	if !r.podIDs.Equal(o.podIDs) {
-		log.Info("platform pod changed")
+		log.Info(r.Log("platform pod changed"))
 		return false
 	}
 
 	if len(r.idToNetwork) != len(o.idToNetwork) {
-		log.Info("platform network changed")
+		log.Info(r.Log("platform network changed"))
 		return false
 	} else {
 		for id, rnetwork := range r.idToNetwork {
 			if onetwork, ok := o.idToNetwork[id]; ok {
 				if rnetwork.NetType != onetwork.NetType {
-					log.Info("platform network changed")
+					log.Info(r.Log("platform network changed"))
 					return false
 				}
 			} else {
-				log.Info("platform network changed")
+				log.Info(r.Log("platform network changed"))
 				return false
 			}
 		}
 	}
 
 	if !SliceEqual[string](r.subnetPrefix, o.subnetPrefix) {
-		log.Info("platform subnet changed")
+		log.Info(r.Log("platform subnet changed"))
 		return false
 	}
 
 	if !SliceEqual[string](r.subnetMask, o.subnetMask) {
-		log.Info("platform subnet changed")
+		log.Info(r.Log("platform subnet changed"))
 		return false
 	}
 
 	if !r.vpcIDs.Equal(o.vpcIDs) {
-		log.Info("platform vpc changed")
+		log.Info(r.Log("platform vpc changed"))
 		return false
 	}
 
 	if !r.tunnelIDs.Equal(o.tunnelIDs) {
-		log.Info("platform vpc tunnel_id changed")
+		log.Info(r.Log("platform vpc tunnel_id changed"))
 		return false
 	}
 
 	if !r.vifIDsOfLANIP.Equal(o.vifIDsOfLANIP) {
-		log.Info("platform lan vifs changed")
+		log.Info(r.Log("platform lan vifs changed"))
 		return false
 	}
 
 	if !r.vifIDsOfWANIP.Equal(o.vifIDsOfWANIP) {
-		log.Info("platform wan vifs changed")
+		log.Info(r.Log("platform wan vifs changed"))
 		return false
 	}
 
 	if !r.ipsOfLANIP.Equal(o.ipsOfLANIP) {
-		log.Info("platform lan ips changed")
+		log.Info(r.Log("platform lan ips changed"))
 		return false
 	}
 
 	if !r.ipsOfWANIP.Equal(o.ipsOfWANIP) {
-		log.Info("platform wan ips changed")
+		log.Info(r.Log("platform wan ips changed"))
 		return false
 	}
 
 	if !r.vmIDsOfFIP.Equal(o.vmIDsOfFIP) {
-		log.Info("platform floating ips changed")
+		log.Info(r.Log("platform floating ips changed"))
 		return false
 	}
 
 	if !r.regionUUIDs.Equal(o.regionUUIDs) {
-		log.Info("platform region changed")
+		log.Info(r.Log("platform region changed"))
 		return false
 	}
 
 	if !r.azUUIDs.Equal(o.azUUIDs) {
-		log.Info("platform az changed")
+		log.Info(r.Log("platform az changed"))
 		return false
 	}
 
 	if !r.peerConnIDs.Equal(o.peerConnIDs) {
-		log.Info("platform peer_connections changed")
+		log.Info(r.Log("platform peer_connections changed"))
 		return false
 	}
 
 	if !r.cenIDs.Equal(o.cenIDs) {
-		log.Info("platform cens changed")
+		log.Info(r.Log("platform cens changed"))
 		return false
 	}
 
 	if len(r.serverToVmIDs) != len(o.serverToVmIDs) {
-		log.Info("platform vms launch_server changed")
+		log.Info(r.Log("platform vms launch_server changed"))
 		return false
 	} else {
 		for server, vmIDs := range r.serverToVmIDs {
 			if ovmIDs, ok := o.serverToVmIDs[server]; ok {
 				if !vmIDs.Equal(ovmIDs) {
-					log.Info("platform vms launch_server changed")
+					log.Info(r.Log("platform vms launch_server changed"))
 					return false
 				}
 			} else {
-				log.Info("platform vms launch_server changed")
+				log.Info(r.Log("platform vms launch_server changed"))
 				return false
 			}
 		}
 	}
 
 	if len(r.floatingIPs) != len(o.floatingIPs) {
-		log.Info("platform floating_ip changed")
+		log.Info(r.Log("platform floating_ip changed"))
 		return false
 	} else {
 		for fID, fIP := range r.floatingIPs {
 			if ofIP, ok := o.floatingIPs[fID]; ok {
 				if *fIP != *ofIP {
-					log.Info("platform floating_ip changed")
+					log.Info(r.Log("platform floating_ip changed"))
 					return false
 				}
 			} else {
-				log.Info("platform floating_ip changed")
+				log.Info(r.Log("platform floating_ip changed"))
 				return false
 			}
 		}
 	}
 
 	if !r.podServiceIDs.Equal(o.podServiceIDs) {
-		log.Info("platform pod service changed")
+		log.Info(r.Log("platform pod service changed"))
 		return false
 	}
 
 	if !r.podGroupIDs.Equal(o.podGroupIDs) {
-		log.Info("platform pod group changed")
+		log.Info(r.Log("platform pod group changed"))
 		return false
 	}
 
 	if !r.redisInstanceIDs.Equal(o.redisInstanceIDs) {
-		log.Info("platform redis instance changed")
+		log.Info(r.Log("platform redis instance changed"))
 		return false
 	}
 
 	if !r.rdsInstanceIDs.Equal(o.rdsInstanceIDs) {
-		log.Info("platform rds instance changed")
+		log.Info(r.Log("platform rds instance changed"))
 		return false
 	}
 
 	if !r.podNodeIDs.Equal(o.podNodeIDs) {
-		log.Info("platform pod node changed")
+		log.Info(r.Log("platform pod node changed"))
 		return false
 	}
 
 	if !r.lbIDs.Equal(o.lbIDs) {
-		log.Info("platform lb changed")
+		log.Info(r.Log("platform lb changed"))
 		return false
 	}
 
 	if !r.natIDs.Equal(o.natIDs) {
-		log.Info("platform nat changed")
+		log.Info(r.Log("platform nat changed"))
 		return false
 	}
 
 	if len(r.idToHost) != len(o.idToHost) {
-		log.Info("platform host_device changed")
+		log.Info(r.Log("platform host_device changed"))
 		return false
 	} else {
 		for id, rhost := range r.idToHost {
 			if ohost, ok := o.idToHost[id]; ok {
 				if rhost.HType != ohost.HType {
-					log.Info("platform host_device changed")
+					log.Info(r.Log("platform host_device changed"))
 					return false
 				}
 			} else {
-				log.Info("platform host_device changed")
+				log.Info(r.Log("platform host_device changed"))
 				return false
 			}
 		}
 	}
 
 	if !r.podServicePortIDs.Equal(o.podServicePortIDs) {
-		log.Info("platform pod service ports changed")
+		log.Info(r.Log("platform pod service ports changed"))
 		return false
 	}
 
 	if !r.processIDs.Equal(o.processIDs) {
-		log.Info("platform processes changed")
+		log.Info(r.Log("platform processes changed"))
 		return false
 	}
 
 	if !r.vipIDs.Equal(o.vipIDs) {
-		log.Info("vip changed")
+		log.Info(r.Log("vip changed"))
 		return false
 	}
 
 	if len(r.podServiceIDToPodGroupPortIDs) != len(o.podServiceIDToPodGroupPortIDs) {
-		log.Info("platform pod service pod group ports changed")
+		log.Info(r.Log("platform pod service pod group ports changed"))
 		return false
 	} else {
 		for podServiceID, rpodGroupPortIDs := range r.podServiceIDToPodGroupPortIDs {
 			if opodGroupPortIDs, ok := o.podServiceIDToPodGroupPortIDs[podServiceID]; ok {
 				if !rpodGroupPortIDs.Equal(opodGroupPortIDs) {
-					log.Info("platform pod service pod group ports changed")
+					log.Info(r.Log("platform pod service pod group ports changed"))
 					return false
 				}
 			} else {
-				log.Info("platform pod service pod group ports changed")
+				log.Info(r.Log("platform pod service pod group ports changed"))
 				return false
 			}
 		}
 	}
 
 	if len(r.vmIDToPodNodeID) != len(o.vmIDToPodNodeID) {
-		log.Info("platform vm pod_node connection changed")
+		log.Info(r.Log("platform vm pod_node connection changed"))
 		return false
 	} else {
 		for rvmID, rpodNodeID := range r.vmIDToPodNodeID {
 			if opodNodeID, ok := o.vmIDToPodNodeID[rvmID]; ok {
 				if rpodNodeID != opodNodeID {
-					log.Info("platform vm pod_node connection changed")
+					log.Info(r.Log("platform vm pod_node connection changed"))
 					return false
 				}
 			} else {
-				log.Info("platform vm pod_node connection changed")
+				log.Info(r.Log("platform vm pod_node connection changed"))
 				return false
 			}
 		}
 	}
 
 	if !r.vipDomainLcuuids.Equal(o.vipDomainLcuuids) {
-		log.Info("platform vip domains changed")
+		log.Info(r.Log("platform vip domains changed"))
 		return false
 	}
 
 	if len(r.gatewayHostIDToVifs) != len(o.gatewayHostIDToVifs) {
-		log.Info("platform gateway host vinterface changed")
+		log.Info(r.Log("platform gateway host vinterface changed"))
 		return false
 	} else {
 		for id, vif := range r.gatewayHostIDToVifs {
 			if ovif, ok := o.gatewayHostIDToVifs[id]; ok {
 				if !vif.Equal(ovif) {
-					log.Info("platform gateway host vinterface changed")
+					log.Info(r.Log("platform gateway host vinterface changed"))
 					return false
 				}
 			} else {
-				log.Info("platform gateway host vinterface changed")
+				log.Info(r.Log("platform gateway host vinterface changed"))
 				return false
 			}
 		}

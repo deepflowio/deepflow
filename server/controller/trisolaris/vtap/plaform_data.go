@@ -45,22 +45,25 @@ type VTapPlatformData struct {
 
 	// 专属采集器
 	platformDataBMDedicated *PlatformDataType
+
+	ORGID
 }
 
-func newVTapPlatformData() *VTapPlatformData {
+func newVTapPlatformData(orgID int) *VTapPlatformData {
 	return &VTapPlatformData{
 		platformDataType1:       newPlatformDataType("platformDataType1"),
 		platformDataType2:       newPlatformDataType("platformDataType2"),
 		platformDataType3:       newPlatformDataType("platformDataType3"),
 		platformDataBMDedicated: newPlatformDataType("platformDataBMDedicated"),
+		ORGID:                   ORGID(orgID),
 	}
 }
 
 func (v *VTapPlatformData) String() string {
-	log.Debug(v.platformDataType1)
-	log.Debug(v.platformDataType2)
-	log.Debug(v.platformDataType3)
-	log.Debug(v.platformDataBMDedicated)
+	log.Debug(v.Logf("%s", v.platformDataType1))
+	log.Debug(v.Logf("%s", v.platformDataType2))
+	log.Debug(v.Logf("%s", v.platformDataType3))
+	log.Debug(v.Logf("%s", v.platformDataBMDedicated))
 	return "vtap Platform data"
 }
 
@@ -81,7 +84,7 @@ func (t *PlatformDataType) String() string {
 	t.RLock()
 	defer t.RUnlock()
 	for k, v := range t.platformDataMap {
-		log.Debugf("key: [%s]; value:[%s]", k, v)
+		log.Debug("key: [%s]; value:[%s]", k, v)
 	}
 	return t.name
 }
@@ -118,21 +121,19 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		return
 	}
 
-	log.Debug(c.GetCtrlIP())
-	log.Debug(c.GetCtrlMac())
-	log.Debug(c.getPodDomains())
+	log.Debug(v.Logf("set platfrom data to %s %s %s", c.GetCtrlIP(), c.GetCtrlMac(), c.getPodDomains()))
 	vTapGroupLcuuid := c.GetVTapGroupLcuuid()
 	vtapConfig := c.GetVTapConfig()
 	if vtapConfig == nil {
 		return
 	}
-	log.Debug(vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains)
+	log.Debug(v.Logf("%d %s", vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains))
 	if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS &&
 		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=所有集群
 		// 所有云平台所有数据
 
-		log.Debug("all:", p.GetAllSimplePlatformData())
+		log.Debug(v.Logf("all: %s", p.GetAllSimplePlatformData()))
 		c.setVTapPlatformData(p.GetAllSimplePlatformData())
 	} else if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS {
 		// 下发的云平台列表=xxx，容器集群内部IP下发=所有集群
@@ -149,7 +150,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
 			domainData := domainToAllPlatformData[domainLcuuid]
 			if domainData == nil {
-				log.Errorf("domain(%s) no platform data", domainLcuuid)
+				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
 				continue
 			}
 			domainAllData.Merge(domainData)
@@ -158,7 +159,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		domainAllData.GeneratePlatformDataResult()
 		v.platformDataType1.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
 		c.setVTapPlatformData(domainAllData)
-		log.Debug(domainAllData)
+		log.Debug(v.Logf("%s", domainAllData))
 	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
 		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
@@ -168,7 +169,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		if vTapType == VTAP_TYPE_DEDICATED {
 			data := p.GetAllSimplePlatformData()
 			c.setVTapPlatformData(data)
-			log.Debug("vtap_type_dedicated: ", data)
+			log.Debug(v.Logf("vtap_type_dedicated: %s", data))
 			return
 		}
 		// 获取缓存数据
@@ -185,7 +186,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		for _, podDomain := range podDomains {
 			vTapDomainData := domainToPlarformDataOnlyPod[podDomain]
 			if vTapDomainData == nil {
-				log.Errorf("vtap pod domain(%s) no data", podDomain)
+				log.Errorf(v.Logf("vtap pod domain(%s) no data", podDomain))
 				continue
 			}
 			domainAllData.MergeInterfaces(vTapDomainData)
@@ -193,7 +194,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		domainAllData.GeneratePlatformDataResult()
 		c.setVTapPlatformData(domainAllData)
 		v.platformDataType2.setPlatformDataCache(key, domainAllData)
-		log.Debug(domainAllData)
+		log.Debug(v.Logf("%s", domainAllData))
 	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP {
 		// 下发的云平台列表=xxx，容器集群内部IP下发=采集器所在集群
 		// 云平台列表=xxx中devicetype != POD/容器服务所有接口，集器所在集群devicetype=POD/容器服务的所有接口
@@ -211,7 +212,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 			for _, domainLcuuid := range vtapConfig.ConvertedDomains {
 				domainData := domainToAllPlatformData[domainLcuuid]
 				if domainData == nil {
-					log.Errorf("domain(%s) no platform data", domainLcuuid)
+					log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
 					continue
 				}
 				domainAllData.Merge(domainData)
@@ -220,7 +221,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 			domainAllData.GeneratePlatformDataResult()
 			c.setVTapPlatformData(domainAllData)
 			v.platformDataBMDedicated.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
-			log.Debug(domainAllData)
+			log.Debug(v.Logf("%s", domainAllData))
 			return
 		}
 
@@ -239,7 +240,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
 			domainData := domainToPlatformDataExceptPod[domainLcuuid]
 			if domainData == nil {
-				log.Errorf("domain(%s) no platform data", domainLcuuid)
+				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
 				continue
 			}
 			domainAllData.Merge(domainData)
@@ -248,7 +249,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		for _, podDomain := range podDomains {
 			vtapDomainData := domainToPlarformDataOnlyPod[podDomain]
 			if vtapDomainData == nil {
-				log.Errorf("domain(%s) no platform data", podDomain)
+				log.Errorf(v.Logf("domain(%s) no platform data", podDomain))
 				continue
 			}
 			if Find[string](vtapConfig.ConvertedDomains, podDomain) {
@@ -262,6 +263,6 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		domainAllData.GeneratePlatformDataResult()
 		c.setVTapPlatformData(domainAllData)
 		v.platformDataType3.setPlatformDataCache(key, domainAllData)
-		log.Debug(domainAllData)
+		log.Debug(v.Logf("%s", domainAllData))
 	}
 }

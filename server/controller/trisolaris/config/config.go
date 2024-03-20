@@ -59,6 +59,7 @@ type Config struct {
 	PodClusterInternalIPToIngester int
 	GrpcMaxMessageLength           int
 	ExportersEnabled               bool
+	NoTeamIDRefused                bool
 }
 
 func (c *Config) Convert() {
@@ -123,4 +124,12 @@ func (c *Config) SetExportersEnabled(exporterEnabled bool) {
 
 func (c *Config) GetExportersEnabled() bool {
 	return c.ExportersEnabled
+}
+
+func (c *Config) SetNoTeamIDRefused(refused bool) {
+	c.NoTeamIDRefused = refused
+}
+
+func (c *Config) GetNoTeamIDRefused() bool {
+	return c.NoTeamIDRefused
 }

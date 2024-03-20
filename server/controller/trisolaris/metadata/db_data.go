@@ -23,6 +23,7 @@ import (
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	dbmgr "github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 type DBDataCache struct {
@@ -77,10 +78,15 @@ type DBDataCache struct {
 	chDevices []*models.ChDevice
 
 	config *config.Config
+
+	ORGID
 }
 
-func newDBDataCache(cfg *config.Config) *DBDataCache {
-	return &DBDataCache{config: cfg}
+func newDBDataCache(orgID ORGID, cfg *config.Config) *DBDataCache {
+	return &DBDataCache{
+		config: cfg,
+		ORGID:  orgID,
+	}
 }
 
 func (d *DBDataCache) GetVms() []*models.VM {
@@ -166,7 +172,7 @@ func (d *DBDataCache) GetVipDomains() []*models.Domain {
 func (d *DBDataCache) GetVTapGroupConfigurationsFromDB(db *gorm.DB) []*models.VTapGroupConfiguration {
 	vtapGroupConfigurations, err := dbmgr.DBMgr[models.VTapGroupConfiguration](db).Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 	return vtapGroupConfigurations
 }
@@ -294,41 +300,41 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	if err == nil {
 		d.networks = networks
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 	vms, err := dbmgr.DBMgr[models.VM](db).Gets()
 	if err == nil {
 		d.vms = vms
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vRouters, err := dbmgr.DBMgr[models.VRouter](db).Gets()
 	if err == nil {
 		d.vRouters = vRouters
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vpcs, err := dbmgr.DBMgr[models.VPC](db).Gets()
 	if err == nil {
 		d.vpcs = vpcs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	subnets, err := dbmgr.DBMgr[models.Subnet](db).Gets()
 	if err == nil {
 		d.subnets = subnets
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	dhcpPorts, err := dbmgr.DBMgr[models.DHCPPort](db).Gets()
 	if err == nil {
 		d.dhcpPorts = dhcpPorts
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podFields := []string{}
@@ -341,187 +347,187 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	if err == nil {
 		d.pods = pods
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vInterfaces, err := dbmgr.DBMgr[models.VInterface](db).Gets()
 	if err == nil {
 		d.vInterfaces = vInterfaces
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	azs, err := dbmgr.DBMgr[models.AZ](db).Gets()
 	if err == nil {
 		d.azs = azs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	hostDevices, err := dbmgr.DBMgr[models.Host](db).Gets()
 	if err == nil {
 		d.hostDevices = hostDevices
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podNodes, err := dbmgr.DBMgr[models.PodNode](db).Gets()
 	if err == nil {
 		d.podNodes = podNodes
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vtapGroupConfigurations, err := dbmgr.DBMgr[models.VTapGroupConfiguration](db).Gets()
 	if err == nil {
 		d.vtapGroupConfigurations = vtapGroupConfigurations
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	domains, err := dbmgr.DBMgr[models.Domain](db).Gets()
 	if err == nil {
 		d.domains = domains
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	subDomains, err := dbmgr.DBMgr[models.SubDomain](db).Gets()
 	if err == nil {
 		d.subDomains = subDomains
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	chVTapPorts, err := dbmgr.DBMgr[models.ChVTapPort](db).Gets()
 	if err == nil {
 		d.chVTapPorts = chVTapPorts
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	sysConfigurations, err := dbmgr.DBMgr[models.SysConfiguration](db).Gets()
 	if err == nil {
 		d.sysConfigurations = sysConfigurations
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	wanIPs, err := dbmgr.DBMgr[models.WANIP](db).GetFields([]string{"ip", "vifid", "netmask", "domain"})
 	if err == nil {
 		d.wanIPs = wanIPs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	lanIPs, err := dbmgr.DBMgr[models.LANIP](db).GetFields([]string{"ip", "vifid", "vl2id", "domain"})
 	if err == nil {
 		d.lanIPs = lanIPs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	floatingIPs, err := dbmgr.DBMgr[models.FloatingIP](db).Gets()
 	if err == nil {
 		d.floatingIPs = floatingIPs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	regions, err := dbmgr.DBMgr[models.Region](db).Gets()
 	if err == nil {
 		d.regions = regions
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	peerConnections, err := dbmgr.DBMgr[models.PeerConnection](db).Gets()
 	if err == nil {
 		d.peerConnections = peerConnections
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podServices, err := dbmgr.DBMgr[models.PodService](db).Gets()
 	if err == nil {
 		d.podServices = podServices
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podServicePorts, err := dbmgr.DBMgr[models.PodServicePort](db).Gets()
 	if err == nil {
 		d.podServicePorts = podServicePorts
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	redisInstances, err := dbmgr.DBMgr[models.RedisInstance](db).Gets()
 	if err == nil {
 		d.redisInstances = redisInstances
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	rdsInstances, err := dbmgr.DBMgr[models.RDSInstance](db).Gets()
 	if err == nil {
 		d.rdsInstances = rdsInstances
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podGroupPorts, err := dbmgr.DBMgr[models.PodGroupPort](db).Gets()
 	if err == nil {
 		d.podGroupPorts = podGroupPorts
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 	podGroups, err := dbmgr.DBMgr[models.PodGroup](db).Gets()
 	if err == nil {
 		d.podGroups = podGroups
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 	podClusters, err := dbmgr.DBMgr[models.PodCluster](db).Gets()
 	if err == nil {
 		d.podClusters = podClusters
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	lbs, err := dbmgr.DBMgr[models.LB](db).Gets()
 	if err == nil {
 		d.lbs = lbs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	lbTargetServers, err := dbmgr.DBMgr[models.LBTargetServer](db).Gets()
 	if err == nil {
 		d.lbTargetServers = lbTargetServers
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	lbListeners, err := dbmgr.DBMgr[models.LBListener](db).Gets()
 	if err == nil {
 		d.lbListeners = lbListeners
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	nats, err := dbmgr.DBMgr[models.NATGateway](db).Gets()
 	if err == nil {
 		d.nats = nats
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vmPodNodeConns, err := dbmgr.DBMgr[models.VMPodNodeConnection](db).Gets()
 	if err == nil {
 		d.vmPodNodeConns = vmPodNodeConns
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	DomainMgr := dbmgr.DBMgr[models.Domain](db)
@@ -529,7 +535,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	if err == nil {
 		d.vipDomains = vipDomains
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	skipVTaps, err := dbmgr.DBMgr[models.VTap](db).GetBatchFromTypes([]int{
@@ -537,90 +543,90 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	if err == nil {
 		d.skipVTaps = skipVTaps
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	resourceGroups, err := dbmgr.DBMgr[models.ResourceGroup](db).Gets()
 	if err == nil {
 		d.resourceGroups = resourceGroups
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	resourceGroupExtraInfos, err := dbmgr.DBMgr[models.ResourceGroupExtraInfo](db).Gets()
 	if err == nil {
 		d.resourceGroupExtraInfos = resourceGroupExtraInfos
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	acls, err := dbmgr.DBMgr[models.ACL](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.acls = acls
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	npbTunnels, err := dbmgr.DBMgr[models.NpbTunnel](db).Gets()
 	if err == nil {
 		d.npbTunnels = npbTunnels
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	npbPolicies, err := dbmgr.DBMgr[models.NpbPolicy](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.npbPolicies = npbPolicies
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	pcapPolicies, err := dbmgr.DBMgr[models.PcapPolicy](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.pcapPolicies = pcapPolicies
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	cens, err := dbmgr.DBMgr[models.CEN](db).Gets()
 	if err == nil {
 		d.cens = cens
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	processes, err := dbmgr.DBMgr[models.Process](db).Gets()
 	if err == nil {
 		d.processes = processes
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	podNSs, err := dbmgr.DBMgr[models.PodNamespace](db).GetFields([]string{"id", "name"})
 	if err == nil {
 		d.podNSs = podNSs
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id", "type"})
 	if err == nil {
 		d.vtaps = vtaps
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	chDevices, err := dbmgr.DBMgr[models.ChDevice](db).GetFields([]string{"devicetype", "deviceid", "name"})
 	if err == nil {
 		d.chDevices = chDevices
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 
 	vips, err := dbmgr.DBMgr[models.VIP](db).Gets()
 	if err == nil {
 		d.vips = vips
 	} else {
-		log.Error(err)
+		log.Error(d.Log(err.Error()))
 	}
 }

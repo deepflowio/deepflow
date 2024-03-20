@@ -841,6 +841,7 @@ message GPIDSyncRequest {
 message ShareGPIDSyncRequests {
     optional string server_ip = 1;
     repeated GPIDSyncRequest sync_requests = 2;
+    optional uint32 org_id = 3;
 }
 
 message GPIDSyncResponse {

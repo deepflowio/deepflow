@@ -1048,6 +1048,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     license_type            INTEGER COMMENT '1: A类 2: B类 3: C类',
     license_functions       CHAR(64) COMMENT 'separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控',
     tap_mode                INTEGER,
+    team_id                 INTEGER,
     expected_revision       TEXT,
     upgrade_package         TEXT,
     lcuuid                  CHAR(64)

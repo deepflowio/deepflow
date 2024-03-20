@@ -136,3 +136,17 @@ func IsVMofBMHtype(htype int) bool {
 	}
 	return false
 }
+
+type ORGID int
+
+func (o ORGID) Logf(format string, args ...interface{}) string {
+	return fmt.Sprintf("ORGID-%d: %s", o, fmt.Sprintf(format, args...))
+}
+
+func (o ORGID) Log(logStr string) string {
+	return fmt.Sprintf("ORGID-%d: %s", o, logStr)
+}
+
+func (o ORGID) GetORGID() int {
+	return int(o)
+}

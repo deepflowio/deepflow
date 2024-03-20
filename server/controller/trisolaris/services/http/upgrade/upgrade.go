@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
+	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -85,7 +86,7 @@ func Upgrade(c *gin.Context) {
 		return
 	}
 	key := vtap.CtrlIP + "-" + vtap.CtrlMac
-	vTapCache := trisolaris.GetGVTapInfo().GetVTapCache(key)
+	vTapCache := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetVTapCache(key)
 	if vTapCache == nil {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not found vtap cache"))
 		return

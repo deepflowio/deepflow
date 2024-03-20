@@ -28,6 +28,7 @@ const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 const (
 	DEFAULT_ORG_ID  = 1
 	DEFAULT_TEAM_ID = 1
+	ORG_ID_MAX      = 1024
 )
 
 const (
