@@ -117,7 +117,7 @@ func checkAndStartMasterFunctions(
 				migrateMySQL(cfg)
 
 				// 启动资源ID管理器
-				err := recorderResource.IDManager.Start()
+				err := recorderResource.IDManagers.Start()
 				if err != nil {
 					log.Errorf("resource id manager start failed: %s", err.Error())
 					time.Sleep(time.Second)
@@ -181,7 +181,7 @@ func checkAndStartMasterFunctions(
 
 				domainChecker.Stop()
 
-				recorderResource.IDManager.Stop()
+				recorderResource.IDManagers.Stop()
 
 				prometheus.Encoder.Stop()
 				prometheus.APPLabelLayoutUpdater.Stop()
