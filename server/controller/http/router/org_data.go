@@ -30,40 +30,40 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
-type Database struct {
+type ORGData struct {
 	mysqlCfg mysqlcfg.MySqlConfig
 }
 
-func NewDatabase(cfg *config.ControllerConfig) *Database {
-	return &Database{
+func NewDatabase(cfg *config.ControllerConfig) *ORGData {
+	return &ORGData{
 		mysqlCfg: cfg.MySqlCfg,
 	}
 }
 
-func (d *Database) RegisterTo(e *gin.Engine) {
-	e.POST("/v1/databases/", d.Create)
-	e.DELETE("/v1/databases/:org-id/", d.Delete)
+func (d *ORGData) RegisterTo(e *gin.Engine) {
+	e.POST("/v1/org/", d.Create)
+	e.DELETE("/v1/org/:id/", d.Delete)
 }
 
-func (d *Database) Create(c *gin.Context) {
+func (d *ORGData) Create(c *gin.Context) {
 	var err error
-	var body model.DatabaseCreate
+	var body model.ORGDataCreate
 	err = c.ShouldBindBodyWith(&body, binding.JSON)
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 		return
 	}
 
-	resp, err := service.CreateDatabase(body, d.mysqlCfg)
+	resp, err := service.CreateORGData(body, d.mysqlCfg)
 	common.JsonResponse(c, map[string]interface{}{"DATABASE": resp}, err)
 }
 
-func (d *Database) Delete(c *gin.Context) {
-	orgID, err := strconv.Atoi(c.Param("org-id"))
+func (d *ORGData) Delete(c *gin.Context) {
+	orgID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 		return
 	}
-	err = service.DeleteDatabase(orgID, d.mysqlCfg)
+	err = service.DeleteORGData(orgID, d.mysqlCfg)
 	common.JsonResponse(c, nil, err)
 }
