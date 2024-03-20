@@ -113,6 +113,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    102: PROTO_AMQP\n");
 	fprintf(stderr, "    103: PROTO_OPENWIRE\n");
 	fprintf(stderr, "    104: PROTO_NATS\n");
+	fprintf(stderr, "    106: PROTO_ZMTP\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
 	fprintf(stderr, "    121: PROTO_TLS\n");
 	fprintf(stderr, "PID:\n");

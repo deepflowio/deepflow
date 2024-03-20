@@ -239,6 +239,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("ORACLE");
         } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
             proto_tag.push_str("OPENWIRE");
+        } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
+            proto_tag.push_str("ZMTP");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -398,6 +400,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_AMQP as c_int);
         enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
+        enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
         enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
@@ -534,6 +537,13 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_NATS as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_ZMTP as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
                 .as_c_str()
