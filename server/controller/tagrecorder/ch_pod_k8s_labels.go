@@ -63,3 +63,8 @@ func (c *ChPodK8sLabels) sourceToTarget(item *mysql.Pod) (keys []K8sLabelsKey, t
 	}
 	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: item.Label}}
 }
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabels) {
+
+}

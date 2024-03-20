@@ -133,3 +133,8 @@ func (c *ChOSAppTag) sourceToTarget(source *mysql.Process) (keys []OSAPPTagKey, 
 	}
 	return
 }
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysql.ChOSAppTag) {
+
+}

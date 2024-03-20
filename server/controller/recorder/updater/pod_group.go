@@ -110,6 +110,7 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
+		structInfo.Type.SetNew(cloudItem.Type)
 	}
 	if diffBase.Type != cloudItem.Type {
 		mapInfo["type"] = cloudItem.Type
