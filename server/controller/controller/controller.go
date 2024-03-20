@@ -104,7 +104,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("Resource ID manager init")
 	recorderResource := recorder.GetSingletonResource().Init(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
 	if isMasterController {
-		err := recorderResource.IDManager.Start()
+		err := recorderResource.IDManagers.Start()
 		if err != nil {
 			log.Errorf("resource id manager start failed: %s", err.Error())
 			time.Sleep(time.Second)
