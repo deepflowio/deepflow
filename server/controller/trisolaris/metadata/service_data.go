@@ -48,6 +48,7 @@ type ServiceDataOP struct {
 	serviceRawData *ServiceRawData
 	metaData       *MetaData
 	services       []*trident.ServiceInfo
+	ORGID
 }
 
 func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
@@ -55,6 +56,7 @@ func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
 		serviceRawData: newServiceRawData(),
 		metaData:       metaData,
 		services:       []*trident.ServiceInfo{},
+		ORGID:          metaData.ORGID,
 	}
 }
 
@@ -246,7 +248,7 @@ func (s *ServiceDataOP) generateService() {
 			continue
 		}
 		if podService.ServiceClusterIP == "" {
-			log.Debugf("pod service(id=%d) has no service_cluster_ip", podService.ID)
+			log.Debugf(s.Logf("pod service(id=%d) has no service_cluster_ip", podService.ID))
 			continue
 		}
 		protocols := []trident.ServiceProtocol{}
@@ -323,7 +325,7 @@ func (s *ServiceDataOP) generateService() {
 		vpcID := rData.lbIDToVPCID[lbts.LBID]
 		var ips []string
 		if lbts.IP == "" {
-			log.Debugf("lb_target_server(id=%d) has no ips", lbts.ID)
+			log.Debugf(s.Logf("lb_target_server(id=%d) has no ips", lbts.ID))
 			continue
 		} else {
 			ips = []string{lbts.IP}
@@ -340,7 +342,7 @@ func (s *ServiceDataOP) generateService() {
 		services = append(services, service)
 	}
 	s.services = services
-	log.Debugf("service have %d", len(s.services))
+	log.Debugf(s.Logf("service have %d", len(s.services)))
 }
 
 func (s *ServiceDataOP) GetServiceData() []*trident.ServiceInfo {

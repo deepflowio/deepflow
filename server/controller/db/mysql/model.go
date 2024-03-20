@@ -196,6 +196,7 @@ type VTap struct {
 	TapMode            int       `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"`
 	ExpectedRevision   string    `gorm:"column:expected_revision;type:text;default null" json:"EXPECTED_REVISION"`
 	UpgradePackage     string    `gorm:"column:upgrade_package;type:text;default null" json:"UPGRADE_PACKAGE"`
+	TeamID             int       `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
@@ -650,4 +651,5 @@ type Team struct {
 	Name        string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
 	LoopID      int    `gorm:"column:loop_id;type:int;default:0" json:"LOOP_ID"`
 	ShortLcuuid string `gorm:"column:short_lcuuid;type:char(64);default:''" json:"SHORT_LCUUID"`
+	OrgLoopID   int    `gorm:"column:org_loop_id;type:int;default:1" json:"ORG_LOOP_ID"`
 }

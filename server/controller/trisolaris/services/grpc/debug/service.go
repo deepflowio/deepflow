@@ -22,6 +22,7 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	. "github.com/deepflowio/deepflow/server/controller/common"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
@@ -47,7 +48,10 @@ func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncReque
 	log.Infof("receive DebugGPIDGlobalLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s)",
 		in.GetCtrlIp(), in.GetCtrlMac())
 
-	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	processInfo := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetProcessInfo()
+	if processInfo == nil {
+		return &api.GPIDGlobalData{}, nil
+	}
 	entries := processInfo.GetGlobalEntries()
 	return &api.GPIDGlobalData{
 		Entries: entries,
@@ -56,14 +60,17 @@ func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncReque
 
 func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDVTapData, error) {
 	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
-	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
+	vtapCache := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
 		log.Info("not found vtap(ctrl_ip: %s, ctrl_mac: %s) cache", in.GetCtrlIp(), in.GetCtrlMac())
 		return &api.GPIDVTapData{}, nil
 	}
 	log.Infof("receive DebugGPIDVTapLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s, id: %d)",
 		in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID())
-	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	processInfo := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetProcessInfo()
+	if processInfo == nil {
+		return &api.GPIDVTapData{}, nil
+	}
 	req, updateTime := processInfo.GetAgentGPIDReq(uint32(vtapCache.GetVTapID()))
 	return &api.GPIDVTapData{
 		UpdateTime:  &updateTime,
@@ -72,14 +79,20 @@ func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest
 }
 
 func (s *service) DebugRealGlobalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.RealGlobalData, error) {
-	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	processInfo := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetProcessInfo()
+	if processInfo == nil {
+		return &api.RealGlobalData{}, nil
+	}
 	return &api.RealGlobalData{
 		Entries: processInfo.GetRealGlobalData(),
 	}, nil
 }
 
 func (s *service) DebugRIPToVIP(ctx context.Context, in *api.GPIDSyncRequest) (*api.RVData, error) {
-	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	processInfo := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetProcessInfo()
+	if processInfo == nil {
+		return &api.RVData{}, nil
+	}
 	return &api.RVData{
 		Entries: processInfo.GetRVData(),
 	}, nil
@@ -87,7 +100,7 @@ func (s *service) DebugRIPToVIP(ctx context.Context, in *api.GPIDSyncRequest) (*
 
 func (s *service) DebugAgentCache(ctx context.Context, in *api.AgentCacheRequest) (*api.AgentCacheResponse, error) {
 	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
-	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
+	vtapCache := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
 		log.Infof("not found vtap(ctrl_ip: %s, ctrl_mac: %s) cache", in.GetCtrlIp(), in.GetCtrlMac())
 		return &api.AgentCacheResponse{}, nil

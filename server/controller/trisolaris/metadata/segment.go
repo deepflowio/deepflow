@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 type MacID struct {
@@ -181,9 +182,10 @@ type Segment struct {
 	podNodeIDToAllVifs   IDToVifs
 
 	vRouterLaunchServerToSegments ServerToNetworkMacs
+	ORGID
 }
 
-func newSegment() *Segment {
+func newSegment(orgID ORGID) *Segment {
 	return &Segment{
 		launchServerToSegments:        newServerToNetworkMacs(),
 		hostIDToSegments:              newIDToNetworkMacs(),
@@ -197,6 +199,7 @@ func newSegment() *Segment {
 		vmIDToPodNodeAllVifs:          newIDToVifs(),
 		podNodeIDToAllVifs:            newIDToVifs(),
 		vRouterLaunchServerToSegments: newServerToNetworkMacs(),
+		ORGID:                         orgID,
 	}
 }
 
@@ -401,8 +404,8 @@ func (s *Segment) GenerateNoVTapUsedSegments(rawData *PlatformRawData) {
 		}
 		segments = append(segments, segment)
 	}
-	log.Infof("vtap about vifs used: %d  not used: %d",
-		s.vtapUsedVInterfaceIDs.Cardinality(), len(macs))
+	log.Infof(s.Logf("vtap about vifs used: %d  not used: %d",
+		s.vtapUsedVInterfaceIDs.Cardinality(), len(macs)))
 	s.notVtapUsedSegments = segments
 }
 

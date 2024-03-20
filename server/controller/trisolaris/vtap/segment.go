@@ -86,7 +86,7 @@ func (v *VTapInfo) GenerateVTapLocalSegments(c *VTapCache) []*trident.Segment {
 		// 专属采集器，隧道解封装采集器没有local segments
 		return localSegments
 	} else {
-		log.Errorf("vtap type(%d) not found", vtapType)
+		log.Errorf(v.Logf("vtap type(%d) not found", vtapType))
 	}
 
 	return localSegments

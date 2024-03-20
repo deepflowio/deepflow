@@ -85,12 +85,14 @@ func sendPluginFailed(in api.Synchronizer_PluginServer) error {
 
 func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
 	vtapCacheKey := r.GetCtrlIp() + "-" + r.GetCtrlMac()
-	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
+	teamID := r.GetTeamId()
+	orgID := trisolaris.GetOrgIDByTeamID(teamID)
+	vtapCache := trisolaris.GetGVTapInfo(orgID).GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
-		log.Errorf("agent(%s) cache not found", vtapCacheKey)
+		log.Errorf("agent(%s team_id=%s org_id=%d) cache not found", vtapCacheKey, teamID, orgID)
 		return sendPluginFailed(in)
 	}
-	log.Infof("receive agent(%s) plugin request", vtapCacheKey)
+	log.Infof("receive agent(%s team_id=%s org_id=%d) plugin request", vtapCacheKey, teamID, orgID)
 
 	pluginData, err := p.GetPluginData(r)
 	if err != nil {
@@ -112,10 +114,10 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("send agent(%s) plugin data faild, err:%s", vtapCacheKey, err)
+			log.Errorf("send agent(%s team_id=%s org_id=%d) plugin data faild, err:%s", vtapCacheKey, teamID, orgID, err)
 			break
 		}
 	}
-	log.Infof("sending plugin data to agent(%s) completed", vtapCacheKey)
+	log.Infof("sending plugin data to agent(%s team_id=%s org_id=%d) completed", vtapCacheKey, teamID, orgID)
 	return err
 }

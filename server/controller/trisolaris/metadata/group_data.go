@@ -58,15 +58,17 @@ type GroupProto struct {
 	groups       *atomic.Value // []byte
 	groupHash    uint64
 	startTime    int64
+	ORGID
 }
 
-func newGroupProto() *GroupProto {
+func newGroupProto(orgID ORGID) *GroupProto {
 	groups := &atomic.Value{}
 	groups.Store([]byte{})
 	return &GroupProto{
 		groupVersion: 0,
 		groups:       groups,
 		groupHash:    0,
+		ORGID:        orgID,
 	}
 }
 
@@ -83,7 +85,7 @@ func (g *GroupProto) checkVersion(groupHash uint64) {
 		} else {
 			atomic.AddUint64(&g.groupVersion, 1)
 		}
-		log.Infof("group data changed to %s", g)
+		log.Infof(g.Logf("group data changed to %s", g))
 	}
 }
 
@@ -111,7 +113,7 @@ func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*tr
 		h64.Write(groupBytes)
 		g.checkVersion(h64.Sum64())
 	} else {
-		log.Error(err)
+		log.Error(g.Log(err.Error()))
 	}
 }
 
@@ -121,6 +123,7 @@ type GroupDataOP struct {
 	groupRawData      *GroupRawData
 	tridentGroupProto *GroupProto
 	dropletGroupProto *GroupProto
+	ORGID
 }
 
 func newGroupDataOP(metaData *MetaData) *GroupDataOP {
@@ -128,8 +131,9 @@ func newGroupDataOP(metaData *MetaData) *GroupDataOP {
 		groupRawData:      newGroupRawData(),
 		serviceDataOP:     newServiceDataOP(metaData),
 		metaData:          metaData,
-		tridentGroupProto: newGroupProto(),
-		dropletGroupProto: newGroupProto(),
+		tridentGroupProto: newGroupProto(metaData.ORGID),
+		dropletGroupProto: newGroupProto(metaData.ORGID),
+		ORGID:             metaData.ORGID,
 	}
 }
 
@@ -192,7 +196,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 				if err == nil {
 					groupIDsUsedByNpbPcap.Add(id)
 				} else {
-					log.Error(err)
+					log.Error(g.Log(err.Error()))
 				}
 			}
 			if acl.DstGroupIDs != "" {
@@ -200,7 +204,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 				if err == nil {
 					groupIDsUsedByNpbPcap.Add(id)
 				} else {
-					log.Error(err)
+					log.Error(g.Log(err.Error()))
 				}
 			}
 		}
@@ -232,12 +236,12 @@ func (g *GroupDataOP) generateGroupRawData() {
 			for _, id := range ids {
 				idInt, err := strconv.Atoi(id)
 				if err != nil {
-					log.Error(err)
+					log.Error(g.Log(err.Error()))
 					continue
 				}
 				extraInfo, ok := idToExtraInfo[idInt]
 				if ok == false {
-					log.Errorf("resourceGroup(id=%d) did not find extra_info(id:%d)", resourceGroup.ID, idInt)
+					log.Errorf(g.Logf("resourceGroup(id=%d) did not find extra_info(id:%d)", resourceGroup.ID, idInt))
 					continue
 				}
 				switch resourceGroup.Type {
@@ -367,7 +371,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 				for _, vmID := range vmIDs {
 					id, err := strconv.Atoi(vmID)
 					if err != nil {
-						log.Error(err)
+						log.Error(g.Log(err.Error()))
 						continue
 					}
 					if resourceGroup.VPCID == nil {
@@ -451,7 +455,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 				for _, strNetworkID := range strNetworkIDs {
 					id, err := strconv.Atoi(strNetworkID)
 					if err != nil {
-						log.Error(err)
+						log.Error(g.Log(err.Error()))
 						continue
 					}
 					if tnets, ok := rawData.networkIDToSubnets[id]; ok {

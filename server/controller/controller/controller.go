@@ -152,8 +152,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Trisolaris init")
 	// 启动trisolaris
-	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
-	go t.Start()
+	tm := trisolaris.NewTrisolarisManager(&cfg.TrisolarisCfg, mysql.Db)
+	go tm.Start()
 
 	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
