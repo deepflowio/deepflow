@@ -133,3 +133,8 @@ func (c *ChPodK8sAnnotation) sourceToTarget(source *mysql.Pod) (keys []K8sAnnota
 	}
 	return
 }
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodK8sAnnotation) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotation) {
+
+}

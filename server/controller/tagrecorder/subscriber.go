@@ -75,6 +75,19 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 func (c *SubscriberManager) getSubscribers() []Subscriber {
 	subscribers := []Subscriber{
 		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChVMDevice(c.resourceTypeToIconID),
+		NewChHostDevice(c.resourceTypeToIconID),
+		NewChVRouterDevice(c.resourceTypeToIconID),
+		NewChDHCPPortDevice(c.resourceTypeToIconID),
+		NewChNATGatewayDevice(c.resourceTypeToIconID),
+		NewChLBDevice(c.resourceTypeToIconID),
+		NewChRDSInstanceDevice(c.resourceTypeToIconID),
+		NewChRedisInstanceDevice(c.resourceTypeToIconID),
+		NewChPodServiceDevice(c.resourceTypeToIconID),
+		NewChPodDevice(c.resourceTypeToIconID),
+		NewChPodGroupDevice(c.resourceTypeToIconID),
+		NewChPodNodeDevice(c.resourceTypeToIconID),
+		NewChProcessDevice(c.resourceTypeToIconID),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
 		NewChPodK8sLabel(),
@@ -133,6 +146,7 @@ type Subscriber interface {
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
 	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT)
+	softDeletedTargetsUpdated([]CT)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
@@ -210,5 +224,9 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(orgID int
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
 	keys, chItems := s.generateKeyTargets(items)
-	s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
+	if softDelete {
+		s.subscriberDG.softDeletedTargetsUpdated(chItems)
+	} else {
+		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
+	}
 }

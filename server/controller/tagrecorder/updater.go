@@ -72,13 +72,8 @@ func (c *UpdaterManager) refresh() {
 	log.Info("tagrecorder updaters refresh")
 	// 生成各资源更新器，刷新ch数据
 	updaters := []Updater{
-		NewChDevice(c.resourceTypeToIconID),
 		NewChRegion(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChIPRelation(),
-		NewChPodServiceK8sLabel(),
-		NewChPodServiceK8sLabels(),
-		NewChPodNSCloudTag(),
-		NewChPodNSCloudTags(),
 		NewChVTapPort(),
 		NewChStringEnum(),
 		NewChIntEnum(),
@@ -92,11 +87,6 @@ func (c *UpdaterManager) refresh() {
 		NewChTapType(c.resourceTypeToIconID),
 		NewChVTap(c.resourceTypeToIconID),
 		NewChLbListener(c.resourceTypeToIconID),
-
-		NewChPodServiceK8sAnnotation(),
-		NewChPodServiceK8sAnnotations(),
-		NewChPodService(),
-		NewChChost(),
 
 		NewChPolicy(),
 		NewChNpbTunnel(),

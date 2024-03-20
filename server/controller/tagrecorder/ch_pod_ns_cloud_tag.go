@@ -104,3 +104,8 @@ func (c *ChPodNSCloudTag) sourceToTarget(source *mysql.PodNamespace) (keys []Clo
 	}
 	return
 }
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTag) softDeletedTargetsUpdated(targets []mysql.ChPodNSCloudTag) {
+
+}
