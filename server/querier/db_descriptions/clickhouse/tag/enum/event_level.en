@@ -3,4 +3,4 @@
 2       , Error           ,
 3       , Warn            ,
 4       , NoData          ,
-5       , Normal          ,
+5       , Recovered       ,
