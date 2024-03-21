@@ -185,6 +185,14 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					if name == "lb_listener" || name == "pod_ingress" {
 						continue
 					}
+					notSupportedOperators := []string{}
+					if len(tagSlice) >= 9 {
+						notSupportedOperators = ckcommon.ParseNotSupportedOperator(tagSlice[8])
+						// not support select
+						if slices.Contains(notSupportedOperators, "select") {
+							continue
+						}
+					}
 					clientName := tagSlice[1].(string)
 					serverName := tagSlice[2].(string)
 					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
