@@ -1757,7 +1757,6 @@ static __inline enum message_type infer_openwire_message(const char *buf,
 		    ) != MSG_UNKNOWN) {
 			return msg_type;
 		}
-
 		return MSG_CLEAR;
 	}
 }
@@ -1972,6 +1971,233 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+static __inline bool check_zmtp_mechanism(const char *buf)
+{
+	// check mechanism fields
+	if (buf[0] == 'N' && buf[1] == 'U' && buf[2] == 'L' && buf[3] == 'L') {
+		return true;
+	}
+	if (buf[0] == 'P' && buf[1] == 'L'
+	    && buf[2] == 'A' && buf[3] == 'I' && buf[4] == 'N') {
+		return true;
+	}
+	if (buf[0] == 'C' && buf[1] == 'U'
+	    && buf[2] == 'R' && buf[3] == 'V' && buf[4] == 'E') {
+		return true;
+	}
+	return false;
+}
+
+static __inline bool check_zmtp_greeting(const char *buf, size_t count, struct conn_info_s
+					 *conn_info)
+{
+	/*
+	 * For backward compatibility, the greeting header
+	 * may be segmented into two or more segments.
+	 */
+	// first segment
+	if (count >= 10 && buf[0] == '\xff' && buf[9] == '\x7f') {
+		if (count == 10)
+			return true;
+		if (count == 11 && buf[10] == 3)
+			return true;
+		if (count >= 12 && buf[10] == 3 && buf[11] <= 1)
+			return check_zmtp_mechanism(&buf[12]);
+	}
+	// second or third segment
+	if (count == 54 || count == 53) {
+		// major version and minor version are presented
+		__u8 major_version = 3;
+		__u32 offset = 0;
+		if (count == 54) {
+			major_version = buf[offset++];
+		} else {
+			// merge the previous segment
+			if (conn_info->prev_count != 1)
+				return false;
+			major_version = conn_info->prev_buf[0];
+		}
+		__u8 minor_version = buf[offset++];
+		if (major_version == 3 && minor_version <= 1) {
+			check_zmtp_mechanism(&buf[offset]);
+		}
+	}
+	return false;
+}
+
+static __inline bool check_zmtp_segment(const char *buf,
+					size_t count,
+					const char *ptr,
+					size_t infer_len, bool strict_check)
+{
+	if (count <= 4) {
+		return false;
+	}
+	// reserved bytes must be zero
+	__u8 size_type = buf[0];
+	if (size_type & 0xf8)
+		return false;
+	bool is_command = size_type & 0x04;
+	bool long_frame = size_type & 0x02;
+	bool more_frame = size_type & 0x01;
+	if (long_frame && count < 10) {
+		return false;
+	}
+	if (more_frame && count < 6) {
+		return false;
+	}
+	if (is_command) {
+		__u32 offset = 1;
+		// no more frame for command
+		if (more_frame)
+			return false;
+		__u32 frame_size = 0;
+		if (long_frame) {
+			__u32 hi = __bpf_ntohl(*(__u32 *) & buf[offset]);
+			__u32 lo = __bpf_ntohl(*(__u32 *) & buf[offset + 4]);
+			// length must be in range [256, 0x7fffffff]
+			if (hi || lo < 256u || lo > 0x7fffffffu)
+				return false;
+			frame_size = lo;
+			offset += 8;
+		} else {
+			frame_size = buf[offset++];
+		}
+		if (strict_check) {
+			if (offset + frame_size != count) {
+				return false;
+			}
+			__u8 cmd_name_len = buf[offset++];
+			if (offset + cmd_name_len > count || cmd_name_len < 5) {
+				return false;
+			}
+			// check first 5 bytes of command name
+			static const int MIN_CMD_LEN = 5;
+			char cmd_buf[MIN_CMD_LEN];
+			if (bpf_probe_read_user
+			    (cmd_buf, MIN_CMD_LEN, ptr + offset)) {
+				return false;
+			}
+			for (size_t i = 0; i < MIN_CMD_LEN; i++) {
+				char byte = cmd_buf[i];
+				if (byte < 'A' || byte > 'Z')
+					return false;
+			}
+		}
+		return true;
+	} else {
+		if (strict_check) {
+			__u32 offset = 0;
+			static const int MAX_TRIES = 5;
+#pragma unroll
+			for (size_t i = 0; i < MAX_TRIES; i++) {
+				__u8 size_type;
+				if (offset + 1 > infer_len
+				    || bpf_probe_read_user(&size_type,
+							   sizeof(size_type),
+							   ptr + offset)) {
+					return false;
+				}
+				offset++;
+				if (size_type & 0xf8)
+					return false;
+				bool is_command = size_type & 0x04;
+				bool long_frame = size_type & 0x02;
+				bool more_frame = size_type & 0x01;
+				if (is_command)
+					return false;
+				__u32 frame_size = 0;
+				if (long_frame) {
+					__u8 digit[8];
+					if (offset + 8 > infer_len
+					    || bpf_probe_read_user(digit,
+								   sizeof
+								   (digit),
+								   ptr +
+								   offset)) {
+						return false;
+					}
+					__u32 hi =
+					    __bpf_ntohl(*(__u32 *) & digit[0]);
+					__u32 lo =
+					    __bpf_ntohl(*(__u32 *) & digit[4]);
+					// length must be in range [256, 0x7fffffff]
+					if (hi || lo < 256u || lo > 0x7fffffffu)
+						return false;
+					frame_size = lo;
+					offset += 8;
+				} else {
+					__u8 len;
+					if (offset + 1 > infer_len
+					    || bpf_probe_read_user(&len,
+								   sizeof(len),
+								   ptr +
+								   offset)) {
+						return false;
+					}
+					frame_size = len;
+					offset++;
+				}
+				offset += frame_size;
+				if (!more_frame) {
+					return offset == infer_len;
+				}
+			}
+			return false;
+		} else {
+			__u32 offset = 1;
+			if (long_frame) {
+				__u32 hi =
+				    __bpf_ntohl(*(__u32 *) & buf[offset]);
+				__u32 lo =
+				    __bpf_ntohl(*(__u32 *) & buf[offset + 4]);
+				// length must be in range [256, 0x7fffffff]
+				if (hi || lo < 256u || lo > 0x7fffffffu)
+					return false;
+			}
+			return true;
+		}
+	}
+}
+
+// https://rfc.zeromq.org/spec/23/
+static __inline enum message_type infer_zmtp_message(const char *buf,
+						     size_t count, const char
+						     *syscall_infer_addr,
+						     size_t syscall_infer_len,
+						     struct conn_info_s
+						     *conn_info)
+{
+	if (!protocol_port_check_2(PROTO_ZMTP, conn_info))
+		return MSG_UNKNOWN;
+	// the second greeting segment
+	if (count == 1) {
+		// only one byte stands for the major version
+		__u8 major_version = buf[0];
+		if (major_version != 3) {
+			return MSG_UNKNOWN;
+		}
+		save_prev_data(buf, conn_info, count);
+		return MSG_PRESTORE;
+	}
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_ZMTP)
+			return MSG_UNKNOWN;
+		if (check_zmtp_greeting(buf, count, conn_info)
+		    || check_zmtp_segment(buf, count, syscall_infer_addr,
+					  syscall_infer_len, false)) {
+			return MSG_REQUEST;
+		}
+		return MSG_UNKNOWN;
+	}
+	if (check_zmtp_greeting(buf, count, conn_info)
+	    || check_zmtp_segment(buf, count, syscall_infer_addr,
+				  syscall_infer_len, true)) {
+		return MSG_REQUEST;
+	}
+	return MSG_UNKNOWN;
+}
+
 /*
  * https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/
  * 0                                                                                       31
@@ -2038,7 +2264,7 @@ struct dubbo_header {
 	__u8 status;
 	__u64 request_id;
 	__u32 data_len;
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 static __inline enum message_type infer_dubbo_message(const char *buf,
 						      size_t count,
@@ -2181,10 +2407,10 @@ static __inline enum message_type infer_kafka_request(const char *buf,
 static __inline bool kafka_data_check_len(size_t count,
 					  const char *buf,
 					  struct conn_info_s *conn_info,
-					  bool * use_prev_buf)
+					  bool *use_prev_buf)
 {
 	*use_prev_buf = (conn_info->prev_count == 4)
-	    && ((size_t) __bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
+	    && ((size_t)__bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
 
 	if (*use_prev_buf) {
 		count += 4;
@@ -2200,7 +2426,7 @@ static __inline bool kafka_data_check_len(size_t count,
 
 	// Enforcing count to be exactly message_size + 4 to mitigate misclassification.
 	// However, this will miss long messages broken into multiple reads.
-	if (message_size < 0 || count != (size_t) message_size) {
+	if (message_size < 0 || count != (size_t)message_size) {
 		return false;
 	}
 
@@ -2302,7 +2528,7 @@ struct fastcgi_header {
 	__u16 content_length;	// cannot be 0
 	__u8 padding_length;
 	__u8 __unused;
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 #define FCGI_BEGIN_REQUEST 1
 #define FCGI_PARAMS 4
@@ -2596,7 +2822,7 @@ infer_mongo_message(const char *buf, size_t count,
  *           (9) is Change Cipher Spec message, content_Type:0x14
  */
 
-typedef struct __attribute__ ((packed)) {
+typedef struct __attribute__((packed)) {
 	__u8 content_type;
 	__u16 version;
 	__u16 length;
@@ -2995,6 +3221,16 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_ZMTP:
+			if ((inferred_message.type =
+			     infer_zmtp_message(infer_buf, count,
+						syscall_infer_addr,
+						syscall_infer_len,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_ZMTP;
+				return inferred_message;
+			}
+			break;
 		default:
 			break;
 		}
@@ -3187,6 +3423,16 @@ infer_protocol_2(const char *infer_buf, size_t count,
 		    infer_openwire_message(infer_buf, count,
 					   conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_OPENWIRE;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_ZMTP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_zmtp_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ZMTP;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
 #else
