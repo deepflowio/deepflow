@@ -214,6 +214,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "ZMTP";
 	case PROTO_NATS:
 		return "NATS";
+	case PROTO_PULSAR:
+		return "Pulsar";
 	case PROTO_DUBBO:
 		return "Dubbo";
 	case PROTO_SOFARPC:
