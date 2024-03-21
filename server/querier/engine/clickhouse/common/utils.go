@@ -71,6 +71,24 @@ func ParsePermission(permission interface{}) ([]bool, error) {
 	return permissions, nil
 }
 
+// not_supported_operators parsed as an array
+func ParseNotSupportedOperator(notSupportedOperator interface{}) []string {
+	notSupportedOperators := []string{}
+	notSupportedOperatorStr := notSupportedOperator.(string)
+	if len(notSupportedOperatorStr) == 3 {
+		if string(notSupportedOperatorStr[0]) == "1" {
+			notSupportedOperators = append(notSupportedOperators, "select")
+		}
+		if string(notSupportedOperatorStr[1]) == "1" {
+			notSupportedOperators = append(notSupportedOperators, "group")
+		}
+		if string(notSupportedOperatorStr[2]) == "1" {
+			notSupportedOperators = append(notSupportedOperators, "where")
+		}
+	}
+	return notSupportedOperators
+}
+
 func IPFilterStringToHex(ip string) string {
 	if strings.Contains(ip, ":") {
 		return fmt.Sprintf("hex(toIPv6(%s))", ip)

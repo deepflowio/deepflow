@@ -890,6 +890,13 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 	}
 	// Tunnel IP
+	tagResourceMap["tunnel_tx_ip"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"(if(tunnel_is_ipv4=1, hex(tunnel_tx_ip4_0), hex(tunnel_tx_ip6_0)) %s %s OR if(tunnel_is_ipv4=1, hex(tunnel_tx_ip4_1), hex(tunnel_tx_ip6_1)) %s %s)",
+			"",
+		)}
 	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0))",
@@ -902,6 +909,13 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1))",
 			"",
 			"if(tunnel_is_ipv4=1, hex(tunnel_tx_ip4_1), hex(tunnel_tx_ip6_1)) %s %s",
+			"",
+		)}
+	tagResourceMap["tunnel_rx_ip"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"(if(tunnel_is_ipv4=1, hex(tunnel_rx_ip4_0), hex(tunnel_rx_ip6_0)) %s %s OR if(tunnel_is_ipv4=1, hex(tunnel_rx_ip4_1), hex(tunnel_rx_ip6_1)) %s %s)",
 			"",
 		)}
 	tagResourceMap["tunnel_rx_ip_0"] = map[string]*Tag{
@@ -1196,6 +1210,60 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"icon_id": NewTag(iconIdTrans, "", "", "")}
 			}
 		}
+	}
+	// X_Request_ID
+	tagResourceMap["x_request_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"x_request_id_0 %s %s OR x_request_id_1 %s %s",
+			"",
+		),
+	}
+	// Syscall_Thread
+	tagResourceMap["syscall_thread"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"syscall_thread_0 %s %s OR syscall_thread_1 %s %s",
+			"",
+		),
+	}
+	// Syscall_Coroutine
+	tagResourceMap["syscall_coroutine"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"syscall_coroutine_0 %s %s OR syscall_coroutine_1 %s %s",
+			"",
+		),
+	}
+	// Syscall_Cap_Seq
+	tagResourceMap["syscall_cap_seq"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"syscall_cap_seq_0 %s %s OR syscall_cap_seq_1 %s %s",
+			"",
+		),
+	}
+	// Syscall_Trace_ID
+	tagResourceMap["syscall_trace_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"syscall_trace_id_request %s %s OR syscall_trace_id_response %s %s",
+			"",
+		),
+	}
+	// Tcp_Seq
+	tagResourceMap["tcp_seq"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"req_tcp_seq %s %s OR resp_tcp_seq %s %s",
+			"",
+		),
 	}
 	return tagResourceMap
 }
