@@ -48,6 +48,37 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 
 static int probe_read_kernel_feat;
 
+static int suspend_stderr()
+{
+	fflush(stderr);
+
+	int ret = dup(STDERR_FILENO);
+	if (ret == -1) {
+		return -1;
+	}
+	int fd = open("/dev/null", O_WRONLY);
+	if (fd == -1) {
+		close(ret);
+		return -1;
+	}
+	if (dup2(fd, STDERR_FILENO) == -1) {
+		close(fd);
+		close(ret);
+		return -1;
+	}
+	close(fd);
+	return ret;
+}
+
+static void resume_stderr(int fd)
+{
+	fflush(stderr);
+	if (fd < 0)
+		return;
+	dup2(fd, STDERR_FILENO);
+	close(fd);
+}
+
 /*
  * Feature checks for the Linux kernel, 
  * `bpf_probe_read{kernel,user}[_str]`, vary across
@@ -72,11 +103,16 @@ static bool feat_probe_read_kernel(unsigned kern_version)
 		BPF_EXIT_INSN(),
 	};
 
-	int fd;
-	if ((fd = bcc_prog_load
-	     (BPF_PROG_TYPE_TRACEPOINT, NULL, insns, sizeof(insns), LICENSE_DEF,
-	      kern_version, 0, NULL,
-	      0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ )) >= 0) {
+	int stderr_fd = suspend_stderr();
+	if (stderr_fd < 0) {
+		ebpf_warning("Failed to suspend stderr\n");
+	}
+	int fd = bcc_prog_load
+	    (BPF_PROG_TYPE_TRACEPOINT, NULL, insns, sizeof(insns), LICENSE_DEF,
+	     kern_version, 0, NULL,
+	     0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
+	resume_stderr(stderr_fd);
+	if (fd >= 0) {
 		close(fd);
 		probe_read_kernel_feat = KERN_FEAT_SUP;
 		ebpf_info
