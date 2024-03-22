@@ -618,6 +618,7 @@ async fn handler(
         }
         // OpenTelemetry trace integration
         (&Method::POST, "/api/v1/otel/trace") => {
+            log::error!("xxxxxxxxxxxxxxxxxxxxx /api/v1/otel/trace");
             if external_trace_integration_disabled {
                 return Ok(Response::builder().body(Body::empty()).unwrap());
             }
