@@ -33,6 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
+	tagrecordercheck "github.com/deepflowio/deepflow/server/controller/tagrecorder/check"
 )
 
 func IsMasterRegion(cfg *config.ControllerConfig) bool {
@@ -102,6 +103,9 @@ func checkAndStartMasterFunctions(
 
 	httpService := http.GetSingleton()
 
+	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
+	tr := tagrecordercheck.GetSingleton()
+
 	masterController := ""
 	thisIsMasterController := false
 	for range time.Tick(time.Minute) {
@@ -126,7 +130,8 @@ func checkAndStartMasterFunctions(
 
 				// 启动tagrecorder
 				tagRecorder.UpdaterManager.Start()
-				tagRecorder.SubscriberManager.HealthCheck()
+				tr.Check()
+				// tagRecorder.SubscriberManager.HealthCheck()
 
 				// 控制器检查
 				controllerCheck.Start()
@@ -164,6 +169,7 @@ func checkAndStartMasterFunctions(
 
 				// stop tagrecorder
 				tagRecorder.UpdaterManager.Stop()
+				tr.Stop()
 
 				// stop controller check
 				controllerCheck.Stop()
