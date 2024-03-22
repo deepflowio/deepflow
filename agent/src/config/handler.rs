@@ -1081,6 +1081,7 @@ impl PartialEq for L7LogDynamicConfig {
             && self.x_request_id == other.x_request_id
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
+            && self.extra_log_fields == other.extra_log_fields
     }
 }
 
