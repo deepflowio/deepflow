@@ -32,6 +32,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
+var recorderRefreshTryInterval = 5 // unit: s
+
 type Task struct {
 	tCtx    context.Context
 	tCancel context.CancelFunc
@@ -81,14 +83,13 @@ func (t *Task) startDomainRefreshMonitor() {
 	go func() {
 	LOOP:
 		for {
-			log.Infof("task (%s) wait for next refresh", t.DomainName) // TODO delete debug log
+			log.Infof("task (%s) wait for next refresh", t.DomainName)
 			t.domainRefreshSignal.Get()
 			log.Infof("task (%s) call recorder refresh", t.DomainName)
-			log.Infof("task (%s) sub_domain refresh signals: %#v", t.DomainName, t.subDomainRefreshSignals)
 			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); errors.Is(err, recorder.RefreshConflictError) {
 				log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
 				t.domainRefreshSignal.Put(struct{}{})
-				time.Sleep(5 * time.Second) // TODO
+				time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 			}
 
 			select {
@@ -117,17 +118,21 @@ func (t *Task) startSubDomainRefreshMonitor() {
 
 					// TODO 考虑改为并发
 					if signal.Len() != 0 {
+						signal.Get()
+						log.Infof("task (%s) sub_domain (%s) call recorder refresh", t.DomainName, lcuuid)
+
 						// TODO cloud 提供接口获取附属容器集群数据
 						resource := cloudmodel.Resource{
 							SubDomainResources: map[string]cloudmodel.SubDomainResource{lcuuid: t.Cloud.GetResource().SubDomainResources[lcuuid]},
 						}
-						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err == nil {
-							signal.Get()
-						} else {
+						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err != nil {
 							if errors.Is(err, recorder.RefreshConflictError) {
 								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
-								time.Sleep(5 * time.Second) // TODO
+							} else {
+								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s, retry after 5 seconds", t.DomainName, lcuuid, err.Error())
 							}
+							signal.Put(struct{}{})
+							time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 						}
 					}
 				}
