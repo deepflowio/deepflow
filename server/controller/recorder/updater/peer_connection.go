@@ -57,7 +57,7 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,
-			db.NewPeerConnection(),
+			db.NewPeerConnection().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PeerConnections,
 			cloudData,
 		),

@@ -57,7 +57,7 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,
-			db.NewNATRule(),
+			db.NewNATRule().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.NATRules,
 			cloudData,
 		),

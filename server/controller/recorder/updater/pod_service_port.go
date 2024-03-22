@@ -57,7 +57,7 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,
-			db.NewPodServicePort(),
+			db.NewPodServicePort().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodServicePorts,
 			cloudData,
 		),

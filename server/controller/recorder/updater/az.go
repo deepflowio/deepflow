@@ -57,7 +57,7 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
-			db.NewAZ(),
+			db.NewAZ().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.AZs,
 			cloudData,
 		),

@@ -57,7 +57,7 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,
-			db.NewPod(),
+			db.NewPod().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.Pods,
 			cloudData,
 		),

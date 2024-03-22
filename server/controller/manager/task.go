@@ -61,7 +61,7 @@ func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, re
 		tCancel:      tCancel,
 		cfg:          cfg,
 		Cloud:        cloud.NewCloud(domain, cfg.CloudCfg, tCtx),
-		Recorder:     recorder.NewRecorder(domain.Lcuuid, domain.Name, cfg.RecorderCfg, tCtx, resourceEventQueue),
+		Recorder:     recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, common.DEFAULT_ORG_ID, domain.Lcuuid, domain.Name),
 		DomainName:   domain.Name,
 		DomainConfig: domain.Config,
 

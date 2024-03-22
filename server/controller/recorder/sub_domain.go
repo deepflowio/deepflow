@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
@@ -35,6 +36,8 @@ import (
 )
 
 type subDomains struct {
+	org *rcommon.ORG
+
 	domainLcuuid string
 	domainName   string
 	cacheMng     *cache.CacheManager
@@ -43,8 +46,10 @@ type subDomains struct {
 	refreshers map[string]*subDomain
 }
 
-func newSubDomains(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, domainLcuuid, domainName string, cacheMng *cache.CacheManager) *subDomains {
+func newSubDomains(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, org *rcommon.ORG, domainLcuuid, domainName string, cacheMng *cache.CacheManager) *subDomains {
 	return &subDomains{
+		org: org,
+
 		domainLcuuid: domainLcuuid,
 		domainName:   domainName,
 		cacheMng:     cacheMng,
@@ -89,10 +94,14 @@ func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResourc
 }
 
 func (s *subDomains) newRefresher(lcuuid string) *subDomain {
-	return newSubDomain(s.eventQueue, s.domainLcuuid, s.domainName, lcuuid, s.cacheMng.DomainCache.ToolDataSet, s.cacheMng.CreateSubDomainCacheIfNotExists(lcuuid))
+	copiedOrg := rcommon.ReplaceORGLogger(s.org)
+	copiedOrg.Logger.AppendSubDomainLcuuid(lcuuid)
+	return newSubDomain(s.eventQueue, copiedOrg, s.domainLcuuid, s.domainName, lcuuid, s.cacheMng.DomainCache.ToolDataSet, s.cacheMng.CreateSubDomainCacheIfNotExists(lcuuid))
 }
 
 type subDomain struct {
+	org *rcommon.ORG
+
 	domainLcuuid      string
 	domainName        string
 	domainToolDataSet *tool.DataSet
@@ -102,8 +111,10 @@ type subDomain struct {
 	eventQueue *queue.OverwriteQueue
 }
 
-func newSubDomain(eventQueue *queue.OverwriteQueue, domainLcuuid, domainName, lcuuid string, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
+func newSubDomain(eventQueue *queue.OverwriteQueue, org *rcommon.ORG, domainLcuuid, domainName, lcuuid string, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
 	return &subDomain{
+		org: org,
+
 		domainLcuuid:      domainLcuuid,
 		domainName:        domainName,
 		domainToolDataSet: domainToolDataSet,
@@ -244,26 +255,26 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 		return
 	}
 	var subDomain mysql.SubDomain
-	err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
+	err := s.org.DB.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", lcuuid, err)
 		return
 	}
 	subDomain.SyncedAt = &syncAt
-	mysql.Db.Save(&subDomain)
+	s.org.DB.Save(&subDomain)
 	log.Debugf("update sub_domain (%+v)", subDomain)
 }
 
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
-func (r *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
+func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
 	var subDomain mysql.SubDomain
-	err := mysql.Db.Where("lcuuid = ?", r.Lcuuid).First(&subDomain).Error
+	err := s.org.DB.Where("lcuuid = ?", s.Lcuuid).First(&subDomain).Error
 	if err != nil {
-		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", r.Lcuuid, err)
+		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", s.Lcuuid, err)
 		return
 	}
 	subDomain.State = cloudData.ErrorState
 	subDomain.ErrorMsg = cloudData.ErrorMessage
-	mysql.Db.Save(&subDomain)
+	s.org.DB.Save(&subDomain)
 	log.Debugf("update sub_domain (%+v)", subDomain)
 }

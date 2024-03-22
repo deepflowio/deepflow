@@ -57,7 +57,7 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,
-			db.NewDHCPPort(),
+			db.NewDHCPPort().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.DHCPPorts,
 			cloudData,
 		),

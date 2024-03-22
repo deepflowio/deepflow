@@ -57,7 +57,7 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewLBVMConnection(),
+			db.NewLBVMConnection().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.LBVMConnections,
 			cloudData,
 		),

@@ -33,11 +33,11 @@ type PodService struct {
 
 func NewPodService(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodService {
 	mng := &PodService{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE,
 	}
 	return mng

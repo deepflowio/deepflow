@@ -57,7 +57,7 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,
-			db.NewVIP(),
+			db.NewVIP().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VIP,
 			cloudData,
 		),

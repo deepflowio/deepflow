@@ -57,7 +57,7 @@ func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.Securi
 		](
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			wholeCache,
-			db.NewSecurityGroupRule(),
+			db.NewSecurityGroupRule().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.SecurityGroupRules,
 			cloudData,
 		),

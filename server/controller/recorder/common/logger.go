@@ -29,25 +29,35 @@ type Logger struct {
 func NewLogger(orgID int) *Logger {
 	return &Logger{
 		ORGID:  orgID,
-		MsgPre: fmt.Sprintf("org id: %d, ", orgID),
+		MsgPre: fmt.Sprintf("oid: %d, ", orgID),
 	}
 }
 
 func (l *Logger) AppendDomainName(domainName string) {
 	l.DomainName = domainName
-	l.MsgPre += fmt.Sprintf("domain name: %s, ", domainName)
+	l.MsgPre += fmt.Sprintf("dn: %s, ", domainName)
 }
 
 func (l *Logger) AppendDomainLcuuid(domainLcuuid string) {
 	l.DomainLcuuid = domainLcuuid
-	l.MsgPre += fmt.Sprintf("domain lcuuid: %s, ", domainLcuuid)
+	l.MsgPre += fmt.Sprintf("dl: %s, ", domainLcuuid)
 }
 
 func (l *Logger) AppendSubDomainLcuuid(subDomainLcuuid string) {
 	l.SubDomainLcuuid = subDomainLcuuid
-	l.MsgPre += fmt.Sprintf("sub domain lcuuid: %s, ", subDomainLcuuid)
+	l.MsgPre += fmt.Sprintf("sbl: %s, ", subDomainLcuuid)
 }
 
 func (l *Logger) AddPre(format string, a ...any) string {
 	return l.MsgPre + fmt.Sprintf(format, a...)
+}
+
+func CopyLogger(l *Logger) *Logger {
+	return &Logger{
+		ORGID:           l.ORGID,
+		DomainName:      l.DomainName,
+		DomainLcuuid:    l.DomainLcuuid,
+		SubDomainLcuuid: l.SubDomainLcuuid,
+		MsgPre:          l.MsgPre,
+	}
 }

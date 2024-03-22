@@ -22,6 +22,7 @@ import (
 	"github.com/op/go-logging"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -35,12 +36,17 @@ type Recorder struct {
 	domainRefresher *domain
 }
 
-func NewRecorder(domainLcuuid, domainName string, cfg config.RecorderConfig, ctx context.Context, eventQueue *queue.OverwriteQueue) *Recorder {
+func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, orgID int, domainLcuuid, domainName string) *Recorder {
+	org, err := common.NewORG(orgID)
+	if err != nil {
+		log.Errorf("failed to create org object: %s", err.Error())
+		return nil
+	}
 	return &Recorder{
 		cfg: cfg,
 		ctx: ctx,
 
-		domainRefresher: newDomain(ctx, cfg, eventQueue, domainLcuuid, domainName),
+		domainRefresher: newDomain(ctx, cfg, eventQueue, org, domainLcuuid, domainName),
 	}
 }
 

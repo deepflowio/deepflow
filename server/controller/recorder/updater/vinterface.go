@@ -60,7 +60,7 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
-			db.NewVInterface(),
+			db.NewVInterface().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VInterfaces,
 			cloudData,
 		),

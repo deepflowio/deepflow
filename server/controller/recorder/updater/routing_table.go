@@ -57,7 +57,7 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,
-			db.NewRoutingTable(),
+			db.NewRoutingTable().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.RoutingTables,
 			cloudData,
 		),

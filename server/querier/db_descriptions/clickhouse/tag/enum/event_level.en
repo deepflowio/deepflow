@@ -4,3 +4,4 @@
 3       , Warn            ,
 4       , NoData          ,
 5       , Recovered       ,
+6       , Info            ,

@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
@@ -44,11 +45,18 @@ type DBItemSetter[MT constraint.MySQLModel] interface {
 }
 
 type OperatorBase[MT constraint.MySQLModel] struct {
+	org *rcommon.ORG
+
 	resourceTypeName        string
 	softDelete              bool
 	allocateID              bool
 	fieldsNeededAfterCreate []string // fields needed to be used after create
 	setter                  DBItemSetter[MT]
+}
+
+func (o *OperatorBase[MT]) SetORG(org *rcommon.ORG) Operator[MT] {
+	o.org = org
+	return o
 }
 
 func (o *OperatorBase[MT]) setFieldsNeededAfterCreate(fs []string) {
@@ -61,13 +69,13 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 		return nil, false
 	}
 
-	err := mysql.Db.Create(&itemsToAdd).Error
+	err := o.org.DB.Create(&itemsToAdd).Error
 	if err != nil {
 		log.Errorf("add %s batch failed: %v", o.resourceTypeName, err)
 		log.Errorf("add %s (lcuuids: %v) failed", o.resourceTypeName, lcuuidsToAdd)
 
 		if o.allocateID && len(allocatedIDs) > 0 {
-			idmng.ReleaseIDs(common.DEFAULT_ORG_ID, o.resourceTypeName, allocatedIDs)
+			idmng.ReleaseIDs(o.org.ID, o.resourceTypeName, allocatedIDs)
 		}
 		return nil, false
 	}
@@ -79,8 +87,8 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	// 		2. We need to use the ids of the created items
 	// 		3. Ids are not allocated by ourselves
 	// 		4. Use gorm to insert batch data
-	if mysql.DbConfig.AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
-		mysql.Db.Select(o.fieldsNeededAfterCreate).Where("lcuuid IN ?", lcuuidsToAdd).Find(&itemsToAdd)
+	if mysql.GetConfig().AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
+		o.org.DB.Select(o.fieldsNeededAfterCreate).Where("lcuuid IN ?", lcuuidsToAdd).Find(&itemsToAdd)
 	}
 
 	for _, item := range itemsToAdd {
@@ -92,19 +100,19 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 
 func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool) {
 	dbItem := new(MT)
-	err := mysql.Db.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
+	err := o.org.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (lcuuid: %s, detail: %+v) failed: %s", o.resourceTypeName, lcuuid, updateInfo, err.Error())
 		return dbItem, false
 	}
 	log.Infof("update %s (lcuuid: %s, detail: %+v) success", o.resourceTypeName, lcuuid, updateInfo)
-	mysql.Db.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
+	o.org.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
 }
 
 func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 	var deletedItems []*MT
-	err := mysql.Db.Clauses(clause.Returning{}).Where("lcuuid IN ?", lcuuids).Delete(&deletedItems).Error
+	err := o.org.DB.Clauses(clause.Returning{}).Where("lcuuid IN ?", lcuuids).Delete(&deletedItems).Error
 	if err != nil {
 		log.Errorf("delete %s (lcuuids: %v) failed: %v", o.resourceTypeName, lcuuids, err)
 		return nil, false
@@ -153,7 +161,7 @@ func (o OperatorBase[MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[string]
 
 func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem map[string]*MT) ([]*MT, []string, bool) {
 	var dupItems []*MT
-	err := mysql.Db.Unscoped().Where("lcuuid IN ?", lcuuids).Find(&dupItems).Error
+	err := o.org.DB.Unscoped().Where("lcuuid IN ?", lcuuids).Find(&dupItems).Error
 	if err != nil {
 		log.Errorf("get %s duplicate data failed: %v", o.resourceTypeName, err)
 		return nil, nil, false
@@ -178,7 +186,7 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 				// (*dbItem).SetID((*dupItem).GetID()) // TODO 不可行
 			}
 			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs)
-			err = mysql.Db.Unscoped().Delete(&dupItems).Error
+			err = o.org.DB.Unscoped().Delete(&dupItems).Error
 			if err != nil {
 				log.Errorf("delete duplicated data failed: %+v", err)
 				return items, lcuuids, false
@@ -222,7 +230,7 @@ func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 			}
 		}
 		if count > 0 {
-			ids, err := idmng.GetIDs(common.DEFAULT_ORG_ID, o.resourceTypeName, count)
+			ids, err := idmng.GetIDs(o.org.ID, o.resourceTypeName, count)
 			if err != nil {
 				log.Errorf("%s request ids failed", o.resourceTypeName)
 				return itemsHasID, []int{}, false
@@ -248,7 +256,7 @@ func (o *OperatorBase[MT]) returnUsedIDs(deletedItems []*MT) {
 		for _, dbItem := range deletedItems {
 			ids = append(ids, (*dbItem).GetID())
 		}
-		err := idmng.ReleaseIDs(common.DEFAULT_ORG_ID, o.resourceTypeName, ids)
+		err := idmng.ReleaseIDs(o.org.ID, o.resourceTypeName, ids)
 		if err != nil {
 			log.Errorf("%s release ids: %v failed", o.resourceTypeName, ids)
 		}

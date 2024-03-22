@@ -31,11 +31,11 @@ type RDSInstance struct {
 
 func NewRDSInstance(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *RDSInstance {
 	return &RDSInstance{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE,
 	}
 }

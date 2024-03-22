@@ -35,22 +35,23 @@ import (
 type Process struct {
 	EventManagerBase
 	deviceType int
+	tool       *IPTool
 }
 
 func NewProcess(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Process {
 	mng := &Process{
-		EventManagerBase{
-			resourceType: "process",
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase("process",
+			toolDS,
+			eq,
+		),
 		common.PROCESS_INSTANCE_TYPE,
+		newTool(toolDS),
 	}
 	return mng
 }
 
 func (p *Process) ProduceByAdd(items []*mysql.Process) {
-	processData, err := GetProcessData(items)
+	processData, err := p.GetProcessData(items)
 	if err != nil {
 		log.Error(err)
 	}
@@ -76,7 +77,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 					eventapi.TagPodNodeID(info.PodNodeID),
 					eventapi.TagPodNSID(info.PodNamespaceID),
 				}...)
-				if l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, info.PodNodeID); ok {
+				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(info.PodNodeID); ok {
 					opts = append(opts, l3DeviceOpts...)
 				}
 			}
@@ -94,7 +95,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 					eventapi.TagVPCID(info.VPCID),
 					eventapi.TagPodClusterID(info.PodClusterID),
 				}...)
-				if l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, podNodeID); ok {
+				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(podNodeID); ok {
 					opts = append(opts, l3DeviceOpts...)
 				}
 			}
@@ -161,14 +162,14 @@ type ProcessData struct {
 	VTapName     string
 }
 
-func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
+func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 	// store vtap info
 	vtapIDs := mapset.NewSet[uint32]()
 	for _, item := range processes {
 		vtapIDs.Add(item.VTapID)
 	}
 	var vtaps []mysql.VTap
-	if err := mysql.Db.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
+	if err := p.org.DB.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
 		return nil, err
 	}
 	type vtapInfo struct {
@@ -194,7 +195,7 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 
 	// store vm info
 	var vms []mysql.VM
-	if err := mysql.Db.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+	if err := p.org.DB.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -204,7 +205,7 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+	if err := p.org.DB.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))
@@ -214,7 +215,7 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 
 	// store pod info
 	var pods []mysql.Pod
-	if err := mysql.Db.Find(&pods).Error; err != nil {
+	if err := p.org.DB.Find(&pods).Error; err != nil {
 		return nil, err
 	}
 	podIDToName := make(map[int]string, len(pods))

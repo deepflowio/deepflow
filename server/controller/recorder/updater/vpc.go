@@ -57,7 +57,7 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
-			db.NewVPC(),
+			db.NewVPC().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.VPCs,
 			cloudData,
 		),

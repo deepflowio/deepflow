@@ -57,7 +57,7 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			wholeCache,
-			db.NewPodReplicaSet(),
+			db.NewPodReplicaSet().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.PodReplicaSets,
 			cloudData,
 		),

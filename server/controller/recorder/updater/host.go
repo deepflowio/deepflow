@@ -57,7 +57,7 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
-			db.NewHost(),
+			db.NewHost().SetORG(wholeCache.GetORG()),
 			wholeCache.DiffBaseDataSet.Hosts,
 			cloudData,
 		),
