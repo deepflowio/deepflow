@@ -100,6 +100,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -171,6 +173,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		PodClusterId: &podClusterId,
 
 		Plugins: e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &loadMetric,
 	}
 
 	cacheTSBIP := c.GetTSDBIP()
@@ -236,6 +242,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	}
 
 	return configure
+}
+
+// convertBreakerMetric make the first letter of a string uppercase, such as load1 to Load1.
+func convertBreakerMetric(breakerMetric string) string {
+	var breakerMetricStr string
+	if len(breakerMetric) >= 2 {
+		breakerMetricStr = strings.ToUpper(string(breakerMetric[0])) + breakerMetric[1:]
+	}
+	return breakerMetricStr
 }
 
 func isOpenK8sSyn(vtapType int) bool {
@@ -459,6 +474,8 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -518,6 +535,10 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
 		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		Plugins:             e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &loadMetric,
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)

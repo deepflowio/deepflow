@@ -27,6 +27,7 @@ vendor:
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${LIBS} && go generate ./...
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < ../server/patch/clickhouse-go/write_improve.patch
+	patch -p1 -d vendor/github.com/cornelk/hashmap < ../server/patch/cornelk_hashmap/complex128.patch
 
 .PHONY: cli
 cli: vendor
