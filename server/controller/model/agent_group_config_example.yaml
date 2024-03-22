@@ -1005,6 +1005,7 @@ vtap_group_id: g-xxxxxx
   #- HTTP2 ## for both HTTP2 and gRPC
   #- SofaRPC
   #- FastCGI
+  #- bRPC
   #- Dubbo
   #- MySQL
   #- PostgreSQL
