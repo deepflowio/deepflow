@@ -104,6 +104,7 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 		PodIngressID:     podIngressID,
 		PodIngressRuleID: podIngressRuleID,
 		SubDomain:        cloudItem.SubDomainLcuuid,
+		Domain:           b.cache.DomainLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

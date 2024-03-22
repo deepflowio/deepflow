@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS routing_table (
     destination         TEXT,
     nexthop_type        TEXT,
     nexthop             TEXT,
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64)
 )engine=innodb AUTO_INCREMENT=1  DEFAULT CHARSET=utf8;
 TRUNCATE TABLE routing_table;
@@ -236,6 +237,7 @@ CREATE TABLE IF NOT EXISTS security_group_rule (
     remote              TEXT,
     priority            INTEGER NOT NULL,
     action              TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0.Unknow 1.Accept 2.Drop',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT ''
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE security_group_rule;
@@ -245,6 +247,7 @@ CREATE TABLE IF NOT EXISTS vm_security_group (
     sg_id               INTEGER NOT NULL,
     vm_id               INTEGER NOT NULL,
     priority            INTEGER NOT NULL,
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT ''
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE vm_security_group;
@@ -288,6 +291,7 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     name                VARCHAR(256) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
     PRIMARY KEY (id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
@@ -444,6 +448,7 @@ INSERT INTO az (id, name, lcuuid, region, domain) values(1, '系统默认', 'fff
 
 CREATE TABLE IF NOT EXISTS domain (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id             INTEGER DEFAULT 0,
     name                VARCHAR(64),
     icon_id             INTEGER,
     display_name        VARCHAR(64) DEFAULT '',
@@ -917,6 +922,7 @@ CREATE TABLE IF NOT EXISTS pod_service_port (
     node_port           INTEGER,
     pod_service_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_service_port;
@@ -929,6 +935,7 @@ CREATE TABLE IF NOT EXISTS pod_group_port (
     pod_group_id        INTEGER DEFAULT NULL,
     pod_service_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT ''
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_group_port;
@@ -957,6 +964,7 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule (
     host                TEXT,
     pod_ingress_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT ''
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule;
@@ -969,6 +977,7 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
     pod_ingress_rule_id INTEGER DEFAULT NULL,
     pod_ingress_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT ''
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule_backend;
