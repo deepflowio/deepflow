@@ -333,16 +333,17 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	versionGroups := gVTapInfo.GetGroupDataVersion()
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
+	policyStr := gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
 		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
 			"(platform data version  %d -> %d), "+
-			"(acls version %d -> %d), "+
+			"(acls version %d -> %d, datalen: %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(),
 			versionPlatformData, in.GetVersionPlatformData(),
-			versionPolicy, in.GetVersionAcls(),
+			versionPolicy, in.GetVersionAcls(), len(policyStr),
 			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
@@ -701,10 +702,8 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if versionGroups != pushVersionGroups {
 		groups = gVTapInfo.GetGroupData()
 	}
-	acls := []byte{}
-	if versionPolicy != in.GetVersionAcls() {
-		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
-	}
+
+	acls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
 
 	// 只有专属采集器下发tap_types
 	tapTypes := []*api.TapType{}
@@ -729,12 +728,12 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	Containers := gVTapInfo.GetContainers(int(vtapCache.GetVTapID()))
 	log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, "+
 		"(platform data version: %d datalen: %d), "+
-		"(acls version:%d datalen: %d), "+
+		"(acls version:%d  request version:%d, datalen: %d), "+
 		"(groups version:%d datalen:%d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 		ctrlIP, ctrlMac,
 		versionPlatformData, len(platformData),
-		versionPolicy, len(acls),
+		versionPolicy, in.GetVersionAcls(), len(acls),
 		versionGroups, len(groups),
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	return &api.SyncResponse{
