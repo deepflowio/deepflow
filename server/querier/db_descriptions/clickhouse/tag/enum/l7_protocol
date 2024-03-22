@@ -6,6 +6,7 @@
 41      , gRPC            ,
 43      , SOFARPC         ,
 44      , FastCGI         ,
+45      , bRPC            ,
 60      , MySQL           ,
 61      , PostgreSQL      ,
 62      , Oracle          ,
