@@ -225,6 +225,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("AMQP");
         } else if sk_proto_safe(sd) == SOCK_DATA_NATS {
             proto_tag.push_str("NATS");
+        } else if sk_proto_safe(sd) == SOCK_DATA_PULSAR {
+            proto_tag.push_str("PULSAR");
         } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
             proto_tag.push_str("DUBBO");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
@@ -402,6 +404,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
         enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
         enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
+        enable_ebpf_protocol(SOCK_DATA_PULSAR as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
@@ -537,6 +540,13 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_NATS as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_PULSAR as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
                 .as_c_str()

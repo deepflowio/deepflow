@@ -596,8 +596,8 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		    conn_info->socket_info_ptr->direction) {
 			bpf_probe_read_kernel(conn_info->prev_buf,
 					      sizeof(conn_info->prev_buf),
-					      conn_info->socket_info_ptr->
-					      prev_data);
+					      conn_info->
+					      socket_info_ptr->prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -1184,16 +1184,28 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	 * Here, we assume a maximum length of 128 bytes for the queries name.
 	 * If queries name exceeds 128 bytes, the identification of AAAA or A
 	 * types will be impossible.
+	 *
+	 * For decreasing the stack usage, we use a 32-byte buffer to store the
+	 * queries name, and repeatedly read the queries name from the buffer.
 	 */
 	conn_info->dns_q_type = 0;
-	__u8 tmp_buf[128];
+	__u8 tmp_buf[32];
 	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
-	// bpf_probe_read_user_str() returns the length including '\0'.
-	const int len =
-	    bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf), queries_start);
-	if (len > 0 && len < sizeof(tmp_buf)) {
-		bpf_probe_read_user(tmp_buf, 2, queries_start + len);
-		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *) tmp_buf);
+	for (int i = 0; i < 4; i++) {
+		short tmp =
+		    bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf),
+					    queries_start);
+		if (tmp < 0) {
+			break;
+		}
+		if (tmp != sizeof(tmp_buf)) {
+			queries_start += tmp;
+			bpf_probe_read_user(tmp_buf, 2, queries_start);
+			conn_info->dns_q_type = __bpf_ntohs(*(__u16 *) tmp_buf);
+			break;
+		} else {
+			queries_start += tmp - 1;
+		}
 	}
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
@@ -1971,6 +1983,182 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+static __inline bool pulsar_check_basecommand(const char *buf, size_t count)
+{
+	/*
+	 * message BaseCommand {
+	 *   required Type type = 1;
+	 *   optional CommandConnect connect          = 2;
+	 *   optional CommandConnected connected      = 3;
+	 *   ....
+	 *   optional CommandTopicMigrated topicMigrated = 68;
+	 * }
+	 */
+#define WIRE_TYPE_VARINT 0
+#define WIRE_TYPE_LEN 2
+#define MIN_TAG 2		// connect
+#define MAX_TAG 68		// topicMigrated
+
+	short type_v = -1, command_tag = -1;
+	const char *target = buf + count;
+
+	if (count == 0)
+		return false;
+
+	unsigned char tmp;
+
+	// https://protobuf.dev/programming-guides/encoding/
+#pragma unroll
+	for (short i = 0; i < 2; i++) {
+		if (buf == target)
+			return false;
+		bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+		buf += sizeof(tmp);
+		short tag = tmp >> 3, wire_type = tmp & 0x07;
+		if (tag == 1) {
+			if (wire_type != WIRE_TYPE_VARINT)
+				return false;
+			if (buf == target)
+				return false;
+			bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+			buf += sizeof(tmp);
+			type_v = tmp;
+			// for varint, the most significant bit is the continuation bit
+			if (tmp & 0x80) {
+				if (buf == target)
+					return false;
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				buf += sizeof(tmp);
+				if (tmp & 0x80)
+					return false;
+				type_v |= tmp << 7;
+			}
+		} else {
+			if (tmp & 0x80) {
+				if (buf == target)
+					return false;
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				buf += sizeof(tmp);
+				if (tmp & 0x80)
+					return false;
+				tag |= tmp << 4;
+			}
+			if (tag < MIN_TAG || tag > MAX_TAG)
+				return false;
+			if (wire_type != WIRE_TYPE_LEN)
+				return false;
+			command_tag = tag;
+			short len = 0;
+			if (buf == target)
+				return false;
+			bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+			buf += sizeof(tmp);
+			len |= tmp & 0x7f;
+			if (tmp & 0x80) {
+				if (buf == target)
+					return false;
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				buf += sizeof(tmp);
+				if (tmp & 0x80)
+					return false;
+				len |= tmp << 7;
+			}
+			buf += len;
+		}
+	}
+
+	if (type_v == -1 || command_tag == -1)
+		return false;
+	if (buf != target)
+		return false;
+	return type_v == command_tag;
+
+#undef WIRE_TYPE_VARINT
+#undef WIRE_TYPE_LEN
+#undef MIN_TAG
+#undef MAX_TAG
+}
+
+// https://pulsar.apache.org/docs/3.2.x/developing-binary-protocol/
+static __inline enum message_type infer_pulsar_message(const char *ptr,
+						       __u32 infer_len,
+						       __u32 count,
+						       struct conn_info_s
+						       *conn_info)
+{
+	if (infer_len < 8)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_PULSAR, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_PULSAR)
+			return MSG_UNKNOWN;
+	}
+
+	char buffer[4];
+
+	bpf_probe_read_user(buffer, 4, ptr);
+	short total_size = __bpf_ntohl(*(__u32 *) buffer);
+	bpf_probe_read_user(buffer, 4, ptr + 4);
+	short command_size = __bpf_ntohl(*(__u32 *) buffer);
+
+	if (total_size < command_size + 4 || total_size + 4 < count)
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto == PROTO_PULSAR)
+			return MSG_REQUEST;
+		return MSG_UNKNOWN;
+	}
+
+	short limit = total_size + 4 < infer_len ? total_size + 4 : infer_len;
+
+	short offset = 8;
+	if (!pulsar_check_basecommand(ptr + 8, command_size))
+		return MSG_UNKNOWN;
+	offset += command_size;
+
+	if (offset == total_size + 4)
+		return MSG_REQUEST;
+
+	if (offset + 2 > limit)
+		return MSG_UNKNOWN;
+	bpf_probe_read_user(buffer, 2, ptr + offset);
+	offset += 2;
+
+	if (buffer[0] == '\x0e' && buffer[1] == '\x02') {
+		if (offset + 4 > limit)
+			return MSG_UNKNOWN;
+		bpf_probe_read_user(buffer, 4, ptr + offset);
+		offset += 4;
+
+		short broker_entry_size = __bpf_ntohl(*(__u32 *) buffer);
+		if (offset + broker_entry_size > limit)
+			return MSG_UNKNOWN;
+		offset += broker_entry_size;
+
+		if (offset + 2 > limit)
+			return MSG_UNKNOWN;
+		bpf_probe_read_user(buffer, 2, ptr + offset);
+		offset += 2;
+	}
+	if (buffer[0] != '\x0e' || buffer[1] != '\x01')
+		return MSG_UNKNOWN;
+	offset += 4;		// checksum, ignored
+
+	if (offset + 4 > limit)
+		return MSG_UNKNOWN;
+	bpf_probe_read_user(buffer, 4, ptr + offset);
+	offset += 4;
+
+	short metadata_size = __bpf_ntohl(*(__u32 *) buffer);
+	if (offset + metadata_size > total_size + 4)
+		return MSG_UNKNOWN;
+	return MSG_REQUEST;
+}
+
 static __inline bool check_zmtp_mechanism(const char *buf)
 {
 	// check mechanism fields
@@ -2072,7 +2260,7 @@ static __inline bool check_zmtp_segment(const char *buf,
 				return false;
 			}
 			// check first 5 bytes of command name
-			static const int MIN_CMD_LEN = 5;
+#define MIN_CMD_LEN 5
 			char cmd_buf[MIN_CMD_LEN];
 			if (bpf_probe_read_user
 			    (cmd_buf, MIN_CMD_LEN, ptr + offset)) {
@@ -2083,6 +2271,7 @@ static __inline bool check_zmtp_segment(const char *buf,
 				if (byte < 'A' || byte > 'Z')
 					return false;
 			}
+#undef MIN_CMD_LEN
 		}
 		return true;
 	} else {
@@ -3121,6 +3310,16 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_PULSAR:
+			if ((inferred_message.type =
+			     infer_pulsar_message(syscall_infer_addr,
+						  syscall_infer_len,
+						  count,
+						  conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_PULSAR;
+				return inferred_message;
+			}
+			break;
 		case PROTO_DUBBO:
 			if ((inferred_message.type =
 			     infer_dubbo_message(infer_buf, count,
@@ -3398,6 +3597,16 @@ infer_protocol_2(const char *infer_buf, size_t count,
 				       syscall_infer_len,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_NATS;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_PULSAR && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_pulsar_message(syscall_infer_addr,
+					 syscall_infer_len,
+					 count,
+					 conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_PULSAR;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else

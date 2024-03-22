@@ -79,6 +79,8 @@ pub const SOCK_DATA_OPENWIRE: u16 = 103;
 #[allow(dead_code)]
 pub const SOCK_DATA_NATS: u16 = 104;
 #[allow(dead_code)]
+pub const SOCK_DATA_PULSAR: u16 = 105;
+#[allow(dead_code)]
 pub const SOCK_DATA_ZMTP: u16 = 106;
 #[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
