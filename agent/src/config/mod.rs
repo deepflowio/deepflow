@@ -33,6 +33,6 @@ pub use handler::FlowAccess;
 pub use handler::{DispatcherConfig, FlowConfig, ModuleConfig, NpbConfig};
 
 #[cfg(test)]
-pub use config::{HttpEndpointExtraction, MatchRule};
+pub use config::{ExtraLogFields, HttpEndpointExtraction, MatchRule};
 #[cfg(test)]
 pub use handler::HttpEndpointTrie;

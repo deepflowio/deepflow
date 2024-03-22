@@ -1113,8 +1113,6 @@ impl HttpLog {
                     info.proto = L7Protocol::Grpc;
                 }
             }
-            "user-agent" => info.user_agent = Some(String::from_utf8_lossy(val).into_owned()),
-            "referer" => info.referer = Some(String::from_utf8_lossy(val).into_owned()),
             _ => {}
         }
 
@@ -1147,6 +1145,34 @@ impl HttpLog {
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
             info.client_ip = Some(val.to_owned());
         }
+
+        fn process_attributes(
+            config: &L7LogDynamicConfig,
+            info: &mut HttpInfo,
+            key: &str,
+            val: &str,
+        ) {
+            let field_iter = match info.proto {
+                L7Protocol::Http1 => config.extra_log_fields.http.iter(),
+                L7Protocol::Http2 => config.extra_log_fields.http2.iter(),
+                L7Protocol::Grpc => config.extra_log_fields.grpc.iter(),
+                _ => return,
+            };
+
+            info.attributes.extend(field_iter.filter_map(|f| {
+                if f.field_name.eq_ignore_ascii_case(key) {
+                    Some(KeyVal {
+                        key: key.replace("-", "_"),
+                        val: val.to_owned(),
+                    })
+                } else {
+                    None
+                }
+            }));
+        }
+
+        process_attributes(config, info, key, val);
+
         Ok(())
     }
 
@@ -1505,7 +1531,8 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 #[cfg(test)]
 mod tests {
     use crate::config::{
-        handler::LogParserConfig, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
+        handler::LogParserConfig, ExtraLogFields, HttpEndpointExtraction, HttpEndpointTrie,
+        MatchRule,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
@@ -1546,6 +1573,7 @@ mod tests {
             vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
+            ExtraLogFields::default(),
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,

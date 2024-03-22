@@ -1054,6 +1054,15 @@ vtap_group_id: g-xxxxxx
     ## - Redis
     #obfuscate-enabled-protocols: []
 
+    ## Configuration to extract the customized header fields of HTTP, HTTP2, GRPC protocol etc
+    #extra-log-fields:
+    ## for example:
+    ## http:
+    ## - field-name: "user-agent"
+    ## - field-name: "cookie"
+    #  http: []
+    #  http2: []
+    #  grpc: []
 
   #oracle-parse-config:
     #is-be: true
