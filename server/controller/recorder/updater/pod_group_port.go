@@ -96,6 +96,7 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 		PodServiceID: podServiceID,
 		PodGroupID:   podGroupID,
 		SubDomain:    cloudItem.SubDomainLcuuid,
+		Domain:       p.cache.DomainLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
