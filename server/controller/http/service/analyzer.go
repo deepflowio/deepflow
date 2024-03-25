@@ -31,7 +31,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 )
 
-func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err error) {
+func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyzer, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var response []model.Analyzer
 	var analyzers []mysql.Analyzer
 	var controllers []mysql.Controller
@@ -40,7 +45,6 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 	var azAnalyzerconns []mysql.AZAnalyzerConnection
 	var vtaps []mysql.VTap
 
-	db := mysql.Db
 	if lcuuid, ok := filter["lcuuid"]; ok {
 		db = db.Where("lcuuid = ?", lcuuid)
 	} else if ip, ok := filter["ip"]; ok {
@@ -50,7 +54,7 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 	} else if region, ok := filter["region"]; ok {
 		azConns := []mysql.AZAnalyzerConnection{}
 		ips := []string{}
-		mysql.Db.Where("region = ?", region).Find(&azConns)
+		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
 			ips = append(ips, conn.AnalyzerIP)
 		}
@@ -60,11 +64,11 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		db = db.Where("state IN (?)", states)
 	}
 	db.Find(&analyzers)
-	mysql.Db.Find(&controllers)
-	mysql.Db.Find(&regions)
-	mysql.Db.Find(&azs)
-	mysql.Db.Find(&azAnalyzerconns)
-	mysql.Db.Find(&vtaps)
+	db.Find(&controllers)
+	db.Find(&regions)
+	db.Find(&azs)
+	db.Find(&azAnalyzerconns)
+	db.Find(&vtaps)
 
 	lcuuidToRegion := make(map[string]*mysql.Region)
 	for i, region := range regions {
@@ -172,19 +176,24 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 }
 
 func UpdateAnalyzer(
-	lcuuid string, analyzerUpdate map[string]interface{}, m *monitor.AnalyzerCheck,
-	cfg *config.ControllerConfig,
+	orgID int, lcuuid string, analyzerUpdate map[string]interface{},
+	m *monitor.AnalyzerCheck, cfg *config.ControllerConfig,
 ) (resp *model.Analyzer, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var analyzer mysql.Analyzer
 	var dbUpdateMap = make(map[string]interface{})
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
 		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
 	log.Infof("update analyzer (%s) config %v", analyzer.Name, analyzerUpdate)
 
-	tx := mysql.Db.Begin()
+	tx := db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
@@ -202,7 +211,7 @@ func UpdateAnalyzer(
 		if vtapMax < analyzer.VTapMax {
 			vtaps := []mysql.VTap{}
 			updateVTapLcuuids := []string{}
-			mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&vtaps)
+			db.Where("analyzer_ip = ?", analyzer.IP).Find(&vtaps)
 			if len(vtaps) > vtapMax {
 				if vtapMax == 0 {
 					for _, vtap := range vtaps {
@@ -225,7 +234,7 @@ func UpdateAnalyzer(
 	// 检查: 如果区域内没有控制器，禁止将数据节点修改至该区域
 	if _, ok := analyzerUpdate["REGION"]; ok {
 		var azControllerConns []mysql.AZControllerConnection
-		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
+		db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
 		if len(azControllerConns) == 0 {
 			return nil, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
 		}
@@ -250,7 +259,7 @@ func UpdateAnalyzer(
 		)
 		var analyzerRegion string
 		var azAnalyzerConns []mysql.AZAnalyzerConnection
-		mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
+		db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
 		if len(azAnalyzerConns) > 0 {
 			analyzerRegion = azAnalyzerConns[0].Region
 		} else {
@@ -414,27 +423,32 @@ func UpdateAnalyzer(
 		tx.Rollback()
 		return nil, err
 	}
-	response, _ := GetAnalyzers(map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetAnalyzers(orgID, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
 }
 
-func DeleteAnalyzer(lcuuid string, m *monitor.AnalyzerCheck) (resp map[string]string, err error) {
+func DeleteAnalyzer(orgID int, lcuuid string, m *monitor.AnalyzerCheck) (resp map[string]string, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var analyzer mysql.Analyzer
 	var vtapCount int64
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete analyzer (%s)", analyzer.Name)
 
-	mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Count(&vtapCount)
+	db.Where("analyzer_ip = ?", analyzer.IP).Count(&vtapCount)
 	if vtapCount > 0 {
 		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("analyzer (%s) is being used by vtap", lcuuid))
 	}
 
-	mysql.Db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", analyzer.IP)
-	mysql.Db.Delete(&analyzer)
+	db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", analyzer.IP)
+	db.Delete(&analyzer)
 
 	// 触发对应的采集器重新分配数据节点
 	m.TriggerReallocAnalyzer(analyzer.IP)
