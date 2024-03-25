@@ -62,6 +62,9 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 	}
 
 	alarmEventor, err := NewAlarmEventor(config, recv, manager, platformDataManager.GetMasterPlatformInfoTable())
+	if err != nil {
+		return nil, err
+	}
 
 	return &Event{
 		Config:          config,
