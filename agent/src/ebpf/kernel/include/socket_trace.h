@@ -137,10 +137,12 @@ struct conn_info_s {
 	 */
 	__u8 need_reconfirm:1;
 	/*
-	 * True to keep the sequence number of the
-	 * captured data unchanged, otherwise false.
+	 * Retain tracing information without deletion, primarily
+	 * addressing scenarios where MySQL kComStmtClose/kComStmtQuit
+	 * single-sided transmissions (client requests without responses)
+	 * tracing gets interrupted.
 	 */
-	__u8 reserve:1;
+	__u8 keep_trace:1;
 	__u8 direction:1;	// current T_INGRESS or T_EGRESS
 	__u8 prev_direction:1;	// The direction of the last saved data
 	__u8 role:2;

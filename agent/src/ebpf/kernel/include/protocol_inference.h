@@ -649,6 +649,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	static const __u8 kComStmtPrepare = 0x16;
 	static const __u8 kComStmtExecute = 0x17;
 	static const __u8 kComStmtClose = 0x19;
+	static const __u8 kComStmtQuit = 0x01; 
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
@@ -701,12 +702,16 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	if (com != kComConnect && com != kComQuery && com != kComStmtPrepare &&
-	    com != kComStmtExecute && com != kComStmtClose) {
+	if (com != kComConnect && com != kComQuery &&
+	    com != kComStmtPrepare && com != kComStmtExecute &&
+	    com != kComStmtClose && com != kComStmtQuit) {
 		return MSG_UNKNOWN;
 	}
 
 out:
+	if (com == kComStmtClose || com == kComStmtQuit)
+		conn_info->keep_trace = 1;
+
 	if (is_mysqld)
 		return conn_info->direction ==
 		    T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
@@ -3059,6 +3064,13 @@ check:
 	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
 	if (!(handshake.version == 0x301 || handshake.version == 0x303))
 		return MSG_UNKNOWN;
+
+	/*
+	 * Encrypted Alert unidirectional transmission, retain tracking information
+	 * without removal.
+	 */
+	if (handshake.content_type == 0x15)
+		conn_info->keep_trace = 1;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/* If it has been completed, give up collecting subsequent data. */

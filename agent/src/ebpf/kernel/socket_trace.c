@@ -216,6 +216,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
  * F : first_iov
  * F_S : first_iov_size
  */
+/* *INDENT-OFF* */
 #define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {				\
 	struct iovec iov_cpy;							\
 	bpf_probe_read_user(&iov_cpy, sizeof(struct iovec), (I));		\
@@ -225,11 +226,11 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		F_S = iov_cpy.iov_len;						\
 	}									\
 	const int bytes_remaining = (L_T) - (L_C);				\
-  __u32 iov_size =							\
-iov_cpy.iov_len <							\
-bytes_remaining ? iov_cpy.iov_len : bytes_remaining;			\
-  __u32 len = (O) + (L_C);						\
-  struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
+	__u32 iov_size =							\
+		iov_cpy.iov_len <						\
+			bytes_remaining ? iov_cpy.iov_len : bytes_remaining;	\
+	__u32 len = (O) + (L_C);						\
+	struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
 	if (len > (sizeof((B)) - sizeof(*cp)))					\
 		break;								\
 	if (iov_size >= sizeof(cp->data)) {					\
@@ -241,6 +242,7 @@ bytes_remaining ? iov_cpy.iov_len : bytes_remaining;			\
 	}									\
 	L_C = (L_C) + iov_size;							\
 } while (0)
+/* *INDENT-ON* */
 
 static __inline int iovecs_copy(struct __socket_data *v,
 				struct __socket_data_buffer *v_buff,
@@ -1074,6 +1076,26 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			}
 
 			*thread_trace_id = trace_info_ptr->thread_trace_id;
+
+			/*
+			 * Retain tracking information without deletion. Mainly address
+			 * situations where MySQL 'kComStmtClose/kComStmtQuit' unilaterally
+			 * sends (client only requests without response) tracking being
+			 * severed.
+			 *
+			 * For example: (Mysql Client)
+			 * 
+			 * Request Type       Request TraceID   Response TraceID
+			 * -----------------------------------------------------
+			 * COM_STMT_EXECUTE   A                 B
+			 * COM_STMT_CLOSE     B                 0
+			 * COM_QUERY          B                 C
+			 *
+			 * Implement COM_QUERY with Request TraceID set to 'B' instead of '0'
+			 * to avoid interruption of tracing.
+			 */
+			if (conn_info->keep_trace)
+				return;
 
 			if (!trace_map__delete(trace_key)) {
 				__sync_fetch_and_add
