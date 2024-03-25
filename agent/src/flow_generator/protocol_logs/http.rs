@@ -1154,8 +1154,7 @@ impl HttpLog {
         ) {
             let field_iter = match info.proto {
                 L7Protocol::Http1 => config.extra_log_fields.http.iter(),
-                L7Protocol::Http2 => config.extra_log_fields.http2.iter(),
-                L7Protocol::Grpc => config.extra_log_fields.grpc.iter(),
+                L7Protocol::Http2 | L7Protocol::Grpc => config.extra_log_fields.http2.iter(),
                 _ => return,
             };
 
