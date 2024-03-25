@@ -18,11 +18,12 @@ package http
 
 import (
 	"fmt"
-	nhttp "net/http"
 	"strconv"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,15 +32,16 @@ func HandleOrgIDMiddleware() gin.HandlerFunc {
 		orgID := mcommon.DEFAULT_ORG_ID
 		orgIDString := ctx.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		if len(orgIDString) != 0 {
-			_, err := strconv.Atoi(orgIDString)
+			var err error
+			orgID, err = strconv.Atoi(orgIDString)
 			if err != nil {
-				ctx.JSON(nhttp.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)})
+				errStr := fmt.Sprintf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)
+				routercommon.BadRequestResponse(ctx, httpcommon.ORG_ID_INVALID, errStr)
 				ctx.Abort()
 				return
 			}
-		} else {
-			ctx.Request.Header.Set(common.HEADER_KEY_X_ORG_ID, strconv.Itoa(orgID))
 		}
+		ctx.Set(common.HEADER_KEY_X_ORG_ID, orgID)
 		ctx.Next()
 	}
 }
