@@ -297,6 +297,9 @@ impl DispatcherListener {
     // When interfaces.len() is greater than local_dispatcher_count, interfaces is evenly distributed among each dispatcher;
     // otherwise interfaces is evenly distributed among the preceding dispatcher, and the following dispatcher does not work
     fn get_interfaces<'a>(&self, interfaces: &'a [Link]) -> &'a [Link] {
+        if self.local_dispatcher_count() == 1 {
+            return interfaces;
+        }
         let id = self.id();
         if interfaces.len() < self.local_dispatcher_count() {
             if id < interfaces.len() {
