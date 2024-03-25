@@ -1125,9 +1125,6 @@ impl L7LogDynamicConfig {
         for f in extra_log_fields.http2.iter() {
             expected_headers_set.insert(f.field_name.as_bytes().to_vec());
         }
-        for f in extra_log_fields.grpc.iter() {
-            expected_headers_set.insert(f.field_name.as_bytes().to_vec());
-        }
 
         Self {
             proxy_client,

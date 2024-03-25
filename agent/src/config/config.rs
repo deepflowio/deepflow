@@ -445,7 +445,6 @@ pub struct ExtraLogFieldsInfo {
 pub struct ExtraLogFields {
     pub http: Vec<ExtraLogFieldsInfo>,
     pub http2: Vec<ExtraLogFieldsInfo>,
-    pub grpc: Vec<ExtraLogFieldsInfo>,
 }
 
 impl ExtraLogFields {
@@ -460,7 +459,6 @@ impl ExtraLogFields {
 
         deduplicate_fields(&mut self.http);
         deduplicate_fields(&mut self.http2);
-        deduplicate_fields(&mut self.grpc);
     }
 }
 
