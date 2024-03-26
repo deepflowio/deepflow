@@ -17,9 +17,12 @@
 package trisolaris
 
 import (
+	"time"
+
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/kubernetes"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
@@ -102,8 +105,25 @@ func PutGroup() {
 	trisolaris.metaData.PutChGroup()
 }
 
+func (t *Trisolaris) getStartTime() int64 {
+	startTime := int64(0)
+	for {
+		startTime = election.GetAcquireTime()
+		if startTime == 0 {
+			log.Errorf("get start time(%d) failed", startTime)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+
+	log.Infof("get start time(%d) success", startTime)
+
+	return startTime
+}
+
 func (t *Trisolaris) Start() {
-	t.metaData.InitData() // 需要先初始化
+	t.metaData.InitData(t.getStartTime()) // 需要先初始化
 	go t.metaData.TimedRefreshMetaData()
 	go t.kubernetesInfo.TimedRefreshClusterID()
 	go t.vTapInfo.TimedRefreshVTapCache()
