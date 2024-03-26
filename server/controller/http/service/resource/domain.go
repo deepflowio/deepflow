@@ -251,6 +251,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
+	domain.TeamID = domainCreate.TeamID
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
@@ -379,6 +380,11 @@ func UpdateDomain(
 	// 禁用/启用
 	if _, ok := domainUpdate["ENABLED"]; ok {
 		dbUpdateMap["enabled"] = domainUpdate["ENABLED"]
+	}
+
+	// update team
+	if _, ok := domainUpdate["TEAM_ID"]; ok {
+		dbUpdateMap["team_id"] = domainUpdate["TEAM_ID"]
 	}
 
 	// 图标
