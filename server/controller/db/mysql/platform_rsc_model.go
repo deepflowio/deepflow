@@ -92,6 +92,7 @@ type Domain struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT" mapstructure:"SYNCED_AT"`
+	TeamID       int        `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID" mapstructure:"TEAM_ID"`
 	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME" mapstructure:"NAME"`
 	IconID       int        `gorm:"column:icon_id;type:int" json:"ICON_ID" mapstructure:"ICON_ID"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME" mapstructure:"DISPLAY_NAME"`
