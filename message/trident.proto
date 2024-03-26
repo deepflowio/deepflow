@@ -240,6 +240,7 @@ message Config {
 
     optional uint32 vtap_id = 40;  // 限制在64000
     optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
+    optional uint32 platform_sync_interval = 42 [default = 10];
 
     optional SocketType collector_socket_type = 45 [default = TCP];
     // _ = 46; // deprecated
