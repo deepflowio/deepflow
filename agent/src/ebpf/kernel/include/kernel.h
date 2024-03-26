@@ -22,25 +22,6 @@
 #ifndef DF_LINUX_KERN_H
 #define DF_LINUX_KERN_H
 
-// In the absence of BTF files, it is necessary to loop through the array to
-// obtain offsets. The instructions of this part of the logic are close to the
-// upper limit of the number of instructions and cannot be retrieved from the
-// map, so these constants are reserved. Retaining these constants will not
-// affect the system with BTF files have negative impacts.
-#ifdef LINUX_VER_3_10_0
-#define STRUCT_FILES_STRUCT_FDT_OFFSET          0x8
-#else
-#define STRUCT_FILES_STRUCT_FDT_OFFSET          0x20
-#endif
-
-#ifdef LINUX_VER_KYLIN
-#define STRUCT_FILES_PRIVATE_DATA_OFFSET	0xc0
-#elif defined LINUX_VER_3_10_0
-#define STRUCT_FILES_PRIVATE_DATA_OFFSET        0xa8
-#else
-#define STRUCT_FILES_PRIVATE_DATA_OFFSET	0xc8
-#endif
-
 #define S_IFMT 00170000
 #define S_IFSOCK 0140000
 #define S_IFLNK 0120000
