@@ -56,7 +56,7 @@ type Counter struct {
 }
 
 // all 'PrometheusWriters' share 'prometheusCKWriters' to write to ClickHouse, preventing each PrometheusWriter from creating CKWriter and causing excessive resource consumption
-var prometheusCKWriters [MAX_APP_LABEL_COLUMN_INDEX]*ckwriter.CKWriter
+var prometheusCKWriters [MAX_APP_LABEL_COLUMN_INDEX + 1]*ckwriter.CKWriter
 var prometheusCKWritersMutex sync.Mutex
 
 func getPrometheusCKWriters(columnCount int) *ckwriter.CKWriter {

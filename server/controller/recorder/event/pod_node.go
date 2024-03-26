@@ -101,7 +101,7 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = p.ToolDataSet.GetPodNodeNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
+				log.Error(p.org.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
 			}
 		}
 

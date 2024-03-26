@@ -65,6 +65,7 @@ tunnel_type               , Tunnel Type                   ,
 
 client_port               , Client Port                   ,
 server_port               , Server Port                   ,
+tcp_seq                   , TCP Seq                       ,
 req_tcp_seq               , TCP Seq of Request            ,
 resp_tcp_seq              , TCP Seq of Response           ,
 
@@ -93,15 +94,20 @@ trace_id                  , TraceID                       ,
 span_id                   , SpanID                        ,
 parent_span_id            , ParentSpanID                  ,
 span_kind                 , Span Kind                     , From OpenTelemetry.
+x_request_id              , X-Request-ID                  ,
 x_request_id_0            , Request X-Request-ID          ,
 x_request_id_1            , Response X-Request-ID         ,
 http_proxy_client         , HTTP Client IP                , Real client IP before proxy translate.
+syscall_trace_id          , Syscall TraceID               ,
 syscall_trace_id_request  , Req Syscall TraceID           ,
 syscall_trace_id_response , Resp Syscall TraceID          ,
+syscall_thread            , Syscall Thread                ,
 syscall_thread_0          , Req Syscall Thread            ,
 syscall_thread_1          , Resp Syscall Thread           ,
+syscall_coroutine         , Syscall Coroutine             ,
 syscall_coroutine_0       , Req Syscall Coroutine         ,
 syscall_coroutine_1       , Resp Syscall Coroutine        ,
+syscall_cap_seq           , Syscall CapSeq                ,
 syscall_cap_seq_0         , Req Syscall CapSeq            ,
 syscall_cap_seq_1         , Resp Syscall CapSeq           ,
 

@@ -93,7 +93,7 @@ func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.Resour
 	if rt == "" {
 		rt = DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
 	}
-	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event)
+	log.Info(e.org.LogPre("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event))
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(rt, err))
@@ -113,7 +113,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
-		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error())
+		log.Error(e.org.LogPre("json marshal event (detail: %#v) failed: %s", event, err.Error()))
 	} else {
 		dbItem := mysql.ResourceEvent{
 			Domain:  domainLcuuid,
@@ -121,9 +121,9 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 		}
 		err = e.org.DB.Create(&dbItem).Error
 		if err != nil {
-			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error())
+			log.Error(e.org.LogPre("add resource_event (detail: %#v) failed: %s", dbItem, err.Error()))
 		} else {
-			log.Infof("create resource_event (detail: %#v) success", dbItem)
+			log.Info(e.org.LogPre("create resource_event (detail: %#v) success", dbItem))
 			return
 		}
 	}

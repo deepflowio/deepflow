@@ -139,7 +139,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 		var name string
 		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
 		if !exists {
-			log.Errorf("process info not fount, lcuuid: %s", lcuuid)
+			log.Error(p.org.LogPre("process info not fount, lcuuid: %s", lcuuid))
 		} else {
 			id = processInfo.ID
 			name = processInfo.Name

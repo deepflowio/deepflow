@@ -59,7 +59,6 @@ func newSubDomains(ctx context.Context, cfg config.RecorderConfig, eventQueue *q
 }
 
 func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResource) error {
-	log.Info("in RefreshAll")
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	for lcuuid, resource := range cloudData {
 		sd, ok := s.refreshers[lcuuid]
@@ -80,7 +79,6 @@ func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResourc
 }
 
 func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResource) error {
-	log.Info("in RefreshOne")
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	for lcuuid, resource := range cloudData {
 		sd, ok := s.refreshers[lcuuid]
@@ -138,14 +136,14 @@ func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
 		s.refresh(cloudData)
 		s.cache.ResetRefreshSignal(cache.RefreshSignalCallerSubDomain)
 	default:
-		log.Infof("sub_domain (lcuuid: %s) refresh is running, does nothing", s.domainLcuuid)
+		log.Info(s.org.LogPre("sub_domain refresh is running, does nothing"))
 		return RefreshConflictError
 	}
 	return nil
 }
 
 func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
-	log.Infof("sub_domain (lcuuid: %s) sync refresh started", s.Lcuuid)
+	log.Info(s.org.LogPre("sub_domain sync refresh started"))
 
 	listener := listener.NewWholeSubDomain(s.domainLcuuid, s.Lcuuid, s.cache, s.eventQueue)
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudData)
@@ -155,24 +153,24 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 
 	s.updateSyncedAt(s.Lcuuid, cloudData.SyncAt)
 
-	log.Infof("sub_domain (lcuuid: %s) sync refresh completed", s.Lcuuid)
+	log.Info(s.org.LogPre("sub_domain sync refresh completed"))
 }
 
 func (s *subDomain) clear() {
-	log.Infof("sub_domain (lcuuid: %s) clean refresh started", s.Lcuuid)
+	log.Info(s.org.LogPre("sub_domain clean refresh started"))
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudmodel.SubDomainResource{})
 	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
-	log.Infof("sub_domain (lcuuid: %s) clean refresh completed", s.Lcuuid)
+	log.Info(s.org.LogPre("sub_domain clean refresh completed"))
 }
 
 func (s *subDomain) shouldRefresh(lcuuid string, cloudData cloudmodel.SubDomainResource) error {
 	if cloudData.Verified {
 		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 || len(cloudData.Pods) == 0 {
-			log.Infof("sub_domain (lcuuid: %s, name: %s) has no networks or vinterfaces or pods, does nothing", lcuuid)
+			log.Info(s.org.LogPre("sub_domain has no networks or vinterfaces or pods, does nothing"))
 			return DataMissingError
 		}
 	} else {
-		log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", lcuuid)
+		log.Info(s.org.LogPre("sub_domain is not verified, does nothing"))
 		return DataNotVerifiedError
 	}
 	return nil
@@ -242,10 +240,10 @@ func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpda
 	vmPodNodeConnectionUpdater.HandleDelete()
 }
 
-func (r *subDomain) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
+func (s *subDomain) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
 	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
 	if platformDataChanged {
-		log.Infof("domain(%v) data changed, refresh platform data", r.domainLcuuid)
+		log.Info(s.org.LogPre("sub domain data changed, refresh platform data"))
 		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
@@ -257,12 +255,12 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 	var subDomain mysql.SubDomain
 	err := s.org.DB.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
-		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", lcuuid, err)
+		log.Error(s.org.LogPre("get sub_domain from db failed: %s", err.Error()))
 		return
 	}
 	subDomain.SyncedAt = &syncAt
 	s.org.DB.Save(&subDomain)
-	log.Debugf("update sub_domain (%+v)", subDomain)
+	log.Debug(s.org.LogPre("update sub_domain (%+v)", subDomain))
 }
 
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
@@ -270,11 +268,11 @@ func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
 	var subDomain mysql.SubDomain
 	err := s.org.DB.Where("lcuuid = ?", s.Lcuuid).First(&subDomain).Error
 	if err != nil {
-		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", s.Lcuuid, err)
+		log.Error(s.org.LogPre("get sub_domain from db failed: %s", err.Error()))
 		return
 	}
 	subDomain.State = cloudData.ErrorState
 	subDomain.ErrorMsg = cloudData.ErrorMessage
 	s.org.DB.Save(&subDomain)
-	log.Debugf("update sub_domain (%+v)", subDomain)
+	log.Debug(s.org.LogPre("update sub_domain (%+v)", subDomain))
 }

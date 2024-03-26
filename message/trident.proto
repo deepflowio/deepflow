@@ -540,6 +540,7 @@ message VtapIp {
     optional string ip = 3;             // 采集器运行环境的IP
     optional uint32 pod_cluster_id = 4;
     optional uint32 team_id = 5;        // agent team id for ingester
+    optional uint32 org_id = 6;         // agent org id for ingester
 }
 
 message SkipInterface {

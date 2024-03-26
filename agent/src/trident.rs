@@ -1864,6 +1864,17 @@ impl AgentComponents {
         ));
 
         let mut src_interfaces_and_namespaces = vec![];
+        #[cfg(target_os = "linux")]
+        let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local
+            && candidate_config.dispatcher.extra_netns_regex == ""
+        {
+            yaml_config.local_dispatcher_count
+        } else {
+            1
+        };
+        #[cfg(any(target_os = "windows", target_os = "android"))]
+        let local_dispatcher_count = 1;
+
         for src_if in yaml_config.src_interfaces.iter() {
             src_interfaces_and_namespaces.push((
                 src_if.clone(),
@@ -1881,14 +1892,6 @@ impl AgentComponents {
             }
         }
         if src_interfaces_and_namespaces.is_empty() {
-            #[cfg(target_os = "linux")]
-            let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local {
-                yaml_config.local_dispatcher_count
-            } else {
-                1
-            };
-            #[cfg(any(target_os = "windows", target_os = "android"))]
-            let local_dispatcher_count = 1;
             for _ in 0..local_dispatcher_count {
                 src_interfaces_and_namespaces.push((
                     "".into(),
@@ -1923,7 +1926,6 @@ impl AgentComponents {
             false,
         );
 
-        let local_dispatcher_count = src_interfaces_and_namespaces.len();
         for (i, entry) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let src_interface = entry.0;
             #[cfg(target_os = "linux")]

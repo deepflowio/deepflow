@@ -1081,6 +1081,7 @@ impl PartialEq for L7LogDynamicConfig {
             && self.x_request_id == other.x_request_id
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
+            && self.extra_log_fields == other.extra_log_fields
     }
 }
 
@@ -1122,9 +1123,6 @@ impl L7LogDynamicConfig {
         extra_log_fields.deduplicate();
 
         for f in extra_log_fields.http2.iter() {
-            expected_headers_set.insert(f.field_name.as_bytes().to_vec());
-        }
-        for f in extra_log_fields.grpc.iter() {
             expected_headers_set.insert(f.field_name.as_bytes().to_vec());
         }
 

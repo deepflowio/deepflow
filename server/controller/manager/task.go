@@ -19,7 +19,6 @@ package manager
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -33,6 +32,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
+var recorderRefreshTryInterval = 5 // unit: s
+
 type Task struct {
 	tCtx    context.Context
 	tCancel context.CancelFunc
@@ -42,7 +43,6 @@ type Task struct {
 	Recorder     *recorder.Recorder
 	DomainName   string // 云平台名称
 	DomainConfig string // 云平台配置字段config
-
 	// 云平台刷新控制，初始化时本信号自动启动一个 goroutine 定时输入信号，用于定时刷新；
 	// kubernetes 类型云平台的 kubernetes_gather，也通过输入到此信号，触发实时刷新。
 	domainRefreshSignal *queue.OverwriteQueue
@@ -55,22 +55,18 @@ type Task struct {
 func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 
 	tCtx, tCancel := context.WithCancel(ctx)
+	cloudTask := cloud.NewCloud(domain, cfg.CloudCfg, tCtx)
 
 	return &Task{
-		tCtx:         tCtx,
-		tCancel:      tCancel,
-		cfg:          cfg,
-		Cloud:        cloud.NewCloud(domain, cfg.CloudCfg, tCtx),
-		Recorder:     recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, common.DEFAULT_ORG_ID, domain.Lcuuid, domain.Name),
-		DomainName:   domain.Name,
-		DomainConfig: domain.Config,
-
-		domainRefreshSignal: queue.NewOverwriteQueue(
-			fmt.Sprintf("cloud-task-%s", domain.Name),
-			1,
-			queue.OptionFlushIndicator(time.Duration(cfg.ResourceRecorderInterval)*time.Second), // 定时输入信号，用于定时刷新
-		),
-		subDomainRefreshSignals: cmap.New[*queue.OverwriteQueue](),
+		tCtx:                    tCtx,
+		tCancel:                 tCancel,
+		cfg:                     cfg,
+		Cloud:                   cloudTask,
+		Recorder:                recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, common.DEFAULT_ORG_ID, domain.Lcuuid, domain.Name),
+		DomainName:              domain.Name,
+		DomainConfig:            domain.Config,
+		domainRefreshSignal:     cloudTask.GetDomainRefreshSignal(),
+		subDomainRefreshSignals: cloudTask.GetSubDomainRefreshSignals(),
 	}
 }
 
@@ -79,7 +75,6 @@ func (t *Task) Start() {
 
 	t.startDomainRefreshMonitor()
 	if t.Cloud.GetBasicInfo().Type != common.KUBERNETES {
-		t.startSubDomainChangeMonitor()
 		t.startSubDomainRefreshMonitor()
 	}
 }
@@ -88,14 +83,13 @@ func (t *Task) startDomainRefreshMonitor() {
 	go func() {
 	LOOP:
 		for {
-			log.Infof("task (%s) wait for next refresh", t.DomainName) // TODO delete debug log
+			log.Infof("task (%s) wait for next refresh", t.DomainName)
 			t.domainRefreshSignal.Get()
 			log.Infof("task (%s) call recorder refresh", t.DomainName)
-			log.Infof("task (%s) sub_domain refresh signals: %#v", t.DomainName, t.subDomainRefreshSignals)
 			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); errors.Is(err, recorder.RefreshConflictError) {
 				log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
 				t.domainRefreshSignal.Put(struct{}{})
-				time.Sleep(5 * time.Second) // TODO
+				time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 			}
 
 			select {
@@ -124,17 +118,21 @@ func (t *Task) startSubDomainRefreshMonitor() {
 
 					// TODO 考虑改为并发
 					if signal.Len() != 0 {
+						signal.Get()
+						log.Infof("task (%s) sub_domain (%s) call recorder refresh", t.DomainName, lcuuid)
+
 						// TODO cloud 提供接口获取附属容器集群数据
 						resource := cloudmodel.Resource{
 							SubDomainResources: map[string]cloudmodel.SubDomainResource{lcuuid: t.Cloud.GetResource().SubDomainResources[lcuuid]},
 						}
-						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err == nil {
-							signal.Get()
-						} else {
+						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err != nil {
 							if errors.Is(err, recorder.RefreshConflictError) {
 								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
-								time.Sleep(5 * time.Second) // TODO
+							} else {
+								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s, retry after 5 seconds", t.DomainName, lcuuid, err.Error())
 							}
+							signal.Put(struct{}{})
+							time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 						}
 					}
 				}
@@ -144,36 +142,6 @@ func (t *Task) startSubDomainRefreshMonitor() {
 		}
 	}()
 
-}
-
-// startSubDomainChangeMonitor maintains the add and delete of sub_domain refresh signals by periodically getting KubernetesGatherTaskMap from cloud
-func (t *Task) startSubDomainChangeMonitor() {
-	gatherTasks := t.Cloud.GetKubernetesGatherTaskMap()
-	for lcuuid := range gatherTasks {
-		t.createSubDomainSignalIfNotExists(lcuuid)
-	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(t.cfg.ResourceRecorderInterval) * time.Second)
-		defer ticker.Stop()
-
-	LOOP:
-		for {
-			select {
-			case <-ticker.C:
-				gatherTasks := t.Cloud.GetKubernetesGatherTaskMap()
-				for lcuuid := range gatherTasks {
-					t.createSubDomainSignalIfNotExists(lcuuid)
-				}
-				for lcuuid := range t.subDomainRefreshSignals.Items() {
-					if _, ok := gatherTasks[lcuuid]; !ok {
-						t.subDomainRefreshSignals.Remove(lcuuid)
-					}
-				}
-			case <-t.tCtx.Done():
-				break LOOP
-			}
-		}
-	}()
 }
 
 func (t *Task) Stop() {
@@ -187,31 +155,4 @@ func (t *Task) Stop() {
 func (t *Task) UpdateDomainName(name string) {
 	t.DomainName = name
 	t.Cloud.UpdateBasicInfoName(name)
-}
-
-// 用于向云平台及附属荣集群的刷新信号队列输入信号，触发刷新
-// TODO 添加 kubernetes_gather 相关逻辑实现
-func (t *Task) PutRefreshSignal(target string, lcuuid string) error {
-	log.Infof("task (%s) get a refresh signal, target: %s, lcuuid: %s", t.DomainName, target, lcuuid)
-	switch target {
-	case "domain":
-		t.domainRefreshSignal.Put(struct{}{})
-	case "sub_domain":
-		signal := t.createSubDomainSignalIfNotExists(lcuuid)
-		if signal == nil {
-			return errors.New(fmt.Sprintf("task (%s) sub_domain (lcuuid: %s) refresh signal not found", t.DomainName, lcuuid))
-		}
-		signal.Put(struct{}{})
-	default:
-	}
-	return nil
-}
-
-func (t *Task) createSubDomainSignalIfNotExists(lcuuid string) *queue.OverwriteQueue {
-	t.subDomainRefreshSignals.SetIfAbsent(
-		lcuuid,
-		queue.NewOverwriteQueue(fmt.Sprintf("sub-domain-task-%s", lcuuid), 1),
-	)
-	signal, _ := t.subDomainRefreshSignals.Get(lcuuid)
-	return signal
 }

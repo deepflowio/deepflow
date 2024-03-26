@@ -20,23 +20,51 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"gorm.io/gorm"
 )
 
-func CreateDatabase(dataCreate model.DatabaseCreate, mysqlCfg mysqlcfg.MySqlConfig) (database string, err error) {
+// CreateORGData create database and backs up the controller and analyzer tables.
+// Returns the database name and error.
+func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig) (string, error) {
 	log.Infof("create org (id: %d) data", dataCreate.ORGID)
+	defaultDatabase := mysqlCfg.Database
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, dataCreate.ORGID)
 	existed, err := migrator.CreateDatabase(cfg) // TODO use orgID to create db
-	if existed {
-		err = errors.New(fmt.Sprintf("database (name: %s) already exists", database))
+	if err != nil {
+		return cfg.Database, err
 	}
-	return
+	if existed {
+		return cfg.Database, errors.New(fmt.Sprintf("database (name: %s) already exists", cfg.Database))
+	}
+
+	var controllers []mysql.Controller
+	var analyzers []mysql.Analyzer
+	if err := mysql.DefaultDB.Unscoped().Find(&controllers).Error; err != nil {
+		return defaultDatabase, err
+	}
+	if err := mysql.DefaultDB.Unscoped().Find(&analyzers).Error; err != nil {
+		return defaultDatabase, err
+	}
+
+	db, err := mysql.GetDB(dataCreate.ORGID)
+	if err != nil {
+		return cfg.Database, err
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(controllers, len(controllers)).Error; err != nil {
+			return err
+		}
+		return tx.CreateInBatches(analyzers, len(analyzers)).Error
+	})
+	return cfg.Database, nil
 }
 
-func DeleteDatabase(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
+func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	log.Infof("delete org (id: %d) data", orgID)
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	return migrator.DropDatabase(cfg)

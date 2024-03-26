@@ -74,18 +74,18 @@ func (z *VMSecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMSecurit
 func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGroup) (*mysql.VMSecurityGroup, bool) {
 	securityGroupID, exists := v.cache.ToolDataSet.GetSecurityGroupIDByLcuuid(cloudItem.SecurityGroupLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(v.org.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	vmID, exists := v.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(v.org.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 

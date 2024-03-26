@@ -19,18 +19,26 @@ package common
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/tls"
 	. "encoding/binary"
 	"encoding/csv"
 	"encoding/xml"
+	"errors"
+	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	simplejson "github.com/bitly/go-simplejson"
 	"gopkg.in/yaml.v3"
 	"inet.af/netaddr"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 type VifInfo struct {
@@ -442,4 +450,47 @@ func IPInRanges(ip string, ipRanges ...netaddr.IPPrefix) bool {
 		}
 	}
 	return false
+}
+
+func RequestGet(url string, timeout int, queryStrings map[string]string) error {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Timeout: time.Duration(timeout) * time.Second,
+	}
+
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	queryData := request.URL.Query()
+	for k, v := range queryStrings {
+		queryData.Add(k, v)
+	}
+	request.URL.RawQuery = queryData.Encode()
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	if response.StatusCode != http.StatusOK {
+		return errors.New(fmt.Sprintf("http status failed: (%d)", response.StatusCode))
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+	respJson, err := simplejson.NewJson(body)
+	if err != nil {
+		return errors.New(fmt.Sprintf("response body (%s) serializer to json failed: (%s)", string(body), err.Error()))
+	}
+	optStatus := respJson.Get("OPT_STATUS").MustString()
+	if optStatus != "" && optStatus != "SUCCESS" {
+		description := respJson.Get("DESCRIPTION").MustString()
+		return errors.New(fmt.Sprintf("curl (%s) failed, (%v)", request.URL, description))
+	}
+
+	return nil
 }

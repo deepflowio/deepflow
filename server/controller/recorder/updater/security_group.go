@@ -82,10 +82,10 @@ func (g *SecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroup)
 	if cloudItem.VPCLcuuid != "" {
 		vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(g.org.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.Lcuuid,
-			))
+			)))
 			return nil, false
 		}
 		dbItem.VPCID = vpcID

@@ -33,6 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
+	tagrecordercheck "github.com/deepflowio/deepflow/server/controller/tagrecorder/check"
 )
 
 func IsMasterRegion(cfg *config.ControllerConfig) bool {
@@ -95,12 +96,15 @@ func checkAndStartMasterFunctions(
 	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
-	recorderResource := recorder.GetSingletonResource()
+	recorderResource := recorder.GetResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
 	tagRecorder := tagrecorder.GetSingleton()
 
 	httpService := http.GetSingleton()
+
+	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
+	tr := tagrecordercheck.GetSingleton()
 
 	masterController := ""
 	thisIsMasterController := false
@@ -126,7 +130,8 @@ func checkAndStartMasterFunctions(
 
 				// 启动tagrecorder
 				tagRecorder.UpdaterManager.Start()
-				tagRecorder.SubscriberManager.HealthCheck()
+				tr.Check()
+				// tagRecorder.SubscriberManager.HealthCheck()
 
 				// 控制器检查
 				controllerCheck.Start()
@@ -146,7 +151,7 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 资源数据清理
-				recorderResource.Cleaner.Start()
+				recorderResource.Cleaners.Start()
 
 				// domain检查及自愈
 				domainChecker.Start()
@@ -164,6 +169,7 @@ func checkAndStartMasterFunctions(
 
 				// stop tagrecorder
 				tagRecorder.UpdaterManager.Stop()
+				tr.Stop()
 
 				// stop controller check
 				controllerCheck.Stop()
@@ -177,7 +183,7 @@ func checkAndStartMasterFunctions(
 				// stop vtap license allocation and check
 				vtapLicenseAllocation.Stop()
 
-				recorderResource.Cleaner.Stop()
+				recorderResource.Cleaners.Stop()
 
 				domainChecker.Stop()
 

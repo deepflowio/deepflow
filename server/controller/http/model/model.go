@@ -16,6 +16,6 @@
 
 package model
 
-type DatabaseCreate struct {
+type ORGDataCreate struct {
 	ORGID int `json:"ORGANIZATION_ID" binding:"required"`
 }

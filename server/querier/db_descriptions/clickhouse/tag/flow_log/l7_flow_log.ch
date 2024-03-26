@@ -65,6 +65,7 @@ tunnel_type               , 隧道类型                 ,
 
 client_port               , 客户端口                 ,
 server_port               , 服务端口                 ,
+tcp_seq                   , TCP Seq 号               ,
 req_tcp_seq               , 请求 TCP Seq 号          ,
 resp_tcp_seq              , 响应 TCP Seq 号          ,
 
@@ -93,15 +94,20 @@ trace_id                  , TraceID                  ,
 span_id                   , SpanID                   ,
 parent_span_id            , ParentSpanID             ,
 span_kind                 , Span 类型                , 取自 OpenTelemetry。
+x_request_id              , X-Request-ID             ,
 x_request_id_0            , 请求 X-Request-ID        ,
 x_request_id_1            , 响应 X-Request-ID        ,
 http_proxy_client         , HTTP 代理客户端          , 代理转换之前的真实客户端 IP。
+syscall_trace_id          , Syscall TraceID         ,
 syscall_trace_id_request  , 请求 Syscall TraceID     ,
 syscall_trace_id_response , 响应 Syscall TraceID     ,
+syscall_thread            , Syscall 线程             ,
 syscall_thread_0          , 请求 Syscall 线程        ,
 syscall_thread_1          , 响应 Syscall 线程        ,
+syscall_coroutine         , Syscall 协程             ,
 syscall_coroutine_0       , 请求 Syscall 协程        ,
 syscall_coroutine_1       , 响应 Syscall 协程        ,
+syscall_cap_seq           , Syscall 序号             ,
 syscall_cap_seq_0         , 请求 Syscall 序号        ,
 syscall_cap_seq_1         , 响应 Syscall 序号        ,
 

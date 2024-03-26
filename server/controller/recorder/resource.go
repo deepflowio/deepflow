@@ -17,6 +17,7 @@
 package recorder
 
 import (
+	"context"
 	"sync"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -29,22 +30,22 @@ var (
 )
 
 type Resource struct {
-	Cleaner    *Cleaner
+	Cleaners   *Cleaners
 	IDManagers *idmng.IDManagers
 }
 
-func GetSingletonResource() *Resource {
+func GetResource() *Resource {
 	resourceOnce.Do(func() {
 		resource = &Resource{
-			Cleaner:    GetSingletonCleaner(),
+			Cleaners:   GetCleaners(),
 			IDManagers: idmng.GetSingleton(),
 		}
 	})
 	return resource
 }
 
-func (r *Resource) Init(cfg *config.RecorderConfig) *Resource {
-	r.Cleaner.Init(cfg)
-	r.IDManagers.Init(cfg)
+func (r *Resource) Init(ctx context.Context, cfg config.RecorderConfig) *Resource {
+	r.Cleaners.Init(ctx, cfg)
+	r.IDManagers.Init(&cfg) // TODO add ctx
 	return r
 }
