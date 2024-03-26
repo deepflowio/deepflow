@@ -106,7 +106,7 @@ impl RecvEngine {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => Arc::new(e.get_counter_handle()),
             #[cfg(target_os = "linux")]
-            Self::Dpdk(_) => Arc::new(LibpcapCounter::default()),
+            Self::Dpdk(d) => d.get_counter_handle(),
             Self::Libpcap(w) => match w {
                 Some(w) => w.get_counter_handle(),
                 None => Arc::new(LibpcapCounter::default()),
