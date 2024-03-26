@@ -18,21 +18,19 @@ BEGIN
 
     -- 如果列不存在，则添加列
     IF column_count = 0 THEN
-        SET @sql = CONCAT('ALTER TABLE ', tableName, ' ADD COLUMN ', colName, ' ', colType, ' DEFAULT NULL');
+        SET @sql = CONCAT('ALTER TABLE ', tableName, ' ADD COLUMN ', colName, ' ', colType, ' DEFAULT NULL AFTER max_memory');
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
         DEALLOCATE PREPARE stmt;
     END IF;
 END;
 
-CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_threshold', 'float(8,2)');
-CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_recover', 'float(8,2)');
-CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_metric', 'CHAR(64)');
+CALL AddColumnIfNotExists('vtap_group_configuration', 'platform_sync_interval', 'INTEGER');
 
 DROP PROCEDURE AddColumnIfNotExists;
 
 
 
 -- update db_version to latest, remeber update DB_VERSION_EXPECT in migrate/init.go
-UPDATE db_version SET version='6.5.1.14';
+UPDATE db_version SET version='6.5.1.16';
 -- modify end

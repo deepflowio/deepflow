@@ -179,6 +179,12 @@ vtap_group_id: g-xxxxxx
 ##   tag information from deepflow-server.
 #sync_interval: 60
 
+## Platform Sync Interval 
+## Unit: second. Default: 10. Range: [10, 3600]
+## Note: The interval at which deepflow-agent actively reports resource information 
+##   to deepflow-server.
+#platform_sync_interval: 10
+
 ## Maximum Escape Time
 ## Unit: seconds. Default: 3600. Range: [600, 2592000]
 ## Note: The maximum time that the agent is allowed to work normally when it
