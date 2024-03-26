@@ -96,7 +96,13 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
 	vtapID := uint32(c.GetVTapID())
-	tridentType := common.TridentType(c.GetVTapType())
+
+	tridentType := common.TridentType(0)
+	if clusterID != "" { // if agent report cluster_id, force set tridentType = VTAP_TYPE_POD_VM
+		tridentType = common.TridentType(VTAP_TYPE_POD_VM)
+	} else {
+		tridentType = common.TridentType(c.GetVTapType())
+	}
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
 	tapMode := api.TapMode(vtapConfig.TapMode)
