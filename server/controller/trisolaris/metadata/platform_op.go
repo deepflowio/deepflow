@@ -413,7 +413,7 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 		domainPeerConnProto.peerConns, domainCIDRProto.cidrs, gprocessInfo)
 	oldIngesterPlatformData := p.GetAllPlatformDataForIngester()
 	if oldIngesterPlatformData.GetVersion() == 0 {
-		newIngesterPlatformData.setVersion(uint64(time.Now().Unix()))
+		newIngesterPlatformData.setVersion(uint64(p.metaData.GetStartTime()))
 		p.updateAllPlatformDataForIngester(newIngesterPlatformData)
 	} else if !newIngesterPlatformData.equal(oldIngesterPlatformData) {
 		newIngesterPlatformData.setVersion(oldIngesterPlatformData.GetVersion() + 1)

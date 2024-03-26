@@ -40,6 +40,14 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
+var (
+	acquireTime = int64(0)
+)
+
+func GetAcquireTime() int64 {
+	return acquireTime
+}
+
 const (
 	ID_ITEM_NUM = 4
 )
@@ -143,6 +151,7 @@ func checkLeaderValid(ctx context.Context, lock *resourcelock.LeaseLock) {
 				continue
 			}
 			if !record.RenewTime.Equal(&observedTime) {
+				acquireTime = record.AcquireTime.Unix()
 				leaderData.setValide()
 				leaderData.SetLeader(record.HolderIdentity)
 				log.Infof("check leader finish, leader is %s", record.HolderIdentity)
