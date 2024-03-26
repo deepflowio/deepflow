@@ -1197,18 +1197,25 @@ static void process_events_handle_main(__unused void *arg)
 	}
 }
 
-static int update_offset_map_default(struct bpf_tracer *t)
+static int update_offset_map_default(struct bpf_tracer *t,
+				     enum linux_kernel_type kern_type)
 {
 	struct bpf_offset_param offset;
 	memset(&offset, 0, sizeof(offset));
 
-	if (k_version == KERNEL_VERSION(3, 10, 0)) {
+	switch (kern_type) {
+	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
 		offset.struct_files_private_data_offset = 0xa8;
-	} else {
+		break;
+	case K_TYPE_KYLIN:
+		offset.struct_files_struct_fdt_offset = 0x20;
+		offset.struct_files_private_data_offset = 0xc0;
+		break;
+	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc8;
-	}
+	};
 
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
@@ -1723,8 +1730,8 @@ static void perf_buffer_read(void *arg)
 	 * Each "read" thread has its own independent epoll fd, used
 	 * to monitor the perf buffer belonging to its jurisdiction.
 	 */
-	uint64_t epoll_id = (uint64_t)arg;
-	thread_index = THREAD_PROC_ACT_IDX_BASE + epoll_id; // for bihash
+	uint64_t epoll_id = (uint64_t) arg;
+	thread_index = THREAD_PROC_ACT_IDX_BASE + epoll_id;	// for bihash
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
 		ebpf_warning("find_bpf_tracer() error\n");
@@ -1738,7 +1745,8 @@ static void perf_buffer_read(void *arg)
 		for (i = 0; i < tracer->perf_readers_count; i++) {
 			perf_reader = &tracer->readers[i];
 			struct epoll_event events[perf_reader->readers_count];
-			int nfds = reader_epoll_wait(perf_reader, events, epoll_id);
+			int nfds =
+			    reader_epoll_wait(perf_reader, events, epoll_id);
 			if (nfds > 0) {
 				reader_event_read(events, nfds);
 			}
@@ -1795,7 +1803,8 @@ static int perf_read_workers_setup(struct bpf_tracer *tracer)
 	return ETR_OK;
 }
 
-static int dispatch_workers_setup(struct bpf_tracer *tracer, unsigned int queue_size)
+static int dispatch_workers_setup(struct bpf_tracer *tracer,
+				  unsigned int queue_size)
 {
 	int i, ret;
 
@@ -1893,7 +1902,6 @@ int running_socket_tracer(tracer_callback_t handle,
 			     sys_cpus_count);
 		return -EINVAL;
 	}
-
 	// Ensure that the number of worker threads does not exceed the
 	// number of CPUs
 	if (thread_nr > sys_cpus_count)
@@ -1903,28 +1911,33 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 	}
 
-	char sys_type[16];
-	memset(sys_type, 0, sizeof(sys_type));
-	if (fetch_system_type(sys_type, sizeof(sys_type) - 1) != ETR_OK) {
+	char sys_type_str[16];
+	memset(sys_type_str, 0, sizeof(sys_type_str));
+	if (fetch_system_type(sys_type_str, sizeof(sys_type_str) - 1) != ETR_OK) {
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	if (strcmp(sys_type, "ky10") == 0) {
+	enum linux_kernel_type k_type;
+	if (strcmp(sys_type_str, "ky10") == 0) {
+		k_type = K_TYPE_KYLIN;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-kylin");
 		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
 		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
 	} else if (major > 5 || (major == 5 && minor >= 2)) {
+		k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2_plus");
 		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
 		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
 	} else if (major == 3 && minor == 10) {
+		k_type = K_TYPE_VER_3_10;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-3.10.0");
 		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
 		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
 	} else {
+		k_type = K_TYPE_COMM;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");
 		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
@@ -1995,8 +2008,7 @@ int running_socket_tracer(tracer_callback_t handle,
 					   reader_raw_cb,
 					   reader_lost_cb,
 					   perf_pages_cnt,
-					   thread_nr,
-					   PERF_READER_TIMEOUT_DEF);
+					   thread_nr, PERF_READER_TIMEOUT_DEF);
 	if (reader == NULL)
 		return -EINVAL;
 
@@ -2007,7 +2019,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
 		ebpf_info
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
-		if (update_offset_map_default(tracer) != ETR_OK) {
+		if (update_offset_map_default(tracer, k_type) != ETR_OK) {
 			ebpf_error
 			    ("Fatal error, failed to update default offset\n");
 		}
