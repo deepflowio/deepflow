@@ -37,6 +37,7 @@ type MetaData struct {
 	groupDataOP    *GroupDataOP
 	tapType        *TapType
 	policyDataOP   *PolicyDataOP
+	startTime      int64
 	chPlatformData chan struct{}
 	chTapType      chan struct{}
 	chPolicy       chan struct{}
@@ -154,9 +155,15 @@ func (m *MetaData) GetPlatformVips() []string {
 	return m.config.PlatformVips
 }
 
-func (m *MetaData) InitData() {
+func (m *MetaData) GetStartTime() int64 {
+	return m.startTime
+}
+
+func (m *MetaData) InitData(startTime int64) {
+	m.startTime = startTime
 	m.generateDbDataCache()
 	m.platformDataOP.initData()
+	m.groupDataOP.SetStartTime(startTime)
 	m.groupDataOP.generateGroupData()
 	m.tapType.generateTapTypes()
 	m.policyDataOP.generatePolicyData()
