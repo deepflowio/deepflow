@@ -584,12 +584,14 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
 					      sk +
-					      offset->struct_sock_ip6saddr_offset);
+					      offset->
+					      struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.daddr, 16,
 					      sk +
-					      offset->struct_sock_ip6daddr_offset);
+					      offset->
+					      struct_sock_ip6daddr_offset);
 		}
 		v->tuple.addr_len = 16;
 		break;
@@ -877,7 +879,21 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	}
 }
 
-static __inline int infer_offset_retry(int fd)
+static __inline bool infer_offset_check_tgid(void)
+{
+	__u32 k0 = 0;
+	__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
+	if (!adapt_uid)
+		return false;
+
+	// Only a preset uid can be adapted to the kernel
+	if (*adapt_uid != bpf_get_current_pid_tgid())
+		return false;
+
+	return true;
+}
+
+static __inline int infer_offset_phase_1(int fd)
 {
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -885,12 +901,7 @@ static __inline int infer_offset_retry(int fd)
 		return OFFSET_NO_READY;
 
 	if (unlikely(!offset->ready)) {
-		__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
-		if (!adapt_uid)
-			return OFFSET_NO_READY;
-
-		// Only a preset uid can be adapted to the kernel
-		if (*adapt_uid != bpf_get_current_pid_tgid())
+		if (!infer_offset_check_tgid())
 			return OFFSET_NO_READY;
 
 		void *infer_sk =
@@ -898,10 +909,36 @@ static __inline int infer_offset_retry(int fd)
 		if (infer_sk) {
 			if (unlikely(!offset->sock__flags_offset))
 				infer_sock_flags(infer_sk, offset);
+		}
+	} else {
+		return OFFSET_READY;
+	}
+
+	return OFFSET_NO_READY;
+}
+
+static __inline int infer_offset_phase_2(int fd)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return OFFSET_NO_READY;
+
+	if (unlikely(!offset->ready)) {
+		if (!infer_offset_check_tgid())
+			return OFFSET_NO_READY;
+
+		if (unlikely
+		    (!offset->sock__flags_offset
+		     || !offset->task__files_offset))
+			return OFFSET_NO_READY;
+
+		void *sk = get_socket_from_fd(fd, offset);
+		if (sk) {
 
 			if (unlikely(!offset->tcp_sock__copied_seq_offset ||
 				     !offset->tcp_sock__write_seq_offset)) {
-				infer_tcp_seq_offset(infer_sk, offset);
+				infer_tcp_seq_offset(sk, offset);
 				if (likely
 				    (offset->tcp_sock__copied_seq_offset
 				     && offset->tcp_sock__write_seq_offset
@@ -917,9 +954,15 @@ static __inline int infer_offset_retry(int fd)
 	return OFFSET_READY;
 }
 
-#define CHECK_OFFSET_READY(f) \
+#define INFER_OFFSET_PHASE_1(f) \
 do { \
-	if (infer_offset_retry((f)) == OFFSET_NO_READY) \
+	if (infer_offset_phase_1((f)) == OFFSET_NO_READY) \
+		return 0; \
+} while(0)
+
+#define INFER_OFFSET_PHASE_2(f) \
+do { \
+	if (infer_offset_phase_2((f)) == OFFSET_NO_READY) \
 		return 0; \
 } while(0)
 
@@ -1260,8 +1303,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->
-							      peer_fd);
+							      socket_info_ptr->peer_fd);
 			struct socket_info_t *peer_socket_info_ptr =
 			    socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
@@ -1632,6 +1674,9 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
 TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
+
+	INFER_OFFSET_PHASE_1(sockfd);
+
 	char *buf = (char *)ctx->buf;
 	// Stash arguments.
 	struct data_args_t write_args = {};
@@ -1994,7 +2039,7 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	if (!offset)
 		return 0;
 
-	CHECK_OFFSET_READY(fd);
+	INFER_OFFSET_PHASE_2(fd);
 
 	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
 	if (sock_addr) {

@@ -29,6 +29,13 @@
 #define CACHE_LINE_ROUNDUP(size) \
   (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
 
+enum linux_kernel_type {
+	K_TYPE_COMM,
+	K_TYPE_KYLIN,
+	K_TYPE_VER_5_2_PLUS,
+	K_TYPE_VER_3_10
+};
+
 enum probes_act_type {
 	ACT_NONE,
 	ACT_ATTACH,
