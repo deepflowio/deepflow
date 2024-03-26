@@ -1076,7 +1076,6 @@ vtap_group_id: g-xxxxxx
     ## - field-name: "cookie"
     #  http: []
     #  http2: []
-    #  grpc: []
 
   #oracle-parse-config:
     #is-be: true
