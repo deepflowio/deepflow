@@ -29,20 +29,13 @@
 #define NSEC_PER_SEC	1000000000L
 #define USER_HZ		100
 
-#ifdef LINUX_VER_5_2_PLUS
 static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
-						      int fd_num,
-						      int files_off,
-						      struct
+						      int fd_num, struct
 						      member_fields_offset
 						      *offset)
-#else
-static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
-						      int fd_num, int files_off)
-#endif
 {
 	void *file = NULL;
-	void *files, *files_ptr = (void *)task + files_off;
+	void *files, *files_ptr = (void *)task + offset->task__files_offset;
 	bpf_probe_read_kernel(&files, sizeof(files), files_ptr);
 
 	if (files == NULL)
@@ -50,41 +43,8 @@ static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
 
 	struct fdtable *fdt, __fdt;
 
-	/*
-	 * Here, we consider the Kylin operating system in China,
-	 * for which we have separately compiled a BPF bytecode
-	 * that is compatible with a kernel version lower than 5.2.
-	 * In KYLIN, the value of STRUCT_FILES_PRIVATE_DATA_OFFSET
-	 * is different from other systems:
-	 *
-	 * #ifdef LINUX_VER_KYLIN
-	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc0
-	 * #else
-	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc8
-	 * #endif
-	 *
-	 * This approach is mainly designed to accommodate this sp-
-	 * ecific system (and there may be other system differences
-	 * in the future).
-	 *
-	 * For kernel versions 5.2 and above, which support BTF, we
-	 * don't need to consider kernel compatibility issues in this
-	 * section. As a general rule, for kernel versions 5.2 and
-	 * above, the BTF feature should be enabled to avoid any com-
-	 * patibility issues.
-	 *
-	 * Apart from the mentioned special offsets for systems like
-	 * Kylin, currently, all feature offsets are written to the
-	 * eBPF map, using a unified approach of both manual inference
-	 * and BTF.
-	 */
-#ifdef LINUX_VER_5_2_PLUS
 	bpf_probe_read_kernel(&fdt, sizeof(fdt),
 			      files + offset->struct_files_struct_fdt_offset);
-#else
-	bpf_probe_read_kernel(&fdt, sizeof(fdt),
-			      files + STRUCT_FILES_STRUCT_FDT_OFFSET);
-#endif
 	bpf_probe_read_kernel(&__fdt, sizeof(__fdt), (void *)fdt);
 
 	if (fd_num >= (int)__fdt.max_fds)
@@ -96,7 +56,8 @@ static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
 }
 
 static __inline void *retry_get_socket_file_addr(struct task_struct *task,
-						 int fd_num, int files_off)
+						 int fd_num, int fdt_offset,
+						 int files_off)
 {
 	void *file = NULL;
 	void *files, *files_ptr = (void *)task + files_off;
@@ -106,8 +67,7 @@ static __inline void *retry_get_socket_file_addr(struct task_struct *task,
 		return NULL;
 
 	struct fdtable *fdt, __fdt;
-	bpf_probe_read_kernel(&fdt, sizeof(fdt),
-			      files + STRUCT_FILES_STRUCT_FDT_OFFSET);
+	bpf_probe_read_kernel(&fdt, sizeof(fdt), files + fdt_offset);
 	bpf_probe_read_kernel(&__fdt, sizeof(__fdt), (void *)fdt);
 	bpf_probe_read_kernel(&file, sizeof(file), __fdt.fd + fd_num);
 
@@ -166,13 +126,16 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 		for (i = 0; i < ARRAY_SIZE(files_offset_array); i++) {
 			file =
 			    retry_get_socket_file_addr(task, fd_num,
+						       offset->
+						       struct_files_struct_fdt_offset,
 						       files_offset_array[i]);
 
 			if (file) {
 				bpf_probe_read_kernel(&private_data,
 						      sizeof(private_data),
 						      file +
-						      STRUCT_FILES_PRIVATE_DATA_OFFSET);
+						      offset->
+						      struct_files_private_data_offset);
 				if (private_data != NULL) {
 					socket = private_data;
 					bpf_probe_read_kernel(&__socket,
@@ -190,19 +153,18 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 	} else {
 		file =
 		    retry_get_socket_file_addr(task, fd_num,
+					       offset->
+					       struct_files_struct_fdt_offset,
 					       offset->task__files_offset);
 	}
 
 	if (file == NULL || !offset->task__files_offset) {
 		return NULL;
 	}
-#ifdef LINUX_VER_5_2_PLUS
+
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
 			      file + offset->struct_files_private_data_offset);
-#else
-	bpf_probe_read_kernel(&private_data, sizeof(private_data),
-			      file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
+
 	if (private_data == NULL) {
 		return NULL;
 	}
@@ -234,25 +196,13 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
-#ifdef LINUX_VER_5_2_PLUS
-	file =
-	    get_socket_file_addr_with_check(task, fd_num,
-					    offset->task__files_offset, offset);
-#else
-	file =
-	    get_socket_file_addr_with_check(task, fd_num,
-					    offset->task__files_offset);
-#endif
+	file = get_socket_file_addr_with_check(task, fd_num, offset);
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
-#ifdef LINUX_VER_5_2_PLUS
+
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
 			      file + offset->struct_files_private_data_offset);
-#else
-	bpf_probe_read_kernel(&private_data, sizeof(private_data),
-			      file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
 	if (private_data == NULL) {
 		return NULL;
 	}
@@ -288,15 +238,7 @@ static __inline void *fd_to_file(int fd_num,
 	}
 
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-#ifdef LINUX_VER_5_2_PLUS
-	void *file =
-	    get_socket_file_addr_with_check(task, fd_num,
-					    offset->task__files_offset, offset);
-#else
-	void *file =
-	    get_socket_file_addr_with_check(task, fd_num,
-					    offset->task__files_offset);
-#endif
+	void *file = get_socket_file_addr_with_check(task, fd_num, offset);
 	return file;
 }
 
