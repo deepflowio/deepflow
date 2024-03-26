@@ -472,6 +472,7 @@ type VTapGroupConfiguration struct {
 	MaxCPUs                           *int          `json:"MAX_CPUS" yaml:"max_cpus,omitempty"`
 	MaxMemory                         *int          `json:"MAX_MEMORY" yaml:"max_memory,omitempty"` // unit: M
 	SyncInterval                      *int          `json:"SYNC_INTERVAL" yaml:"sync_interval,omitempty"`
+	PlatformSyncInterval              *int          `json:"PLATFORM_SYNC_INTERVAL" yaml:"platform_sync_interval,omitempty"`
 	StatsInterval                     *int          `json:"STATS_INTERVAL" yaml:"stats_interval,omitempty"`
 	RsyslogEnabled                    *int          `json:"RSYSLOG_ENABLED" yaml:"rsyslog_enabled,omitempty"` // 0: disabled 1:enabled
 	SystemLoadCircuitBreakerThreshold *float32      `json:"SYSTEM_LOAD_CIRCUIT_BREAKER_THRESHOLD" yaml:"system_load_circuit_breaker_threshold,omitempty"`
@@ -559,6 +560,7 @@ type VTapGroupConfigurationResponse struct {
 	MaxCPUs                           *int           `json:"MAX_CPUS"`
 	MaxMemory                         *int           `json:"MAX_MEMORY"` // unit: M
 	SyncInterval                      *int           `json:"SYNC_INTERVAL"`
+	PlatformSyncInterval              *int           `json:"PLATFORM_SYNC_INTERVAL"`
 	StatsInterval                     *int           `json:"STATS_INTERVAL"`
 	RsyslogEnabled                    *int           `json:"RSYSLOG_ENABLED"` // 0: disabled 1:enabled
 	SystemLoadCircuitBreakerThreshold *float32       `json:"SYSTEM_LOAD_CIRCUIT_BREAKER_THRESHOLD"`

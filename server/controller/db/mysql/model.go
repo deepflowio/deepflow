@@ -236,6 +236,7 @@ type VTapGroupConfiguration struct {
 	MaxNpbBps                         *int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           *int     `gorm:"column:max_cpus;type:int;default:null" json:"MAX_CPUS"`
 	MaxMemory                         *int     `gorm:"column:max_memory;type:int;default:null" json:"MAX_MEMORY"` // unit: M
+	PlatformSyncInterval              *int     `gorm:"column:platform_sync_interval;type:int;default:null" json:"PLATFORM_SYNC_INTERVAL"`
 	SyncInterval                      *int     `gorm:"column:sync_interval;type:int;default:null" json:"SYNC_INTERVAL"`
 	StatsInterval                     *int     `gorm:"column:stats_interval;type:int;default:null" json:"STATS_INTERVAL"`
 	RsyslogEnabled                    *int     `gorm:"column:rsyslog_enabled;type:tinyint(1);default:null" json:"RSYSLOG_ENABLED"` // 0: disabled 1:enabled
@@ -315,6 +316,7 @@ type RVTapGroupConfiguration struct {
 	MaxNpbBps                         int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           int     `gorm:"column:max_cpus;type:int;default:null" json:"MAX_CPUS"`
 	MaxMemory                         int     `gorm:"column:max_memory;type:int;default:null" json:"MAX_MEMORY"` // unit: M
+	PlatformSyncInterval              int     `gorm:"column:platform_sync_interval;type:int;default:null" json:"PLATFORM_SYNC_INTERVAL"`
 	SyncInterval                      int     `gorm:"column:sync_interval;type:int;default:null" json:"SYNC_INTERVAL"`
 	StatsInterval                     int     `gorm:"column:stats_interval;type:int;default:null" json:"STATS_INTERVAL"`
 	RsyslogEnabled                    int     `gorm:"column:rsyslog_enabled;type:tinyint(1);default:null" json:"RSYSLOG_ENABLED"` // 0: disabled 1:enabled

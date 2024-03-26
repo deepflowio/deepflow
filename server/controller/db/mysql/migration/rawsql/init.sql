@@ -1612,6 +1612,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,
     max_memory                              INTEGER        DEFAULT NULL     COMMENT 'unit: M',
+    platform_sync_interval                  INTEGER        DEFAULT NULL,
     sync_interval                           INTEGER        DEFAULT NULL,
     stats_interval                          INTEGER,
     rsyslog_enabled                         TINYINT(1)     COMMENT '0: disabled 1: enabled',
