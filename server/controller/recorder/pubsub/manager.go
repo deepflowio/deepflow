@@ -78,6 +78,7 @@ func GetManager() *Manager {
 				PubSubTypeRedisInstance:         NewRedisInstance(),
 				PubSubTypePodCluster:            NewPodCluster(),
 				PubSubTypePodNode:               NewPodNode(),
+				PubSubTypeVMPodNodeConnection:   NewVMPodNodeConnection(),
 				PubSubTypePodNamespace:          NewPodNamespace(),
 				PubSubTypePodIngress:            NewPodIngress(),
 				PubSubTypePodIngressRule:        NewPodIngressRule(),
