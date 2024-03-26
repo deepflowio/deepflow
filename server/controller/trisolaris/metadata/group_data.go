@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/message/trident"
@@ -58,6 +57,7 @@ type GroupProto struct {
 	groupVersion uint64
 	groups       *atomic.Value // []byte
 	groupHash    uint64
+	startTime    int64
 }
 
 func newGroupProto() *GroupProto {
@@ -79,7 +79,7 @@ func (g *GroupProto) checkVersion(groupHash uint64) {
 	if g.groupHash != groupHash {
 		g.groupHash = groupHash
 		if g.groupVersion == 0 {
-			g.groupVersion = uint64(time.Now().Unix())
+			g.groupVersion = uint64(g.startTime)
 		} else {
 			atomic.AddUint64(&g.groupVersion, 1)
 		}
@@ -138,6 +138,11 @@ var tridentGroup = []int{NPB_BUSINESS_ID, PCAP_BUSINESS_ID}
 type GroupIP struct {
 	cidrs    []string
 	ipRanges []string
+}
+
+func (g *GroupDataOP) SetStartTime(startTime int64) {
+	g.tridentGroupProto.startTime = startTime
+	g.dropletGroupProto.startTime = startTime
 }
 
 func (g *GroupDataOP) GetIDToGroup() map[int]*models.ResourceGroup {
