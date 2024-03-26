@@ -22,8 +22,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getNetworks() ([]model.Network, error) {
@@ -40,7 +38,7 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 		}
 		vpcLcuuid := n.VPCLcuuid
 		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUID(g.defaultVpcName, uuid.Nil)
+			vpcLcuuid = common.GenerateUUID(g.defaultVpcName)
 			g.defaultVpc = true
 		}
 		networkName := n.Name

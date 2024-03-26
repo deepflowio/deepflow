@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getRegions() ([]awsRegion, error) {
@@ -55,7 +54,7 @@ func (a *Aws) getRegions() ([]awsRegion, error) {
 				continue
 			}
 		}
-		lcuuid := common.GetUUID(name, uuid.Nil)
+		lcuuid := common.GenerateUUID(name)
 		regions = append(regions, awsRegion{
 			name:   name,
 			lcuuid: lcuuid,

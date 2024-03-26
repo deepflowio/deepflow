@@ -17,10 +17,9 @@
 package tencent
 
 import (
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []model.PeerConnection) ([]model.PeerConnection, error) {
@@ -43,7 +42,7 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 			continue
 		}
 		peerID := pData.Get("VpcPeerConnectionId").MustString()
-		peerLcuuid := common.GetUUID(peerID, uuid.Nil)
+		peerLcuuid := common.GenerateUUID(peerID)
 		if peerConnectionLcuuids.Contains(peerLcuuid) {
 			continue
 		}
@@ -62,8 +61,8 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 			Lcuuid:             peerLcuuid,
 			Name:               peerName,
 			Label:              peerID,
-			LocalVPCLcuuid:     common.GetUUID(localVpcID, uuid.Nil),
-			RemoteVPCLcuuid:    common.GetUUID(remoteVpcID, uuid.Nil),
+			LocalVPCLcuuid:     common.GenerateUUID(localVpcID),
+			RemoteVPCLcuuid:    common.GenerateUUID(remoteVpcID),
 			LocalRegionLcuuid:  localRegionLcuuid,
 			RemoteRegionLcuuid: remoteRegionLcuuid,
 		})

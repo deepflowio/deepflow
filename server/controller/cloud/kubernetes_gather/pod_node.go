@@ -24,7 +24,6 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork, podNetwork model.Network, err error) {
@@ -132,7 +131,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 	}
 
 	nodeNetworkName := k.Name + "_NODE_NET"
-	nodeNetworkLcuuid := common.GetUUID(k.UuidGenerate+nodeNetworkName, uuid.Nil)
+	nodeNetworkLcuuid := common.GenerateUUID(k.UuidGenerate + nodeNetworkName)
 	nodeIPs := cloudcommon.StringStringMapKeys(k.nodeIPToLcuuid)
 	nodeCIDRs := []string{}
 	if len(nodeIPs) != 0 {
@@ -170,7 +169,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 	}
 
 	podNetworkName := k.Name + "_POD_NET"
-	podNetworkLcuuid := common.GetUUID(k.UuidGenerate+podNetworkName, uuid.Nil)
+	podNetworkLcuuid := common.GenerateUUID(k.UuidGenerate + podNetworkName)
 
 	podCIDRs := []string{}
 	if len(podNetworkCIDRs) != 0 {

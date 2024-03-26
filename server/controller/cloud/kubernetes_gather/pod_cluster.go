@@ -23,7 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 
 	"github.com/bitly/go-simplejson"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
@@ -42,7 +41,7 @@ func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 	if version == "" {
 		return model.PodCluster{}, errors.New("not found k8s gitversion")
 	}
-	k.podClusterLcuuid = common.GetUUID(k.UuidGenerate, uuid.Nil)
+	k.podClusterLcuuid = common.GenerateUUID(k.UuidGenerate)
 	podCluster := model.PodCluster{
 		Lcuuid:       k.podClusterLcuuid,
 		Version:      K8S_VERSION_PREFIX + " " + version,

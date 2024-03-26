@@ -26,7 +26,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
@@ -97,7 +96,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			if targetIndex != -1 {
 				abstractPGName = resourceName[:targetIndex]
 			}
-			uid := common.GetUUID(namespace+abstractPGName, uuid.Nil)
+			uid := common.GenerateUUID(namespace + abstractPGName)
 			// 适配 serverless pod
 			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, abstractPGType)))
 		}
@@ -129,7 +128,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		if kind == "StatefulSet" {
 			generate_name := metaData.Get("generate_name").MustString()
 			serialNumber := strings.TrimLeft(name, generate_name)
-			podLcuuid = common.GetUUID(ID+serialNumber, uuid.Nil)
+			podLcuuid = common.GenerateUUID(ID + serialNumber)
 		} else {
 			podLcuuid = uID
 		}

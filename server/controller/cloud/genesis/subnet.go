@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getSubnets() ([]model.Subnet, error) {
@@ -38,7 +36,7 @@ func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 		}
 		vpcLcuuid := s.VPCLcuuid
 		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUID(g.defaultVpcName, uuid.Nil)
+			vpcLcuuid = common.GenerateUUID(g.defaultVpcName)
 			g.defaultVpc = true
 		}
 		subnetName := s.Name

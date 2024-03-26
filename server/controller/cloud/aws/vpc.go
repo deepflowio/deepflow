@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
@@ -58,7 +57,7 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 		if vpcName == "" {
 			vpcName = vpcID
 		}
-		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
+		vpcLcuuid := common.GenerateUUID(vpcID)
 		vpcs = append(vpcs, model.VPC{
 			Lcuuid:       vpcLcuuid,
 			Name:         vpcName,

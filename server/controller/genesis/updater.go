@@ -37,7 +37,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/queue"
-	uuid "github.com/satori/go.uuid"
 )
 
 type bridge struct {
@@ -214,8 +213,8 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 				ipSlice = append(ipSlice, fmt.Sprintf("%s/%v", ip.Address, ip.MaskLen))
 			}
 			vIF.IPs = strings.Join(ipSlice, ",")
-			vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
-			vIF.DeviceLcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
+			vIF.Lcuuid = common.GenerateUUID(vIF.Name + vIF.Mac + strconv.Itoa(int(vtapID)))
+			vIF.DeviceLcuuid = common.GenerateUUID(vIF.Name + vIF.Mac + strconv.Itoa(int(vtapID)))
 			vIF.DeviceType = deviceType
 			vIF.HostIP = peer
 			vIF.LastSeen = epoch
@@ -239,7 +238,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 	}
 	deviceIDToUUID := map[string]string{}
 	for key, value := range deviceIDToMinMAC {
-		deviceIDToUUID[key] = common.GetUUID(key+fmt.Sprintf("%d", value), uuid.Nil)
+		deviceIDToUUID[key] = common.GenerateUUID(key + fmt.Sprintf("%d", value))
 	}
 	for _, iface := range info.message.GetPlatformData().Interfaces {
 		vIF := model.GenesisVinterface{
@@ -280,7 +279,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			validIPs = append(validIPs, addr)
 		}
 		vIF.IPs = strings.Join(validIPs, ",")
-		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)), uuid.Nil)
+		vIF.Lcuuid = common.GenerateUUID(vIF.Name + vIF.Mac + vIF.IPs + strconv.Itoa(int(vtapID)))
 		ifaceNSName := iface.GetNetns()
 		if gIF, ok := ifIndexToInterface[fmt.Sprintf("%v%v", ifaceNSName, iface.GetTapIndex())]; ok && isContainer {
 			vIF.TapName = gIF.Name
@@ -347,7 +346,7 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 					continue
 				}
 				vips = append(vips, model.GenesisVIP{
-					Lcuuid: common.GetUUID(ip.Address+strconv.Itoa(int(vtapID)), uuid.Nil),
+					Lcuuid: common.GenerateUUID(ip.Address + strconv.Itoa(int(vtapID))),
 					IP:     ip.Address,
 					VtapID: vtapID,
 				})
@@ -374,13 +373,13 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode)
 	vpc := model.GenesisVpc{
 		Name:   "default-public-cloud-vpc",
-		Lcuuid: common.GetUUID("default-public-cloud-vpc", uuid.Nil),
+		Lcuuid: common.GenerateUUID("default-public-cloud-vpc"),
 		VtapID: vtapID,
 	}
 	if behindNat && !v.singleVPCMode {
 		vpc = model.GenesisVpc{
 			Name:   "VPC-" + peer,
-			Lcuuid: common.GetUUID("VPC-"+peer, uuid.Nil),
+			Lcuuid: common.GenerateUUID("VPC-" + peer),
 			VtapID: vtapID,
 		}
 	}
@@ -389,7 +388,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	vm := model.GenesisVM{
 		Name:         hostName,
 		Label:        hostName,
-		Lcuuid:       common.GetUUID(hostName, uuid.Nil),
+		Lcuuid:       common.GenerateUUID(hostName),
 		VPCLcuuid:    vpc.Lcuuid,
 		LaunchServer: "127.0.0.1",
 		State:        common.VM_STATE_RUNNING,
@@ -448,7 +447,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		}
 		if !ok {
 			network = model.GenesisNetwork{
-				Lcuuid:         common.GetUUID(networkName, uuid.Nil),
+				Lcuuid:         common.GenerateUUID(networkName),
 				Name:           networkName,
 				SegmentationID: 1,
 				VtapID:         vtapID,
@@ -459,7 +458,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 			nameToNetwork[networkName] = network
 		}
 		port := model.GenesisPort{
-			Lcuuid:        common.GetUUID(hostName+iface.MAC, uuid.Nil),
+			Lcuuid:        common.GenerateUUID(hostName + iface.MAC),
 			Type:          uint32(vType),
 			VtapID:        vtapID,
 			Mac:           iface.MAC,
@@ -480,7 +479,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 				continue
 			}
 			ipLastSeen := model.GenesisIP{
-				Lcuuid:           common.GetUUID(hostName+oIP.String()+port.Lcuuid, uuid.Nil),
+				Lcuuid:           common.GenerateUUID(hostName + oIP.String() + port.Lcuuid),
 				VinterfaceLcuuid: port.Lcuuid,
 				IP:               p.Address,
 				Masklen:          p.MaskLen,
@@ -519,7 +518,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
 		processes = append(processes, model.GenesisProcess{
-			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
+			Lcuuid:      common.GenerateUUID(strconv.Itoa(int(pID)) + strconv.Itoa(int(vtapID))),
 			PID:         pID,
 			NetnsID:     p.GetNetnsId(),
 			Name:        p.GetName(),
@@ -556,7 +555,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	hosts := []model.GenesisHost{
 		model.GenesisHost{
 			Hostname: rawHostName,
-			Lcuuid:   common.GetUUID(rawHostName, uuid.Nil),
+			Lcuuid:   common.GenerateUUID(rawHostName),
 			IP:       peer,
 			VtapID:   vtapID,
 		},
@@ -618,7 +617,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 			}
 			bge := bridge{
 				name: br,
-				uuid: common.GetUUID(fmt.Sprintf("%d,%s", vlan, br), uuid.Nil),
+				uuid: common.GenerateUUID(fmt.Sprintf("%d,%s", vlan, br)),
 				vlan: vlan,
 			}
 			for _, iface := range ifaces {
@@ -715,7 +714,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 					if err != nil {
 						tagInt = 1
 					}
-					network.Lcuuid = common.GetUUID(strconv.Itoa(tagInt), uuid.Nil)
+					network.Lcuuid = common.GenerateUUID(strconv.Itoa(tagInt))
 				}
 				if sID, ok := options["segmentation_id"]; ok {
 					sIDInt, err := strconv.Atoi(sID)
@@ -734,11 +733,11 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 				br, ok := portToBridge[ifName]
 				if !ok {
 					br = bridge{
-						uuid: common.GetUUID("yunshan-temp", uuid.Nil),
+						uuid: common.GenerateUUID("yunshan-temp"),
 						vlan: 1,
 					}
 				}
-				port.Lcuuid = common.GetUUID(mac, uuid.Nil)
+				port.Lcuuid = common.GenerateUUID(mac)
 				network.Lcuuid = br.uuid
 				network.SegmentationID = uint32(br.vlan)
 			}
@@ -767,7 +766,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 			ports = append(ports, port)
 			for _, ip := range macToIPs[mac] {
 				ip.VinterfaceLcuuid = port.Lcuuid
-				ip.Lcuuid = common.GetUUID(ip.IP+ip.VinterfaceLcuuid, uuid.Nil)
+				ip.Lcuuid = common.GenerateUUID(ip.IP + ip.VinterfaceLcuuid)
 				ips = append(ips, ip)
 			}
 		}
@@ -787,7 +786,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	lldps := []model.GenesisLldp{}
 	for _, l := range info.message.GetPlatformData().GetLldpInfo() {
 		lldp := model.GenesisLldp{}
-		lldp.Lcuuid = common.GetUUID(peer+l.GetManagementAddress()+l.GetPortId(), uuid.Nil)
+		lldp.Lcuuid = common.GenerateUUID(peer + l.GetManagementAddress() + l.GetPortId())
 		lldp.HostIP = peer
 		lldp.VtapID = vtapID
 		lldp.HostInterface = l.GetInterface()

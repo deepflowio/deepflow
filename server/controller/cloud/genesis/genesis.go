@@ -32,7 +32,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/op/go-logging"
-	uuid "github.com/satori/go.uuid"
 )
 
 var log = logging.MustGetLogger("cloud.genesis")
@@ -175,7 +174,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 			knownCIDRs.Add(cidr.Masked())
 			if _, ok := subnetMap[cidr.Masked().String()]; !ok {
 				subnet := cloudmodel.Subnet{
-					Lcuuid:        common.GetUUID(networkID+cidr.Masked().String(), uuid.Nil),
+					Lcuuid:        common.GenerateUUID(networkID + cidr.Masked().String()),
 					CIDR:          cidr.Masked().String(),
 					NetworkLcuuid: networkID,
 					VPCLcuuid:     NetworkIDToVpcID[networkID],
@@ -235,7 +234,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 				if cidr.Contains(ipNet) {
 					if _, ok := subnetMap[cidr.String()]; !ok {
 						subnet := cloudmodel.Subnet{
-							Lcuuid:        common.GetUUID(networkID+cidr.String(), uuid.Nil),
+							Lcuuid:        common.GenerateUUID(networkID + cidr.String()),
 							NetworkLcuuid: networkID,
 							CIDR:          cidr.String(),
 							VPCLcuuid:     NetworkIDToVpcID[networkID],
@@ -314,7 +313,7 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	}
 	if g.defaultVpc {
 		vpc := cloudmodel.VPC{
-			Lcuuid:       common.GetUUID(g.defaultVpcName, uuid.Nil),
+			Lcuuid:       common.GenerateUUID(g.defaultVpcName),
 			Name:         g.defaultVpcName,
 			RegionLcuuid: g.regionUuid,
 		}

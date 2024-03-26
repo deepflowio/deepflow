@@ -22,7 +22,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
@@ -57,8 +56,8 @@ func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
 		privatePort := nData.Get("PrivatePort").MustInt()
 		key := publicIP + natID + strconv.Itoa(publicPort) + ipProtocol + privateIP + strconv.Itoa(privatePort)
 		natRules = append(natRules, model.NATRule{
-			Lcuuid:           common.GetUUID(key, uuid.Nil),
-			NATGatewayLcuuid: common.GetUUID(natID, uuid.Nil),
+			Lcuuid:           common.GenerateUUID(key),
+			NATGatewayLcuuid: common.GenerateUUID(natID),
 			Type:             "DNAT",
 			Protocol:         strings.ToUpper(ipProtocol),
 			FloatingIP:       publicIP,

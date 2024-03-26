@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getIPs() ([]model.IP, error) {
@@ -38,7 +36,7 @@ func (g *Genesis) getIPs() ([]model.IP, error) {
 		}
 		lcuuid := i.Lcuuid
 		if lcuuid == "" {
-			lcuuid = common.GetUUID(i.VInterfaceLcuuid+i.IP, uuid.Nil)
+			lcuuid = common.GenerateUUID(i.VInterfaceLcuuid + i.IP)
 		}
 		ip := model.IP{
 			Lcuuid:           lcuuid,

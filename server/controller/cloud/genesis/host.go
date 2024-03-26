@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getHosts() ([]model.Host, error) {
@@ -34,7 +32,7 @@ func (g *Genesis) getHosts() ([]model.Host, error) {
 
 	for _, h := range hostsData {
 		host := model.Host{
-			Lcuuid:       common.GetUUID(h.IP, uuid.Nil),
+			Lcuuid:       common.GenerateUUID(h.IP),
 			IP:           h.IP,
 			Name:         h.Hostname,
 			HType:        common.HOST_HTYPE_KVM,

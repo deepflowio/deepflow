@@ -23,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
@@ -125,7 +124,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					if targetIndex != -1 {
 						abstractPGName = resourceName[:targetIndex]
 					}
-					uID = common.GetUUID(namespace+abstractPGName, uuid.Nil)
+					uID = common.GenerateUUID(namespace + abstractPGName)
 					if k.podGroupLcuuids.Contains(uID) {
 						log.Debugf("sci pod (%s) abstract workload already existed", name)
 						continue

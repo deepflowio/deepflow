@@ -19,8 +19,6 @@ package cloud
 import (
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -87,7 +85,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		if node.State == common.POD_NODE_STATE_EXCEPTION {
 			state = common.VM_STATE_EXCEPTION
 		}
-		vmLcuuid := "ff" + common.GetUUID(node.Name, uuid.Nil)[2:]
+		vmLcuuid := "ff" + common.GenerateUUID(node.Name)[2:]
 		vms = append(vms, model.VM{
 			Lcuuid:       vmLcuuid,
 			Name:         node.Name,
@@ -101,7 +99,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 			RegionLcuuid: node.RegionLcuuid,
 		})
 		vmPodNodeConnections = append(vmPodNodeConnections, model.VMPodNodeConnection{
-			Lcuuid:        common.GetUUID(vmLcuuid+node.Lcuuid, uuid.Nil),
+			Lcuuid:        common.GenerateUUID(vmLcuuid + node.Lcuuid),
 			VMLcuuid:      vmLcuuid,
 			PodNodeLcuuid: node.Lcuuid,
 		})
