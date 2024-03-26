@@ -90,7 +90,6 @@ use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
-const MINUTE: Duration = Duration::from_secs(60);
 
 type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
 
@@ -1348,7 +1347,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             pcap: conf.yaml_config.pcap.clone(),
             platform: PlatformConfig {
-                sync_interval: MINUTE,
+                sync_interval: Duration::from_secs(conf.platform_sync_interval),
                 kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
                 libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
                 kubernetes_poller_type: conf.yaml_config.kubernetes_poller_type,

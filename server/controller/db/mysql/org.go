@@ -25,7 +25,7 @@ import (
 
 const ORG_TABLE = "org"
 
-func GetOrgIDs() ([]int, error) {
+func GetORGIDs() ([]int, error) {
 	ids := []int{common.DEFAULT_ORG_ID}
 	var orgTable string
 	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error

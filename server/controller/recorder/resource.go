@@ -38,7 +38,7 @@ func GetResource() *Resource {
 	resourceOnce.Do(func() {
 		resource = &Resource{
 			Cleaners:   GetCleaners(),
-			IDManagers: idmng.GetSingleton(),
+			IDManagers: idmng.GetIDManagers(),
 		}
 	})
 	return resource
@@ -46,6 +46,6 @@ func GetResource() *Resource {
 
 func (r *Resource) Init(ctx context.Context, cfg config.RecorderConfig) *Resource {
 	r.Cleaners.Init(ctx, cfg)
-	r.IDManagers.Init(&cfg) // TODO add ctx
+	r.IDManagers.Init(ctx, cfg)
 	return r
 }

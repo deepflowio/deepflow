@@ -1151,8 +1151,9 @@ pub struct RuntimeConfig {
     pub enabled: bool,
     pub max_cpus: u32,
     pub max_memory: u64,
-    pub sync_interval: u64,  // unit(second)
-    pub stats_interval: u64, // unit(second)
+    pub sync_interval: u64,          // unit(second)
+    pub platform_sync_interval: u64, // unit(second)
+    pub stats_interval: u64,         // unit(second)
     #[serde(rename = "max_collect_pps")]
     pub global_pps_threshold: u64,
     #[cfg(target_os = "linux")]
@@ -1299,6 +1300,7 @@ impl RuntimeConfig {
             max_cpus: 1,
             max_memory: 768,
             sync_interval: 60,
+            platform_sync_interval: 10,
             stats_interval: 10,
             global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
@@ -1378,6 +1380,12 @@ impl RuntimeConfig {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "sync-interval {:?} not in [1s, 1h]",
                 Duration::from_secs(self.sync_interval)
+            )));
+        }
+        if self.platform_sync_interval < 10 || self.platform_sync_interval > 60 * 60 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "platform-sync-interval {:?} not in [10s, 1h]",
+                Duration::from_secs(self.platform_sync_interval)
             )));
         }
         if self.stats_interval < 1 || self.stats_interval > 60 * 60 {
@@ -1472,6 +1480,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             max_cpus: conf.max_cpus(),
             max_memory: (conf.max_memory() as u64) << 20,
             sync_interval: conf.sync_interval() as u64,
+            platform_sync_interval: conf.platform_sync_interval() as u64,
             stats_interval: conf.stats_interval() as u64,
             global_pps_threshold: conf.global_pps_threshold(),
             #[cfg(target_os = "linux")]
