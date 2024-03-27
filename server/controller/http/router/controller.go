@@ -17,9 +17,12 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
@@ -48,7 +51,11 @@ func (c *Controller) RegisterTo(e *gin.Engine) {
 func getController(c *gin.Context) {
 	args := make(map[string]string)
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := service.GetControllers(args)
+	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+	data, err := service.GetControllers(orgID.(int), args)
+	if err != nil {
+		err = fmt.Errorf("org id(%v), %s", orgID, err.Error())
+	}
 	JsonResponse(c, data, err)
 }
 
@@ -75,7 +82,12 @@ func getControllers(c *gin.Context) {
 	if value, ok := c.GetQuery("region"); ok {
 		args["region"] = value
 	}
-	data, err := service.GetControllers(args)
+
+	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+	data, err := service.GetControllers(orgID.(int), args)
+	if err != nil {
+		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+	}
 	JsonResponse(c, data, err)
 }
 
@@ -104,7 +116,11 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.UpdateController(lcuuid, patchMap, m, cfg)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.UpdateController(orgID.(int), lcuuid, patchMap, m, cfg)
+		if err != nil {
+			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+		}
 		JsonResponse(c, data, err)
 	})
 }
@@ -119,7 +135,11 @@ func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		}
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.DeleteController(lcuuid, m)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.DeleteController(orgID.(int), lcuuid, m)
+		if err != nil {
+			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+		}
 		JsonResponse(c, data, err)
 		return
 	})
