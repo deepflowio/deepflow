@@ -45,6 +45,7 @@ func NewDomain(cfg *config.ControllerConfig) *Domain {
 	return &Domain{cfg: cfg}
 }
 
+// TODO: 后续通过header中携带的用户信息校验用户权限
 func (d *Domain) RegisterTo(e *gin.Engine) {
 	// TODO: 后续统一为v2
 	e.GET("/v2/domains/:lcuuid/", getDomain)
