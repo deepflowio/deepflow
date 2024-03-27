@@ -81,6 +81,7 @@ type CHEngine struct {
 	NoPreWhere         bool
 	IsDerivative       bool
 	DerivativeGroupBy  []string
+	ORGID              string
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -91,6 +92,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	sql := args.Sql
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
+	e.ORGID = args.ORGID
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 
@@ -143,7 +145,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
 		for _, showSql := range sqlList {
-			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 			showEngine.Init()
 			showParser := parse.Parser{Engine: showEngine}
 			err = showParser.ParseSQL(showSql)
@@ -167,6 +169,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 				QueryCacheTTL:   args.QueryCacheTTL,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
+				ORGID:           args.ORGID,
 			}
 			result, err := chClient.DoQuery(params)
 			if err != nil {
@@ -217,6 +220,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: ColumnSchemaMap,
+		ORGID:           args.ORGID,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
@@ -270,7 +274,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
-			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.UseQueryCache, e.Context)
+			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 			if err != nil {
 				return nil, []string{}, true, err
 			}
@@ -376,16 +380,16 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 			return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.UseQueryCache)
+			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
 			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.UseQueryCache, e.Context)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return data, []string{}, true, err
 	case "tables":
-		return GetTables(e.DB, args.QueryCacheTTL, args.UseQueryCache, e.Context), []string{}, true, nil
+		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	}
@@ -673,7 +677,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 				}
 			}
 		}
-		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 		innerEngine.Init()
 		if strings.Contains(innerSql, "Derivative") {
 			innerEngine.IsDerivative = true
@@ -693,7 +697,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 		innerEngine.View = view.NewView(innerEngine.Model)
 		innerTransSql = innerEngine.ToSQLString()
 	}
-	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 	outerEngine.Init()
 	if strings.Contains(newSql, "Derivative") {
 		outerEngine.IsDerivative = true
@@ -784,6 +788,7 @@ func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: columnSchemaMap,
+		ORGID:           args.ORGID,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
@@ -805,7 +810,7 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 	for _, match := range subMatches {
 		match = strings.TrimPrefix(match, "(")
 		match = strings.TrimSuffix(match, ")")
-		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 		matchEngine.Init()
 		matchParser := parse.Parser{Engine: matchEngine}
 		err := matchParser.ParseSQL(match)
@@ -1098,16 +1103,20 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				e.Statements = append(e.Statements, &whereStmt)
 				table = "samples"
 			}
-			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource, e.ORGID)
 			if err != nil {
 				log.Error(err)
 				return err
 			}
 			e.Model.Time.DatasourceInterval = interval
+			newDB := e.DB
+			if e.ORGID != "" {
+				newDB = fmt.Sprintf("%s_%s", e.ORGID, e.DB)
+			}
 			if e.DataSource != "" {
-				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
+				e.AddTable(fmt.Sprintf("%s.`%s.%s`", newDB, table, e.DataSource))
 			} else {
-				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
+				e.AddTable(fmt.Sprintf("%s.`%s`", newDB, table))
 			}
 			virtualTableFilter, ok := GetVirtualTableFilter(e.DB, e.Table)
 			if ok {

@@ -44,3 +44,5 @@ const (
 	CAPTURE_NIC_CHOST    = "capture_nic_chost"
 	CAPTURE_NIC_POD_NODE = "capture_nic_pod_node"
 )
+
+const HEADER_KEY_X_ORG_ID = "X-Org-Id"
