@@ -176,7 +176,7 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 				o.setter.setDBItemID(item, id)
 				// (*dbItem).SetID((*dupItem).GetID()) // TODO 不可行
 			}
-			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs)
+			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %#v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0])
 			err = mysql.Db.Unscoped().Delete(&dupItems).Error
 			if err != nil {
 				log.Errorf("delete duplicated data failed: %+v", err)
@@ -190,7 +190,7 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 					dupLcuuids = append(dupLcuuids, lcuuid)
 				}
 			}
-			log.Errorf("%s data is duplicated with db data (lcuuids: %v)", o.resourceTypeName, dupLcuuids)
+			log.Errorf("%s data is duplicated with db data (lcuuids: %v, one detail: %#v)", o.resourceTypeName, dupLcuuids, dupItems[0])
 
 			count := len(lcuuids) - len(dupLcuuids)
 			dedupItems := make([]*MT, 0, count)
