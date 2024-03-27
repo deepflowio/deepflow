@@ -71,7 +71,11 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 func getDomain(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := resource.GetDomains(args)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+	data, err := resource.GetDomains(db, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -80,7 +84,11 @@ func getDomains(c *gin.Context) {
 	if value, ok := c.GetQuery("name"); ok {
 		args["name"] = value
 	}
-	data, err := resource.GetDomains(args)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+	data, err := resource.GetDomains(db, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -96,7 +104,12 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := resource.CreateDomain(domainCreate, cfg)
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+
+		data, err := resource.CreateDomain(db, domainCreate, cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -125,21 +138,30 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		lcuuid := c.Param("lcuuid")
 
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+
 		// set vtap
-		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false)
+		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false, db)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 			return
 		}
 
-		data, err := resource.UpdateDomain(lcuuid, patchMap, cfg)
+		data, err := resource.UpdateDomain(lcuuid, patchMap, cfg, db)
 		common.JsonResponse(c, data, err)
 	})
 }
 
 func deleteDomainByNameOrUUID(c *gin.Context) {
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
 	nameOrUUID := c.Param("name-or-uuid")
-	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID)
+	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db)
 	common.JsonResponse(c, data, err)
 }
 
@@ -156,14 +178,22 @@ func deleteDomainByName(c *gin.Context) {
 		name = rawQuery[1]
 	}
 	log.Infof("delete domain by name(%v)", name)
-	data, err := resource.DeleteDomainByNameOrUUID(name)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+	data, err := resource.DeleteDomainByNameOrUUID(name, db)
 	common.JsonResponse(c, data, err)
 }
 
 func getSubDomain(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := resource.GetSubDomains(args)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+	data, err := resource.GetSubDomains(db, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -175,7 +205,11 @@ func getSubDomains(c *gin.Context) {
 	if value, ok := c.GetQuery("cluster_id"); ok {
 		args["cluster_id"] = value
 	}
-	data, err := resource.GetSubDomains(args)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+	data, err := resource.GetSubDomains(db, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -190,15 +224,25 @@ func createSubDomain(c *gin.Context) {
 		return
 	}
 
-	data, err := resource.CreateSubDomain(subDomainCreate)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+
+	data, err := resource.CreateSubDomain(db, subDomainCreate)
 	common.JsonResponse(c, data, err)
 }
 
 func deleteSubDomain(c *gin.Context) {
 	var err error
 
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+
 	lcuuid := c.Param("lcuuid")
-	data, err := resource.DeleteSubDomain(lcuuid)
+	data, err := resource.DeleteSubDomain(lcuuid, db)
 	common.JsonResponse(c, data, err)
 }
 
@@ -226,13 +270,18 @@ func updateSubDomain(c *gin.Context) {
 
 	lcuuid := c.Param("lcuuid")
 
-	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+	}
+
+	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true, db)
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 		return
 	}
 
-	data, err := resource.UpdateSubDomain(lcuuid, patchMap)
+	data, err := resource.UpdateSubDomain(lcuuid, db, patchMap)
 	common.JsonResponse(c, data, err)
 }
 
