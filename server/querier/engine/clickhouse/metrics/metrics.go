@@ -308,7 +308,7 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 	return map[string]*Metrics{}, err
 }
 
-func GetMetricsByDBTable(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
+func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
@@ -322,7 +322,7 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL string, useQueryCache b
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
-			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
+			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 			for k, v := range loads {
 				if _, ok := metrics[k]; !ok {
 					metrics[k] = v
@@ -370,16 +370,16 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL string, useQueryCache b
 			return GetInProcessMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
-		return GetExtMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
+		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
-		return GetPrometheusMetrics(db, table, where, queryCacheTTL, useQueryCache, ctx)
+		return GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	}
 
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table, where, queryCacheTTL, useQueryCache, ctx)
+func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) ([]interface{}, error) {
+	allMetrics, err := GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
@@ -406,14 +406,14 @@ func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL string, use
 	return values, nil
 }
 
-func GetMetricsDescriptions(db, table, where, queryCacheTTL string, useQueryCache bool, ctx context.Context) (*common.Result, error) {
+func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
 	if table == "" && db != ckcommon.DB_NAME_PROMETHEUS {
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if db == "deepflow_system" {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, useQueryCache, ctx) {
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -426,14 +426,14 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL string, useQueryCach
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, queryCacheTTL, useQueryCache, ctx)
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, queryCacheTTL, orgID, useQueryCache, ctx)
 			if err != nil {
 				return nil, err
 			}
 			values = append(values, metrics...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, useQueryCache, ctx)
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 		if err != nil {
 			return nil, err
 		}

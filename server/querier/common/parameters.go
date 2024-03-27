@@ -32,6 +32,7 @@ type QuerierParams struct {
 	DataSource    string
 	Context       context.Context
 	NoPreWhere    bool
+	ORGID         string
 }
 
 type TempoParams struct {
