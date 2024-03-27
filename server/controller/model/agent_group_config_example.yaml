@@ -890,7 +890,7 @@ vtap_group_id: g-xxxxxx
   ## Note: The DPDK RecvEngine is only started when this configuration item is turned on.
   ##   Note that you also need to set tap_mode to 1. Please refer to
   ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
-  #dpdk_enabled: false
+  #dpdk-enabled: false
 
   ########################
   ## Libpcap RecvEngine ##
