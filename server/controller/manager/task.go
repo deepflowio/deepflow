@@ -86,10 +86,14 @@ func (t *Task) startDomainRefreshMonitor() {
 			log.Infof("task (%s) wait for next refresh", t.DomainName)
 			t.domainRefreshSignal.Get()
 			log.Infof("task (%s) call recorder refresh", t.DomainName)
-			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); errors.Is(err, recorder.RefreshConflictError) {
-				log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
-				t.domainRefreshSignal.Put(struct{}{})
-				time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
+			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); err != nil {
+				if errors.Is(err, recorder.RefreshConflictError) {
+					log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
+					t.domainRefreshSignal.Put(struct{}{})
+					time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
+				} else {
+					log.Warningf("task (%s) refresh failed: %s", t.DomainName, err.Error())
+				}
 			}
 
 			select {
@@ -128,11 +132,11 @@ func (t *Task) startSubDomainRefreshMonitor() {
 						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err != nil {
 							if errors.Is(err, recorder.RefreshConflictError) {
 								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
+								signal.Put(struct{}{})
+								time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 							} else {
-								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s, retry after 5 seconds", t.DomainName, lcuuid, err.Error())
+								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s", t.DomainName, lcuuid, err.Error())
 							}
-							signal.Put(struct{}{})
-							time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 						}
 					}
 				}
