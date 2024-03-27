@@ -216,7 +216,7 @@ pub struct HttpInfo {
 }
 
 impl HttpInfo {
-    pub fn merge_custom_to_http1(&mut self, custom: CustomInfo) {
+    pub fn merge_custom_to_http(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
             self.host = custom.req.domain;
@@ -574,9 +574,6 @@ impl L7ProtocolParserInterface for HttpLog {
         match self.proto {
             L7Protocol::Http1 => {
                 self.parse_http_v1(payload, param, &mut info)?;
-                if param.parse_log {
-                    self.wasm_hook(param, payload, &mut info);
-                }
             }
             L7Protocol::Http2 | L7Protocol::Grpc => {
                 if self.http2_req_decoder.is_none() {
@@ -597,6 +594,13 @@ impl L7ProtocolParserInterface for HttpLog {
             _ => unreachable!(),
         }
         if param.parse_log {
+            // In uprobe mode, headers are reported in a way different from other modes:
+            // one payload contains one header.
+            // Calling wasm plugin on every payload would be wasted effort,
+            // in this condition the call to the wasm plugin will be skipped.
+            if param.ebpf_type != EbpfType::GoHttp2Uprobe {
+                self.wasm_hook(param, payload, &mut info);
+            }
             if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
                 && !config.http_endpoint_disabled
                 && info.path.len() > 0
@@ -1285,7 +1289,7 @@ impl HttpLog {
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
         }
         .map(|custom| {
-            info.merge_custom_to_http1(custom);
+            info.merge_custom_to_http(custom);
         });
     }
 }
