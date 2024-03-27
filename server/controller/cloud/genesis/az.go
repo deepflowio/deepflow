@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getAZ() (model.AZ, error) {
@@ -31,7 +29,7 @@ func (g *Genesis) getAZ() (model.AZ, error) {
 	if g.regionUuid != common.DEFAULT_REGION {
 		azName = g.Name
 	}
-	azLcuuid := common.GetUUID(azName, uuid.Nil)
+	azLcuuid := common.GenerateUUID(azName)
 
 	g.cloudStatsd.RefreshAPIMoniter("az", 0, time.Time{})
 

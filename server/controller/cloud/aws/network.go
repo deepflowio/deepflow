@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
@@ -57,9 +56,9 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 	for _, nData := range retNetworks {
 		networkVpcID := a.getStringPointerValue(nData.VpcId)
 		networkSubnetID := a.getStringPointerValue(nData.SubnetId)
-		networkLcuuid := common.GetUUID(networkSubnetID, uuid.Nil)
-		vpcLcuuid := common.GetUUID(networkVpcID, uuid.Nil)
-		azLcuuid := common.GetUUID(a.getStringPointerValue(nData.AvailabilityZone), uuid.Nil)
+		networkLcuuid := common.GenerateUUID(networkSubnetID)
+		vpcLcuuid := common.GenerateUUID(networkVpcID)
+		azLcuuid := common.GenerateUUID(a.getStringPointerValue(nData.AvailabilityZone))
 		networkName := a.getResultTagName(nData.Tags)
 		if networkName == "" {
 			networkName = networkSubnetID
@@ -78,7 +77,7 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 		a.azLcuuidMap[azLcuuid] = 0
 
 		subnets = append(subnets, model.Subnet{
-			Lcuuid:        common.GetUUID(networkLcuuid, uuid.Nil),
+			Lcuuid:        common.GenerateUUID(networkLcuuid),
 			Name:          networkName,
 			CIDR:          a.getStringPointerValue(nData.CidrBlock),
 			VPCLcuuid:     vpcLcuuid,
@@ -91,10 +90,10 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 		}
 		if routerID != "" {
 			netVinterfaces = append(netVinterfaces, model.VInterface{
-				Lcuuid:        common.GetUUID(networkSubnetID+routerID, uuid.Nil),
+				Lcuuid:        common.GenerateUUID(networkSubnetID + routerID),
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           common.VIF_DEFAULT_MAC,
-				DeviceLcuuid:  common.GetUUID(routerID, uuid.Nil),
+				DeviceLcuuid:  common.GenerateUUID(routerID),
 				DeviceType:    common.VIF_DEVICE_TYPE_VROUTER,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,

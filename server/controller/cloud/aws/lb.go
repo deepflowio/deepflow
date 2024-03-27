@@ -18,7 +18,6 @@ package aws
 
 import (
 	"context"
-	"inet.af/netaddr"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -26,9 +25,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	v2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"inet.af/netaddr"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, error) {
@@ -67,8 +67,8 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			lbModel = common.LB_MODEL_INTERNAL
 		}
 		lbDNSName := a.getStringPointerValue(lData.DNSName)
-		lbLcuuid := common.GetUUID(lbDNSName, uuid.Nil)
-		vpcLcuuid := common.GetUUID(a.getStringPointerValue(lData.VPCId), uuid.Nil)
+		lbLcuuid := common.GenerateUUID(lbDNSName)
+		vpcLcuuid := common.GenerateUUID(a.getStringPointerValue(lData.VPCId))
 		lbs = append(lbs, model.LB{
 			Lcuuid:       lbLcuuid,
 			Name:         a.getStringPointerValue(lData.LoadBalancerName),
@@ -85,7 +85,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			protocol := a.getStringPointerValue(listener.Listener.Protocol)
 			lbPort := listener.Listener.LoadBalancerPort
 			key := protocol + " : " + strconv.Itoa(int(lbPort))
-			listenerLcuuid := common.GetUUID(lbDNSName+key, uuid.Nil)
+			listenerLcuuid := common.GenerateUUID(lbDNSName + key)
 			lbListeners = append(lbListeners, model.LBListener{
 				Lcuuid:   listenerLcuuid,
 				LBLcuuid: lbLcuuid,
@@ -103,11 +103,11 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 					continue
 				}
 				lbTargetServers = append(lbTargetServers, model.LBTargetServer{
-					Lcuuid:           common.GetUUID(listenerLcuuid+serverInstanceID, uuid.Nil),
+					Lcuuid:           common.GenerateUUID(listenerLcuuid + serverInstanceID),
 					LBLcuuid:         lbLcuuid,
 					LBListenerLcuuid: listenerLcuuid,
 					Type:             common.LB_SERVER_TYPE_VM,
-					VMLcuuid:         common.GetUUID(serverInstanceID, uuid.Nil),
+					VMLcuuid:         common.GenerateUUID(serverInstanceID),
 					Port:             int(listener.Listener.InstancePort),
 					VPCLcuuid:        vpcLcuuid,
 					IP:               ip,
@@ -151,8 +151,8 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			log.Infof("load balance v2 lb (%s) LoadBalancerArn not found", v2LBName)
 			continue
 		}
-		v2LBLcuuid := common.GetUUID(v2LBArn, uuid.Nil)
-		v2VPCLcuuid := common.GetUUID(a.getStringPointerValue(v2LData.VpcId), uuid.Nil)
+		v2LBLcuuid := common.GenerateUUID(v2LBArn)
+		v2VPCLcuuid := common.GenerateUUID(a.getStringPointerValue(v2LData.VpcId))
 		lbs = append(lbs, model.LB{
 			Lcuuid:       v2LBLcuuid,
 			Name:         v2LBName,
@@ -170,7 +170,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			v2ListenerArn := a.getStringPointerValue(v2Listener.ListenerArn)
 			v2ListenerPort := a.getInt32PointerValue(v2Listener.Port)
 			v2ListenerPotocol := v2Listener.Protocol
-			v2ListenerLcuuid := common.GetUUID(v2ListenerArn, uuid.Nil)
+			v2ListenerLcuuid := common.GenerateUUID(v2ListenerArn)
 			lbListeners = append(lbListeners, model.LBListener{
 				Lcuuid:   v2ListenerLcuuid,
 				LBLcuuid: v2LBLcuuid,
@@ -210,10 +210,10 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 							continue
 						}
 						v2TargetType = common.LB_SERVER_TYPE_VM
-						v2TargetVMLcuuid = common.GetUUID(v2TargetID, uuid.Nil)
+						v2TargetVMLcuuid = common.GenerateUUID(v2TargetID)
 					}
 					lbTargetServers = append(lbTargetServers, model.LBTargetServer{
-						Lcuuid:           common.GetUUID(v2ListenerArn+v2TargetID+strconv.Itoa(int(v2TargetPort)), uuid.Nil),
+						Lcuuid:           common.GenerateUUID(v2ListenerArn + v2TargetID + strconv.Itoa(int(v2TargetPort))),
 						LBLcuuid:         v2LBLcuuid,
 						LBListenerLcuuid: v2ListenerLcuuid,
 						Port:             int(v2TargetPort),

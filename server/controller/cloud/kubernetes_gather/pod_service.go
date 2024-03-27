@@ -26,7 +26,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodServices() (services []model.PodService, servicePorts []model.PodServicePort, podGroupPorts []model.PodGroupPort, network model.Network, subnets []model.Subnet, vinterfaces []model.VInterface, ips []model.IP, err error) {
@@ -200,7 +199,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				k.nsServiceNameToService[namespace+name] = uidToName
 				key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
 				servicePort := model.PodServicePort{
-					Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
+					Lcuuid:           common.GenerateUUID(uID + key),
 					Name:             ports.Get("name").MustString(),
 					Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
 					Port:             ports.Get("port").MustInt(),
@@ -219,7 +218,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					}
 					key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
 					podGroupPort := model.PodGroupPort{
-						Lcuuid:           common.GetUUID(uID+pgLcuuid+key, uuid.Nil),
+						Lcuuid:           common.GenerateUUID(uID + pgLcuuid + key),
 						Name:             ports.Get("name").MustString(),
 						Port:             targetPort,
 						Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
@@ -243,7 +242,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 	}
 
 	serviceNetworkName := k.Name + "_SVC_NET"
-	serviceNetworkLcuuid := common.GetUUID(k.UuidGenerate+serviceNetworkName, uuid.Nil)
+	serviceNetworkLcuuid := common.GenerateUUID(k.UuidGenerate + serviceNetworkName)
 	clusterIPs := cloudcommon.StringStringMapValues(serviceLcuuidToClusterIP)
 	serviceCIDR := []string{}
 	if len(clusterIPs) != 0 {
@@ -263,10 +262,10 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		}
 	}
 
-	serviceSubnetLcuuid := common.GetUUID(serviceNetworkLcuuid, uuid.Nil)
+	serviceSubnetLcuuid := common.GenerateUUID(serviceNetworkLcuuid)
 	for i, sCIDR := range serviceCIDR {
 		if i > 1 {
-			serviceSubnetLcuuid = common.GetUUID(serviceNetworkLcuuid+sCIDR, uuid.Nil)
+			serviceSubnetLcuuid = common.GenerateUUID(serviceNetworkLcuuid + sCIDR)
 		}
 		nodeSubnet := model.Subnet{
 			Lcuuid:        serviceSubnetLcuuid,
@@ -290,7 +289,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		RegionLcuuid:   k.RegionUUID,
 	}
 	for Lcuuid, IP := range serviceLcuuidToClusterIP {
-		vinterfaceID := common.GetUUID(Lcuuid+common.VIF_DEFAULT_MAC+IP, uuid.Nil)
+		vinterfaceID := common.GenerateUUID(Lcuuid + common.VIF_DEFAULT_MAC + IP)
 		vinterface := model.VInterface{
 			Lcuuid:        vinterfaceID,
 			Type:          common.VIF_TYPE_LAN,
@@ -303,11 +302,11 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		}
 		vinterfaces = append(vinterfaces, vinterface)
 		ip := model.IP{
-			Lcuuid:           common.GetUUID(Lcuuid+IP, uuid.Nil),
+			Lcuuid:           common.GenerateUUID(Lcuuid + IP),
 			VInterfaceLcuuid: vinterfaceID,
 			IP:               IP,
 			RegionLcuuid:     k.RegionUUID,
-			SubnetLcuuid:     common.GetUUID(serviceNetworkLcuuid, uuid.Nil),
+			SubnetLcuuid:     common.GenerateUUID(serviceNetworkLcuuid),
 		}
 		ips = append(ips, ip)
 	}

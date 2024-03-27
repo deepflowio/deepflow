@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.RoutingTable, error) {
@@ -66,7 +65,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 
 	for _, rData := range retRouteTables {
 		routeTableID := a.getStringPointerValue(rData.RouteTableId)
-		routeTableLcuuid := common.GetUUID(routeTableID, uuid.Nil)
+		routeTableLcuuid := common.GenerateUUID(routeTableID)
 		routeTableName := a.getResultTagName(rData.Tags)
 		if routeTableName == "" {
 			routeTableName = routeTableID
@@ -82,7 +81,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 		routers = append(routers, model.VRouter{
 			Lcuuid:       routeTableLcuuid,
 			Name:         routeTableName,
-			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
+			VPCLcuuid:    common.GenerateUUID(vpcID),
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
 		})
 
@@ -115,7 +114,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 			}
 			destination := a.getStringPointerValue(route.DestinationCidrBlock) + a.getStringPointerValue(route.DestinationIpv6CidrBlock)
 			routerTables = append(routerTables, model.RoutingTable{
-				Lcuuid:        common.GetUUID(routeTableLcuuid+destination+gatewayID, uuid.Nil),
+				Lcuuid:        common.GenerateUUID(routeTableLcuuid + destination + gatewayID),
 				VRouterLcuuid: routeTableLcuuid,
 				Destination:   destination,
 				Nexthop:       gatewayID,

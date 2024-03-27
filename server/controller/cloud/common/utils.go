@@ -34,7 +34,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/mikioh/ipaddr"
 	logging "github.com/op/go-logging"
-	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
@@ -539,7 +538,7 @@ func InetNToA(ip uint32) string {
 }
 
 func GetAZLcuuidFromUUIDGenerate(uuidGenerate string) string {
-	lcuuid := common.GetUUID(uuidGenerate, uuid.Nil)
+	lcuuid := common.GenerateUUID(uuidGenerate)
 	return lcuuid[:len(lcuuid)-2] + "ff"
 }
 

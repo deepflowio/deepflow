@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getRegions() ([]tencentRegion, error) {
@@ -60,7 +59,7 @@ func (t *Tencent) getRegions() ([]tencentRegion, error) {
 			continue
 		}
 		rRegion := rData.Get("Region").MustString()
-		regionLcuuid := common.GetUUID(rRegion, uuid.Nil)
+		regionLcuuid := common.GenerateUUID(rRegion)
 		finance := false
 		if strings.Contains(name, FINANCE_REGION_PROFILE) {
 			finance = true

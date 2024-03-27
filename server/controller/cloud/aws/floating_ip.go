@@ -19,14 +19,13 @@ package aws
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (a *Aws) getFloatingIPs() (floatingIPs []model.FloatingIP, err error) {
 	log.Debug("get floating ips starting")
 	for ip, v := range a.publicIPToVinterface {
 		floatingIP := model.FloatingIP{
-			Lcuuid:        common.GetUUID(v.Lcuuid+ip, uuid.Nil),
+			Lcuuid:        common.GenerateUUID(v.Lcuuid + ip),
 			IP:            ip,
 			VMLcuuid:      v.DeviceLcuuid,
 			NetworkLcuuid: common.NETWORK_ISP_LCUUID,
