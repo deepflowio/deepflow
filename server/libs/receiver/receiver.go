@@ -95,12 +95,12 @@ func newBufferPool(bufferSize, poolSizePerCPU int) *pool.LockFreePool {
 
 var recvBufferPools = []*pool.LockFreePool{
 	newBufferPool(RECV_BUFSIZE_2K, 16),
-	newBufferPool(RECV_BUFSIZE_8K, 32),
-	newBufferPool(RECV_BUFSIZE_64K, 8),
-	newBufferPool(RECV_BUFSIZE_256K, 8),
-	newBufferPool(RECV_BUFSIZE_512K, 8),
+	newBufferPool(RECV_BUFSIZE_8K, 16),
+	newBufferPool(RECV_BUFSIZE_64K, 4),
+	newBufferPool(RECV_BUFSIZE_256K, 4),
+	newBufferPool(RECV_BUFSIZE_512K, 4),
 	// if the required buffer > 512k, the memory will not be pre-allocated, and the memory will be allocated when it is used
-	newBufferPool(0, 8),
+	newBufferPool(0, 2),
 }
 
 func getBufferPoolIndex(length int) int {
@@ -127,6 +127,7 @@ func AcquireRecvBuffer(length int) (*RecvBuffer, bool) {
 	buf := recvBufferPools[index].Get().(*RecvBuffer)
 	if len(buf.Buffer) < length {
 		length = minPowerOfTwo(length)
+		log.Infof("realloc buffer size from %d to  %d", len(buf.Buffer), length)
 		buf.Buffer = make([]byte, length)
 		isNew = true
 	}
