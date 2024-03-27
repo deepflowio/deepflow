@@ -66,7 +66,7 @@ func IsMasterController(cfg *config.ControllerConfig) bool {
 func migrateMySQL(cfg *config.ControllerConfig) {
 	err := migrator.MigrateMySQL(cfg.MySqlCfg)
 	if err != nil {
-		log.Error("migrate mysql failed")
+		log.Errorf("migrate mysql failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}

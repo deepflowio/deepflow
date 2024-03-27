@@ -144,6 +144,9 @@ func (c *DBs) set(orgID int, db *DB) {
 }
 
 func (c *DBs) check(db *DB) error {
+	if db.ORGID != common.DEFAULT_ORG_ID {
+		return nil
+	}
 	var version string
 	err := db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
 	if err != nil {
