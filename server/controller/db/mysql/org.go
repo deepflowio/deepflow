@@ -26,9 +26,14 @@ import (
 const ORG_TABLE = "org"
 
 func GetORGIDs() ([]int, error) {
+	db, err := GetDB(common.DEFAULT_ORG_ID)
+	if err != nil {
+		return nil, err
+	}
+
 	ids := []int{common.DEFAULT_ORG_ID}
 	var orgTable string
-	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
+	err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
 	if err != nil {
 		err = errors.New(fmt.Sprintf("check org table failed: %v", err.Error()))
 		log.Error(err.Error())
@@ -39,7 +44,7 @@ func GetORGIDs() ([]int, error) {
 	}
 
 	var orgs []*Org
-	if err := DefaultDB.Where("loop_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
+	if err := db.Where("loop_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
 		return ids, errors.New(fmt.Sprintf("failed to get org ids: %v", err.Error()))
 	}
 	for _, org := range orgs {
