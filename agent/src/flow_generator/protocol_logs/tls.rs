@@ -559,11 +559,8 @@ impl TlsLog {
                     }
 
                     if let Some(server_name) = h.domain_name() {
-                        info.request_domain = server_name;
-                    }
-
-                    if info.request_type.is_empty() || h.is_change_cipher_spec() {
-                        info.request_type = h.to_string();
+                        info.request_domain = server_name.clone();
+                        info.request_resource = server_name;
                     }
 
                     if let Some(v) = h.validity() {
@@ -574,7 +571,7 @@ impl TlsLog {
                     }
                 });
 
-                info.request_resource = tls_headers
+                info.request_type = tls_headers
                     .iter()
                     .map(|i| i.to_string())
                     .collect::<Vec<String>>()
@@ -630,6 +627,13 @@ impl TlsLog {
                         }
                     }
                 });
+
+                if let Version::Unknown(v) = info.version {
+                    return Err(Error::TlsLogParseFailed(format!(
+                        "Unknown tls version 0x{:x}",
+                        v
+                    )));
+                }
 
                 info.response_result = tls_headers
                     .iter()
