@@ -202,7 +202,7 @@ impl BaseDispatcher {
             Ok(links) => links,
         };
         let options = self.options.lock().unwrap();
-        self.engine = if options.tap_mode == TapMode::Local && options.libpcap_enabled {
+        if options.tap_mode == TapMode::Local && options.libpcap_enabled {
             if pcap_interfaces.is_empty() {
                 return Err(Error::Libpcap(
                     "libpcap capture must give interface to capture packet".into(),
@@ -230,10 +230,14 @@ impl BaseDispatcher {
                 src_ifaces, options.packet_blocks, options.snap_len
             );
             self.need_update_bpf.store(true, Ordering::Relaxed);
-            RecvEngine::Libpcap(Some(libpcap))
+            warn!("switch_recv_engine xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+            let w_pcap = RecvEngine::Libpcap(Some(libpcap));
+            warn!("switch_recv_engine xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+            self.engine = RecvEngine::Libpcap(None);
+            warn!("switch_recv_engine xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
         } else {
             todo!()
-        };
+        }
 
         Ok(())
     }
@@ -246,7 +250,9 @@ impl BaseDispatcher {
         counter: &PacketCounter,
         ntp_diff: &AtomicI64,
     ) -> Option<(Packet<'a>, Duration)> {
+        info!("xxxxxxxxxxxxxxxxxxxx in");
         let packet = engine.recv();
+        info!("xxxxxxxxxxxxxxxxxxxx out");
         if packet.is_err() {
             if let recv_engine::Error::Timeout = packet.unwrap_err() {
                 return None;
