@@ -313,7 +313,7 @@ type Domain struct {
 type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
-	TeamID              int                    `json:"TEAM_ID" binding:"required"`
+	TeamID              int                    `json:"TEAM_ID"`
 	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required

@@ -448,7 +448,7 @@ INSERT INTO az (id, name, lcuuid, region, domain) values(1, '系统默认', 'fff
 
 CREATE TABLE IF NOT EXISTS domain (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id             INTEGER DEFAULT 0,
+    team_id             INTEGER DEFAULT 1,
     name                VARCHAR(64),
     icon_id             INTEGER,
     display_name        VARCHAR(64) DEFAULT '',
