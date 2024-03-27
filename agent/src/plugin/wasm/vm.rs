@@ -364,7 +364,7 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpReqCtx {
     fn from(value: (&ParseParam<'_>, &HttpInfo, &[u8])) -> Self {
         let (param, info, payload) = value;
         Self {
-            base_ctx: VmCtxBase::from((param, 0, payload)),
+            base_ctx: VmCtxBase::from((param, info.proto as u8, payload)),
             path: info.path.clone(),
             host: info.host.clone(),
             user_agent: info
@@ -418,7 +418,7 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpRespCtx {
     fn from(value: (&ParseParam, &HttpInfo, &[u8])) -> Self {
         let (param, info, payload) = value;
         Self {
-            base_ctx: VmCtxBase::from((param, 0, payload)),
+            base_ctx: VmCtxBase::from((param, info.proto as u8, payload)),
             code: info.status_code,
             status: info.status,
         }
