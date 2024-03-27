@@ -93,7 +93,6 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 		VMID:            vmID,
 		SecurityGroupID: securityGroupID,
 		Priority:        cloudItem.Priority,
-		Domain:          v.cache.DomainLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

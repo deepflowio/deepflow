@@ -94,7 +94,6 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 		Netmask:   netmask,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		NetworkID: networkID,
-		Domain:    s.cache.DomainLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
