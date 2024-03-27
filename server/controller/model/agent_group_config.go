@@ -174,20 +174,23 @@ type OnCpuProfile struct {
 }
 
 type EbpfConfig struct {
-	Disabled                *bool                              `yaml:"disabled,omitempty"`
-	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
-	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
-	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
-	ThreadNum               *int                               `yaml:"thread-num,omitempty"`
-	PerfPagesCount          *int                               `yaml:"perf-pages-count,omitempty"`
-	RingSize                *int                               `yaml:"ring-size,omitempty"`
-	MaxSocketEntries        *int                               `yaml:"max-socket-entries,omitempty"`
-	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
-	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
-	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
-	IOEventCollectMode      *int                               `yaml:"io-event-collect-mode,omitempty"`
-	IOEventMinimalDuration  *string                            `yaml:"io-event-minimal-duration,omitempty"`
-	OnCpuProfile            *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
+	Disabled                      *bool                              `yaml:"disabled,omitempty"`
+	UprobeProcessNameRegexs       *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
+	KprobeWhitelist               *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
+	KprobeBlacklist               *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
+	ThreadNum                     *int                               `yaml:"thread-num,omitempty"`
+	PerfPagesCount                *int                               `yaml:"perf-pages-count,omitempty"`
+	RingSize                      *int                               `yaml:"ring-size,omitempty"`
+	MaxSocketEntries              *int                               `yaml:"max-socket-entries,omitempty"`
+	MaxTraceEntries               *int                               `yaml:"max-trace-entries,omitempty"`
+	SocketMapMaxReclaim           *int                               `yaml:"socket-map-max-reclaim,omitempty"`
+	GoTracingTimeout              *int                               `yaml:"go-tracing-timeout,omitempty"`
+	IOEventCollectMode            *int                               `yaml:"io-event-collect-mode,omitempty"`
+	IOEventMinimalDuration        *string                            `yaml:"io-event-minimal-duration,omitempty"`
+	OnCpuProfile                  *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
+	SyscallOutOfOrderCacheSize    *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`
+	SyscallOutOfOrderReassembly   []string                           `yaml:"syscall-out-of-order-reassembly,omitempty"`
+	SyscallSegmentationReassembly []string                           `yaml:"syscall-segmentation-reassembly,omitempty"`
 }
 
 type OsProcRegex struct {

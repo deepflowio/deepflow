@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
-use public::l7_protocol::L7ProtocolEnum;
+use public::l7_protocol::{L7ProtocolChecker as L7ProtocolCheckerBitmap, L7ProtocolEnum};
 
 use super::protocol_logs::sql::ObfuscateCache;
 use super::{

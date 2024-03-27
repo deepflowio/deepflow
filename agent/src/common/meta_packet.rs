@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::any::Any;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
@@ -61,6 +62,7 @@ use public::{
     buffer::BatchedBuffer,
     utils::net::{is_unicast_link_local, MacAddr},
 };
+use reorder::{CacheItem, Downcast};
 
 #[derive(Clone, Debug)]
 pub enum RawPacket<'a> {
@@ -1085,6 +1087,34 @@ impl<'a> fmt::Display for MetaPacket<'a> {
             }
         }
         write!(f, "")
+    }
+}
+
+impl Downcast for MetaPacket<'static> {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+impl CacheItem for MetaPacket<'static> {
+    fn get_id(&self) -> u64 {
+        self.generate_ebpf_flow_id()
+    }
+
+    fn get_seq(&self) -> u64 {
+        self.cap_seq
+    }
+
+    fn get_timestmap(&self) -> u64 {
+        self.lookup_key.timestamp.as_secs()
+    }
+
+    fn get_l7_protocol(&self) -> L7Protocol {
+        self.l7_protocol_from_ebpf
     }
 }
 

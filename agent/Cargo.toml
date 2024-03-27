@@ -88,6 +88,7 @@ cgroups-rs = "0.2.9"
 nix = "0.23"
 pcap = "0.9.1"
 procfs = { git = "https://github.com/deepflowio/procfs/" }
+reorder = { path = "plugins/reorder" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 k8s-openapi = { version = "^0.15", features = ["v1_19", "schemars"] }

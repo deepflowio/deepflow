@@ -1315,6 +1315,53 @@ vtap_group_id: g-xxxxxx
       ## The unit of measurement used is seconds.
       #java-symbol-file-refresh-defer-interval: 600s
 
+    ## Ebpf reassembly configuration
+    ## Default: 16. Range: [8, 128]
+    #syscall-out-of-order-cache-size: 16,
+
+    ## List of Application Protocols
+    ## Note: After enabling the l7 protocol, the agent will perform sorting.
+    #syscall-out-of-order-reassembly:
+    #- HTTP
+    #- HTTP2 ## for both HTTP2 and gRPC
+    #- SofaRPC
+    #- FastCGI
+    #- Dubbo
+    #- MySQL
+    #- PostgreSQL
+    #- Redis
+    #- MongoDB
+    #- Kafka
+    #- MQTT
+    #- AMQP
+    #- OpenWire
+    #- NATS
+    #- DNS
+    #- TLS
+    #- Custom ## custom protocol from plugin
+
+    ## List of Application Protocols
+    ## Note: After enabling the protocol, the agent will perform segmented aggregation
+    #syscall-segmentation-reassembly:
+    #- HTTP
+    #- HTTP2 ## for both HTTP2 and gRPC
+    #- SofaRPC
+    #- FastCGI
+    #- Dubbo
+    #- MySQL
+    #- PostgreSQL
+    #- Redis
+    #- MongoDB
+    #- Kafka
+    #- MQTT
+    #- AMQP
+    #- OpenWire
+    #- NATS
+    #- DNS
+    #- TLS
+    #- Custom ## custom protocol from plugin
+
+
   ######################################
   ## Agent Running in Standalone Mode ##
   ######################################

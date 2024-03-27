@@ -47,7 +47,7 @@ use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum};
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -515,12 +515,14 @@ impl L7ProtocolBitmap {
     pub fn set_disabled(&mut self, p: L7Protocol) {
         self.0 &= !(1 << (p as u128));
     }
+}
 
-    pub fn is_disabled(&self, p: L7Protocol) -> bool {
+impl L7ProtocolChecker for L7ProtocolBitmap {
+    fn is_disabled(&self, p: L7Protocol) -> bool {
         self.0 & (1 << (p as u128)) == 0
     }
 
-    pub fn is_enabled(&self, p: L7Protocol) -> bool {
+    fn is_enabled(&self, p: L7Protocol) -> bool {
         !self.is_disabled(p)
     }
 }
