@@ -30,6 +30,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -41,10 +42,10 @@ import (
 
 var log = logging.MustGetLogger("service.rebalance")
 
-func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration int) (*model.VTapRebalanceResult, error) {
+func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *gorm.DB, ifCheckout bool, dataDuration int) (*model.VTapRebalanceResult, error) {
 	if r.dbInfo == nil {
 		r.dbInfo = &DBInfo{}
-		err := r.dbInfo.Get()
+		err := r.dbInfo.Get(db)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +113,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			vtaps:           azVTaps,
 			analyzers:       azAnalyzers,
 		}
-		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(ifCheckout)
+		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(db, ifCheckout)
 		if azVTapRebalanceResult != nil {
 			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
 			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
@@ -204,7 +205,7 @@ type ChangeInfo struct {
 //   - 采集器权重 = 采集器发送流量 / 所有采集器发送的流量
 //   - 数据节点的平均权重 = 采集器权重之和 / 正常数据节点个数
 //   - 数据节点权重 = 数据节点上的采集器权重之和 / 数据节点的平均权重
-func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model.AZVTapRebalanceResult) {
+func (p *AZInfo) rebalanceAnalyzer(db *gorm.DB, ifCheckout bool) (map[int]*ChangeInfo, *model.AZVTapRebalanceResult) {
 
 	var beforeTraffic, afterTraffic int64
 	for _, dataSize := range p.vTapIDToTraffic {
@@ -348,7 +349,7 @@ func (p *AZInfo) rebalanceAnalyzer(ifCheckout bool) (map[int]*ChangeInfo, *model
 			}
 		}
 		if !ifCheckout {
-			mysql.Db.Model(mysql.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
+			db.Model(mysql.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
 		}
 		if _, ok := analyzerIPToInfo[allocIP]; !ok {
 			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip", allocVTap.VtapID, allocIP)

@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -55,9 +57,10 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 	var dataSources []mysql.DataSource
 	var baseDataSources []mysql.DataSource
 
-	Db := mysql.Db
+	// TODO(weiqiang): add database name
+	db := mysql.DBMap.Get("")
 	if _, ok := filter["lcuuid"]; ok {
-		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
+		db = db.Where("lcuuid = ?", filter["lcuuid"])
 	}
 	if t, ok := filter["type"]; ok {
 		var collection string
@@ -78,19 +81,19 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 			return nil, fmt.Errorf("not support type(%s)", t)
 		}
 
-		Db = Db.Where("data_table_collection = ?", collection)
+		db = db.Where("data_table_collection = ?", collection)
 	}
 	if name, ok := filter["name"]; ok {
 		interval := convertNameToInterval(name.(string))
 		if interval != 0 {
-			Db = Db.Where("`interval` = ?", interval)
+			db = db.Where("`interval` = ?", interval)
 		}
 	}
-	if err := Db.Find(&dataSources).Error; err != nil {
+	if err := db.Find(&dataSources).Error; err != nil {
 		return nil, err
 	}
 
-	if err := mysql.Db.Find(&baseDataSources).Error; err != nil {
+	if err := db.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
 	idToDisplayName := make(map[int]string)
@@ -152,7 +155,10 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	var dataSourceCount int64
 	var err error
 
-	if ret := mysql.Db.Where(
+	// TODO(weiqiang): add database name
+	db := mysql.DBMap.Get("")
+
+	if ret := db.Where(
 		map[string]interface{}{
 			"data_table_collection": dataSourceCreate.DataTableCollection,
 			"interval":              dataSourceCreate.Interval,
@@ -172,7 +178,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	if err := mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
+	if err := db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
 		return model.DataSource{}, err
 	}
 	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
@@ -182,7 +188,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	if ret := mysql.Db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
+	if ret := db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
 			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("base data_source (%d) not exist", dataSourceCreate.BaseDataSourceID),
@@ -227,13 +233,13 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	dataSource.RetentionTime = dataSourceCreate.RetentionTime
 	dataSource.SummableMetricsOperator = dataSourceCreate.SummableMetricsOperator
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
-	if err := mysql.Db.Create(&dataSource).Error; err != nil {
+	if err := db.Create(&dataSource).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
@@ -253,7 +259,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	}
 
 	if err != nil {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return model.DataSource{}, err
@@ -265,8 +271,10 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 }
 
 func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
+	// TODO(weiqiang): add database name
+	db := mysql.DBMap.Get("")
 	var dataSource mysql.DataSource
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
@@ -286,7 +294,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
@@ -304,14 +312,14 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	if err == nil {
 		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
-		if err := mysql.Db.Save(&dataSource).Error; err != nil {
+		if err := db.Save(&dataSource).Error; err != nil {
 			return model.DataSource{}, err
 		}
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
 	if errors.Is(err, httpcommon.ErrorFail) {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return model.DataSource{}, err
@@ -335,7 +343,9 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	var baseDataSource mysql.DataSource
 	var err error
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
+	// TODO(weiqiang): add database name
+	db := mysql.DBMap.Get("")
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return map[string]string{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
@@ -351,7 +361,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	}
 
 	// 被其他数据源引用的数据源禁止删除
-	if ret := mysql.Db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
+	if ret := db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
 		return map[string]string{}, NewError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source (%s) is used by other data_source", dataSource.DisplayName),
@@ -362,7 +372,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return nil, err
 	}
 
@@ -382,13 +392,13 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	}
 
 	if err != nil {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return nil, err
 		}
 	}
-	if err := mysql.Db.Delete(&dataSource).Error; err != nil {
+	if err := db.Delete(&dataSource).Error; err != nil {
 		return nil, err
 	}
 
@@ -497,6 +507,18 @@ func getTableName(collection string) string {
 }
 
 func ConfigAnalyzerDataSource(ip string) error {
+	group := new(errgroup.Group)
+	group.SetLimit(5)
+
+	for _, db := range mysql.DBMap.GetDBMap() {
+		group.Go(func() error {
+			return configAnalyzerDataSource(db, ip)
+		})
+	}
+	return group.Wait()
+}
+
+func configAnalyzerDataSource(db *gorm.DB, ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
