@@ -675,5 +675,6 @@ const (
 )
 
 const (
-	HEADER_KEY_X_ORG_ID = "X-Org-Id"
+	HEADER_KEY_X_ORG_ID  = "X-Org-Id"
+	INGESTER_BODY_ORG_ID = "org-id"
 )
