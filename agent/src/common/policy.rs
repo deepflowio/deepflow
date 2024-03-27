@@ -325,7 +325,7 @@ impl IpSegment {
             } else {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
             },
-            epc_id: 0,
+            epc_id: (EPC_ANY & 0xffff) as u16,
         }
     }
 
