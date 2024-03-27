@@ -30,12 +30,12 @@
 #define USER_HZ		100
 
 static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
-						      int fd_num, struct
-						      member_fields_offset
-						      *offset)
+						      int fd_num,
+						      int files_off,
+						      int fdt_off)
 {
 	void *file = NULL;
-	void *files, *files_ptr = (void *)task + offset->task__files_offset;
+	void *files, *files_ptr = (void *)task + files_off;
 	bpf_probe_read_kernel(&files, sizeof(files), files_ptr);
 
 	if (files == NULL)
@@ -43,8 +43,7 @@ static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
 
 	struct fdtable *fdt, __fdt;
 
-	bpf_probe_read_kernel(&fdt, sizeof(fdt),
-			      files + offset->struct_files_struct_fdt_offset);
+	bpf_probe_read_kernel(&fdt, sizeof(fdt), files + fdt_off);
 	bpf_probe_read_kernel(&__fdt, sizeof(__fdt), (void *)fdt);
 
 	if (fd_num >= (int)__fdt.max_fds)
@@ -126,16 +125,14 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 		for (i = 0; i < ARRAY_SIZE(files_offset_array); i++) {
 			file =
 			    retry_get_socket_file_addr(task, fd_num,
-						       offset->
-						       struct_files_struct_fdt_offset,
+						       offset->struct_files_struct_fdt_offset,
 						       files_offset_array[i]);
 
 			if (file) {
 				bpf_probe_read_kernel(&private_data,
 						      sizeof(private_data),
 						      file +
-						      offset->
-						      struct_files_private_data_offset);
+						      offset->struct_files_private_data_offset);
 				if (private_data != NULL) {
 					socket = private_data;
 					bpf_probe_read_kernel(&__socket,
@@ -153,8 +150,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 	} else {
 		file =
 		    retry_get_socket_file_addr(task, fd_num,
-					       offset->
-					       struct_files_struct_fdt_offset,
+					       offset->struct_files_struct_fdt_offset,
 					       offset->task__files_offset);
 	}
 
@@ -196,7 +192,11 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
-	file = get_socket_file_addr_with_check(task, fd_num, offset);
+	file =
+	    get_socket_file_addr_with_check(task, fd_num,
+					    offset->task__files_offset,
+					    offset->
+					    struct_files_struct_fdt_offset);
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
@@ -238,7 +238,11 @@ static __inline void *fd_to_file(int fd_num,
 	}
 
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-	void *file = get_socket_file_addr_with_check(task, fd_num, offset);
+	void *file =
+	    get_socket_file_addr_with_check(task, fd_num,
+					    offset->task__files_offset,
+					    offset->
+					    struct_files_struct_fdt_offset);
 	return file;
 }
 
