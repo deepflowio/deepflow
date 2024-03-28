@@ -40,16 +40,16 @@ STATIC_OBJDIR := $(OBJDIR)/staticobjs
 
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@cd kernel && make clean --no-print-directory && make socket_trace.elf $(2) --no-print-directory && cd ../
+	@cd kernel && make clean --no-print-directory && make socket_trace.bpf.elf $(2) --no-print-directory && cd ../
 	@echo "  Generate file user/socket_trace_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/socket_trace.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
+	@./tools/bintobuffer kernel/socket_trace.bpf.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
 endef
 
 define compile_perf_profiler_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@cd kernel && make clean --no-print-directory && make perf_profiler.elf $(2) --no-print-directory && cd ../
+	@cd kernel && make clean --no-print-directory && make perf_profiler.bpf.elf $(2) --no-print-directory && cd ../
 	@echo "  Generate file user/perf_profiler_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/perf_profiler.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
+	@./tools/bintobuffer kernel/perf_profiler.bpf.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
 endef
 
 define check_gcc_version
