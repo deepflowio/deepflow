@@ -184,6 +184,7 @@ type HostFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
 	IP           fieldDetail[string]
+	UID          fieldDetail[string]
 	HType        fieldDetail[int]
 	VCPUNum      fieldDetail[int]
 	MemTotal     fieldDetail[int]
@@ -210,6 +211,7 @@ type VMFieldsUpdate struct {
 	LaunchServer fieldDetail[string]
 	CloudTags    fieldDetail[map[string]string]
 	HostID       fieldDetail[int]
+	UID          fieldDetail[string]
 	Hostname     fieldDetail[string]
 	VPCID        fieldDetail[int]
 	VPCLcuuid    fieldDetail[string]
@@ -442,6 +444,7 @@ type NATGatewayFieldsUpdate struct {
 	Name         fieldDetail[string]
 	FloatingIPs  fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
+	UID          fieldDetail[string]
 }
 type NATGatewayUpdate struct {
 	Fields[NATGatewayFieldsUpdate]
@@ -473,6 +476,7 @@ type NATVMConnectionUpdate struct {
 type LBFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	Model        fieldDetail[int]
 	VIP          fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
@@ -553,6 +557,7 @@ type CENUpdate struct {
 type RDSInstanceFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	State        fieldDetail[int]
 	Series       fieldDetail[int]
 	Model        fieldDetail[int]
@@ -569,6 +574,7 @@ type RDSInstanceUpdate struct {
 type RedisInstanceFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	State        fieldDetail[int]
 	PublicHost   fieldDetail[string]
 	AZLcuuid     fieldDetail[string]

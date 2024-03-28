@@ -19,87 +19,122 @@ package tagrecorder
 import (
 	"strings"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodK8sLabel struct {
-	UpdaterComponent[mysql.ChPodK8sLabel, K8sLabelKey]
+	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sLabel, K8sLabelKey]
 }
 
 func NewChPodK8sLabel() *ChPodK8sLabel {
-	updater := &ChPodK8sLabel{
-		newUpdaterComponent[mysql.ChPodK8sLabel, K8sLabelKey](
-			RESOURCE_TYPE_CH_K8S_LABEL,
+	mng := &ChPodK8sLabel{
+		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sLabel, K8sLabelKey](
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_LABEL,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (k *ChPodK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodK8sLabel, bool) {
-	var pods []mysql.Pod
-	var podGroups []mysql.PodGroup
-	var podClusters []mysql.PodCluster
-	err := mysql.Db.Unscoped().Find(&pods).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Find(&podGroups).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Find(&podClusters).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+	keysToAdd := make([]K8sLabelKey, 0)
+	targetsToAdd := make([]mysql.ChPodK8sLabel, 0)
+	keysToDelete := make([]K8sLabelKey, 0)
+	targetsToDelete := make([]mysql.ChPodK8sLabel, 0)
+	var chItem mysql.ChPodK8sLabel
+	var updateKey K8sLabelKey
+	updateInfo := make(map[string]interface{})
+	if fieldsUpdate.Label.IsDifferent() {
+		new := map[string]string{}
+		old := map[string]string{}
+		newStr := fieldsUpdate.Label.GetNew()
+		oldStr := fieldsUpdate.Label.GetOld()
+		splitNews := strings.Split(newStr, ", ")
+		splitOlds := strings.Split(oldStr, ", ")
 
-	podClusterIDToVPCID := make(map[int]int)
-	for _, podCluster := range podClusters {
-		podClusterIDToVPCID[podCluster.ID] = podCluster.VPCID
-	}
-	keyToItem := make(map[K8sLabelKey]mysql.ChPodK8sLabel)
-	for _, pod := range pods {
-		splitLabel := strings.Split(pod.Label, ", ")
-		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
-			if len(splitSingleLabel) == 2 {
-				key := K8sLabelKey{
-					ID:  pod.ID,
-					Key: splitSingleLabel[0],
-				}
-				keyToItem[key] = mysql.ChPodK8sLabel{
-					ID:      pod.ID,
-					Key:     splitSingleLabel[0],
-					Value:   splitSingleLabel[1],
-					L3EPCID: pod.VPCID,
-					PodNsID: pod.PodNamespaceID,
+		for _, splitNew := range splitNews {
+			splitSingleTag := strings.Split(splitNew, ":")
+			if len(splitSingleTag) == 2 {
+				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+			}
+		}
+		for _, splitOld := range splitOlds {
+			splitSingleTag := strings.Split(splitOld, ":")
+			if len(splitSingleTag) == 2 {
+				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+			}
+		}
+		for k, v := range new {
+			oldV, ok := old[k]
+			if !ok {
+				keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
+				targetsToAdd = append(targetsToAdd, mysql.ChPodK8sLabel{
+					ID:    sourceID,
+					Key:   k,
+					Value: v,
+				})
+			} else {
+				if oldV != v {
+					updateKey = K8sLabelKey{ID: sourceID, Key: k}
+					updateInfo[k] = v
+					mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+					if chItem.ID == 0 {
+						keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
+						targetsToAdd = append(targetsToAdd, mysql.ChPodK8sLabel{
+							ID:    sourceID,
+							Key:   k,
+							Value: v,
+						})
+					} else if len(updateInfo) > 0 {
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey)
+					}
 				}
 			}
 		}
+		for k := range old {
+			if _, ok := new[k]; !ok {
+				keysToDelete = append(keysToDelete, K8sLabelKey{ID: sourceID, Key: k})
+				targetsToDelete = append(targetsToDelete, mysql.ChPodK8sLabel{
+					ID:  sourceID,
+					Key: k,
+				})
+			}
+		}
 	}
-	return keyToItem, true
+	if len(keysToAdd) > 0 {
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+	}
+	if len(keysToDelete) > 0 {
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+	}
 }
 
-func (k *ChPodK8sLabel) generateKey(dbItem mysql.ChPodK8sLabel) K8sLabelKey {
-	return K8sLabelKey{ID: dbItem.ID, Key: dbItem.Key}
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodK8sLabel) sourceToTarget(source *mysql.Pod) (keys []K8sLabelKey, targets []mysql.ChPodK8sLabel) {
+	labelMap := map[string]string{}
+	splitTags := strings.Split(source.Label, ", ")
+
+	for _, splitTag := range splitTags {
+		splitSingleTag := strings.Split(splitTag, ":")
+		if len(splitSingleTag) == 2 {
+			labelMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+		}
+	}
+	for k, v := range labelMap {
+		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
+		targets = append(targets, mysql.ChPodK8sLabel{
+			ID:    source.ID,
+			Key:   k,
+			Value: v,
+		})
+	}
+	return
 }
 
-func (k *ChPodK8sLabel) generateUpdateInfo(oldItem, newItem mysql.ChPodK8sLabel) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if oldItem.Value != newItem.Value {
-		updateInfo["value"] = newItem.Value
-	}
-	if oldItem.L3EPCID != newItem.L3EPCID {
-		updateInfo["l3_epc_id"] = newItem.L3EPCID
-	}
-	if oldItem.PodNsID != newItem.PodNsID {
-		updateInfo["pod_ns_id"] = newItem.PodNsID
-	}
-	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodK8sLabel) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabel) {
+
 }

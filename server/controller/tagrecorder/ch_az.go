@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -77,4 +79,12 @@ func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ)
 		IconID: iconID,
 	})
 	return
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ) {
+	mysql.Db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }
