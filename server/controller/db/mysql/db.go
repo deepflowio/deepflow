@@ -130,6 +130,62 @@ func (c *DBs) Create(orgID int) {
 	c.NewDBIfNotExists(orgID)
 }
 
+func (c *DBs) DoTransactionOnAllDBs(execFunc func(db *DB) error) error {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return err
+	}
+	var dbs []*DB
+	for _, id := range orgIDs {
+		db, err := c.NewDBIfNotExists(id)
+		if err != nil {
+			return fmt.Errorf("failed to init db for org %d: %v", id, err)
+		}
+		dbs = append(dbs, db)
+	}
+	log.Infof("weiqiang  db len: %v", len(dbs))
+
+	var txs []*DB
+	for _, db := range dbs {
+		tx := db.Begin()
+		if tx.Error != nil {
+			return fmt.Errorf("failed to begin db for org(%d): %s", db.ORGID, tx.Error.Error())
+		}
+		log.Infof("weiqiang db(%d) begin, db == nil: %v", db.ORGID, db == nil)
+		txs = append(txs, &DB{tx, db.ORGID})
+	}
+
+	var txErr error
+	for _, tx := range txs {
+		defer func(t *DB) {
+			if txErr != nil {
+				if err := t.Rollback().Error; err != nil {
+					log.Errorf("failed to rollback db for org(%d): %s", tx.ORGID, err.Error())
+
+				}
+			}
+		}(tx)
+
+		log.Infof("weiqiang exec func in db(%d)", tx.ORGID)
+		if err := execFunc(tx); err != nil {
+			txErr = err
+			return fmt.Errorf("failed to exec db for org(%d): %s", tx.ORGID, err.Error())
+		}
+	}
+
+	for _, tx := range txs {
+		if err := tx.Commit().Error; err != nil {
+			txErr = err
+			return fmt.Errorf("failed to commit db for org(%d): %s", tx.ORGID, err.Error())
+		}
+		log.Infof("weiqiang db(%d) commit", tx.ORGID)
+	}
+	return nil
+}
+
 func (c *DBs) get(orgID int) (*DB, bool) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
