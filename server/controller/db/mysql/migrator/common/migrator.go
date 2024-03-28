@@ -45,9 +45,9 @@ func CreateDatabase(db *gorm.DB, database string) error {
 }
 
 func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
-	var datadbaseName string
-	db.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", database)).Scan(&datadbaseName)
-	if datadbaseName == database {
+	var databaseName string
+	db.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", database)).Scan(&databaseName)
+	if databaseName == database {
 		return true, nil
 	} else {
 		err := CreateDatabase(db, database)
@@ -79,7 +79,7 @@ func InitDBVersion(db *gorm.DB) error {
 	return err
 }
 
-func ExecuteIssus(db *gorm.DB, curVersion string) error {
+func ExecuteIssus(db *gorm.DB, curVersion string, database string) error {
 	issus, err := ioutil.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql dir faild: %v", err)
@@ -88,7 +88,7 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 	nextVersions := getAscSortedNextVersions(issus, curVersion)
 	log.Infof("issus to be executed: %v", nextVersions)
 	for _, nv := range nextVersions {
-		err = executeIssu(db, nv)
+		err = executeIssu(db, nv, database)
 		if err != nil {
 			return err
 		}
@@ -100,17 +100,19 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 	return nil
 }
 
-func executeIssu(db *gorm.DB, nextVersion string) error {
-	issuSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
+func executeIssu(db *gorm.DB, nextVersion string, database string) error {
+	byteSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
 	if err != nil {
 		log.Errorf("read sql file (version: %s) failed: %v", nextVersion, err)
 		return err
 	}
-	if len(issuSQL) == 0 {
+	if len(byteSQL) == 0 {
 		log.Infof("issu with no content (version: %s)", nextVersion)
 		return nil
 	}
-	err = db.Exec(string(issuSQL)).Error
+
+	strSQL := fmt.Sprintf("SET @tableSchema=%s;\n", database) + string(byteSQL)
+	err = db.Exec(strSQL).Error
 	if err != nil {
 		log.Errorf("excute db issu (version: %s) failed: %v", nextVersion, err)
 		return err

@@ -39,30 +39,40 @@ var log = logging.MustGetLogger("db.mysql.migrator")
 // if configured database exists, and db_version table exists, check whether db_version is the latest version
 //
 //	and upgrade based the result.
-func MigrateMySQL(cfg config.MySqlConfig) error {
-	databaseExisted, err := CreateDatabase(cfg)
+func Migrate(cfg config.MySqlConfig) error {
+	if err := migrateDatabase(cfg, mysqlcommon.DEFAULT_ORG_ID); err != nil {
+		return err
+	}
+
+	orgIDs, err := mysql.GetNonDefaultORGIDs()
+	if err != nil {
+		return err
+	}
+	for _, orgID := range orgIDs {
+		if err = migrateDatabase(cfg, orgID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateDatabase(cfg config.MySqlConfig, orgID int) error {
+	var copiedCfg config.MySqlConfig
+	if orgID == mysqlcommon.DEFAULT_ORG_ID {
+		copiedCfg = cfg
+	} else {
+		copiedCfg = mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)
+	}
+
+	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
 		return err
 	}
 
 	if databaseExisted {
-		if err = table.UpgradeDatabase(cfg); err != nil {
-			return errors.New(fmt.Sprintf("org id: %d, %s", mysqlcommon.DEFAULT_ORG_ID, err.Error()))
+		if err = table.UpgradeDatabase(copiedCfg); err != nil {
+			return errors.New(fmt.Sprintf("org id: %d, %s", orgID, err.Error()))
 		}
-
-		// TODO
-		// orgIDs, err := mysql.GetORGIDs()
-		// if err != nil {
-		// 	return err
-		// }
-		// for _, orgID := range orgIDs {
-		// 	if orgID == mysqlcommon.DEFAULT_ORG_ID {
-		// 		continue
-		// 	}
-		// 	if err = table.UpgradeDatabase(mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)); err != nil {
-		// 		return errors.New(fmt.Sprintf("org id: %d, %s", orgID, err.Error()))
-		// 	}
-		// }
 	}
 	return nil
 }

@@ -24,9 +24,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 )
 
 var log = logging.MustGetLogger("db.mysql.migrator.table")
@@ -44,13 +44,13 @@ func UpgradeDatabase(cfg config.MySqlConfig) error {
 		return err
 	}
 	if dbVersionTable == "" {
-		return initTablesWithoutRollBack(db, cfg.Database)
+		return initTablesWithoutRollBack(db)
 	} else {
 		return upgradeIfDBVersionNotLatest(db, cfg)
 	}
 }
 
-func initTablesWithoutRollBack(db *gorm.DB, database string) error {
+func initTablesWithoutRollBack(db *gorm.DB) error {
 	log.Info("init db tables without rollback")
 	return initTables(db)
 }
@@ -74,7 +74,7 @@ func upgradeIfDBVersionNotLatest(db *gorm.DB, cfg config.MySqlConfig) error {
 			return err
 		}
 	} else if version != migration.DB_VERSION_EXPECTED {
-		return common.ExecuteIssus(db, version)
+		return common.ExecuteIssus(db, version, cfg.Database)
 	}
 	return nil
 }
@@ -99,7 +99,6 @@ func recreateDatabaseAndInitTables(db *gorm.DB, cfg config.MySqlConfig) error {
 	}
 	return DropDatabaseIfInitTablesFailed(db, cfg.Database)
 }
-
 
 func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) error {
 	log.Info("drop database if init tables failed")

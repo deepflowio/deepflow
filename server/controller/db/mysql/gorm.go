@@ -59,10 +59,6 @@ func Gorm(cfg MySqlConfig) (*gorm.DB, error) {
 	return GetGormDB(dsn)
 }
 
-func GetResultSetMax() int {
-	return int(DbConfig.ResultSetMax)
-}
-
 func GetConnectionWithoutDatabase(cfg MySqlConfig) (*gorm.DB, error) {
 	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
 	return GetGormDB(dsn)
