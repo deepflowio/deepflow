@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+mod brpc;
 mod dubbo;
 mod sofa_rpc;
 
+pub use brpc::{BrpcInfo, BrpcLog};
 pub use dubbo::{DubboInfo, DubboLog};
 pub use sofa_rpc::{
     decode_new_rpc_trace_context_with_type, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
