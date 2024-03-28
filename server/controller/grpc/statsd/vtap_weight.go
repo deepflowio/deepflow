@@ -35,7 +35,9 @@ type GetVTapWeightCounter struct {
 }
 
 func (g *GetVTapWeightCounter) GetCounter() interface{} {
-	return g.VTapWeightCounter
+	var counter *VTapWeightCounter
+	counter, g.VTapWeightCounter = g.VTapWeightCounter, &VTapWeightCounter{}
+	return counter
 }
 
 func (g *GetVTapWeightCounter) Closed() bool {
