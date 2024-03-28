@@ -77,6 +77,12 @@ message TsdbReportInfo {
     optional string pcap_data_mount_path = 4;
 }
 
+enum K8sWatchPolicy {
+    UNKNOWN = 0; // Environment variable K8S_WATCH_POLICY does not exist
+    ONLY_WATCH = 1;
+    WATCH_DISABLED = 2;
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -95,9 +101,10 @@ message SyncRequest {
     repeated string host_ips = 23;  // 仅作为注册使用
     optional string ctrl_mac = 25;
     optional string vtap_group_id_request = 26;  // 支持采集器自动加入组
-    optional bool kubernetes_force_watch = 27 [default = false];
+    optional bool kubernetes_force_watch = 27 [default = false]; // deprecated, use k8s_watch_policy
     optional AgentIdentifier agent_unique_identifier = 28 [default = IP_AND_MAC];
     optional string team_id = 29;   // agent team identity
+    optional K8sWatchPolicy k8s_watch_policy = 30 [default = UNKNOWN];
 
     repeated CommunicationVtap communication_vtaps = 31;  // 仅对数据节点有意义
 
