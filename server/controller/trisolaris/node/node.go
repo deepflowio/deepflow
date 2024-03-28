@@ -30,7 +30,9 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -469,8 +471,8 @@ func (n *NodeInfo) generateNodeCache() {
 	n.generateControllerInfo()
 }
 
-func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
-	tsdbMgr := dbmgr.DBMgr[models.Analyzer](n.db)
+func (n *NodeInfo) registerTSDBToDB(db *mysql.DB, tsdb *models.Analyzer) {
+	tsdbMgr := dbmgr.DBMgr[models.Analyzer](db.DB)
 	tsdbs, err := tsdbMgr.Gets()
 	if err != nil {
 		log.Error(err)
@@ -482,7 +484,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 	_, err = tsdbMgr.GetByOption(option)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		switch {
-		case tsdbCount == 0 || tsdb.CAMD5 == "":
+		case db.ORGID != common.DEFAULT_ORG_ID && (tsdbCount == 0 || tsdb.CAMD5 == ""):
 			azConn := &models.AZAnalyzerConnection{
 				AZ:         CONN_DEFAULT_AZ,
 				Region:     CONN_DEFAULT_REGION,
@@ -490,10 +492,10 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 				Lcuuid:     uuid.NewString(),
 			}
 			azConns = append(azConns, azConn)
-		case tsdbCount > 0:
+		case db.ORGID != common.DEFAULT_ORG_ID && tsdbCount > 0:
 			localTSDB, err := tsdbMgr.GetFromCAMD5(tsdb.CAMD5)
 			if err == nil {
-				conns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).GetBatchFromAnalyzerIP(localTSDB.IP)
+				conns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](db.DB).GetBatchFromAnalyzerIP(localTSDB.IP)
 				if err == nil {
 					for _, conn := range conns {
 						azConn := &models.AZAnalyzerConnection{
@@ -616,7 +618,12 @@ func (n *NodeInfo) isRegisterController() {
 			controllerMgr.Save(dbController)
 		}
 	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		n.registerControllerToDB(data)
+		if err := mysql.GetDBs().DoTransactionOnAllDBs(func(db *models.DB) error {
+			n.registerControllerToDB(db, data)
+			return nil
+		}); err != nil {
+			log.Error(err)
+		}
 	} else {
 		log.Error(err)
 	}
@@ -638,9 +645,9 @@ func (n *NodeInfo) GetPolicyVersion() uint64 {
 	return n.metaData.GetDropletPolicyVersion()
 }
 
-func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
+func (n *NodeInfo) registerControllerToDB(db *mysql.DB, data *models.Controller) {
 	log.Infof("resiter controller(%+v)", data)
-	controllerDBMgr := dbmgr.DBMgr[models.Controller](n.db)
+	controllerDBMgr := dbmgr.DBMgr[models.Controller](db.DB)
 	controllers, err := controllerDBMgr.Gets()
 	if err != nil {
 		log.Error(err)
@@ -649,7 +656,7 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 	controllerCount := len(controllers)
 	var azConns []*models.AZControllerConnection
 	switch {
-	case controllerCount == 0 || data.CAMD5 == "":
+	case db.ORGID != common.DEFAULT_ORG_ID && (controllerCount == 0 || data.CAMD5 == ""):
 		azConn := &models.AZControllerConnection{
 			AZ:           CONN_DEFAULT_AZ,
 			Region:       CONN_DEFAULT_REGION,
@@ -657,10 +664,10 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 			Lcuuid:       uuid.NewString(),
 		}
 		azConns = append(azConns, azConn)
-	case controllerCount > 0:
+	case db.ORGID != common.DEFAULT_ORG_ID && controllerCount > 0:
 		localController, err := controllerDBMgr.GetFromCAMD5(data.CAMD5)
 		if err == nil {
-			conns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromControllerIP(localController.IP)
+			conns, err := dbmgr.DBMgr[models.AZControllerConnection](db.DB).GetBatchFromControllerIP(localController.IP)
 			if err == nil {
 				for _, conn := range conns {
 					azConn := &models.AZControllerConnection{
@@ -684,7 +691,7 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 		return
 	}
 	if len(azConns) != 0 {
-		connDBMgr := dbmgr.DBMgr[models.AZControllerConnection](n.db)
+		connDBMgr := dbmgr.DBMgr[models.AZControllerConnection](db.DB)
 		for _, azConn := range azConns {
 			err := connDBMgr.Insert(azConn)
 			if err != nil {
@@ -768,8 +775,14 @@ func (n *NodeInfo) generatePlatformData() {
 func (n *NodeInfo) registerTSDB() {
 	log.Info("start register rsdb")
 	data := n.tsdbRegister.getRegisterData()
-	for _, tsdb := range data {
-		n.registerTSDBToDB(tsdb)
+	if err := mysql.GetDBs().DoTransactionOnAllDBs(func(db *mysql.DB) error {
+		for _, tsdb := range data {
+			log.Infof("weiqiang registerTSDBToDB, ip: %v", tsdb.IP)
+			n.registerTSDBToDB(db, tsdb)
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("failed to register analyzer: %s", err.Error())
 	}
 	log.Info("end register tsdb")
 }
