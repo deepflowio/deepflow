@@ -43,6 +43,21 @@ func GetORGIDs() ([]int, error) {
 		return ids, nil
 	}
 
+	if oids, err := GetNonDefaultORGIDs(); err != nil {
+		return ids, err
+	} else {
+		ids = append(ids, oids...)
+	}
+	return ids, nil
+}
+
+func GetNonDefaultORGIDs() ([]int, error) {
+	db, err := GetDB(common.DEFAULT_ORG_ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]int, 0)
 	var orgs []*Org
 	if err := db.Where("loop_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
 		return ids, errors.New(fmt.Sprintf("failed to get org ids: %v", err.Error()))

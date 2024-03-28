@@ -1,4 +1,3 @@
--- modify start, add upgrade sql
 DROP PROCEDURE IF EXISTS AddColumnAndSetIfNotExists;
 
 CREATE PROCEDURE AddColumnAndSetIfNotExists(
@@ -11,7 +10,7 @@ CREATE PROCEDURE AddColumnAndSetIfNotExists(
 BEGIN
     DECLARE col_count INT;
 
-    -- 检查列是否存在
+    -- check whether the column exists, pay attention to specify the @tableSchema variable which will be added when this file is executed
     SELECT COUNT(*)
     INTO col_count
     FROM INFORMATION_SCHEMA.COLUMNS
@@ -19,7 +18,7 @@ BEGIN
     AND TABLE_NAME = tableName
     AND COLUMN_NAME = colName;
 
-    -- 如果列不存在，则添加列
+    -- if the column does not exist, add the column
     IF col_count = 0 THEN
         SET @sql = CONCAT('ALTER TABLE ', tableName, ' ADD COLUMN ', colName, ' ', colType, ' DEFAULT ', defaultVal, ' AFTER ', afterCol);
         PREPARE stmt FROM @sql;
