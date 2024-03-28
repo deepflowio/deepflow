@@ -17,7 +17,6 @@
 package mysql
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -29,14 +28,13 @@ import (
 )
 
 var (
-	defaultDB sync.Once
-	DefaultDB *DB // TODO better name
+	DefaultDB *DB
 
 	dbsOnce sync.Once
 	dbs     *DBs
 )
 
-func GetDB(orgID int) (*DB, error) { // TODO whether return error
+func GetDB(orgID int) (*DB, error) {
 	return GetDBs().NewDBIfNotExists(orgID)
 }
 
@@ -44,24 +42,36 @@ func GetConfig() config.MySqlConfig {
 	return GetDBs().GetConfig()
 }
 
+func InitDefaultDB(cfg config.MySqlConfig) error {
+	var err error
+	DefaultDB, err = NewDB(cfg, common.DEFAULT_ORG_ID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type DB struct {
 	*gorm.DB
 	ORGID int
+	Name  string
 }
 
 func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 	var db *gorm.DB
 	var err error
+	copiedCfg := cfg
 	if orgID == common.DEFAULT_ORG_ID {
-		db, err = Gorm(cfg)
+		db, err = common.GetSession(copiedCfg)
 	} else {
-		newCfg := common.ReplaceConfigDatabaseName(cfg, orgID)
-		db, err = Gorm(newCfg)
+		copiedCfg = common.ReplaceConfigDatabaseName(cfg, orgID)
+		db, err = common.GetSession(copiedCfg)
 	}
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("connect mysql failed: %s, org id: %d", err.Error(), orgID))
+		log.Errorf("failed to create db session: %s, config: %v", err.Error(), copiedCfg)
+		return nil, err
 	}
-	return &DB{db, orgID}, nil
+	return &DB{db, orgID, copiedCfg.Database}, nil
 }
 
 type DBs struct {
@@ -93,7 +103,7 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	}
 	for _, id := range orgIDs {
 		if _, err := c.NewDBIfNotExists(id); err != nil {
-			return errors.New(fmt.Sprintf("failed to init db for org %d: %v", id, err))
+			return err
 		}
 	}
 	return err
@@ -150,10 +160,12 @@ func (c *DBs) check(db *DB) error {
 	var version string
 	err := db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
 	if err != nil {
-		return errors.New("get current db version failed")
+		log.Errorf("db: %s, failed to check db version: %s", db.Name, err.Error())
+		return err
 	}
 	if version != migration.DB_VERSION_EXPECTED {
-		return errors.New(fmt.Sprintf("current db version: %s != expected db version: %s", version, migration.DB_VERSION_EXPECTED))
+		log.Errorf("db: %s, current db version: %s != expected db version: %s", db.Name, version, migration.DB_VERSION_EXPECTED)
+		return err
 	}
 	return nil
 }

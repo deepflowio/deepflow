@@ -17,112 +17,107 @@
 package table
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/op/go-logging"
-	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 )
 
 var log = logging.MustGetLogger("db.mysql.migrator.table")
 
 func UpgradeDatabase(cfg config.MySqlConfig) error {
-	db, err := mysql.GetConnectionWithDatabase(cfg)
+	db, err := common.GetSessionWithName(cfg)
 	if err != nil {
 		return err
 	}
+
+	dc := common.NewDBConfig(db, cfg)
 	var dbVersionTable string
 	err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migration.DB_VERSION_TABLE)).Scan(&dbVersionTable).Error
 	if err != nil {
-		err = errors.New(fmt.Sprintf("check db_version table failed: %v", err))
-		log.Error(err.Error())
+		log.Error(common.LogDBName(dc.Config.Database, "failed to check db_version table: %s", err.Error()))
 		return err
 	}
 	if dbVersionTable == "" {
-		return initTablesWithoutRollBack(db, cfg.Database)
+		return initTablesWithoutRollBack(dc)
 	} else {
-		return upgradeIfDBVersionNotLatest(db, cfg)
+		return upgradeIfDBVersionNotLatest(dc)
 	}
 }
 
-func initTablesWithoutRollBack(db *gorm.DB, database string) error {
-	log.Info("init db tables without rollback")
-	return initTables(db)
+func initTablesWithoutRollBack(dc common.DBConfig) error {
+	log.Info(common.LogDBName(dc.Config.Database, "initialize db tables without rollback"))
+	return initTables(dc)
 }
 
-func upgradeIfDBVersionNotLatest(db *gorm.DB, cfg config.MySqlConfig) error {
-	log.Info("upgrade if db version is not the latest")
+func upgradeIfDBVersionNotLatest(dc common.DBConfig) error {
+	log.Info(common.LogDBName(dc.Config.Database, "upgrade if db version is not the latest"))
 	var version string
-	err := db.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
+	err := dc.DB.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
 	if err != nil {
-		err = errors.New(fmt.Sprintf("check db version failed: %v", err))
-		log.Error(err.Error())
+		log.Error(common.LogDBName(dc.Config.Database, "failed to check db version: %s", err.Error()))
 		return err
 	}
-	log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
+	log.Infof(common.LogDBName(dc.Config.Database, "current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED))
 	if version == "" {
-		if cfg.DropDatabaseEnabled {
-			return recreateDatabaseAndInitTables(db, cfg)
+		if dc.Config.DropDatabaseEnabled {
+			return recreateDatabaseAndInitTables(dc)
 		} else {
-			err = errors.New("current db version is null, need manual handling")
-			log.Error(err.Error())
+			log.Error(common.LogDBName(dc.Config.Database, "current db version is null, need manual handling"))
 			return err
 		}
 	} else if version != migration.DB_VERSION_EXPECTED {
-		return common.ExecuteIssus(db, version)
+		return common.ExecuteIssues(dc, version)
 	}
 	return nil
 }
 
-func recreateDatabaseAndInitTables(db *gorm.DB, cfg config.MySqlConfig) error {
-	log.Info("recreate database and init tables")
-	common.DropDatabase(db, cfg.Database)
-	db, err := mysql.GetConnectionWithoutDatabase(cfg)
+func recreateDatabaseAndInitTables(dc common.DBConfig) error {
+	log.Info(common.LogDBName(dc.Config.Database, "recreate database and initialize tables"))
+	common.DropDatabase(dc)
+	db, err := common.GetSessionWithoutName(dc.Config)
 	if err != nil {
 		return err
 	}
-	err = common.CreateDatabase(db, cfg.Database)
+	dc.DB = db
+	err = common.CreateDatabase(dc)
 	if err != nil {
-		err = errors.New(fmt.Sprintf("created database %s failed: %v", cfg.Database, err))
-		log.Error(err.Error())
+		log.Error(common.LogDBName(dc.Config.Database, "failed to create database: %s", err.Error()))
 		return err
 	}
 
-	db, err = mysql.GetConnectionWithDatabase(cfg)
+	db, err = common.GetSessionWithName(dc.Config)
 	if err != nil {
 		return err
 	}
-	return DropDatabaseIfInitTablesFailed(db, cfg.Database)
+	dc.DB = db
+	return DropDatabaseIfInitTablesFailed(dc)
 }
 
-
-func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) error {
-	log.Info("drop database if init tables failed")
-	err := initTables(db)
+func DropDatabaseIfInitTablesFailed(dc common.DBConfig) error {
+	log.Info(common.LogDBName(dc.Config.Database, "drop database if fails to initialize tables"))
+	err := initTables(dc)
 	if err != nil {
-		err := common.DropDatabase(db, database)
+		err := common.DropDatabase(dc)
 		if err != nil {
-			err = errors.New(fmt.Sprintf("drop database %s failed: %v", database, err))
-			log.Error(err.Error())
+			log.Error(common.LogDBName(dc.Config.Database, "failed to drop database: %s", err.Error()))
 		}
 		return err
 	}
 	return nil
 }
 
-func initTables(db *gorm.DB) error {
-	log.Info("init db tables start")
-	if err := common.InitEETables(db); err != nil {
+func initTables(dc common.DBConfig) error {
+	log.Info(common.LogDBName(dc.Config.Database, "initialize db tables"))
+	if err := common.InitEETables(dc); err != nil {
 		return err
 	}
-	if err := common.InitDBVersion(db); err != nil {
+	if err := common.InitDBVersion(dc); err != nil {
 		return err
 	}
-	log.Info("init db tables success")
+	log.Info(common.LogDBName(dc.Config.Database, "initialized db tables successfully"))
 	return nil
 }
