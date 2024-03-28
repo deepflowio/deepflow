@@ -300,6 +300,7 @@ type Domain struct {
 	VTapCtrlIP     string                 `json:"VTAP_CTRL_IP"`
 	VTapCtrlMAC    string                 `json:"VTAP_CTRL_MAC"`
 	IconID         int                    `json:"ICON_ID"`
+	TeamID         int                    `json:"TEAM_ID"`
 	K8sEnabled     int                    `json:"K8S_ENABLED"`
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`

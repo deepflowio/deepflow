@@ -156,6 +156,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			ErrorMsg:     domain.ErrorMsg,
 			ControllerIP: domain.ControllerIP,
 			IconID:       domain.IconID, // 后续与前端沟通icon作为默认配置
+			TeamID:       domain.TeamID,
 			CreatedAt:    domain.CreatedAt.Format(common.GO_BIRTHDAY),
 			SyncedAt:     syncedAt,
 			Lcuuid:       domain.Lcuuid,
