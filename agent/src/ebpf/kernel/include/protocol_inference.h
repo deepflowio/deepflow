@@ -2164,6 +2164,37 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 	return MSG_REQUEST;
 }
 
+static __inline enum message_type infer_brpc_message(const char *buf,
+						     size_t count,
+						     struct conn_info_s
+						     *conn_info)
+{
+	if (count < 12)
+		return MSG_UNKNOWN;
+	
+	if (!protocol_port_check_2(PROTO_BRPC, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_BRPC)
+			return MSG_UNKNOWN;
+	}
+
+	// PRPC
+	if (buf[0] != 'P' || buf[1] != 'R' || buf[2] != 'P' || buf[3] != 'C')
+		return MSG_UNKNOWN;
+
+	unsigned int body_size = __bpf_ntohl(*(__u32 *) & buf[4]);
+	unsigned int meta_size = __bpf_ntohl(*(__u32 *) & buf[8]);
+
+	if (body_size + 12 > count)
+		return MSG_UNKNOWN;
+	if (meta_size > body_size)
+		return MSG_UNKNOWN;
+
+	return MSG_REQUEST;
+}
+
 static __inline bool check_zmtp_mechanism(const char *buf)
 {
 	// check mechanism fields
@@ -3388,6 +3419,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_BRPC:
+			if ((inferred_message.type =
+			     infer_brpc_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_BRPC;
+				return inferred_message;
+			}
+			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
 			     infer_http2_message(syscall_infer_addr,
@@ -3619,6 +3658,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					 count,
 					 conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_PULSAR;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_BRPC && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_brpc_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_BRPC;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else
