@@ -68,7 +68,7 @@ func (c *ChVMDevice) sourceToTarget(source *mysql.VM) (keys []DeviceKey, targets
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
+func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -90,15 +90,15 @@ func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFie
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VM).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VM).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VM,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChVMDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChVMDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -145,8 +145,9 @@ func (c *ChHostDevice) sourceToTarget(source *mysql.Host) (keys []DeviceKey, tar
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.HostFieldsUpdate) {
+func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.HostFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -167,15 +168,16 @@ func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.Hos
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_HOST).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_HOST).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_HOST,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChHostDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChHostDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -219,22 +221,24 @@ func (c *ChVRouterDevice) sourceToTarget(source *mysql.VRouter) (keys []DeviceKe
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VRouterFieldsUpdate) {
+func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VRouterFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VROUTER).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VROUTER).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -278,22 +282,24 @@ func (c *ChDHCPPortDevice) sourceToTarget(source *mysql.DHCPPort) (keys []Device
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.DHCPPortFieldsUpdate) {
+func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.DHCPPortFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_DHCP_PORT).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_DHCP_PORT).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -338,8 +344,9 @@ func (c *ChNATGatewayDevice) sourceToTarget(source *mysql.NATGateway) (keys []De
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.NATGatewayFieldsUpdate) {
+func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.NATGatewayFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -348,15 +355,16 @@ func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_NAT_GATEWAY).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_NAT_GATEWAY).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -401,8 +409,9 @@ func (c *ChLBDevice) sourceToTarget(source *mysql.LB) (keys []DeviceKey, targets
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFieldsUpdate) {
+func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -411,15 +420,16 @@ func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFie
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_LB).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_LB).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_LB,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChLBDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChLBDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -464,8 +474,9 @@ func (c *ChRDSInstanceDevice) sourceToTarget(source *mysql.RDSInstance) (keys []
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RDSInstanceFieldsUpdate) {
+func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RDSInstanceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -474,15 +485,16 @@ func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *mess
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_RDS_INSTANCE).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_RDS_INSTANCE).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -527,8 +539,9 @@ func (c *ChRedisInstanceDevice) sourceToTarget(source *mysql.RedisInstance) (key
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RedisInstanceFieldsUpdate) {
+func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RedisInstanceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -537,15 +550,16 @@ func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *me
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_REDIS_INSTANCE).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_REDIS_INSTANCE).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -599,22 +613,24 @@ func (c *ChPodServiceDevice) sourceToTarget(source *mysql.PodService) (keys []De
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_SERVICE).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_SERVICE).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -658,23 +674,24 @@ func (c *ChPodDevice) sourceToTarget(source *mysql.Pod) (keys []DeviceKey, targe
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
+func (c *ChPodDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
 
-	mysql.Db.Clauses(clause.OnConflict{
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -718,23 +735,25 @@ func (c *ChPodGroupDevice) sourceToTarget(source *mysql.PodGroup) (keys []Device
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate) {
+func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		podGroupType := fieldsUpdate.Type.GetNew()
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -778,22 +797,24 @@ func (c *ChPodNodeDevice) sourceToTarget(source *mysql.PodNode) (keys []DeviceKe
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate) {
+func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
@@ -837,22 +858,24 @@ func (c *ChProcessDevice) sourceToTarget(source *mysql.Process) (keys []DeviceKe
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate) {
+func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
-		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-			DeviceID: sourceID})
+			DeviceID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

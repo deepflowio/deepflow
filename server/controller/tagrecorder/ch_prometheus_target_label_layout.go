@@ -37,10 +37,9 @@ func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusTargetLabelLayout, bool) {
+func (l *ChPrometheusTargetLabelLayout) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChPrometheusTargetLabelLayout, bool) {
 	var prometheusTargets []mysql.PrometheusTarget
-
-	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
+	err := db.Unscoped().Find(&prometheusTargets).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false

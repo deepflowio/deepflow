@@ -61,8 +61,9 @@ func (c *ChPodNamespace) sourceToTarget(source *mysql.PodNamespace) (keys []IDKe
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate) {
+func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -71,14 +72,14 @@ func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodNamespace
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) softDeletedTargetsUpdated(targets []mysql.ChPodNamespace) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodNamespace) softDeletedTargetsUpdated(targets []mysql.ChPodNamespace, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

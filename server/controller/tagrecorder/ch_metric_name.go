@@ -35,10 +35,9 @@ func NewChPrometheusMetricNames() *ChPrometheusMetricName {
 	return updater
 }
 
-func (l *ChPrometheusMetricName) generateNewData() (map[IDKey]mysql.ChPrometheusMetricName, bool) {
+func (l *ChPrometheusMetricName) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChPrometheusMetricName, bool) {
 	var prometheusMetricName []mysql.PrometheusMetricName
-
-	err := mysql.Db.Unscoped().Find(&prometheusMetricName).Error
+	err := db.Unscoped().Find(&prometheusMetricName).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false

@@ -34,9 +34,9 @@ func NewChNpbTunnel() *ChNpbTunnel {
 	return updater
 }
 
-func (p *ChNpbTunnel) generateNewData() (map[IDKey]mysql.ChNpbTunnel, bool) {
+func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChNpbTunnel, bool) {
 	var npbTunnels []mysql.NpbTunnel
-	err := mysql.Db.Unscoped().Select("id", "name").Find(&npbTunnels).Error
+	err := db.Unscoped().Select("id", "name").Find(&npbTunnels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

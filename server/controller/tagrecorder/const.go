@@ -711,15 +711,15 @@ const (
 )
 
 const (
-	CREATE_APP_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW flow_tag.app_label_live_view WITH PERIODIC REFRESH %d\n" +
+	CREATE_APP_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW %s.app_label_live_view WITH PERIODIC REFRESH %d\n" +
 		"(\n" +
 		"    `label_name_id` UInt64,\n" +
 		"    `label_value_id` UInt64,\n" +
 		"    `label_value` String\n" +
 		") AS\n" +
 		"SELECT *\n" +
-		"FROM flow_tag.app_label_map"
-	CREATE_TARGET_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW flow_tag.target_label_live_view WITH PERIODIC REFRESH %d\n" +
+		"FROM %s.app_label_map"
+	CREATE_TARGET_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW %s.target_label_live_view WITH PERIODIC REFRESH %d\n" +
 		"(\n" +
 		"    `metric_id` UInt64,\n" +
 		"    `label_name_id` UInt64,\n" +
@@ -727,7 +727,7 @@ const (
 		"    `label_value` String\n" +
 		") AS\n" +
 		"SELECT *\n" +
-		"FROM flow_tag.target_label_map"
+		"FROM %s.target_label_map"
 )
 
 var DBNodeTypeToResourceType = map[string]string{

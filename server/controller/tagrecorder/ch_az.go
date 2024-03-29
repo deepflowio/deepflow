@@ -43,15 +43,15 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate) {
+func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChAZ
-		mysql.Db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
-		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
+		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
@@ -78,8 +78,8 @@ func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

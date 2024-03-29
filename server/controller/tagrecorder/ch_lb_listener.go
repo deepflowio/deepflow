@@ -37,15 +37,15 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	return updater
 }
 
-func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
+func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChLBListener, bool) {
 	var lbListeners []mysql.LBListener
 	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Unscoped().Find(&lbListeners).Error
+	err := db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&lbTargetServers).Error
+	err = db.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false

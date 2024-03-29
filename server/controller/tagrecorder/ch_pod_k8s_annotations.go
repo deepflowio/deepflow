@@ -37,21 +37,23 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Annotation.IsDifferent() {
 		updateInfo["annotations"] = fieldsUpdate.Annotation.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sAnnotations
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sAnnotationsKey{{ID: sourceID}},
 				[]mysql.ChPodK8sAnnotations{{ID: sourceID, Annotations: updateInfo["annotations"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sAnnotationsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sAnnotationsKey{ID: sourceID}, db)
 		}
 	}
 }
@@ -65,6 +67,6 @@ func (c *ChPodK8sAnnotations) sourceToTarget(item *mysql.Pod) (keys []K8sAnnotat
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotations) {
+func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotations, db *mysql.DB) {
 
 }

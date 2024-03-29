@@ -34,10 +34,10 @@ func NewChAlarmPolicy() *ChAlarmPolicy {
 	return updater
 }
 
-func (p *ChAlarmPolicy) generateNewData() (map[IDKey]mysql.ChAlarmPolicy, bool) {
+func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChAlarmPolicy, bool) {
 	log.Infof("generate data for %s", p.resourceTypeName)
 	var alarmPolicys []mysql.AlarmPolicy
-	err := mysql.Db.Unscoped().Find(&alarmPolicys).Error
+	err := db.Unscoped().Find(&alarmPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

@@ -39,7 +39,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
+func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
@@ -51,14 +51,15 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChChostCloudTags
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]CloudTagsKey{{ID: sourceID}},
 				[]mysql.ChChostCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
 		}
 	}
 }
@@ -77,6 +78,6 @@ func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, 
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTags) {
+func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTags, db *mysql.DB) {
 
 }
