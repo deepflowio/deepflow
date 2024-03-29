@@ -19,17 +19,6 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
-#include <linux/bpf_perf_event.h>
-#include "config.h"
-#include "bpf_base.h"
-#include "common.h"
-#include "kernel.h"
-#include "bpf_endian.h"
-#include "perf_profiler.h"
-
-#define KERN_STACKID_FLAGS (0)
-#define USER_STACKID_FLAGS (0 | BPF_F_USER_STACK)
-
 struct key_t {
 	int pid;
 	int tgid;
@@ -39,11 +28,11 @@ struct key_t {
 };
 
 /* *INDENT-OFF* */
-MAP_PERF_EVENT(profiler_output_a, int, __u32, MAX_CPU)
-MAP_PERF_EVENT(profiler_output_b, int, __u32, MAX_CPU)
-MAP_STACK_TRACE(stack_map_a, STACK_MAP_ENTRIES)
-MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES)
-BPF_HASH(count_map, struct key_t, __u64)
+MAP_PERF_EVENT(offcpu_output_a, int, __u32, MAX_CPU)
+MAP_PERF_EVENT(offcpu_output_b, int, __u32, MAX_CPU)
+MAP_STACK_TRACE(offcpu_stack_map_a, STACK_MAP_ENTRIES)
+MAP_STACK_TRACE(offcpu_stack_map_b, STACK_MAP_ENTRIES)
+BPF_HASH(offcpu_count_map, struct key_t, __u64)
 /* *INDENT-ON* */
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
@@ -70,15 +59,16 @@ struct sched_switch_ctx {
  * (REC->prev_state & ((((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) - 1)) ?
  *   __print_flags(REC->prev_state & ((((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) - 1), "|", { 0x01, "S" }, { 0x02, "D" }, { 0x04, "T" }, { 0x08, "t" }, { 0x10, "X" }, { 0x20, "Z" }, { 0x40, "P" }, { 0x80, "I" }) : "R", REC->prev_state & (((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) ? "+" : ""
  */
-TPPROG(sched_switch) (struct sched_switch_ctx * ctx) {
+TP_SCHED_PROG(sched_switch) (struct sched_switch_ctx * ctx) {
 
 	struct key_t key;
-	key.kernstack = bpf_get_stackid(ctx, &NAME(stack_map),
+	key.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
 					KERN_STACKID_FLAGS);
-	key.userstack = bpf_get_stackid(ctx, &NAME(stack_map),
+	key.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
 					USER_STACKID_FLAGS);
-	pid = ctx->prev_pid;
+	int pid = ctx->prev_pid;
 
+	bpf_debug("pid %d\n", pid);
 #if 0
 	int pid = 0;
 	unsigned long long duration = 0;

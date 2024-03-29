@@ -47,22 +47,6 @@
 
 #include "../perf_profiler_bpf_common.c"
 
-/*
- * This section is for symbolization of Java addresses, and we need
- * to prepare two so librarys, one for GNU and the other for MUSL:
- *
- * df_java_agent.so
- * df_java_agent_musl.so
- *
- * These two files need to be saved in the '/tmp' directory, and the
- * agent so library will be injected into the JVM to generate
- * 'perf-<pid>.map'.
- */
-#include "java_agent_so_gnu.c"
-#include "java_agent_so_musl.c"
-/* use for java symbols generate */
-#include "deepflow_jattach_bin.c"
-
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
@@ -73,7 +57,6 @@ int g_java_syms_write_bytes_max;
 /* Used for handling updates to JAVA symbol files */
 static pthread_t java_syms_update_thread;
 
-extern int major, minor;
 extern char linux_release[128];
 extern __thread uword thread_index;
 
@@ -1379,9 +1362,19 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
 	buffer_sz = sizeof(perf_profiler_common_ebpf_data);
 
+	struct tracer_probes_conf *tps =
+	    malloc(sizeof(struct tracer_probes_conf));
+	if (tps == NULL) {
+		ebpf_warning("malloc() error.\n");
+		return -ENOMEM;
+	}
+	memset(tps, 0, sizeof(*tps));
+	init_list_head(&tps->uprobe_syms_head);
+	CP_PROFILE_SET_PROBES(tps);
+
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
-			     bpf_bin_buffer, buffer_sz, NULL, 0,
+			     bpf_bin_buffer, buffer_sz, tps, 0,
 			     relase_profiler, create_profiler,
 			     (void *)callback, freq);
 	if (tracer == NULL)
