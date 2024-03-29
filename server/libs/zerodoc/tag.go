@@ -854,6 +854,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",tap_side=c-gw")
 		case ServerGateway:
 			offset += copy(b[offset:], ",tap_side=s-gw")
+		case ClientProcess:
+			offset += copy(b[offset:], ",tap_side=c-p")
+		case ServerProcess:
+			offset += copy(b[offset:], ",tap_side=s-p")
+		case ClientApp:
+			offset += copy(b[offset:], ",tap_side=c-app")
+		case ServerApp:
+			offset += copy(b[offset:], ",tap_side=s-app")
+		case App:
+			offset += copy(b[offset:], ",tap_side=app")
+		case Local:
+			offset += copy(b[offset:], ",tap_side=local")
 		}
 	}
 	if t.Code&TAPType != 0 {
