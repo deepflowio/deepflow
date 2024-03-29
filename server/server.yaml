@@ -462,14 +462,21 @@ ingester:
   #  l7-flow-log: 72
   #  l4-packet: 72
 
-  ## event data write config
+  ## resource event data write config
   #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
-  ## resource event table data retention time(unit: hour)
+  ## k8s event data write config
+  #k8s-event-ck-writer:
+  #  queue-count: 1      # parallelism of table writing
+  #  queue-size: 50000  # size of writing queue
+  #  batch-size: 25600   # size of batch writing
+  #  flush-timeout: 5    # timeout of table writing
+
+  ## resource/k8s event table data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #event-ttl-hour: 720
 
@@ -622,6 +629,9 @@ ingester:
 
   #event-decoder-queue-count: 1
   #event-decoder-queue-size: 10000
+
+  #k8s-event-decoder-queue-count: 1
+  #k8s-event-decoder-queue-size: 10000
 
   #perf-event-decoder-queue-count: 2
   #perf-event-decoder-queue-size: 100000

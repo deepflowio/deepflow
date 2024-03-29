@@ -181,7 +181,7 @@ func NewAlarmEventWriter(config *config.Config) (*EventWriter, error) {
 		ckdbCluster:       config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
-		ttl:               config.AlarmTTL,
+		ttl:               config.AlarmEventTTL,
 		writerConfig:      config.CKWriterConfig,
 	}
 

@@ -129,21 +129,15 @@ func (d *Decoder) Run() {
 				d.handleResourceEvent(event)
 				event.Release()
 			case common.PERF_EVENT:
-				if buffer[i] == nil {
-					continue
-				}
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
-					log.Warning("get proc event decode queue data type wrong")
+					log.Warning("get perf event decode queue data type wrong")
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.handlePerfEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.ALARM_EVENT:
-				if buffer[i] == nil {
-					continue
-				}
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
 					log.Warning("get alarm event decode queue data type wrong")
@@ -151,6 +145,15 @@ func (d *Decoder) Run() {
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.handleAlarmEvent(decoder)
+				receiver.ReleaseRecvBuffer(recvBytes)
+			case common.K8S_EVENT:
+				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
+				if !ok {
+					log.Warning("get k8s event decode queue data type wrong")
+					continue
+				}
+				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.handleK8sEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			}
 		}

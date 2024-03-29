@@ -36,7 +36,7 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240411025135-f1218473a3ec
+	github.com/deepflowio/deepflow/message v0.0.0-20240412081932-84d2a830cc18
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
