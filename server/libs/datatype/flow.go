@@ -155,6 +155,7 @@ const (
 	L7_PROTOCOL_GRPC     L7Protocol = 41
 	L7_PROTOCOL_SOFARPC  L7Protocol = 43
 	L7_PROTOCOL_FASTCGI  L7Protocol = 44
+	L7_PROTOCOL_BRPC     L7Protocol = 45
 	L7_PROTOCOL_MYSQL    L7Protocol = 60
 	L7_PROTOCOL_POSTGRE  L7Protocol = 61
 	L7_PROTOCOL_ORACLE   L7Protocol = 62
@@ -165,6 +166,7 @@ const (
 	L7_PROTOCOL_AMQP     L7Protocol = 102
 	L7_PROTOCOL_OPENWIRE L7Protocol = 103
 	L7_PROTOCOL_NATS     L7Protocol = 104
+	L7_PROTOCOL_PULSAR   L7Protocol = 105
 	L7_PROTOCOL_ZMTP     L7Protocol = 106
 	L7_PROTOCOL_DNS      L7Protocol = 120
 	L7_PROTOCOL_TLS      L7Protocol = 121
@@ -647,6 +649,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "FastCGI"
 		}
+	case L7_PROTOCOL_BRPC:
+		if isTLS {
+			return "bRPC_TLS"
+		} else {
+			return "bRPC"
+		}
 	case L7_PROTOCOL_MYSQL:
 		if isTLS {
 			return "MySQL_TLS"
@@ -707,6 +715,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "NATS"
 		}
+	case L7_PROTOCOL_PULSAR:
+		if isTLS {
+			return "Pulsar_TLS"
+		} else {
+			return "Pulsar"
+		}
 	case L7_PROTOCOL_ZMTP:
 		if isTLS {
 			return "ZMTP_TLS"
@@ -739,6 +753,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_GRPC.String(false)):     L7_PROTOCOL_GRPC,
 	strings.ToLower(L7_PROTOCOL_SOFARPC.String(false)):  L7_PROTOCOL_SOFARPC,
 	strings.ToLower(L7_PROTOCOL_FASTCGI.String(false)):  L7_PROTOCOL_FASTCGI,
+	strings.ToLower(L7_PROTOCOL_BRPC.String(false)):     L7_PROTOCOL_BRPC,
 	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):    L7_PROTOCOL_MYSQL,
 	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):  L7_PROTOCOL_POSTGRE,
 	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):   L7_PROTOCOL_ORACLE,
@@ -749,6 +764,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_AMQP.String(false)):     L7_PROTOCOL_AMQP,
 	strings.ToLower(L7_PROTOCOL_OPENWIRE.String(false)): L7_PROTOCOL_OPENWIRE,
 	strings.ToLower(L7_PROTOCOL_NATS.String(false)):     L7_PROTOCOL_NATS,
+	strings.ToLower(L7_PROTOCOL_PULSAR.String(false)):   L7_PROTOCOL_PULSAR,
 	strings.ToLower(L7_PROTOCOL_ZMTP.String(false)):     L7_PROTOCOL_ZMTP,
 	strings.ToLower(L7_PROTOCOL_DNS.String(false)):      L7_PROTOCOL_DNS,
 	strings.ToLower(L7_PROTOCOL_TLS.String(false)):      L7_PROTOCOL_TLS,
