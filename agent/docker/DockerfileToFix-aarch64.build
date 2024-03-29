@@ -10,7 +10,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 
 # Install base dependencies
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq patch
-RUN yum install gcc gcc-c++ curl unzip devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem java-1.8.0-openjdk-devel dpdk dpdk-devel numactl numactl-devel numactl-libs protobuf-devel -y && \
+RUN yum install gcc gcc-c++ curl unzip devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem java-1.8.0-openjdk-devel dpdk dpdk-devel numactl numactl-devel numactl-libs -y && \
     curl https://sh.rustup.rs -so rustup.sh; bash rustup.sh -y && \
     source /opt/rh/devtoolset-8/enable && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-devel-1.2.2-el7.aarch64.rpm --silent -O && \
@@ -28,6 +28,10 @@ RUN yum install gcc gcc-c++ curl unzip devtoolset-8-gcc devtoolset-8-gdb devtool
     yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libGoReSym-0.0.1-2.el8.aarch64.rpm --silent -O && \
     yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-compiler-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-devel-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./protobuf-*.rpm && rm -rf protobuf-*.rpm && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/ebpftoolsbuilder-llvm-clang-11.0.0-2.el7.aarch64.rpm --silent -O && \
     yum --disablerepo=* localinstall -y ebpftoolsbuilder-llvm-clang-*.rpm && rm -rf ebpftoolsbuilder-llvm-clang-*.rpm && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/musl-clang-1.2.2-el7.aarch64.rpm --silent -O && \
