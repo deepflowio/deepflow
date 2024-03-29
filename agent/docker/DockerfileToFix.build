@@ -31,6 +31,7 @@ RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llvm
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protobuf-3.6.1-4.el7.x86_64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protobuf-compiler-3.6.1-4.el7.x86_64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protobuf-devel-3.6.1-4.el7.x86_64.rpm --silent -O && \
+    yum install emacs-filesystem -y && \
     yum --disablerepo=* localinstall -y ./protobuf-*.rpm && rm -rf protobuf-*.rpm && \
     yum clean all
 

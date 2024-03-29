@@ -31,6 +31,7 @@ RUN yum install gcc gcc-c++ curl unzip devtoolset-8-gcc devtoolset-8-gdb devtool
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-3.6.1-4.el7.aarch64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-compiler-3.6.1-4.el7.aarch64.rpm --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-devel-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    yum install emacs-filesystem -y && \
     yum --disablerepo=* localinstall -y ./protobuf-*.rpm && rm -rf protobuf-*.rpm && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/ebpftoolsbuilder-llvm-clang-11.0.0-2.el7.aarch64.rpm --silent -O && \
     yum --disablerepo=* localinstall -y ebpftoolsbuilder-llvm-clang-*.rpm && rm -rf ebpftoolsbuilder-llvm-clang-*.rpm && \
