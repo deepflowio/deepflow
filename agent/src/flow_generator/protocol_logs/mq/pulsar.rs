@@ -36,9 +36,9 @@ pub struct PulsarInfo {
 
     rtt: u64,
 
-    command: BaseCommand,
+    command: Box<BaseCommand>,
     broker_entry_metadata: Option<BrokerEntryMetadata>,
-    message_metadata: Option<MessageMetadata>,
+    message_metadata: Box<Option<MessageMetadata>>,
 
     // min(CommandConnect.protocol_version, CommandConnected.protocol_version)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -133,7 +133,7 @@ impl PulsarInfo {
     }
 
     fn parse_request_id(&self) -> Option<u32> {
-        let metadata = self.message_metadata.as_ref()?;
+        let metadata = self.message_metadata.as_ref().as_ref()?;
         Some(metadata.sequence_id as u32)
     }
 
@@ -333,7 +333,7 @@ impl PulsarInfo {
             return None;
         }
         let buf = payload.get(8..8 + command_size as usize)?;
-        info.command = BaseCommand::decode(buf).ok()?;
+        info.command = Box::new(BaseCommand::decode(buf).ok()?);
         let mut extra = payload.get(8 + command_size..4 + total_size)?;
         let payload = payload.get(4 + total_size..)?;
         if extra.len() > 0 {
@@ -351,7 +351,7 @@ impl PulsarInfo {
             let _checksum = read_u32_be(extra.get(2..6)?);
             let metadata_size = read_u32_be(extra.get(6..10)?) as usize;
             let buf = extra.get(10..10 + metadata_size)?;
-            info.message_metadata = Some(MessageMetadata::decode(buf).ok()?);
+            info.message_metadata = Box::new(Some(MessageMetadata::decode(buf).ok()?));
             let _payload = extra.get(10 + metadata_size..)?;
         }
         (info.trace_id, info.span_id) = info.parse_trace_span(param);
