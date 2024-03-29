@@ -12,23 +12,27 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq patch
 
 # 安装基础依赖#
-RUN  yum install curl devtoolset-11-gcc devtoolset-11-gdb devtoolset-11-gcc-c++ devtoolset-11-binutils devtoolset-11-gcc* openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git java-1.8.0-openjdk-devel dpdk dpdk-devel numactl numactl-devel numactl-libs protobuf-devel -y && \
-     echo "source /opt/rh/devtoolset-11/enable" >> /etc/profile && \
-     curl  https://sh.rustup.rs -so rustup.sh; bash rustup.sh -y
-RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version && \
-     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/indent --silent -o /usr/bin/indent && chmod a+x /usr/bin/indent
+RUN yum install curl devtoolset-11-gcc devtoolset-11-gdb devtoolset-11-gcc-c++ devtoolset-11-binutils devtoolset-11-gcc* openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git java-1.8.0-openjdk-devel dpdk dpdk-devel numactl numactl-devel numactl-libs -y && \
+    echo "source /opt/rh/devtoolset-11/enable" >> /etc/profile && \
+    curl  https://sh.rustup.rs -so rustup.sh; bash rustup.sh -y
+RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/indent --silent -o /usr/bin/indent && chmod a+x /usr/bin/indent
 
-RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
-     yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
-     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libdwarf-0.4.1-1.el7.x86_64.rpm --silent -O && \
-     yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
-     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
-     yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-*.rpm && \
-     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
-     yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
-     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libGoReSym-0.0.1-2.el7.x86_64.rpm --silent -O && \
-     yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
-     yum clean all
+RUN curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libdwarf-0.4.1-1.el7.x86_64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libGoReSym-0.0.1-2.el7.x86_64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-compiler-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/protobuf-devel-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./protobuf-*.rpm && rm -rf protobuf-*.rpm && \
+    yum clean all
 
 
 
