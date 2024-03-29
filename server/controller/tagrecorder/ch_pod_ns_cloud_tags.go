@@ -39,8 +39,9 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate) {
+func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
 		if err != nil {
@@ -51,14 +52,15 @@ func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodNSCloudTags
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]CloudTagsKey{{ID: sourceID}},
 				[]mysql.ChPodNSCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
 		}
 	}
 }
@@ -77,6 +79,6 @@ func (c *ChPodNSCloudTags) sourceToTarget(item *mysql.PodNamespace) (keys []Clou
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysql.ChPodNSCloudTags) {
+func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysql.ChPodNSCloudTags, db *mysql.DB) {
 
 }

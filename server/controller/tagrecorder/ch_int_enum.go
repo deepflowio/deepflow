@@ -39,7 +39,7 @@ func NewChIntEnum() *ChIntEnum {
 	return updater
 }
 
-func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) {
+func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysql.ChIntEnum, bool) {
 	sql := "show tag all_int_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"

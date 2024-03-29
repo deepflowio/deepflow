@@ -39,7 +39,7 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sEnvKey, 0)
 	targetsToAdd := make([]mysql.ChPodK8sEnv, 0)
 	keysToDelete := make([]K8sEnvKey, 0)
@@ -47,6 +47,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 	var chItem mysql.ChPodK8sEnv
 	var updateKey K8sEnvKey
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.ENV.IsDifferent() {
 		new := map[string]string{}
 		old := map[string]string{}
@@ -80,7 +81,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 				if oldV != v {
 					updateKey = K8sEnvKey{ID: sourceID, Key: k}
 					updateInfo[k] = v
-					mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
 						targetsToAdd = append(targetsToAdd, mysql.ChPodK8sEnv{
@@ -89,7 +90,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 							Value: v,
 						})
 					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey)
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
 					}
 				}
 			}
@@ -105,10 +106,10 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
@@ -135,6 +136,6 @@ func (c *ChPodK8sEnv) sourceToTarget(source *mysql.Pod) (keys []K8sEnvKey, targe
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) softDeletedTargetsUpdated(targets []mysql.ChPodK8sEnv) {
+func (c *ChPodK8sEnv) softDeletedTargetsUpdated(targets []mysql.ChPodK8sEnv, db *mysql.DB) {
 
 }

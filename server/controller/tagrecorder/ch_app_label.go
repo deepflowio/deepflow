@@ -37,18 +37,18 @@ func NewChAPPLabel() *ChAPPLabel {
 	return updater
 }
 
-func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLabel, bool) {
+func (l *ChAPPLabel) generateNewData(db *mysql.DB) (map[PrometheusAPPLabelKey]mysql.ChAPPLabel, bool) {
 	var prometheusLabels []mysql.PrometheusLabel
-	err := mysql.Db.Unscoped().Find(&prometheusLabels).Error
+	err := db.Unscoped().Find(&prometheusLabels).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
 	}
 
-	appLabelSlice, ok := l.generateAPPLabelData()
+	appLabelSlice, ok := l.generateAPPLabelData(db)
 
-	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData()
+	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData(db)
 	if !ok {
 		return nil, false
 	}
@@ -86,10 +86,10 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[
 	return nil, false
 }
 
-func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
+func (l *ChAPPLabel) generateAPPLabelData(db *mysql.DB) ([]string, bool) {
 	appLabelSlice := []string{}
 	var prometheusAPPMetricAPPLabelLayouts []mysql.ChPrometheusMetricAPPLabelLayout
-	err := mysql.Db.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
+	err := db.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
@@ -102,13 +102,13 @@ func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
 	return appLabelSlice, true
 }
 
-func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, bool) {
+func (l *ChAPPLabel) generateNameIDData(db *mysql.DB) (map[string]int, map[string]int, bool) {
 	labelNameIDMap := make(map[string]int)
 	valueNameIDMap := make(map[string]int)
 	var prometheusLabelNames []mysql.PrometheusLabelName
 	var prometheusLabelValues []mysql.PrometheusLabelValue
 
-	err := mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
+	err := db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))

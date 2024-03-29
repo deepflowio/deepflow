@@ -39,11 +39,12 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sLabelKey, 0)
 	targetsToAdd := make([]mysql.ChPodServiceK8sLabel, 0)
 	keysToDelete := make([]K8sLabelKey, 0)
 	targetsToDelete := make([]mysql.ChPodServiceK8sLabel, 0)
+
 	if fieldsUpdate.Label.IsDifferent() {
 		new := fieldsUpdate.Label.GetNew()
 		old := fieldsUpdate.Label.GetOld()
@@ -76,7 +77,7 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 					if oldV != v {
 						key := K8sLabelKey{ID: sourceID, Key: k}
 						var chItem mysql.ChPodServiceK8sLabel
-						mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+						db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 						if chItem.ID == 0 {
 							keysToAdd = append(keysToAdd, key)
 							targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sLabel{
@@ -85,7 +86,7 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 								Value: v,
 							})
 						} else {
-							c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key)
+							c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key, db)
 						}
 					}
 				}
@@ -102,10 +103,10 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
@@ -127,6 +128,6 @@ func (c *ChPodServiceK8sLabel) sourceToTarget(source *mysql.PodService) (keys []
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabel) {
+func (c *ChPodServiceK8sLabel) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabel, db *mysql.DB) {
 
 }

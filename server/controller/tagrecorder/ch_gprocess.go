@@ -62,8 +62,9 @@ func (c *ChGProcess) sourceToTarget(source *mysql.Process) (keys []IDKey, target
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate) {
+func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -75,14 +76,14 @@ func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChGProcess
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysql.ChGProcess) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysql.ChGProcess, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

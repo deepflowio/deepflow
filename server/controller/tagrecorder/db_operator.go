@@ -22,10 +22,10 @@ import (
 )
 
 type operator[MT MySQLChModel, KT ChModelKey] interface {
-	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT))
-	add(keys []KT, dbItems []MT)
-	update(oldDBItem MT, updateInfo map[string]interface{}, key KT)
-	delete(keys []KT, dbItems []MT)
+	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB), db *mysql.DB)
+	add(keys []KT, dbItems []MT, db *mysql.DB)
+	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB)
+	delete(keys []KT, dbItems []MT, db *mysql.DB)
 	setConfig(config.TagRecorderConfig)
 }
 
@@ -44,7 +44,7 @@ func (b *operatorComponent[MT, KT]) setConfig(cfg config.TagRecorderConfig) {
 	b.cfg = cfg
 }
 
-func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT)) {
+func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB), db *mysql.DB) {
 	count := len(items)
 	offset := b.cfg.MySQLBatchSize
 	var pages int
@@ -59,12 +59,12 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 		if end > count {
 			end = count
 		}
-		operateFunc(keys[start:end], items[start:end])
+		operateFunc(keys[start:end], items[start:end], db)
 	}
 }
 
-func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT) {
-	err := mysql.Db.Create(&dbItems).Error
+func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
+	err := db.Create(&dbItems).Error
 	if err != nil {
 		for i := range keys {
 			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error()) // TODO is key needed?
@@ -76,8 +76,8 @@ func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT) {
 	}
 }
 
-func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
-	err := mysql.Db.Model(&oldDBItem).Updates(updateInfo).Error
+func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) {
+	err := db.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error())
 		return
@@ -85,8 +85,8 @@ func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]i
 	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
 }
 
-func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT) {
-	err := mysql.Db.Delete(&dbItems).Error
+func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *mysql.DB) {
+	err := db.Delete(&dbItems).Error
 	if err != nil {
 		for i := range keys {
 			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
