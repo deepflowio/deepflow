@@ -57,8 +57,17 @@ func GetGNodeInfo() *node.NodeInfo {
 	return trisolaris.nodeInfo
 }
 
-func GetGKubernetesInfo() *kubernetes.KubernetesInfo {
-	return trisolaris.kubernetesInfo
+// TODO support org
+func TeamIDToTrisolaris(teamID string) *Trisolaris {
+	return trisolaris
+}
+
+func GetGKubernetesInfo(teamID string) *kubernetes.KubernetesInfo {
+	tri := TeamIDToTrisolaris(teamID)
+	if tri == nil {
+		return nil
+	}
+	return tri.kubernetesInfo
 }
 
 func GetConfig() *config.Config {
