@@ -237,19 +237,25 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		return model.DataSource{}, err
 	}
 
+	var errStrs []string
 	for _, analyzer := range analyzers {
-		if CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
+		if ingesterErr := CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port); ingesterErr != nil {
+			errStr := fmt.Sprintf(
+				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName,
 			)
-			log.Error(errMsg)
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
-			break
+			errStrs = append(errStrs, errStr)
+			continue
 		}
 		log.Infof(
 			"config analyzer (%s) add data_source (%s) complete",
 			analyzer.IP, dataSource.DisplayName,
 		)
+	}
+	if len(errStrs) > 0 {
+		errMsg := strings.Join(errStrs, ".") + "."
+		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		log.Error(errMsg)
 	}
 
 	if err != nil {
@@ -292,17 +298,21 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	var err error
 	var errAnalyzerIP string
+	var errs []error
 	for _, analyzer := range analyzers {
 		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
 		if err != nil {
-			errAnalyzerIP = analyzer.IP
-			break
+			errs = append(errs, fmt.Errorf(
+				"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, err,
+			))
+			continue
 		}
 		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
 			analyzer.IP, dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
 
-	if err == nil {
+	if len(errs) == 0 {
 		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
 		if err := mysql.Db.Save(&dataSource).Error; err != nil {
 			return model.DataSource{}, err
@@ -310,20 +320,31 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
-	if errors.Is(err, httpcommon.ErrorFail) {
-		if err := mysql.Db.Model(&dataSource).Updates(
-			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		).Error; err != nil {
-			return model.DataSource{}, err
-		}
-		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.DisplayName)
-		log.Error(errMsg)
-		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+	var errStrs []string
+	for _, e := range errs {
+		errStrs = append(errStrs, e.Error())
 	}
-	if errors.Is(err, httpcommon.ErrorPending) {
-		warnMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.DisplayName)
-		log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
-		err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
+	errMsg := strings.Join(errStrs, ".") + "."
+
+	for _, e := range errs {
+		if errors.Is(e, httpcommon.ErrorFail) {
+			if err := mysql.Db.Model(&dataSource).Updates(
+				map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
+			).Error; err != nil {
+				return model.DataSource{}, err
+			}
+			err = NewError(httpcommon.SERVER_ERROR, errMsg)
+			break
+		}
+	}
+
+	for _, e := range errs {
+		if errors.Is(e, httpcommon.ErrorPending) {
+			warnMsg := fmt.Sprintf("config analyzer (name: %s, ip:%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.DisplayName)
+			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
+			err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
+			break
+		}
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
@@ -366,14 +387,15 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 		return nil, err
 	}
 
+	var errStrs []string
 	for _, analyzer := range analyzers {
 		if CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
+			errStr := fmt.Sprintf(
+				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName,
 			)
-			log.Error(errMsg)
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
-			break
+			errStrs = append(errStrs, errStr)
+			continue
 		}
 		log.Infof(
 			"config analyzer (%s) del data_source (%s) complete",
@@ -381,15 +403,20 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 		)
 	}
 
-	if err != nil {
+	if len(errStrs) > 0 {
 		if err := mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return nil, err
 		}
 	}
-	if err := mysql.Db.Delete(&dataSource).Error; err != nil {
-		return nil, err
+	if len(errStrs) > 0 {
+		errMsg := strings.Join(errStrs, ".") + "."
+		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		log.Error(errMsg)
+	}
+	if e := mysql.Db.Delete(&dataSource).Error; e != nil {
+		return nil, e
 	}
 
 	return map[string]string{"LCUUID": lcuuid}, err
