@@ -273,8 +273,11 @@ impl Collector {
     }
 
     pub fn set_hostname(&self, hostname: String) {
-        info!("set stats hostname to {:?}", hostname);
-        *self.hostname.lock().unwrap() = hostname;
+        let mut last = self.hostname.lock().unwrap();
+        if *last != hostname {
+            info!("set stats hostname to {:?}", hostname);
+            *last = hostname;
+        }
     }
 
     pub fn set_min_interval(&self, interval: Duration) {
