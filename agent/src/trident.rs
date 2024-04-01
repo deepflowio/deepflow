@@ -693,7 +693,7 @@ impl Trident {
                     }
                     if let Some(c) = config.take() {
                         let agent_id = synchronizer.agent_id.read().clone();
-                        config_handler.on_config(
+                        let callbacks = config_handler.on_config(
                             c,
                             &exception_handler,
                             None,
@@ -713,6 +713,22 @@ impl Trident {
                             api_watcher.start();
                         } else {
                             api_watcher.stop();
+                        }
+
+                        if let Some(Components::Agent(c)) = components.as_mut() {
+                            for callback in callbacks {
+                                callback(&config_handler, c);
+                            }
+
+                            for listener in c.dispatcher_listeners.iter_mut() {
+                                listener
+                                    .on_config_change(&config_handler.candidate_config.dispatcher);
+                            }
+                        } else {
+                            stats_collector
+                                .set_hostname(config_handler.candidate_config.stats.host.clone());
+                            stats_collector
+                                .set_min_interval(config_handler.candidate_config.stats.interval);
                         }
                     }
                     state_guard = cond.wait(state_guard).unwrap();
