@@ -3092,8 +3092,14 @@ check:
 	      handshake.content_type == 0x14 || handshake.content_type == 0x15))
 		return MSG_UNKNOWN;
 
-	/* version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2 */
-	if (!(handshake.version == 0x301 || handshake.version == 0x303))
+	/* 
+	 * version check:
+	 *   0x0301 for TLS 1.0;
+	 *   0x0302 for TLS 1.1;
+	 *   0x0303 for TLS 1.2;
+	 *   0x0304 for TLS 1.3;
+	 */
+	if (!(handshake.version >= 0x301 && handshake.version <= 0x304))
 		return MSG_UNKNOWN;
 
 	/*
