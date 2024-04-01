@@ -17,7 +17,7 @@ CLANG ?= /usr/bin/clang
 LLVM_STRIP ?= /usr/bin/llvm-strip
 LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
 CC ?= gcc
-TAEGET_KERN_SRC = socket_trace.c perf_profiler.c
+TAEGET_KERN_SRC = socket_trace.bpf.c perf_profiler.bpf.c
 TAEGET_KERN_LL = $(TAEGET_KERN_SRC:c=ll)
 TAEGET_KERN_ELF = $(TAEGET_KERN_SRC:c=elf)
 ifeq ($(V),1)

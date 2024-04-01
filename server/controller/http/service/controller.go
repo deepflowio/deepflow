@@ -31,7 +31,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 )
 
-func GetControllers(filter map[string]string) (resp []model.Controller, err error) {
+func GetControllers(orgID int, filter map[string]string) (resp []model.Controller, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var response []model.Controller
 	var controllers []mysql.Controller
 	var regions []mysql.Region
@@ -39,7 +44,6 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	var azControllerconns []mysql.AZControllerConnection
 	var vtaps []mysql.VTap
 
-	db := mysql.Db
 	analyzerName, analyzerNameOK := filter["analyzer_name"]
 	analyzerIP, analyzerIpOK := filter["analyzer_ip"]
 	if lcuuid, ok := filter["lcuuid"]; ok {
@@ -51,41 +55,41 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	} else if analyzerNameOK || analyzerIpOK {
 		analyzer := mysql.Analyzer{}
 		if analyzerNameOK {
-			mysql.Db.Where("name = ?", analyzerName).First(&analyzer)
-			if ret := mysql.Db.Where("name = ?", analyzerName).First(&analyzer); ret.Error != nil {
+			db.Where("name = ?", analyzerName).First(&analyzer)
+			if ret := db.Where("name = ?", analyzerName).First(&analyzer); ret.Error != nil {
 				return []model.Controller{}, nil
 			}
 		} else {
-			mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer)
-			if ret := mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer); ret.Error != nil {
+			db.Where("ip = ?", analyzerIP).First(&analyzer)
+			if ret := db.Where("ip = ?", analyzerIP).First(&analyzer); ret.Error != nil {
 				return []model.Controller{}, nil
 			}
 		}
 		azAnalyzerConns := []mysql.AZAnalyzerConnection{}
-		mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
+		db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
 		region := ""
 		if len(azAnalyzerConns) > 0 {
 			region = azAnalyzerConns[0].Region
 		}
 		azConns := []mysql.AZControllerConnection{}
 		ips := []string{}
-		mysql.Db.Where("region = ?", region).Find(&azConns)
+		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
 			ips = append(ips, conn.ControllerIP)
 		}
 		db = db.Where("ip IN (?)", ips)
 	} else if vtapName, ok := filter["vtap_name"]; ok {
 		vtap := mysql.VTap{}
-		if ret := mysql.Db.Where("name = ?", vtapName).First(&vtap); ret.Error != nil {
+		if ret := db.Where("name = ?", vtapName).First(&vtap); ret.Error != nil {
 			return []model.Controller{}, nil
 		}
 		az := mysql.AZ{}
-		if ret := mysql.Db.Where("lcuuid = ?", vtap.AZ).First(&az); ret.Error != nil {
+		if ret := db.Where("lcuuid = ?", vtap.AZ).First(&az); ret.Error != nil {
 			return []model.Controller{}, nil
 		}
 		azConns := []mysql.AZControllerConnection{}
 		ips := []string{}
-		mysql.Db.Where("region = ?", az.Region).Find(&azConns)
+		db.Where("region = ?", az.Region).Find(&azConns)
 		for _, conn := range azConns {
 			ips = append(ips, conn.ControllerIP)
 		}
@@ -93,17 +97,17 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	} else if region, ok := filter["region"]; ok {
 		azConns := []mysql.AZControllerConnection{}
 		ips := []string{}
-		mysql.Db.Where("region = ?", region).Find(&azConns)
+		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
 			ips = append(ips, conn.ControllerIP)
 		}
 		db = db.Where("ip IN (?)", ips)
 	}
 	db.Find(&controllers)
-	mysql.Db.Find(&regions)
-	mysql.Db.Find(&azs)
-	mysql.Db.Find(&azControllerconns)
-	mysql.Db.Find(&vtaps)
+	db.Find(&regions)
+	db.Find(&azs)
+	db.Find(&azControllerconns)
+	db.Find(&vtaps)
 
 	lcuuidToRegion := make(map[string]*mysql.Region)
 	for i, region := range regions {
@@ -211,19 +215,24 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 }
 
 func UpdateController(
-	lcuuid string, controllerUpdate map[string]interface{}, m *monitor.ControllerCheck,
-	cfg *config.ControllerConfig,
+	orgID int, lcuuid string, controllerUpdate map[string]interface{},
+	m *monitor.ControllerCheck, cfg *config.ControllerConfig,
 ) (resp *model.Controller, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var controller mysql.Controller
 	var dbUpdateMap = make(map[string]interface{})
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
 		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate)
 
-	tx := mysql.Db.Begin()
+	tx := db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
@@ -446,27 +455,33 @@ func UpdateController(
 		tx.Rollback()
 		return nil, err
 	}
-	response, _ := GetControllers(map[string]string{"lcuuid": lcuuid})
+
+	response, _ := GetControllers(orgID, map[string]string{"lcuuid": lcuuid})
 	return &response[0], nil
 }
 
-func DeleteController(lcuuid string, m *monitor.ControllerCheck) (resp map[string]string, err error) {
+func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (resp map[string]string, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var controller mysql.Controller
 	var vtapCount int64
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete controller (%s)", controller.Name)
 
-	mysql.Db.Where("controller_ip = ?", controller.IP).Count(&vtapCount)
+	db.Where("controller_ip = ?", controller.IP).Count(&vtapCount)
 	if vtapCount > 0 {
 		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
 	}
 
-	mysql.Db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", controller.IP)
-	mysql.Db.Delete(&controller)
+	db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", controller.IP)
+	db.Delete(&controller)
 
 	// 触发对应的采集器重新分配控制器
 	m.TriggerReallocController(controller.IP)

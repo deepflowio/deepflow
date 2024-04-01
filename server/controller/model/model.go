@@ -300,6 +300,7 @@ type Domain struct {
 	VTapCtrlIP     string                 `json:"VTAP_CTRL_IP"`
 	VTapCtrlMAC    string                 `json:"VTAP_CTRL_MAC"`
 	IconID         int                    `json:"ICON_ID"`
+	TeamID         int                    `json:"TEAM_ID"`
 	K8sEnabled     int                    `json:"K8S_ENABLED"`
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`
@@ -313,6 +314,7 @@ type Domain struct {
 type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
+	TeamID              int                    `json:"TEAM_ID"`
 	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
@@ -323,6 +325,7 @@ type DomainUpdate struct {
 	Name         string                 `json:"NAME"`
 	Enabled      int                    `json:"ENABLED"`
 	IconID       int                    `json:"ICON_ID"`
+	TeamID       int                    `json:"TEAM_ID"`
 	ControllerIP string                 `json:"CONTROLLER_IP"`
 	Config       map[string]interface{} `json:"CONFIG"`
 }
@@ -470,6 +473,7 @@ type VTapGroupConfiguration struct {
 	MaxCPUs                           *int          `json:"MAX_CPUS" yaml:"max_cpus,omitempty"`
 	MaxMemory                         *int          `json:"MAX_MEMORY" yaml:"max_memory,omitempty"` // unit: M
 	SyncInterval                      *int          `json:"SYNC_INTERVAL" yaml:"sync_interval,omitempty"`
+	PlatformSyncInterval              *int          `json:"PLATFORM_SYNC_INTERVAL" yaml:"platform_sync_interval,omitempty"`
 	StatsInterval                     *int          `json:"STATS_INTERVAL" yaml:"stats_interval,omitempty"`
 	RsyslogEnabled                    *int          `json:"RSYSLOG_ENABLED" yaml:"rsyslog_enabled,omitempty"` // 0: disabled 1:enabled
 	SystemLoadCircuitBreakerThreshold *float32      `json:"SYSTEM_LOAD_CIRCUIT_BREAKER_THRESHOLD" yaml:"system_load_circuit_breaker_threshold,omitempty"`
@@ -557,6 +561,7 @@ type VTapGroupConfigurationResponse struct {
 	MaxCPUs                           *int           `json:"MAX_CPUS"`
 	MaxMemory                         *int           `json:"MAX_MEMORY"` // unit: M
 	SyncInterval                      *int           `json:"SYNC_INTERVAL"`
+	PlatformSyncInterval              *int           `json:"PLATFORM_SYNC_INTERVAL"`
 	StatsInterval                     *int           `json:"STATS_INTERVAL"`
 	RsyslogEnabled                    *int           `json:"RSYSLOG_ENABLED"` // 0: disabled 1:enabled
 	SystemLoadCircuitBreakerThreshold *float32       `json:"SYSTEM_LOAD_CIRCUIT_BREAKER_THRESHOLD"`

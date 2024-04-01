@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/message/trident"
@@ -776,7 +775,7 @@ func getSortKey(vtapIDToPolicy map[int]*Policy) []int {
 
 func (op *PolicyDataOP) checkNewPolicies(vtapIDToPolicy map[int]*Policy,
 	allVTapSharePolicy *Policy, dropletPolicy *Policy) {
-	version := uint64(time.Now().Unix())
+	version := uint64(op.metaData.GetStartTime())
 	allVTapSharePolicy.toSerializeString()
 	dropletPolicy.toSerializeString()
 	vtapIDs := getSortKey(vtapIDToPolicy)

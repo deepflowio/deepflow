@@ -336,7 +336,7 @@ static __inline struct member_fields_offset *retrieve_ready_kern_offset(void)
 	return offset;
 }
 
-#include "uprobe_base_bpf.c"
+#include "uprobe_base.bpf.c"
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
@@ -2669,6 +2669,6 @@ PROGTP(io_event) (void *ctx) {
 }
 
 //Refer to the eBPF programs here
-#include "go_tls_bpf.c"
-#include "go_http2_bpf.c"
-#include "openssl_bpf.c"
+#include "go_tls.bpf.c"
+#include "go_http2.bpf.c"
+#include "openssl.bpf.c"

@@ -76,3 +76,8 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(item *mysql.PodService) (key
 		Annotations: common.StrToJsonstr(item.Annotation),
 	}}
 }
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sAnnotations) {
+
+}

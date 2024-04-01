@@ -192,7 +192,7 @@ func (t *SuiteTest) TestDeleteDomain() {
 	r = t.db.Create(&mysql.Pod{Base: mysql.Base{Lcuuid: uuid.NewString()}, Domain: domain.Lcuuid})
 	assert.Equal(t.T(), r.RowsAffected, int64(1))
 
-	DeleteDomain(domain.Lcuuid)
+	DeleteDomainByNameOrUUID(domain.Lcuuid)
 
 	var azs []mysql.AZ
 	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&azs)

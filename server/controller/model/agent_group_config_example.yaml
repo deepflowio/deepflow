@@ -179,6 +179,12 @@ vtap_group_id: g-xxxxxx
 ##   tag information from deepflow-server.
 #sync_interval: 60
 
+## Platform Sync Interval 
+## Unit: second. Default: 10. Range: [10, 3600]
+## Note: The interval at which deepflow-agent actively reports resource information 
+##   to deepflow-server.
+#platform_sync_interval: 10
+
 ## Maximum Escape Time
 ## Unit: seconds. Default: 3600. Range: [600, 2592000]
 ## Note: The maximum time that the agent is allowed to work normally when it
@@ -890,7 +896,7 @@ vtap_group_id: g-xxxxxx
   ## Note: The DPDK RecvEngine is only started when this configuration item is turned on.
   ##   Note that you also need to set tap_mode to 1. Please refer to
   ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
-  #dpdk_enabled: false
+  #dpdk-enabled: false
 
   ########################
   ## Libpcap RecvEngine ##
@@ -999,6 +1005,7 @@ vtap_group_id: g-xxxxxx
   #- HTTP2 ## for both HTTP2 and gRPC
   #- SofaRPC
   #- FastCGI
+  #- bRPC
   #- Dubbo
   #- MySQL
   #- PostgreSQL

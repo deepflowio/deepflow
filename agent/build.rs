@@ -200,10 +200,31 @@ fn make_pulsar_proto() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn make_brpc_proto() -> Result<(), Box<dyn Error>> {
+    tonic_build::configure()
+        .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
+        .build_server(false)
+        .out_dir("src/flow_generator/protocol_logs/rpc/brpc")
+        .compile(
+            &["src/flow_generator/protocol_logs/rpc/brpc/baidu_rpc_meta.proto"],
+            &["src/flow_generator/protocol_logs/rpc"],
+        )?;
+
+    Command::new("cargo")
+        .args([
+            "fmt",
+            "--",
+            "src/flow_generator/protocol_logs/rpc/brpc.proto.rs",
+        ])
+        .spawn()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     set_build_info()?;
     compile_wasm_plugin_proto()?;
     make_pulsar_proto()?;
+    make_brpc_proto()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     if target_os.as_str() == "linux" {
         set_build_libtrace()?;

@@ -1260,7 +1260,7 @@ pub struct RuntimeConfig {
     #[serde(deserialize_with = "bool_from_int")]
     pub external_agent_http_proxy_enabled: bool,
     pub external_agent_http_proxy_port: u16,
-    #[serde(skip)]
+    #[serde(deserialize_with = "to_tap_mode")]
     pub tap_mode: TapMode,
     pub prometheus_http_api_addresses: Vec<String>,
     #[serde(skip)]
@@ -1708,6 +1708,21 @@ where
         0 => Ok(trident::VlanMode::None),
         1 => Ok(trident::VlanMode::Qinq),
         2 => Ok(trident::VlanMode::Vlan),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_tap_mode<'de, D>(deserializer: D) -> Result<TapMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(TapMode::Local),
+        1 => Ok(TapMode::Mirror),
+        2 => Ok(TapMode::Analyzer),
         other => Err(de::Error::invalid_value(
             Unexpected::Unsigned(other as u64),
             &"0|1|2",

@@ -88,12 +88,12 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			continue
 		}
 		vtapNameToID := make(map[string]int, len(azVTaps))
-		vtapIDToName := make(map[int]string, len(azVTaps))
+		vTapIDToVTap := make(map[int]*mysql.VTap, len(azVTaps))
 		vTapIDToTraffic := make(map[int]int64)
 		for _, vtap := range azVTaps {
 			vtapNameToID[vtap.Name] = vtap.ID
-			vtapIDToName[vtap.ID] = vtap.Name
 			vTapIDToTraffic[vtap.ID] = 0
+			vTapIDToVTap[vtap.ID] = vtap
 		}
 		for vtapName, traffic := range r.regionToVTapNameToTraffic[az.Region] {
 			vtapID, ok := vtapNameToID[vtapName]
@@ -126,7 +126,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 		}
 
 		// update counter
-		updateCounter(vtapIDToName, vTapIDToChangeInfo)
+		updateCounter(vTapIDToVTap, vtapNameToID, vTapIDToChangeInfo)
 	}
 	if response.TotalSwitchVTapNum != 0 {
 		log.Infof("vtap rebalance result switch_total_num(%v)", response.TotalSwitchVTapNum)
@@ -515,11 +515,34 @@ func parseBody(data []byte) (map[string]int64, error) {
 	return vtapNameToTraffic, nil
 }
 
-func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*ChangeInfo) {
-	for vtapID, changeInfo := range vtapIDToChangeInfo {
-		name, ok := vtapIDToName[vtapID]
+func updateCounter(vtapIDToVTap map[int]*mysql.VTap, vtapNameToID map[string]int, vtapIDToChangeInfo map[int]*ChangeInfo) {
+	setNullFunc := func(name string, vtapNameToCounter map[string]*statsd.GetVTapWeightCounter) {
+		if _, ok := statsd.VTapNameToCounter[name]; ok {
+			statsd.VTapNameToCounter[name].VTapWeightCounter = &statsd.VTapWeightCounter{}
+		}
+	}
+
+	for name := range statsd.VTapNameToCounter {
+		vtapID, ok := vtapNameToID[name]
 		if !ok {
-			log.Info("vtap(%d) not found", vtapID)
+			setNullFunc(name, statsd.VTapNameToCounter)
+			continue
+		}
+		if vtap, ok := vtapIDToVTap[vtapID]; ok && vtap.State != common.VTAP_STATE_NORMAL {
+			setNullFunc(name, statsd.VTapNameToCounter)
+			continue
+		}
+	}
+
+	for vtapID, changeInfo := range vtapIDToChangeInfo {
+		vtap, ok := vtapIDToVTap[vtapID]
+		if !ok {
+			log.Info("vtap(%d) not found, change info: %#v", vtapID, changeInfo)
+			continue
+		}
+		name := vtap.Name
+		if vtap.State != common.VTAP_STATE_NORMAL {
+			setNullFunc(name, statsd.VTapNameToCounter)
 			continue
 		}
 
@@ -549,6 +572,5 @@ func updateCounter(vtapIDToName map[int]string, vtapIDToChangeInfo map[int]*Chan
 			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
 			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
 		}
-
 	}
 }

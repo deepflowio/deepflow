@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -50,14 +51,18 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"网络-网络策略",       // flow_metrics.traffic_policy
 }
 
-func GetDataSources(filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
+func GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var response []model.DataSource
 	var dataSources []mysql.DataSource
 	var baseDataSources []mysql.DataSource
 
-	Db := mysql.Db
 	if _, ok := filter["lcuuid"]; ok {
-		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
+		db = db.Where("lcuuid = ?", filter["lcuuid"])
 	}
 	if t, ok := filter["type"]; ok {
 		var collection string
@@ -78,19 +83,19 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 			return nil, fmt.Errorf("not support type(%s)", t)
 		}
 
-		Db = Db.Where("data_table_collection = ?", collection)
+		db = db.Where("data_table_collection = ?", collection)
 	}
 	if name, ok := filter["name"]; ok {
 		interval := convertNameToInterval(name.(string))
 		if interval != 0 {
-			Db = Db.Where("`interval` = ?", interval)
+			db = db.Where("`interval` = ?", interval)
 		}
 	}
-	if err := Db.Find(&dataSources).Error; err != nil {
+	if err := db.Find(&dataSources).Error; err != nil {
 		return nil, err
 	}
 
-	if err := mysql.Db.Find(&baseDataSources).Error; err != nil {
+	if err := db.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
 	idToDisplayName := make(map[int]string)
@@ -146,13 +151,17 @@ func GetDataSources(filter map[string]interface{}, specCfg *config.Specification
 	return response, nil
 }
 
-func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return model.DataSource{}, err
+	}
+	db := dbInfo.DB
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
 	var dataSourceCount int64
-	var err error
 
-	if ret := mysql.Db.Where(
+	if ret := db.Where(
 		map[string]interface{}{
 			"data_table_collection": dataSourceCreate.DataTableCollection,
 			"interval":              dataSourceCreate.Interval,
@@ -172,7 +181,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	if err := mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
+	if err := db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
 		return model.DataSource{}, err
 	}
 	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
@@ -182,7 +191,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		)
 	}
 
-	if ret := mysql.Db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
+	if ret := db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
 			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("base data_source (%d) not exist", dataSourceCreate.BaseDataSourceID),
@@ -227,18 +236,18 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	dataSource.RetentionTime = dataSourceCreate.RetentionTime
 	dataSource.SummableMetricsOperator = dataSourceCreate.SummableMetricsOperator
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
-	if err := mysql.Db.Create(&dataSource).Error; err != nil {
+	if err := db.Create(&dataSource).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
 	for _, analyzer := range analyzers {
-		if CallIngesterAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port) != nil {
+		if CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
 			)
@@ -253,20 +262,25 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	}
 
 	if err != nil {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return model.DataSource{}, err
 		}
 	}
 
-	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
+	response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 
-func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return model.DataSource{}, err
+	}
+	db := dbInfo.DB
 	var dataSource mysql.DataSource
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
@@ -286,14 +300,13 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
-	var err error
 	var errAnalyzerIP string
 	for _, analyzer := range analyzers {
-		err = CallIngesterAPIModRP(analyzer.IP, dataSource, cfg.IngesterApi.Port)
+		err = CallIngesterAPIModRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port)
 		if err != nil {
 			errAnalyzerIP = analyzer.IP
 			break
@@ -304,14 +317,14 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	if err == nil {
 		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
-		if err := mysql.Db.Save(&dataSource).Error; err != nil {
+		if err := db.Save(&dataSource).Error; err != nil {
 			return model.DataSource{}, err
 		}
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
 	if errors.Is(err, httpcommon.ErrorFail) {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return model.DataSource{}, err
@@ -326,16 +339,20 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
 	}
 
-	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
+	response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 
-func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]string, error) {
+func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (map[string]string, error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
-	var err error
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return map[string]string{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
@@ -351,7 +368,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	}
 
 	// 被其他数据源引用的数据源禁止删除
-	if ret := mysql.Db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
+	if ret := db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
 		return map[string]string{}, NewError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source (%s) is used by other data_source", dataSource.DisplayName),
@@ -362,12 +379,12 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
-	if err := mysql.Db.Find(&analyzers).Error; err != nil {
+	if err := db.Find(&analyzers).Error; err != nil {
 		return nil, err
 	}
 
 	for _, analyzer := range analyzers {
-		if CallIngesterAPIDelRP(analyzer.IP, dataSource, cfg.IngesterApi.Port) != nil {
+		if CallIngesterAPIDelRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
 			)
@@ -382,20 +399,20 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	}
 
 	if err != nil {
-		if err := mysql.Db.Model(&dataSource).Updates(
+		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return nil, err
 		}
 	}
-	if err := mysql.Db.Delete(&dataSource).Error; err != nil {
+	if err := db.Delete(&dataSource).Error; err != nil {
 		return nil, err
 	}
 
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func CallIngesterAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ingesterApiPort int) error {
+func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql.DataSource, ingesterApiPort int) error {
 	var name, baseName string
 	var err error
 	if name, err = getName(dataSource.Interval, dataSource.DataTableCollection); err != nil {
@@ -405,48 +422,51 @@ func CallIngesterAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource
 		return err
 	}
 	body := map[string]interface{}{
-		"name":                  name,
-		"db":                    getTableName(dataSource.DataTableCollection),
-		"base-rp":               baseName,
-		"summable-metrics-op":   strings.ToLower(dataSource.SummableMetricsOperator),
-		"unsummable-metrics-op": strings.ToLower(dataSource.UnSummableMetricsOperator),
-		"interval":              dataSource.Interval / common.INTERVAL_1MINUTE,
-		"retention-time":        dataSource.RetentionTime,
+		common.INGESTER_BODY_ORG_ID: orgID,
+		"name":                      name,
+		"db":                        getTableName(dataSource.DataTableCollection),
+		"base-rp":                   baseName,
+		"summable-metrics-op":       strings.ToLower(dataSource.SummableMetricsOperator),
+		"unsummable-metrics-op":     strings.ToLower(dataSource.UnSummableMetricsOperator),
+		"interval":                  dataSource.Interval / common.INTERVAL_1MINUTE,
+		"retention-time":            dataSource.RetentionTime,
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
-	_, err = common.CURLPerform("POST", url, body)
+	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	return err
 }
 
-func CallIngesterAPIModRP(ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
+func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
 	}
 	body := map[string]interface{}{
-		"name":           name,
-		"db":             getTableName(dataSource.DataTableCollection),
-		"retention-time": dataSource.RetentionTime,
+		common.INGESTER_BODY_ORG_ID: orgID,
+		"name":                      name,
+		"db":                        getTableName(dataSource.DataTableCollection),
+		"retention-time":            dataSource.RetentionTime,
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
-	_, err = common.CURLPerform("PATCH", url, body)
+	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	return err
 }
 
-func CallIngesterAPIDelRP(ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
+func CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
 	}
 	body := map[string]interface{}{
-		"name": name,
-		"db":   getTableName(dataSource.DataTableCollection),
+		common.INGESTER_BODY_ORG_ID: orgID,
+		"name":                      name,
+		"db":                        getTableName(dataSource.DataTableCollection),
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
-	_, err = common.CURLPerform("DELETE", url, body)
+	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	return err
 }
 
@@ -500,6 +520,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
+	// TODO(weiqiang): add org to register analyzer
 	if err := mysql.Db.Find(&dataSources).Error; err != nil {
 		return err
 	}
@@ -514,7 +535,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 		sort.Strings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES)
 		index := sort.SearchStrings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName)
 		if index < len(DEFAULT_DATA_SOURCE_DISPLAY_NAMES) && DEFAULT_DATA_SOURCE_DISPLAY_NAMES[index] == dataSource.DisplayName {
-			if CallIngesterAPIModRP(ip, dataSource, common.INGESTER_API_PORT) != nil {
+			if CallIngesterAPIModRP(common.DEFAULT_ORG_ID, ip, dataSource, common.INGESTER_API_PORT) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.DisplayName,
 				)
@@ -530,7 +551,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
-			if CallIngesterAPIAddRP(ip, dataSource, baseDataSource, common.INGESTER_API_PORT) != nil {
+			if CallIngesterAPIAddRP(common.DEFAULT_ORG_ID, ip, dataSource, baseDataSource, common.INGESTER_API_PORT) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.DisplayName,
 				)

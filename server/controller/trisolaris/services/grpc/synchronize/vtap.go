@@ -116,6 +116,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
 		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
 		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
 		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
@@ -491,6 +492,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
 		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
 		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
 		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
@@ -675,16 +677,17 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	pushVersionGroups := vtapCache.GetPushVersionGroups()
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
+	newAcls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
 		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, "+
 			"(platform data version  %d -> %d), "+
-			"(acls version %d -> %d), "+
+			"(acls version %d -> %d datalen: %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac,
 			versionPlatformData, pushVersionPlatformData,
-			versionPolicy, pushVersionPolicy,
+			versionPolicy, pushVersionPolicy, len(newAcls),
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
@@ -709,7 +712,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		groups = gVTapInfo.GetGroupData()
 	}
 	acls := []byte{}
-	if versionPolicy != in.GetVersionAcls() {
+	if versionPolicy != pushVersionPolicy {
 		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	}
 

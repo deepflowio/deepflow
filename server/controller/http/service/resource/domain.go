@@ -156,6 +156,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			ErrorMsg:     domain.ErrorMsg,
 			ControllerIP: domain.ControllerIP,
 			IconID:       domain.IconID, // 后续与前端沟通icon作为默认配置
+			TeamID:       domain.TeamID,
 			CreatedAt:    domain.CreatedAt.Format(common.GO_BIRTHDAY),
 			SyncedAt:     syncedAt,
 			Lcuuid:       domain.Lcuuid,
@@ -251,6 +252,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
+	domain.TeamID = domainCreate.TeamID
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
@@ -379,6 +381,11 @@ func UpdateDomain(
 	// 禁用/启用
 	if _, ok := domainUpdate["ENABLED"]; ok {
 		dbUpdateMap["enabled"] = domainUpdate["ENABLED"]
+	}
+
+	// update team
+	if _, ok := domainUpdate["TEAM_ID"]; ok {
+		dbUpdateMap["team_id"] = domainUpdate["TEAM_ID"]
 	}
 
 	// 图标

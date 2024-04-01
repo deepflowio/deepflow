@@ -2,7 +2,6 @@
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
 CREATE PROCEDURE AddColumnIfNotExists(
-    IN dbName VARCHAR(255),
     IN tableName VARCHAR(255),
     IN colName VARCHAR(255),
     IN colType VARCHAR(255)
@@ -14,8 +13,7 @@ BEGIN
     SELECT COUNT(*)
     INTO column_count
     FROM information_schema.columns
-    WHERE table_schema = dbName
-    AND table_name = tableName
+    WHERE table_name = tableName
     AND column_name = colName;
 
     -- 如果列不存在，则添加列
@@ -27,9 +25,9 @@ BEGIN
     END IF;
 END;
 
-CALL AddColumnIfNotExists('deepflow', 'vtap_group_configuration', 'system_load_circuit_breaker_threshold', 'float(8,2)');
-CALL AddColumnIfNotExists('deepflow', 'vtap_group_configuration', 'system_load_circuit_breaker_recover', 'float(8,2)');
-CALL AddColumnIfNotExists('deepflow', 'vtap_group_configuration', 'system_load_circuit_breaker_metric', 'CHAR(64)');
+CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_threshold', 'float(8,2)');
+CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_recover', 'float(8,2)');
+CALL AddColumnIfNotExists('vtap_group_configuration', 'system_load_circuit_breaker_metric', 'CHAR(64)');
 
 DROP PROCEDURE AddColumnIfNotExists;
 

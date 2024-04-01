@@ -23,6 +23,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table"
@@ -39,10 +40,29 @@ var log = logging.MustGetLogger("db.mysql.migrator")
 //
 //	and upgrade based the result.
 func MigrateMySQL(cfg config.MySqlConfig) error {
-	if databaseExisted, err := CreateDatabase(cfg); err != nil {
+	databaseExisted, err := CreateDatabase(cfg)
+	if err != nil {
 		return err
-	} else if databaseExisted {
-		return table.UpgradeDatabase(cfg)
+	}
+
+	if databaseExisted {
+		if err = table.UpgradeDatabase(cfg); err != nil {
+			return errors.New(fmt.Sprintf("org id: %d, %s", mysqlcommon.DEFAULT_ORG_ID, err.Error()))
+		}
+
+		// TODO
+		// orgIDs, err := mysql.GetORGIDs()
+		// if err != nil {
+		// 	return err
+		// }
+		// for _, orgID := range orgIDs {
+		// 	if orgID == mysqlcommon.DEFAULT_ORG_ID {
+		// 		continue
+		// 	}
+		// 	if err = table.UpgradeDatabase(mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)); err != nil {
+		// 		return errors.New(fmt.Sprintf("org id: %d, %s", orgID, err.Error()))
+		// 	}
+		// }
 	}
 	return nil
 }

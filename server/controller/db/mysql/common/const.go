@@ -22,5 +22,6 @@ const (
 )
 
 const (
-	DEFAULT_ORG_ID = 1
+	DEFAULT_ORG_ID  = 1
+	DEFAULT_TEAM_ID = 1
 )

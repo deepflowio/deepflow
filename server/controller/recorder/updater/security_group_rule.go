@@ -92,6 +92,7 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 		Local:           cloudItem.Local,
 		Remote:          cloudItem.Remote,
 		Action:          cloudItem.Action,
+		Domain:          r.cache.DomainLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
