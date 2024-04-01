@@ -17,9 +17,6 @@
 package migrator
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -39,59 +36,72 @@ var log = logging.MustGetLogger("db.mysql.migrator")
 // if configured database exists, and db_version table exists, check whether db_version is the latest version
 //
 //	and upgrade based the result.
-func MigrateMySQL(cfg config.MySqlConfig) error {
-	databaseExisted, err := CreateDatabase(cfg)
+func Migrate(cfg config.MySqlConfig) error {
+	if err := migrateDatabase(cfg, mysqlcommon.DEFAULT_ORG_ID); err != nil {
+		return err
+	}
+	if err := mysql.InitDefaultDB(cfg); err != nil {
+		return err
+	}
+	orgIDs, err := mysql.GetNonDefaultORGIDs()
+	if err != nil {
+		return err
+	}
+	for _, orgID := range orgIDs {
+		if err = migrateDatabase(cfg, orgID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateDatabase(cfg config.MySqlConfig, orgID int) error {
+	var copiedCfg config.MySqlConfig
+	if orgID == mysqlcommon.DEFAULT_ORG_ID {
+		copiedCfg = cfg
+	} else {
+		copiedCfg = mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)
+	}
+
+	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
 		return err
 	}
 
 	if databaseExisted {
-		if err = table.UpgradeDatabase(cfg); err != nil {
-			return errors.New(fmt.Sprintf("org id: %d, %s", mysqlcommon.DEFAULT_ORG_ID, err.Error()))
+		if err = table.UpgradeDatabase(copiedCfg); err != nil {
+			return err
 		}
-
-		// TODO
-		// orgIDs, err := mysql.GetORGIDs()
-		// if err != nil {
-		// 	return err
-		// }
-		// for _, orgID := range orgIDs {
-		// 	if orgID == mysqlcommon.DEFAULT_ORG_ID {
-		// 		continue
-		// 	}
-		// 	if err = table.UpgradeDatabase(mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)); err != nil {
-		// 		return errors.New(fmt.Sprintf("org id: %d, %s", orgID, err.Error()))
-		// 	}
-		// }
 	}
 	return nil
 }
 
 func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
-	db, err := mysql.GetConnectionWithoutDatabase(cfg)
+	db, err := common.GetSessionWithoutName(cfg)
 	if err != nil {
 		return
 	}
-	databaseExisted, err = common.CreateDatabaseIfNotExists(db, cfg.Database)
+	dc := common.NewDBConfig(db, cfg)
+	databaseExisted, err = common.CreateDatabaseIfNotExists(dc)
 	if err != nil {
-		err = errors.New(fmt.Sprintf("database: %s is not ready: %v", cfg.Database, err))
-		log.Error(err.Error())
+		log.Error(common.LogDBName(cfg.Database, "database is not ready: %v", err))
 		return
 	}
 	if !databaseExisted {
-		db, err = mysql.GetConnectionWithDatabase(cfg)
+		db, err = common.GetSessionWithName(cfg)
 		if err != nil {
 			return
 		}
-		err = table.DropDatabaseIfInitTablesFailed(db, cfg.Database)
+		dc.SetDB(db)
+		err = table.DropDatabaseIfInitTablesFailed(dc)
 	}
 	return
 }
 
 func DropDatabase(cfg config.MySqlConfig) error {
-	db, err := mysql.GetConnectionWithDatabase(cfg)
+	db, err := common.GetSessionWithName(cfg)
 	if err != nil {
 		return err
 	}
-	return common.DropDatabase(db, cfg.Database)
+	return common.DropDatabase(common.NewDBConfig(db, cfg))
 }

@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,35 +14,22 @@
  * limitations under the License.
  */
 
-package mysql
+package common
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 )
 
-var log = logging.MustGetLogger("db.mysql")
-var Db *gorm.DB
+func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
+	dsn := common.GenerateDSN(cfg, false, cfg.TimeOut, false)
+	return common.InitSession(dsn)
+}
 
-func InitMySQL(cfg config.MySqlConfig) error {
-	Db, _ = common.GetSession(cfg)
-	if Db == nil {
-		return errors.New("connect mysql failed")
-	}
-	var version string
-	err := Db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
-	if err != nil {
-		return errors.New("get current db version failed")
-	}
-	if version != migration.DB_VERSION_EXPECTED {
-		return errors.New(fmt.Sprintf("current db version: %s != expected db version: %s", version, migration.DB_VERSION_EXPECTED))
-	}
-	return nil
+func GetSessionWithName(cfg config.MySqlConfig) (*gorm.DB, error) {
+	// set multiStatements=true in dsn only when migrating MySQL
+	dsn := common.GenerateDSN(cfg, true, cfg.TimeOut*2, true)
+	return common.InitSession(dsn)
 }
