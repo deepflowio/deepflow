@@ -56,7 +56,7 @@ func GenerateDSN(cfg config.MySqlConfig, useDatabase bool, timeout uint32, multi
 }
 
 func InitSession(dsn string) (*gorm.DB, error) {
-	Db, err := gorm.Open(mysql.New(mysql.Config{
+	db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN:                       dsn,   // DSN data source name
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
@@ -75,14 +75,15 @@ func InitSession(dsn string) (*gorm.DB, error) {
 			}), // 配置log
 	})
 	if err != nil {
-		log.Error(fmt.Sprintf("failed to init session: %v, dsn: %s", err.Error(), dsn))
+		log.Errorf("failed to initialize session: %v, dsn: %s", err.Error(), dsn)
 		return nil, err
 	}
+	log.Infof("initialized mysql session successfully, dsn: %s", dsn)
 
-	sqlDB, _ := Db.DB()
+	sqlDB, _ := db.DB()
 	// 限制最大空闲连接数、最大连接数和连接的生命周期
 	sqlDB.SetMaxIdleConns(50)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
-	return Db, nil
+	return db, nil
 }
