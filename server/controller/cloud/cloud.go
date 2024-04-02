@@ -130,6 +130,10 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 }
 
 func (c *Cloud) getCloudGatherInterval() int {
+	if (c.basicInfo.Type == common.QINGCLOUD || c.basicInfo.Type == common.QINGCLOUD_PRIVATE) && c.cfg.QingCloudConfig.DailyTriggerTime != "" {
+		log.Infof("qing and qing private daily trigger time is (%s), sync timer is default (%d)s", c.cfg.QingCloudConfig.DailyTriggerTime, cloudcommon.CLOUD_SYNC_TIMER_DEFAULT)
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
+	}
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
