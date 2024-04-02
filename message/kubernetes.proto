@@ -9,7 +9,7 @@ package kubernetes;
 // option (gogoproto.marshaler_all) = true;
 // option (gogoproto.sizer_all) = true;
 
-option go_package = "pb";
+option go_package = "kubernetes";
 
 message Source {
     string component = 1;
