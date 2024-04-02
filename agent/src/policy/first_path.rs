@@ -247,7 +247,6 @@ pub struct FirstPath {
     fast: FastPath,
 
     fast_disable: bool,
-    queue_count: usize,
 
     memory_limit: AtomicU64,
 }
@@ -280,14 +279,9 @@ impl FirstPath {
             current_level: level,
 
             fast: FastPath::new(queue_count, map_size),
-            queue_count,
             fast_disable,
             memory_limit: AtomicU64::new(0),
         }
-    }
-
-    pub fn update_map_size(&mut self, map_size: usize) {
-        self.fast.update_map_size(map_size)
     }
 
     pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
@@ -720,6 +714,10 @@ impl FirstPath {
 
     pub fn set_memory_limit(&self, limit: u64) {
         self.memory_limit.store(limit, Ordering::Relaxed);
+    }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        self.fast.reset_queue_size(queue_count);
     }
 }
 
