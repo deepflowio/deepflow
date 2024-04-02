@@ -61,7 +61,7 @@ func NewUDPClient(conf UDPConfig) (*UDPClient, error) {
 
 	h := datatype.BaseHeader{
 		FrameSize: datatype.MESSAGE_HEADER_LEN + datatype.FLOW_HEADER_LEN,
-		Type:      datatype.MESSAGE_TYPE_DFSTATS,
+		Type:      datatype.MESSAGE_TYPE_SERVER_DFSTATS,
 	}
 	flowHeader := datatype.FlowHeader{}
 	header := make([]byte, datatype.MESSAGE_HEADER_LEN+datatype.FLOW_HEADER_LEN)

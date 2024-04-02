@@ -63,14 +63,14 @@ func getIPMap(hostType string) (map[string]bool, error) {
 	switch hostType {
 	case common.HOST_TYPE_CONTROLLER:
 		var controllers []mysql.Controller
-		mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
+		mysql.Db.Find(&controllers)
 		res = make(map[string]bool, len(controllers))
 		for _, controller := range controllers {
 			res[controller.IP] = true
 		}
 	case common.HOST_TYPE_ANALYZER:
 		var analyzers []mysql.Analyzer
-		mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
+		mysql.Db.Find(&analyzers)
 		res = make(map[string]bool, len(analyzers))
 		for _, analyzer := range analyzers {
 			res[analyzer.IP] = true

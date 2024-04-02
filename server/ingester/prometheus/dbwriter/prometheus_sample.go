@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/prometheus/common/model"
 )
@@ -38,6 +38,7 @@ type PrometheusSampleInterface interface {
 	DatabaseName() string
 	TableName() string
 	WriteBlock(*ckdb.Block)
+	OrgID() uint16
 	Columns(int) []*ckdb.Column
 	AppLabelLen() int
 	GenCKTable(string, string, int, *ckdb.ColdStorage, int) *ckdb.Table
@@ -53,9 +54,15 @@ type PrometheusSample struct {
 }
 
 type PrometheusSampleMini struct {
-	Timestamp        uint32 // s
-	MetricID         uint32
-	TargetID         uint32
+	Timestamp uint32 // s
+	VtapId    uint16
+	MetricID  uint32
+	TargetID  uint32
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'prometheus', otherwise stored in '<OrgId>_prometheus'.
+	OrgId            uint16
+	TeamID           uint16
 	AppLabelValueIDs []uint32
 
 	Value float64
@@ -87,11 +94,16 @@ func (m *PrometheusSampleMini) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		m.MetricID,
 		m.TargetID,
+		m.TeamID,
 	)
 	for _, v := range m.AppLabelValueIDs[1:] {
 		block.Write(v)
 	}
 	block.Write(m.Value)
+}
+
+func (m *PrometheusSampleMini) OrgID() uint16 {
+	return m.OrgId
 }
 
 // Note: The order of append() must be consistent with the order of Write() in WriteBlock.
@@ -102,6 +114,7 @@ func (m *PrometheusSampleMini) Columns(appLabelColumnCount int) []*ckdb.Column {
 	columns = append(columns,
 		ckdb.NewColumn("metric_id", ckdb.UInt32).SetComment("encoded ID of the metric name"),
 		ckdb.NewColumn("target_id", ckdb.UInt32).SetComment("the encoded ID of the target"),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("the team ID"),
 	)
 	for i := 1; i <= appLabelColumnCount; i++ {
 		columns = append(columns, ckdb.NewColumn(fmt.Sprintf("app_label_value_id_%d", i), ckdb.UInt32))
@@ -144,6 +157,8 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 		TableId:   m.MetricID,
 		VpcId:     m.VpcId(),
 		PodNsId:   m.PodNsId(),
+		VtapId:    m.VtapId,
+		TeamID:    m.TeamID,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
@@ -227,6 +242,10 @@ func (m *PrometheusSample) TableName() string {
 func (m *PrometheusSample) WriteBlock(block *ckdb.Block) {
 	m.PrometheusSampleMini.WriteBlock(block)
 	m.UniversalTag.WriteBlock(block)
+}
+
+func (m *PrometheusSample) OrgID() uint16 {
+	return m.OrgId
 }
 
 // Note: The order of append() must be consistent with the order of Write() in WriteBlock.

@@ -173,7 +173,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(uint32(vtapId), e.Pid)
+	s.GProcessID = d.platformData.QueryProcessInfo(vtapId, e.Pid)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
@@ -184,7 +184,8 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
 	s.VTAPID = vtapId
-	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
+	s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapId)
+	s.L3EpcID = d.platformData.QueryVtapEpc0(vtapId)
 
 	var info *grpc.Info
 	if e.PodId != 0 {
@@ -193,7 +194,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
-		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapId))
+		vtapInfo := d.platformData.QueryVtapInfo(vtapId)
 		if vtapInfo != nil {
 			vtapIP := net.ParseIP(vtapInfo.Ip)
 			if vtapIP != nil {

@@ -40,18 +40,18 @@ type DBConfig struct {
 	Config config.MySqlConfig
 }
 
-func NewDBConfig(db *gorm.DB, cfg config.MySqlConfig) DBConfig {
-	return DBConfig{
+func NewDBConfig(db *gorm.DB, cfg config.MySqlConfig) *DBConfig {
+	return &DBConfig{
 		DB:     db,
 		Config: cfg,
 	}
 }
 
-func (dc DBConfig) SetDB(db *gorm.DB) {
+func (dc *DBConfig) SetDB(db *gorm.DB) {
 	dc.DB = db
 }
 
-func (dc DBConfig) SetConfig(c config.MySqlConfig) {
+func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
 	dc.Config = c
 }
 
@@ -59,17 +59,18 @@ func LogDBName(databaseName string, format string, a ...any) string {
 	return fmt.Sprintf("db: %s, ", databaseName) + fmt.Sprintf(format, a...)
 }
 
-func DropDatabase(dc DBConfig) error {
+func DropDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "drop database"))
 	return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
 }
 
-func CreateDatabase(dc DBConfig) error {
+func CreateDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "create database"))
+	log.Infof("%#v", dc.DB)
 	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
 }
 
-func CreateDatabaseIfNotExists(dc DBConfig) (bool, error) {
+func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
 	var databaseName string
 	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
 	if databaseName == dc.Config.Database {
@@ -80,8 +81,9 @@ func CreateDatabaseIfNotExists(dc DBConfig) (bool, error) {
 	}
 }
 
-func InitEETables(dc DBConfig) error {
+func InitCETables(dc *DBConfig) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize CE tables"))
+	log.Infof("%#v", dc.DB)
 	initSQL, err := os.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to read sql file: %s", err.Error()))
@@ -96,7 +98,7 @@ func InitEETables(dc DBConfig) error {
 	return err
 }
 
-func InitDBVersion(dc DBConfig) error {
+func InitDBVersion(dc *DBConfig) error {
 	err := dc.DB.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to initialize db version: %s", err.Error()))
@@ -104,7 +106,7 @@ func InitDBVersion(dc DBConfig) error {
 	return err
 }
 
-func ExecuteIssues(dc DBConfig, curVersion string) error {
+func ExecuteIssues(dc *DBConfig, curVersion string) error {
 	issus, err := os.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to read sql dir: %s", err.Error()))
@@ -125,7 +127,7 @@ func ExecuteIssues(dc DBConfig, curVersion string) error {
 	return nil
 }
 
-func executeIssue(dc DBConfig, nextVersion string) error {
+func executeIssue(dc *DBConfig, nextVersion string) error {
 	byteSQL, err := os.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to read sql file (version: %s): %s", nextVersion, err.Error()))
@@ -146,7 +148,7 @@ func executeIssue(dc DBConfig, nextVersion string) error {
 	return nil
 }
 
-func executeScript(dc DBConfig, nextVersion string) error {
+func executeScript(dc *DBConfig, nextVersion string) error {
 	var err error
 	switch nextVersion {
 	case script.SCRIPT_UPDATE_CLOUD_TAG:
