@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package kubernetes;
+package k8s_event;
 
 // rust 不支持以下import和option，暂时删除，go客户端使用时需要加回
 // import "github.com/gogo/protobuf/gogoproto/gogo.proto";
@@ -9,7 +9,7 @@ package kubernetes;
 // option (gogoproto.marshaler_all) = true;
 // option (gogoproto.sizer_all) = true;
 
-option go_package = "pb";
+option go_package = "k8s_event";
 
 message Source {
     string component = 1;
