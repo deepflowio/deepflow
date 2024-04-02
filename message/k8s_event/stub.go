@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-package kubernetes
+package k8s_event
 
 //go:generate protoc --gofast_out=plugins=grpc:. -I.. ../kubernetes.proto
