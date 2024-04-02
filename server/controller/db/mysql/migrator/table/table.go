@@ -48,12 +48,12 @@ func UpgradeDatabase(cfg config.MySqlConfig) error {
 	}
 }
 
-func initTablesWithoutRollBack(dc common.DBConfig) error {
+func initTablesWithoutRollBack(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "initialize db tables without rollback"))
 	return initTables(dc)
 }
 
-func upgradeIfDBVersionNotLatest(dc common.DBConfig) error {
+func upgradeIfDBVersionNotLatest(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "upgrade if db version is not the latest"))
 	var version string
 	err := dc.DB.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
@@ -75,15 +75,14 @@ func upgradeIfDBVersionNotLatest(dc common.DBConfig) error {
 	return nil
 }
 
-func recreateDatabaseAndInitTables(dc common.DBConfig) error {
+func recreateDatabaseAndInitTables(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "recreate database and initialize tables"))
 	common.DropDatabase(dc)
 	db, err := common.GetSessionWithoutName(dc.Config)
 	if err != nil {
 		return err
 	}
-	dc.DB = db
-	err = common.CreateDatabase(dc)
+	err = common.CreateDatabase(common.NewDBConfig(db, dc.Config))
 	if err != nil {
 		log.Error(common.LogDBName(dc.Config.Database, "failed to create database: %s", err.Error()))
 		return err
@@ -93,11 +92,11 @@ func recreateDatabaseAndInitTables(dc common.DBConfig) error {
 	if err != nil {
 		return err
 	}
-	dc.DB = db
+	dc.SetDB(db)
 	return DropDatabaseIfInitTablesFailed(dc)
 }
 
-func DropDatabaseIfInitTablesFailed(dc common.DBConfig) error {
+func DropDatabaseIfInitTablesFailed(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "drop database if fails to initialize tables"))
 	err := initTables(dc)
 	if err != nil {
@@ -110,9 +109,9 @@ func DropDatabaseIfInitTablesFailed(dc common.DBConfig) error {
 	return nil
 }
 
-func initTables(dc common.DBConfig) error {
+func initTables(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "initialize db tables"))
-	if err := common.InitEETables(dc); err != nil {
+	if err := common.InitCETables(dc); err != nil {
 		return err
 	}
 	if err := common.InitDBVersion(dc); err != nil {

@@ -57,6 +57,7 @@ func GetIDManagers() *IDManagers {
 func (m *IDManagers) Init(ctx context.Context, cfg config.RecorderConfig) {
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	m.recorderCfg = cfg
+	m.orgIDToIDMng = make(map[int]*IDManager)
 }
 
 func (m *IDManagers) Start() error {
@@ -64,9 +65,6 @@ func (m *IDManagers) Start() error {
 		return nil
 	}
 	m.inUse = true
-
-	// clear before each startup
-	m.orgIDToIDMng = make(map[int]*IDManager)
 
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
@@ -86,8 +84,10 @@ func (m *IDManagers) Stop() {
 	if m.cancel != nil {
 		m.cancel()
 	}
-	log.Info("resource id managers stopped")
+	// clear before each stop
+	m.orgIDToIDMng = make(map[int]*IDManager)
 	m.inUse = false
+	log.Info("resource id managers stopped")
 }
 
 // 定时刷新所有组织的 ID 池，恢复/修复页面删除 domain/sub_domain、定时永久删除无效资源等操作释放的 ID

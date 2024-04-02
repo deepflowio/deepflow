@@ -56,14 +56,12 @@ func GetCleaners() *Cleaners {
 func (c *Cleaners) Init(ctx context.Context, cfg config.RecorderConfig) {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.cfg = cfg
+	c.orgIDToCleaner = make(map[int]*Cleaner)
 	return
 }
 
 func (c *Cleaners) Start() error {
 	log.Info("resource clean started")
-
-	// clear before each startup
-	c.orgIDToCleaner = make(map[int]*Cleaner)
 
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
@@ -93,6 +91,8 @@ func (c *Cleaners) Stop() {
 	if c.cancel != nil {
 		c.cancel()
 	}
+	// clear before each stop
+	c.orgIDToCleaner = make(map[int]*Cleaner)
 	log.Info("resource clean stopped")
 }
 
