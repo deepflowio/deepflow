@@ -166,10 +166,14 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		return "", err
 	}
 
-	var team *mysql.Team
-	if err := mysql.DefaultDB.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
-		log.Errorf("failed to get team by uid: %s", teamUID)
-		return "", err
+	teamID := DEFAULT_TEAM_ID
+	if teamUID != "" {
+		var team *mysql.Team
+		if err := mysql.DefaultDB.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
+			log.Errorf("failed to get team by uid: %s", teamUID)
+			return "", err
+		}
+		teamID = team.ID
 	}
 	domainConf := map[string]interface{}{
 		"controller_ip":              k.cfg.NodeIP,
@@ -191,7 +195,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		KubernetesClusterID: clusterID,
 		ControllerIP:        k.cfg.NodeIP,
 		Config:              domainConf,
-		TeamID:              team.ID,
+		TeamID:              teamID,
 		// icon id value only for enterprise edition
 		IconID: DomainTypeToIconID[KUBERNETES],
 	}
