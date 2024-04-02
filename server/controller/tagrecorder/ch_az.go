@@ -48,10 +48,6 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
-	// TODO refresh control
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChAZ
 		mysql.Db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?

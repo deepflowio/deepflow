@@ -65,9 +65,6 @@ func (c *ChPodCluster) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodCluster
 		mysql.Db.Where("id = ?", sourceID).First(&chItem)

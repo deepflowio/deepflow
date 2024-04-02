@@ -51,15 +51,19 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *SubscriberManager) Start() {
+func (c *SubscriberManager) Start() (err error) {
 	log.Info("tagrecorder subscriber manager started")
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = UpdateIconInfo(c.cfg)
+	if err != nil {
+		return err
+	}
 	c.subscribers = c.getSubscribers()
 	log.Infof("tagrecorder run start")
 	for _, subscriber := range c.subscribers {
 		subscriber.SetConfig(c.cfg.TagRecorderCfg)
 		subscriber.Subscribe()
 	}
+	return nil
 }
 
 func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {

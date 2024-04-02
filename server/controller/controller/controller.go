@@ -157,7 +157,12 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("TagRecorder init")
 	tr := tagrecorder.GetSingleton()
 	tr.Init(ctx, *cfg)
-	tr.SubscriberManager.Start()
+	err = tr.SubscriberManager.Start()
+	if err != nil {
+		log.Errorf("get icon failed: %s", err.Error())
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
 	go checkAndStartAllRegionMasterFunctions()
 
 	router.SetInitStageForHealthChecker("Master function init")
