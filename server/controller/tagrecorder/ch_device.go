@@ -82,9 +82,12 @@ func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFie
 	if fieldsUpdate.IP.IsDifferent() {
 		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
+	if fieldsUpdate.HType.IsDifferent() {
+		updateInfo["icon_id"] = c.resourceTypeToIconID[IconKey{
+			NodeType: RESOURCE_TYPE_VM,
+			SubType:  fieldsUpdate.HType.GetNew(),
+		}]
+	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VM).First(&chItem)
@@ -156,9 +159,12 @@ func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.Hos
 	if fieldsUpdate.IP.IsDifferent() {
 		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
+	if fieldsUpdate.HType.IsDifferent() {
+		updateInfo["icon_id"] = c.resourceTypeToIconID[IconKey{
+			NodeType: RESOURCE_TYPE_HOST,
+			SubType:  fieldsUpdate.HType.GetNew(),
+		}]
+	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_HOST).First(&chItem)
@@ -218,9 +224,6 @@ func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VROUTER).First(&chItem)
@@ -280,9 +283,6 @@ func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_DHCP_PORT).First(&chItem)
@@ -346,9 +346,6 @@ func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_NAT_GATEWAY).First(&chItem)
@@ -412,9 +409,6 @@ func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFie
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_LB).First(&chItem)
@@ -478,9 +472,6 @@ func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *mess
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_RDS_INSTANCE).First(&chItem)
@@ -544,9 +535,6 @@ func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *me
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_REDIS_INSTANCE).First(&chItem)
@@ -616,9 +604,6 @@ func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_SERVICE).First(&chItem)
@@ -678,9 +663,6 @@ func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD).First(&chItem)
@@ -741,9 +723,6 @@ func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		podGroupType := fieldsUpdate.Type.GetNew()
 		var chItem mysql.ChDevice
@@ -804,9 +783,6 @@ func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
@@ -866,9 +842,6 @@ func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
 		mysql.Db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)

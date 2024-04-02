@@ -69,9 +69,6 @@ func (c *ChVPC) onResourceUpdated(sourceID int, fieldsUpdate *message.VPCFieldsU
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChVPC
 		mysql.Db.Where("id = ?", sourceID).First(&chItem)

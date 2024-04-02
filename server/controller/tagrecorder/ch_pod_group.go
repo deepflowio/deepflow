@@ -77,9 +77,6 @@ func (c *ChPodGroup) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGr
 	if fieldsUpdate.PodNamespaceID.IsDifferent() {
 		updateInfo["pod_ns_id"] = fieldsUpdate.PodNamespaceID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodGroup
 		mysql.Db.Where("id = ?", sourceID).First(&chItem)
