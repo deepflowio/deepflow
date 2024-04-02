@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -299,7 +299,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 
 func (b *PrometheusSamplesBuilder) GetEpcPodClusterId(vtapID uint16) (uint16, uint16, error) {
 	epcId, podClusterId := int32(0), uint16(0)
-	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
+	if vtapInfo := b.platformData.QueryVtapInfo(vtapID); vtapInfo != nil {
 		epcId, podClusterId = vtapInfo.EpcId, uint16(vtapInfo.PodClusterId)
 	}
 	if epcId == 0 || epcId == datatype.EPC_FROM_INTERNET {
@@ -456,7 +456,9 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 			m.Value = v
+			m.VtapId = vtapID
 			b.samplesBuffer = append(b.samplesBuffer, m)
+			m.OrgId, m.TeamID = b.platformData.QueryVtapOrgAndTeamID(vtapID)
 		} else {
 			m := dbwriter.AcquirePrometheusSample()
 			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
@@ -464,6 +466,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 			m.Value = v
+			m.OrgId, m.TeamID = b.platformData.QueryVtapOrgAndTeamID(vtapID)
 
 			if i == 0 {
 				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
@@ -531,7 +534,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	var ip net.IP
 	var hasMatched bool
 	if podName != "" {
-		podInfo := b.platformData.QueryPodInfo(uint32(vtapID), podName)
+		podInfo := b.platformData.QueryPodInfo(vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
@@ -547,7 +550,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 	if !hasMatched {
 		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-			t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
+			t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
 			ip = net.ParseIP(instanceIP)
 			if ip != nil {
 				hasMatched = true
@@ -556,8 +559,8 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	}
 
 	if !hasMatched && fillWithVtapId {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
-		vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID))
+		t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
+		vtapInfo := b.platformData.QueryVtapInfo(vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)

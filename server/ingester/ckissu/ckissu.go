@@ -356,7 +356,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
-		rawTable, dstTableName,
+		rawTable, d.db, dstTableName,
 		d.summable, d.unsummable, d.interval)
 	log.Info(createMvSql)
 	_, err = connect.Exec(createMvSql)
@@ -374,7 +374,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 
 	// create table local
 	createLocalSql := datasource.MakeCreateTableLocal(
-		rawTable, dstTableName,
+		rawTable, d.db, dstTableName,
 		d.summable, d.unsummable)
 	log.Info(createLocalSql)
 	_, err = connect.Exec(createLocalSql)
@@ -383,7 +383,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	}
 
 	// create table global
-	createGlobalSql := datasource.MakeGlobalTableCreateSQL(rawTable, dstTableName)
+	createGlobalSql := datasource.MakeGlobalTableCreateSQL(rawTable, d.db, dstTableName)
 	log.Info(createGlobalSql)
 	_, err = connect.Exec(createGlobalSql)
 	if err != nil {
@@ -859,9 +859,10 @@ func getColumnRenames(columnRenamess []*ColumnRenames) []*ColumnRename {
 	return renames
 }
 
-func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
+func (i *Issu) renameColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnRename, error) {
 	dones := []*ColumnRename{}
 	for _, renameColumn := range i.columnRenames {
+		renameColumn.Db = getOrgDatabase(renameColumn.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, renameColumn.Db, renameColumn.Table)
 		if err != nil {
 			if strings.Contains(err.Error(), "doesn't exist") {
@@ -883,9 +884,10 @@ func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
 	return dones, nil
 }
 
-func (i *Issu) modColumns(connect *sql.DB) ([]*ColumnMod, error) {
+func (i *Issu) modColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnMod, error) {
 	dones := []*ColumnMod{}
 	for _, modColumn := range i.columnMods {
+		modColumn.Db = getOrgDatabase(modColumn.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, modColumn.Db, modColumn.Table)
 		if err != nil {
 			return dones, err
@@ -902,9 +904,10 @@ func (i *Issu) modColumns(connect *sql.DB) ([]*ColumnMod, error) {
 	return dones, nil
 }
 
-func (i *Issu) dropColumns(connect *sql.DB) ([]*ColumnDrop, error) {
+func (i *Issu) dropColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnDrop, error) {
 	dones := []*ColumnDrop{}
 	for _, dropColumn := range i.columnDrops {
+		dropColumn.Db = getOrgDatabase(dropColumn.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, dropColumn.Db, dropColumn.Table)
 		if err != nil {
 			return dones, err
@@ -920,8 +923,9 @@ func (i *Issu) dropColumns(connect *sql.DB) ([]*ColumnDrop, error) {
 	return dones, nil
 }
 
-func (i *Issu) modTableTTLs(connect *sql.DB) error {
+func (i *Issu) modTableTTLs(connect *sql.DB, orgIDPrefix string) error {
 	for _, modTTL := range i.modTTLs {
+		modTTL.Db = getOrgDatabase(modTTL.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, modTTL.Db, modTTL.Table)
 		if err != nil {
 			log.Error(err)
@@ -1012,9 +1016,10 @@ func getColumnDatasourceAdds(columnDatasourceAddss []*ColumnDatasourceAdds) []*C
 	return adds
 }
 
-func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
+func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, error) {
 	dones := []*ColumnAdd{}
 	for _, add := range i.columnAdds {
+		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, add.Db, add.Table)
 		if err != nil {
 			return dones, err
@@ -1032,7 +1037,7 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	for _, tableName := range []string{
 		flow_metrics.NETWORK_1M.TableName(), flow_metrics.NETWORK_MAP_1M.TableName(),
 		flow_metrics.APPLICATION_1M.TableName(), flow_metrics.APPLICATION_MAP_1M.TableName()} {
-		datasourceInfos, err := i.getUserDefinedDatasourceInfos(connect, ckdb.METRICS_DB, strings.Split(tableName, ".")[0])
+		datasourceInfos, err := i.getUserDefinedDatasourceInfos(connect, getOrgDatabase(ckdb.METRICS_DB, orgIDPrefix), strings.Split(tableName, ".")[0])
 		if err != nil {
 			log.Warning(err)
 			continue
@@ -1049,9 +1054,10 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	return dones, nil
 }
 
-func (i *Issu) addIndexs(connect *sql.DB) ([]*IndexAdd, error) {
+func (i *Issu) addIndexs(connect *sql.DB, orgIDPrefix string) ([]*IndexAdd, error) {
 	dones := []*IndexAdd{}
 	for _, add := range i.indexAdds {
+		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
 		version, err := i.getTableVersion(connect, add.Db, add.Table)
 		if err != nil {
 			return dones, err
@@ -1069,63 +1075,124 @@ func (i *Issu) addIndexs(connect *sql.DB) ([]*IndexAdd, error) {
 	return dones, nil
 }
 
+func isNumeric(s string) bool {
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// return orgIdPrefix,raw_database from orgDatabase. eg. '0123_flow_metrics', return '0123_', 'flow_metrics'
+func parseOrgDatabase(db string) (string, string) {
+	if len(db) > ckdb.ORG_ID_PREFIX_LEN && db[ckdb.ORG_ID_LEN] == '_' && isNumeric(db[:ckdb.ORG_ID_LEN]) {
+		return db[:ckdb.ORG_ID_PREFIX_LEN], db[ckdb.ORG_ID_PREFIX_LEN:]
+	}
+	return "", db
+}
+
+func getOrgDatabase(db string, orgIDPrefix string) string {
+	_, rawDb := parseOrgDatabase(db)
+	return orgIDPrefix + rawDb
+}
+
+func (i *Issu) startOrg(connect *sql.DB, orgIDPrefix string) error {
+	renames, errRenames := i.renameColumns(connect, orgIDPrefix)
+	if errRenames != nil {
+		return errRenames
+	}
+	mods, errMods := i.modColumns(connect, orgIDPrefix)
+	if errMods != nil {
+		return errMods
+	}
+
+	adds, errAdds := i.addColumns(connect, orgIDPrefix)
+	if errAdds != nil {
+		return errAdds
+	}
+
+	addIndexs, errAddIndexs := i.addIndexs(connect, orgIDPrefix)
+	if errAddIndexs != nil {
+		log.Warning(errAddIndexs)
+	}
+
+	drops, errDrops := i.dropColumns(connect, orgIDPrefix)
+	if errDrops != nil {
+		return errDrops
+	}
+
+	for _, cr := range renames {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
+		}
+	}
+	for _, cr := range mods {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
+		}
+	}
+	for _, cr := range adds {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
+		}
+	}
+	for _, cr := range addIndexs {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
+		}
+	}
+	for _, cr := range drops {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
+		}
+	}
+	go i.modTableTTLs(connect, orgIDPrefix)
+	return nil
+}
+
+func (i *Issu) getOrgIDPrefixs(connect *sql.DB) ([]string, error) {
+	checkOrgDatabase := "flow_log"
+	sql := fmt.Sprintf("SELECT name FROM system.databases WHERE name like '%%%s%%'", checkOrgDatabase)
+	rows, err := connect.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("get orgs sql: ", sql)
+	var db string
+	orgIDPrefixs := []string{}
+	for rows.Next() {
+		err := rows.Scan(&db)
+		if err != nil {
+			return nil, err
+		}
+
+		orgPrefix, _ := parseOrgDatabase(db)
+		orgIDPrefixs = append(orgIDPrefixs, orgPrefix)
+	}
+	return orgIDPrefixs, nil
+
+}
+
 func (i *Issu) Start() error {
 	connects := i.Connections
 	if len(connects) == 0 {
 		return fmt.Errorf("connections is nil")
 	}
+
 	for _, connect := range connects {
-		renames, errRenames := i.renameColumns(connect)
-		if errRenames != nil {
-			return errRenames
+		orgIDPrefixs, err := i.getOrgIDPrefixs(connect)
+		if err != nil {
+			return fmt.Errorf("get orgIDs failed, err: %s", err)
 		}
-		mods, errMods := i.modColumns(connect)
-		if errMods != nil {
-			return errMods
-		}
-
-		adds, errAdds := i.addColumns(connect)
-		if errAdds != nil {
-			return errAdds
-		}
-
-		addIndexs, errAddIndexs := i.addIndexs(connect)
-		if errAddIndexs != nil {
-			log.Warning(errAddIndexs)
-		}
-
-		drops, errDrops := i.dropColumns(connect)
-		if errDrops != nil {
-			return errDrops
-		}
-
-		for _, cr := range renames {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
+		for _, orgIDPrefix := range orgIDPrefixs {
+			err := i.startOrg(connect, orgIDPrefix)
+			if err != nil {
+				log.Errorf("orgIDPrefix %s run issu failed, err: %s", orgIDPrefix, err)
 			}
 		}
-		for _, cr := range mods {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
-		}
-		for _, cr := range adds {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
-		}
-		for _, cr := range addIndexs {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
-		}
-		for _, cr := range drops {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
-		}
-		go i.modTableTTLs(connect)
 	}
+
 	return nil
 }
 
@@ -1157,7 +1224,7 @@ func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.Dataso
 				interval = INTERVAL_DAY
 			}
 			//readd mvTable,localTable,gobalTable
-			if err := ds.Handle(tableGroup, "add", dsInfo.baseTable, dsInfo.name, dsInfo.summable, dsInfo.unsummable, interval, DEFAULT_TTL); err != nil {
+			if err := ds.Handle(ckdb.DEFAULT_ORG_ID, datasource.ADD, tableGroup, dsInfo.baseTable, dsInfo.name, dsInfo.summable, dsInfo.unsummable, interval, DEFAULT_TTL); err != nil {
 				return err
 			}
 		}
