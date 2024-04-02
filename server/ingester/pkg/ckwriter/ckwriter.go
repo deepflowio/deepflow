@@ -312,7 +312,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 			item := rawItems[i]
 			if ck, ok := item.(CKItem); ok {
 				orgID := ck.OrgID()
-				if orgID > MAX_ORGANIZATINON_ID || orgID == 0 {
+				if orgID > MAX_ORGANIZATINON_ID {
 					if w.counters[queueID].OrgInvalidCount == 0 {
 						log.Warningf("get writer queue(%s) data orgID wrong %d", w.name, orgID)
 					}
