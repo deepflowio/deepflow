@@ -1253,6 +1253,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
+        let flow_acl_listener = self.flow_acl_listener.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let runtime_config =
@@ -1268,6 +1269,18 @@ impl Synchronizer {
                             continue;
                         }
                     };
+
+                for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+                    let _ = listener.flow_acl_change(
+                        runtime_config.trident_type,
+                        runtime_config.epc_id as i32,
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                    );
+                }
 
                 max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
                 let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);
