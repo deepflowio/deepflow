@@ -666,8 +666,7 @@ vtap_group_id: g-xxxxxx
   ## Dispatcher ##
   ################
   ## TAP NICs when tap_mode != 0
-  ## Note: The list of capture NICs when tap_mode is not equal to 0, in which
-  ##   case tap_interface_regex is invalid.
+  ## Note: Deprecated and instead use tap_interface_regex
   #src-interfaces:
   #- dummy0
   #- dummy1

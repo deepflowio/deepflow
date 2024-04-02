@@ -94,7 +94,6 @@ pub struct Policy {
 
     nat: RwLock<Vec<AHashMap<u128, GpidEntry>>>,
 
-    queue_count: usize,
     first_hit: usize,
     fast_hit: usize,
 
@@ -116,7 +115,6 @@ impl Policy {
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
             forward: Forward::new(queue_count, forward_capacity),
             nat: RwLock::new(vec![AHashMap::new(), AHashMap::new()]),
-            queue_count,
             first_hit: 0,
             fast_hit: 0,
             monitor: None,
@@ -511,6 +509,10 @@ impl Policy {
     pub fn set_memory_limit(&self, limit: u64) {
         self.table.set_memory_limit(limit);
     }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        self.table.reset_queue_size(queue_count);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -615,10 +617,6 @@ impl PolicySetter {
         unsafe { &mut *self.policy }
     }
 
-    pub fn update_map_size(&mut self, map_size: usize) {
-        self.policy().table.update_map_size(map_size);
-    }
-
     pub fn update_local_epc(&mut self, local_epc: i32) {
         self.policy().labeler.update_local_epc(local_epc);
     }
@@ -679,6 +677,10 @@ impl PolicySetter {
 
     pub fn set_memory_limit(&self, limit: u64) {
         self.policy().set_memory_limit(limit)
+    }
+
+    pub fn reset_queue_size(&self, queue_count: usize) {
+        self.policy().reset_queue_size(queue_count);
     }
 }
 

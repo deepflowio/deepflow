@@ -16,12 +16,15 @@
 
 use std::cmp::max;
 use std::net::IpAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, RwLock,
+};
 use std::thread;
 use std::time::Duration;
 
 use ipnet::{IpNet, Ipv4Net};
-use log::{info, warn};
+use log::warn;
 use lru::LruCache;
 
 use crate::common::endpoint::{EndpointData, EndpointStore};
@@ -53,24 +56,26 @@ pub struct FastPath {
     // Use the first 16 bits of the IPv4 address to query the table and obtain the corresponding netmask.
     netmask_table: RwLock<Vec<u32>>,
 
-    policy_table_flush_flags: [bool; super::MAX_QUEUE_COUNT + 1],
+    policy_table_flush_flags: [AtomicBool; super::MAX_QUEUE_COUNT + 1],
 
     mask_from_interface: RwLock<Vec<u32>>,
     mask_from_ipgroup: RwLock<Vec<u32>>,
     mask_from_cidr: RwLock<Vec<u32>>,
 
     map_size: usize,
-    queue_count: usize,
 
     // 统计计数
     policy_count: usize,
 }
 
+const FLUSH_FLAGS: AtomicBool = AtomicBool::new(false);
 impl FastPath {
     // 策略相关等内容更新后必须执行该函数以清空策略表
     pub fn flush(&mut self) {
         self.generate_mask_table();
-        self.policy_table_flush_flags = [true; super::MAX_QUEUE_COUNT + 1];
+        self.policy_table_flush_flags.iter_mut().for_each(|f| {
+            f.store(true, Ordering::Relaxed);
+        });
         self.policy_count = 0;
     }
 
@@ -261,30 +266,15 @@ impl FastPath {
         key.dst_port = table[key.dst_port as usize].min();
     }
 
-    pub fn update_map_size(&mut self, map_size: usize) {
-        if self.map_size == map_size {
-            return;
-        }
-        info!(
-            "fastpath map size change from {} to {}",
-            self.map_size, map_size
-        );
-        self.map_size = map_size;
-
-        for i in 0..self.queue_count {
-            self.policy_table_flush_flags[i] = true
-        }
-    }
-
     fn table_flush_check(&mut self, key: &LookupKey) -> bool {
         let start_index = key.fast_index * MAX_TAP_TYPE;
-        if self.policy_table_flush_flags[key.fast_index] {
+        if self.policy_table_flush_flags[key.fast_index].load(Ordering::Relaxed) {
             for i in 0..MAX_TAP_TYPE {
                 if let Some(t) = &mut self.policy_table[start_index + i] {
                     t.clear();
                 }
             }
-            self.policy_table_flush_flags[key.fast_index] = false
+            self.policy_table_flush_flags[key.fast_index].store(false, Ordering::Relaxed);
         }
 
         if self.policy_table[start_index + u16::from(key.tap_type) as usize].is_none() {
@@ -426,7 +416,6 @@ impl FastPath {
         );
         FastPath {
             map_size,
-            queue_count,
 
             mask_from_interface: RwLock::new(
                 std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
@@ -451,11 +440,21 @@ impl FastPath {
                 table
             },
 
-            policy_table_flush_flags: [false; super::MAX_QUEUE_COUNT + 1],
+            policy_table_flush_flags: [FLUSH_FLAGS; super::MAX_QUEUE_COUNT + 1],
 
             // 统计计数
             policy_count: 0,
         }
+    }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        assert!(
+            queue_count <= super::MAX_QUEUE_COUNT,
+            "Fastpath queue count over limit."
+        );
+        self.policy_table_flush_flags.iter_mut().for_each(|f| {
+            f.store(true, Ordering::Relaxed);
+        });
     }
 }
 

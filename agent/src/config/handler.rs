@@ -1718,6 +1718,9 @@ impl ConfigHandler {
         if candidate_config.tap_mode != new_config.tap_mode {
             info!("tap_mode set to {:?}", new_config.tap_mode);
             candidate_config.tap_mode = new_config.tap_mode;
+            if let Some(c) = components.as_mut() {
+                c.clear_dispatcher_components();
+            }
         }
 
         if candidate_config.tap_mode != TapMode::Analyzer
@@ -1732,21 +1735,8 @@ impl ConfigHandler {
             }
         }
 
-        if !yaml_config
-            .src_interfaces
-            .eq(&new_config.yaml_config.src_interfaces)
-        {
-            yaml_config
-                .src_interfaces
-                .clone_from(&new_config.yaml_config.src_interfaces);
-            info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
-        }
-
-        if candidate_config.tap_mode != TapMode::Local
-            && yaml_config.src_interfaces.is_empty()
-            && !yaml_config.dpdk_enabled
-        {
-            warn!("src_interfaces should be set in Analyzer mode or Mirror mode");
+        if !new_config.yaml_config.src_interfaces.is_empty() {
+            warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
         if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
@@ -1938,9 +1928,10 @@ impl ConfigHandler {
                     != new_config.dispatcher.tap_interface_regex
             {
                 fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
-                    for dispatcher in comp.dispatchers.iter() {
-                        if let Err(e) =
-                            dispatcher.switch_recv_engine(&handler.candidate_config.dispatcher)
+                    for d in comp.dispatcher_components.iter() {
+                        if let Err(e) = d
+                            .dispatcher
+                            .switch_recv_engine(&handler.candidate_config.dispatcher)
                         {
                             log::error!(
                                 "switch RecvEngine error: {}, deepflow-agent restart...",
@@ -1978,8 +1969,8 @@ impl ConfigHandler {
                     fn start_dispatcher(handler: &ConfigHandler, components: &mut AgentComponents) {
                         match handler.candidate_config.tap_mode {
                             TapMode::Analyzer => {
-                                for dispatcher in components.dispatchers.iter() {
-                                    dispatcher.start();
+                                for d in components.dispatcher_components.iter_mut() {
+                                    d.start();
                                 }
                             }
                             _ => {
@@ -1991,8 +1982,8 @@ impl ConfigHandler {
                                         &components.exception_handler,
                                     ) {
                                         Ok(()) => {
-                                            for dispatcher in components.dispatchers.iter() {
-                                                dispatcher.start();
+                                            for d in components.dispatcher_components.iter_mut() {
+                                                d.start();
                                             }
                                         }
                                         Err(e) => {
@@ -2006,8 +1997,8 @@ impl ConfigHandler {
                     callbacks.push(start_dispatcher);
                 } else {
                     fn stop_dispatcher(_: &ConfigHandler, components: &mut AgentComponents) {
-                        for dispatcher in components.dispatchers.iter() {
-                            dispatcher.stop();
+                        for d in components.dispatcher_components.iter_mut() {
+                            d.stop();
                         }
                     }
                     callbacks.push(stop_dispatcher);
@@ -2668,8 +2659,9 @@ impl ConfigHandler {
             candidate_config.ebpf = new_config.ebpf;
 
             fn ebpf_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
-                    ebpf_collector.on_config_change(&handler.candidate_config.ebpf);
+                if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
+                    d.ebpf_collector
+                        .on_config_change(&handler.candidate_config.ebpf);
                 }
             }
             callbacks.push(ebpf_callback);
@@ -2687,9 +2679,9 @@ impl ConfigHandler {
             if candidate_config.metric_server.enabled != new_config.metric_server.enabled {
                 if let Some(c) = components.as_mut() {
                     if new_config.metric_server.enabled {
-                        c.external_metrics_server.start();
+                        c.metrics_server_component.start();
                     } else {
-                        c.external_metrics_server.stop();
+                        c.metrics_server_component.stop();
                     }
                 }
             }
@@ -2697,7 +2689,8 @@ impl ConfigHandler {
             // 当端口更新后，在enabled情况下需要重启服务器重新监听
             if candidate_config.metric_server.port != new_config.metric_server.port {
                 if let Some(c) = components.as_mut() {
-                    c.external_metrics_server
+                    c.metrics_server_component
+                        .external_metrics_server
                         .set_port(new_config.metric_server.port);
                 }
             }
@@ -2707,6 +2700,7 @@ impl ConfigHandler {
                     components: &mut AgentComponents,
                 ) {
                     components
+                        .metrics_server_component
                         .external_metrics_server
                         .enable_compressed(handler.candidate_config.metric_server.compressed);
                 }
@@ -2721,9 +2715,9 @@ impl ConfigHandler {
 
         if candidate_config.npb != new_config.npb {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                let dispatcher_builders = &components.handler_builders;
+                let dispatcher_builders = &components.dispatcher_components;
                 for e in dispatcher_builders {
-                    let mut builders = e.lock().unwrap();
+                    let mut builders = e.handler_builders.lock().unwrap();
                     for e in builders.iter_mut() {
                         match e {
                             PacketHandlerBuilder::Npb(n) => {
@@ -2754,8 +2748,8 @@ impl ConfigHandler {
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                for dispatcher in components.dispatchers.iter() {
-                    dispatcher.stop();
+                for d in components.dispatcher_components.iter_mut() {
+                    d.stop();
                 }
                 if handler.candidate_config.tap_mode != TapMode::Analyzer
                     && !running_in_container()
@@ -2768,8 +2762,8 @@ impl ConfigHandler {
                         &components.exception_handler,
                     ) {
                         Ok(()) => {
-                            for dispatcher in components.dispatchers.iter() {
-                                dispatcher.start();
+                            for d in components.dispatcher_components.iter_mut() {
+                                d.start();
                             }
                         }
                         Err(e) => {
@@ -2777,8 +2771,8 @@ impl ConfigHandler {
                         }
                     }
                 } else {
-                    for dispatcher in components.dispatchers.iter() {
-                        dispatcher.start();
+                    for d in components.dispatcher_components.iter_mut() {
+                        d.start();
                     }
                 }
             }
