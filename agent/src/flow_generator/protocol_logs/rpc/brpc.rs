@@ -81,7 +81,7 @@ impl BrpcInfo {
             info.resp_code = resp.error_code;
             info.resp_exception = resp.error_text;
             info.resp_status = match resp.error_code {
-                Some(x) if x != 0 => Some(L7ResponseStatus::Error),
+                Some(x) if x != 0 => Some(L7ResponseStatus::ServerError),
                 _ => Some(L7ResponseStatus::Ok),
             };
             info.resp_len = Some(body_size as u32 + 12);
