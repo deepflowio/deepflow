@@ -1530,7 +1530,10 @@ func (t *PlatformInfoTable) updateVtapIps(vtapIps []*trident.VtapIp) {
 			OrgId:        uint16(vtapIp.GetOrgId()),
 			TeamId:       uint16(vtapIp.GetTeamId()),
 		}
-		orgIdMap[uint16(vtapIp.GetOrgId())] = struct{}{}
+		orgId := vtapIp.GetOrgId()
+		if orgId != ckdb.INVALID_ORG_ID {
+			orgIdMap[uint16(orgId)] = struct{}{}
+		}
 	}
 	// add default org
 	orgIdMap[ckdb.DEFAULT_ORG_ID] = struct{}{}
