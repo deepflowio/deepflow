@@ -302,6 +302,12 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	for _, analyzer := range analyzers {
 		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
 		if err != nil {
+			if errors.Is(err, httpcommon.ErrorFail) {
+				log.Infof("weiqiang fail: %v", err)
+			}
+			if errors.Is(err, httpcommon.ErrorPending) {
+				log.Infof("weiqiang pending: %v", err)
+			}
 			errs = append(errs, fmt.Errorf(
 				"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
 				analyzer.Name, analyzer.IP, dataSource.DisplayName, err,
@@ -322,9 +328,18 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	}
 	var errStrs []string
 	for _, e := range errs {
+		if errors.Is(e, httpcommon.ErrorFail) {
+			log.Infof("weiqiang fail: %v", e)
+		}
+		if errors.Is(e, httpcommon.ErrorPending) {
+			log.Infof("weiqiang pending: %v", e)
+		}
 		errStrs = append(errStrs, e.Error())
 	}
 	errMsg := strings.Join(errStrs, ".") + "."
+	if len(errMsg) > 0 {
+		log.Error(err)
+	}
 
 	for _, e := range errs {
 		if errors.Is(e, httpcommon.ErrorFail) {
