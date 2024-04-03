@@ -19,6 +19,7 @@ package statsd
 import (
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/server/libs/stats"
 )
@@ -63,8 +64,10 @@ func (c *VTapCounter) SetCounter(vtapName string, weight float64, isChanged uint
 			log.Infof("agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
 				vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
 		}
-		counter.Weight = weight
-		counter.IsAnalyzerChanged = isChanged
+
+		c.VTapNameCounter[vtapName].Weight = weight
+		atomic.StoreUint64(&c.VTapNameCounter[vtapName].IsAnalyzerChanged, isChanged)
+		// c.VTapNameCounter[vtapName].IsAnalyzerChanged = isChanged
 		return
 	}
 

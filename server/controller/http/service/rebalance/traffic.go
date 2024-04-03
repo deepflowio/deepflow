@@ -78,6 +78,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 
 	response := &model.VTapRebalanceResult{}
 	for _, az := range info.AZs {
+		log.Infof("weiqiang az: %#v", az)
 		azVTaps, ok := azToVTaps[az.Lcuuid]
 		if !ok {
 			continue
@@ -111,7 +112,22 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 			vtaps:           azVTaps,
 			analyzers:       azAnalyzers,
 		}
+		b, err := json.Marshal(p)
+		if err != nil {
+			log.Error(err)
+		}
+		log.Infof("weiqiang az info: %s", string(b))
 		vTapIDToChangeInfo, azVTapRebalanceResult := p.rebalanceAnalyzer(ifCheckout)
+		b, err = json.Marshal(vTapIDToChangeInfo)
+		if err != nil {
+			log.Error(err)
+		}
+		log.Infof("weiqiang vTapIDToChangeInfo: %s", string(b))
+		b, err = json.Marshal(azVTapRebalanceResult)
+		if err != nil {
+			log.Error(err)
+		}
+		log.Infof("weiqiang azVTapRebalanceResult: %s", string(b))
 		if azVTapRebalanceResult != nil {
 			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
 			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
@@ -119,7 +135,12 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(ifCheckout bool, dataDuration 
 		if azVTapRebalanceResult != nil && azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
 			for vtapID, changeInfo := range vTapIDToChangeInfo {
 				if changeInfo.OldIP != changeInfo.NewIP {
-					log.Infof("az(%s) vtap(%v) analyzer ip changed: %s -> %s", az.Lcuuid, vtapID, changeInfo.OldIP, changeInfo.NewIP)
+					var vtapName string
+					if vtap, ok := vTapIDToVTap[vtapID]; ok {
+						vtapName = vtap.Name
+					}
+					log.Infof("az(%s) vtap(%v) analyzer ip changed: %s -> %s",
+						az.Lcuuid, vtapName, changeInfo.OldIP, changeInfo.NewIP)
 				}
 			}
 		}
