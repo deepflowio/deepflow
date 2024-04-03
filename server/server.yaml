@@ -557,13 +557,17 @@ ingester:
   #prometheus-label-cache-expiration: 86400
 
   #ck-disk-monitor:
-  #  check-interval: 300 # 检查时间间隔(单位: 秒)
+  #  check-interval: 180 # 检查时间间隔(单位: 秒)
   ## 磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space, 或磁盘占用大于used-space, 开始清理数据
   ## When the disk space is insufficient, the disk occupancy > 'used-percent' and the disk idle < 'free-space' are met at the same time, or the disk occupancy > 'used-space', then the data is cleaned up
   #  disk-cleanups:
+  #  - disk-name-prefix: default  # monitor disks starting with 'disk-name-prefix', check the disks 'select * from system.disks'
+  #    used-percent: 80         #  disk usage threshold, ranges: 0-100
+  #    free-space: 300          #  uint: GB, disk minimum free threshold
+  #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  - disk-name-prefix: path_  # monitor disks starting with 'disk-name-prefix', check the disks 'select * from system.disks'
   #    used-percent: 80         #  disk usage threshold, ranges: 0-100
-  #    free-space: 100          #  uint: GB, disk minimum free threshold
+  #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
   #  - database: flow_log
