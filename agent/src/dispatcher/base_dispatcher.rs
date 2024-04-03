@@ -202,6 +202,10 @@ impl BaseDispatcher {
             Ok(links) => links,
         };
         let options = self.options.lock().unwrap();
+        log::info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 1");
+        self.engine = RecvEngine::Libpcap(None);
+        log::info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 11");
+
         self.engine = if options.tap_mode == TapMode::Local && options.libpcap_enabled {
             if pcap_interfaces.is_empty() {
                 return Err(Error::Libpcap(
@@ -234,6 +238,7 @@ impl BaseDispatcher {
         } else {
             todo!()
         };
+        log::info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 2");
 
         Ok(())
     }
@@ -388,12 +393,15 @@ impl BaseDispatcher {
         }
 
         let bpf_options = self.bpf_options.lock().unwrap();
+        log::info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 1");
+
         if let Err(e) = self
             .engine
             .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
+        log::info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 2");
     }
 }
 
