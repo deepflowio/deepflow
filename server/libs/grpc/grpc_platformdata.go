@@ -195,7 +195,7 @@ type PlatformInfoTable struct {
 func QueryAllOrgIDs() []uint16 {
 	var orgIDs []uint16
 	// wait until get orgIDs
-	for orgIDs == nil {
+	for len(orgIDs) == 0 {
 		log.Info("waiting for get orgIDs")
 		time.Sleep(time.Second)
 		if platformDataManager != nil {
