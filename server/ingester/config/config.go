@@ -37,10 +37,11 @@ var log = logging.MustGetLogger("config")
 const (
 	DefaultControllerIP             = "127.0.0.1"
 	DefaultControllerPort           = 20035
-	DefaultCheckInterval            = 300 // clickhouse是异步删除
+	DefaultCheckInterval            = 180 // clickhouse是异步删除
 	DefaultDiskUsedPercent          = 80
-	DefaultDiskFreeSpace            = 100
-	DefaultDFDiskPrefix             = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
+	DefaultDiskFreeSpace            = 300
+	DefaultDFDiskPrefix             = "path_"   // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
+	DefaultSystemDiskPrefix         = "default" // In the config.xml of ClickHouse, the disk name of default storage policy 'default'
 	EnvK8sNodeIP                    = "K8S_NODE_IP_FOR_DEEPFLOW"
 	EnvK8sPodName                   = "K8S_POD_NAME_FOR_DEEPFLOW"
 	EnvK8sNodeName                  = "K8S_NODE_NAME_FOR_DEEPFLOW"
@@ -414,6 +415,12 @@ func Load(path string) *Config {
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
 				[]DiskCleanup{
+					{
+						DefaultSystemDiskPrefix,
+						DefaultDiskUsedPercent,
+						DefaultDiskFreeSpace,
+						0,
+					},
 					{
 						DefaultDFDiskPrefix,
 						DefaultDiskUsedPercent,
