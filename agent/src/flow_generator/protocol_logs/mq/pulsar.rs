@@ -319,7 +319,7 @@ impl PulsarInfo {
             self.resp_code = None;
             self.resp_exception = None;
         } else {
-            self.resp_status = Some(L7ResponseStatus::Error);
+            self.resp_status = Some(L7ResponseStatus::ServerError);
             self.resp_code = code;
             self.resp_exception = msg;
         }
