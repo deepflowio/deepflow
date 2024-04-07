@@ -61,9 +61,21 @@ type OperatedTime struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
 }
 
+func (o OperatedTime) GetCreatedAt() time.Time {
+	return o.CreatedAt
+}
+
+func (o OperatedTime) GetUpdatedAt() time.Time {
+	return o.UpdatedAt
+}
+
 type SoftDeleteBase struct {
 	OperatedTime `mapstructure:",squash"`
 	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
+}
+
+func (s SoftDeleteBase) GetDeletedAt() gorm.DeletedAt {
+	return s.DeletedAt
 }
 
 type Process struct {
