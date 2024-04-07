@@ -567,8 +567,8 @@ func updateCounter(vtapIDToVTap map[int]*mysql.VTap, vtapNameToID map[string]int
 				log.Error(err)
 			}
 		} else {
-			log.Debugf("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
-			log.Debugf("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
+			log.Infof("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Infof("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
 			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
 			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
 		}
