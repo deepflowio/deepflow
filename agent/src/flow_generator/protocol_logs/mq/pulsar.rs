@@ -92,6 +92,14 @@ impl Default for PulsarLog {
     }
 }
 
+macro_rules! check_exists {
+    ($command:expr, $field:ident) => {
+        if $command.$field.is_none() {
+            return None;
+        }
+    };
+}
+
 macro_rules! check {
     ($command:expr, $code:expr, $exception:expr) => {
         if let Some(x) = &$command {
@@ -450,6 +458,109 @@ impl PulsarInfo {
         }
         let buf = payload.get(8..8 + command_size as usize)?;
         info.command = Box::new(BaseCommand::decode(buf).ok()?);
+        let command = &info.command;
+        match command.r#type() {
+            CommandType::Ack => check_exists!(command, ack),
+            CommandType::Flow => check_exists!(command, flow),
+            CommandType::Message => check_exists!(command, message),
+            CommandType::RedeliverUnacknowledgedMessages => {
+                check_exists!(command, redeliver_unacknowledged_messages)
+            }
+            CommandType::ReachedEndOfTopic => check_exists!(command, reached_end_of_topic),
+            CommandType::ActiveConsumerChange => check_exists!(command, active_consumer_change),
+            CommandType::AckResponse => check_exists!(command, ack_response),
+            CommandType::WatchTopicList => check_exists!(command, watch_topic_list),
+            CommandType::WatchTopicListSuccess => check_exists!(command, watch_topic_list_success),
+            CommandType::WatchTopicUpdate => check_exists!(command, watch_topic_update),
+            CommandType::WatchTopicListClose => check_exists!(command, watch_topic_list_close),
+            CommandType::TopicMigrated => check_exists!(command, topic_migrated),
+
+            CommandType::Connect => check_exists!(command, connect),
+            CommandType::Connected => check_exists!(command, connected),
+
+            CommandType::Producer => check_exists!(command, producer),
+            CommandType::ProducerSuccess => check_exists!(command, producer_success),
+
+            CommandType::Send => check_exists!(command, send),
+            CommandType::SendReceipt => check_exists!(command, send_receipt),
+            CommandType::SendError => check_exists!(command, send_error),
+
+            CommandType::Ping => check_exists!(command, ping),
+            CommandType::Pong => check_exists!(command, pong),
+
+            CommandType::Lookup => check_exists!(command, lookup_topic),
+            CommandType::LookupResponse => check_exists!(command, lookup_topic_response),
+
+            CommandType::PartitionedMetadata => check_exists!(command, partition_metadata),
+            CommandType::PartitionedMetadataResponse => {
+                check_exists!(command, partition_metadata_response)
+            }
+
+            CommandType::GetSchema => check_exists!(command, get_schema),
+            CommandType::GetSchemaResponse => check_exists!(command, get_schema_response),
+
+            CommandType::ConsumerStats => check_exists!(command, consumer_stats),
+            CommandType::ConsumerStatsResponse => check_exists!(command, consumer_stats_response),
+
+            CommandType::GetLastMessageId => check_exists!(command, get_last_message_id),
+            CommandType::GetLastMessageIdResponse => {
+                check_exists!(command, get_last_message_id_response)
+            }
+
+            CommandType::GetTopicsOfNamespace => check_exists!(command, get_topics_of_namespace),
+            CommandType::GetTopicsOfNamespaceResponse => {
+                check_exists!(command, get_topics_of_namespace_response)
+            }
+
+            CommandType::AuthChallenge => check_exists!(command, auth_challenge),
+            CommandType::AuthResponse => check_exists!(command, auth_response),
+
+            CommandType::GetOrCreateSchema => check_exists!(command, get_or_create_schema),
+            CommandType::GetOrCreateSchemaResponse => {
+                check_exists!(command, get_or_create_schema_response)
+            }
+
+            CommandType::NewTxn => check_exists!(command, new_txn),
+            CommandType::NewTxnResponse => check_exists!(command, new_txn_response),
+
+            CommandType::AddPartitionToTxn => check_exists!(command, add_partition_to_txn),
+            CommandType::AddPartitionToTxnResponse => {
+                check_exists!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::AddSubscriptionToTxn => check_exists!(command, add_subscription_to_txn),
+            CommandType::AddSubscriptionToTxnResponse => {
+                check_exists!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::EndTxn => check_exists!(command, end_txn),
+            CommandType::EndTxnResponse => check_exists!(command, end_txn_response),
+
+            CommandType::EndTxnOnPartition => check_exists!(command, end_txn_on_partition),
+            CommandType::EndTxnOnPartitionResponse => {
+                check_exists!(command, end_txn_on_partition_response)
+            }
+
+            CommandType::EndTxnOnSubscription => check_exists!(command, end_txn_on_subscription),
+            CommandType::EndTxnOnSubscriptionResponse => {
+                check_exists!(command, end_txn_on_subscription_response)
+            }
+
+            CommandType::TcClientConnectRequest => {
+                check_exists!(command, tc_client_connect_request)
+            }
+            CommandType::TcClientConnectResponse => {
+                check_exists!(command, tc_client_connect_response)
+            }
+
+            CommandType::Subscribe => check_exists!(command, subscribe),
+            CommandType::Unsubscribe => check_exists!(command, unsubscribe),
+            CommandType::CloseProducer => check_exists!(command, close_producer),
+            CommandType::CloseConsumer => check_exists!(command, close_consumer),
+            CommandType::Seek => check_exists!(command, seek),
+            CommandType::Error => check_exists!(command, error),
+            CommandType::Success => check_exists!(command, success),
+        }
         let mut extra = payload.get(8 + command_size..4 + total_size)?;
         let payload = payload.get(4 + total_size..)?;
         if extra.len() > 0 {
