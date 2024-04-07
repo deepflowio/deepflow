@@ -32,7 +32,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -227,13 +226,6 @@ func batchDeleteVtap(c *gin.Context) {
 
 func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		// 如果不是masterController，将请求转发至是masterController
-		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
-		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
-			return
-		}
-
 		args := make(map[string]interface{})
 		args["check"] = false
 		if value, ok := c.GetQuery("check"); ok {

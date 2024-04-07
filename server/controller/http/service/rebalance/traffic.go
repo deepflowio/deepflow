@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
@@ -474,7 +475,6 @@ func (q *Query) GetAgentDispatcher(domainPrefix string, dataDuration int) (map[s
 		return nil, err
 	}
 
-	log.Debugf("traffic query sql: %s", sql)
 	vtapNameToDataSize, err := parseBody(body)
 	if err != nil {
 		return nil, fmt.Errorf("parse response data failed, data: %s, err: %s", string(body), err)
@@ -516,15 +516,20 @@ func parseBody(data []byte) (map[string]int64, error) {
 }
 
 func updateCounter(vtapIDToVTap map[int]*mysql.VTap, vtapNameToID map[string]int, vtapIDToChangeInfo map[int]*ChangeInfo) {
-	vtapCounter := statsd.GetVTapCounter()
-	for name := range vtapCounter.VTapNameCounter {
+	setNullFunc := func(name string, vtapNameToCounter map[string]*statsd.GetVTapWeightCounter) {
+		if _, ok := statsd.VTapNameToCounter[name]; ok {
+			statsd.VTapNameToCounter[name].VTapWeightCounter = &statsd.VTapWeightCounter{}
+		}
+	}
+
+	for name := range statsd.VTapNameToCounter {
 		vtapID, ok := vtapNameToID[name]
 		if !ok {
-			vtapCounter.SetNull(name)
+			setNullFunc(name, statsd.VTapNameToCounter)
 			continue
 		}
 		if vtap, ok := vtapIDToVTap[vtapID]; ok && vtap.State != common.VTAP_STATE_NORMAL {
-			vtapCounter.SetNull(name)
+			setNullFunc(name, statsd.VTapNameToCounter)
 			continue
 		}
 	}
@@ -537,7 +542,7 @@ func updateCounter(vtapIDToVTap map[int]*mysql.VTap, vtapNameToID map[string]int
 		}
 		name := vtap.Name
 		if vtap.State != common.VTAP_STATE_NORMAL {
-			vtapCounter.SetNull(name)
+			setNullFunc(name, statsd.VTapNameToCounter)
 			continue
 		}
 
@@ -545,6 +550,27 @@ func updateCounter(vtapIDToVTap map[int]*mysql.VTap, vtapNameToID map[string]int
 		if changeInfo.OldIP != changeInfo.NewIP {
 			isAnalyzerChanged = uint64(1)
 		}
-		vtapCounter.SetCounter(name, changeInfo.NewWeight, isAnalyzerChanged)
+		counter, ok := statsd.VTapNameToCounter[name]
+		if !ok {
+			counter := &statsd.GetVTapWeightCounter{
+				Name: name,
+				VTapWeightCounter: &statsd.VTapWeightCounter{
+					Weight:            changeInfo.NewWeight,
+					IsAnalyzerChanged: isAnalyzerChanged,
+				},
+			}
+			statsd.VTapNameToCounter[name] = counter
+			b, _ := json.Marshal(counter)
+			log.Infof("agent(%v) register counter: %v", name, string(b))
+			err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", counter, stats.OptionStatTags{"host": name})
+			if err != nil {
+				log.Error(err)
+			}
+		} else {
+			log.Debugf("agent(%v) update weight: %v -> %v", name, counter.VTapWeightCounter.Weight, changeInfo.NewWeight)
+			log.Debugf("agent(%v) update is_analyzer_changed: %v -> %v", name, counter.VTapWeightCounter.IsAnalyzerChanged, isAnalyzerChanged)
+			counter.VTapWeightCounter.Weight = changeInfo.NewWeight
+			counter.VTapWeightCounter.IsAnalyzerChanged = isAnalyzerChanged
+		}
 	}
 }
