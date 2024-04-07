@@ -162,6 +162,10 @@ controller:
         hostname_to_ip_file: /etc/hostname_to_ip.csv
         # 开启debug模式，支持debug云平台API/SDK原始数据
         debug_enabled: false
+        # tencent 公有云私有化部署配置
+        # tencent_config:
+        #   region:
+        #   endpoint:
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
         cache_refresh_interval: 60
