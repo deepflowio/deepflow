@@ -27,4 +27,5 @@ type GenesisConfig struct {
 	MultiNSMode             bool     `default:"false" yaml:"multi_ns_mode"`
 	SingleVPCMode           bool     `default:"false" yaml:"single_vpc_mode"`
 	IgnoreNICRegex          string   `default:"^(kube-ipvs)" yaml:"ignore_nic_regex"`
+	VMNameField             string   `default:"metadata" yaml:"vm_name_field"`
 }
