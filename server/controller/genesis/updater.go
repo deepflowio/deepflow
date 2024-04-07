@@ -55,6 +55,7 @@ type GenesisSyncRpcUpdater struct {
 	excludeIPRanges       []netaddr.IPPrefix
 	multiNSMode           bool
 	singleVPCMode         bool
+	vmNameField           string
 	ignoreNICRegex        *regexp.Regexp
 	genesisSyncDataByPeer map[uint32]GenesisSyncDataOperation
 }
@@ -119,6 +120,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		excludeIPRanges:       excludeIPRanges,
 		multiNSMode:           cfg.MultiNSMode,
 		singleVPCMode:         cfg.SingleVPCMode,
+		vmNameField:           cfg.VMNameField,
 		ignoreNICRegex:        ignoreNICRegex,
 		genesisSyncDataByPeer: map[uint32]GenesisSyncDataOperation{},
 	}
@@ -624,7 +626,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	if err != nil {
 		log.Warning("parse vm states failed: " + err.Error())
 	}
-	xmlVMs, err := genesiscommon.ParseVMXml(rawVM)
+	xmlVMs, err := genesiscommon.ParseVMXml(rawVM, v.vmNameField)
 	if err != nil {
 		log.Warning("parse vm xml failed: " + err.Error())
 	}

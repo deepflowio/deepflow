@@ -256,6 +256,11 @@ controller:
     single_vpc_mode:
     # 忽略网卡正则表达式配置，匹配到会忽略该网卡，默认为 ^(kube-ipvs) ，增加其他的网卡名称需要在此基础上新增
     ignore_nic_regex:
+    ## 采集器同步 KVM ，解析虚拟机的 XML 时，默认为 metadata 即使用 domian.metadata.instance.name 字段作为虚拟机的名称
+    ## 可通过此配置将虚拟机名称指定为 domain.name、domain.title、domain.uuid 之一，默认为空
+    ## 当使用此配置指定的字段取不到虚拟机名称或虚拟机名称为空时，则将使用 domain.name 的值作为虚拟机名称
+    ## 例：vm_name_field: title ，指定 domain.title 作为虚拟机的名称
+    #vm_name_field: metadata
 
   prometheus:
     # synchronizer cache refresh interval, unit: second
