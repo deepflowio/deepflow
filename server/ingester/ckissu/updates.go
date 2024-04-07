@@ -133,8 +133,13 @@ var ColumnAdd65 = []*ColumnAdds{
 
 	{
 		Dbs: []string{"flow_metrics"},
-		Tables: []string{"application.1m", "application.1m_local", "application_map.1m", "application_map.1m_local",
-			"application.1s", "application.1s_local", "application_map.1s", "application_map.1s_local", "traffic_policy.1m", "traffic_policy.1m_local"},
+		Tables: []string{
+			"application.1m", "application.1m_local", "application_map.1m", "application_map.1m_local",
+			"application.1s", "application.1s_local", "application_map.1s", "application_map.1s_local",
+			"traffic_policy.1m", "traffic_policy.1m_local",
+			"network.1m", "network.1m_local", "network_map.1m", "network_map.1m_local",
+			"network.1s", "network.1s_local", "network_map.1s", "network_map.1s_local",
+		},
 		ColumnNames: []string{"team_id"},
 		ColumnType:  ckdb.UInt16,
 	},
