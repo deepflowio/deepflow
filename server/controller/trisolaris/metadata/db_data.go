@@ -21,6 +21,7 @@ import (
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	dbmgr "github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
 
@@ -74,10 +75,12 @@ type DBDataCache struct {
 	podNSs    []*models.PodNamespace
 	vtaps     []*models.VTap
 	chDevices []*models.ChDevice
+
+	config *config.Config
 }
 
-func newDBDataCache() *DBDataCache {
-	return &DBDataCache{}
+func newDBDataCache(cfg *config.Config) *DBDataCache {
+	return &DBDataCache{config: cfg}
 }
 
 func (d *DBDataCache) GetVms() []*models.VM {
@@ -328,7 +331,13 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	pods, err := dbmgr.DBMgr[models.Pod](db).Gets()
+	podFields := []string{}
+	if d.config.ExportersEnabled {
+		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain", "label"}
+	} else {
+		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain"}
+	}
+	pods, err := dbmgr.DBMgr[models.Pod](db).GetFields(podFields)
 	if err == nil {
 		d.pods = pods
 	} else {
@@ -398,14 +407,14 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	wanIPs, err := dbmgr.DBMgr[models.WANIP](db).Gets()
+	wanIPs, err := dbmgr.DBMgr[models.WANIP](db).GetFields([]string{"ip", "vifid", "netmask", "domain"})
 	if err == nil {
 		d.wanIPs = wanIPs
 	} else {
 		log.Error(err)
 	}
 
-	lanIPs, err := dbmgr.DBMgr[models.LANIP](db).Gets()
+	lanIPs, err := dbmgr.DBMgr[models.LANIP](db).GetFields([]string{"ip", "vifid", "vl2id", "domain"})
 	if err == nil {
 		d.lanIPs = lanIPs
 	} else {
