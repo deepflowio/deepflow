@@ -462,6 +462,9 @@ impl ZmtpLog {
         param: &ParseParam,
         strict_check: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
+        if param.is_tls() {
+            return Err(Error::ZmtpLogParseFailed);
+        }
         let mut info_list = vec![];
         while !payload.is_empty() {
             let mut info = ZmtpInfo::default();
