@@ -140,55 +140,6 @@ func (c *DBs) Create(orgID int) {
 	c.NewDBIfNotExists(orgID)
 }
 
-func (c *DBs) DoTransactionOnAllDBs(execFunc func(db *DB) error) error {
-	orgIDs, err := GetORGIDs()
-	if err != nil {
-		return err
-	}
-	var dbs []*DB
-	for _, id := range orgIDs {
-		db, err := c.NewDBIfNotExists(id)
-		if err != nil {
-			return fmt.Errorf("failed to init db for org %d: %v", id, err)
-		}
-		dbs = append(dbs, db)
-	}
-
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	var txs []*DB
-	var txErr error
-	for _, db := range dbs {
-		tx := db.Begin()
-		defer func(t *DB) {
-			if txErr != nil {
-				if err := t.Rollback().Error; err != nil {
-					log.Errorf("failed to rollback db for org(%d): %s", t.ORGID, err.Error())
-
-				}
-			}
-		}(db)
-		if tx.Error != nil {
-			return fmt.Errorf("failed to begin db for org(%d): %s", db.ORGID, tx.Error.Error())
-		}
-
-		txs = append(txs, db)
-		if err := execFunc(db); err != nil {
-			txErr = err
-			return fmt.Errorf("failed to exec db for org(%d): %s", db.ORGID, err.Error())
-		}
-	}
-
-	for _, tx := range txs {
-		if err := tx.Commit().Error; err != nil {
-			txErr = err
-			return fmt.Errorf("failed to commit db for org(%d): %s", tx.ORGID, err.Error())
-		}
-	}
-	return nil
-}
-
 func (c *DBs) get(orgID int) (*DB, bool) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
