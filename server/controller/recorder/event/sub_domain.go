@@ -50,17 +50,17 @@ func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *tool.DataSet, eq
 // If the population fails, incomplete resource events are also written to the queue.
 func (r *SubDomain) ProduceFromMySQL() {
 	var dbItems []mysql.ResourceEvent
-	err := r.org.DB.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
+	err := r.metadata.DB.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
 	if err != nil {
-		log.Error(r.org.LogPre("db query resource_event failed:%s", err.Error()))
+		log.Error(r.metadata.LogPre("db query resource_event failed:%s", err.Error()))
 		return
 	}
 	for _, item := range dbItems {
 		var event *eventapi.ResourceEvent
 		err = json.Unmarshal([]byte(item.Content), &event)
 		if err != nil {
-			log.Error(r.org.LogPre("json marshal event (detail: %#v) failed: %s", item, err.Error()))
-			r.org.DB.Delete(&item)
+			log.Error(r.metadata.LogPre("json marshal event (detail: %#v) failed: %s", item, err.Error()))
+			r.metadata.DB.Delete(&item)
 			continue
 		}
 
@@ -70,7 +70,7 @@ func (r *SubDomain) ProduceFromMySQL() {
 			r.fillL3DeviceInfo(event)
 		}
 		r.convertAndEnqueue(item.ResourceLcuuid, event)
-		r.org.DB.Delete(&item)
+		r.metadata.DB.Delete(&item)
 	}
 }
 
@@ -93,7 +93,7 @@ func (r *SubDomain) fillL3DeviceInfo(event *eventapi.ResourceEvent) bool {
 	} else if event.InstanceType == common.VIF_DEVICE_TYPE_POD {
 		podInfo, err := r.ToolDataSet.GetPodInfoByID(int(event.InstanceID))
 		if err != nil {
-			log.Error(r.org.LogPre("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error()))
+			log.Error(r.metadata.LogPre("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error()))
 			return false
 		}
 		podNodeID = podInfo.PodNodeID

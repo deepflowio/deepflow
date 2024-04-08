@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
@@ -213,32 +214,32 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(orgID int, msg interface{}) { // TODO handle org
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
-	db, err := mysql.GetDB(orgID)
+	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", orgID)
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	keys, chItems := s.generateKeyTargets(items)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(orgID int, msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
-	db, err := mysql.GetDB(orgID)
+	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", orgID)
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
-	db, err := mysql.GetDB(orgID)
+	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", orgID)
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	keys, chItems := s.generateKeyTargets(items)
 	if softDelete {

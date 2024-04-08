@@ -57,7 +57,7 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,
-			db.NewDHCPPort().SetORG(wholeCache.GetORG()),
+			db.NewDHCPPort().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.DHCPPorts,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffB
 func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.DHCPPort, bool) {
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(p.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
 		)))
@@ -82,7 +82,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.D
 	}
 	dbItem := &mysql.DHCPPort{
 		Name:   cloudItem.Name,
-		Domain: p.cache.DomainLcuuid,
+		Domain: p.metadata.Domain.Lcuuid,
 		Region: cloudItem.RegionLcuuid,
 		AZ:     cloudItem.AZLcuuid,
 		VPCID:  vpcID,
@@ -97,7 +97,7 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cl
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(p.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
 			)))

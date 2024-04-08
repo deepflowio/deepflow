@@ -58,7 +58,7 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,
-			db.NewVRouter().SetORG(wholeCache.GetORG()),
+			db.NewVRouter().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VRouters,
 			cloudData,
 		),
@@ -75,7 +75,7 @@ func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBas
 func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRouter, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(r.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 		)))
@@ -86,7 +86,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRo
 		Label:          cloudItem.Label,
 		State:          rcommon.VROUTER_STATE_RUNNING,
 		GWLaunchServer: cloudItem.GWLaunchServer,
-		Domain:         r.cache.DomainLcuuid,
+		Domain:         r.metadata.Domain.Lcuuid,
 		Region:         cloudItem.RegionLcuuid,
 		VPCID:          vpcID,
 	}
@@ -100,7 +100,7 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(r.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 			)))

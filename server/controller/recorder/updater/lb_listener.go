@@ -57,7 +57,7 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,
-			db.NewLBListener().SetORG(wholeCache.GetORG()),
+			db.NewLBListener().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LBListeners,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (d
 func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mysql.LBListener, bool) {
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
-		log.Error(l.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(l.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.Lcuuid,
 		)))
@@ -89,7 +89,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 		Label:    cloudItem.Label,
 		Port:     cloudItem.Port,
 		Protocol: cloudItem.Protocol,
-		Domain:   l.cache.DomainLcuuid,
+		Domain:   l.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

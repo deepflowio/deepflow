@@ -57,7 +57,7 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,
-			db.NewRoutingTable().SetORG(wholeCache.GetORG()),
+			db.NewRoutingTable().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.RoutingTables,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable
 func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysql.RoutingTable, bool) {
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
-		log.Error(t.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(t.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, cloudItem.Lcuuid,
 		)))
@@ -85,7 +85,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 		NexthopType: cloudItem.NexthopType,
 		Nexthop:     cloudItem.Nexthop,
 		VRouterID:   vrouterID,
-		Domain:      t.cache.DomainLcuuid,
+		Domain:      t.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

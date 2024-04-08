@@ -57,7 +57,7 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,
-			db.NewVIP().SetORG(wholeCache.GetORG()),
+			db.NewVIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VIP,
 			cloudData,
 		),
@@ -75,7 +75,7 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysql.VIP, bool) 
 	dbItem := &mysql.VIP{
 		IP:     cloudItem.IP,
 		VTapID: cloudItem.VTapID,
-		Domain: p.cache.DomainLcuuid,
+		Domain: p.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 

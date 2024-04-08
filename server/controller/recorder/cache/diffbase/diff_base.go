@@ -16,16 +16,10 @@
 
 package diffbase
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
-)
-
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
 // 应保持字段定义与cloud字段定义一致，用于在比较资源时可以抽象方法
 type DataSet struct {
 	LogController
-
-	org *common.ORG
 
 	Regions                map[string]*Region
 	AZs                    map[string]*AZ
@@ -122,11 +116,6 @@ func NewDataSet() *DataSet {
 		PrometheusTarget:       make(map[string]*PrometheusTarget),
 		VIP:                    make(map[string]*VIP),
 	}
-}
-
-func (d *DataSet) SetORG(org *common.ORG) *DataSet {
-	d.org = org
-	return d
 }
 
 type DiffBase struct {

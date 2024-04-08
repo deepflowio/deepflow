@@ -57,7 +57,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,
-			db.NewNATGateway().SetORG(wholeCache.GetORG()),
+			db.NewNATGateway().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.NATGateways,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (g *NATGateway) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATGateway) (d
 func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mysql.NATGateway, bool) {
 	vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(g.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(g.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.Lcuuid,
 		)))
@@ -86,7 +86,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 		Label:       cloudItem.Label,
 		UID:         cloudItem.Label,
 		FloatingIPs: cloudItem.FloatingIPs,
-		Domain:      g.cache.DomainLcuuid,
+		Domain:      g.metadata.Domain.Lcuuid,
 		Region:      cloudItem.RegionLcuuid,
 		VPCID:       vpcID,
 	}

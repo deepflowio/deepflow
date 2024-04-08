@@ -60,7 +60,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
-			db.NewVM().SetORG(wholeCache.GetORG()),
+			db.NewVM().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VMs,
 			cloudData,
 		),
@@ -77,7 +77,7 @@ func (m *VM) getDiffBaseByCloudItem(cloudItem *cloudmodel.VM) (diffBase *diffbas
 func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(m.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(m.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 		)))
@@ -101,7 +101,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		HType:        cloudItem.HType,
 		LaunchServer: cloudItem.LaunchServer,
 		HostID:       hostID,
-		Domain:       m.cache.DomainLcuuid,
+		Domain:       m.metadata.Domain.Lcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,
@@ -120,7 +120,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(m.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(m.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 			)))
