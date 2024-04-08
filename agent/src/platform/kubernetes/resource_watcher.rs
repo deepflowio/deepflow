@@ -22,7 +22,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Weak,
     },
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use enum_dispatch::enum_dispatch;
@@ -35,7 +35,7 @@ use k8s_openapi::{
             StatefulSet, StatefulSetSpec,
         },
         core::v1::{
-            Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
+            Container, ContainerStatus, Event, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
             PodStatus, ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
         },
         extensions, networking,
@@ -49,6 +49,7 @@ use kube::{
 };
 use log::{debug, info, trace, warn};
 use openshift_openapi::api::route::v1::Route;
+use public::proto::k8s_event::{EventType, InvolvedObject, KubernetesEvent, Source};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
@@ -58,8 +59,11 @@ use super::crd::{
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
     pingan::ServiceRule,
 };
-use crate::utils::stats::{
-    self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+use crate::{
+    platform::kubernetes::k8s_events::BoxedKubernetesEvent,
+    utils::stats::{
+        self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+    },
 };
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
@@ -73,6 +77,7 @@ pub trait Watcher {
     fn start(&self) -> Option<JoinHandle<()>>;
     fn error(&self) -> Option<String>;
     fn entries(&self) -> Vec<Vec<u8>>;
+    fn events(&self) -> Vec<BoxedKubernetesEvent>;
     fn pb_name(&self) -> &str;
     fn version(&self) -> u64;
     fn ready(&self) -> bool;
@@ -93,6 +98,7 @@ pub enum GenericResourceWatcher {
     V1Ingress(ResourceWatcher<networking::v1::Ingress>),
     V1beta1Ingress(ResourceWatcher<networking::v1beta1::Ingress>),
     ExtV1beta1Ingress(ResourceWatcher<extensions::v1beta1::Ingress>),
+    Event(ResourceWatcher<Event>),
     Route(ResourceWatcher<Route>),
 
     // CRDs
@@ -233,6 +239,15 @@ pub fn default_resources() -> Vec<Resource> {
                     version: "v1beta1",
                 },
             ],
+            selected_gv: None,
+        },
+        Resource {
+            name: "events",
+            pb_name: "*v1.Events",
+            group_versions: vec![GroupVersion {
+                group: "events.k8s.io",
+                version: "v1",
+            }],
             selected_gv: None,
         },
     ]
@@ -382,6 +397,15 @@ pub fn supported_resources() -> Vec<Resource> {
             }],
             selected_gv: None,
         },
+        Resource {
+            name: "events",
+            pb_name: "*v1.Events",
+            group_versions: vec![GroupVersion {
+                group: "events.k8s.io",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
     ]
 }
 
@@ -456,6 +480,7 @@ pub struct WatcherConfig {
 pub struct ResourceWatcher<K> {
     api: Api<K>,
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    events: Arc<Mutex<Vec<BoxedKubernetesEvent>>>,
     err_msg: Arc<Mutex<Option<String>>>,
     kind: Resource,
     version: Arc<AtomicU64>,
@@ -469,6 +494,7 @@ pub struct ResourceWatcher<K> {
 
 struct Context<K> {
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    events: Arc<Mutex<Vec<BoxedKubernetesEvent>>>,
     version: Arc<AtomicU64>,
     api: Api<K>,
     kind: Resource,
@@ -488,6 +514,7 @@ where
     fn start(&self) -> Option<JoinHandle<()>> {
         let ctx = Context {
             entries: self.entries.clone(),
+            events: self.events.clone(),
             version: self.version.clone(),
             kind: self.kind.clone(),
             err_msg: self.err_msg.clone(),
@@ -524,6 +551,10 @@ where
             .collect::<Vec<_>>()
     }
 
+    fn events(&self) -> Vec<BoxedKubernetesEvent> {
+        self.events.blocking_lock().drain(..).collect()
+    }
+
     fn ready(&self) -> bool {
         self.ready.load(Ordering::Relaxed)
     }
@@ -543,6 +574,7 @@ where
         Self {
             api,
             entries: Arc::new(Mutex::new(HashMap::new())),
+            events: Arc::new(Mutex::new(vec![])),
             version: Arc::new(AtomicU64::new(0)),
             kind,
             err_msg: Arc::new(Mutex::new(None)),
@@ -576,8 +608,8 @@ where
             };
             while let Some(ev) = stream.next().await {
                 match ev {
-                    Ok(event) => {
-                        match &event {
+                    Ok(watch_event) => {
+                        match &watch_event {
                             WatchEvent::Added(o)
                             | WatchEvent::Modified(o)
                             | WatchEvent::Deleted(o) => {
@@ -598,7 +630,7 @@ where
                             }
                         }
                         // handles add/modify/delete
-                        Self::resolve_event(&ctx, encoder, event).await;
+                        Self::resolve_watch_event(&ctx, encoder, watch_event).await;
                     }
                     Err(e) => {
                         if std::matches!(
@@ -680,6 +712,7 @@ where
             ctx.kind, ctx.config.list_limit,
         );
         let mut all_entries = HashMap::new();
+        let mut all_events = vec![];
         let mut total_count = 0;
         let mut estimated_total = None;
         let mut total_bytes = 0;
@@ -711,40 +744,54 @@ where
                         estimated_total = Some(total_count + r as usize);
                     }
 
-                    for object in object_list.items {
-                        if object.meta().uid.as_ref().is_none() {
-                            continue;
-                        }
-                        let mut trim_object = object.trim();
-                        match serde_json::to_vec(&trim_object) {
-                            Ok(serialized_object) => {
-                                let compressed_object = match Self::compress_entry(
-                                    encoder,
-                                    serialized_object.as_slice(),
-                                ) {
-                                    Ok(c) => c,
-                                    Err(e) => {
-                                        warn!(
-                                            "failed to compress {} resource with UID({}) error: {} ",
-                                            ctx.kind,
-                                            trim_object.meta().uid.as_ref().unwrap(),
-                                            e
-                                        );
-                                        continue;
-                                    }
-                                };
-                                total_bytes += compressed_object.len();
-                                all_entries.insert(
-                                    trim_object.meta_mut().uid.take().unwrap(),
-                                    compressed_object,
-                                );
+                    if ctx.kind.name == "events" {
+                        for object in object_list.items {
+                            if object.meta().uid.as_ref().is_none() {
+                                continue;
                             }
-                            Err(e) => warn!(
-                                "failed serialized resource {} UID({}) to json Err: {}",
-                                ctx.kind,
-                                trim_object.meta().uid.as_ref().unwrap(),
-                                e
-                            ),
+                            let event = object.trim_to_event();
+                            // Only collect pod events
+                            if !is_pod_event(&event) {
+                                continue;
+                            }
+                            all_events.push(event);
+                        }
+                    } else {
+                        for object in object_list.items {
+                            if object.meta().uid.as_ref().is_none() {
+                                continue;
+                            }
+                            let mut trim_object = object.trim();
+                            match serde_json::to_vec(&trim_object) {
+                                Ok(serialized_object) => {
+                                    let compressed_object = match Self::compress_entry(
+                                        encoder,
+                                        serialized_object.as_slice(),
+                                    ) {
+                                        Ok(c) => c,
+                                        Err(e) => {
+                                            warn!(
+                                                "failed to compress {} resource with UID({}) error: {} ",
+                                                ctx.kind,
+                                                trim_object.meta().uid.as_ref().unwrap(),
+                                                e
+                                            );
+                                            continue;
+                                        }
+                                    };
+                                    total_bytes += compressed_object.len();
+                                    all_entries.insert(
+                                        trim_object.meta_mut().uid.take().unwrap(),
+                                        compressed_object,
+                                    );
+                                }
+                                Err(e) => warn!(
+                                    "failed serialized resource {} UID({}) to json Err: {}",
+                                    ctx.kind,
+                                    trim_object.meta().uid.as_ref().unwrap(),
+                                    e
+                                ),
+                            }
                         }
                     }
 
@@ -758,6 +805,9 @@ where
                             );
                             if !all_entries.is_empty() {
                                 *ctx.entries.lock().await = all_entries;
+                                ctx.version.fetch_add(1, Ordering::SeqCst);
+                            } else if !all_events.is_empty() {
+                                *ctx.events.lock().await = all_events;
                                 ctx.version.fetch_add(1, Ordering::SeqCst);
                             }
                             ctx.resource_version = object_list.metadata.resource_version.take();
@@ -805,13 +855,26 @@ where
         }
     }
 
-    async fn resolve_event(
+    async fn resolve_watch_event(
         ctx: &Context<K>,
         encoder: &mut ZlibEncoder<Vec<u8>>,
-        event: WatchEvent<K>,
+        watch_event: WatchEvent<K>,
     ) {
-        match event {
+        match watch_event {
             WatchEvent::Added(object) | WatchEvent::Modified(object) => {
+                if ctx.kind.name == "events" {
+                    if object.meta().uid.as_ref().is_none() {
+                        return;
+                    }
+                    let event = object.trim_to_event();
+                    // Only collect pod events
+                    if !is_pod_event(&event) {
+                        return;
+                    }
+                    let all_events = &mut ctx.events.lock().await;
+                    all_events.push(event);
+                    return;
+                }
                 Self::insert_object(encoder, object, &ctx.entries, &ctx.version, &ctx.kind).await;
                 ctx.stats_counter
                     .watch_applied
@@ -885,6 +948,9 @@ where
 
 pub trait Trimmable: 'static + Send {
     fn trim(self) -> Self;
+    fn trim_to_event(&self) -> BoxedKubernetesEvent {
+        BoxedKubernetesEvent::default()
+    }
 }
 
 impl Trimmable for Pod {
@@ -1168,6 +1234,58 @@ impl Trimmable for Namespace {
     }
 }
 
+impl Trimmable for Event {
+    fn trim(self) -> Self {
+        Event::default()
+    }
+
+    fn trim_to_event(&self) -> BoxedKubernetesEvent {
+        BoxedKubernetesEvent(Box::new(KubernetesEvent {
+            first_timestamp: self.first_timestamp.clone().map_or(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros() as u64,
+                |t| t.0.timestamp_micros() as u64,
+            ),
+            involved_object: Some(InvolvedObject {
+                field_path: self.involved_object.field_path.clone().unwrap_or_default(),
+                kind: self.involved_object.kind.clone().unwrap_or_default(),
+                name: self.involved_object.name.clone().unwrap_or_default(),
+            }),
+            message: self.message.clone().unwrap_or_default(),
+            reason: self.reason.clone().unwrap_or_default(),
+            source: Some(Source {
+                component: self
+                    .source
+                    .clone()
+                    .map(|s| s.component.unwrap_or_default())
+                    .unwrap_or_default(),
+            }),
+            r#type: self
+                .type_
+                .clone()
+                .map(|t| {
+                    if t == "Normal" {
+                        EventType::Normal
+                    } else {
+                        EventType::Warning
+                    }
+                })
+                .unwrap_or(EventType::Warning)
+                .into(),
+        }))
+    }
+}
+
+fn is_pod_event(event: &BoxedKubernetesEvent) -> bool {
+    if let Some(o) = &event.0.involved_object {
+        o.kind == "Pod"
+    } else {
+        false
+    }
+}
+
 pub struct ResourceWatcherFactory {
     client: Client,
     runtime: Handle,
@@ -1352,6 +1470,12 @@ impl ResourceWatcherFactory {
                 config,
             )),
             "ippools" => GenericResourceWatcher::IpPool(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "events" => GenericResourceWatcher::Event(self.new_watcher_inner(
                 resource,
                 stats_collector,
                 namespace,

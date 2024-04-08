@@ -14,10 +14,22 @@
  * limitations under the License.
  */
 
-pub mod common;
-pub mod flow_log;
-pub mod integration;
-pub mod k8s_event;
-pub mod metric;
-pub mod stats;
-pub mod trident;
+use public::{
+    proto::k8s_event::KubernetesEvent,
+    sender::{SendMessageType, Sendable},
+};
+
+use prost::Message;
+
+#[derive(Debug, Default, Clone)]
+pub struct BoxedKubernetesEvent(pub Box<KubernetesEvent>);
+
+impl Sendable for BoxedKubernetesEvent {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        self.0.encode(buf).map(|_| self.0.encoded_len())
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::KubernetesEvent
+    }
+}

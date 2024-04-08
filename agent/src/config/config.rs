@@ -514,6 +514,7 @@ pub struct YamlConfig {
     pub toa_lru_cache_size: usize,
     pub flow_sender_queue_size: usize,
     pub flow_sender_queue_count: usize,
+    pub k8s_event_sender_queue_size: usize,
     #[serde(rename = "second-flow-extra-delay-second", with = "humantime_serde")]
     pub second_flow_extra_delay: Duration,
     #[serde(with = "humantime_serde")]
@@ -653,6 +654,9 @@ impl YamlConfig {
             } else {
                 1 << 16
             };
+        }
+        if c.k8s_event_sender_queue_size < 1 << 16 {
+            c.k8s_event_sender_queue_size = 1 << 16;
         }
         if c.packet_delay < Duration::from_secs(1) || c.packet_delay > Duration::from_secs(10) {
             c.packet_delay = Duration::from_secs(1);
@@ -904,6 +908,7 @@ impl Default for YamlConfig {
             // default size changes according to tap_mode
             flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
+            k8s_event_sender_queue_size: 1 << 16,
             second_flow_extra_delay: Duration::from_secs(0),
             packet_delay: Duration::from_secs(1),
             triple: Default::default(),

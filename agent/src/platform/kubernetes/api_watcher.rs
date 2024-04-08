@@ -36,9 +36,12 @@ use log::{debug, error, info, log_enabled, warn, Level};
 use parking_lot::RwLock;
 use tokio::{runtime::Runtime, task::JoinHandle};
 
-use super::resource_watcher::{
-    default_resources, supported_resources, GenericResourceWatcher, GroupVersion, Resource,
-    Watcher, WatcherConfig,
+use super::{
+    k8s_events::BoxedKubernetesEvent,
+    resource_watcher::{
+        default_resources, supported_resources, GenericResourceWatcher, GroupVersion, Resource,
+        Watcher, WatcherConfig,
+    },
 };
 use crate::{
     config::{handler::PlatformAccess, KubernetesResourceConfig},
@@ -52,9 +55,12 @@ use crate::{
         stats,
     },
 };
-use public::proto::{
-    common::KubernetesApiInfo,
-    trident::{Exception, KubernetesApiSyncRequest},
+use public::{
+    proto::{
+        common::KubernetesApiInfo,
+        trident::{Exception, KubernetesApiSyncRequest},
+    },
+    queue::DebugSender,
 };
 
 /*
@@ -99,6 +105,7 @@ pub struct ApiWatcher {
     exception_handler: ExceptionHandler,
     stats_collector: Arc<stats::Collector>,
     agent_id: Arc<RwLock<AgentId>>,
+    k8s_events_sender: Arc<Mutex<Option<DebugSender<BoxedKubernetesEvent>>>>,
 }
 
 impl ApiWatcher {
@@ -131,7 +138,15 @@ impl ApiWatcher {
             watchers: Arc::new(Mutex::new(HashMap::new())),
             exception_handler,
             stats_collector,
+            k8s_events_sender: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn set_k8s_events_sender(&self, k8s_events_sender: DebugSender<BoxedKubernetesEvent>) {
+        self.k8s_events_sender
+            .lock()
+            .unwrap()
+            .replace(k8s_events_sender);
     }
 
     // 直接拿对应的entries
@@ -221,6 +236,7 @@ impl ApiWatcher {
         let watchers = self.watchers.clone();
         let exception_handler = self.exception_handler.clone();
         let stats_collector = self.stats_collector.clone();
+        let k8s_events_sender = self.k8s_events_sender.clone();
 
         let handle = thread::Builder::new()
             .name("kubernetes-api-watcher".to_owned())
@@ -236,6 +252,7 @@ impl ApiWatcher {
                     exception_handler,
                     stats_collector,
                     agent_id,
+                    k8s_events_sender,
                 )
             })
             .unwrap();
@@ -579,6 +596,7 @@ impl ApiWatcher {
         resource_watchers: &Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
         exception_handler: &ExceptionHandler,
         agent_id: &Arc<RwLock<AgentId>>,
+        k8s_events_sender: &Arc<Mutex<Option<DebugSender<BoxedKubernetesEvent>>>>,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -632,6 +650,19 @@ impl ApiWatcher {
             let resource_watchers_guard = resource_watchers.lock().unwrap();
             for watcher in resource_watchers_guard.values() {
                 let kind = watcher.pb_name();
+                if kind == "*v1.Events" {
+                    let mut events = watcher.events();
+                    if events.is_empty() {
+                        continue;
+                    }
+                    let mut k8s_events_sender_guard = k8s_events_sender.lock().unwrap();
+                    if let Some(s) = k8s_events_sender_guard.as_mut() {
+                        if let Err(e) = s.send_all(&mut events) {
+                            warn!("send k8s events failed: {:?}", e);
+                        }
+                    }
+                    continue;
+                }
                 for entry in watcher.entries() {
                     total_entries.push(KubernetesApiInfo {
                         r#type: Some(kind.to_owned()),
@@ -752,6 +783,7 @@ impl ApiWatcher {
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
         agent_id: Arc<RwLock<AgentId>>,
+        k8s_events_sender: Arc<Mutex<Option<DebugSender<BoxedKubernetesEvent>>>>,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -849,6 +881,7 @@ impl ApiWatcher {
                 &resource_watchers,
                 &exception_handler,
                 &agent_id,
+                &k8s_events_sender,
             );
             break;
         }
@@ -864,6 +897,7 @@ impl ApiWatcher {
                 &resource_watchers,
                 &exception_handler,
                 &agent_id,
+                &k8s_events_sender,
             );
         }
         info!("kubernetes api watcher stopping");

@@ -63,6 +63,7 @@ rules:
   - services
   - pods
   - replicationcontrollers
+  - events
   verbs: ["get", "list", "watch"]
 - apiGroups: ["apps"]
   resources:

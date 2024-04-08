@@ -727,6 +727,12 @@ vtap_group_id: g-xxxxxx
   ##   FlowAggregator/SessionAggregator.
   #flow-sender-queue-count: 1
 
+  ## Queue Size of K8sEventSender Output
+  ## Default: 65536. Range: [65536, +oo)
+  ## Note: the length of the following queues:
+  ##   - 1-k8s-events-to-sender
+  #k8s-event-sender-queue-size: 65536
+
   ## Queue Size for Analyzer Mode
   ## Default: 131072. Range: [65536, +oo)
   ## Note: the length of the following queues (only for tap_mode = 2):

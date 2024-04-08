@@ -1908,6 +1908,34 @@ impl AgentComponents {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
+        #[cfg(target_os = "linux")]
+        {
+            let k8s_events_queue_name = "1-k8s-events-to-sender";
+            let (k8s_events_sender, k8s_events_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.k8s_event_sender_queue_size,
+                k8s_events_queue_name,
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![StatsOption::Tag(
+                    "module",
+                    k8s_events_queue_name.to_string(),
+                )],
+            );
+            let mut k8s_events_uniform_sender = UniformSenderThread::new(
+                k8s_events_queue_name,
+                Arc::new(k8s_events_receiver),
+                config_handler.sender(),
+                stats_collector.clone(),
+                exception_handler.clone(),
+                true,
+            );
+            api_watcher.set_k8s_events_sender(k8s_events_sender);
+            k8s_events_uniform_sender.start();
+        }
+
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
             yaml_config.toa_sender_queue_size,

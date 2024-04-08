@@ -25,6 +25,7 @@ use regex::Regex;
 mod active_poller;
 mod api_watcher;
 mod crd;
+mod k8s_events;
 mod passive_poller;
 mod sidecar_poller;
 pub use active_poller::ActivePoller;

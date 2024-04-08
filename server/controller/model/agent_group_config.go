@@ -56,6 +56,7 @@ type StaticConfig struct {
 	ToaLruCacheSize                    *int                        `yaml:"toa-lru-cache-size,omitempty"`
 	FlowSenderQueueSize                *int                        `yaml:"flow-sender-queue-size,omitempty"`
 	FlowSenderQueueCount               *int                        `yaml:"flow-sender-queue-count,omitempty"`
+	K8sEventSenderQueueSize            *int                        `yaml:"k8s-event-sender-queue-size,omitempty"`
 	SecondFlowExtraDelaySecond         *string                     `yaml:"second-flow-extra-delay-second,omitempty"`
 	PacketDelay                        *string                     `yaml:"packet-delay,omitempty"`
 	Triple                             *TripleMapConfig            `yaml:"triple,omitempty"`
