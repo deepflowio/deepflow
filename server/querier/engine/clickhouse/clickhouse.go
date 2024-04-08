@@ -92,7 +92,10 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	sql := args.Sql
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
-	e.ORGID = args.ORGID
+	e.ORGID = common.DEFAULT_ORG_ID
+	if args.ORGID != "" {
+		e.ORGID = args.ORGID
+	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 
@@ -841,6 +844,7 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 	e.Model.DB = e.DB
+	e.ORGID = common.DEFAULT_ORG_ID
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -1110,7 +1114,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			}
 			e.Model.Time.DatasourceInterval = interval
 			newDB := e.DB
-			if e.ORGID != "" {
+			if e.ORGID != common.DEFAULT_ORG_ID {
 				newDB = fmt.Sprintf("%s_%s", e.ORGID, e.DB)
 			}
 			if e.DataSource != "" {

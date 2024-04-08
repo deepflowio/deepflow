@@ -117,7 +117,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		sqlstr += queryCacheStr
 	}
 	// ORGID
-	if params.ORGID != "" {
+	if params.ORGID != common.DEFAULT_ORG_ID {
 		sqlstr = strings.ReplaceAll(sqlstr, "flow_tag", fmt.Sprintf("%s_flow_tag", params.ORGID))
 	}
 	err = c.init(query_uuid)
