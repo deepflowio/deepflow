@@ -101,7 +101,123 @@ macro_rules! check {
     };
 }
 
+macro_rules! get_req {
+    ($command:expr, $x:ident) => {{
+        let obj = $command.$x.as_ref()?;
+        Some(obj.request_id as u64)
+    }};
+}
+
+macro_rules! get_msg_req {
+    ($command:expr, $x:ident) => {{
+        let obj = $command.$x.as_ref()?;
+        let producer_id = obj.producer_id as u16 as u64;
+        let sequence_id = obj.sequence_id as u16 as u64;
+        Some((producer_id << 16) | sequence_id)
+    }};
+}
+
 impl PulsarInfo {
+    fn get_request_id(&self) -> Option<u64> {
+        let command = self.command.as_ref();
+        match command.r#type() {
+            CommandType::Ack => None,
+            CommandType::Flow => None,
+            CommandType::Message => None,
+            CommandType::RedeliverUnacknowledgedMessages => None,
+            CommandType::ReachedEndOfTopic => None,
+            CommandType::ActiveConsumerChange => None,
+            CommandType::AckResponse => None,
+            CommandType::WatchTopicList => None,
+            CommandType::WatchTopicListSuccess => None,
+            CommandType::WatchTopicUpdate => None,
+            CommandType::WatchTopicListClose => None,
+            CommandType::TopicMigrated => None,
+
+            CommandType::Connect => None,
+            CommandType::Connected => None,
+
+            CommandType::Producer => get_req!(command, producer),
+            CommandType::ProducerSuccess => get_req!(command, producer_success),
+
+            CommandType::Send => get_msg_req!(command, send),
+            CommandType::SendReceipt => get_msg_req!(command, send_receipt),
+            CommandType::SendError => get_msg_req!(command, send_error),
+
+            CommandType::Ping => None,
+            CommandType::Pong => None,
+
+            CommandType::Lookup => get_req!(command, lookup_topic),
+            CommandType::LookupResponse => get_req!(command, lookup_topic_response),
+
+            CommandType::PartitionedMetadata => get_req!(command, partition_metadata),
+            CommandType::PartitionedMetadataResponse => {
+                get_req!(command, partition_metadata_response)
+            }
+
+            CommandType::GetSchema => get_req!(command, get_schema),
+            CommandType::GetSchemaResponse => get_req!(command, get_schema_response),
+
+            CommandType::ConsumerStats => get_req!(command, consumer_stats),
+            CommandType::ConsumerStatsResponse => get_req!(command, consumer_stats_response),
+
+            CommandType::GetLastMessageId => get_req!(command, get_last_message_id),
+            CommandType::GetLastMessageIdResponse => {
+                get_req!(command, get_last_message_id_response)
+            }
+
+            CommandType::GetTopicsOfNamespace => get_req!(command, get_topics_of_namespace),
+            CommandType::GetTopicsOfNamespaceResponse => {
+                get_req!(command, get_topics_of_namespace_response)
+            }
+
+            CommandType::AuthChallenge => None,
+            CommandType::AuthResponse => None,
+
+            CommandType::GetOrCreateSchema => get_req!(command, get_or_create_schema),
+            CommandType::GetOrCreateSchemaResponse => {
+                get_req!(command, get_or_create_schema_response)
+            }
+
+            CommandType::NewTxn => get_req!(command, new_txn),
+            CommandType::NewTxnResponse => get_req!(command, new_txn_response),
+
+            CommandType::AddPartitionToTxn => get_req!(command, add_partition_to_txn),
+            CommandType::AddPartitionToTxnResponse => {
+                get_req!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::AddSubscriptionToTxn => get_req!(command, add_subscription_to_txn),
+            CommandType::AddSubscriptionToTxnResponse => {
+                get_req!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::EndTxn => get_req!(command, end_txn),
+            CommandType::EndTxnResponse => get_req!(command, end_txn_response),
+
+            CommandType::EndTxnOnPartition => get_req!(command, end_txn_on_partition),
+            CommandType::EndTxnOnPartitionResponse => {
+                get_req!(command, end_txn_on_partition_response)
+            }
+
+            CommandType::EndTxnOnSubscription => get_req!(command, end_txn_on_subscription),
+            CommandType::EndTxnOnSubscriptionResponse => {
+                get_req!(command, end_txn_on_subscription_response)
+            }
+
+            CommandType::TcClientConnectRequest => get_req!(command, tc_client_connect_request),
+            CommandType::TcClientConnectResponse => get_req!(command, tc_client_connect_response),
+
+            CommandType::Subscribe => get_req!(command, subscribe),
+            CommandType::Unsubscribe => get_req!(command, unsubscribe),
+            CommandType::CloseProducer => get_req!(command, close_producer),
+            CommandType::CloseConsumer => get_req!(command, close_consumer),
+            CommandType::Seek => get_req!(command, seek),
+            CommandType::Error => get_req!(command, error),
+            CommandType::Success => get_req!(command, success),
+        }
+    }
+
     fn parse_trace_span(&self, param: &ParseParam) -> (Option<String>, Option<String>) {
         let Some(config) = param.parse_config.map(|x| &x.l7_log_dynamic) else {
             return (None, None);
@@ -132,7 +248,7 @@ impl PulsarInfo {
         (trace_id, span_id)
     }
 
-    fn parse_request_id(&self) -> Option<u32> {
+    fn parse_sequence_id(&self) -> Option<u32> {
         let metadata = self.message_metadata.as_ref().as_ref()?;
         Some(metadata.sequence_id as u32)
     }
@@ -319,7 +435,7 @@ impl PulsarInfo {
             self.resp_code = None;
             self.resp_exception = None;
         } else {
-            self.resp_status = Some(L7ResponseStatus::Error);
+            self.resp_status = Some(L7ResponseStatus::ServerError);
             self.resp_code = code;
             self.resp_exception = msg;
         }
@@ -356,7 +472,7 @@ impl PulsarInfo {
         }
         (info.trace_id, info.span_id) = info.parse_trace_span(param);
         info.x_request_id = info.parse_x_request_id();
-        info.request_id = info.parse_request_id();
+        info.request_id = info.get_request_id().map(|x| x as u32);
         info.domain = info.parse_domain();
         info.version = info.parse_version();
         info.topic = info.parse_topic();
@@ -419,7 +535,7 @@ impl L7ProtocolInfoInterface for PulsarInfo {
     }
 
     fn session_id(&self) -> Option<u32> {
-        None
+        self.get_request_id().map(|x| x as u32)
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
