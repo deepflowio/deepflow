@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"strings"
 
 	//"database/sql"
@@ -117,8 +118,12 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		sqlstr += queryCacheStr
 	}
 	// ORGID
-	if params.ORGID != common.DEFAULT_ORG_ID {
-		sqlstr = strings.ReplaceAll(sqlstr, "flow_tag", fmt.Sprintf("%s_flow_tag", params.ORGID))
+	if params.ORGID != common.DEFAULT_ORG_ID && params.ORGID != "" {
+		orgIDInt, err := strconv.Atoi(params.ORGID)
+		if err != nil {
+			return nil, err
+		}
+		sqlstr = strings.ReplaceAll(sqlstr, "flow_tag", fmt.Sprintf("%04d_flow_tag", orgIDInt))
 	}
 	err = c.init(query_uuid)
 	if err != nil {

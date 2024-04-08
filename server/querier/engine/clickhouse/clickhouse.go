@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1114,8 +1115,13 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			}
 			e.Model.Time.DatasourceInterval = interval
 			newDB := e.DB
-			if e.ORGID != common.DEFAULT_ORG_ID {
-				newDB = fmt.Sprintf("%s_%s", e.ORGID, e.DB)
+			if e.ORGID != common.DEFAULT_ORG_ID && e.ORGID != "" {
+				orgIDInt, err := strconv.Atoi(e.ORGID)
+				if err != nil {
+					log.Error(err)
+					return err
+				}
+				newDB = fmt.Sprintf("%04d_%s", orgIDInt, e.DB)
 			}
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", newDB, table, e.DataSource))
