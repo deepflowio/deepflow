@@ -2103,7 +2103,7 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 	bpf_probe_read_user(buffer, 4, ptr + 4);
 	short command_size = __bpf_ntohl(*(__u32 *) buffer);
 
-	if (total_size < command_size + 4 || total_size + 4 < count)
+	if (total_size < command_size + 4)
 		return MSG_UNKNOWN;
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
@@ -2111,6 +2111,9 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 			return MSG_REQUEST;
 		return MSG_UNKNOWN;
 	}
+
+	if (count < total_size + 4)
+		return MSG_UNKNOWN;
 
 	short limit = total_size + 4 < infer_len ? total_size + 4 : infer_len;
 
