@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msg "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 )
 
@@ -70,7 +71,8 @@ type UpdaterBase[
 	MDPT msg.DeletePtr[MDT],
 	MDT msg.Delete,
 ] struct {
-	org *common.ORG
+	metadata    *common.Metadata
+	msgMetadata *message.Metadata
 
 	resourceType string
 
@@ -105,7 +107,7 @@ func newUpdaterBase[
 	resourceType string, cache *cache.Cache, dbOperator db.Operator[MT], diffBaseData map[string]BT, cloudData []CT,
 ) UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT] {
 	u := UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]{
-		org: cache.GetORG(),
+		metadata: cache.GetMetadata(),
 
 		resourceType: resourceType,
 		cache:        cache,
@@ -113,6 +115,7 @@ func newUpdaterBase[
 		diffBaseData: diffBaseData,
 		cloudData:    cloudData,
 	}
+	u.msgMetadata = message.NewMetadata(u.metadata.ORGID, u.metadata.Domain.TeamID, u.metadata.Domain.ID)
 	u.initPubSub()
 	return u
 }
@@ -120,7 +123,7 @@ func newUpdaterBase[
 func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initPubSub() {
 	ps := pubsub.GetPubSub(u.resourceType)
 	if ps == nil {
-		log.Error(u.org.LogPre("pubsub not found for resource type: %s", u.resourceType))
+		log.Error(u.metadata.LogPre("pubsub not found for resource type: %s", u.resourceType))
 		return
 	}
 	u.pubsub = ps.(pubsub.ResourcePubSub[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT])
@@ -144,11 +147,11 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	logDebug := logDebugResourceTypeEnabled(u.resourceType)
 	for _, cloudItem := range u.cloudData {
 		if logDebug {
-			log.Info(u.org.LogPre(debugCloudItem(u.resourceType, cloudItem)))
+			log.Info(u.metadata.LogPre(debugCloudItem(u.resourceType, cloudItem)))
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Info(u.org.LogPre("to add (cloud item: %#v)", cloudItem))
+			log.Info(u.metadata.LogPre("to add (cloud item: %#v)", cloudItem))
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -157,7 +160,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 			diffBase.SetSequence(u.cache.GetSequence())
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Info(u.org.LogPre("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase))
+				log.Info(u.metadata.LogPre("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase))
 				u.update(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
@@ -171,7 +174,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Info(u.org.LogPre("to delete (diff base item: %#v)", diffBase))
+			log.Info(u.metadata.LogPre("to delete (diff base item: %#v)", diffBase))
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}
@@ -216,7 +219,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 
 		msgData := MAPT(new(MAT))
 		msgData.SetMySQLItems(dbItems)
-		u.pubsub.PublishBatchAdded(u.org.ID, msgData)
+		u.pubsub.PublishBatchAdded(u.msgMetadata, msgData)
 		u.Changed = true
 	}
 }
@@ -231,7 +234,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		msgData.SetFields(structInfo)
 		msgData.SetDiffBase(diffBase)
 		msgData.SetCloudItem(cloudItem)
-		u.pubsub.PublishUpdated(u.org.ID, msgData)
+		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
 		u.Changed = true
 	}
 }
@@ -260,7 +263,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
 		msgData.SetMySQLItems(dbItems)
-		u.pubsub.PublishBatchDeleted(u.org.ID, msgData, u.dbOperator.GetSoftDelete())
+		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData, u.dbOperator.GetSoftDelete())
 		u.Changed = true
 	}
 }

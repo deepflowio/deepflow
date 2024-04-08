@@ -59,7 +59,7 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,
-			db.NewLANIP().SetORG(wholeCache.GetORG()),
+			db.NewLANIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LANIPs,
 			nil,
 		),
@@ -122,7 +122,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	}
 	dbItem := &mysql.LANIP{
 		IP:           ip,
-		Domain:       i.cache.DomainLcuuid,
+		Domain:       i.metadata.Domain.Lcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		NetworkID:    networkID,
 		VInterfaceID: vinterfaceID,

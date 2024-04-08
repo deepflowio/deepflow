@@ -57,7 +57,7 @@ func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGr
 		](
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			wholeCache,
-			db.NewSecurityGroup().SetORG(wholeCache.GetORG()),
+			db.NewSecurityGroup().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.SecurityGroups,
 			cloudData,
 		),
@@ -75,14 +75,14 @@ func (g *SecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroup)
 	dbItem := &mysql.SecurityGroup{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
-		Domain: g.cache.DomainLcuuid,
+		Domain: g.metadata.Domain.Lcuuid,
 		Region: cloudItem.RegionLcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if cloudItem.VPCLcuuid != "" {
 		vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(g.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(g.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.Lcuuid,
 			)))

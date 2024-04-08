@@ -23,13 +23,13 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type EventManagerBase struct {
-	org *ORG
+	metadata *common.Metadata
 
 	resourceType string
 	ToolDataSet  *tool.DataSet
@@ -38,7 +38,7 @@ type EventManagerBase struct {
 
 func newEventManagerBase(rt string, toolDS *tool.DataSet, q *queue.OverwriteQueue) EventManagerBase {
 	return EventManagerBase{
-		org: toolDS.GetORG(),
+		metadata: toolDS.GetMetadata(),
 
 		resourceType: rt,
 		ToolDataSet:  toolDS,
@@ -91,9 +91,9 @@ func (e EventManagerBase) fillEvent(
 func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.ResourceEvent) {
 	rt := e.resourceType
 	if rt == "" {
-		rt = DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
+		rt = common.DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
 	}
-	log.Info(e.org.LogPre("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event))
+	log.Info(e.metadata.LogPre("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event))
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(rt, err))
@@ -113,17 +113,17 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
-		log.Error(e.org.LogPre("json marshal event (detail: %#v) failed: %s", event, err.Error()))
+		log.Error(e.metadata.LogPre("json marshal event (detail: %#v) failed: %s", event, err.Error()))
 	} else {
 		dbItem := mysql.ResourceEvent{
 			Domain:  domainLcuuid,
 			Content: string(content),
 		}
-		err = e.org.DB.Create(&dbItem).Error
+		err = e.metadata.DB.Create(&dbItem).Error
 		if err != nil {
-			log.Error(e.org.LogPre("add resource_event (detail: %#v) failed: %s", dbItem, err.Error()))
+			log.Error(e.metadata.LogPre("add resource_event (detail: %#v) failed: %s", dbItem, err.Error()))
 		} else {
-			log.Info(e.org.LogPre("create resource_event (detail: %#v) success", dbItem))
+			log.Info(e.metadata.LogPre("create resource_event (detail: %#v) success", dbItem))
 			return
 		}
 	}

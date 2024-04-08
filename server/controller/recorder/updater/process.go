@@ -58,7 +58,7 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
-			db.NewProcess().SetORG(wholeCache.GetORG()),
+			db.NewProcess().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.Process,
 			cloudData,
 		),
@@ -118,7 +118,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		UserName:    cloudItem.UserName,
 		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
-		Domain:      p.cache.DomainLcuuid,
+		Domain:      p.metadata.Domain.Lcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
 		NetnsID:     cloudItem.NetnsID,
 		DeviceType:  deviceType,

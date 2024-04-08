@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,28 +14,18 @@
  * limitations under the License.
  */
 
-package common
+package message
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-)
-
-type ORG struct {
-	ID     int       // org id
-	DB     *mysql.DB // org database connection
-	Logger *Logger   // log controller
+type Metadata struct {
+	ORGID    int
+	TeamID   int
+	DomainID int
 }
 
-func NewORG(id int) (*ORG, error) {
-	db, err := mysql.GetDB(id)
-	return &ORG{
-		ID:     id,
-		DB:     db,
-		Logger: NewLogger(id),
-	}, err
-}
-
-// LogPre adds org id, domain info, sub_domain info to logs
-func (o *ORG) LogPre(format string, a ...any) string {
-	return o.Logger.AddPre(format, a...)
+func NewMetadata(orgID, teamID, domainID int) *Metadata {
+	return &Metadata{
+		ORGID:    orgID,
+		TeamID:   teamID,
+		DomainID: domainID,
+	}
 }

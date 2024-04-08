@@ -85,7 +85,7 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = h.ToolDataSet.GetHostNameByID(id)
 			if err != nil {
-				log.Error(h.org.LogPre("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err))
+				log.Error(h.metadata.LogPre("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err))
 			}
 		}
 

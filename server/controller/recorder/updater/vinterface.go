@@ -60,7 +60,7 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
-			db.NewVInterface().SetORG(wholeCache.GetORG()),
+			db.NewVInterface().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VInterfaces,
 			cloudData,
 		),
@@ -85,7 +85,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			}
 			if !exists {
-				log.Error(i.org.LogPre(resourceAForResourceBNotFound(
+				log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 				)))
@@ -95,7 +95,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	}
 	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 	if !exists {
-		log.Error(i.org.LogPre(
+		log.Error(i.metadata.LogPre(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
 			cloudItem.DeviceType, cloudItem.DeviceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
@@ -114,7 +114,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		DeviceID:   deviceID,
 		VlanTag:    0,
 		SubDomain:  cloudItem.SubDomainLcuuid,
-		Domain:     i.cache.DomainLcuuid,
+		Domain:     i.metadata.Domain.Lcuuid,
 		Region:     cloudItem.RegionLcuuid,
 		NetnsID:    cloudItem.NetnsID,
 		VtapID:     cloudItem.VTapID,
@@ -136,7 +136,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 				}
 				if !exists {
-					log.Error(i.org.LogPre(resourceAForResourceBNotFound(
+					log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
 						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 					)))
