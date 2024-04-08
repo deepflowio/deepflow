@@ -48,7 +48,7 @@ type MetaData struct {
 
 func NewMetaData(db *gorm.DB, cfg *config.Config) *MetaData {
 	dbDataCache := &atomic.Value{}
-	dbDataCache.Store(newDBDataCache())
+	dbDataCache.Store(newDBDataCache(cfg))
 	metaData := &MetaData{
 		dbDataCache:    dbDataCache,
 		tapType:        newTapType(db),
@@ -66,7 +66,7 @@ func NewMetaData(db *gorm.DB, cfg *config.Config) *MetaData {
 }
 
 func (m *MetaData) generateDbDataCache() {
-	dbDataCache := newDBDataCache()
+	dbDataCache := newDBDataCache(m.config)
 	dbDataCache.GetDataCacheFromDB(m.db)
 	m.updateDBDataCache(dbDataCache)
 }

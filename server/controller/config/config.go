@@ -24,6 +24,7 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
+	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -143,6 +144,8 @@ func (c *Config) Load(path string) {
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetIngesterPort(ingesterPort)
 	}
+	// from ingester exporter setting
+	c.ControllerConfig.TrisolarisCfg.SetExportersEnabled(shared_common.ExportersEnabled(path))
 }
 
 func DefaultConfig() *Config {
