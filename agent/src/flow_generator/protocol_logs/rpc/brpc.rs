@@ -114,6 +114,19 @@ impl BrpcInfo {
 
         Some((payload, info))
     }
+
+    fn get_request_id(&self) -> Option<u32> {
+        /*
+        file: brpc/src/bthread/id.cpp
+
+        inline bthread_id_t make_id(uint32_t version, IdResourceId slot) {
+            const bthread_id_t tmp =
+                { (((uint64_t)slot.value) << 32) | (uint64_t)version };
+            return tmp;
+        }
+        */
+        self.correlation_id.map(|x| (x >> 32) as u32)
+    }
 }
 
 impl From<BrpcInfo> for L7ProtocolSendLog {
@@ -125,16 +138,7 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
 
         let endpoint = info.get_endpoint();
 
-        /*
-        file: brpc/src/bthread/id.cpp
-
-        inline bthread_id_t make_id(uint32_t version, IdResourceId slot) {
-            const bthread_id_t tmp =
-                { (((uint64_t)slot.value) << 32) | (uint64_t)version };
-            return tmp;
-        }
-        */
-        let request_id = info.correlation_id.map(|x| (x >> 32) as u32);
+        let request_id = info.get_request_id();
 
         let log = L7ProtocolSendLog {
             flags,
@@ -174,7 +178,7 @@ impl L7ProtocolInfoInterface for BrpcInfo {
     }
 
     fn session_id(&self) -> Option<u32> {
-        None
+        self.get_request_id()
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
