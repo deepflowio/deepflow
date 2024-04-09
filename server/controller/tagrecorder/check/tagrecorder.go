@@ -64,17 +64,24 @@ func (c *TagRecorder) Check() {
 	go func() {
 		log.Info("tagrecorder health check data run")
 		t := time.Now()
-		c.check()
+		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+			return c.check(db)
+		}); err != nil {
+			log.Error(err)
+		}
 		log.Infof("tagrecorder health check data end, time since: %v", time.Since(t))
 	}()
 }
 
-func (c *TagRecorder) check() {
+func (c *TagRecorder) check(db *mysql.DB) error {
 	// 调用API获取资源对应的icon_id
-	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo()
-	for _, updater := range c.getUpdaters(domainToIconID, resourceToIconID) {
-		updater.Check()
+	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo(db)
+	for _, updater := range c.getUpdaters(db, domainToIconID, resourceToIconID) {
+		if err := updater.Check(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (t *TagRecorder) Stop() {
@@ -84,14 +91,14 @@ func (t *TagRecorder) Stop() {
 	log.Info("tagrecorder stopped")
 }
 
-func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
+func (c *TagRecorder) getUpdaters(db *mysql.DB, domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []ChResourceUpdater{
-		NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
+		// NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
 		NewChAZ(domainLcuuidToIconID, resourceTypeToIconID),
 		NewChVPC(resourceTypeToIconID),
 		NewChDevice(resourceTypeToIconID),
-		NewChIPRelation(),
+		// NewChIPRelation(),
 		NewChPodK8sLabel(),
 		NewChPodK8sLabels(),
 		NewChPodServiceK8sLabel(),
@@ -102,25 +109,25 @@ func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceT
 		NewChPodNSCloudTags(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
-		NewChVTapPort(),
+		// NewChVTapPort(),
 		NewChStringEnum(),
 		NewChIntEnum(),
-		NewChNodeType(),
-		NewChAPPLabel(),
-		NewChTargetLabel(),
-		NewChPrometheusTargetLabelLayout(),
-		NewChPrometheusLabelName(),
-		NewChPrometheusMetricNames(),
-		NewChPrometheusMetricAPPLabelLayout(),
+		// NewChNodeType(),
+		// NewChAPPLabel(),
+		// NewChTargetLabel(),
+		// NewChPrometheusTargetLabelLayout(),
+		// NewChPrometheusLabelName(),
+		// NewChPrometheusMetricNames(),
+		// NewChPrometheusMetricAPPLabelLayout(),
 		NewChNetwork(resourceTypeToIconID),
-		NewChTapType(resourceTypeToIconID),
-		NewChVTap(resourceTypeToIconID),
+		// NewChTapType(resourceTypeToIconID),
+		// NewChVTap(resourceTypeToIconID),
 		NewChPod(resourceTypeToIconID),
 		NewChPodCluster(resourceTypeToIconID),
 		NewChPodGroup(resourceTypeToIconID),
 		NewChPodNamespace(resourceTypeToIconID),
 		NewChPodNode(resourceTypeToIconID),
-		NewChLbListener(resourceTypeToIconID),
+		// NewChLbListener(resourceTypeToIconID),
 		NewChPodIngress(resourceTypeToIconID),
 		NewChGProcess(resourceTypeToIconID),
 
@@ -133,14 +140,15 @@ func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceT
 		NewChPodService(),
 		NewChChost(),
 
-		NewChPolicy(),
-		NewChNpbTunnel(),
+		// NewChPolicy(),
+		// NewChNpbTunnel(),
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.SetDB(db)
 	}
 	return updaters
 }
@@ -161,10 +169,10 @@ func (b *UpdaterBase[MT, KT]) Check() error {
 		i++
 	}
 
-	return compareAndCheck(oldItems, newItems)
+	return compareAndCheck(b.db, oldItems, newItems)
 }
 
-func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
+func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) error {
 	if len(newItems) == 0 && len(oldItems) == 0 {
 		return nil
 	}
@@ -180,7 +188,7 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 		return nil
 	}
 
-	err = mysql.Db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		m := new(CT)
 		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&m).Error; err != nil {
 			return fmt.Errorf("truncate table(%s) failed, %v", tableName, err)

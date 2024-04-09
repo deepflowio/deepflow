@@ -38,7 +38,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
+	processes, err := query.FindInBatches[mysql.Process](p.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
