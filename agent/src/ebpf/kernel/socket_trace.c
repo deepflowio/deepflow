@@ -1089,8 +1089,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
-			*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
-			sk_info.prev_data_len = 4;
+			bpf_probe_read(sk_info.prev_data, sizeof(sk_info.prev_data), conn_info->prev_buf);
+			sk_info.prev_data_len = conn_info->prev_count;
 			sk_info.uid = 0;
 		}
 
@@ -1223,9 +1223,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		conn_info->prev_count = 0;
 	}
 
-	if (conn_info->prev_count == 4) {
+	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
-		v->extra_data = *(__u32 *)conn_info->prev_buf;
+		bpf_probe_read(v->extra_data, sizeof(v->extra_data), conn_info->prev_buf);
 		v->extra_data_count = conn_info->prev_count;
 		v->tcp_seq -= conn_info->prev_count; // 客户端和服务端的tcp_seq匹配
 	} else

@@ -735,9 +735,10 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		int offset = 0;
 		if (len > 0) {
 			if (sd->extra_data_count > 0) {
-				*(uint32_t *) submit_data->cap_data =
-				    sd->extra_data;
-				offset = sizeof(sd->extra_data);
+				memcpy_fast(submit_data->cap_data,
+					    sd->extra_data,
+					    sd->extra_data_count);
+				offset = sd->extra_data_count;
 			}
 
 			memcpy_fast(submit_data->cap_data + offset, sd->data,

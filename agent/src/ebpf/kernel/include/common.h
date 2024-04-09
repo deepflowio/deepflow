@@ -75,4 +75,8 @@ enum {
 	TASK_COMM_LEN = 16,
 };
 
+#ifndef EBPF_CACHE_SIZE
+#define EBPF_CACHE_SIZE 16
+#endif
+
 #endif /* DF_BPF_COMMON_H */
