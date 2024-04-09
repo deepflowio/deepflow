@@ -34,7 +34,7 @@ type IconKey struct {
 	SubType  int
 }
 
-func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) {
+func (c *TagRecorder) UpdateIconInfo(db *mysql.DB) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
 	if !c.cfg.DFWebService.Enabled {
@@ -81,7 +81,7 @@ func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) 
 		}
 	}
 	var domains []mysql.Domain
-	mysql.Db.Unscoped().Find(&domains)
+	db.Unscoped().Find(&domains)
 	for _, domain := range domains {
 		if domain.IconID != 0 {
 			domainToIconID[domain.Lcuuid] = domain.IconID

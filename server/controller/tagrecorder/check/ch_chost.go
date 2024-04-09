@@ -39,12 +39,12 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 		chosts []mysql.VM
 		hosts  []mysql.Host
 	)
-	err := mysql.Db.Unscoped().Find(&chosts).Error
+	err := p.db.Unscoped().Find(&chosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Select("id", "ip").Find(&hosts).Error
+	err = p.db.Unscoped().Select("id", "ip").Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

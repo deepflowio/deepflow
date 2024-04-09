@@ -38,7 +38,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 
 func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 	var vpcs []mysql.VPC
-	err := mysql.Db.Unscoped().Find(&vpcs).Error
+	err := v.db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
 		return nil, false
