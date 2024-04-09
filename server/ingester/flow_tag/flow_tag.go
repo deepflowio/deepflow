@@ -17,6 +17,7 @@
 package flow_tag
 
 import (
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
@@ -150,6 +151,7 @@ func (t *FlowTag) GenCKTable(cluster, storagePolicy, tableName string, ttl int, 
 	}
 
 	return &ckdb.Table{
+		Version:         common.CK_VERSION,
 		Database:        FLOW_TAG_DB,
 		LocalName:       tableName + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      tableName,
