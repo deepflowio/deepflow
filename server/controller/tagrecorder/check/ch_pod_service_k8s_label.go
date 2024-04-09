@@ -40,17 +40,17 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	var podServices []mysql.PodService
 	var podGroups []mysql.PodGroup
 	var podClusters []mysql.PodCluster
-	err := mysql.Db.Unscoped().Find(&podServices).Error
+	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&podGroups).Error
+	err = k.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&podClusters).Error
+	err = k.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false

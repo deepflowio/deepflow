@@ -38,7 +38,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 
 func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	var podClusters []mysql.PodCluster
-	err := mysql.Db.Unscoped().Find(&podClusters).Error
+	err := p.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

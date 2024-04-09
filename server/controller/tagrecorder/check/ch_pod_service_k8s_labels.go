@@ -39,7 +39,7 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 
 func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodServiceK8sLabels, bool) {
 	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
+	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false

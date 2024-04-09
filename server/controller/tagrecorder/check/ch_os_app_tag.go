@@ -38,7 +38,7 @@ func NewChOSAppTag() *ChOSAppTag {
 }
 
 func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
+	processes, err := query.FindInBatches[mysql.Process](o.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
 		return nil, false

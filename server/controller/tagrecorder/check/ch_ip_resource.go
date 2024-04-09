@@ -42,10 +42,10 @@ func NewChIPResource(ctx context.Context) *ChIPResource {
 	return updater
 }
 
-func getVMIdToUidMap() map[int]string {
+func getVMIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var vms []mysql.VM
-	err := mysql.Db.Unscoped().Find(&vms).Error
+	err := db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
 		return idToUidMap
@@ -56,10 +56,10 @@ func getVMIdToUidMap() map[int]string {
 	return idToUidMap
 }
 
-func getRDSIdToUidMap() map[int]string {
+func getRDSIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var rdsInstances []mysql.RDSInstance
-	err := mysql.Db.Unscoped().Find(&rdsInstances).Error
+	err := db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err))
 		return idToUidMap
@@ -70,10 +70,10 @@ func getRDSIdToUidMap() map[int]string {
 	return idToUidMap
 }
 
-func getRedisIdToUidMap() map[int]string {
+func getRedisIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var redisInstances []mysql.RedisInstance
-	err := mysql.Db.Unscoped().Find(&redisInstances).Error
+	err := db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err))
 		return idToUidMap
@@ -84,10 +84,10 @@ func getRedisIdToUidMap() map[int]string {
 	return idToUidMap
 }
 
-func getLBIdToUidMap() map[int]string {
+func getLBIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var lbs []mysql.LB
-	err := mysql.Db.Unscoped().Find(&lbs).Error
+	err := db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
 		return idToUidMap
@@ -98,10 +98,10 @@ func getLBIdToUidMap() map[int]string {
 	return idToUidMap
 }
 
-func getNatgwIdToUidMap() map[int]string {
+func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var natGateways []mysql.NATGateway
-	err := mysql.Db.Unscoped().Find(&natGateways).Error
+	err := db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
 		return idToUidMap
@@ -112,10 +112,10 @@ func getNatgwIdToUidMap() map[int]string {
 	return idToUidMap
 }
 
-func getVPCIdToUidMap() map[int]string {
+func getVPCIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
 	var vpcs []mysql.VPC
-	err := mysql.Db.Unscoped().Find(&vpcs).Error
+	err := db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err))
 		return idToUidMap
@@ -128,12 +128,12 @@ func getVPCIdToUidMap() map[int]string {
 
 func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, bool) {
 	keyToItem := make(map[IPResourceKey]mysql.ChIPResource)
-	vmIdToUidMap := getVMIdToUidMap()
-	rdsIdToUidMap := getRDSIdToUidMap()
-	redisIdToUidMap := getRedisIdToUidMap()
-	lbIdToUidMap := getLBIdToUidMap()
-	natgwIdToUidMap := getNatgwIdToUidMap()
-	vpcIdToUidMap := getVPCIdToUidMap()
+	vmIdToUidMap := getVMIdToUidMap(i.db)
+	rdsIdToUidMap := getRDSIdToUidMap(i.db)
+	redisIdToUidMap := getRedisIdToUidMap(i.db)
+	lbIdToUidMap := getLBIdToUidMap(i.db)
+	natgwIdToUidMap := getNatgwIdToUidMap(i.db)
+	vpcIdToUidMap := getVPCIdToUidMap(i.db)
 	if redis.GetClient() == nil {
 		return keyToItem, false
 	}

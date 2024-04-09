@@ -39,7 +39,7 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) {
 	var pods []mysql.Pod
 
-	err := mysql.Db.Unscoped().Find(&pods).Error
+	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false

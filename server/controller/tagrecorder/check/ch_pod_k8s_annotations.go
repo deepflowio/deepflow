@@ -39,7 +39,7 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 
 func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChPodK8sAnnotations, bool) {
 	var pods []mysql.Pod
-	err := mysql.Db.Unscoped().Find(&pods).Error
+	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false

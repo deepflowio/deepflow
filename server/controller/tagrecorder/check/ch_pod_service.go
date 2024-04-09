@@ -36,7 +36,7 @@ func NewChPodService() *ChPodService {
 
 func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
+	err := p.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
