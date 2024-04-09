@@ -139,6 +139,42 @@ protocol_port_check_2(enum traffic_protocol proto,
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
 }
 
+static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
+{
+	return (sk_info != NULL && sk_info->uid != 0);
+}
+
+static __inline bool is_infer_socket_valid(struct socket_info_t *sk_info)
+{
+	return (sk_info != NULL && sk_info->uid != 0
+		&& sk_info->l7_proto != PROTO_TLS);
+}
+
+// When calling this function, count must be a constant, and at this time, the
+// compiler can optimize it into an immediate value and write it into the
+// instruction.
+static __inline void save_prev_data_from_kern(const char *buf,
+					      struct conn_info_s *conn_info,
+					      size_t count)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		bpf_probe_read_kernel(conn_info->socket_info_ptr->prev_data,
+				      count, buf);
+
+		conn_info->socket_info_ptr->prev_data_len = count;
+		/*
+		 * This piece of data needs to be merged with subsequent data, so
+		 * the direction of the previous piece of data needs to be saved here.
+		 */
+		conn_info->socket_info_ptr->pre_direction =
+		    conn_info->socket_info_ptr->direction;
+		conn_info->socket_info_ptr->direction = conn_info->direction;
+	} else {
+		bpf_probe_read_kernel(conn_info->prev_buf, count, buf);
+		conn_info->prev_count = count;
+	}
+}
+
 static __inline bool is_same_command(char *a, char *b)
 {
 	static const int KERNEL_COMM_MAX = 16;
@@ -162,17 +198,6 @@ static __inline bool is_current_comm(char *comm)
 		return false;
 
 	return is_same_command(comm, current_comm);
-}
-
-static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
-{
-	return (sk_info != NULL && sk_info->uid != 0);
-}
-
-static __inline bool is_infer_socket_valid(struct socket_info_t *sk_info)
-{
-	return (sk_info != NULL && sk_info->uid != 0
-		&& sk_info->l7_proto != PROTO_TLS);
 }
 
 static __inline int is_http_response(const char *data)
@@ -340,7 +365,10 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 //      4       :path  /
 //      5       :path  /index.html
 // others as response.
-static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
+static __inline enum message_type parse_http2_headers_frame(const char
+							    *buf_kern,
+							    size_t syscall_len,
+							    const char *buf_src,
 							    size_t count,
 							    struct conn_info_s
 							    *conn_info,
@@ -372,6 +400,15 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 #define HTTPV2_FRAME_READ_SZ            21
 #define HTTPV2_STATIC_TABLE_IDX_MAX     61
 
+	/*
+	 * If the server reads data in multiple passes, and the previous pass
+	 * has already read the first 9 bytes of the protocol header, and it
+	 * has been determined as HEADER, then the current data is directly
+	 * PUSHed to the upper layer.
+	 */
+	if (conn_info->prev_count == HTTPV2_FRAME_PROTO_SZ) {
+		return MSG_REQUEST;
+	}
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
 		return MSG_UNKNOWN;
@@ -417,13 +454,6 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		if (type != HTTPV2_FRAME_TYPE_HEADERS)
 			continue;
 
-		/*
-		 * 如果不是初次推断（即：socket已经确认了数据协议类型并明确了角色）
-		 * 可以通过方向来判断请求或回应。
-		 */
-		if (!is_first)
-			return MSG_RECONFIRM;
-
 		flags_unset = buf[4] & 0xd2;
 		flags_padding = buf[4] & 0x08;
 		flags_priority = buf[4] & 0x20;
@@ -432,6 +462,18 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		// flags_unset和reserve必须为0，否则直接放弃判断。
 		if (flags_unset || reserve)
 			return MSG_UNKNOWN;
+
+		if (syscall_len == HTTPV2_FRAME_PROTO_SZ) {
+			msg_type = MSG_PRESTORE;
+			break;
+		}
+
+		/*
+		 * If the protocol inference is complete, it can be directly
+		 * pushed to the upper layer.
+		 */
+		if (!is_first)
+			return MSG_REQUEST;
 
 		/*
 		 * 根据帧结构中的flags的不同设置(具体检查PADDING位和PRIORITY位)
@@ -458,9 +500,6 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
 			msg_type = MSG_REQUEST;
-			conn_info->role =
-			    (conn_info->direction ==
-			     T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 
 		} else {
 
@@ -481,10 +520,16 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		break;
 	}
 
+	if (msg_type == MSG_PRESTORE)
+		save_prev_data_from_kern(buf_kern, conn_info,
+					 HTTPV2_FRAME_PROTO_SZ);
+
 	return msg_type;
 }
 
-static __inline enum message_type infer_http2_message(const char *buf_src,
+static __inline enum message_type infer_http2_message(const char *buf_kern,
+						      size_t syscall_len,
+						      const char *buf_src,
 						      size_t count,
 						      struct conn_info_s
 						      *conn_info)
@@ -510,24 +555,16 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		return MSG_UNKNOWN;
 	}
 
+	bool is_first = true;	// Is it the first inference?
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
-
-		if (parse_http2_headers_frame(buf_src, count, conn_info, false)
-		    != MSG_RECONFIRM)
-			return MSG_UNKNOWN;
-
-		if (conn_info->socket_info_ptr->role == ROLE_SERVER)
-			return (conn_info->direction == T_INGRESS) ?
-			    MSG_REQUEST : MSG_RESPONSE;
-
-		if (conn_info->socket_info_ptr->role == ROLE_CLIENT)
-			return (conn_info->direction == T_INGRESS) ?
-			    MSG_RESPONSE : MSG_REQUEST;
+		is_first = false;
 	}
 
-	return parse_http2_headers_frame(buf_src, count, conn_info, true);
+	return parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
+					 conn_info, is_first);
+
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
@@ -561,29 +598,6 @@ static __inline enum message_type infer_http_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
-// When calling this function, count must be a constant, and at this time, the
-// compiler can optimize it into an immediate value and write it into the
-// instruction.
-static __inline void save_prev_data(const char *buf,
-				    struct conn_info_s *conn_info, size_t count)
-{
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		bpf_probe_read_kernel(conn_info->socket_info_ptr->prev_data,
-				      count, buf);
-		conn_info->socket_info_ptr->prev_data_len = count;
-		/*
-		 * This piece of data needs to be merged with subsequent data, so
-		 * the direction of the previous piece of data needs to be saved here.
-		 */
-		conn_info->socket_info_ptr->pre_direction =
-		    conn_info->socket_info_ptr->direction;
-		conn_info->socket_info_ptr->direction = conn_info->direction;
-	} else {
-		bpf_probe_read_kernel(conn_info->prev_buf, count, buf);
-		conn_info->prev_count = count;
-	}
-}
-
 // MySQL and Kafka need the previous n bytes of data for inference
 static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 {
@@ -596,8 +610,8 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		    conn_info->socket_info_ptr->direction) {
 			bpf_probe_read_kernel(conn_info->prev_buf,
 					      sizeof(conn_info->prev_buf),
-					      conn_info->
-					      socket_info_ptr->prev_data);
+					      conn_info->socket_info_ptr->
+					      prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -637,7 +651,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info, 4);
+		save_prev_data_from_kern(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 
@@ -649,7 +663,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	static const __u8 kComStmtPrepare = 0x16;
 	static const __u8 kComStmtExecute = 0x17;
 	static const __u8 kComStmtClose = 0x19;
-	static const __u8 kComStmtQuit = 0x01; 
+	static const __u8 kComStmtQuit = 0x01;
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
@@ -1197,9 +1211,8 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	__u8 tmp_buf[32];
 	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
 	for (int i = 0; i < 4; i++) {
-		short tmp =
-		    bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf),
-					    queries_start);
+		short tmp = bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf),
+						    queries_start);
 		if (tmp < 0) {
 			break;
 		}
@@ -2026,7 +2039,8 @@ static __inline bool pulsar_check_basecommand(const char *buf, size_t count)
 			if (tmp & 0x80) {
 				if (buf == target)
 					return false;
-				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp),
+						    buf);
 				buf += sizeof(tmp);
 				if (tmp & 0x80)
 					return false;
@@ -2036,7 +2050,8 @@ static __inline bool pulsar_check_basecommand(const char *buf, size_t count)
 			if (tmp & 0x80) {
 				if (buf == target)
 					return false;
-				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp),
+						    buf);
 				buf += sizeof(tmp);
 				if (tmp & 0x80)
 					return false;
@@ -2056,7 +2071,8 @@ static __inline bool pulsar_check_basecommand(const char *buf, size_t count)
 			if (tmp & 0x80) {
 				if (buf == target)
 					return false;
-				bpf_probe_read_user((char *)&tmp, sizeof(tmp), buf);
+				bpf_probe_read_user((char *)&tmp, sizeof(tmp),
+						    buf);
 				buf += sizeof(tmp);
 				if (tmp & 0x80)
 					return false;
@@ -2168,7 +2184,7 @@ static __inline enum message_type infer_brpc_message(const char *buf,
 {
 	if (count < 12)
 		return MSG_UNKNOWN;
-	
+
 	if (!protocol_port_check_2(PROTO_BRPC, conn_info))
 		return MSG_UNKNOWN;
 
@@ -2176,7 +2192,6 @@ static __inline enum message_type infer_brpc_message(const char *buf,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_BRPC)
 			return MSG_UNKNOWN;
 	}
-
 	// PRPC
 	if (buf[0] != 'P' || buf[1] != 'R' || buf[2] != 'P' || buf[3] != 'C')
 		return MSG_UNKNOWN;
@@ -2399,7 +2414,7 @@ static __inline enum message_type infer_zmtp_message(const char *buf,
 		if (major_version != 3) {
 			return MSG_UNKNOWN;
 		}
-		save_prev_data(buf, conn_info, count);
+		save_prev_data_from_kern(buf, conn_info, count);
 		return MSG_PRESTORE;
 	}
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
@@ -2486,7 +2501,7 @@ struct dubbo_header {
 	__u8 status;
 	__u64 request_id;
 	__u32 data_len;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 static __inline enum message_type infer_dubbo_message(const char *buf,
 						      size_t count,
@@ -2629,10 +2644,10 @@ static __inline enum message_type infer_kafka_request(const char *buf,
 static __inline bool kafka_data_check_len(size_t count,
 					  const char *buf,
 					  struct conn_info_s *conn_info,
-					  bool *use_prev_buf)
+					  bool * use_prev_buf)
 {
 	*use_prev_buf = (conn_info->prev_count == 4)
-	    && ((size_t)__bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
+	    && ((size_t) __bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
 
 	if (*use_prev_buf) {
 		count += 4;
@@ -2648,7 +2663,7 @@ static __inline bool kafka_data_check_len(size_t count,
 
 	// Enforcing count to be exactly message_size + 4 to mitigate misclassification.
 	// However, this will miss long messages broken into multiple reads.
-	if (message_size < 0 || count != (size_t)message_size) {
+	if (message_size < 0 || count != (size_t) message_size) {
 		return false;
 	}
 
@@ -2664,7 +2679,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info, 4);
+		save_prev_data_from_kern(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 
@@ -2750,7 +2765,7 @@ struct fastcgi_header {
 	__u16 content_length;	// cannot be 0
 	__u8 padding_length;
 	__u8 __unused;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 #define FCGI_BEGIN_REQUEST 1
 #define FCGI_PARAMS 4
@@ -2794,7 +2809,7 @@ infer_fastcgi_message(const char *buf, size_t count,
 	    (header->type == FCGI_BEGIN_REQUEST ||
 	     header->type == FCGI_PARAMS || header->type == FCGI_STDOUT) &&
 	    __bpf_ntohs(header->content_length) != 0) {
-		save_prev_data(buf, conn_info, 8);
+		save_prev_data_from_kern(buf, conn_info, 8);
 		return MSG_PRESTORE;
 	}
 
@@ -2892,7 +2907,7 @@ infer_mongo_message(const char *buf, size_t count,
 	 */
 	if (count == sizeof(*header)
 	    && conn_info->direction == T_INGRESS) {
-		save_prev_data(buf, conn_info, sizeof(*header));
+		save_prev_data_from_kern(buf, conn_info, sizeof(*header));
 		return MSG_PRESTORE;
 	}
 
@@ -3044,7 +3059,7 @@ infer_mongo_message(const char *buf, size_t count,
  *           (9) is Change Cipher Spec message, content_Type:0x14
  */
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__ ((packed)) {
 	__u8 content_type;
 	__u16 version;
 	__u16 length;
@@ -3114,7 +3129,7 @@ check:
 	}
 
 	if (count == 5) {
-		save_prev_data(buf, conn_info, 5);
+		save_prev_data_from_kern(buf, conn_info, 5);
 		return MSG_PRESTORE;
 	}
 
@@ -3432,7 +3447,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-			     infer_http2_message(syscall_infer_addr,
+			     infer_http2_message(infer_buf, count,
+						 syscall_infer_addr,
 						 syscall_infer_len,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
@@ -3596,7 +3612,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(syscall_infer_addr, syscall_infer_len,
+		    infer_http2_message(infer_buf, count, syscall_infer_addr,
+					syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 	}
@@ -3658,8 +3675,7 @@ infer_protocol_2(const char *infer_buf, size_t count,
 #endif
 		    infer_pulsar_message(syscall_infer_addr,
 					 syscall_infer_len,
-					 count,
-					 conn_info)) != MSG_UNKNOWN) {
+					 count, conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_PULSAR;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_BRPC && (inferred_message.type =
