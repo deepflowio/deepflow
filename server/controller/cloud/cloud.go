@@ -105,17 +105,20 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
-	if c.basicInfo.Type != common.KUBERNETES {
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified {
-			cResource.SubDomainResources = c.getSubDomainData(cResource)
-			cResource = c.appendResourceVIPs(cResource)
+	if !cResource.Verified {
+		return model.Resource{
+			ErrorState:   cResource.ErrorState,
+			ErrorMessage: cResource.ErrorMessage,
 		}
 	}
 
-	if cResource.Verified {
-		cResource = c.appendAddtionalResourcesData(cResource)
-		cResource = c.appendResourceProcess(cResource)
+	if c.basicInfo.Type != common.KUBERNETES {
+		cResource.SubDomainResources = c.getSubDomainData(cResource)
+		cResource = c.appendResourceVIPs(cResource)
 	}
+
+	cResource = c.appendAddtionalResourcesData(cResource)
+	cResource = c.appendResourceProcess(cResource)
 	return cResource
 }
 
@@ -186,13 +189,19 @@ func (c *Cloud) getCloudData() {
 	if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
 		cResource = model.Resource{
 			ErrorState:   cResource.ErrorState,
-			ErrorMessage: cResource.ErrorMessage,
+			ErrorMessage: "invalid vm count (0). " + cResource.ErrorMessage,
 		}
 	}
 
-	cResource.SyncAt = time.Now()
-	c.resource = cResource
-	c.sendStatsd(cloudCost)
+	if cResource.Verified {
+		cResource.SyncAt = time.Now()
+		c.resource = cResource
+		c.sendStatsd(cloudCost)
+	} else {
+		c.resource.ErrorState = cResource.ErrorState
+		c.resource.ErrorMessage = cResource.ErrorMessage
+		log.Warningf("get cloud (%s) data, verify is (false), error state (%d), error message (%s)", c.basicInfo.Name, cResource.ErrorState, cResource.ErrorMessage)
+	}
 }
 
 func (c *Cloud) sendStatsd(cloudCost float64) {
