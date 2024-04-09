@@ -922,7 +922,7 @@ fn get_listener_links(
         }
         Ok(links) => {
             if links.is_empty() {
-                warn!(
+                info!(
                     "tap-interface-regex({}) do not match any interface in {:?}",
                     conf.tap_interface_regex, netns,
                 );
