@@ -54,7 +54,7 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 
 func (c *SubscriberManager) Start() (err error) {
 	log.Info("tagrecorder subscriber manager started")
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = UpdateIconInfo(c.cfg)
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = GetIconInfo(c.cfg)
 	if err != nil {
 		return err
 	}
