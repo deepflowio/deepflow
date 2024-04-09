@@ -226,7 +226,7 @@ func UpdateAnalyzer(
 					tx.Rollback()
 					return nil, err
 				}
-				m.TriggerReallocAnalyzer("")
+				m.TriggerReallocAnalyzer(dbInfo, "")
 			}
 		}
 	}
@@ -386,7 +386,7 @@ func UpdateAnalyzer(
 			}
 		}
 
-		m.TriggerReallocAnalyzer("")
+		m.TriggerReallocAnalyzer(dbInfo, "")
 	}
 
 	// 修改nat_ip
@@ -416,7 +416,7 @@ func UpdateAnalyzer(
 	// if state equal to maintaince/exception, trigger realloc analyzer
 	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配数据节点
 	if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
-		m.TriggerReallocAnalyzer(analyzer.IP)
+		m.TriggerReallocAnalyzer(dbInfo, analyzer.IP)
 	}
 
 	if err = tx.Commit().Error; err != nil {
@@ -451,7 +451,7 @@ func DeleteAnalyzer(orgID int, lcuuid string, m *monitor.AnalyzerCheck) (resp ma
 	db.Delete(&analyzer)
 
 	// 触发对应的采集器重新分配数据节点
-	m.TriggerReallocAnalyzer(analyzer.IP)
+	m.TriggerReallocAnalyzer(dbInfo, analyzer.IP)
 
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

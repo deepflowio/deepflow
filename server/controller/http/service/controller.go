@@ -265,7 +265,7 @@ func UpdateController(
 					tx.Rollback()
 					return nil, err
 				}
-				m.TriggerReallocController("")
+				m.TriggerReallocController(dbInfo, "")
 			}
 		}
 	}
@@ -421,7 +421,7 @@ func UpdateController(
 			}
 		}
 
-		m.TriggerReallocController("")
+		m.TriggerReallocController(dbInfo, "")
 
 		// TODO: 触发给采集器下发信息的推送
 	}
@@ -448,7 +448,7 @@ func UpdateController(
 	// if state equal to maintaince/exception, trigger realloc controller
 	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配控制器
 	if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
-		m.TriggerReallocController(controller.IP)
+		m.TriggerReallocController(dbInfo, controller.IP)
 	}
 
 	if err = tx.Commit().Error; err != nil {
@@ -484,7 +484,7 @@ func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (res
 	db.Delete(&controller)
 
 	// 触发对应的采集器重新分配控制器
-	m.TriggerReallocController(controller.IP)
+	m.TriggerReallocController(dbInfo, controller.IP)
 
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
