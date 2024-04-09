@@ -16,9 +16,73 @@
 
 package statsd
 
-var (
-	VTapNameToCounter = make(map[string]*GetVTapWeightCounter)
+import (
+	"encoding/json"
+	"sync"
+
+	"github.com/deepflowio/deepflow/server/libs/stats"
 )
+
+var (
+	vtapCounter     *VTapCounter
+	vtapCounterOnce sync.Once
+)
+
+func GetVTapCounter() *VTapCounter {
+	vtapCounterOnce.Do(func() {
+		vtapCounter = &VTapCounter{
+			VTapNameCounter: make(map[string]*GetVTapWeightCounter),
+		}
+	})
+	return vtapCounter
+}
+
+type VTapCounter struct {
+	mu sync.Mutex
+
+	VTapNameCounter map[string]*GetVTapWeightCounter
+}
+
+func (c *VTapCounter) SetNull(vtapName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	counter, ok := c.VTapNameCounter[vtapName]
+	if !ok {
+		return
+	}
+	counter.IsAnalyzerChanged = 0
+	counter.Weight = 0
+}
+
+func (c *VTapCounter) SetCounter(vtapName string, weight float64, isChanged uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if counter, ok := c.VTapNameCounter[vtapName]; ok {
+		if counter.Weight != weight || counter.IsAnalyzerChanged != isChanged {
+			log.Infof("agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
+				vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
+		}
+		counter.Weight = weight
+		counter.IsAnalyzerChanged = isChanged
+		return
+	}
+
+	newCounter := &GetVTapWeightCounter{
+		Name: vtapName,
+		VTapWeightCounter: &VTapWeightCounter{
+			Weight:            weight,
+			IsAnalyzerChanged: isChanged,
+		},
+	}
+	c.VTapNameCounter[vtapName] = newCounter
+	b, _ := json.Marshal(newCounter.VTapWeightCounter)
+	log.Infof("agent(%v) register counter: %v", vtapName, string(b))
+	err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", newCounter, stats.OptionStatTags{"host": vtapName})
+	if err != nil {
+		log.Error(err)
+	}
+}
 
 type VTapWeightCounter struct {
 	Weight            float64 `statsd:"weight"`

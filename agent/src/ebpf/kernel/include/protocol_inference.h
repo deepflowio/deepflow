@@ -1927,9 +1927,7 @@ static __inline enum message_type infer_nats_message(const char *buf,
 		if (buf[1] == 'I' || buf[1] == 'i') {
 			if (buf[2] == 'N' || buf[2] == 'n') {
 				if (buf[3] == 'G' || buf[3] == 'g') {
-					if (buf[4] == ' ' || buf[4] == '\t') {
-						return MSG_REQUEST;
-					}
+					return MSG_REQUEST;
 				}
 			}
 		}
@@ -1939,9 +1937,7 @@ static __inline enum message_type infer_nats_message(const char *buf,
 		if (buf[1] == 'O' || buf[1] == 'o') {
 			if (buf[2] == 'N' || buf[2] == 'n') {
 				if (buf[3] == 'G' || buf[3] == 'g') {
-					if (buf[4] == ' ' || buf[4] == '\t') {
-						return MSG_RESPONSE;
-					}
+					return MSG_RESPONSE;
 				}
 			}
 		}
@@ -1950,9 +1946,7 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	if (buf[0] == '+') {
 		if (buf[1] == 'O' || buf[1] == 'o') {
 			if (buf[2] == 'K' || buf[2] == 'k') {
-				if (buf[3] == ' ' || buf[3] == '\t') {
-					return MSG_REQUEST;
-				}
+				return MSG_REQUEST;
 			}
 		}
 	}
@@ -2109,7 +2103,7 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 	bpf_probe_read_user(buffer, 4, ptr + 4);
 	short command_size = __bpf_ntohl(*(__u32 *) buffer);
 
-	if (total_size < command_size + 4 || total_size + 4 < count)
+	if (total_size < command_size + 4)
 		return MSG_UNKNOWN;
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
@@ -2117,6 +2111,9 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 			return MSG_REQUEST;
 		return MSG_UNKNOWN;
 	}
+
+	if (count < total_size + 4)
+		return MSG_UNKNOWN;
 
 	short limit = total_size + 4 < infer_len ? total_size + 4 : infer_len;
 

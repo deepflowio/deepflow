@@ -78,11 +78,10 @@ const FLOW_LOG_VERSION: u32 = 20220128;
 #[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
-    Ok,
-    Error, // deprecate
-    NotExist,
-    ServerError,
-    ClientError,
+    Ok = 0,
+    NotExist = 2,
+    ServerError = 3,
+    ClientError = 4,
 }
 
 impl Default for L7ResponseStatus {
@@ -493,3 +492,16 @@ macro_rules! swap_if {
 }
 
 pub(crate) use swap_if;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_l7_response_status_as_uint() {
+        assert_eq!(L7ResponseStatus::Ok as u32, 0);
+        assert_eq!(L7ResponseStatus::NotExist as u32, 2);
+        assert_eq!(L7ResponseStatus::ServerError as u32, 3);
+        assert_eq!(L7ResponseStatus::ClientError as u32, 4);
+    }
+}

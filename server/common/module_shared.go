@@ -17,11 +17,16 @@
 package common
 
 import (
+	"io/ioutil"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
+	logging "github.com/op/go-logging"
+	yaml "gopkg.in/yaml.v2"
 )
+
+var log = logging.MustGetLogger("server_common")
 
 const QUEUE_SIZE = 1 << 16
 
@@ -36,4 +41,29 @@ func NewControllerIngesterShared() *ControllerIngesterShared {
 			queue.OptionFlushIndicator(time.Second*3),
 			queue.OptionRelease(func(p interface{}) { p.(*eventapi.ResourceEvent).Release() })),
 	}
+}
+
+type Config struct {
+	Ingester IngesterConfig `yaml:"ingester"`
+}
+
+type IngesterConfig struct {
+	Exporters ExportersConfig `yaml:"exporters"`
+}
+
+type ExportersConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+func ExportersEnabled(configPath string) bool {
+	configBytes, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		log.Error("Read config file error:", err)
+		return false
+	}
+	config := Config{}
+	if err = yaml.Unmarshal(configBytes, &config); err != nil {
+		log.Error("Unmarshal yaml error:", err)
+	}
+	return config.Ingester.Exporters.Enabled
 }

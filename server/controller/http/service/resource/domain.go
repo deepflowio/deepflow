@@ -773,8 +773,8 @@ func CreateSubDomain(db *gorm.DB, subDomainCreate model.SubDomainCreate) (*model
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	displayName := common.GenerateUUID("")
-	lcuuid := common.GenerateUUID(displayName)
+	displayName := common.GetUUID("", uuid.Nil)
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
 	subDomain.Name = subDomainCreate.Name
 	subDomain.DisplayName = displayName
