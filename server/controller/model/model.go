@@ -195,6 +195,12 @@ type HostVTapRebalanceResult struct {
 	SwitchVTapNum     int     `json:"SWITCH_VTAP_NUM"`
 	BeforeVTapWeights float64 `json:"BEFORE_VTAP_WEIGHTS"`
 	AfterVTapWeights  float64 `json:"AFTER_VTAP_WEIGHTS"`
+
+	// debug data
+	NewVTapToTraffic  map[string]int64 `json:"-"`
+	DelVTapToTraffic  map[string]int64 `json:"-"`
+	BeforeVTapTraffic int64            `json:"-"`
+	AfterVTapTraffic  int64            `json:"-"`
 }
 
 type AZVTapRebalanceResult struct {

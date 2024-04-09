@@ -23,7 +23,7 @@ import (
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -44,15 +44,19 @@ import (
 var log = logging.MustGetLogger("cloud.qingcloud")
 
 type QingCloud struct {
-	Uuid          string
-	UuidGenerate  string
-	Name          string
-	RegionUuid    string
-	url           string
-	secretID      string
-	secretKey     string
-	isPublicCloud bool
-	httpTimeout   int
+	Uuid                  string
+	UuidGenerate          string
+	Name                  string
+	RegionUuid            string
+	url                   string
+	secretID              string
+	secretKey             string
+	isPublicCloud         bool
+	DisableSyncLBListener bool
+	httpTimeout           int
+	MaxRetries            uint
+	RetryDuration         uint
+	DailyTriggerTime      time.Time
 
 	defaultVPCName   string
 	defaultVxnetName string
@@ -110,17 +114,30 @@ func NewQingCloud(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud,
 		url = "https://api.qingcloud.com"
 	}
 
+	var dailyTriggerTime time.Time
+	if cfg.QingCloudConfig.DailyTriggerTime != "" {
+		dailyTriggerTime, err = time.ParseInLocation("15:04", cfg.QingCloudConfig.DailyTriggerTime, time.Local)
+		if err != nil {
+			log.Errorf("parse qing config daily trigger time failed: (%s)", err.Error())
+			return nil, err
+		}
+	}
+
 	return &QingCloud{
 		Uuid: domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
-		UuidGenerate:  domain.DisplayName,
-		Name:          domain.Name,
-		RegionUuid:    config.Get("region_uuid").MustString(),
-		url:           url,
-		secretID:      secretID,
-		secretKey:     decryptSecretKey,
-		isPublicCloud: domain.Type == common.QINGCLOUD,
-		httpTimeout:   cfg.HTTPTimeout,
+		UuidGenerate:          domain.DisplayName,
+		Name:                  domain.Name,
+		RegionUuid:            config.Get("region_uuid").MustString(),
+		url:                   url,
+		secretID:              secretID,
+		secretKey:             decryptSecretKey,
+		isPublicCloud:         domain.Type == common.QINGCLOUD,
+		httpTimeout:           cfg.HTTPTimeout,
+		MaxRetries:            cfg.QingCloudConfig.MaxRetries,
+		RetryDuration:         cfg.QingCloudConfig.RetryDuration,
+		DisableSyncLBListener: cfg.QingCloudConfig.DisableSyncLBListener,
+		DailyTriggerTime:      dailyTriggerTime,
 
 		defaultVPCName:            domain.Name + "_default_vpc",
 		defaultVxnetName:          "vxnet-0",
@@ -188,7 +205,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 	var response []*simplejson.Json
 	startTime := time.Now()
 	count := 0
-
+	var retry, maxRetries uint = 0, q.MaxRetries
 	offset, limit := 0, 100
 	for {
 		url := q.getURL(action, kwargs, offset, limit)
@@ -206,38 +223,63 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Errorf("curl (%s) failed, (%v)", url, err)
+			errMSG := fmt.Sprintf("curl (%s) failed, (%v)", url, err)
+			log.Warning(errMSG)
+			if retry < maxRetries {
+				retry += 1
+				log.Warningf("(%s) try again (%d/%d) in (%d) seconds", action, retry, maxRetries, q.RetryDuration)
+				time.Sleep(time.Duration(q.RetryDuration) * time.Second)
+				continue
+			}
+			log.Error(errMSG)
 			return nil, err
 		} else if resp.StatusCode != http.StatusOK {
-			log.Errorf("curl (%s) failed, (%v)", url, resp)
-			defer resp.Body.Close()
-			return nil, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, resp))
+			errMSG := fmt.Sprintf("curl (%s) failed, (%v)", url, resp)
+			log.Warning(errMSG)
+			if retry < maxRetries {
+				retry += 1
+				log.Warningf("(%s) try again (%d/%d) in (%d) seconds", action, retry, maxRetries, q.RetryDuration)
+				time.Sleep(time.Duration(q.RetryDuration) * time.Second)
+				continue
+			}
+			log.Error(errMSG)
+			return nil, errors.New(errMSG)
 		}
 		defer resp.Body.Close()
 
-		respBytes, err := ioutil.ReadAll(resp.Body)
+		respBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("read (%s) response failed, (%v)", action, err)
 			return nil, err
 		}
 		respJson, err := simplejson.NewJson(respBytes)
 		if err != nil {
-			log.Errorf("parse (%s) response failed, (%v)", action, err)
+			log.Errorf("parse (%s) response body (%s) failed, (%v)", action, string(respBytes), err)
 			return nil, err
 		}
-		if curResp, ok := respJson.CheckGet(resultKey); ok {
-			response = append(response, curResp)
-			curRespLens := len(curResp.MustArray())
-			count += curRespLens
-			if curRespLens < limit {
-				break
+
+		curResp, ok := respJson.CheckGet(resultKey)
+		if !ok {
+			errMSG := fmt.Sprintf("get (%s) response (%s) failed, (%v)", action, resultKey, respJson)
+			log.Warning(errMSG)
+			if retry < maxRetries {
+				retry += 1
+				log.Warningf("(%s) try again (%d/%d) in (%d) seconds", action, retry, maxRetries, q.RetryDuration)
+				time.Sleep(time.Duration(q.RetryDuration) * time.Second)
+				continue
 			}
-			offset += limit
-		} else {
-			err := errors.New(fmt.Sprintf("get (%s) response (%s) failed, (%v)", action, resultKey, respJson))
-			log.Error(respJson)
-			return nil, err
+			log.Error(errMSG)
+			return nil, errors.New(errMSG)
 		}
+		response = append(response, curResp)
+		curRespLens := len(curResp.MustArray())
+		count += curRespLens
+		if curRespLens < limit {
+			break
+		}
+		offset += limit
+		// get api success, reset retry times
+		retry = 0
 	}
 
 	// qingcloud has a unified call API，so this could be very convenient
@@ -286,6 +328,17 @@ func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 
 func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
+
+	if !q.DailyTriggerTime.IsZero() {
+		now := time.Now()
+		triggerTime := time.Date(now.Year(), now.Month(), now.Day(), q.DailyTriggerTime.Hour(), q.DailyTriggerTime.Minute(), 0, 0, time.Local)
+		timeSub := now.Sub(triggerTime)
+		if timeSub < time.Second || timeSub > time.Minute {
+			log.Infof("now is not the trigger time (%s), the task is not running", triggerTime.Format(common.GO_BIRTHDAY))
+			return resource, nil
+		}
+	}
+
 	// every tasks must init
 	q.CloudStatsd = statsd.NewCloudStatsd()
 

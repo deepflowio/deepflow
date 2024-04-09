@@ -821,6 +821,7 @@ func (i *Issu) getTableVersion(connect *sql.DB, db, table string) (string, error
 		if err != nil {
 			return "", err
 		}
+		return version, nil
 	}
 	if version == "" {
 		version = common.CK_VERSION
