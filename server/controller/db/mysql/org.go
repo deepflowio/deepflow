@@ -18,8 +18,12 @@ package mysql
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const ORG_TABLE = "org"
@@ -55,4 +59,101 @@ func GetNonDefaultORGIDs() ([]int, error) {
 		ids = append(ids, org.LoopID)
 	}
 	return ids, nil
+}
+
+// SyncDefaultOrgData synchronizes a slice of data items of any type T to all organization databases except the default one.
+// It assumes each data item has an "ID" field (with a json tag "ID") serving as the primary key. During upsertion,
+// fields are updated based on their "gorm" tags, and empty string values are converted to null in the database.
+//
+// Parameters:
+// - data: A slice of data items of any type T to be synchronized. The type T must have an "ID" field tagged as the primary key.
+func SyncDefaultOrgData[T any](data []T) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	// get fields to update
+	dataType := reflect.TypeOf(data[0])
+	var fields []string
+	for i := 0; i < dataType.NumField(); i++ {
+		field := dataType.Field(i)
+		dbTag := field.Tag.Get("gorm")
+		if dbTag != "" {
+			columnName := GetColumnNameFromTag(dbTag)
+			if columnName != "" {
+				fields = append(fields, columnName)
+			}
+		}
+	}
+
+	for orgID, db := range dbs.orgIDToDB {
+		if orgID == DefaultDB.ORGID {
+			continue
+		}
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			// delete
+			var existingIDs []int
+			var t T
+			if err := db.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
+				return err
+			}
+			existingIDMap := make(map[int]bool)
+			for _, id := range existingIDs {
+				existingIDMap[id] = true
+			}
+			for _, item := range data {
+				id := reflect.ValueOf(item).FieldByName("ID").Int()
+				existingIDMap[int(id)] = false
+			}
+			for id, exists := range existingIDMap {
+				if exists {
+					if err := db.Where("id = ?", id).Delete(&t).Error; err != nil {
+						return err
+					}
+				}
+			}
+
+			// add or update
+			if err := db.Clauses(clause.OnConflict{
+				DoUpdates: clause.AssignmentColumns(fields), // `UpdateAll: true,` can not update time
+			}).Save(&data).Error; err != nil {
+				return fmt.Errorf("failed to sync data: %v", err)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Errorf("org(id:%d, name:%s) error: %s", db.ORGID, db.Name, err.Error())
+		}
+	}
+	return nil
+}
+
+// getTagNameFromTag extracts the tag value for a given prefix from a struct field's tag string.
+func getTagNameFromTag(tag, prefix string) string {
+	start := strings.Index(tag, prefix)
+	if start == -1 {
+		return ""
+	}
+	start += len(prefix)
+	rest := tag[start:]
+
+	end := strings.Index(rest, ";")
+	if end == -1 {
+		return rest
+	}
+	return rest[:end]
+}
+
+// GetColumnNameFromTag extracts the column name from a struct field's "gorm" tag.
+// Parameters:
+// - tag: The "gorm" tag string from a struct field.
+// Returns:
+//   - The extracted column name if the "column" prefix is present in the tag. If the "column"
+//     prefix is not found, or if there's no value for the "column" prefix, an empty string is returned.
+//
+// Example:
+// If the tag is `gorm:"column:ip;unique"`, the function returns "ip".
+func GetColumnNameFromTag(tag string) string {
+	return getTagNameFromTag(tag, "column:")
 }
