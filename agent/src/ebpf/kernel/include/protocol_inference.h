@@ -428,17 +428,20 @@ static __inline enum message_type infer_http_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+// When calling this function, count must be a constant, and at this time, the
+// compiler can optimize it into an immediate value and write it into the
+// instruction.
 static __inline void save_prev_data(const char *buf,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_t *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		*(__u32 *) conn_info->socket_info_ptr->prev_data =
-		    *(__u32 *) buf;
-		conn_info->socket_info_ptr->prev_data_len = 4;
+		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
+			       buf);
+		conn_info->socket_info_ptr->prev_data_len = count;
 		conn_info->socket_info_ptr->direction = conn_info->direction;
 	} else {
-		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
-		conn_info->prev_count = 4;
+		bpf_probe_read(conn_info->prev_buf, count, buf);
+		conn_info->prev_count = count;
 	}
 }
 
@@ -447,15 +450,16 @@ static __inline void save_prev_data(const char *buf,
 static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
-	    conn_info->socket_info_ptr->prev_data_len == 4) {
+	    conn_info->socket_info_ptr->prev_data_len > 0) {
 		/*
 		 * For adjacent read/write in the same direction.
 		 */
 		if (conn_info->direction ==
 		    conn_info->socket_info_ptr->direction) {
-			*(__u32 *) conn_info->prev_buf =
-			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-			conn_info->prev_count = 4;
+			bpf_probe_read(conn_info->prev_buf,
+				       sizeof(conn_info->prev_buf),
+				       conn_info->socket_info_ptr->prev_data);
+			conn_info->prev_count = conn_info->socket_info_ptr->prev_data_len;
 		}
 
 		/*
@@ -487,7 +491,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	}
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info);
+		save_prev_data(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 
@@ -1372,7 +1376,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	}
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info);
+		save_prev_data(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 

@@ -146,7 +146,7 @@ struct conn_info_t {
 	enum traffic_direction direction; //T_INGRESS or T_EGRESS
 	enum endpoint_role role;
 	size_t prev_count;
-	char prev_buf[4];
+	char prev_buf[EBPF_CACHE_SIZE];
 	__s32 correlation_id; // 目前用于kafka判断
 	enum traffic_direction prev_direction;
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
