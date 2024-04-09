@@ -87,6 +87,54 @@ fn bench_labeler(c: &mut Criterion) {
             start.elapsed()
         })
     });
+
+    c.bench_function("ebpf first", |b| {
+        let mut labeler: Labeler = Default::default();
+        let mut cidr_list: Vec<Arc<Cidr>> = Vec::new();
+        let mut iface_list: Vec<Arc<PlatformData>> = Vec::new();
+        let interface: PlatformData = PlatformData {
+            mac: 0x112233445566,
+            ips: vec![IpSubnet {
+                raw_ip: "192.168.0.200".parse().unwrap(),
+                ..Default::default()
+            }],
+            epc_id: 10,
+            ..Default::default()
+        };
+        iface_list.push(Arc::new(interface));
+
+        for i in 0..100 {
+            let ip = "192.168.".to_string().as_str().to_owned()
+                + ((i >> 8) & 0xff).to_string().as_str()
+                + ".".to_string().as_str()
+                + (i & 0xff).to_string().as_str()
+                + "/32".to_string().as_str();
+            let cidr: Cidr = Cidr {
+                ip: IpNet::from_str(&ip).unwrap(),
+                epc_id: 10,
+                ..Default::default()
+            };
+
+            cidr_list.push(Arc::new(cidr));
+        }
+        labeler.update_cidr_table(&cidr_list);
+        labeler.update_interface_table(&iface_list);
+
+        let key: LookupKey = LookupKey {
+            src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
+            src_ip: "192.168.0.100".parse().unwrap(),
+            dst_ip: "192.168.0.200".parse().unwrap(),
+            ..Default::default()
+        };
+
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            for _ in 0..iters {
+                labeler.get_endpoint_data_by_epc(key.src_ip, key.dst_ip, 10, 0);
+            }
+            start.elapsed()
+        })
+    });
 }
 
 fn bench_policy(c: &mut Criterion) {
@@ -175,6 +223,38 @@ fn bench_policy(c: &mut Criterion) {
             let start = Instant::now();
             for _ in 0..iters {
                 first.fast_get(&mut key);
+            }
+            start.elapsed()
+        })
+    });
+
+    c.bench_function("ebpf fast", |b| {
+        let mut first = generate_table();
+        let key = LookupKey {
+            src_ip: "192.168.2.1".parse::<IpAddr>().unwrap(),
+            dst_ip: "192.168.2.5".parse::<IpAddr>().unwrap(),
+            src_port: 80,
+            dst_port: 100,
+            feature_flag: FeatureFlags::NONE,
+            ..Default::default()
+        };
+
+        let endpoints = EndpointData {
+            src_info: EndpointInfo {
+                l3_epc_id: 2,
+                ..Default::default()
+            },
+            dst_info: EndpointInfo {
+                l3_epc_id: 20,
+                ..Default::default()
+            },
+        };
+
+        first.ebpf_fast_add(key.src_ip, key.dst_ip, 2, 0, endpoints);
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            for _ in 0..iters {
+                first.ebpf_fast_get(key.src_ip, key.dst_ip, 2, 0);
             }
             start.elapsed()
         })
