@@ -265,7 +265,7 @@ impl Policy {
 
         if packet.signal_source == SignalSource::EBPF {
             let (endpoints, gpid_entries) = self.lookup_all_by_epc(key, local_epc_id);
-            packet.endpoint_data = Some(EndpointDataPov::new(Arc::new(endpoints)));
+            packet.endpoint_data = Some(EndpointDataPov::new(endpoints));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
             Self::fill_gpid_entry(packet, &gpid_entries);
             return;
@@ -354,19 +354,39 @@ impl Policy {
     }
 
     pub fn lookup_all_by_epc(
-        &self,
+        &mut self,
         key: &mut LookupKey,
         local_epc_id: i32,
-    ) -> (EndpointData, GpidEntry) {
-        // TODO：可能也需要走fast提升性能
+    ) -> (Arc<EndpointData>, GpidEntry) {
         let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
             (local_epc_id, 0)
         } else {
             (0, local_epc_id)
         };
+
+        if let Some(endpoints) =
+            self.table
+                .ebpf_fast_get(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1)
+        {
+            let entry = self.lookup_gpid_entry(key, &endpoints);
+            self.send_ebpf(
+                key.src_ip,
+                key.dst_ip,
+                key.src_port,
+                key.dst_port,
+                endpoints.src_info.l3_epc_id,
+                endpoints.dst_info.l3_epc_id,
+                &entry,
+            );
+            return (endpoints, entry);
+        }
+
         let endpoints =
             self.labeler
                 .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
+        let endpoints =
+            self.table
+                .ebpf_fast_add(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1, endpoints);
         let entry = self.lookup_gpid_entry(key, &endpoints);
         self.send_ebpf(
             key.src_ip,

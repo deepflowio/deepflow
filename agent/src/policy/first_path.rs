@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::net::IpAddr;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, RwLock,
@@ -686,6 +687,33 @@ impl FirstPath {
             }
         }
         return Some((forward_policy, forward_endpoints));
+    }
+
+    pub fn ebpf_fast_get(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> Option<Arc<EndpointData>> {
+        if self.fast_disable {
+            return None;
+        }
+
+        self.fast
+            .ebpf_get_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst)
+    }
+
+    pub fn ebpf_fast_add(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+        endpoints: EndpointData,
+    ) -> Arc<EndpointData> {
+        self.fast
+            .ebpf_add_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, endpoints)
     }
 
     pub fn fast_get(
