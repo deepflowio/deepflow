@@ -131,22 +131,6 @@ struct conn_info_t {
 	__u8 skc_state;
 	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
 	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
-	__u32 fd;
-	void *sk;
-
-	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
-	enum traffic_protocol protocol;
-	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	enum message_type message_type;
-
-	enum traffic_direction direction; //T_INGRESS or T_EGRESS
-	enum endpoint_role role;
-	size_t prev_count;
-	char prev_buf[EBPF_CACHE_SIZE];
-	__s32 correlation_id; // 目前用于kafka判断
-	enum traffic_direction prev_direction;
-	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
-
 	/*
 	The matching logic is:
 
@@ -170,7 +154,22 @@ struct conn_info_t {
 	// the Go DNS case. Parse DNS save record type and ignore AAAA records
 	// in call chain trace
 	__u16 dns_q_type;
-	__u32 tcpseq_offset;	// Used for adjusting TCP sequence numbers
+	__u32 fd;
+	__s32 correlation_id; // 目前用于kafka判断
+	void *sk;
+
+	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
+	enum traffic_protocol protocol;
+	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
+	enum message_type message_type;
+
+	enum traffic_direction direction; //T_INGRESS or T_EGRESS
+	enum endpoint_role role;
+	size_t prev_count;
+	char prev_buf[EBPF_CACHE_SIZE];
+	enum traffic_direction prev_direction;
+	__u32 tcpseq_offset;    // Used for adjusting TCP sequence numbers
+	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
 };
 
 struct process_data_extra {
