@@ -923,7 +923,7 @@ fn get_listener_links(
         Ok(links) => {
             if links.is_empty() {
                 warn!(
-                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                    "tap-interface-regex({}) do not match any interface in {:?}",
                     conf.tap_interface_regex, netns,
                 );
             }
@@ -1718,6 +1718,10 @@ impl AgentComponents {
             .environment
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
+
+        if !yaml_config.src_interfaces.is_empty() {
+            warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
+        }
 
         #[cfg(target_os = "linux")]
         {

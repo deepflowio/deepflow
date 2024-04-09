@@ -1735,10 +1735,6 @@ impl ConfigHandler {
             }
         }
 
-        if !new_config.yaml_config.src_interfaces.is_empty() {
-            warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
-        }
-
         if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
             yaml_config.analyzer_dedup_disabled = new_config.yaml_config.analyzer_dedup_disabled;
             info!(
