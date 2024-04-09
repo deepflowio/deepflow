@@ -25,6 +25,9 @@
 #include "common.h"
 #include "socket_trace.h"
 
+static __inline void save_prev_data(const char *buf,
+				    struct conn_info_t *conn_info, size_t count);
+
 static __inline bool is_same_command(char *a, char *b)
 {
 	static const int KERNEL_COMM_MAX = 16;
@@ -221,7 +224,9 @@ static bool is_http2_magic(const char *buf_src, size_t count)
 //      4       :path  /
 //      5       :path  /index.html
 // others as response.
-static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
+static __inline enum message_type parse_http2_headers_frame(const char *buf_kern,
+							    size_t syscall_len,
+							    const char *buf_src,
 							    size_t count,
 							    struct conn_info_t
 							    *conn_info,
@@ -248,6 +253,19 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
  */
 #define HTTPV2_FRAME_READ_SZ            21
 #define HTTPV2_STATIC_TABLE_IDX_MAX     61
+
+	/*
+	 * If the server reads data in multiple passes, and the previous pass
+	 * has already read the first 9 bytes of the protocol header, and it
+	 * has been determined as HEADER, then the current data is directly
+	 * PUSHed to the upper layer.
+	 */
+	if (conn_info->prev_count == HTTPV2_FRAME_PROTO_SZ) {
+		if (!is_first)
+			return MSG_RECONFIRM;
+
+		return MSG_REQUEST;
+	}
 
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
@@ -288,13 +306,6 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		if (type != HTTPV2_FRAME_TYPE_HEADERS)
 			continue;
 
-		/*
-		 * 如果不是初次推断（即：socket已经确认了数据协议类型并明确了角色）
-		 * 可以通过方向来判断请求或回应。
-		 */
-		if (!is_first)
-			return MSG_RECONFIRM;
-
 		flags_unset = buf[4] & 0xd2;
 		flags_padding = buf[4] & 0x08;
 		flags_priority = buf[4] & 0x20;
@@ -303,6 +314,18 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		// flags_unset和reserve必须为0，否则直接放弃判断。
 		if (flags_unset || reserve)
 			return MSG_UNKNOWN;
+
+		if (syscall_len == HTTPV2_FRAME_PROTO_SZ) {
+			msg_type = MSG_PRESTORE;
+			break;
+		}
+
+		/*
+		 * If the protocol inference is complete, it can be directly
+		 * pushed to the upper layer.
+		 */
+		if (!is_first)
+			return MSG_RECONFIRM;
 
 		/*
 		 * 根据帧结构中的flags的不同设置(具体检查PADDING位和PRIORITY位)
@@ -326,7 +349,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		// HTTPV2 REQUEST
 		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-	    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
 		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
 			msg_type = MSG_REQUEST;
@@ -352,10 +375,15 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		break;
 	}
 
+	if (msg_type == MSG_PRESTORE)
+		save_prev_data(buf_kern, conn_info, HTTPV2_FRAME_PROTO_SZ);
+
 	return msg_type;
 }
 
-static __inline enum message_type infer_http2_message(const char *buf_src,
+static __inline enum message_type infer_http2_message(const char *buf_kern,
+						      size_t syscall_len,
+						      const char *buf_src,
 						      size_t count,
 						      struct conn_info_t
 						      *conn_info)
@@ -386,8 +414,8 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 
-		if (parse_http2_headers_frame(buf_src, count, conn_info, false) !=
-		    MSG_RECONFIRM)
+		if (parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
+					      conn_info, false) != MSG_RECONFIRM)
 			return MSG_UNKNOWN;
 		
 		if (conn_info->socket_info_ptr->role == ROLE_SERVER)
@@ -397,9 +425,12 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 		if (conn_info->socket_info_ptr->role == ROLE_CLIENT)
 			return (conn_info->direction == T_INGRESS) ?
 				MSG_RESPONSE: MSG_REQUEST;
+
+		return MSG_REQUEST;
 	}
 
-	return parse_http2_headers_frame(buf_src, count, conn_info, true);
+	return parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
+					 conn_info, true);
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
@@ -1822,7 +1853,7 @@ infer_protocol(struct ctx_info_s *ctx,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-				infer_http2_message(syscall_infer_ptr,
+				infer_http2_message(infer_buf, count, syscall_infer_ptr,
 						    syscall_infer_len,
 						    conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
@@ -1957,8 +1988,9 @@ infer_protocol(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(syscall_infer_ptr, syscall_infer_len, 
-					conn_info)) != MSG_UNKNOWN) {
+		    infer_http2_message(infer_buf, count,syscall_infer_ptr,
+					syscall_infer_len, conn_info)) !=
+					MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
