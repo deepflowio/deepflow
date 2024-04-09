@@ -315,7 +315,7 @@ impl ZmtpLog {
                 // long-size
                 let (payload, size) = parse_long(payload).ok_or(Error::ZmtpLogParseFailed)?;
                 // size are unlikely to surpass 2^31
-                if size > i32::MAX as u64 {
+                if size < u8::MAX as u64 || size > i32::MAX as u64 {
                     return Err(Error::ZmtpLogParseFailed);
                 }
                 (payload, size as u64)
@@ -417,7 +417,7 @@ impl ZmtpLog {
                 // long-size
                 let (payload, size) = parse_long(payload).ok_or(Error::ZmtpLogParseFailed)?;
                 // size are unlikely to surpass 2^31
-                if size > i32::MAX as u64 {
+                if size < u8::MAX as u64 || size > i32::MAX as u64 {
                     return Err(Error::ZmtpLogParseFailed);
                 }
                 (payload, size as u64)
@@ -454,7 +454,10 @@ impl ZmtpLog {
             return false;
         }
         let mut parser = ZmtpLog::default();
-        parser.parse(payload, param, true).is_ok()
+        parser
+            .parse(payload, param, true)
+            .map(|infos| !infos.is_empty())
+            .unwrap_or(false)
     }
     fn parse(
         &mut self,
@@ -498,6 +501,9 @@ impl ZmtpLog {
                     info_list.push(L7ProtocolInfo::ZmtpInfo(info));
                 }
                 FrameType::Message => {
+                    if strict_check {
+                        continue;
+                    }
                     if self.client_socket_type == Some(SocketType::REQ)
                         || self.client_socket_type == Some(SocketType::REP)
                         || self.server_socket_type == Some(SocketType::REQ)
