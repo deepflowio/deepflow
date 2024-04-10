@@ -880,3 +880,5 @@ var RESOURCE_POD_GROUP_TYPE_MAP = map[int]int{
 	common.POD_GROUP_REPLICASET_CONTROLLER: common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
 	common.POD_GROUP_CLONESET:              common.VIF_DEVICE_TYPE_POD_GROUP_CLONESET,
 }
+
+const TrisolarisNodeTypeMaster = "master"
