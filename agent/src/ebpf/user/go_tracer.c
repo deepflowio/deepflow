@@ -556,7 +556,10 @@ static int resolve_bin_file(const char *path, int pid,
 	if (syms_count == 0) {
 		ret = ETR_NOSYMBOL;
 		ebpf_warning(
-			"Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
+			"Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!"
+			" You can try setting the configuration option 'golang-symbol' to see "
+			"if it resolves the issue, if the issue persists, please attempt to "
+			"resolve it using the Golang executable with symbol table included.\n",
 			pid, path, go_ver->major, go_ver->minor);
 		goto failed;
 	}
@@ -598,23 +601,36 @@ static int resolve_bin_file(const char *path, int pid,
 			p_info->info.offsets[off->idx] = offset;
 		}
 
+		const char *tcp_conn_sym, *tls_conn_sym, *syscall_conn_sym;
 		if (p_info->info.version < GO_VERSION(1, 20, 0)) {
-			p_info->info.net_TCPConn_itab =
-				get_symbol_addr_from_binary(binary_path, "go.itab.*net.TCPConn,net.Conn");
-			p_info->info.crypto_tls_Conn_itab =
-				get_symbol_addr_from_binary(binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
-			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
-				binary_path,
-				"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+			tcp_conn_sym = "go.itab.*net.TCPConn,net.Conn";
+			tls_conn_sym = "go.itab.*crypto/tls.Conn,net.Conn";
+			syscall_conn_sym =
+				"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
 		} else {
-			p_info->info.net_TCPConn_itab =
-				get_symbol_addr_from_binary(binary_path, "go:itab.*net.TCPConn,net.Conn");
-			p_info->info.crypto_tls_Conn_itab =
-				get_symbol_addr_from_binary(binary_path, "go:itab.*crypto/tls.Conn,net.Conn");
-			p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
-				binary_path,
-				"go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
+			tcp_conn_sym = "go:itab.*net.TCPConn,net.Conn";
+			tls_conn_sym = "go:itab.*crypto/tls.Conn,net.Conn";
+			syscall_conn_sym =
+				"go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
 		}
+
+		p_info->info.net_TCPConn_itab =
+			get_symbol_addr_from_binary(binary_path, tcp_conn_sym);
+		if (p_info->info.net_TCPConn_itab == 0)
+			ebpf_warning("'%s' does not exist. Since eBPF uprobe relies on it to retrieve "
+				     "connection information, if it is empty, eBPF will not retrieve any"
+				     " data. This situation may be due to the lack of symbol table in "
+				     "the golang executable (confirm by executing 'nm %s'). If it shows "
+				     "'no symbols', you can try setting the configuration option "
+				     "'golang-symbol' to see if it resolves the issue, if the issue "
+				     "persists, please attempt to resolve it using the Golang executable "
+				     "with symbol table included.\n", tcp_conn_sym, binary_path);
+
+		p_info->info.crypto_tls_Conn_itab =
+			get_symbol_addr_from_binary(binary_path, tls_conn_sym);
+
+		p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+			binary_path, syscall_conn_sym);
 
 		p_info->has_updated = false;
 
