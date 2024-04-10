@@ -308,7 +308,7 @@ func NewRemoteReadQueryCache() *RemoteReadQueryCache {
 	return s
 }
 
-func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, resp *prompb.ReadResponse) *prompb.ReadResponse {
+func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, resp *prompb.ReadResponse, orgID string) *prompb.ReadResponse {
 	if req == nil || len(req.Queries) == 0 {
 		return resp
 	}
@@ -320,7 +320,7 @@ func (s *RemoteReadQueryCache) AddOrMerge(req *prompb.ReadRequest, resp *prompb.
 		return resp
 	}
 
-	key := promRequestToCacheKey(q)
+	key := promRequestToCacheKey(q, orgID)
 	start, end := GetPromRequestQueryTime(q)
 	start = timeAlign(start)
 
@@ -398,11 +398,11 @@ func copyResponse(cached *prompb.ReadResponse) *prompb.ReadResponse {
 	return resp
 }
 
-func (s *RemoteReadQueryCache) Remove(req *prompb.ReadRequest) {
+func (s *RemoteReadQueryCache) Remove(req *prompb.ReadRequest, orgID string) {
 	if req == nil || len(req.Queries) == 0 {
 		return
 	}
-	key := promRequestToCacheKey(req.Queries[0])
+	key := promRequestToCacheKey(req.Queries[0], orgID)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -412,7 +412,7 @@ func (s *RemoteReadQueryCache) Remove(req *prompb.ReadRequest) {
 	}
 }
 
-func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64) (*CacheItem, CacheHit, int64, int64) {
+func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64, orgID string) (*CacheItem, CacheHit, int64, int64) {
 	if req.Hints.Func == "series" {
 		// for series api, don't use cache
 		// not count cache miss here
@@ -420,7 +420,7 @@ func (s *RemoteReadQueryCache) Get(req *prompb.Query, start int64, end int64) (*
 	}
 
 	// for query api, cache query samples
-	key := promRequestToCacheKey(req)
+	key := promRequestToCacheKey(req, orgID)
 	start = timeAlign(start)
 
 	// lock for concurrency key reading

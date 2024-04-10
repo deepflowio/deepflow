@@ -43,7 +43,7 @@ type prometheusReader struct {
 	addExternalTagToCache   func(string, string)
 }
 
-func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, querierSql, sql string, duration float64, err error) {
+func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, orgID string, debug bool) (resp *prompb.ReadResponse, querierSql, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	if req == nil || len(req.Queries) == 0 {
 		return nil, "", "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
@@ -57,7 +57,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		// when error occurs, means query not finished yet, remove the first query placeholder
 		// if error is nil, means query finished, don't clean key
 		if err != nil || response == nil {
-			cache.PromReadResponseCache().Remove(r)
+			cache.PromReadResponseCache().Remove(r, orgID)
 		}
 	}(req)
 
@@ -67,7 +67,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	if cacheAvailable {
 		var hit cache.CacheHit
 		var cacheItem *cache.CacheItem
-		cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end)
+		cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, orgID)
 		if cacheItem != nil {
 			response = cacheItem.Data()
 		}
@@ -81,7 +81,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 				log.Infof("req [%s:%d-%d] wait 10 seconds to get cache result", metricName, start, end)
 				return response, "", "", 0, errors.New("query timeout, retry to get response! ")
 			case <-loadCompleted:
-				cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end)
+				cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, orgID)
 				if cacheItem != nil {
 					response = cacheItem.Data()
 				}
@@ -99,7 +99,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	var db, datasource string
 	var debugInfo map[string]interface{}
 	log.Debugf("metric: [%s] data query range: [%d-%d]", metricName, start, end)
-	ctx, querierSql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end, debug)
+	ctx, querierSql, db, datasource, metricName, err = p.promReaderTransToSQL(ctx, req, start, end, orgID, debug)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, "", "", 0, err
@@ -121,6 +121,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		Debug:      strconv.FormatBool(debug),
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
+		ORGID:      orgID,
 	}
 	// get parentSpan for inject others attribute below
 	parentSpan := trace.SpanFromContext(ctx)
@@ -176,7 +177,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 
 	if cacheAvailable {
 		// merge result into cache
-		response = cache.PromReadResponseCache().AddOrMerge(req, resp)
+		response = cache.PromReadResponseCache().AddOrMerge(req, resp, orgID)
 	} else {
 		// not using cache, query result would be real result
 		response = resp
@@ -207,7 +208,7 @@ func extractQuerySQLFromQueryResponse(debug map[string]interface{}) string {
 	return ""
 }
 
-func queryDataExecute(ctx context.Context, querierSql string, db string, ds string, debug bool) (*common.Result, string, float64, error) {
+func queryDataExecute(ctx context.Context, querierSql string, db string, ds string, orgID string, debug bool) (*common.Result, string, float64, error) {
 	var sql string
 	var duration float64
 	query_uuid := uuid.New()
@@ -218,6 +219,7 @@ func queryDataExecute(ctx context.Context, querierSql string, db string, ds stri
 		Debug:      strconv.FormatBool(debug),
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
+		ORGID:      orgID,
 	}
 	// trace clickhouse query
 	var span trace.Span

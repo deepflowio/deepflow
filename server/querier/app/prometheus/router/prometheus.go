@@ -42,6 +42,7 @@ const _STATUS_SUCCESS = "success"
 func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 
@@ -70,6 +71,7 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 		args.StartTime = c.Request.FormValue("start")
@@ -110,7 +112,8 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 		offloading := c.Request.FormValue("operator-offloading")
 		var offloadingArgs bool
 		setRouterArgs(offloading, &offloadingArgs, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
-		resp, err := svc.PromRemoteReadService(&req, c.Request.Context(), offloadingArgs)
+		orgID := c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		resp, err := svc.PromRemoteReadService(&req, c.Request.Context(), offloadingArgs, orgID)
 		if err != nil {
 			code, _ := handleError(err)
 			// remote read use different response, not use `obj`, otherwise it will cause decode response error
@@ -137,6 +140,7 @@ func promTagValuesReader(svc *service.PrometheusService) gin.HandlerFunc {
 			StartTime: c.Request.FormValue("start"),
 			EndTime:   c.Request.FormValue("end"),
 			Context:   c.Request.Context(),
+			OrgID:     c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID),
 		}
 		result, err := svc.PromLabelValuesService(&args, c.Request.Context())
 		if err != nil {
@@ -154,6 +158,7 @@ func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 			EndTime:   c.Request.FormValue("end"),
 			Matchers:  c.Request.Form["match[]"],
 			Context:   c.Request.Context(),
+			OrgID:     c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID),
 		}
 		debug := c.Request.FormValue("debug")
 		offloading := c.Request.FormValue("operator-offloading")
@@ -178,6 +183,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 		apps := c.Query("app")
 		from := c.Query("from")
 		to := c.Query("to")
+		orgID := c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 
 		var targetLabels, appLabels []string
 		if targets != "" {
@@ -187,7 +193,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 			appLabels = strings.Split(apps, ",")
 		}
 
-		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to)
+		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to, orgID)
 		if err != nil {
 			c.JSON(500, result)
 			return
@@ -196,6 +202,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 	})
 }
 
+// 提供 PromQL 语法分析，不执行查询
 func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		query := c.Query("query")
@@ -208,6 +215,7 @@ func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
 	})
 }
 
+// 提供 PromQL 语法分析，不执行查询
 func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		query := c.Query("query")

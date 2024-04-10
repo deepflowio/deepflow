@@ -99,7 +99,7 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, querierSql, sql, duration, err := q.reader.promReaderExecute(q.Ctx, req, q.Args.Debug)
+	resp, querierSql, sql, duration, err := q.reader.promReaderExecute(q.Ctx, req, q.Args.OrgID, q.Args.Debug)
 	if q.Args.Debug {
 		q.Querierable.queryStats = append(q.Querierable.queryStats, model.PromQueryStats{SQL: sql, QuerierSQL: querierSql, Duration: duration})
 	}

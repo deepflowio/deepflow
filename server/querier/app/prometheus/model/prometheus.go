@@ -31,6 +31,7 @@ type PromQueryParams struct {
 	StartTime  string
 	EndTime    string
 	Step       string
+	OrgID      string
 	Matchers   []string
 	Context    context.Context
 }
@@ -52,6 +53,7 @@ type PromMetaParams struct {
 	StartTime string
 	EndTime   string
 	LabelName string
+	OrgID     string
 	Context   context.Context
 }
 
@@ -82,5 +84,6 @@ type DeepFlowPromRequest struct {
 	End      int64
 	Step     time.Duration
 	Query    string
+	OrgID    string
 	Matchers []string
 }

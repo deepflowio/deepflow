@@ -55,8 +55,9 @@ func GetPromRequestQueryTime(q *prompb.Query) (int64, int64) {
 	return q.Hints.StartMs / 1000, endTime
 }
 
-func promRequestToCacheKey(q *prompb.Query) string {
+func promRequestToCacheKey(q *prompb.Query, orgID string) string {
 	matcher := &strings.Builder{}
+	matcher.WriteString(orgID + "-")
 	for i := 0; i < len(q.Matchers); i++ {
 		matcher.WriteString(q.Matchers[i].GetName() + q.Matchers[i].Type.String() + q.Matchers[i].GetValue())
 		matcher.WriteByte('-')

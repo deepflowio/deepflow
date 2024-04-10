@@ -69,6 +69,7 @@ func NewOffloadQueriable(args *model.PromQueryParams, opts ...OffloadQuerierable
 		startTime:    o.args.StartTime,
 		endTime:      o.args.EndTime,
 		debug:        o.args.Debug,
+		orgID:        o.args.OrgID,
 	}
 
 	return o
@@ -183,11 +184,12 @@ type OffloadQuerier struct {
 
 	debug              bool
 	startTime, endTime string
+	orgID              string
 }
 
 func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	// get query Request by hint
-	promtheusHint := &prometheusHint{hints: hints, matchers: matchers}
+	promtheusHint := &prometheusHint{hints: hints, matchers: matchers, orgID: o.orgID}
 	queryReq := o.querierable.mapToQueryRequest[o.keyGenerator(promtheusHint)]
 
 	//lint:ignore SA1029 use string as context key, ensure no type reference to app/prometheus
@@ -197,7 +199,7 @@ func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, mat
 	o.querierable.restoreFunctionAfterQueryFinished()
 	querierSql := o.querierable.reader.parseQueryRequestToSQL(ctx, queryReq, o.querierable.queryType)
 	if querierSql != "" {
-		result, sql, duration, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", o.debug)
+		result, sql, duration, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", o.orgID, o.debug)
 		if err != nil {
 			log.Error(err)
 			log.Errorf("offload querier sql: %s", querierSql)
@@ -245,7 +247,7 @@ func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, mat
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, querierSql, sql, duration, err := o.querierable.reader.promReaderExecute(o.ctx, req, o.debug)
+	resp, querierSql, sql, duration, err := o.querierable.reader.promReaderExecute(o.ctx, req, o.orgID, o.debug)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)

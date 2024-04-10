@@ -21,6 +21,9 @@ import (
 )
 
 type QueryRequest interface {
+	// Get OrgID for multiple orgs
+	GetOrgID() string
+
 	// GetStart returns the start timestamp of query, unit: ms
 	GetStart() int64
 

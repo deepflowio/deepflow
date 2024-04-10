@@ -37,7 +37,8 @@ func (w *WeakKeyGenerator) GenerateRequestKey(q model.QueryRequest) string {
 		vectorWrapper = q.GetFunc()[0]
 	}
 	return fmt.Sprintf(
-		"df:%s:%d:%s:%s:%s:%s",
+		"df:%s:%s:%d:%s:%s:%s:%s",
+		q.GetOrgID(),
 		q.GetMetric(),
 		q.GetStep(),
 		generateMatcherKey(q.GetLabels(), ":"),
@@ -53,7 +54,8 @@ type CacheKeyGenerator struct {
 // generate key without query time (start/end) for cache query
 func (k *CacheKeyGenerator) GenerateCacheKey(req *model.DeepFlowPromRequest) string {
 	return fmt.Sprintf(
-		"df:%s:%d:%d:%d:%s",
+		"df:%s:%s:%d:%d:%d:%s",
+		req.OrgID,
 		req.Query,
 		req.Step,
 		req.Start%int64(req.Step.Seconds()), // real interval for data
@@ -69,7 +71,8 @@ type HardKeyGenerator struct {
 func (h *HardKeyGenerator) GenerateRequestKey(q model.QueryRequest) string {
 	funcs := q.GetFunc()
 	return fmt.Sprintf(
-		"df:%s:%d:%d:%d:%s:%s:%s:%s:%s",
+		"df:%s:%s:%d:%d:%d:%s:%s:%s:%s:%s",
+		q.GetOrgID(),
 		q.GetMetric(),
 		q.GetStart(),
 		q.GetEnd(),

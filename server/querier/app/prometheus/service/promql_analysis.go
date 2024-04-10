@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
-func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, targetLabels []string, appLabels []string, startTime string, endTime string) (*common.Result, error) {
+func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, targetLabels []string, appLabels []string, startTime string, endTime string, orgID string) (*common.Result, error) {
 	startMs, err := strconv.ParseInt(startTime, 10, 64)
 	if err != nil {
 		log.Error(err)
@@ -97,6 +97,6 @@ func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, 
 		strings.Join(group, ","),
 		10000,
 	)
-	result, _, _, err := queryDataExecute(ctx, sql, "flow_log", "", false)
+	result, _, _, err := queryDataExecute(ctx, sql, "flow_log", "", orgID, false)
 	return result, err
 }

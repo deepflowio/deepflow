@@ -256,7 +256,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
-	queryRequests := analyzer.parsePromQL(args.Promql, start, end, step)
+	queryRequests := analyzer.parsePromQL(args.Promql, start, end, step, args.OrgID)
 	promRequest := &model.DeepFlowPromRequest{
 		Slimit: args.Slimit,
 		Start:  start.UnixMilli(),
@@ -384,7 +384,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
-	queryRequests := analyzer.parsePromQL(args.Promql, queryTime, queryTime, 0)
+	queryRequests := analyzer.parsePromQL(args.Promql, queryTime, queryTime, 0, args.OrgID)
 
 	// for matrix selector in instant query, may need a bigger time range than query
 	var minStart, maxEnd int64
@@ -495,7 +495,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	return result, err
 }
 
-func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest, orgID string) (resp *prompb.ReadResponse, err error) {
 	var query *prompb.Query
 	var queryType model.QueryType
 	if len(req.Queries) > 0 {
@@ -522,6 +522,7 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 		hints:    selectHints,
 		matchers: promMatchersToMatchers(&query.Matchers),
 		query:    query.String(),
+		orgID:    orgID,
 	}
 	reader := &prometheusReader{
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
@@ -530,7 +531,7 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 	}
 	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
 	if querierSql != "" {
-		result, _, _, err := queryDataExecute(ctx, querierSql, chCommon.DB_NAME_PROMETHEUS, "", false)
+		result, _, _, err := queryDataExecute(ctx, querierSql, chCommon.DB_NAME_PROMETHEUS, "", orgID, false)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -545,7 +546,7 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 		}
 		return resp, err
 	} else {
-		resp, _, _, _, err = reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
+		resp, _, _, _, err = reader.promReaderExecute(ctx, req, orgID, config.Cfg.Prometheus.RequestQueryWithDebug)
 		return resp, err
 	}
 }
@@ -570,13 +571,13 @@ func promMatchersToMatchers(matchers *[]*prompb.LabelMatcher) []*labels.Matcher 
 	return lm
 }
 
-func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest, orgID string) (resp *prompb.ReadResponse, err error) {
 	reader := &prometheusReader{
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
-	result, _, _, _, err := reader.promReaderExecute(ctx, req, config.Cfg.Prometheus.RequestQueryWithDebug)
+	result, _, _, _, err := reader.promReaderExecute(ctx, req, orgID, config.Cfg.Prometheus.RequestQueryWithDebug)
 	return result, err
 }
 

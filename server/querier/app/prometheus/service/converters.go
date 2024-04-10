@@ -127,7 +127,7 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTime int64, endTime int64, debug bool) (context.Context, string, string, string, string, error) {
+func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTime int64, endTime int64, orgID string, debug bool) (context.Context, string, string, string, string, error) {
 	queriers := req.Queries
 	if len(queriers) < 1 {
 		return ctx, "", "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
@@ -153,7 +153,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		isShowTagStatement = st
 	}
 	if isShowTagStatement {
-		tagsArray, err := showTags(ctx, db, table, startTime, endTime)
+		tagsArray, err := showTags(ctx, db, table, startTime, endTime, orgID)
 		if err != nil {
 			return ctx, "", "", "", "", err
 		}
@@ -436,17 +436,17 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 	return
 }
 
-func showTags(ctx context.Context, db string, table string, startTime int64, endTime int64) ([]string, error) {
+func showTags(ctx context.Context, db string, table string, startTime int64, endTime int64, orgID string) ([]string, error) {
 	showTags := "SHOW tags FROM %s.%s WHERE time >= %d AND time <= %d"
 	var data *common.Result
 	var err error
 	var tagsArray []string
 	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), "", orgID, false, ctx)
 	} else if db == chCommon.DB_NAME_EXT_METRICS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), "", orgID, false, ctx)
 	} else {
-		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), "", orgID, false, ctx)
 	}
 	if err != nil || data == nil {
 		return tagsArray, err

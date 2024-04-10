@@ -376,7 +376,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 				},
 			})
 
-			_, sql, db, ds, metricName, err := prometheusReader.promReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries}, startS, endS, false)
+			_, sql, db, ds, metricName, err := prometheusReader.promReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries}, startS, endS, "", false)
 
 			if !p.hasError {
 				So(err, ShouldBeNil)

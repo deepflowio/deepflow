@@ -88,13 +88,19 @@ type QueryHint struct {
 	end      int64
 	step     int64
 	query    string
+	orgID    string
 	funcs    []functionCall
 	matchers []*labels.Matcher
+}
+
+func (q *QueryHint) GetOrgID() string {
+	return q.orgID
 }
 
 func (q *QueryHint) GetStart() int64 {
 	return q.start
 }
+
 func (q *QueryHint) GetEnd() int64 {
 	return q.end
 }
@@ -169,11 +175,17 @@ type prometheusHint struct {
 	hints    *storage.SelectHints
 	matchers []*labels.Matcher
 	query    string
+	orgID    string
+}
+
+func (p *prometheusHint) GetOrgID() string {
+	return p.orgID
 }
 
 func (p *prometheusHint) GetStart() int64 {
 	return p.hints.Start
 }
+
 func (p *prometheusHint) GetEnd() int64 {
 	return p.hints.End
 }
@@ -231,7 +243,7 @@ func newQueryAnalyzer(lookBackDelta time.Duration) *queryAnalyzer {
 	}
 }
 
-func (d *queryAnalyzer) parsePromQL(qry string, start time.Time, end time.Time, interval time.Duration) []model.QueryRequest {
+func (d *queryAnalyzer) parsePromQL(qry string, start time.Time, end time.Time, interval time.Duration, orgID string) []model.QueryRequest {
 	// build Expr from promql analysis
 	expr, err := parser.ParseExpr(qry)
 	if err != nil {
@@ -243,7 +255,7 @@ func (d *queryAnalyzer) parsePromQL(qry string, start time.Time, end time.Time, 
 		End:      end,
 		Interval: interval,
 	}
-	return d.parseStmt(stmt)
+	return d.parseStmt(stmt, orgID)
 }
 
 /*
@@ -252,7 +264,7 @@ in prometheus, SelectHints only extract inner function for <VectorSelector> and 
 but we may need multiple functions query in clickhouse, like: sum(rate(metric[1d])) should get only 1 point from database, not 1d
 so use CombineHint to get multiple functions outside of <VectorSelector>
 */
-func (d *queryAnalyzer) parseStmt(stmt *parser.EvalStmt) []model.QueryRequest {
+func (d *queryAnalyzer) parseStmt(stmt *parser.EvalStmt, orgID string) []model.QueryRequest {
 	result := make([]model.QueryRequest, 0)
 	var evalRange time.Duration
 	parser.Inspect(stmt.Expr, func(node parser.Node, path []parser.Node) error {
@@ -267,6 +279,7 @@ func (d *queryAnalyzer) parseStmt(stmt *parser.EvalStmt) []model.QueryRequest {
 				matchers: n.LabelMatchers,
 				funcs:    extractSubFunctionFromPath(path),
 				query:    stmt.String(),
+				orgID:    orgID,
 			}
 			evalRange = 0
 			result = append(result, queryHint)
