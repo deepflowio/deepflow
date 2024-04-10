@@ -174,36 +174,34 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	// step 2: merge function stacks to profile tree
 	rootTotalValue := 0
 	for profileLocationStr, profileValue := range stackMap {
+		// XXX: reuse dst for every profileLocationStr
 		dst := make([]byte, 0, len(profileLocationStr))
-		if true {
-			dst = dst[:0]
-			profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
+		profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
+		// XXX: reuse the memory of profileLocationStrByte
+		profileLocationStrSlice := strings.Split(string(profileLocationStrByte), ";")
+		for profileLocationIndex := range profileLocationStrSlice {
+			nodeProfileValue := 0
+			if profileLocationIndex == len(profileLocationStrSlice)-1 {
+				nodeProfileValue = profileValue
+				rootTotalValue += profileValue
+			}
 			// XXX: reuse the memory of profileLocationStrByte
-			profileLocationStrSlice := strings.Split(string(profileLocationStrByte), ";")
-			for profileLocationIndex := range profileLocationStrSlice {
-				nodeProfileValue := 0
-				if profileLocationIndex == len(profileLocationStrSlice)-1 {
-					nodeProfileValue = profileValue
-					rootTotalValue += profileValue
+			profileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex+1], ";")
+			nodeID := controller_common.GenerateUUID(profileLocationStrs)
+			existNode, ok := NodeIDToProfileTree[nodeID]
+			if ok {
+				existNode.SelfValue += nodeProfileValue
+				existNode.TotalValue = existNode.SelfValue
+			} else {
+				// XXX: After the aforementioned memory reuse optimization is completed, memory allocation is required here.
+				nodeProfileLocationStr := profileLocationStrSlice[profileLocationIndex]
+				node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
+				if profileLocationIndex != 0 {
+					// XXX: reuse the memory of profileLocationStrByte
+					parentProfileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex], ";")
+					node.ParentNodeID = controller_common.GenerateUUID(parentProfileLocationStrs)
 				}
-				// XXX: reuse the memory of profileLocationStrByte
-				profileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex+1], ";")
-				nodeID := controller_common.GenerateUUID(profileLocationStrs)
-				existNode, ok := NodeIDToProfileTree[nodeID]
-				if ok {
-					existNode.SelfValue += nodeProfileValue
-					existNode.TotalValue = existNode.SelfValue
-				} else {
-					// XXX: After the aforementioned memory reuse optimization is completed, memory allocation is required here.
-					nodeProfileLocationStr := profileLocationStrSlice[profileLocationIndex]
-					node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
-					if profileLocationIndex != 0 {
-						// XXX: reuse the memory of profileLocationStrByte
-						parentProfileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex], ";")
-						node.ParentNodeID = controller_common.GenerateUUID(parentProfileLocationStrs)
-					}
-					NodeIDToProfileTree[nodeID] = node
-				}
+				NodeIDToProfileTree[nodeID] = node
 			}
 		}
 	}
