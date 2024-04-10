@@ -110,11 +110,13 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		Debug:   strconv.FormatBool(args.Debug),
 		Context: args.Context,
 	}
+	// XXX: change to streaming read, reduce memory
 	querierResult, querierDebug, err := ckEngine.ExecuteQuery(&querierArgs)
 	if err != nil {
 		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
 		return
 	}
+	// XXX: move following line to a function
 	profileDebug := model.Debug{}
 	profileDebug.Sql = sql
 	profileDebug.IP = querierDebug["ip"].(string)
@@ -123,6 +125,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	profileDebug.Error = querierDebug["error"].(string)
 	profileDebug.QueryTime = querierDebug["query_time"].(string)
 	debugs.QuerierDebug = append(debugs.QuerierDebug, profileDebug)
+
 	formatStartTime := time.Now()
 	profileLocationStrIndex := -1
 	profileValueIndex := -1
@@ -146,8 +149,9 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		err = errors.New("Not all fields found")
 		return
 	}
-	// merge profile_node_ids, profile_parent_node_ids, self_value
-	rootTotalValue := 0
+
+	// step 1: merge to uniq function stacks
+	stackMap := make(map[string]int)
 	for _, value := range values {
 		switch valueSlice := value.(type) {
 		case []interface{}:
@@ -159,30 +163,45 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 			if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
 				profileValue = profileValueInt
 			}
-			dst := make([]byte, 0, len(profileLocationStr))
-			profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
-			profileLocationStrSlice := strings.Split(string(profileLocationStrByte), ";")
-			for profileLocationIndex := range profileLocationStrSlice {
-				nodeProfileValue := 0
-				if profileLocationIndex == len(profileLocationStrSlice)-1 {
-					nodeProfileValue = profileValue
-					rootTotalValue += profileValue
+			if _, ok := stackMap[profileLocationStr]; ok {
+				stackMap[profileLocationStr] += profileValue
+			} else {
+				stackMap[profileLocationStr] = profileValue
+			}
+		}
+	}
+
+	// step 2: merge function stacks to profile tree
+	rootTotalValue := 0
+	for profileLocationStr, profileValue := range stackMap {
+		// XXX: reuse dst for every profileLocationStr
+		dst := make([]byte, 0, len(profileLocationStr))
+		profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
+		// XXX: reuse the memory of profileLocationStrByte
+		profileLocationStrSlice := strings.Split(string(profileLocationStrByte), ";")
+		for profileLocationIndex := range profileLocationStrSlice {
+			nodeProfileValue := 0
+			if profileLocationIndex == len(profileLocationStrSlice)-1 {
+				nodeProfileValue = profileValue
+				rootTotalValue += profileValue
+			}
+			// XXX: reuse the memory of profileLocationStrByte
+			profileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex+1], ";")
+			nodeID := controller_common.GenerateUUID(profileLocationStrs)
+			existNode, ok := NodeIDToProfileTree[nodeID]
+			if ok {
+				existNode.SelfValue += nodeProfileValue
+				existNode.TotalValue = existNode.SelfValue
+			} else {
+				// XXX: After the aforementioned memory reuse optimization is completed, memory allocation is required here.
+				nodeProfileLocationStr := profileLocationStrSlice[profileLocationIndex]
+				node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
+				if profileLocationIndex != 0 {
+					// XXX: reuse the memory of profileLocationStrByte
+					parentProfileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex], ";")
+					node.ParentNodeID = controller_common.GenerateUUID(parentProfileLocationStrs)
 				}
-				profileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex+1], ";")
-				nodeID := controller_common.GenerateUUID(profileLocationStrs)
-				existNode, ok := NodeIDToProfileTree[nodeID]
-				if ok {
-					existNode.SelfValue += nodeProfileValue
-					existNode.TotalValue = existNode.SelfValue
-				} else {
-					nodeProfileLocationStr := profileLocationStrSlice[profileLocationIndex]
-					node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
-					if profileLocationIndex != 0 {
-						parentProfileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex], ";")
-						node.ParentNodeID = controller_common.GenerateUUID(parentProfileLocationStrs)
-					}
-					NodeIDToProfileTree[nodeID] = node
-				}
+				NodeIDToProfileTree[nodeID] = node
 			}
 		}
 	}
