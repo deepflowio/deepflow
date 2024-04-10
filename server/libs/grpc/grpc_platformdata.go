@@ -1009,9 +1009,7 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 
 func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
 	vtapIps := response.GetVtapIps()
-	if vtapIps != nil {
-		t.updateVtapIps(vtapIps)
-	}
+	t.updateVtapIps(vtapIps)
 	podIps := response.GetPodIps()
 	if podIps != nil {
 		t.updatePodIps(podIps)

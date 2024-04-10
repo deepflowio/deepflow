@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -35,18 +36,9 @@ type IconKey struct {
 	SubType  int
 }
 
-func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
+func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
-	if !cfg.DFWebService.Enabled {
-		return domainToIconID, resourceToIconID, nil
-	}
-	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
-	if err != nil {
-		log.Error(err)
-		return domainToIconID, resourceToIconID, err
-	}
 	if len(response.Get("DATA").MustArray()) == 0 {
 		return domainToIconID, resourceToIconID, errors.New("no data in get icons response")
 	}
@@ -82,7 +74,11 @@ func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]in
 		}
 	}
 	var domains []mysql.Domain
-	mysql.Db.Unscoped().Find(&domains)
+	err := mysql.Db.Unscoped().Find(&domains).Error
+	if err != nil {
+		log.Error(err)
+		return domainToIconID, resourceToIconID, err
+	}
 	for _, domain := range domains {
 		if domain.IconID != 0 {
 			domainToIconID[domain.Lcuuid] = domain.IconID
@@ -96,4 +92,43 @@ func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]in
 		}
 	}
 	return domainToIconID, resourceToIconID, nil
+}
+
+// timing
+func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
+	domainToIconID := make(map[string]int)
+	resourceToIconID := make(map[IconKey]int)
+	if !cfg.DFWebService.Enabled {
+		return domainToIconID, resourceToIconID, nil
+	}
+	body := make(map[string]interface{})
+	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
+	if err != nil {
+		log.Error(err)
+		return domainToIconID, resourceToIconID, err
+	}
+	return ParseIcon(cfg, response)
+}
+
+// subscriber
+func GetIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
+	domainToIconID := make(map[string]int)
+	resourceToIconID := make(map[IconKey]int)
+	// master region
+	if cfg.TrisolarisCfg.NodeType == TrisolarisNodeTypeMaster {
+		return UpdateIconInfo(cfg)
+	}
+	var controller mysql.Controller
+	err := mysql.Db.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
+	if err != nil {
+		log.Error(err)
+		return domainToIconID, resourceToIconID, err
+	}
+	body := make(map[string]interface{})
+	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons/", controller.IP, cfg.ListenNodePort), body)
+	if err != nil {
+		log.Error(err)
+		return domainToIconID, resourceToIconID, err
+	}
+	return ParseIcon(cfg, response)
 }

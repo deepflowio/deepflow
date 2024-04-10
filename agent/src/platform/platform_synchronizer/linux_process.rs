@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "android")]
+use std::os::android::fs::MetadataExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
+
 use std::collections::HashSet;
 use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -30,8 +35,8 @@ use regex::Regex;
 use ring::digest;
 use serde::Deserialize;
 
+use super::linux_socket::get_proc_netns;
 use super::proc_scan_hook::proc_scan_hook;
-use super::{dir_inode, get_proc_netns, SHA1_DIGEST_LEN};
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
@@ -41,6 +46,7 @@ use crate::config::{
 };
 
 const CONTAINER_ID_LEN: usize = 64;
+const SHA1_DIGEST_LEN: usize = 20;
 
 #[derive(Debug, Clone)]
 pub struct ProcessData {
@@ -87,7 +93,8 @@ impl ProcessData {
     pub(super) fn get_root_inode(&mut self, proc_root: &str) -> std::io::Result<u64> {
         // /proc/{pid}/root
         let p = PathBuf::from_iter([proc_root, self.pid.to_string().as_str(), "root"]);
-        dir_inode(p.to_str().unwrap())
+        let m = std::fs::metadata(p.to_str().unwrap())?;
+        Ok(m.st_ino())
     }
 
     pub(super) fn set_username(&mut self, pwd: &PasswordInfo) {
@@ -382,7 +389,13 @@ pub(super) fn get_all_pid_process_map(proc_root: &str) -> PidProcMap {
     h
 }
 
-pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
+pub(crate) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
+    let mut ret = vec![];
+    get_all_process_in(conf, &mut ret);
+    ret
+}
+
+pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessData>) {
     // Hashmap<root_inode, PasswordInfo>
     let mut pwd_info = HashMap::new();
     let (user, cmd, proc_root, proc_regexp, tagged_only, now_sec) = (
@@ -410,7 +423,6 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
         }
     };
 
-    let mut ret = vec![];
     let mut pid_proc_map = get_all_pid_process_map(conf.os_proc_root.as_str());
 
     if let Ok(procs) = procfs::process::all_processes_with_root(proc_root) {
@@ -475,9 +487,8 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
             }
         }
         fill_child_proc_tag_by_parent(ret.as_mut());
-        proc_scan_hook(&mut ret);
+        proc_scan_hook(ret);
     }
-    return ret;
 }
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {

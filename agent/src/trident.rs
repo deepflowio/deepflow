@@ -33,7 +33,7 @@ use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
 use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 
@@ -80,7 +80,7 @@ use crate::{
     },
     metric::document::BoxedDocument,
     monitor::Monitor,
-    platform::PlatformSynchronizer,
+    platform::synchronizer::Synchronizer as PlatformSynchronizer,
     policy::{Policy, PolicyGetter, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
@@ -595,16 +595,11 @@ impl Trident {
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
+                config_handler.static_config.override_os_hostname.clone(),
                 synchronizer.agent_id.clone(),
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
-                config_handler
-                    .candidate_config
-                    .dispatcher
-                    .extra_netns_regex
-                    .clone(),
-                config_handler.static_config.override_os_hostname.clone(),
             ));
             ext.start();
             let poller = if sidecar_mode {
@@ -634,10 +629,10 @@ impl Trident {
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
+            config_handler.static_config.override_os_hostname.clone(),
             synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
-            config_handler.static_config.override_os_hostname.clone(),
         ));
         if matches!(
             config_handler.static_config.agent_mode,
@@ -1723,20 +1718,6 @@ impl AgentComponents {
             warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
-        #[cfg(target_os = "linux")]
-        {
-            // require an update because platfrom_synchronizer starts before receiving config from server
-            let regex = &candidate_config.dispatcher.extra_netns_regex;
-            let regex = if regex != "" {
-                info!("platform monitoring extra netns: /{}/", regex);
-                Some(regex::Regex::new(regex).unwrap())
-            } else {
-                info!("platform monitoring no extra netns");
-                None
-            };
-            platform_synchronizer.set_netns_regex(regex);
-        }
-
         let mut stats_sender = UniformSenderThread::new(
             "stats",
             stats_collector.get_receiver(),
@@ -1779,7 +1760,7 @@ impl AgentComponents {
                         .push((get_listener_links(&candidate_config.dispatcher, &ns), ns));
                 }
             } else {
-                error!("When the TapMode is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
+                log::error!("When the TapMode is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
             }
         }
 

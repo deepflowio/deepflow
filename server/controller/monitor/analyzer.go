@@ -59,6 +59,12 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 func (c *AnalyzerCheck) Start() {
 	log.Info("analyzer check start")
 	go func() {
+		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
+			c.SyncDefaultOrgData()
+		}
+	}()
+
+	go func() {
 		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
 			// 数据节点健康检查
 			c.healthCheck()
@@ -381,4 +387,14 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 	}
 
 	log.Info("az connection check end")
+}
+
+func (c *AnalyzerCheck) SyncDefaultOrgData() {
+	var analyzers []mysql.Analyzer
+	if err := mysql.DefaultDB.Find(&analyzers); err != nil {
+		log.Error(err)
+	}
+	if err := mysql.SyncDefaultOrgData(analyzers); err != nil {
+		log.Error(err)
+	}
 }
