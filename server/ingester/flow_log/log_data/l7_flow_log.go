@@ -444,10 +444,21 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 			h.AttributeNames = append(h.AttributeNames, "rpc_service")
 			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.RpcService)
 		}
-		h.AttributeNames = append(h.AttributeNames, l.ExtInfo.AttributeNames...)
-		h.AttributeValues = append(h.AttributeValues, l.ExtInfo.AttributeValues...)
-		h.MetricsNames = append(h.MetricsNames, l.ExtInfo.MetricsNames...)
-		h.MetricsValues = append(h.MetricsValues, l.ExtInfo.MetricsValues...)
+		attributeLen := len(l.ExtInfo.AttributeNames)
+		if attributeLen != 0 && attributeLen == len(l.ExtInfo.AttributeValues) {
+			h.AttributeNames = append(h.AttributeNames, l.ExtInfo.AttributeNames...)
+			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.AttributeValues...)
+		} else if attributeLen > 0 {
+			log.Warningf("invalid attributes: %v %v", l.ExtInfo.AttributeNames, l.ExtInfo.AttributeValues)
+		}
+
+		metricsLen := len(l.ExtInfo.MetricsNames)
+		if metricsLen != 0 && metricsLen == len(l.ExtInfo.MetricsValues) {
+			h.MetricsNames = append(h.MetricsNames, l.ExtInfo.MetricsNames...)
+			h.MetricsValues = append(h.MetricsValues, l.ExtInfo.MetricsValues...)
+		} else if metricsLen > 0 {
+			log.Warningf("invalid metrics: %v %v", l.ExtInfo.MetricsNames, l.ExtInfo.MetricsValues)
+		}
 	}
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId
