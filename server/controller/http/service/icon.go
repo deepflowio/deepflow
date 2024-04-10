@@ -30,10 +30,11 @@ func GetIcon(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 		return errResponse, nil
 	}
 	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
+	iconResponse, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
 	if err != nil {
 		log.Error(err)
 		return errResponse, err
 	}
+	response := iconResponse.Get("DATA")
 	return response, err
 }
