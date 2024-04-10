@@ -87,14 +87,14 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 				}
 			}
 
-			redisLcuuid := common.GenerateUUID(redisId)
-			vpcLcuuid := common.GenerateUUID(vpcId)
+			redisLcuuid := common.GenerateUUIDByOrgID(a.orgID, redisId)
+			vpcLcuuid := common.GenerateUUIDByOrgID(a.orgID, vpcId)
 			retRedisInstance := model.RedisInstance{
 				Lcuuid:       redisLcuuid,
 				Name:         redisName,
 				Label:        redisId,
 				VPCLcuuid:    vpcLcuuid,
-				AZLcuuid:     common.GenerateUUID(a.uuidGenerate + "_" + zoneId),
+				AZLcuuid:     common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
 				InternalHost: internalHost,
 				PublicHost:   publicHost,
@@ -130,7 +130,7 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 		return []model.VInterface{}, []model.IP{}, err
 	}
 
-	redisLcuuid := common.GenerateUUID(redisId)
+	redisLcuuid := common.GenerateUUIDByOrgID(a.orgID, redisId)
 	for _, rNet := range response {
 		for j := range rNet.Get("InstanceNetInfo").MustArray() {
 			net := rNet.Get("InstanceNetInfo").GetIndex(j)
@@ -139,10 +139,10 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 			if ip == "" {
 				continue
 			}
-			portLcuuid := common.GenerateUUID(redisLcuuid + ip)
+			portLcuuid := common.GenerateUUIDByOrgID(a.orgID, redisLcuuid+ip)
 			portType := common.VIF_TYPE_LAN
-			vpcLcuuid := common.GenerateUUID(net.Get("VPCId").MustString())
-			networkLcuuid := common.GenerateUUID(net.Get("VSwitchId").MustString())
+			vpcLcuuid := common.GenerateUUIDByOrgID(a.orgID, net.Get("VPCId").MustString())
+			networkLcuuid := common.GenerateUUIDByOrgID(a.orgID, net.Get("VSwitchId").MustString())
 			if net.Get("IPType").MustString() == "Public" {
 				portType = common.VIF_TYPE_WAN
 				networkLcuuid = common.NETWORK_ISP_LCUUID
@@ -160,10 +160,10 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
 			retIP := model.IP{
-				Lcuuid:           common.GenerateUUID(portLcuuid + ip),
+				Lcuuid:           common.GenerateUUIDByOrgID(a.orgID, portLcuuid+ip),
 				VInterfaceLcuuid: portLcuuid,
 				IP:               ip,
-				SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+				SubnetLcuuid:     common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),
 				RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
 			}
 			retIPs = append(retIPs, retIP)

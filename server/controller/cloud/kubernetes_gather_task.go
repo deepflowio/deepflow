@@ -41,8 +41,8 @@ type KubernetesGatherTask struct {
 }
 
 func NewKubernetesGatherTask(
-	ctx context.Context, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
-	kubernetesGather := kubernetes_gather.NewKubernetesGather(domain, subDomain, cfg, isSubDomain)
+	ctx context.Context, db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
+	kubernetesGather := kubernetes_gather.NewKubernetesGather(db, domain, subDomain, cfg, isSubDomain)
 	if kubernetesGather == nil {
 		log.Errorf("kubernetes_gather task (%s) init faild", domain.Name)
 		return nil

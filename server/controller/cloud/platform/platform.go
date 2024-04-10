@@ -45,13 +45,13 @@ type Platform interface {
 	ClearDebugLog()
 }
 
-func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) {
+func NewPlatform(domain mysql.Domain, cfg config.CloudConfig, db *mysql.DB) (Platform, error) {
 	var platform Platform
 	var err error
 
 	switch domain.Type {
 	case common.ALIYUN:
-		platform, err = aliyun.NewAliyun(domain, cfg)
+		platform, err = aliyun.NewAliyun(db.ORGID, domain, cfg)
 	case common.AWS:
 		platform, err = aws.NewAws(domain, cfg)
 	case common.AGENT_SYNC:
@@ -63,7 +63,7 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 	case common.TENCENT:
 		platform, err = tencent.NewTencent(domain, cfg)
 	case common.KUBERNETES:
-		platform, err = kubernetes.NewKubernetes(domain)
+		platform, err = kubernetes.NewKubernetes(db.ORGID, domain)
 	case common.HUAWEI:
 		platform, err = huawei.NewHuaWei(domain, cfg)
 	case common.FILEREADER:
