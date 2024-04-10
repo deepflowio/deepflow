@@ -101,13 +101,13 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 					"%d-%02d-%02d %02d:%02d:%02d \033[0;35m[eBPF] ",
 					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 					p->tm_hour, p->tm_min, p->tm_sec);
-			len += snprintf(msg + len, max - len, "WARNING: func %s()", function_name);
+			len += snprintf(msg + len, max - len, "WARN func %s()", function_name);
 		} else {
 			len += snprintf(msg + len, max - len,
 					"%d-%02d-%02d %02d:%02d:%02d \033[0;31m[eBPF] ",
 					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 					p->tm_hour, p->tm_min, p->tm_sec);
-			len += snprintf(msg + len, max - len, "ERROR: func %s()", function_name);
+			len += snprintf(msg + len, max - len, "ERROR func %s()", function_name);
 		}
 		if (line_number > 0)
 			len +=
