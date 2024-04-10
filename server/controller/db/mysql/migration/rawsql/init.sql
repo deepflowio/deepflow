@@ -2177,6 +2177,7 @@ CREATE TABLE IF NOT EXISTS ch_ip_relation (
     pod_ingress_name    VARCHAR(256),
     pod_service_id      INTEGER,
     pod_service_name    VARCHAR(256),
+    team_id             INTEGER,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (l3_epc_id, ip)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2233,6 +2234,7 @@ TRUNCATE TABLE ch_ip_resource;
 CREATE TABLE IF NOT EXISTS ch_lb_listener (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_lb_listener;

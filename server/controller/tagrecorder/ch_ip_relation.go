@@ -210,6 +210,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 					IP:        ip,
 					NATGWID:   natGateway.ID,
 					NATGWName: natGateway.Name,
+					TeamID:    DomainToTeamID[natGateway.Domain],
 				}
 			}
 		}
@@ -226,6 +227,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 						IP:        ip,
 						NATGWID:   natGateway.ID,
 						NATGWName: natGateway.Name,
+						TeamID:    DomainToTeamID[natGateway.Domain],
 					}
 				}
 			}
@@ -238,6 +240,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 				IP:        natRule.FixedIP,
 				NATGWID:   natGateway.ID,
 				NATGWName: natGateway.Name,
+				TeamID:    DomainToTeamID[natGateway.Domain],
 			}
 		}
 	}
@@ -285,6 +288,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 					IP:      ip,
 					LBID:    lb.ID,
 					LBName:  lb.Name,
+					TeamID:  DomainToTeamID[lb.Domain],
 				}
 			}
 		}
@@ -301,6 +305,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 						IP:      ip,
 						LBID:    lb.ID,
 						LBName:  lb.Name,
+						TeamID:  DomainToTeamID[lb.Domain],
 					}
 				}
 			}
@@ -316,6 +321,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 					LBName:         lb.Name,
 					LBListenerID:   lbListener.ID,
 					LBListenerName: lbListener.Name,
+					TeamID:         DomainToTeamID[lb.Domain],
 				}
 			}
 			// VPCID：负载均衡器VPC、后端主机云服务器VPC
@@ -337,6 +343,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 					LBName:         lb.Name,
 					LBListenerID:   lbListener.ID,
 					LBListenerName: lbListener.Name,
+					TeamID:         DomainToTeamID[lb.Domain],
 				}
 			}
 		}
@@ -389,6 +396,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 					IP:             ip,
 					PodServiceID:   podService.ID,
 					PodServiceName: podService.Name,
+					TeamID:         DomainToTeamID[podService.Domain],
 				}
 				if podService.PodIngressID != 0 {
 					dbItem.PodIngressID = podService.PodIngressID
@@ -407,6 +415,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 						IP:             ip,
 						PodServiceID:   podService.ID,
 						PodServiceName: podService.Name,
+						TeamID:         DomainToTeamID[podService.Domain],
 					}
 					if podService.PodIngressID != 0 {
 						dbItem.PodIngressID = podService.PodIngressID

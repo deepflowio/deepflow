@@ -158,6 +158,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 			log.Errorf("get org dbinfo fail : %d", orgID)
 			continue
 		}
+		GetTeamInfo(db)
 		newKeyToDBItem, newOK := b.updaterDG.generateNewData(db)
 		oldKeyToDBItem, oldOK := b.generateOldData(db)
 		keysToAdd := []KT{}

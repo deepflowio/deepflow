@@ -55,7 +55,6 @@ func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChLBListen
 	for _, lbTargetServer := range lbTargetServers {
 		lbTargetSertverMap[lbTargetServer.LBListenerID] += 1
 	}
-
 	keyToItem := make(map[IDKey]mysql.ChLBListener)
 	for _, lbListener := range lbListeners {
 		if lbTargetSertverMap[lbListener.ID] == 0 {
@@ -63,13 +62,15 @@ func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChLBListen
 		}
 		if lbListener.DeletedAt.Valid {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name + " (deleted)",
+				ID:     lbListener.ID,
+				Name:   lbListener.Name + " (deleted)",
+				TeamID: DomainToTeamID[lbListener.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name,
+				ID:     lbListener.ID,
+				Name:   lbListener.Name,
+				TeamID: DomainToTeamID[lbListener.Domain],
 			}
 		}
 	}
