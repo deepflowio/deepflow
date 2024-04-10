@@ -38,7 +38,7 @@ func NewChStringEnum() *ChStringEnum {
 	return updater
 }
 
-func (e *ChStringEnum) generateNewData() (map[StringEnumTagKey]mysql.ChStringEnum, bool) {
+func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey]mysql.ChStringEnum, bool) {
 	sql := "show tag all_string_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"

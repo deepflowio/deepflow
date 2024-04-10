@@ -60,24 +60,22 @@ func (c *ChPodNode) sourceToTarget(source *mysql.PodNode) (keys []IDKey, targets
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNode) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate) {
+func (c *ChPodNode) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodNode
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNode) softDeletedTargetsUpdated(targets []mysql.ChPodNode) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodNode) softDeletedTargetsUpdated(targets []mysql.ChPodNode, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

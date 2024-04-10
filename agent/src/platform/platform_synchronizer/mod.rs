@@ -14,61 +14,24 @@
  * limitations under the License.
  */
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-mod linux;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-mod linux_process;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-mod linux_socket;
 mod proc_scan_hook;
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-mod windows_process;
 
-#[cfg(target_os = "android")]
-use std::os::android::fs::MetadataExt;
-#[cfg(target_os = "linux")]
-use std::os::linux::fs::MetadataExt;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use std::{
-    fs::{metadata, symlink_metadata},
-    path::PathBuf,
-};
+cfg_if::cfg_if! {
+    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        mod linux;
+        pub(crate) mod linux_process;
+        mod linux_socket;
 
-#[cfg(target_os = "windows")]
-pub use self::windows::*;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub use linux::*;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub use linux_process::*;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub use linux_socket::*;
-use public::proto::common::TridentType;
-#[cfg(target_os = "windows")]
-pub use windows_process::*;
-
-use crate::utils::environment::{is_tt_pod, is_tt_workload};
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-// return the (now_sec - sym_change_time) second
-pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static str> {
-    // linux default not record the file birth time, use the change time instead of the birth time.
-    let s = symlink_metadata(path)
-        .map_err(|_| "get symlink metadate fail")?
-        .st_ctime() as u64;
-    if now_sec >= s {
-        Ok(now_sec - s)
-    } else {
-        Err("sym up time after current")
+        pub use linux::SocketSynchronizer;
+        pub use linux_process::{ProcessData, ProcRegRewrite};
+    } else if #[cfg(target_os = "windows")] {
+        pub struct ProcessData {}
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub fn dir_inode(path: &str) -> std::io::Result<u64> {
-    let m = metadata(path)?;
-    Ok(m.st_ino())
-}
+use public::proto::common::TridentType;
+
+use crate::utils::environment::{is_tt_pod, is_tt_workload};
 
 // whether need to scan the process info
 pub fn process_info_enabled(t: TridentType) -> bool {

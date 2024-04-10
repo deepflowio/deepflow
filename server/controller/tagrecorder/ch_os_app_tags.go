@@ -40,8 +40,9 @@ func NewChOSAppTags() *ChOSAppTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate) {
+func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.OSAPPTags.IsDifferent() {
 		osAppTagsMap := map[string]string{}
 		splitTags := strings.Split(fieldsUpdate.OSAPPTags.GetNew(), ", ")
@@ -61,14 +62,15 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChOSAppTags
-		mysql.Db.Where("pid = ?", sourceID).First(&chItem)
+		db.Where("pid = ?", sourceID).First(&chItem)
 		if chItem.PID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]OSAPPTagsKey{{PID: sourceID}},
 				[]mysql.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, OSAPPTagsKey{PID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, OSAPPTagsKey{PID: sourceID}, db)
 		}
 	}
 }
@@ -96,6 +98,6 @@ func (c *ChOSAppTags) sourceToTarget(item *mysql.Process) (keys []OSAPPTagsKey, 
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []mysql.ChOSAppTags) {
+func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []mysql.ChOSAppTags, db *mysql.DB) {
 
 }

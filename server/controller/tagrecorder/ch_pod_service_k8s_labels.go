@@ -37,8 +37,9 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	var labels string
 	if fieldsUpdate.Label.IsDifferent() {
 		labels = common.StrToJsonstr(fieldsUpdate.Label.GetNew())
@@ -48,7 +49,7 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodServiceK8sLabels
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sLabelsKey{{ID: sourceID}},
@@ -56,9 +57,10 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 					ID:     sourceID,
 					Labels: updateInfo["labels"].(string),
 				}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
 }
@@ -75,6 +77,6 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(item *mysql.PodService) (keys []K
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabels) {
+func (c *ChPodServiceK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabels, db *mysql.DB) {
 
 }

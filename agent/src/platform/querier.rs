@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
-pub struct ProcessData {}
-
-pub enum ProcRegRewrite {}
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "android")] {
+        mod android;
+        pub use android::Querier;
+    } else if #[cfg(target_os = "linux")] {
+        mod linux;
+        pub use linux::Querier;
+    } else if #[cfg(target_os = "windows")] {
+        mod windows;
+        pub use windows::Querier;
+    }
+}

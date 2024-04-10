@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
@@ -51,15 +52,19 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *SubscriberManager) Start() {
+func (c *SubscriberManager) Start() (err error) {
 	log.Info("tagrecorder subscriber manager started")
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = GetIconInfo(c.cfg)
+	if err != nil {
+		return err
+	}
 	c.subscribers = c.getSubscribers()
 	log.Infof("tagrecorder run start")
 	for _, subscriber := range c.subscribers {
 		subscriber.SetConfig(c.cfg.TagRecorderCfg)
 		subscriber.Subscribe()
 	}
+	return nil
 }
 
 func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
@@ -145,8 +150,8 @@ type Subscriber interface {
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
 	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
-	onResourceUpdated(int, MUPT)
-	softDeletedTargetsUpdated([]CT)
+	onResourceUpdated(int, MUPT, *mysql.DB)
+	softDeletedTargetsUpdated([]CT, *mysql.DB)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
@@ -210,23 +215,35 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(orgID int, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", orgID)
+	}
 	keys, chItems := s.generateKeyTargets(items)
-	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add)
+	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(orgID int, msg interface{}) {
 	updateFields := msg.(MUPT)
-	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields)
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", orgID)
+	}
+	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", orgID)
+	}
 	keys, chItems := s.generateKeyTargets(items)
 	if softDelete {
-		s.subscriberDG.softDeletedTargetsUpdated(chItems)
+		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
-		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
+		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
 	}
 }

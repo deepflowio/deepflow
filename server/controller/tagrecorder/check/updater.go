@@ -30,6 +30,7 @@ type ChResourceUpdater interface {
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	// Refresh() bool
 	SetConfig(cfg config.TagRecorderConfig)
+	SetDB(db *mysql.DB)
 	Check() error
 }
 
@@ -46,19 +47,24 @@ type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
 	cfg              config.TagRecorderConfig
 	resourceTypeName string
 	dataGenerator    DataGenerator[MT, KT]
+	db               *mysql.DB // db for multi org
 }
 
 func (b *UpdaterBase[MT, KT]) SetConfig(cfg config.TagRecorderConfig) {
 	b.cfg = cfg
 }
 
+func (b *UpdaterBase[MT, KT]) SetDB(db *mysql.DB) {
+	b.db = db
+}
+
 func (b *UpdaterBase[MT, KT]) generateOldData() ([]MT, bool) {
 	var items []MT
 	var err error
 	if b.resourceTypeName == RESOURCE_TYPE_CH_GPROCESS {
-		items, err = query.FindInBatchesObj[MT](mysql.Db.Unscoped())
+		items, err = query.FindInBatchesObj[MT](b.db.Unscoped())
 	} else {
-		err = mysql.Db.Unscoped().Find(&items).Error
+		err = b.db.Unscoped().Find(&items).Error
 	}
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))

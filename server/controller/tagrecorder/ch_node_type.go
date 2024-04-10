@@ -34,7 +34,7 @@ func NewChNodeType() *ChNodeType {
 	return updater
 }
 
-func (n *ChNodeType) generateNewData() (map[NodeTypeKey]mysql.ChNodeType, bool) {
+func (n *ChNodeType) generateNewData(db *mysql.DB) (map[NodeTypeKey]mysql.ChNodeType, bool) {
 	keyToItem := make(map[NodeTypeKey]mysql.ChNodeType)
 	for resourceType, nodeType := range RESOURCE_TYPE_TO_NODE_TYPE {
 		keyToItem[NodeTypeKey{ResourceType: resourceType}] = mysql.ChNodeType{

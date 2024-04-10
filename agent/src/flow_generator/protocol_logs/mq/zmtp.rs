@@ -272,11 +272,6 @@ impl ZmtpLog {
             check_minor_version(major_version, minor_version)?;
             info.minor_version = Some(minor_version);
             payload
-        } else if payload == b"\x03" {
-            // partial greeting header
-            // major version
-            info.major_version = Some(3);
-            return Err(Error::ZmtpLogParseEOF);
         } else {
             return Err(Error::ZmtpLogParseFailed);
         };
@@ -320,7 +315,7 @@ impl ZmtpLog {
                 // long-size
                 let (payload, size) = parse_long(payload).ok_or(Error::ZmtpLogParseFailed)?;
                 // size are unlikely to surpass 2^31
-                if size > i32::MAX as u64 {
+                if size < u8::MAX as u64 || size > i32::MAX as u64 {
                     return Err(Error::ZmtpLogParseFailed);
                 }
                 (payload, size as u64)
@@ -329,15 +324,18 @@ impl ZmtpLog {
         };
         info.req_msg_size = Some(size);
         // command body
-        let (payload, length) = parse_byte(payload).ok_or(Error::ZmtpLogParseEOF)?;
+        let (payload, length) = parse_byte(payload).ok_or(Error::ZmtpLogParseFailed)?;
         // Due to a libzmq bug, "\x05ERROR" is treated as "\x5e" "RROR",
         // so we process it as an exceptional case.
         let payload = if length == 0x5e && payload.get(0..4) == Some(b"RROR") {
             info.command_name = Some("ERROR".to_string());
             &payload[4..]
         } else {
+            if length < 5 {
+                return Err(Error::ZmtpLogParseFailed);
+            }
             let (payload, command_name) =
-                parse_bytes(payload, length as usize).ok_or(Error::ZmtpLogParseEOF)?;
+                parse_bytes(payload, length as usize).ok_or(Error::ZmtpLogParseFailed)?;
             // only allow alpha characters
             if command_name.iter().any(|&x| !x.is_alpha()) {
                 return Err(Error::ZmtpLogParseFailed);
@@ -419,7 +417,7 @@ impl ZmtpLog {
                 // long-size
                 let (payload, size) = parse_long(payload).ok_or(Error::ZmtpLogParseFailed)?;
                 // size are unlikely to surpass 2^31
-                if size > i32::MAX as u64 {
+                if size < u8::MAX as u64 || size > i32::MAX as u64 {
                     return Err(Error::ZmtpLogParseFailed);
                 }
                 (payload, size as u64)
@@ -434,32 +432,32 @@ impl ZmtpLog {
     fn try_parse<'a>(&mut self, payload: &'a [u8], info: &mut ZmtpInfo) -> Result<&'a [u8]> {
         *info = ZmtpInfo::default();
         match Self::parse_greeting(payload, info) {
-            Ok(payload) => return Ok(payload),
-            Err(Error::ZmtpLogParseEOF) => return Err(Error::ZmtpLogParseEOF),
-            _ => {}
-        }
-        *info = ZmtpInfo::default();
-        match Self::parse_message(payload, info) {
             Ok(payload) => {
                 return Ok(payload);
             }
             Err(Error::ZmtpLogParseEOF) => return Err(Error::ZmtpLogParseEOF),
-            _ => {}
+            _ => *info = ZmtpInfo::default(),
         }
-        *info = ZmtpInfo::default();
         match Self::parse_command(payload, info, self.mechanism.clone()) {
             Ok(payload) => return Ok(payload),
             Err(Error::ZmtpLogParseEOF) => return Err(Error::ZmtpLogParseEOF),
-            _ => {}
+            _ => *info = ZmtpInfo::default(),
         }
-        Err(Error::ZmtpLogParseFailed)
+        // message lacks uniqueness, so we do not allow EOF
+        match Self::parse_message(payload, info) {
+            Ok(payload) => Ok(payload),
+            _ => Err(Error::ZmtpLogParseFailed),
+        }
     }
     fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         let mut parser = ZmtpLog::default();
-        parser.parse(payload, param, true).is_ok()
+        parser
+            .parse(payload, param, true)
+            .map(|infos| !infos.is_empty())
+            .unwrap_or(false)
     }
     fn parse(
         &mut self,
@@ -467,25 +465,22 @@ impl ZmtpLog {
         param: &ParseParam,
         strict_check: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
+        if param.is_tls() {
+            return Err(Error::ZmtpLogParseFailed);
+        }
         let mut info_list = vec![];
         while !payload.is_empty() {
             let mut info = ZmtpInfo::default();
             payload = match self.try_parse(payload, &mut info) {
                 Ok(p) => p,
                 Err(Error::ZmtpLogParseEOF) => {
-                    // allow malformed greeting
+                    // always allow malformed greeting
                     if strict_check && info.frame_type != FrameType::Greeting {
                         return Err(Error::ZmtpLogParseFailed);
                     }
                     &payload[0..0]
                 }
-                Err(_) => {
-                    if info_list.is_empty() || strict_check {
-                        return Err(Error::ZmtpLogParseFailed);
-                    } else {
-                        break;
-                    }
-                }
+                Err(_) => return Err(Error::ZmtpLogParseFailed),
             };
             if param.direction == PacketDirection::ServerToClient {
                 info.res_msg_size = info.req_msg_size.take();
@@ -506,6 +501,9 @@ impl ZmtpLog {
                     info_list.push(L7ProtocolInfo::ZmtpInfo(info));
                 }
                 FrameType::Message => {
+                    if strict_check {
+                        continue;
+                    }
                     if self.client_socket_type == Some(SocketType::REQ)
                         || self.client_socket_type == Some(SocketType::REP)
                         || self.server_socket_type == Some(SocketType::REQ)

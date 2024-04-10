@@ -34,17 +34,17 @@ func NewChPolicy() *ChPolicy {
 	return updater
 }
 
-func (p *ChPolicy) generateNewData() (map[PolicyKey]mysql.ChPolicy, bool) {
+func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, bool) {
 	var (
 		pcapPolicys []mysql.PcapPolicy
 		npbPolicys  []mysql.NpbPolicy
 	)
-	err := mysql.Db.Unscoped().Select("id", "name", "policy_acl_group_id").Find(&pcapPolicys).Error
+	err := db.Unscoped().Select("id", "name", "policy_acl_group_id").Find(&pcapPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Select("id", "name", "policy_acl_group_id", "npb_tunnel_id").Find(&npbPolicys).Error
+	err = db.Unscoped().Select("id", "name", "policy_acl_group_id", "npb_tunnel_id").Find(&npbPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

@@ -19,6 +19,8 @@ package client
 import (
 	"context"
 	"reflect"
+	"strconv"
+	"strings"
 
 	//"database/sql"
 	"fmt"
@@ -44,6 +46,7 @@ type QueryParams struct {
 	Callbacks       map[string]func(result *common.Result) error
 	QueryUUID       string
 	ColumnSchemaMap map[string]*common.ColumnSchema
+	ORGID           string
 }
 
 // All ClickHouse Client share one connection
@@ -113,6 +116,14 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			queryCacheStr += fmt.Sprintf(", query_cache_ttl = %s", params.QueryCacheTTL)
 		}
 		sqlstr += queryCacheStr
+	}
+	// ORGID
+	if params.ORGID != common.DEFAULT_ORG_ID && params.ORGID != "" {
+		orgIDInt, err := strconv.Atoi(params.ORGID)
+		if err != nil {
+			return nil, err
+		}
+		sqlstr = strings.ReplaceAll(sqlstr, "flow_tag", fmt.Sprintf("%04d_flow_tag", orgIDInt))
 	}
 	err = c.init(query_uuid)
 	if err != nil {

@@ -606,7 +606,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response = &common.Result{
@@ -645,7 +645,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 		Context:  ctx,
 	}
 	k8sLabelSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_service_k8s_label_map UNION ALL SELECT key FROM flow_tag.pod_k8s_label_map) GROUP BY key"
-	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
+	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
@@ -670,6 +670,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 		Sql:           "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key",
 		UseQueryCache: useQueryCache,
 		QueryCacheTTL: queryCacheTTL,
+		ORGID:         orgID,
 	})
 	if err != nil {
 		return nil, err
@@ -692,7 +693,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 
 	// 查询 k8s_env
 	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key", UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
+		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key", UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
@@ -714,7 +715,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 
 	// 查询cloud.tag
 	cloudTagSql := "SELECT key FROM (SELECT key FROM flow_tag.chost_cloud_tag_map UNION ALL SELECT key FROM flow_tag.pod_ns_cloud_tag_map) GROUP BY key"
-	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
+	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
@@ -736,7 +737,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 
 	// 查询 os.app
 	osAPPTagSql := "SELECT key FROM flow_tag.os_app_tag_map GROUP BY key"
-	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
+	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
@@ -801,7 +802,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL string, useQueryCache b
 	} else {
 		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
-	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL})
+	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
@@ -859,7 +860,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, sql, queryCacheTTL string, useQueryCache bool) (*common.Result, []string, error) {
+func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache bool) (*common.Result, []string, error) {
 	var sqlList []string
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")

@@ -37,7 +37,7 @@ func NewChChostCloudTag() *ChChostCloudTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
+func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]CloudTagKey, 0)
 	targetsToAdd := make([]mysql.ChChostCloudTag, 0)
 	keysToDelete := make([]CloudTagKey, 0)
@@ -60,7 +60,7 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 				if oldV != v {
 					key := c.newTargetKey(sourceID, k)
 					updateInfo["value"] = v
-					mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, key)
 						targetsToAdd = append(targetsToAdd, mysql.ChChostCloudTag{
@@ -69,7 +69,7 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 							Value: v,
 						})
 					} else {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, key)
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, key, db)
 					}
 				}
 			}
@@ -85,10 +85,10 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
@@ -110,6 +110,6 @@ func (c *ChChostCloudTag) newTargetKey(id int, key string) CloudTagKey {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTag) {
+func (c *ChChostCloudTag) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTag, db *mysql.DB) {
 
 }

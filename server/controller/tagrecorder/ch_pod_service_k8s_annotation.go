@@ -39,11 +39,12 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sAnnotationKey, 0)
 	targetsToAdd := make([]mysql.ChPodServiceK8sAnnotation, 0)
 	keysToDelete := make([]K8sAnnotationKey, 0)
 	targetsToDelete := make([]mysql.ChPodServiceK8sAnnotation, 0)
+
 	if fieldsUpdate.Annotation.IsDifferent() {
 		new := fieldsUpdate.Annotation.GetNew()
 		old := fieldsUpdate.Annotation.GetOld()
@@ -76,7 +77,7 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 					if oldV != v {
 						key := K8sAnnotationKey{ID: sourceID, Key: k}
 						var chItem mysql.ChPodServiceK8sAnnotation
-						mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+						db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 						if chItem.ID == 0 {
 							keysToAdd = append(keysToAdd, key)
 							targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sAnnotation{
@@ -85,7 +86,7 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 								Value: v,
 							})
 						} else {
-							c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key)
+							c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key, db)
 						}
 					}
 				}
@@ -102,10 +103,10 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
@@ -127,6 +128,6 @@ func (c *ChPodServiceK8sAnnotation) sourceToTarget(source *mysql.PodService) (ke
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sAnnotation) {
+func (c *ChPodServiceK8sAnnotation) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sAnnotation, db *mysql.DB) {
 
 }

@@ -294,6 +294,8 @@ pub struct PlatformConfig {
     pub tap_mode: TapMode,
     pub os_proc_scan_conf: OsProcScanConfig,
     pub agent_enabled: bool,
+    #[cfg(target_os = "linux")]
+    pub extra_netns_regex: String,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -1401,6 +1403,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 os_proc_scan_conf: OsProcScanConfig {},
                 prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
                 agent_enabled: conf.enabled,
+                #[cfg(target_os = "linux")]
+                extra_netns_regex: conf.extra_netns_regex.to_string(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1735,10 +1739,6 @@ impl ConfigHandler {
             }
         }
 
-        if !new_config.yaml_config.src_interfaces.is_empty() {
-            warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
-        }
-
         if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
             yaml_config.analyzer_dedup_disabled = new_config.yaml_config.analyzer_dedup_disabled;
             info!(
@@ -1908,7 +1908,6 @@ impl ConfigHandler {
                         return vec![];
                     }
 
-                    c.platform_synchronizer.set_netns_regex(regex.clone());
                     c.kubernetes_poller.set_netns_regex(regex);
                 }
             }

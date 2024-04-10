@@ -36,9 +36,9 @@ func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	return updater
 }
 
-func (t *ChTapType) generateNewData() (map[TapTypeKey]mysql.ChTapType, bool) {
+func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysql.ChTapType, bool) {
 	var tapTypes []mysql.TapType
-	err := mysql.Db.Unscoped().Find(&tapTypes).Error
+	err := db.Unscoped().Find(&tapTypes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(t.resourceTypeName, err))
 		return nil, false

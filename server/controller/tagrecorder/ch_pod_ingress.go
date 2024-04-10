@@ -54,21 +54,21 @@ func (c *ChPodIngress) sourceToTarget(source *mysql.PodIngress) (keys []IDKey, t
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodIngress) onResourceUpdated(sourceID int, fieldsUpdate *message.PodIngressFieldsUpdate) {
+func (c *ChPodIngress) onResourceUpdated(sourceID int, fieldsUpdate *message.PodIngressFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodIngress
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodIngress) softDeletedTargetsUpdated(targets []mysql.ChPodIngress) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodIngress) softDeletedTargetsUpdated(targets []mysql.ChPodIngress, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

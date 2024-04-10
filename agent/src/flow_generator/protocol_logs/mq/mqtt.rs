@@ -491,10 +491,7 @@ impl MqttLog {
         }
         self.status = L7ResponseStatus::Ok;
 
-        self.parse_mqtt_info(payload, param.parse_log).map_err(|e| {
-            self.status = L7ResponseStatus::Error;
-            e
-        })
+        self.parse_mqtt_info(payload, param.parse_log)
     }
 
     fn parse_status_code(&mut self, code: u8) -> L7ResponseStatus {

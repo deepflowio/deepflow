@@ -58,6 +58,7 @@ type Config struct {
 	IngesterPort                   int
 	PodClusterInternalIPToIngester int
 	GrpcMaxMessageLength           int
+	ExportersEnabled               bool
 }
 
 func (c *Config) Convert() {
@@ -114,4 +115,12 @@ func (c *Config) SetGrpcMaxMessageLength(maxLen int) {
 
 func (c *Config) GetGrpcMaxMessageLength() int {
 	return c.GrpcMaxMessageLength
+}
+
+func (c *Config) SetExportersEnabled(exporterEnabled bool) {
+	c.ExportersEnabled = exporterEnabled
+}
+
+func (c *Config) GetExportersEnabled() bool {
+	return c.ExportersEnabled
 }

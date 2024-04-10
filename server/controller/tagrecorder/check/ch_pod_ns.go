@@ -38,7 +38,7 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 
 func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool) {
 	var podNamespaces []mysql.PodNamespace
-	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
+	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

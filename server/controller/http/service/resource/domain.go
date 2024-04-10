@@ -27,6 +27,7 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
+	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -247,8 +248,8 @@ func CreateDomain(db *gorm.DB, domainCreate model.DomainCreate, cfg *config.Cont
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
 
 	domain := mysql.Domain{}
-	displayName := common.GenerateUUID(domainCreate.KubernetesClusterID)
-	lcuuid := common.GenerateUUID(displayName)
+	displayName := common.GetUUID(domainCreate.KubernetesClusterID, uuid.Nil)
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
 	domain.TeamID = domainCreate.TeamID
@@ -772,8 +773,8 @@ func CreateSubDomain(db *gorm.DB, subDomainCreate model.SubDomainCreate) (*model
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	displayName := common.GenerateUUID("")
-	lcuuid := common.GenerateUUID(displayName)
+	displayName := common.GetUUID("", uuid.Nil)
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
 	subDomain.Name = subDomainCreate.Name
 	subDomain.DisplayName = displayName

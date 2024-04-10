@@ -39,7 +39,7 @@ func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 
 func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 	var podIngresses []mysql.PodIngress
-	err := mysql.Db.Unscoped().Find(&podIngresses).Error
+	err := p.db.Unscoped().Find(&podIngresses).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

@@ -59,6 +59,12 @@ func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *Cont
 func (c *ControllerCheck) Start() {
 	log.Info("controller check start")
 	go func() {
+		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
+			c.SyncDefaultOrgData()
+		}
+	}()
+
+	go func() {
 		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
 			// 控制器健康检查
 			c.healthCheck()
@@ -78,6 +84,7 @@ func (c *ControllerCheck) Start() {
 			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
+
 }
 
 func (c *ControllerCheck) Stop() {
@@ -95,6 +102,7 @@ func (c *ControllerCheck) healthCheck() {
 
 	log.Info("controller health check start")
 
+	mysql.Db.Clauses()
 	if err := mysql.Db.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers).Error; err != nil {
 		log.Errorf("get controller from db error: %v", err)
 		return
@@ -380,5 +388,15 @@ func (c *ControllerCheck) cleanExceptionControllerData(controllerIPs []string) {
 		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err)
 	} else {
 		log.Infof("clean controllers (%s) genesis vinterface success", controllerIPs)
+	}
+}
+
+func (c *ControllerCheck) SyncDefaultOrgData() {
+	var controllers []mysql.Controller
+	if err := mysql.DefaultDB.Find(&controllers); err != nil {
+		log.Error(err)
+	}
+	if err := mysql.SyncDefaultOrgData(controllers); err != nil {
+		log.Error(err)
 	}
 }

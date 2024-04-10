@@ -36,7 +36,7 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 
 func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudTag, bool) {
 	var podNamespaces []mysql.PodNamespace
-	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
+	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

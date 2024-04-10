@@ -202,6 +202,11 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 	var retLBListeners []model.LBListener
 	var retLBTargetServers []model.LBTargetServer
 
+	if q.DisableSyncLBListener {
+		log.Infof("config disable sync lb listener is (%t)", q.DisableSyncLBListener)
+		return retLBListeners, retLBTargetServers, nil
+	}
+
 	log.Info("get lb listener and target_servers starting")
 
 	for regionId := range q.RegionIdToLcuuid {
