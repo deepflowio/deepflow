@@ -432,6 +432,16 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		h.XRequestId0 = l.ExtInfo.XRequestId_0
 		h.XRequestId1 = l.ExtInfo.XRequestId_1
 		h.HttpProxyClient = l.ExtInfo.ClientIp
+		if len(h.AttributeNames) != 0 {
+			log.Warningf("iinvalid attributes: %v %v", h.AttributeNames, h.AttributeValues)
+			h.AttributeNames = h.AttributeNames[:0]
+			h.AttributeValues = h.AttributeValues[:0]
+		}
+		if len(h.MetricsNames) != 0 {
+			log.Warningf("iinvalid metrics: %v %v", h.MetricsNames, h.MetricsValues)
+			h.MetricsNames = h.MetricsNames[:0]
+			h.MetricsValues = h.MetricsValues[:0]
+		}
 		if l.ExtInfo.HttpUserAgent != "" {
 			h.AttributeNames = append(h.AttributeNames, "http_user_agent")
 			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.HttpUserAgent)
@@ -449,7 +459,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 			h.AttributeNames = append(h.AttributeNames, l.ExtInfo.AttributeNames...)
 			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.AttributeValues...)
 		} else if attributeLen > 0 {
-			log.Warningf("invalid attributes: %v %v", l.ExtInfo.AttributeNames, l.ExtInfo.AttributeValues)
+			log.Warningf("iinvalid attributes: %v %v", l.ExtInfo.AttributeNames, l.ExtInfo.AttributeValues)
 		}
 
 		metricsLen := len(l.ExtInfo.MetricsNames)
@@ -457,7 +467,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 			h.MetricsNames = append(h.MetricsNames, l.ExtInfo.MetricsNames...)
 			h.MetricsValues = append(h.MetricsValues, l.ExtInfo.MetricsValues...)
 		} else if metricsLen > 0 {
-			log.Warningf("invalid metrics: %v %v", l.ExtInfo.MetricsNames, l.ExtInfo.MetricsValues)
+			log.Warningf("iinvalid metrics: %v %v", l.ExtInfo.MetricsNames, l.ExtInfo.MetricsValues)
 		}
 	}
 	if l.TraceInfo != nil {
