@@ -17,11 +17,12 @@
 package aliyun
 
 import (
+	"strconv"
+	"strings"
+
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"strconv"
-	"strings"
 )
 
 func (a *Aliyun) getSecurityGroups(region model.Region) ([]model.SecurityGroup, []model.SecurityGroupRule, error) {
@@ -55,11 +56,11 @@ func (a *Aliyun) getSecurityGroups(region model.Region) ([]model.SecurityGroup, 
 			}
 			vpcId := securityGroup.Get("VpcId").MustString()
 
-			securityGroupLcuuid := common.GenerateUUID(securityGroupId)
+			securityGroupLcuuid := common.GenerateUUIDByOrgID(a.orgID, securityGroupId)
 			retSecurityGroup := model.SecurityGroup{
 				Lcuuid:       securityGroupLcuuid,
 				Name:         securityGroupName,
-				VPCLcuuid:    common.GenerateUUID(vpcId),
+				VPCLcuuid:    common.GenerateUUIDByOrgID(a.orgID, vpcId),
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
 			}
 			retSecurityGroups = append(retSecurityGroups, retSecurityGroup)
@@ -88,7 +89,7 @@ func (a *Aliyun) getSecurityGroupRules(region model.Region, securityGroupId stri
 		return retSecurityGroupRules, err
 	}
 
-	securityGroupLcuuid := common.GenerateUUID(securityGroupId)
+	securityGroupLcuuid := common.GenerateUUIDByOrgID(a.orgID, securityGroupId)
 	for _, rRule := range Response {
 		for j := range rRule.Get("Permission").MustArray() {
 			rule := rRule.Get("Permission").GetIndex(j)
@@ -135,7 +136,7 @@ func (a *Aliyun) getSecurityGroupRules(region model.Region, securityGroupId stri
 			}
 			if groupId != "" {
 				ethertype = common.SECURITY_GROUP_IP_TYPE_UNKNOWN
-				remote = common.GenerateUUID(groupId)
+				remote = common.GenerateUUIDByOrgID(a.orgID, groupId)
 			}
 			if direction == common.SECURITY_GROUP_RULE_INGRESS {
 				local, remote = remote, local
@@ -157,7 +158,7 @@ func (a *Aliyun) getSecurityGroupRules(region model.Region, securityGroupId stri
 			key := securityGroupId + strconv.Itoa(direction) + local + remote + portRange +
 				protocol + strconv.Itoa(priority) + strconv.Itoa(action)
 			retRule := model.SecurityGroupRule{
-				Lcuuid:              common.GenerateUUID(key),
+				Lcuuid:              common.GenerateUUIDByOrgID(a.orgID, key),
 				SecurityGroupLcuuid: securityGroupLcuuid,
 				Direction:           direction,
 				EtherType:           ethertype,
@@ -196,7 +197,7 @@ func (a *Aliyun) getSecurityGroupRules(region model.Region, securityGroupId stri
 				}
 				key := securityGroupLcuuid + strconv.Itoa(direction) + local
 				retRule := model.SecurityGroupRule{
-					Lcuuid:              common.GenerateUUID(key),
+					Lcuuid:              common.GenerateUUIDByOrgID(a.orgID, key),
 					SecurityGroupLcuuid: securityGroupLcuuid,
 					Direction:           direction,
 					EtherType:           ethertype,

@@ -49,7 +49,7 @@ func (a *Aliyun) getVPCs(region model.Region) ([]model.VPC, error) {
 				}
 			}
 
-			vpcLcuuid := common.GenerateUUID(vpcId)
+			vpcLcuuid := common.GenerateUUIDByOrgID(a.orgID, vpcId)
 			retVPC := model.VPC{
 				Lcuuid:       vpcLcuuid,
 				Name:         vpcName,

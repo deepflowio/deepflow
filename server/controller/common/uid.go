@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 )
@@ -35,6 +36,13 @@ var (
 
 func GenerateUUID(str string) string {
 	return uuid.NewV5(uuid.NamespaceOID, str).String()
+}
+
+func GenerateUUIDByOrgID(orgID int, s string) string {
+	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+		s = strconv.Itoa(orgID) + "_" + s
+	}
+	return GenerateUUID(s)
 }
 
 const SHORT_UUID_LENGTH int = 10
@@ -59,6 +67,21 @@ func GetUUID(str string, namespace uuid.UUID) string {
 		return v4.String()
 	}
 	return uuid.NewV5(uuid.NamespaceOID, str).String()
+}
+
+func GetUUIDByOrgID(orgID int, s string) string {
+	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+		s = strconv.Itoa(orgID) + "_" + s
+	}
+	return GetUUID(s, uuid.Nil)
+}
+
+func IDGenerateUUID(orgID int, s string) string {
+	if orgID == mysqlcommon.DEFAULT_ORG_ID {
+		return s
+	}
+	s = strconv.Itoa(orgID) + "_" + s
+	return GetUUID(s, uuid.Nil)
 }
 
 func GenerateKuberneteClusterIDByMD5(md5 string) (string, error) {
