@@ -21,13 +21,12 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-func GetContextOrgDB(ctx *gin.Context) (*gorm.DB, error) {
+func GetContextOrgDB(ctx *gin.Context) (*mysql.DB, error) {
 	orgID, exist := ctx.Get(common.HEADER_KEY_X_ORG_ID)
 	if !exist {
 		return nil, errors.New(fmt.Sprintf("invalid org id (%v)", orgID))
@@ -37,5 +36,5 @@ func GetContextOrgDB(ctx *gin.Context) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return db.DB, nil
+	return db, nil
 }

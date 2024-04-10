@@ -75,7 +75,7 @@ func getDomain(c *gin.Context) {
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
-	data, err := resource.GetDomains(db, args)
+	data, err := resource.GetDomains(db.DB, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -88,7 +88,7 @@ func getDomains(c *gin.Context) {
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
-	data, err := resource.GetDomains(db, args)
+	data, err := resource.GetDomains(db.DB, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -144,7 +144,7 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		// set vtap
-		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false, db)
+		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false, db.DB)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 			return
@@ -161,7 +161,7 @@ func deleteDomainByNameOrUUID(c *gin.Context) {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
 	nameOrUUID := c.Param("name-or-uuid")
-	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db)
+	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db.DB)
 	common.JsonResponse(c, data, err)
 }
 
@@ -182,7 +182,7 @@ func deleteDomainByName(c *gin.Context) {
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
-	data, err := resource.DeleteDomainByNameOrUUID(name, db)
+	data, err := resource.DeleteDomainByNameOrUUID(name, db.DB)
 	common.JsonResponse(c, data, err)
 }
 
@@ -193,7 +193,7 @@ func getSubDomain(c *gin.Context) {
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
-	data, err := resource.GetSubDomains(db, args)
+	data, err := resource.GetSubDomains(db.DB, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -209,7 +209,7 @@ func getSubDomains(c *gin.Context) {
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
-	data, err := resource.GetSubDomains(db, args)
+	data, err := resource.GetSubDomains(db.DB, args)
 	common.JsonResponse(c, data, err)
 }
 
@@ -229,7 +229,7 @@ func createSubDomain(c *gin.Context) {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
 
-	data, err := resource.CreateSubDomain(db, subDomainCreate)
+	data, err := resource.CreateSubDomain(db.DB, subDomainCreate)
 	common.JsonResponse(c, data, err)
 }
 
@@ -242,7 +242,7 @@ func deleteSubDomain(c *gin.Context) {
 	}
 
 	lcuuid := c.Param("lcuuid")
-	data, err := resource.DeleteSubDomain(lcuuid, db)
+	data, err := resource.DeleteSubDomain(lcuuid, db.DB)
 	common.JsonResponse(c, data, err)
 }
 
@@ -275,13 +275,13 @@ func updateSubDomain(c *gin.Context) {
 		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 	}
 
-	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true, db)
+	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true, db.DB)
 	if err != nil {
 		common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
 		return
 	}
 
-	data, err := resource.UpdateSubDomain(lcuuid, db, patchMap)
+	data, err := resource.UpdateSubDomain(lcuuid, db.DB, patchMap)
 	common.JsonResponse(c, data, err)
 }
 
