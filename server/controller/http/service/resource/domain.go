@@ -40,6 +40,8 @@ import (
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 var log = logging.MustGetLogger("service.resource")
@@ -220,7 +222,7 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 	return info
 }
 
-func CreateDomain(db *gorm.DB, domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
+func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
 	db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
@@ -324,18 +326,18 @@ func CreateDomain(db *gorm.DB, domainCreate model.DomainCreate, cfg *config.Cont
 		} else {
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
-		createKubernetesRelatedResources(domain, regionLcuuid)
+		createKubernetesRelatedResources(db, domain, regionLcuuid)
 	}
 	err := db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
 
-	response, _ := GetDomains(db, map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetDomains(db.DB, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
 }
 
-func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) {
+func createKubernetesRelatedResources(db *mysql.DB, domain mysql.Domain, regionLcuuid string) {
 	if regionLcuuid == "" {
 		regionLcuuid = common.DEFAULT_REGION
 	}
@@ -345,10 +347,17 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	az.Domain = domain.Lcuuid
 	az.Region = regionLcuuid
 	az.CreateMethod = common.CREATE_METHOD_LEARN
-	err := mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&az).Error
+	err := db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&az).Error
 	if err != nil {
 		log.Errorf("create az failed: %s", err)
 	}
+
+	// pub to tagrecorder
+	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
+	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers(common.RESOURCE_TYPE_AZ_EN) {
+		s.OnResourceBatchAdded(metadata, []*mysql.AZ{&az})
+	}
+
 	vpc := mysql.VPC{}
 	vpc.Lcuuid = k8s.GetVPCLcuuidFromUUIDGenerate(domain.DisplayName)
 	vpc.Name = domain.Name
@@ -359,15 +368,21 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	if err != nil {
 		log.Errorf("create vpc failed: %s", err)
 	}
+
+	// pub to tagrecorder
+	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers(common.RESOURCE_TYPE_VPC_EN) {
+		s.OnResourceBatchAdded(metadata, []*mysql.VPC{&vpc})
+	}
 	return
 }
 
 func UpdateDomain(
-	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig, db *gorm.DB,
+	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig, DB *mysql.DB,
 ) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
+	db := DB.DB
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid),

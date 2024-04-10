@@ -200,7 +200,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		IconID: DomainTypeToIconID[KUBERNETES],
 	}
 	// TODO: 根据采集器上报的 team_id 获取对应的 org_id，传入对应的 db session
-	domain, err := resourceservice.CreateDomain(mysql.Db, domainCreate, nil)
+	domain, err := resourceservice.CreateDomain(mysql.DefaultDB, domainCreate, nil)
 	if err != nil {
 		log.Errorf("create domain failed: %s", err.Error())
 		return "", err
