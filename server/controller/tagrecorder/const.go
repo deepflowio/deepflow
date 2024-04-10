@@ -358,7 +358,8 @@ const (
 		"    `pod_ingress_id` UInt64,\n" +
 		"    `pod_ingress_name` String,\n" +
 		"    `pod_service_id` UInt64,\n" +
-		"    `pod_service_name` String\n" +
+		"    `pod_service_name` String,\n" +
+		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY l3_epc_id, ip\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -368,6 +369,16 @@ const (
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_LB_LISTENER_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -793,7 +804,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_IP_PORT:                CREATE_IP_PORT_DICTIONARY_SQL,
 	CH_DICTIONARY_SERVER_PORT:            CREATE_SERVER_PORT_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RELATION:            CREATE_IP_RELATION_DICTIONARY_SQL,
-	CH_DICTIONARY_LB_LISTENER:            CREATE_ID_NAME_DICTIONARY_SQL,
+	CH_DICTIONARY_LB_LISTENER:            CREATE_LB_LISTENER_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_INGRESS:            CREATE_ID_NAME_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_LABEL:          CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_LABELS:         CREATE_K8S_LABELS_DICTIONARY_SQL,

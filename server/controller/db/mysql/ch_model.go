@@ -146,6 +146,7 @@ type ChIPRelation struct {
 	PodIngressName string `gorm:"column:pod_ingress_name;type:varchar(256);default:null" json:"POD_INGRESS_NAME"`
 	PodServiceID   int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
 	PodServiceName string `gorm:"column:pod_service_name;type:varchar(256);default:null" json:"POD_SERVICE_NAME"`
+	TeamID         int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChIPRelation) TableName() string {
@@ -271,8 +272,9 @@ type ChTapType struct {
 }
 
 type ChLBListener struct {
-	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChLBListener) TableName() string {
