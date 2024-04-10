@@ -100,9 +100,9 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 
 	if (function_name) {
 		if (how_to_die & ERROR_WARNING) {
-			len += snprintf(msg + len, max - len, "[eBPF] WARNING: func %s()", function_name);
+			len += snprintf(msg + len, max - len, "[eBPF] WARN func %s()", function_name);
 		} else {
-			len += snprintf(msg + len, max - len, "[eBPF] ERROR: func %s()", function_name);
+			len += snprintf(msg + len, max - len, "[eBPF] ERROR func %s()", function_name);
 		}
 		if (line_number > 0)
 			len +=
