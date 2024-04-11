@@ -31,7 +31,7 @@ use super::{
     consts::*,
     round_to_minute,
     types::{AppMeterWithFlow, MiniFlow},
-    MetricsType,
+    MetricsType, QgStats,
 };
 
 use crate::common::flow::{CloseType, L7Protocol, L7Stats, SignalSource};
@@ -40,7 +40,7 @@ use crate::metric::meter::{AppAnomaly, AppLatency, AppMeter, AppTraffic};
 use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     buffer::BatchedBox,
@@ -496,12 +496,11 @@ impl L7QuadrupleGenerator {
                 quad_gen.stashs.push_back(QuadrupleStash::new());
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats {
+                    id,
+                    kind: "l7_second",
+                },
                 Countable::Ref(Arc::downgrade(&quad_gen.counter) as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "l7_second".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             second_quad_gen = Some(quad_gen);
         }
@@ -525,12 +524,11 @@ impl L7QuadrupleGenerator {
                 quad_gen.stashs.push_back(QuadrupleStash::new());
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats {
+                    id,
+                    kind: "l7_minute",
+                },
                 Countable::Ref(Arc::downgrade(&quad_gen.counter) as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "l7_minute".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             minute_quad_gen = Some(quad_gen);
         }

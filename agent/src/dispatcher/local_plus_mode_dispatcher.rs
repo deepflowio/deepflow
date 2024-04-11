@@ -47,7 +47,7 @@ use crate::{
     rpc::get_timestamp,
     utils::{
         bytes::read_u16_be,
-        stats::{self, Countable, StatsOption},
+        stats::{self, Countable, QueueStats},
     },
 };
 use public::{
@@ -351,29 +351,21 @@ impl LocalPlusModeDispatcher {
     }
 
     fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
-        let id = self.base.id.to_string();
+        let id = self.base.id;
         let name = "0.1-raw-packet-to-flow-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
-            "queue",
+            &QueueStats { id, module: name },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id.clone()),
-            ],
         );
 
         let name = "0.2-packet-to-additional-pipeline";
         let (sender_to_pipeline, receiver_from_flow, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
-            "queue",
+            &QueueStats { id, module: name },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id),
-            ],
         );
 
         self.run_flow_generator(receiver_from_dispatcher, sender_to_pipeline);
