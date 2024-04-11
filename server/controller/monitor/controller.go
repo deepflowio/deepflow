@@ -407,7 +407,7 @@ func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controll
 
 func (c *ControllerCheck) SyncDefaultOrgData() {
 	var controllers []mysql.Controller
-	if err := mysql.DefaultDB.Find(&controllers); err != nil {
+	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
 	if err := mysql.SyncDefaultOrgData(controllers); err != nil {
