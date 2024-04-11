@@ -268,7 +268,7 @@ func (d *domain) notifyOnResourceChanged(updatersInUpdateOrder []updater.Resourc
 	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
 	if platformDataChanged {
 		log.Info(d.metadata.LogPre("domain data changed, refresh platform data"))
-		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
 

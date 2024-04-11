@@ -57,6 +57,8 @@ type PlatformDataOP struct {
 
 	podIPs *atomic.Value // []*trident.PodIp
 
+	notifyIngesterDataChanged func()
+
 	ORGID
 }
 
@@ -94,6 +96,10 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 		podIPs:                     &atomic.Value{},
 		ORGID:                      metaData.ORGID,
 	}
+}
+
+func (p *PlatformDataOP) RegisteNotifyIngesterDatachanged(notify func()) {
+	p.notifyIngesterDataChanged = notify
 }
 
 // 有依赖 需要按顺序convert
@@ -721,5 +727,8 @@ func (p *PlatformDataOP) GeneratePlatformData() {
 		p.generateBasePlatformData()
 		p.generateBaseSegments(newRawData)
 		p.putPlatformDataChange()
+		if p.notifyIngesterDataChanged != nil {
+			p.notifyIngesterDataChanged()
+		}
 	}
 }

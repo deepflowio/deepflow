@@ -521,7 +521,7 @@ func CreateVTapGroupConfig(createData *agent_config.AgentGroupConfig) (*agent_co
 	lcuuid := uuid.New().String()
 	dbData.Lcuuid = &lcuuid
 	mysql.Db.Create(dbData)
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbData, nil
 }
 
@@ -537,7 +537,7 @@ func DeleteVTapGroupConfig(lcuuid string) (*agent_config.AgentGroupConfigModel, 
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
 	db.Delete(dbConfig)
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbConfig, nil
 }
 
@@ -557,7 +557,7 @@ func UpdateVTapGroupConfig(lcuuid string, updateData *agent_config.AgentGroupCon
 	if ret.Error != nil {
 		return nil, fmt.Errorf("save config failed, %s", ret.Error)
 	}
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbConfig, nil
 }
 
@@ -769,7 +769,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *agent_config.Agent
 	if string(b) == string(emptyData) {
 		b = nil
 	}
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 
@@ -804,7 +804,7 @@ func CreateVTapGroupAdvancedConfig(createData *agent_config.AgentGroupConfig) (s
 	if err != nil {
 		log.Error(err)
 	}
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 
@@ -859,7 +859,7 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 	if err != nil {
 		log.Error(err)
 	}
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 
