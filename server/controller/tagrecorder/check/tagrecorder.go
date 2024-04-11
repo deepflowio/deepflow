@@ -147,7 +147,7 @@ func (c *TagRecorder) getUpdaters(db *mysql.DB, domainLcuuidToIconID map[string]
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
-		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.SetConfig(c.cfg)
 		updater.SetDB(db)
 	}
 	return updaters
