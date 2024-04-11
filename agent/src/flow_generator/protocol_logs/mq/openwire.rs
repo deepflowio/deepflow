@@ -1888,9 +1888,6 @@ impl L7ProtocolParserInterface for OpenWireLog {
     fn parsable_on_udp(&self) -> bool {
         false
     }
-    fn reset(&mut self) {
-        self.perf_stats = None;
-    }
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
     }

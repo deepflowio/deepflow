@@ -13,7 +13,6 @@ use crate::{
         },
     },
 };
-use nom::AsChar;
 use serde::Serialize;
 use std::fmt;
 
@@ -331,13 +330,15 @@ impl ZmtpLog {
             info.command_name = Some("ERROR".to_string());
             &payload[4..]
         } else {
-            if length < 5 {
+            // Currently, the shortest command names are "PING", "PONG",
+            // and "JOIN" with the length of 4.
+            if length < 4 {
                 return Err(Error::ZmtpLogParseFailed);
             }
             let (payload, command_name) =
                 parse_bytes(payload, length as usize).ok_or(Error::ZmtpLogParseFailed)?;
-            // only allow alpha characters
-            if command_name.iter().any(|&x| !x.is_alpha()) {
+            // only allow uppercase ASCII characters
+            if !command_name.iter().all(|&x| x.is_ascii_uppercase()) {
                 return Err(Error::ZmtpLogParseFailed);
             }
             info.command_name = Some(String::from_utf8_lossy(command_name).to_string());
@@ -571,9 +572,6 @@ impl L7ProtocolParserInterface for ZmtpLog {
     }
     fn protocol(&self) -> L7Protocol {
         L7Protocol::ZMTP
-    }
-    fn reset(&mut self) {
-        self.perf_stats = None;
     }
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
         self.perf_stats.take()
