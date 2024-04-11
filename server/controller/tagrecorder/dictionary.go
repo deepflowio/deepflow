@@ -225,7 +225,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			mysqlDatabaseName = c.cfg.MySqlCfg.Database
 			ckDatabaseName = c.cfg.ClickHouseCfg.Database
 		} else {
-			mysqlDatabaseName = fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.MySqlCfg.Database
+			mysqlDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.MySqlCfg.Database + "`"
 			ckDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.ClickHouseCfg.Database + "`"
 		}
 		var databases []string
