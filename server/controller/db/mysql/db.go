@@ -171,23 +171,7 @@ func (c *DBs) check(db *DB) error {
 }
 
 func (c *DBs) DoOnAllDBs(execFunc func(db *DB) error) error {
-	orgIDs, err := GetORGIDs()
-	if err != nil {
-		return err
-	}
-	var dbs []*DB
-	for _, id := range orgIDs {
-		db, err := c.NewDBIfNotExists(id)
-		if err != nil {
-			return fmt.Errorf("failed to init db for org(%d): %v", id, err)
-		}
-		dbs = append(dbs, db)
-	}
-
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	for _, db := range dbs {
+	for _, db := range dbs.orgIDToDB {
 		if err := execFunc(db); err != nil {
 			return fmt.Errorf("org(id:%d, name:%s) %s", db.ORGID, db.Name, err.Error())
 		}
