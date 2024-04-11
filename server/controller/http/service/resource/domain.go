@@ -28,7 +28,6 @@ import (
 
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -91,7 +90,7 @@ func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (st
 	}
 }
 
-func GetDomains(db *gorm.DB, filter map[string]interface{}) (resp []model.Domain, err error) {
+func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
 	var domains []mysql.Domain
 	var azs []mysql.AZ
@@ -102,11 +101,12 @@ func GetDomains(db *gorm.DB, filter map[string]interface{}) (resp []model.Domain
 	var domainToRegionLcuuidsToAZLcuuids map[string](map[string][]string)
 	var controllerIPToName map[string]string
 
+	db := orgDB.DB
 	if _, ok := filter["lcuuid"]; ok {
-		db = db.Where("lcuuid = ?", filter["lcuuid"])
+		db = orgDB.Where("lcuuid = ?", filter["lcuuid"])
 	}
 	if _, ok := filter["name"]; ok {
-		db = db.Where("name = ?", filter["name"])
+		db = orgDB.Where("name = ?", filter["name"])
 	}
 	db.Order("created_at DESC").Find(&domains)
 
@@ -333,7 +333,7 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
 
-	response, _ := GetDomains(db.DB, map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetDomains(db, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
 }
 
@@ -377,12 +377,11 @@ func createKubernetesRelatedResources(db *mysql.DB, domain mysql.Domain, regionL
 }
 
 func UpdateDomain(
-	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig, DB *mysql.DB,
+	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig, db *mysql.DB,
 ) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
-	db := DB.DB
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid),
@@ -498,7 +497,7 @@ func cleanSoftDeletedResource(lcuuid string) {
 	log.Info("clean soft deleted resources completed")
 }
 
-func DeleteDomainByNameOrUUID(nameOrUUID string, db *gorm.DB) (map[string]string, error) {
+func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB) (map[string]string, error) {
 	var domain mysql.Domain
 	err1 := db.Where("lcuuid = ?", nameOrUUID).First(&domain).Error
 	var domains []mysql.Domain
@@ -528,7 +527,7 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *gorm.DB) (map[string]string
 	)
 }
 
-func deleteDomain(domain *mysql.Domain, db *gorm.DB) (map[string]string, error) { // TODO whether release resource ids
+func deleteDomain(domain *mysql.Domain, db *mysql.DB) (map[string]string, error) { // TODO whether release resource ids
 	log.Infof("delete domain (%s) resources started", domain.Name)
 
 	lcuuid := domain.Lcuuid
@@ -612,7 +611,7 @@ func deleteDomain(domain *mysql.Domain, db *gorm.DB) (map[string]string, error) 
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *gorm.DB) error {
+func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) error {
 	if value == "" {
 		return nil
 	}
@@ -696,11 +695,12 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *gorm.DB) erro
 	return nil
 }
 
-func GetSubDomains(db *gorm.DB, filter map[string]interface{}) ([]*model.SubDomain, error) {
+func GetSubDomains(orgDB *mysql.DB, filter map[string]interface{}) ([]*model.SubDomain, error) {
 	var response []*model.SubDomain
 	var subDomains []mysql.SubDomain
 	var vpcs []mysql.VPC
 
+	db := orgDB.DB
 	if _, ok := filter["lcuuid"]; ok {
 		db = db.Where("lcuuid = ?", filter["lcuuid"])
 	}
@@ -770,7 +770,7 @@ func GetSubDomains(db *gorm.DB, filter map[string]interface{}) ([]*model.SubDoma
 	return response, nil
 }
 
-func CreateSubDomain(db *gorm.DB, subDomainCreate model.SubDomainCreate) (*model.SubDomain, error) {
+func CreateSubDomain(db *mysql.DB, subDomainCreate model.SubDomainCreate) (*model.SubDomain, error) {
 	var domainCount int64
 	if err := db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).Count(&domainCount).Error; err != nil {
 		return nil, err
@@ -804,7 +804,7 @@ func CreateSubDomain(db *gorm.DB, subDomainCreate model.SubDomainCreate) (*model
 	return response[0], nil
 }
 
-func UpdateSubDomain(lcuuid string, db *gorm.DB, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
+func UpdateSubDomain(lcuuid string, db *mysql.DB, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
 	if _, ok := subDomainUpdate["NAME"]; ok {
 		return nil, errors.New("name field cannot be modified")
 	}
@@ -835,7 +835,7 @@ func UpdateSubDomain(lcuuid string, db *gorm.DB, subDomainUpdate map[string]inte
 	return response[0], nil
 }
 
-func DeleteSubDomain(lcuuid string, db *gorm.DB) (map[string]string, error) {
+func DeleteSubDomain(lcuuid string, db *mysql.DB) (map[string]string, error) {
 	var subDomain mysql.SubDomain
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(
