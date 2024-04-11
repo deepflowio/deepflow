@@ -75,7 +75,7 @@ func createPlugin(c *gin.Context) {
 
 	data, err := service.CreatePlugin(plugin)
 	if err == nil {
-		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
 	JsonResponse(c, data, err)
 }
@@ -84,7 +84,7 @@ func deletePlugin(c *gin.Context) {
 	name := c.Param("name")
 	err := service.DeletePlugin(name)
 	if err == nil {
-		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
 	JsonResponse(c, nil, err)
 }

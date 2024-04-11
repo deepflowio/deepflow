@@ -163,6 +163,7 @@ type VTapCache struct {
 	processName        *string
 	licenseType        int
 	tapMode            int
+	teamID             int
 	lcuuid             *string
 	licenseFunctions   *string
 	licenseFunctionSet mapset.Set
@@ -244,6 +245,7 @@ func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.processName = proto.String(vtap.ProcessName)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
+	vTapCache.teamID = vtap.TeamID
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
@@ -806,6 +808,14 @@ func (c *VTapCache) updateTapMode(tapMode int) {
 	c.tapMode = tapMode
 }
 
+func (c *VTapCache) GetTeamID() int {
+	return c.teamID
+}
+
+func (c *VTapCache) updateTeamID(teamID int) {
+	c.teamID = teamID
+}
+
 func (c *VTapCache) UpdateRevision(revision string) {
 	c.revision = &revision
 }
@@ -1019,6 +1029,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap) {
 		c.updateLicenseFunctions(vtap.LicenseFunctions)
 	}
 	c.updateTapMode(vtap.TapMode)
+	c.updateTeamID(vtap.TeamID)
 	if c.vTapType != vtap.Type {
 		c.vTapType = vtap.Type
 		v.setVTapChangedForSegment()

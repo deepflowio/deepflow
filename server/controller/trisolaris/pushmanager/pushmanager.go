@@ -18,26 +18,49 @@ package pushmanager
 
 import (
 	"sync"
+
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 type PushManager struct {
-	c *sync.Cond
+	orgToagentC [utils.ORG_ID_INDEX_MAX]*sync.Cond
+	ingesterC   *sync.Cond
 }
 
 var pushManager *PushManager = NewPushManager()
 
 func NewPushManager() *PushManager {
+	orgToagentC := [utils.ORG_ID_INDEX_MAX]*sync.Cond{}
+	for index, _ := range orgToagentC {
+		orgToagentC[index] = sync.NewCond(&sync.Mutex{})
+	}
 	return &PushManager{
-		c: sync.NewCond(&sync.Mutex{}),
+		orgToagentC: orgToagentC,
+		ingesterC:   sync.NewCond(&sync.Mutex{}),
 	}
 }
 
-func Broadcast() {
-	pushManager.c.Broadcast()
+func Broadcast(orgID int) {
+	if utils.CheckOrgID(orgID) {
+		pushManager.orgToagentC[orgID].Broadcast()
+	}
 }
 
-func Wait() {
-	pushManager.c.L.Lock()
-	pushManager.c.Wait()
-	pushManager.c.L.Unlock()
+func IngesterBroadcast() {
+	pushManager.ingesterC.Broadcast()
+}
+
+func Wait(orgID int) {
+	if utils.CheckOrgID(orgID) {
+		agentC := pushManager.orgToagentC[orgID]
+		agentC.L.Lock()
+		agentC.Wait()
+		agentC.L.Unlock()
+	}
+}
+
+func IngesterWait() {
+	pushManager.ingesterC.L.Lock()
+	pushManager.ingesterC.Wait()
+	pushManager.ingesterC.L.Unlock()
 }
