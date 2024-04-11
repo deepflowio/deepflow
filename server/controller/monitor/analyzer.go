@@ -396,7 +396,7 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 
 func (c *AnalyzerCheck) SyncDefaultOrgData() {
 	var analyzers []mysql.Analyzer
-	if err := mysql.DefaultDB.Find(&analyzers); err != nil {
+	if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
 		log.Error(err)
 	}
 	if err := mysql.SyncDefaultOrgData(analyzers); err != nil {
