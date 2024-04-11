@@ -216,6 +216,8 @@ pub struct NatsInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    l7_protocol_str: Option<String>,
 }
 
 #[derive(Default)]
@@ -733,6 +735,7 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                         Some(info.attributes)
                     }
                 },
+                protocol_str: info.l7_protocol_str,
                 ..Default::default()
             }),
             ..Default::default()
@@ -822,6 +825,9 @@ impl NatsLog {
         if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
             if !custom.attributes.is_empty() {
                 info.attributes.extend(custom.attributes);
+            }
+            if custom.proto_str.len() > 0 {
+                info.l7_protocol_str = Some(custom.proto_str);
             }
         }
     }

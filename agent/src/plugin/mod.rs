@@ -132,6 +132,9 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
 
             ) x 2
 
+        l7_protocol_str len: 2 bytes
+        l7_protocol_str:     $(l7_protocol_str len) bytes
+
         need_protocol_merge: 1 byte, the msb indicate is need protocol merge, the lsb indicate is end, such as 1 000000 1
 
         has trace: 1 byte
@@ -284,6 +287,14 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                     ));
                 }
             }
+        }
+
+        if let Some(proto_str) = read_wasm_str(buf, &mut off) {
+            info.proto_str = proto_str;
+        } else {
+            return Err(Error::WasmSerializeFail(
+                "buf len too short when parse l7_protocol_str".to_string(),
+            ));
         }
 
         // need_protocol_merge
