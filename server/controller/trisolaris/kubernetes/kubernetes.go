@@ -25,18 +25,17 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"context"
+
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	resourceservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
-)
-
-import (
-	"context"
 )
 
 var log = logging.MustGetLogger("trisolaris.kubernetes")
@@ -214,8 +213,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		// icon id value only for enterprise edition
 		IconID: DomainTypeToIconID[KUBERNETES],
 	}
-	// TODO: 根据采集器上报的 team_id 获取对应的 org_id，传入对应的 db session
-	domain, err := resourceservice.CreateDomain(mysql.DefaultDB, domainCreate, nil)
+	domain, err := resourceservice.CreateDomain(&mysql.DB{k.db, k.GetORGID(), mysqlcommon.ORGIDToDatabaseName(k.GetORGID())}, domainCreate, nil)
 	if err != nil {
 		log.Errorf(k.Logf("create domain failed: %s", err.Error()))
 		return "", err
