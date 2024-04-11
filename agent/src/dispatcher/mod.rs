@@ -1033,9 +1033,8 @@ impl DispatcherBuilder {
             queue_debugger: queue_debugger.clone(),
         };
         collector.register_countable(
-            "dispatcher",
+            &stats::SingleTagModule("dispatcher", "id", base.id),
             stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
-            vec![stats::StatsOption::Tag("id", base.id.to_string())],
         );
         let mut dispatcher = match tap_mode {
             TapMode::Local => {

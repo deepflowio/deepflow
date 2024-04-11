@@ -106,6 +106,46 @@ pub struct Config<'a> {
     pub ebpf: Option<&'a EbpfConfig>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
 }
 
+struct PluginStats<'a> {
+    id: u32,
+    plugin_name: &'a str,
+    plugin_type: &'static str,
+    export_func: &'static str,
+}
+
+impl stats::Module for PluginStats<'_> {
+    fn name(&self) -> &'static str {
+        "plugin"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("id", self.id.to_string()),
+            StatsOption::Tag("plugin_name", self.plugin_name.to_owned()),
+            StatsOption::Tag("plugin_type", self.plugin_type.to_owned()),
+            StatsOption::Tag("export_func", self.export_func.to_owned()),
+        ]
+    }
+}
+
+struct AllocatorStats {
+    id: u32,
+    obj_type: &'static str,
+}
+
+impl stats::Module for AllocatorStats {
+    fn name(&self) -> &'static str {
+        "allocator"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("id", self.id.to_string()),
+            StatsOption::Tag("type", self.obj_type.to_owned()),
+        ]
+    }
+}
+
 // not thread-safe
 pub struct FlowMap {
     // The original std HashMap uses SipHash-1-3 and is slow.
@@ -189,15 +229,13 @@ impl FlowMap {
         };
 
         stats_collector.register_countable(
-            "flow-map",
+            &stats::SingleTagModule("flow-map", "id", id),
             Countable::Ref(Arc::downgrade(&stats_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", id.to_string())],
         );
 
         stats_collector.register_countable(
-            "flow-perf",
+            &stats::SingleTagModule("flow-perf", "id", id),
             Countable::Ref(Arc::downgrade(&flow_perf_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", format!("{}", id))],
         );
         let system_time = get_timestamp(ntp_diff.load(Ordering::Relaxed));
         let start_time = system_time - config.packet_delay - Duration::from_secs(1);
@@ -230,12 +268,11 @@ impl FlowMap {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
                 let allocator = Allocator::new(n.max(1));
                 stats_collector.register_countable(
-                    "allocator",
+                    &AllocatorStats {
+                        id,
+                        obj_type: "TaggedFlow",
+                    },
                     Countable::Ref(allocator.counter()),
-                    vec![
-                        StatsOption::Tag("type", "TaggedFlow".to_owned()),
-                        StatsOption::Tag("id", format!("{}", id)),
-                    ],
                 );
                 allocator
             },
@@ -243,12 +280,11 @@ impl FlowMap {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<L7Stats>();
                 let allocator = Allocator::new(n.max(1));
                 stats_collector.register_countable(
-                    "allocator",
+                    &AllocatorStats {
+                        id,
+                        obj_type: "L7Stats",
+                    },
                     Countable::Ref(allocator.counter()),
-                    vec![
-                        StatsOption::Tag("type", "L7Stats".to_owned()),
-                        StatsOption::Tag("id", format!("{}", id)),
-                    ],
                 );
                 allocator
             },
@@ -308,18 +344,18 @@ impl FlowMap {
         // on counter registration and routine reports, it might be delayed because
         // FlowLog can hold these references
         if let Some(vm) = self.wasm_vm.take() {
+            let counters = vm
+                .counters()
+                .into_iter()
+                .map(|info| PluginStats {
+                    id: self.id,
+                    plugin_name: info.plugin_name,
+                    plugin_type: info.plugin_type,
+                    export_func: info.function_name,
+                })
+                .collect::<Vec<_>>();
             self.stats_collector
-                .deregister_countables(vm.counters().iter().map(|info| {
-                    (
-                        "plugin",
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", info.function_name.to_owned()),
-                        ],
-                    )
-                }));
+                .deregister_countables(counters.iter().map(|c| c as &dyn stats::Module));
         }
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Some(ps) = self.so_plugin.take() {
@@ -327,18 +363,17 @@ impl FlowMap {
             for p in ps.iter() {
                 p.counters_in(&mut counters);
             }
+            let counters = counters
+                .into_iter()
+                .map(|info| PluginStats {
+                    id: self.id,
+                    plugin_name: info.plugin_name,
+                    plugin_type: info.plugin_type,
+                    export_func: info.function_name,
+                })
+                .collect::<Vec<_>>();
             self.stats_collector
-                .deregister_countables(counters.iter().map(|info| {
-                    (
-                        "plugin",
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", info.function_name.to_owned()),
-                        ],
-                    )
-                }));
+                .deregister_countables(counters.iter().map(|c| c as &dyn stats::Module));
         }
 
         debug!("reload plugins");
@@ -352,14 +387,13 @@ impl FlowMap {
             } else {
                 for counter in vm.counters() {
                     self.stats_collector.register_countable(
-                        "plugin",
+                        &PluginStats {
+                            id: self.id,
+                            plugin_name: counter.plugin_name,
+                            plugin_type: counter.plugin_type,
+                            export_func: counter.function_name,
+                        },
                         counter.counter,
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
-                        ],
                     );
                 }
                 Some(vm)
@@ -390,14 +424,13 @@ impl FlowMap {
                 }
                 for counter in counters {
                     self.stats_collector.register_countable(
-                        "plugin",
+                        &PluginStats {
+                            id: self.id,
+                            plugin_name: counter.plugin_name,
+                            plugin_type: counter.plugin_type,
+                            export_func: counter.function_name,
+                        },
                         counter.counter,
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
-                        ],
                     );
                 }
                 Some(plugins)
