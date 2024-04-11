@@ -634,7 +634,7 @@ ingester:
 
   #exporters:
   #  enabled: false
-  #  # export datas ranges: cbpf-net-span, ebpf-sys-span
+  #  # export datas ranges: cbpf-net-span, ebpf-sys-span (app spans from Opentelemetry are not supported)
   #  export-datas: [cbpf-net-span,ebpf-sys-span]
   #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
