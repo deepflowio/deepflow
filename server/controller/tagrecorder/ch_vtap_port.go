@@ -42,6 +42,7 @@ type DeviceInfo struct {
 	DeviceType int
 	DeviceName string
 	IconID     int
+	TeamID     int
 }
 
 func NewChVTapPort() *ChVTapPort {
@@ -162,6 +163,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 			} else {
 				log.Debugf("pass device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName)
 			}
+			vTapPort.TeamID = VTapIDToTeamID[data.VTapID]
 			keyToItem[tapMacKey] = vTapPort
 			log.Debugf("update: %+v", vTapPort)
 		} else {
@@ -177,6 +179,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 					DeviceName: data.DeviceName,
 					HostName:   data.DeviceHostName,
 					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+					TeamID:     VTapIDToTeamID[data.VTapID],
 				}
 				log.Debugf("add new: %+v", keyToItem[tapMacKey])
 			}
@@ -213,6 +216,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 				} else {
 					log.Debugf("pass device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName)
 				}
+				vTapPort.TeamID = VTapIDToTeamID[data.VTapID]
 				keyToItem[macKey] = vTapPort
 				log.Debugf("update: %+v", vTapPort)
 			} else {
@@ -227,6 +231,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 					DeviceName: data.DeviceName,
 					HostName:   data.DeviceHostName,
 					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+					TeamID:     VTapIDToTeamID[data.VTapID],
 				}
 				log.Debugf("add new: %+v", keyToItem[tapMacKey])
 			}
@@ -262,6 +267,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 			} else {
 				log.Debugf("pass device id: %d, device type: %d, device name: %s", deviceInfo.DeviceID, deviceInfo.DeviceType, deviceInfo.DeviceName)
 			}
+			vTapPort.TeamID = VTapIDToTeamID[vTapID]
 		} else if vTapID != 0 {
 			keyToItem[key] = mysql.ChVTapPort{
 				VTapID:     vTapID,
@@ -272,6 +278,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 				DeviceType: deviceInfo.DeviceType,
 				DeviceName: deviceInfo.DeviceName,
 				IconID:     deviceInfo.IconID,
+				TeamID:     VTapIDToTeamID[vTapID],
 			}
 			log.Debugf("add new: %+v", keyToItem[key])
 		}
@@ -311,6 +318,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 							HostID:     host.ID,
 							HostName:   host.Name,
 							IconID:     deviceKeyToIconID[DeviceKey{DeviceID: host.ID, DeviceType: common.VIF_DEVICE_TYPE_HOST}],
+							TeamID:     VTapIDToTeamID[vTap.ID],
 						}
 						log.Debugf("add new: %+v, %+v", key, keyToItem[key])
 					}
@@ -390,6 +398,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 				DeviceID:   vTap.LaunchServerID,
 				DeviceName: hostIDToName[vTap.LaunchServerID],
 				IconID:     hostIDToIconID[vTap.LaunchServerID],
+				TeamID:     VTapIDToTeamID[vTap.ID],
 			}
 		} else if vTap.Type == common.VTAP_TYPE_WORKLOAD_V || vTap.Type == common.VTAP_TYPE_WORKLOAD_P {
 			vTapIDToDeviceInfo[vTap.ID] = DeviceInfo{
@@ -397,6 +406,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 				DeviceID:   vTap.LaunchServerID,
 				DeviceName: vmIDToName[vTap.LaunchServerID],
 				IconID:     vmIDToIconID[vTap.LaunchServerID],
+				TeamID:     VTapIDToTeamID[vTap.ID],
 			}
 		} else if vTap.Type == common.VTAP_TYPE_POD_HOST || vTap.Type == common.VTAP_TYPE_POD_VM {
 			vTapIDToDeviceInfo[vTap.ID] = DeviceInfo{
@@ -404,6 +414,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 				DeviceID:   vTap.LaunchServerID,
 				DeviceName: podNodeIDToName[vTap.LaunchServerID],
 				IconID:     podNodeIDToIconID[vTap.LaunchServerID],
+				TeamID:     VTapIDToTeamID[vTap.ID],
 			}
 		} else if vTap.Type == common.VTAP_TYPE_K8S_SIDECAR {
 			vTapIDToDeviceInfo[vTap.ID] = DeviceInfo{
@@ -411,6 +422,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 				DeviceID:   vTap.LaunchServerID,
 				DeviceName: podIDToName[vTap.LaunchServerID],
 				IconID:     podIDToIconID[vTap.LaunchServerID],
+				TeamID:     VTapIDToTeamID[vTap.ID],
 			}
 		}
 	}

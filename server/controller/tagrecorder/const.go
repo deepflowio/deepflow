@@ -250,7 +250,8 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `type` Int64,\n" +
-		"    `icon_id` Int64\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -280,7 +281,8 @@ const (
 		"    `device_type` UInt64,\n" +
 		"    `device_id` UInt64,\n" +
 		"    `device_name` String,\n" +
-		"    `icon_id` Int64\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY vtap_id, tap_port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +

@@ -2039,6 +2039,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap_port (
     device_id               INTEGER,
     device_name             VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (vtap_id, tap_port)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2056,6 +2057,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
     name                    VARCHAR(256),
     type                    INTEGER,
     icon_id                 INTEGER,
+    team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_vtap;
