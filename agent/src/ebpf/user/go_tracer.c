@@ -49,19 +49,21 @@
 #include "socket.h"
 #include "elf.h"
 
+/* *INDENT-OFF* */
 // For process execute/exit events.
 struct process_event {
-	struct list_head list;          // list add to proc_events_head
-	struct bpf_tracer *tracer;      // link to struct bpf_tracer
-	uint8_t type;                   // EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
-	char *path;                     // Full path "/proc/<pid>/root/..."
-	int pid;                        // Process ID
-	uint32_t expire_time;           // Expiration Date, the number of seconds since the system started.
+	struct list_head list;	// list add to proc_events_head
+	struct bpf_tracer *tracer;	// link to struct bpf_tracer
+	uint8_t type;		// EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
+	char *path;		// Full path "/proc/<pid>/root/..."
+	int pid;		// Process ID
+	uint32_t expire_time;	// Expiration Date, the number of seconds since the system started.
 };
+/* *INDENT-ON* */
 
 static char build_info_magic[] = "\xff Go buildinf:";
 static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
-static struct list_head proc_events_head;     // For process execute/exit events list.
+static struct list_head proc_events_head;	// For process execute/exit events list.
 static pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */
@@ -476,8 +478,7 @@ static struct proc_info *alloc_proc_info_by_pid(void)
 	struct proc_info *info;
 	info = calloc(1, sizeof(struct proc_info));
 	if (info == NULL) {
-		ebpf_warning
-		    ("calloc() size:sizeof(struct proc_info) error.\n");
+		ebpf_warning("calloc() size:sizeof(struct proc_info) error.\n");
 		return NULL;
 	}
 
@@ -502,7 +503,7 @@ static int resolve_bin_file(const char *path, int pid,
 			continue;
 		}
 
-		if (!binary_path){
+		if (!binary_path) {
 			binary_path = strdup(probe_sym->binary_path);
 			if (binary_path == NULL) {
 				goto failed;
@@ -518,7 +519,7 @@ static int resolve_bin_file(const char *path, int pid,
 			for (j = 0; j < probe_sym->rets_count; j++) {
 				addr = probe_sym->rets[j];
 				sub_probe_sym =
-					malloc(sizeof(struct symbol_uprobe));
+				    malloc(sizeof(struct symbol_uprobe));
 				if (sub_probe_sym == NULL) {
 					ebpf_warning("malloc() error.\n");
 					ret = ETR_NOMEM;
@@ -539,13 +540,13 @@ static int resolve_bin_file(const char *path, int pid,
 		} else
 			add_uprobe_symbol(pid, probe_sym, conf);
 
-		ebpf_info(
-			"Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
-			probe_sym->binary_path, probe_sym->pid,
-			probe_sym->ver.major, probe_sym->ver.minor,
-			probe_sym->ver.revision, probe_sym->entry,
-			probe_sym->size, probe_sym->name, probe_sym->probe_func,
-			probe_sym->rets_count);
+		ebpf_info
+		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
+		     probe_sym->binary_path, probe_sym->pid,
+		     probe_sym->ver.major, probe_sym->ver.minor,
+		     probe_sym->ver.revision, probe_sym->entry, probe_sym->size,
+		     probe_sym->name, probe_sym->probe_func,
+		     probe_sym->rets_count);
 
 		if (probe_sym->isret)
 			free_uprobe_symbol(probe_sym, NULL);
@@ -555,17 +556,17 @@ static int resolve_bin_file(const char *path, int pid,
 
 	if (syms_count == 0) {
 		ret = ETR_NOSYMBOL;
-		ebpf_warning(
-			"Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!"
-			" You can try setting the configuration option 'golang-symbol' to see "
-			"if it resolves the issue, if the issue persists, please attempt to "
-			"resolve it using the Golang executable with symbol table included.\n",
-			pid, path, go_ver->major, go_ver->minor);
+		ebpf_warning
+		    ("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!"
+		     " You can try setting the configuration option 'golang-symbol' to see "
+		     "if it resolves the issue, if the issue persists, please attempt to "
+		     "resolve it using the Golang executable with symbol table included.\n",
+		     pid, path, go_ver->major, go_ver->minor);
 		goto failed;
 	}
 
 	struct proc_info *p_info = NULL;
-	if (binary_path){
+	if (binary_path) {
 		bool is_new_info = false;
 		p_info = find_proc_info_by_pid(pid);
 		if (p_info == NULL) {
@@ -591,10 +592,11 @@ static int resolve_bin_file(const char *path, int pid,
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
 			off = &offsets[k];
-			int offset =
-			    struct_member_offset_analyze(binary_path,
-							 off->structure,
-							 off->field_name);
+			int offset = struct_member_offset_analyze(binary_path,
+								  off->
+								  structure,
+								  off->
+								  field_name);
 			if (offset == ETR_INVAL)
 				offset = off->default_offset;
 
@@ -606,31 +608,33 @@ static int resolve_bin_file(const char *path, int pid,
 			tcp_conn_sym = "go.itab.*net.TCPConn,net.Conn";
 			tls_conn_sym = "go.itab.*crypto/tls.Conn,net.Conn";
 			syscall_conn_sym =
-				"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
+			    "go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
 		} else {
 			tcp_conn_sym = "go:itab.*net.TCPConn,net.Conn";
 			tls_conn_sym = "go:itab.*crypto/tls.Conn,net.Conn";
 			syscall_conn_sym =
-				"go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
+			    "go:itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn";
 		}
 
 		p_info->info.net_TCPConn_itab =
-			get_symbol_addr_from_binary(binary_path, tcp_conn_sym);
+		    get_symbol_addr_from_binary(binary_path, tcp_conn_sym);
 		if (p_info->info.net_TCPConn_itab == 0)
-			ebpf_warning("'%s' does not exist. Since eBPF uprobe relies on it to retrieve "
-				     "connection information, if it is empty, eBPF will not retrieve any"
-				     " data. This situation may be due to the lack of symbol table in "
-				     "the golang executable (confirm by executing 'nm %s'). If it shows "
-				     "'no symbols', you can try setting the configuration option "
-				     "'golang-symbol' to see if it resolves the issue, if the issue "
-				     "persists, please attempt to resolve it using the Golang executable "
-				     "with symbol table included.\n", tcp_conn_sym, binary_path);
+			ebpf_warning
+			    ("'%s' does not exist. Since eBPF uprobe relies on it to retrieve "
+			     "connection information, if it is empty, eBPF will not retrieve any"
+			     " data. This situation may be due to the lack of symbol table in "
+			     "the golang executable (confirm by executing 'nm %s'). If it shows "
+			     "'no symbols', you can try setting the configuration option "
+			     "'golang-symbol' to see if it resolves the issue, if the issue "
+			     "persists, please attempt to resolve it using the Golang executable "
+			     "with symbol table included.\n", tcp_conn_sym,
+			     binary_path);
 
 		p_info->info.crypto_tls_Conn_itab =
-			get_symbol_addr_from_binary(binary_path, tls_conn_sym);
+		    get_symbol_addr_from_binary(binary_path, tls_conn_sym);
 
-		p_info->info.credentials_syscallConn_itab = get_symbol_addr_from_binary(
-			binary_path, syscall_conn_sym);
+		p_info->info.credentials_syscallConn_itab =
+		    get_symbol_addr_from_binary(binary_path, syscall_conn_sym);
 
 		p_info->has_updated = false;
 
@@ -708,7 +712,6 @@ bool is_go_process(int pid)
 	return ret;
 }
 
-
 /**
  * collect_go_uprobe_syms_from_procfs -- Find all golang binary executables from Procfs,
  * 				      parse and register uprobe symbols.
@@ -779,8 +782,10 @@ static bool __attribute__ ((unused)) probe_exist_in_procfs(struct probe *p)
 	return pid_exist_in_procfs(sym_uprobe->pid, sym_uprobe->starttime);
 }
 
-static bool __attribute__ ((unused)) pid_exist_in_probes(struct bpf_tracer *tracer, int pid,
-				unsigned long long starttime)
+static bool
+    __attribute__ ((unused)) pid_exist_in_probes(struct bpf_tracer *tracer,
+						 int pid,
+						 unsigned long long starttime)
 {
 	struct probe *p;
 	struct symbol_uprobe *sym;
@@ -870,7 +875,7 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 				ebpf_info("Clear process PID %d\n", pid);
 				info_print = true;
 			}
-				
+
 			free_probe_from_tracer(probe);
 		}
 	}
@@ -893,7 +898,8 @@ void update_proc_info_to_map(struct bpf_tracer *tracer)
 			continue;
 		len =
 		    snprintf(buff, sizeof(buff), "go%d.%d offsets:",
-			     info->version >> 16, ((info->version >> 8) & 0xff));
+			     info->version >> 16,
+			     ((info->version >> 8) & 0xff));
 		for (i = 0; i < OFFSET_IDX_MAX; i++) {
 			len +=
 			    snprintf(buff + len, sizeof(buff) - len, "%d:%d ",
@@ -932,8 +938,27 @@ static void process_execute_handle(int pid, struct bpf_tracer *tracer)
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
 }
 
+// The caller needs 'mutex_proc_events_lock' for protection
+static inline void find_and_clear_event_from_list(int pid)
+{
+	struct process_event *pe;
+	struct list_head *p, *n;
+	list_for_each_safe(p, n, &proc_events_head) {
+		pe = container_of(p, struct process_event, list);
+		if (pe->pid == pid) {
+			list_head_del(&pe->list);
+			free(pe->path);
+			free(pe);
+		}
+	}
+}
+
 static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 {
+	pthread_mutex_lock(&mutex_proc_events_lock);
+	find_and_clear_event_from_list(pid);
+	pthread_mutex_unlock(&mutex_proc_events_lock);
+
 	// Protect the probes operation in multiple threads, similar to process_execute_handle()
 	pthread_mutex_lock(&tracer->mutex_probes_lock);
 	struct tracer_probes_conf *conf = tracer->tps;
@@ -941,8 +966,13 @@ static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
 }
 
-static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid, uint8_t type)
+static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
+				     uint8_t type)
 {
+	// Uprobe's hook points are only for user processes
+	if (!is_user_process(pid))
+		return;
+
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL) {
 		return;
@@ -964,11 +994,12 @@ static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid, uint8_t
 	pe->path = path;
 	pe->pid = pid;
 	pe->type = type;
-	pe->expire_time = get_sys_uptime() + PROC_EVENT_DELAY_HANDLE_DEF; 
+	pe->expire_time = get_sys_uptime() + PROC_EVENT_DELAY_HANDLE_DEF;
 
 	pthread_mutex_lock(&mutex_proc_events_lock);
+	find_and_clear_event_from_list(pid);
 	list_add_tail(&pe->list, &proc_events_head);
-	pthread_mutex_unlock(&mutex_proc_events_lock);	
+	pthread_mutex_unlock(&mutex_proc_events_lock);
 }
 
 /**
@@ -1028,31 +1059,30 @@ void go_process_events_handle(void)
 		} else {
 			pe = NULL;
 		}
-		pthread_mutex_unlock(&mutex_proc_events_lock);
 
-		if (pe == NULL)
+		if (pe == NULL) {
+			pthread_mutex_unlock(&mutex_proc_events_lock);
 			break;
+		}
 
 		if (get_sys_uptime() >= pe->expire_time) {
-			pthread_mutex_lock(&mutex_proc_events_lock);
+			char *path = strdup(pe->path);
+			int pid = pe->pid;
+			struct bpf_tracer *tracer = pe->tracer;
+			uint8_t type = pe->type;
 			list_head_del(&pe->list);
-			pthread_mutex_unlock(&mutex_proc_events_lock);
-
-			if (pe->type == EVENT_TYPE_PROC_EXEC) {
-				/*
-				 * Threads and processes share the code section,
-				 * here only processes are concerned.
-				 */
-				if (is_user_process(pe->pid)
-				    && access(pe->path, F_OK) == 0) {
-					process_execute_handle(pe->pid,
-							       pe->tracer);
-				}
-			}
-
 			free(pe->path);
 			free(pe);
+			pthread_mutex_unlock(&mutex_proc_events_lock);
+			if (type == EVENT_TYPE_PROC_EXEC) {
+				if (access(path, F_OK) == 0) {
+					process_execute_handle(pid, tracer);
+				}
+			}
+			free(path);
+
 		} else {
+			pthread_mutex_unlock(&mutex_proc_events_lock);
 			break;
 		}
 	} while (true);
