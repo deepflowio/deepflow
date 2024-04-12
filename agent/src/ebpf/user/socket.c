@@ -150,6 +150,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 
 	// 周期性触发用于缓存的数据的超时检查
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
