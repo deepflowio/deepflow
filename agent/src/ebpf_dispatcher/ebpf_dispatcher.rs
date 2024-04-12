@@ -50,6 +50,7 @@ use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
     l7_protocol::L7Protocol,
+    leaky_bucket::LeakyBucket,
     proto::{common::TridentType, metric},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
@@ -214,6 +215,7 @@ impl EbpfDispatcher {
             true, // from_ebpf
         );
         let ebpf_config = self.config.load();
+        let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.global_ebpf_pps_threshold));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while unsafe { SWITCH } {
@@ -238,6 +240,10 @@ impl EbpfDispatcher {
             }
 
             for mut packet in batch.drain(..) {
+                if !leaky_bucket.acquire(1) {
+                    continue;
+                }
+
                 counter.rx.fetch_add(1, Ordering::Relaxed);
 
                 packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));

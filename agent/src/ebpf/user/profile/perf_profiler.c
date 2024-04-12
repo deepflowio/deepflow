@@ -330,7 +330,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&tracer->recv, 1);
 }
 
-static int relase_profiler(struct bpf_tracer *tracer)
+static int release_profiler(struct bpf_tracer *tracer)
 {
 	tracer_reader_lock(tracer);
 
@@ -1172,7 +1172,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	return ETR_OK;
 
 error:
-	relase_profiler(tracer);
+	release_profiler(tracer);
 	return ETR_INVAL;
 }
 
@@ -1493,7 +1493,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, NULL, 0,
-			     relase_profiler, create_profiler,
+			     release_profiler, create_profiler,
 			     (void *)callback, freq);
 	if (tracer == NULL)
 		return (-1);
