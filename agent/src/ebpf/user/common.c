@@ -496,7 +496,7 @@ unsigned int fetch_kernel_version_code(void)
 	return KERNEL_VERSION(major, minor, patch);
 }
 
-bool is_process(int pid)
+static bool __is_process(int pid, bool is_user)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
@@ -510,22 +510,34 @@ bool is_process(int pid)
 	if (fd < 0)
 		return false;
 
-	memset(buff, 0, sizeof(buff));
+	memset(buff, 0, 4096);
 	if (read(fd, buff, sizeof(buff)) <= 0) {
-		ebpf_warning("Read file '%s' failed, errno %d\n",
-			     file, errno);
+		ebpf_warning("Read file '%s' failed, errno %d\n", file, errno);
 		close(fd);
 		return false;
 	}
 	close(fd);
 
-	char *p = strstr(buff, "Tgid:");
-	if (p == NULL)
+	/*
+	 * All kernel threads in Linux have their parent process
+	 * as either 0 or 2, and not any other value.
+	 */
+	char *p;
+	if (is_user) {
+		int ppid = -1;
+		p = strstr(buff, "PPid:");
+		if (p == NULL)
+			return false;
+		sscanf(p, "PPid:\t%d", &ppid);
+		if ((ppid == 0 && pid != 1) || ppid == 2 || ppid == -1)
+			return false;
+	}
+
+	if ((p = strstr(buff, "Tgid:")) == NULL)
 		return false;
 	sscanf(p, "Tgid:\t%d", &read_tgid);
 
-	p = strstr(buff, "Pid:");
-	if (p == NULL)
+	if ((p = strstr(buff, "Pid:")) == NULL)
 		return false;
 	sscanf(p, "Pid:\t%d", &read_pid);
 
@@ -536,6 +548,16 @@ bool is_process(int pid)
 		return true;
 
 	return false;
+}
+
+bool is_user_process(int pid)
+{
+	return __is_process(pid, true);
+}
+
+bool is_process(int pid)
+{
+	return __is_process(pid, false);
 }
 
 static char *gen_datetime_str(const char *fmt)
