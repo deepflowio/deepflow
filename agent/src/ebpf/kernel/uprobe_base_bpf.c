@@ -561,6 +561,26 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 SEC("tracepoint/sched/sched_process_fork")
 int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 {
+	/*
+	 * When you find that the golang process starts, sometimes you
+	 * don't get the process start information, all you get is
+	 * threads. Take the following example:
+	 *
+	 * # pstree -p 4157
+	 * deepflow-server(4157)─┬─{deepflow-server}(4214)
+	 *                       ├─{deepflow-server}(4216)
+	 *                       ├─{deepflow-server}(4217)
+	 *                       ├─{deepflow-server}(4218)
+	 *                       ├─{deepflow-server}(4219)
+	 *                       ├─{deepflow-server}(4229)
+	 *
+	 * fetch data:
+	 * .... 296916.616252: 0: parent_pid 4216 child_pid 4218
+	 * .... 296916.616366: 0: parent_pid 4218 child_pid 4219
+	 *
+	 * To get process startup information we add probe 'sched_process_exec'.
+	 */
+
 	struct process_event_t data;
 
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
@@ -568,6 +588,26 @@ int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 	bpf_get_current_comm(data.name, sizeof(data.name));
 	bpf_perf_event_output(ctx, &NAME(socket_data),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));
+
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
+SEC("tracepoint/sched/sched_process_exec")
+int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
+{
+	struct process_event_t data;
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+	pid_t tid = (__u32) id;
+
+	if (pid == tid) {
+		data.meta.event_type = EVENT_TYPE_PROC_EXEC;
+		data.pid = pid;
+		bpf_get_current_comm(data.name, sizeof(data.name));
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, &data, sizeof(data));
+	}
 
 	return 0;
 }
