@@ -58,9 +58,7 @@ use super::crd::{
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
     pingan::ServiceRule,
 };
-use crate::utils::stats::{
-    self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
-};
+use crate::utils::stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable};
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
 const SLEEP_INTERVAL: Duration = Duration::from_secs(5);
@@ -1207,9 +1205,8 @@ impl ResourceWatcherFactory {
             self.listing.clone(),
         );
         stats_collector.register_countable(
-            "resource_watcher",
+            &stats::SingleTagModule("resource_watcher", "kind", &watcher.kind),
             Countable::Ref(Arc::downgrade(&watcher.stats_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("kind", watcher.kind.to_string())],
         );
         watcher
     }

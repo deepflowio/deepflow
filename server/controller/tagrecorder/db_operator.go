@@ -17,8 +17,8 @@
 package tagrecorder
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 type operator[MT MySQLChModel, KT ChModelKey] interface {
@@ -26,11 +26,11 @@ type operator[MT MySQLChModel, KT ChModelKey] interface {
 	add(keys []KT, dbItems []MT, db *mysql.DB)
 	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB)
 	delete(keys []KT, dbItems []MT, db *mysql.DB)
-	setConfig(config.TagRecorderConfig)
+	setConfig(config.ControllerConfig)
 }
 
 type operatorComponent[MT MySQLChModel, KT ChModelKey] struct {
-	cfg              config.TagRecorderConfig
+	cfg              config.ControllerConfig
 	resourceTypeName string
 }
 
@@ -40,13 +40,13 @@ func newOperator[MT MySQLChModel, KT ChModelKey](resourceTypeName string) *opera
 	}
 }
 
-func (b *operatorComponent[MT, KT]) setConfig(cfg config.TagRecorderConfig) {
+func (b *operatorComponent[MT, KT]) setConfig(cfg config.ControllerConfig) {
 	b.cfg = cfg
 }
 
 func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB), db *mysql.DB) {
 	count := len(items)
-	offset := b.cfg.MySQLBatchSize
+	offset := b.cfg.TagRecorderCfg.MySQLBatchSize
 	var pages int
 	if count%offset == 0 {
 		pages = count / offset

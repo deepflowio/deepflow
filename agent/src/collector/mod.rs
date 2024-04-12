@@ -29,7 +29,10 @@ pub use collector::{Collector, L7Collector};
 
 use bitflags::bitflags;
 
-use crate::{common::endpoint::EPC_INTERNET, utils::possible_host::PossibleHost};
+use crate::{
+    common::endpoint::EPC_INTERNET,
+    utils::{possible_host::PossibleHost, stats},
+};
 
 use self::l7_quadruple_generator::L7QuadrupleGeneratorThread;
 use self::types::{MiniFlow, PeerInfo};
@@ -199,3 +202,21 @@ impl L7CollectorThread {
 
 const FLOW_METRICS_PEER_SRC: usize = 0;
 const FLOW_METRICS_PEER_DST: usize = 1;
+
+struct QgStats {
+    id: usize,
+    kind: &'static str,
+}
+
+impl stats::Module for QgStats {
+    fn name(&self) -> &'static str {
+        "quadruple_generator"
+    }
+
+    fn tags(&self) -> Vec<stats::StatsOption> {
+        vec![
+            stats::StatsOption::Tag("index", self.id.to_string()),
+            stats::StatsOption::Tag("kind", self.kind.to_owned()),
+        ]
+    }
+}

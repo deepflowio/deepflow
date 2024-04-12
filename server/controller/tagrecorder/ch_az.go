@@ -58,11 +58,18 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 // onResourceUpdated implements SubscriberDataGenerator
 func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
 	iconID := a.domainLcuuidToIconID[az.Domain]
+	var err error
 	if iconID == 0 {
-		key := IconKey{
-			NodeType: RESOURCE_TYPE_AZ,
+		a.domainLcuuidToIconID, a.resourceTypeToIconID, err = GetIconInfo(a.cfg)
+		if err == nil {
+			iconID = a.domainLcuuidToIconID[az.Domain]
 		}
-		iconID = a.resourceTypeToIconID[key]
+		if iconID == 0 {
+			key := IconKey{
+				NodeType: RESOURCE_TYPE_AZ,
+			}
+			iconID = a.resourceTypeToIconID[key]
+		}
 	}
 	keys = append(keys, IDKey{ID: az.ID})
 	name := az.Name

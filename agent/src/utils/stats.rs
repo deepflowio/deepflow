@@ -131,6 +131,58 @@ impl Sendable for ArcBatch {
     }
 }
 
+pub trait Module {
+    fn name(&self) -> &'static str;
+
+    // instances of the implemented type must return the same set of tag keys
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![]
+    }
+
+    fn options(&self) -> Vec<StatsOption> {
+        vec![]
+    }
+}
+
+pub struct NoTagModule(pub &'static str);
+
+impl Module for NoTagModule {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+}
+
+pub struct SingleTagModule<T: ToString>(pub &'static str, pub &'static str, pub T);
+
+impl<T: ToString> Module for SingleTagModule<T> {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![StatsOption::Tag(self.1, self.2.to_string())]
+    }
+}
+
+#[derive(Default)]
+pub struct QueueStats {
+    pub id: usize,
+    pub module: &'static str,
+}
+
+impl Module for QueueStats {
+    fn name(&self) -> &'static str {
+        "queue"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("index", self.id.to_string()),
+            StatsOption::Tag("module", self.module.to_owned()),
+        ]
+    }
+}
+
 pub struct Collector {
     hostname: Arc<Mutex<String>>,
 
@@ -177,14 +229,12 @@ impl Collector {
             receiver: Arc::new(stats_queue_receiver),
             ntp_diff,
         };
-        Self::register_countable(
-            &s,
-            "queue",
+        s.register_countable(
+            &QueueStats {
+                module: "0-stats-to-sender",
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", "0-stats-to-sender".to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         return s;
     }
@@ -193,24 +243,27 @@ impl Collector {
         self.receiver.clone()
     }
 
-    pub fn register_countable(
-        &self,
-        module: &'static str,
-        countable: Countable,
-        options: Vec<StatsOption>,
-    ) {
+    pub fn register_countable(&self, module: &dyn Module, countable: Countable) {
         let mut source = Source {
-            module,
+            module: module.name(),
             interval: Duration::from_secs(self.min_interval.load(Ordering::Relaxed)),
             countable,
             tags: vec![],
             skip: 0,
         };
-        for option in options {
-            match option {
+        for tag in module.tags() {
+            match tag {
                 StatsOption::Tag(k, v) if !source.tags.iter().any(|(key, _)| key == &k) => {
                     source.tags.push((k, v))
                 }
+                _ => warn!(
+                    "ignored duplicated tag or option for module {}",
+                    source.module
+                ),
+            }
+        }
+        for option in module.options() {
+            match option {
                 StatsOption::Interval(interval)
                     if interval.as_secs() >= self.min_interval.load(Ordering::Relaxed) =>
                 {
@@ -219,7 +272,7 @@ impl Collector {
                     )
                 }
                 _ => warn!(
-                    "ignored duplicated tag or invalid interval for module {}",
+                    "ignored tag or invalid interval for module {}",
                     source.module
                 ),
             }
@@ -248,15 +301,15 @@ impl Collector {
         sources.push(source);
     }
 
-    pub fn deregister_countables<I>(&self, countables: I)
+    pub fn deregister_countables<'a, I>(&self, countables: I)
     where
-        I: Iterator<Item = (&'static str, Vec<StatsOption>)>,
+        I: Iterator<Item = &'a dyn Module> + 'a,
     {
         let mut tags = vec![];
         let mut sources = self.sources.lock().unwrap();
-        for (module, options) in countables {
+        for m in countables {
             tags.clear();
-            for option in options {
+            for option in m.tags() {
                 match option {
                     StatsOption::Tag(k, v) if !tags.iter().any(|(key, _)| key == &k) => {
                         tags.push((k, v))
@@ -264,7 +317,7 @@ impl Collector {
                     _ => (),
                 }
             }
-            sources.retain(|s| !(s.module == module && s.tags == tags));
+            sources.retain(|s| !(s.module == m.name() && s.tags == tags));
         }
     }
 

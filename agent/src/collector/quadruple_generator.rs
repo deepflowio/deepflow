@@ -32,7 +32,7 @@ use super::{
     consts::*,
     round_to_minute,
     types::{FlowMeterWithFlow, MiniFlow},
-    MetricsType,
+    MetricsType, QgStats,
 };
 
 use crate::common::{
@@ -48,7 +48,7 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     buffer::BatchedBox,
@@ -750,13 +750,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "second" },
                 Countable::Ref(Arc::downgrade(&second_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "second".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 
@@ -789,13 +785,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "minute" },
                 Countable::Ref(Arc::downgrade(&minute_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "minute".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 

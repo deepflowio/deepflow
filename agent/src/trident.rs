@@ -95,7 +95,7 @@ use crate::{
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
-        stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
+        stats::{self, ArcBatch, Countable, QueueStats, RefCountable},
     },
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -356,9 +356,8 @@ impl Trident {
         }
 
         stats_collector.register_countable(
-            "log_counter",
+            &stats::NoTagModule("log_counter"),
             stats::Countable::Owned(Box::new(log_level_counter)),
-            Default::default(),
         );
 
         info!("static_config {:#?}", config);
@@ -520,9 +519,8 @@ impl Trident {
             ntp_diff,
         ));
         stats_collector.register_countable(
-            "ntp",
+            &stats::NoTagModule("ntp"),
             stats::Countable::Owned(Box::new(synchronizer.ntp_counter())),
-            Default::default(),
         );
         synchronizer.start();
 
@@ -1458,12 +1456,11 @@ impl AgentComponents {
             );
             l4_log_sender_outer = Some(l4_log_sender);
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id,
+                    module: "2-second-flow-to-minute-aggrer",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
                 id,                                   // id
@@ -1474,9 +1471,8 @@ impl AgentComponents {
             );
             l4_flow_aggr_outer = Some(l4_flow_aggr);
             stats_collector.register_countable(
-                "flow_aggr",
+                &stats::SingleTagModule("flow_aggr", "index", id),
                 Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", id.to_string())],
             );
         }
 
@@ -1486,15 +1482,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-second-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-second-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
         let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
             yaml_config.quadruple_queue_size,
@@ -1502,15 +1494,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-minute-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-minute-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
@@ -1600,15 +1588,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-l7-second-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-l7-second-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
         let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
             yaml_config.quadruple_queue_size,
@@ -1616,15 +1600,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-l7-minute-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-l7-minute-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
@@ -1943,12 +1923,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: l4_flow_aggr_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", l4_flow_aggr_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let l4_flow_uniform_sender = UniformSenderThread::new(
             l4_flow_aggr_queue_name,
@@ -1966,12 +1945,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: metrics_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", metrics_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             metrics_queue_name,
@@ -1989,12 +1967,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: proto_log_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", proto_log_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let l7_flow_uniform_sender = UniformSenderThread::new(
             proto_log_queue_name,
@@ -2050,12 +2027,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: pcap_batch_queue,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(pcap_batch_counter)),
-            vec![
-                StatsOption::Tag("module", pcap_batch_queue.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let pcap_batch_uniform_sender = UniformSenderThread::new(
             pcap_batch_queue,
@@ -2075,12 +2051,11 @@ impl AgentComponents {
             );
 
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: packet_sequence_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", packet_sequence_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
 
         let packet_sequence_uniform_sender = UniformSenderThread::new(
@@ -2164,12 +2139,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: proc_event_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", proc_event_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let proc_event_uniform_sender = UniformSenderThread::new(
             proc_event_queue_name,
@@ -2187,12 +2161,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: profile_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", profile_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let profile_uniform_sender = UniformSenderThread::new(
             profile_queue_name,
@@ -2216,12 +2189,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-tagged-flow-to-quadruple-generator",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
 
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
@@ -2230,12 +2202,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-l7-stats-to-quadruple-generator",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
             let collector = Self::new_collector(
                 ebpf_dispatcher_id,
@@ -2256,12 +2227,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-tagged-flow-to-app-protocol-logs",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
             let (session_aggregator, counter) = SessionAggregator::new(
                 log_receiver,
@@ -2271,9 +2241,8 @@ impl AgentComponents {
                 synchronizer.ntp_diff(),
             );
             stats_collector.register_countable(
-                "l7_session_aggr",
+                &stats::SingleTagModule("l7_session_aggr", "index", ebpf_dispatcher_id),
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", ebpf_dispatcher_id.to_string())],
             );
             let l7_collector = Self::new_l7_collector(
                 ebpf_dispatcher_id,
@@ -2306,9 +2275,8 @@ impl AgentComponents {
                     synchronizer
                         .add_flow_acl_listener(Box::new(ebpf_collector.get_sync_dispatcher()));
                     stats_collector.register_countable(
-                        "ebpf-collector",
+                        &stats::NoTagModule("ebpf-collector"),
                         Countable::Owned(Box::new(ebpf_collector.get_sync_counter())),
-                        vec![],
                     );
                     ebpf_dispatcher_component = Some(EbpfDispatcherComponent {
                         ebpf_collector,
@@ -2330,12 +2298,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: otel_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", otel_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let otel_uniform_sender = UniformSenderThread::new(
             otel_queue_name,
@@ -2354,12 +2321,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id: otel_dispatcher_id,
+                module: "1-l7-stats-to-quadruple-generator",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-                StatsOption::Tag("index", otel_dispatcher_id.to_string()),
-            ],
         );
         let l7_collector = Self::new_l7_collector(
             otel_dispatcher_id,
@@ -2380,12 +2346,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: prometheus_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", prometheus_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             prometheus_queue_name,
@@ -2403,12 +2368,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: telegraf_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", telegraf_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             telegraf_queue_name,
@@ -2426,12 +2390,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: compressed_otel_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", compressed_otel_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let compressed_otel_uniform_sender = UniformSenderThread::new(
             compressed_otel_queue_name,
@@ -2470,9 +2433,8 @@ impl AgentComponents {
         );
 
         stats_collector.register_countable(
-            "integration_collector",
+            &stats::NoTagModule("integration_collector"),
             Countable::Owned(Box::new(external_metrics_counter)),
-            Default::default(),
         );
 
         let sender_config = config_handler.sender().load();
@@ -2485,9 +2447,8 @@ impl AgentComponents {
         );
         synchronizer.add_flow_acl_listener(npb_bandwidth_watcher.clone());
         stats_collector.register_countable(
-            "npb_bandwidth_watcher",
+            &stats::NoTagModule("npb_bandwidth_watcher"),
             Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
-            Default::default(),
         );
 
         Ok(AgentComponents {
@@ -2801,17 +2762,15 @@ fn build_pcap_assembler(
         ntp_diff,
     );
     stats_collector.register_countable(
-        "pcap_assembler",
+        &stats::SingleTagModule("pcap_assembler", "id", id),
         Countable::Ref(Arc::downgrade(&pcap_assembler.counter) as Weak<dyn RefCountable>),
-        vec![StatsOption::Tag("id", id.to_string())],
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: mini_packet_queue,
+        },
         Countable::Owned(Box::new(mini_packet_counter)),
-        vec![
-            StatsOption::Tag("module", mini_packet_queue.to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
     (pcap_assembler, mini_packet_sender)
 }
@@ -2859,12 +2818,11 @@ fn build_dispatchers(
         &queue_debugger,
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: "1-tagged-flow-to-quadruple-generator",
+        },
         Countable::Owned(Box::new(counter)),
-        vec![
-            StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
 
     let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
@@ -2873,12 +2831,11 @@ fn build_dispatchers(
         &queue_debugger,
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: "1-l7-stats-to-quadruple-generator",
+        },
         Countable::Owned(Box::new(counter)),
-        vec![
-            StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
 
     // create and start app proto logs
@@ -2888,12 +2845,11 @@ fn build_dispatchers(
         &queue_debugger,
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: "1-tagged-flow-to-app-protocol-logs",
+        },
         Countable::Owned(Box::new(counter)),
-        vec![
-            StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
 
     let (session_aggr, counter) = SessionAggregator::new(
@@ -2904,9 +2860,8 @@ fn build_dispatchers(
         synchronizer.ntp_diff(),
     );
     stats_collector.register_countable(
-        "l7_session_aggr",
+        &stats::SingleTagModule("l7_session_aggr", "index", id),
         Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-        vec![StatsOption::Tag("index", id.to_string())],
     );
 
     // Enterprise Edition Feature: packet-sequence
@@ -2917,12 +2872,11 @@ fn build_dispatchers(
         &queue_debugger,
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: "1-packet-sequence-block-to-parser",
+        },
         Countable::Owned(Box::new(counter)),
-        vec![
-            StatsOption::Tag("module", "1-packet-sequence-block-to-parser".to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
 
     let packet_sequence_parser = PacketSequenceParser::new(

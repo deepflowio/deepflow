@@ -38,7 +38,7 @@ use crate::{
     trident::AgentId,
     utils::{
         environment::{running_in_container, running_in_only_watch_k8s_mode},
-        stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+        stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable},
     },
 };
 
@@ -161,9 +161,8 @@ impl TargetsWatcher {
         let mut context = self.context.clone();
         let counter = Arc::new(TargetsCounter::default());
         self.stats_collector.register_countable(
-            "prometheus_targets_watcher",
+            &stats::SingleTagModule("prometheus_targets_watcher", "kind", "prometheus_api"),
             Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("kind", "prometheus_api".to_string())],
         );
         let session = self.session.clone();
         let running = self.running.clone();

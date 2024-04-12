@@ -92,16 +92,17 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	}
 	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
 
+	// the exporters cannot be shared by multiple logger decoder.
 	exporters := exporters.NewExporters(config)
 	l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, exporters)
 	if err != nil {
 		return nil, err
 	}
-	otelLogger, err := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, exporters)
+	otelLogger, err := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, nil)
 	if err != nil {
 		return nil, err
 	}
-	otelCompressedLogger, err := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, exporters)
+	otelCompressedLogger, err := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, nil)
 	if err != nil {
 		return nil, err
 	}

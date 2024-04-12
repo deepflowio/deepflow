@@ -26,7 +26,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
-	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 var (
@@ -62,7 +61,7 @@ func (c *SubscriberManager) Start() (err error) {
 	c.subscribers = c.getSubscribers()
 	log.Infof("tagrecorder run start")
 	for _, subscriber := range c.subscribers {
-		subscriber.SetConfig(c.cfg.TagRecorderCfg)
+		subscriber.SetConfig(c.cfg)
 		subscriber.Subscribe()
 	}
 	return nil
@@ -141,7 +140,7 @@ func (c *SubscriberManager) HealthCheck() {
 
 type Subscriber interface {
 	Subscribe()
-	SetConfig(trconfig.TagRecorderConfig)
+	SetConfig(config.ControllerConfig)
 	Check() error
 	GetSubResourceType() string
 	pubsub.ResourceBatchAddedSubscriber
@@ -156,7 +155,7 @@ type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgcon
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
-	cfg trconfig.TagRecorderConfig
+	cfg config.ControllerConfig
 
 	subResourceTypeName string // 订阅表资源类型，即源表资源类型
 	resourceTypeName    string // CH表资源类型
@@ -194,7 +193,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(sources 
 	return keys, targets
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg config.ControllerConfig) {
 	s.cfg = cfg
 	s.dbOperator.setConfig(cfg)
 }

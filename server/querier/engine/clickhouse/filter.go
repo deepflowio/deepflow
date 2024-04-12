@@ -99,62 +99,55 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
-			relatedOK := slices.Contains[[]string, string]([]string{"pod_service"}, resourceNoSuffix)
+			relatedOK := slices.Contains[[]string, string]([]string{"pod_service"}, resourceNoID)
 			if relatedOK {
 				return
 			}
 			deviceTypeTagSuffix := "l3_device_type" + suffix
 			filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
 			return
-		} else if strings.HasPrefix(resourceNoSuffix, "k8s.label.") {
+		} else if strings.HasPrefix(resourceNoID, "k8s.label.") {
 			podIDSuffix := "pod_id" + suffix
 			serviceIDSuffix := "service_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.label.")
+			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.label.")
 			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s')) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoSuffix, "k8s.annotation.") {
+		} else if strings.HasPrefix(resourceNoID, "k8s.annotation.") {
 			podIDSuffix := "pod_id" + suffix
 			serviceIDSuffix := "service_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.annotation.")
+			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.annotation.")
 			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoSuffix, "k8s.env.") {
+		} else if strings.HasPrefix(resourceNoID, "k8s.env.") {
 			podIDSuffix := "pod_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.env.")
+			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.env.")
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')", podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoSuffix, "cloud.tag.") {
+		} else if strings.HasPrefix(resourceNoID, "cloud.tag.") {
 			deviceIDSuffix := "l3_device_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
 			podNSIDSuffix := "pod_ns_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "cloud.tag.")
+			tagNoPreffix := strings.TrimPrefix(resourceNoID, "cloud.tag.")
 			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND %s=1) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))", deviceIDSuffix, tagNoPreffix, deviceTypeSuffix, podNSIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoSuffix, "os.app.") {
+		} else if strings.HasPrefix(resourceNoID, "os.app.") {
 			processIDSuffix := "gprocess_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "os.app.")
+			tagNoPreffix := strings.TrimPrefix(resourceNoID, "os.app.")
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
-		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
+		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoID]; ok {
 			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
-
-		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
-			resourceNoSuffix == "host" || resourceNoSuffix == "service" {
-
-			filter = strings.Join([]string{resourceNoSuffix, "_id", suffix, "!=0"}, "")
-
-		} else if resourceNoSuffix == "vpc" {
+		} else if common.IsValueInSliceString(resourceNoID, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
+			resourceNoID == "host" || resourceNoID == "service" {
+			filter = strings.Join([]string{resourceNoID, "_id", suffix, "!=0"}, "")
+		} else if resourceNoID == "vpc" {
 			filter = strings.Join([]string{"l3_epc_id", suffix, "!=-2"}, "")
-
-		} else if resourceNoSuffix == "l2_vpc" {
+		} else if resourceNoID == "l2_vpc" {
 			filter = strings.Join([]string{"epc_id", suffix, "!=0"}, "")
-
-		} else if common.IsValueInSliceString(resourceNoSuffix, tag.TAG_RESOURCE_TYPE_AUTO) {
-			if common.IsValueInSliceString(resourceNoSuffix, []string{"resource_gl0", "auto_instance"}) {
-
+		} else if common.IsValueInSliceString(resourceNoID, tag.TAG_RESOURCE_TYPE_AUTO) {
+			if common.IsValueInSliceString(resourceNoID, []string{"resource_gl0", "auto_instance"}) {
 				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (101,102)"}, "")
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
 			}
-		} else if resourceInfo, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoSuffix]; ok {
+		} else if resourceInfo, ok := tag.HOSTNAME_IP_DEVICE_MAP[resourceNoID]; ok {
 			deviceTypeValue = resourceInfo.ResourceType
 			deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
-
 			if deviceTypeValue == tag.VIF_DEVICE_TYPE_VM {
 				filter = "l3_device_id" + suffix + "!=0 AND l3_device_type" + suffix + "=" + deviceTypeValueStr
 			} else {

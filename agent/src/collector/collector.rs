@@ -1044,6 +1044,29 @@ fn get_l3_epc_id(l3_epc_id: i32, signal_source: SignalSource) -> i16 {
     }
 }
 
+struct CollectorStats {
+    id: u32,
+    kind: &'static str,
+    layer7: bool,
+}
+
+impl stats::Module for CollectorStats {
+    fn name(&self) -> &'static str {
+        "collector"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("index", self.id.to_string()),
+            if self.layer7 {
+                StatsOption::Tag("kind", format!("l7_{}", self.kind))
+            } else {
+                StatsOption::Tag("kind", self.kind.to_owned())
+            },
+        ]
+    }
+}
+
 #[derive(Clone)]
 struct Context {
     id: u32,
@@ -1094,12 +1117,12 @@ impl Collector {
         });
 
         stats.register_countable(
-            "collector",
+            &CollectorStats {
+                id,
+                kind,
+                layer7: false,
+            },
             Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-            vec![
-                StatsOption::Tag("kind", kind.to_owned()),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         Self {
@@ -1225,12 +1248,12 @@ impl L7Collector {
         });
 
         stats.register_countable(
-            "collector",
+            &CollectorStats {
+                id,
+                kind,
+                layer7: true,
+            },
             Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-            vec![
-                StatsOption::Tag("kind", "l7_".to_owned() + &kind.to_owned()),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         Self {

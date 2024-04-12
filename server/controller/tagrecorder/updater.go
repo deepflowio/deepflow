@@ -23,7 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
-	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 type UpdaterManager struct {
@@ -96,7 +95,7 @@ func (c *UpdaterManager) refresh() {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
-		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.SetConfig(c.cfg)
 		updater.Refresh()
 	}
 }
@@ -108,7 +107,7 @@ type Updater interface {
 	// 遍历新的ch数据，若key不在旧的ch数据中，则新增；否则检查是否有更新，若有更新，则更新
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	Refresh() bool
-	SetConfig(cfg trconfig.TagRecorderConfig)
+	SetConfig(cfg config.ControllerConfig)
 }
 
 type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
@@ -121,7 +120,7 @@ type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 }
 
 type UpdaterComponent[MT MySQLChModel, KT ChModelKey] struct {
-	cfg              trconfig.TagRecorderConfig
+	cfg              config.ControllerConfig
 	resourceTypeName string
 	updaterDG        updaterDataGenerator[MT, KT]
 	dbOperator       operator[MT, KT]
@@ -135,7 +134,7 @@ func newUpdaterComponent[MT MySQLChModel, KT ChModelKey](resourceTypeName string
 	return u
 }
 
-func (b *UpdaterComponent[MT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
+func (b *UpdaterComponent[MT, KT]) SetConfig(cfg config.ControllerConfig) {
 	b.cfg = cfg
 	b.dbOperator.setConfig(cfg)
 }
