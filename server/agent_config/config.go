@@ -250,7 +250,7 @@ type OnCpuProfile struct {
 
 type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
-	GlobalEbpfPpsThreshold  *int                               `yaml:"global-ebpf-pps-threshold"`
+	GlobalEbpfPpsThreshold  *int                               `yaml:"global-ebpf-pps-threshold,omitempty"`
 	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
 	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
 	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
