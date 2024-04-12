@@ -6,6 +6,7 @@ use pulsar_proto::{
     base_command::Type as CommandType, BaseCommand, BrokerEntryMetadata, MessageMetadata,
 };
 use serde::Serialize;
+use std::collections::HashMap;
 
 use crate::{
     common::{
@@ -77,8 +78,10 @@ pub struct PulsarLog {
     perf_stats: Option<L7PerfStats>,
 
     version: i32,
-    topic: Option<String>,
     domain: Option<String>,
+
+    producer_topic: HashMap<u64, String>,
+    consumer_topic: HashMap<u64, String>,
 }
 
 impl Default for PulsarLog {
@@ -86,8 +89,9 @@ impl Default for PulsarLog {
         Self {
             perf_stats: None,
             version: MAX_PROTOCOL_VERSION,
-            topic: None,
             domain: None,
+            producer_topic: HashMap::new(),
+            consumer_topic: HashMap::new(),
         }
     }
 }
@@ -122,6 +126,13 @@ macro_rules! get_msg_req {
         let producer_id = obj.producer_id as u16 as u64;
         let sequence_id = obj.sequence_id as u16 as u64;
         Some((producer_id << 16) | sequence_id)
+    }};
+}
+
+macro_rules! update_topic {
+    ($self:expr, $topic_map:expr, $id:ident, $x:ident) => {{
+        let id = $self.command.$x.as_ref()?.$id;
+        $self.topic = $topic_map.get(&id).cloned();
     }};
 }
 
@@ -292,7 +303,7 @@ impl PulsarInfo {
         }
     }
 
-    fn parse_topic(&self) -> Option<String> {
+    fn get_topic(&self) -> Option<String> {
         let topic = if let Some(producer) = &self.command.producer {
             producer.topic.clone()
         } else if let Some(subscribe) = &self.command.subscribe {
@@ -301,6 +312,69 @@ impl PulsarInfo {
             return None;
         };
         topic.split('/').last().map(|x| x.to_string())
+    }
+
+    fn update_topic(
+        &mut self,
+        producer_topic: &mut HashMap<u64, String>,
+        consumer_topic: &mut HashMap<u64, String>,
+    ) -> Option<()> {
+        let command = self.command.as_ref();
+        match command.r#type() {
+            CommandType::Subscribe => {
+                let consumer_id = command.subscribe.as_ref()?.consumer_id;
+                let topic = self.get_topic()?;
+                consumer_topic.insert(consumer_id, topic.clone());
+                self.topic = Some(topic);
+            }
+            CommandType::Producer => {
+                let producer_id = command.producer.as_ref()?.producer_id;
+                let topic = self.get_topic()?;
+                producer_topic.insert(producer_id, topic.clone());
+                self.topic = Some(topic);
+            }
+
+            CommandType::Send => update_topic!(self, producer_topic, producer_id, send),
+            CommandType::SendReceipt => {
+                update_topic!(self, producer_topic, producer_id, send_receipt)
+            }
+            CommandType::SendError => update_topic!(self, producer_topic, producer_id, send_error),
+            CommandType::CloseProducer => {
+                update_topic!(self, producer_topic, producer_id, close_producer)
+            }
+
+            CommandType::Message => update_topic!(self, consumer_topic, consumer_id, message),
+            CommandType::Ack => update_topic!(self, consumer_topic, consumer_id, ack),
+            CommandType::AckResponse => {
+                update_topic!(self, consumer_topic, consumer_id, ack_response)
+            }
+            CommandType::ActiveConsumerChange => {
+                update_topic!(self, consumer_topic, consumer_id, active_consumer_change)
+            }
+            CommandType::Flow => update_topic!(self, consumer_topic, consumer_id, flow),
+            CommandType::Unsubscribe => {
+                update_topic!(self, consumer_topic, consumer_id, unsubscribe)
+            }
+            CommandType::Seek => update_topic!(self, consumer_topic, consumer_id, seek),
+            CommandType::ReachedEndOfTopic => {
+                update_topic!(self, consumer_topic, consumer_id, reached_end_of_topic)
+            }
+            CommandType::CloseConsumer => {
+                update_topic!(self, consumer_topic, consumer_id, close_consumer)
+            }
+            CommandType::RedeliverUnacknowledgedMessages => update_topic!(
+                self,
+                consumer_topic,
+                consumer_id,
+                redeliver_unacknowledged_messages
+            ),
+            CommandType::ConsumerStats => {
+                update_topic!(self, consumer_topic, consumer_id, consumer_stats)
+            }
+
+            _ => {}
+        }
+        Some(())
     }
 
     fn get_message_type(&self) -> LogMessageType {
@@ -586,7 +660,6 @@ impl PulsarInfo {
         info.request_id = info.get_request_id().map(|x| x as u32);
         info.domain = info.parse_domain();
         info.version = info.parse_version();
-        info.topic = info.parse_topic();
         info.msg_type = info.get_message_type();
         match info.msg_type {
             LogMessageType::Response => {
@@ -705,10 +778,9 @@ impl L7ProtocolParserInterface for PulsarLog {
             self.version = self
                 .version
                 .min(info.version.unwrap_or(MAX_PROTOCOL_VERSION));
-            self.topic = info.topic.clone().or(self.topic.clone());
             self.domain = info.domain.clone().or(self.domain.clone());
+            info.update_topic(&mut self.producer_topic, &mut self.consumer_topic);
             info.version = Some(self.version);
-            info.topic = self.topic.clone();
             info.domain = self.domain.clone();
             vec.push(L7ProtocolInfo::PulsarInfo(info));
         }
@@ -756,15 +828,6 @@ impl L7ProtocolParserInterface for PulsarLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        let mut s = Self::default();
-        s.perf_stats = self.perf_stats.take();
-        s.version = self.version;
-        s.topic = self.topic.take();
-        s.domain = self.domain.take();
-        *self = s;
     }
 }
 
