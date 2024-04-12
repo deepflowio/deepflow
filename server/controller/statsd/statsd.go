@@ -28,7 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("statsd")
@@ -77,6 +77,7 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 
 	// collect
 	timeStamp := time.Now().Unix()
+	dfStats := &pb.Stats{}
 	for _, e := range statter.GetStatter().Element {
 		for mfName, mfValues := range e.MetricsFloatNameToValues {
 			name := common.DEEPFLOW_STATSD_PREFIX + "_" + e.VirtualTableName
@@ -98,10 +99,10 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 				vSum += v
 			}
 			switch e.MetricType {
-			case "Inc":
+			case MetricInc:
 				metricsFloatNames = []string{"count"}
 				metricsFloatValues = []float64{vSum}
-			case "Timing":
+			case MetricTiming:
 				vLen := float64(len(mfValues))
 				vAVG, _ := strconv.ParseFloat(fmt.Sprintf("%.3f", vSum/vLen), 64)
 				metricsFloatNames = []string{"avg", "len"}
@@ -113,7 +114,6 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 				continue
 			}
 
-			dfStats := pb.AcquireDFStats()
 			dfStats.Timestamp = uint64(timeStamp)
 			dfStats.Name = name
 			dfStats.TagNames = tagNames

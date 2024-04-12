@@ -33,11 +33,11 @@ type Host struct {
 
 func NewHost(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Host {
 	mng := &Host{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_HOST,
 	}
 	return mng
@@ -85,7 +85,7 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = h.ToolDataSet.GetHostNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err)
+				log.Error(h.metadata.LogPre("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err))
 			}
 		}
 

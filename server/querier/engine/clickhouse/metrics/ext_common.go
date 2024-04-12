@@ -28,7 +28,7 @@ import (
 
 var EXT_METRICS = map[string]*Metrics{}
 
-func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Metrics, error) {
+func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
 	if db == "ext_metrics" || db == "deepflow_system" || (db == "flow_log" && table == "l7_flow_log") {
@@ -56,7 +56,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 		}
 		externalMetricSql = fmt.Sprintf(externalMetricSql, db, tableFilter, whereSql)
 
-		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricSql})
+		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -70,7 +70,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 			metricName := fmt.Sprintf("metrics.%s", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
-				"metrics", []bool{true, true, true}, "", tableName, "",
+				"metrics", []bool{true, true, true}, "", tableName, "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
@@ -78,7 +78,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 	return loadMetrics, err
 }
 
-func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[string]*Metrics, error) {
+func GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	allMetrics := GetSamplesMetrics()
 	var err error
@@ -105,7 +105,7 @@ func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[str
 	}
 	prometheusTableSql = fmt.Sprintf(prometheusTableSql, db, tableFilter, whereSql)
 
-	prometheusTableRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: prometheusTableSql})
+	prometheusTableRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: prometheusTableSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -125,7 +125,7 @@ func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[str
 			}
 			lm := NewMetrics(
 				index, metric.DBField, metric.DisplayName, "", metricType,
-				"metrics", []bool{true, true, true}, "", tableName, "",
+				"metrics", []bool{true, true, true}, "", tableName, "", "",
 			)
 			lm.IsAgg = isAgg
 			loadMetrics[strings.Join([]string{field, strconv.Itoa(index)}, "-")] = lm

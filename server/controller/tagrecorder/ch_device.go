@@ -17,606 +17,866 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+
+	// "github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
-type ChDevice struct {
-	UpdaterComponent[mysql.ChDevice, DeviceKey]
+type ChVMDevice struct {
+	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChDevice, DeviceKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
-func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
-	updater := &ChDevice{
-		newUpdaterComponent[mysql.ChDevice, DeviceKey](
-			RESOURCE_TYPE_CH_DEVICE,
+func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
+	mng := &ChVMDevice{
+		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysql.VM, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
-	log.Infof("generate data for %s", d.resourceTypeName)
-	keyToItem := make(map[DeviceKey]mysql.ChDevice)
-	ok := d.generateHostData(keyToItem)
-	if !ok {
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChVMDevice) sourceToTarget(source *mysql.VM) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_VM,
+		SubType:  source.HType,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
-	ok = d.generateVMData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateVRouterData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateDHCPPortData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateNATGatewayData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateLBData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateRDSInstanceData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateRedisInstanceData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generatePodServiceData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generatePodData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generatePodGroupData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generatePodNodeData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	ok = d.generateProcessData(keyToItem)
-	if !ok {
-		return nil, false
-	}
-	d.generateIPData(keyToItem)
-	d.generateInternetData(keyToItem)
-	return keyToItem, true
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VM,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_VM,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		UID:        source.UID,
+		IconID:     iconID,
+		Hostname:   source.Hostname,
+		IP:         source.IP,
+	})
+	return
 }
 
-func (d *ChDevice) generateKey(dbItem mysql.ChDevice) DeviceKey {
-	return DeviceKey{
-		DeviceType: dbItem.DeviceType,
-		DeviceID:   dbItem.DeviceID,
-	}
-}
-
-func (d *ChDevice) generateUpdateInfo(oldItem, newItem mysql.ChDevice) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
-		updateInfo["icon_id"] = newItem.IconID
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if oldItem.UID != newItem.UID {
-		updateInfo["uid"] = newItem.UID
+	if fieldsUpdate.Hostname.IsDifferent() {
+		updateInfo["hostname"] = fieldsUpdate.Hostname.GetNew()
 	}
-	if oldItem.Hostname != newItem.Hostname {
-		updateInfo["hostname"] = newItem.Hostname
+	if fieldsUpdate.IP.IsDifferent() {
+		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
-	if oldItem.IP != newItem.IP {
-		updateInfo["ip"] = newItem.IP
+	if fieldsUpdate.HType.IsDifferent() {
+		updateInfo["icon_id"] = c.resourceTypeToIconID[IconKey{
+			NodeType: RESOURCE_TYPE_VM,
+			SubType:  fieldsUpdate.HType.GetNew(),
+		}]
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
-	}
-	return nil, false
-}
-
-func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var hosts []mysql.Host
-	err := mysql.Db.Unscoped().Find(&hosts).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, host := range hosts {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_HOST,
-			DeviceID:   host.ID,
-		}
-		if host.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_HOST,
-				DeviceID:   host.ID,
-				Name:       host.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
-				Hostname:   host.Hostname,
-				IP:         host.IP,
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_HOST,
-				DeviceID:   host.ID,
-				Name:       host.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
-				Hostname:   host.Hostname,
-				IP:         host.IP,
-			}
-		}
-
-	}
-	return true
-}
-
-func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var vms []mysql.VM
-	err := mysql.Db.Unscoped().Find(&vms).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, vm := range vms {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_VM,
-			DeviceID:   vm.ID,
-		}
-
-		if vm.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_VM,
-				DeviceID:   vm.ID,
-				Name:       vm.Name + " (deleted)",
-				UID:        vm.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
-				Hostname:   vm.Hostname,
-				IP:         vm.IP,
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_VM,
-				DeviceID:   vm.ID,
-				Name:       vm.Name,
-				UID:        vm.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
-				Hostname:   vm.Hostname,
-				IP:         vm.IP,
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var vrouters []mysql.VRouter
-	err := mysql.Db.Unscoped().Find(&vrouters).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, vrouter := range vrouters {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
-			DeviceID:   vrouter.ID,
-		}
-		vrouterName := vrouter.Name
-		if vrouter.DeletedAt.Valid {
-			vrouterName += " (deleted)"
-		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
-			DeviceID:   vrouter.ID,
-			Name:       vrouterName,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VGW}],
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var dhcpPorts []mysql.DHCPPort
-	err := mysql.Db.Unscoped().Find(&dhcpPorts).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, dhcpPort := range dhcpPorts {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-			DeviceID:   dhcpPort.ID,
-		}
-
-		if dhcpPort.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-				DeviceID:   dhcpPort.ID,
-				Name:       dhcpPort.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-				DeviceID:   dhcpPort.ID,
-				Name:       dhcpPort.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var natGateways []mysql.NATGateway
-	err := mysql.Db.Unscoped().Find(&natGateways).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, natGateway := range natGateways {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-			DeviceID:   natGateway.ID,
-		}
-
-		if natGateway.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-				DeviceID:   natGateway.ID,
-				Name:       natGateway.Name + " (deleted)",
-				UID:        natGateway.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-				DeviceID:   natGateway.ID,
-				Name:       natGateway.Name,
-				UID:        natGateway.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var lbs []mysql.LB
-	err := mysql.Db.Unscoped().Find(&lbs).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, lb := range lbs {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_LB,
-			DeviceID:   lb.ID,
-		}
-
-		if lb.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_LB,
-				DeviceID:   lb.ID,
-				Name:       lb.Name + " (deleted)",
-				UID:        lb.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_LB,
-				DeviceID:   lb.ID,
-				Name:       lb.Name,
-				UID:        lb.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var rdsInstances []mysql.RDSInstance
-	err := mysql.Db.Unscoped().Find(&rdsInstances).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, rdsInstance := range rdsInstances {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-			DeviceID:   rdsInstance.ID,
-		}
-
-		if rdsInstance.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-				DeviceID:   rdsInstance.ID,
-				Name:       rdsInstance.Name + " (deleted)",
-				UID:        rdsInstance.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-				DeviceID:   rdsInstance.ID,
-				Name:       rdsInstance.Name,
-				UID:        rdsInstance.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var redisInstances []mysql.RedisInstance
-	err := mysql.Db.Unscoped().Find(&redisInstances).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, redisInstance := range redisInstances {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-			DeviceID:   redisInstance.ID,
-		}
-
-		if redisInstance.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-				DeviceID:   redisInstance.ID,
-				Name:       redisInstance.Name + " (deleted)",
-				UID:        redisInstance.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-				DeviceID:   redisInstance.ID,
-				Name:       redisInstance.Name,
-				UID:        redisInstance.UID,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, podService := range podServices {
-
-		if podService.DeletedAt.Valid {
-			podServiceKey := DeviceKey{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-			}
-
-			// service
-			serviceKey := DeviceKey{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-			}
-		} else {
-			// pod_service
-			podServiceKey := DeviceKey{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-			}
-
-			// service
-			serviceKey := DeviceKey{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var pods []mysql.Pod
-	err := mysql.Db.Unscoped().Find(&pods).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, pod := range pods {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_POD,
-			DeviceID:   pod.ID,
-		}
-		if pod.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var podGroups []mysql.PodGroup
-	err := mysql.Db.Unscoped().Find(&podGroups).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, podGroup := range podGroups {
-		key := DeviceKey{
-			DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-			DeviceID:   podGroup.ID,
-		}
-		if podGroup.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	var podNodes []mysql.PodNode
-	err := mysql.Db.Unscoped().Find(&podNodes).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
-	}
-
-	for _, podNode := range podNodes {
-		key := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-			DeviceID:   podNode.ID,
-		}
-		if podNode.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-			}
-		}
-	}
-	return true
-}
-
-func (d *ChDevice) generateIPData(keyToItem map[DeviceKey]mysql.ChDevice) {
-	key := DeviceKey{
-		DeviceType: CH_DEVICE_TYPE_IP,
-		DeviceID:   CH_DEVICE_TYPE_IP,
-	}
-	keyToItem[key] = mysql.ChDevice{
-		DeviceType: CH_DEVICE_TYPE_IP,
-		DeviceID:   CH_DEVICE_TYPE_IP,
-		IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_IP}],
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VM).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VM,
+			DeviceID: sourceID}, db)
 	}
 }
 
-func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysql.ChDevice) {
-	key := DeviceKey{
-		DeviceType: CH_DEVICE_TYPE_INTERNET,
-		DeviceID:   CH_DEVICE_TYPE_INTERNET,
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChVMDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChHostDevice struct {
+	SubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, mysql.Host, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
+	mng := &ChHostDevice{
+		newSubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, mysql.Host, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_HOST_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
 	}
-	keyToItem[key] = mysql.ChDevice{
-		DeviceType: CH_DEVICE_TYPE_INTERNET,
-		DeviceID:   CH_DEVICE_TYPE_INTERNET,
-		Name:       "Internet",
-		IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_INTERNET}],
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChHostDevice) sourceToTarget(source *mysql.Host) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_HOST,
+		SubType:  source.HType,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_HOST,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_HOST,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+		Hostname:   source.Hostname,
+		IP:         source.IP,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.HostFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
+	}
+	if fieldsUpdate.Hostname.IsDifferent() {
+		updateInfo["hostname"] = fieldsUpdate.Hostname.GetNew()
+	}
+	if fieldsUpdate.IP.IsDifferent() {
+		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
+	}
+	if fieldsUpdate.HType.IsDifferent() {
+		updateInfo["icon_id"] = c.resourceTypeToIconID[IconKey{
+			NodeType: RESOURCE_TYPE_HOST,
+			SubType:  fieldsUpdate.HType.GetNew(),
+		}]
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_HOST).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_HOST,
+			DeviceID: sourceID}, db)
 	}
 }
 
-func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
-		return false
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChHostDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChVRouterDevice struct {
+	SubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, mysql.VRouter, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
+	mng := &ChVRouterDevice{
+		newSubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, mysql.VRouter, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_VROUTER_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
 	}
-	for _, process := range processes {
-		key := DeviceKey{
-			DeviceType: CH_DEVICE_TYPE_GPROCESS,
-			DeviceID:   process.ID,
-		}
-		if process.DeletedAt.Valid {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-			}
-		} else {
-			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-			}
-		}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChVRouterDevice) sourceToTarget(source *mysql.VRouter) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_VGW,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
-	return true
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VRouterFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VROUTER).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChDHCPPortDevice struct {
+	SubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, mysql.DHCPPort, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice {
+	mng := &ChDHCPPortDevice{
+		newSubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, mysql.DHCPPort, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_DHCP_PORT_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChDHCPPortDevice) sourceToTarget(source *mysql.DHCPPort) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_DHCP_PORT,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.DHCPPortFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_DHCP_PORT).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChNATGatewayDevice struct {
+	SubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, mysql.NATGateway, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDevice {
+	mng := &ChNATGatewayDevice{
+		newSubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, mysql.NATGateway, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_NAT_GATEWAY_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChNATGatewayDevice) sourceToTarget(source *mysql.NATGateway) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_NAT_GATEWAY,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		UID:        source.UID,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.NATGatewayFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_NAT_GATEWAY).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChLBDevice struct {
+	SubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, mysql.LB, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
+	mng := &ChLBDevice{
+		newSubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, mysql.LB, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_LB_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChLBDevice) sourceToTarget(source *mysql.LB) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_LB,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_LB,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_LB,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		UID:        source.UID,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_LB).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_LB,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChLBDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChRDSInstanceDevice struct {
+	SubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, mysql.RDSInstance, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstanceDevice {
+	mng := &ChRDSInstanceDevice{
+		newSubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, mysql.RDSInstance, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_RDS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChRDSInstanceDevice) sourceToTarget(source *mysql.RDSInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_RDS,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		UID:        source.UID,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RDSInstanceFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_RDS_INSTANCE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChRedisInstanceDevice struct {
+	SubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, mysql.RedisInstance, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInstanceDevice {
+	mng := &ChRedisInstanceDevice{
+		newSubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, mysql.RedisInstance, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_REDIS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChRedisInstanceDevice) sourceToTarget(source *mysql.RedisInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_REDIS,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		UID:        source.UID,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RedisInstanceFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.UID.IsDifferent() {
+		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_REDIS_INSTANCE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChPodServiceDevice struct {
+	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDevice {
+	mng := &ChPodServiceDevice{
+		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodServiceDevice) sourceToTarget(source *mysql.PodService) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD_SERVICE,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+	// pod_service
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+
+	// service
+	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_SERVICE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: CH_DEVICE_TYPE_SERVICE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_SERVICE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChPodDevice struct {
+	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
+	mng := &ChPodDevice{
+		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodDevice) sourceToTarget(source *mysql.Pod) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_POD,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChPodGroupDevice struct {
+	SubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysql.PodGroup, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice {
+	mng := &ChPodGroupDevice{
+		newSubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysql.PodGroup, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_POD_GROUP_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodGroupDevice) sourceToTarget(source *mysql.PodGroup) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD_GROUP,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		podGroupType := fieldsUpdate.Type.GetNew()
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChPodNodeDevice struct {
+	SubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, mysql.PodNode, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
+	mng := &ChPodNodeDevice{
+		newSubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, mysql.PodNode, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_POD_NODE_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodNodeDevice) sourceToTarget(source *mysql.PodNode) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD_NODE,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
+type ChProcessDevice struct {
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
+	mng := &ChProcessDevice{
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChProcessDevice) sourceToTarget(source *mysql.Process) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_GPROCESS,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: CH_DEVICE_TYPE_GPROCESS,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }

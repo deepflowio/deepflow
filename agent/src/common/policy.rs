@@ -23,7 +23,7 @@ use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use log::warn;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use super::endpoint::EPC_FROM_DEEPFLOW;
+use super::endpoint::{EPC_ANY, EPC_DEEPFLOW};
 use super::enums::{IpProtocol, TapType};
 use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
@@ -283,7 +283,7 @@ impl Default for IpSegment {
         Self {
             ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             mask: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            epc_id: 0,
+            epc_id: (EPC_ANY & 0xffff) as u16,
         }
     }
 }
@@ -325,7 +325,7 @@ impl IpSegment {
             } else {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
             },
-            epc_id: 0,
+            epc_id: (EPC_ANY & 0xffff) as u16,
         }
     }
 
@@ -575,18 +575,34 @@ impl Acl {
                     let field = &mut item.field;
                     field.set(MatchedFlag::TapType, u16::from(self.tap_type));
                     field.set_ip(MatchedFlag::SrcIp, src_ip4);
-                    field.set(MatchedFlag::SrcEpc, src_ip.get_epc_id());
+                    let src_epc = src_ip.get_epc_id();
+                    if src_epc == (EPC_ANY & 0xffff) as u16 {
+                        field.set(MatchedFlag::SrcEpc, 0);
+                    } else {
+                        field.set(MatchedFlag::SrcEpc, src_epc);
+                    }
                     field.set_ip(MatchedFlag::DstIp, dst_ip4);
-                    field.set(MatchedFlag::DstEpc, dst_ip.get_epc_id());
+                    let dst_epc = dst_ip.get_epc_id();
+                    if dst_epc == (EPC_ANY & 0xffff) as u16 {
+                        field.set(MatchedFlag::DstEpc, 0);
+                    } else {
+                        field.set(MatchedFlag::DstEpc, dst_epc);
+                    }
                     field.set(MatchedFlag::SrcPort, src_port.port);
                     field.set(MatchedFlag::DstPort, dst_port.port);
 
                     let mask = &mut item.mask;
                     mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
                     mask.set_ip(MatchedFlag::SrcIp, src_mask4);
-                    mask.set_mask(MatchedFlag::SrcEpc, src_ip.get_epc_id() > 0);
+                    mask.set_mask(
+                        MatchedFlag::SrcEpc,
+                        src_ip.get_epc_id() != (EPC_ANY & 0xffff) as u16,
+                    );
                     mask.set_ip(MatchedFlag::DstIp, dst_mask4);
-                    mask.set_mask(MatchedFlag::DstEpc, dst_ip.get_epc_id() > 0);
+                    mask.set_mask(
+                        MatchedFlag::DstEpc,
+                        dst_ip.get_epc_id() != (EPC_ANY & 0xffff) as u16,
+                    );
                     mask.set(MatchedFlag::SrcPort, src_port.mask);
                     mask.set(MatchedFlag::DstPort, dst_port.mask);
 
@@ -629,18 +645,34 @@ impl Acl {
                     let field = &mut item.field;
                     field.set(MatchedFlag::TapType, u16::from(self.tap_type));
                     field.set_ip(MatchedFlag::SrcIp, src_ip6);
-                    field.set(MatchedFlag::SrcEpc, src_ip.get_epc_id());
+                    let src_epc = src_ip.get_epc_id();
+                    if src_epc == (EPC_ANY & 0xffff) as u16 {
+                        field.set(MatchedFlag::SrcEpc, 0);
+                    } else {
+                        field.set(MatchedFlag::SrcEpc, src_epc);
+                    }
                     field.set_ip(MatchedFlag::DstIp, dst_ip6);
-                    field.set(MatchedFlag::DstEpc, dst_ip.get_epc_id());
+                    let dst_epc = dst_ip.get_epc_id();
+                    if dst_epc == (EPC_ANY & 0xffff) as u16 {
+                        field.set(MatchedFlag::DstEpc, 0);
+                    } else {
+                        field.set(MatchedFlag::DstEpc, dst_epc);
+                    }
                     field.set(MatchedFlag::SrcPort, src_port.port);
                     field.set(MatchedFlag::DstPort, dst_port.port);
 
                     let mask = &mut item.mask;
                     mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
                     mask.set_ip(MatchedFlag::SrcIp, src_mask6);
-                    mask.set_mask(MatchedFlag::SrcEpc, src_ip.get_epc_id() > 0);
+                    mask.set_mask(
+                        MatchedFlag::SrcEpc,
+                        src_ip.get_epc_id() != (EPC_ANY & 0xffff) as u16,
+                    );
                     mask.set_ip(MatchedFlag::DstIp, dst_mask6);
-                    mask.set_mask(MatchedFlag::DstEpc, dst_ip.get_epc_id() > 0);
+                    mask.set_mask(
+                        MatchedFlag::DstEpc,
+                        dst_ip.get_epc_id() != (EPC_ANY & 0xffff) as u16,
+                    );
                     mask.set(MatchedFlag::SrcPort, src_port.mask);
                     mask.set(MatchedFlag::DstPort, dst_port.mask);
 
@@ -794,7 +826,7 @@ impl TryFrom<&trident::Cidr> for Cidr {
         if epc_id > 0 {
             epc_id &= 0xffff;
         } else if epc_id == 0 {
-            epc_id = EPC_FROM_DEEPFLOW;
+            epc_id = EPC_DEEPFLOW;
         }
 
         Ok(Cidr {

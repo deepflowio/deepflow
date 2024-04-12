@@ -99,6 +99,10 @@ impl L7ProtocolInfoInterface for RedisInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.request.len()
+    }
 }
 
 pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -271,6 +275,9 @@ impl RedisLog {
     ) -> Result<()> {
         if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
+        }
+        if payload.is_empty() {
+            return Err(Error::L7ProtocolUnknown);
         }
 
         match direction {

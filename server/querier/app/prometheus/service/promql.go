@@ -281,6 +281,12 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
 			}
 		}
+
+		defer func() {
+			if result == nil || err != nil || result.Error != "" || result.Data == nil {
+				p.cacher.Remove(cachedKey)
+			}
+		}()
 	}
 
 	var queriable model.Querierable
@@ -414,6 +420,12 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 				return &model.PromQueryResponse{Data: &model.PromQueryData{ResultType: cached.Value.Type(), Result: cached.Value}, Status: _SUCCESS}, nil
 			}
 		}
+
+		defer func() {
+			if result == nil || err != nil || result.Error != "" || result.Data == nil {
+				p.cacher.Remove(cachedKey)
+			}
+		}()
 	}
 
 	var queriable model.Querierable
@@ -808,7 +820,7 @@ func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e 
 func (p *prometheusExecutor) loadExtraLabelsCache() {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
 	showTags := fmt.Sprintf("show tags from %s", VTAP_FLOW_PORT_TABLE)
-	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, context.Background())
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, "", "", false, context.Background())
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
 		return

@@ -55,6 +55,7 @@ type Metrics struct {
 	Permissions []bool // 指标量的权限控制
 	Table       string // 所属表
 	Description string // 描述
+	TagType     string // Tag type of metric's tag type
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -74,7 +75,7 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 
 func NewMetrics(
 	index int, dbField string, displayname string, unit string, metricType int, category string,
-	permissions []bool, condition string, table string, description string,
+	permissions []bool, condition string, table string, description string, tagType string,
 ) *Metrics {
 	return &Metrics{
 		Index:       index,
@@ -87,6 +88,7 @@ func NewMetrics(
 		Condition:   condition,
 		Table:       table,
 		Description: description,
+		TagType:     tagType,
 	}
 }
 
@@ -126,7 +128,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table, "",
+					"metrics", []bool{true, true, true}, "", table, "", "",
 				)
 				newAllMetrics[field] = metric
 			}
@@ -135,7 +137,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
-			"metrics", []bool{true, true, true}, "", table, "",
+			"metrics", []bool{true, true, true}, "", table, "", "",
 		)
 		newAllMetrics[field] = metric
 	}
@@ -183,6 +185,14 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					if name == "lb_listener" || name == "pod_ingress" {
 						continue
 					}
+					notSupportedOperators := []string{}
+					if len(tagSlice) >= 9 {
+						notSupportedOperators = ckcommon.ParseNotSupportedOperator(tagSlice[8])
+						// not support select
+						if slices.Contains(notSupportedOperators, "select") {
+							continue
+						}
+					}
 					clientName := tagSlice[1].(string)
 					serverName := tagSlice[2].(string)
 					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
@@ -203,11 +213,11 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					if err != nil {
 						return nil, false
 					}
-					if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+					if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
 						if serverName == clientName {
 							clientNameMetric := NewMetrics(
 								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							newAllMetrics[clientName] = clientNameMetric
 						} else {
@@ -229,11 +239,11 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 							}
 							serverNameMetric := NewMetrics(
 								0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							clientNameMetric := NewMetrics(
 								0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "",
+								"Tag", permissions, "", table, "", tagType,
 							)
 							newAllMetrics[serverName] = serverNameMetric
 							newAllMetrics[clientName] = clientNameMetric
@@ -241,7 +251,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					} else {
 						nameMetric := NewMetrics(
 							0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", permissions, "", table, "",
+							"Tag", permissions, "", table, "", tagType,
 						)
 						newAllMetrics[name] = nameMetric
 					}
@@ -269,15 +279,15 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -298,7 +308,7 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 	return map[string]*Metrics{}, err
 }
 
-func GetMetricsByDBTable(db string, table string, where string, ctx context.Context) (map[string]*Metrics, error) {
+func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
@@ -312,7 +322,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
-			exts, err := GetExtMetrics(db, table, where, ctx)
+			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 			for k, v := range loads {
 				if _, ok := metrics[k]; !ok {
 					metrics[k] = v
@@ -328,21 +338,21 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "",
+				"metrics", []bool{true, true, true}, "", table, "", "",
 			)
 			return metrics, err
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			return GetVtapFlowPortMetrics(), err
-		case "vtap_flow_edge_port":
+		case "network_map":
 			return GetVtapFlowEdgePortMetrics(), err
-		case "vtap_app_port":
+		case "application":
 			return GetVtapAppPortMetrics(), err
-		case "vtap_app_edge_port":
+		case "application_map":
 			return GetVtapAppEdgePortMetrics(), err
-		case "vtap_acl":
+		case "traffic_policy":
 			return GetVtapAclMetrics(), err
 		}
 	case "event":
@@ -360,16 +370,16 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			return GetInProcessMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
-		return GetExtMetrics(db, table, where, ctx)
+		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
-		return GetPrometheusMetrics(db, table, where, ctx)
+		return GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	}
 
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx context.Context) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table, where, ctx)
+func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) ([]interface{}, error) {
+	allMetrics, err := GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
@@ -396,14 +406,14 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (*common.Result, error) {
+func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
 	if table == "" && db != ckcommon.DB_NAME_PROMETHEUS {
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if db == "deepflow_system" {
-			for _, extTables := range ckcommon.GetExtTables(db, ctx) {
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -416,14 +426,14 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, ctx)
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, queryCacheTTL, orgID, useQueryCache, ctx)
 			if err != nil {
 				return nil, err
 			}
 			values = append(values, metrics...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, ctx)
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -630,7 +640,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				description := metricsLanguage[3].(string)
 				lm := NewMetrics(
 					i, metrics[1].(string), displayName, unit, metricType,
-					metrics[3].(string), permissions, "", table, description,
+					metrics[3].(string), permissions, "", table, description, "",
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
@@ -662,19 +672,19 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	case "flow_metrics":
 		switch table {
-		case "vtap_flow_port":
+		case "network":
 			metrics = VTAP_FLOW_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
-		case "vtap_flow_edge_port":
+		case "network_map":
 			metrics = VTAP_FLOW_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
-		case "vtap_app_port":
+		case "application":
 			metrics = VTAP_APP_PORT_METRICS
 			replaceMetrics = VTAP_APP_PORT_METRICS_REPLACE
-		case "vtap_app_edge_port":
+		case "application_map":
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
-		case "vtap_acl":
+		case "traffic_policy":
 			metrics = VTAP_ACL_METRICS
 			replaceMetrics = VTAP_ACL_METRICS_REPLACE
 		}

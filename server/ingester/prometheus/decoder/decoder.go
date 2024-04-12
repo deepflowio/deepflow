@@ -33,13 +33,13 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("prometheus.decoder")
@@ -94,9 +94,9 @@ type PrometheusSamplesBuilder struct {
 	appLabelValueIDsBuffer  []uint32
 
 	// universal tag cache
-	podNameIDToUniversalTag  map[uint32]zerodoc.UniversalTag
-	instanceIPToUniversalTag map[uint32]zerodoc.UniversalTag
-	vtapIDToUniversalTag     map[uint16]zerodoc.UniversalTag
+	podNameIDToUniversalTag  map[uint32]flow_metrics.UniversalTag
+	instanceIPToUniversalTag map[uint32]flow_metrics.UniversalTag
+	vtapIDToUniversalTag     map[uint16]flow_metrics.UniversalTag
 
 	counter *BuilderCounter
 	utils.Closable
@@ -113,9 +113,9 @@ func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.Plat
 		name:                     name,
 		platformData:             platformData,
 		labelTable:               labelTable,
-		podNameIDToUniversalTag:  make(map[uint32]zerodoc.UniversalTag),
-		instanceIPToUniversalTag: make(map[uint32]zerodoc.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]zerodoc.UniversalTag),
+		podNameIDToUniversalTag:  make(map[uint32]flow_metrics.UniversalTag),
+		instanceIPToUniversalTag: make(map[uint32]flow_metrics.UniversalTag),
+		vtapIDToUniversalTag:     make(map[uint16]flow_metrics.UniversalTag),
 		appLabelColumnAlign:      appLabelColumnAlign,
 		ignoreUniversalTag:       ignoreUniversalTag,
 		counter:                  &BuilderCounter{},
@@ -299,7 +299,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 
 func (b *PrometheusSamplesBuilder) GetEpcPodClusterId(vtapID uint16) (uint16, uint16, error) {
 	epcId, podClusterId := int32(0), uint16(0)
-	if vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID)); vtapInfo != nil {
+	if vtapInfo := b.platformData.QueryVtapInfo(vtapID); vtapInfo != nil {
 		epcId, podClusterId = vtapInfo.EpcId, uint16(vtapInfo.PodClusterId)
 	}
 	if epcId == 0 || epcId == datatype.EPC_FROM_INTERNET {
@@ -442,7 +442,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 		b.appLabelValueIDsBuffer[index] = b.tsLabelValueIDsBuffer[i]
 	}
 
-	var universalTag *zerodoc.UniversalTag
+	var universalTag *flow_metrics.UniversalTag
 	for i, s := range ts.Samples {
 		v := float64(s.Value)
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -456,7 +456,9 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 			m.Value = v
+			m.VtapId = vtapID
 			b.samplesBuffer = append(b.samplesBuffer, m)
+			m.OrgId, m.TeamID = b.platformData.QueryVtapOrgAndTeamID(vtapID)
 		} else {
 			m := dbwriter.AcquirePrometheusSample()
 			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
@@ -464,6 +466,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 			m.Value = v
+			m.OrgId, m.TeamID = b.platformData.QueryVtapOrgAndTeamID(vtapID)
 
 			if i == 0 {
 				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
@@ -489,9 +492,9 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 				b.platformDataVersion, platformDataVersion)
 		}
 		b.platformDataVersion = platformDataVersion
-		b.podNameIDToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
-		b.instanceIPToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
-		b.vtapIDToUniversalTag = make(map[uint16]zerodoc.UniversalTag)
+		b.podNameIDToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
+		b.instanceIPToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
+		b.vtapIDToUniversalTag = make(map[uint16]flow_metrics.UniversalTag)
 	} else {
 		if podNameID != 0 {
 			if universalTag, ok := b.podNameIDToUniversalTag[podNameID]; ok {
@@ -531,7 +534,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	var ip net.IP
 	var hasMatched bool
 	if podName != "" {
-		podInfo := b.platformData.QueryPodInfo(uint32(vtapID), podName)
+		podInfo := b.platformData.QueryPodInfo(vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
@@ -547,7 +550,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 	if !hasMatched {
 		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-			t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
+			t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
 			ip = net.ParseIP(instanceIP)
 			if ip != nil {
 				hasMatched = true
@@ -556,8 +559,8 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	}
 
 	if !hasMatched && fillWithVtapId {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
-		vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID))
+		t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
+		vtapInfo := b.platformData.QueryVtapInfo(vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
@@ -592,7 +595,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
 		t.L3DeviceID = info.DeviceID
-		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		t.L3DeviceType = flow_metrics.DeviceType(info.DeviceType)
 		if t.PodClusterID == 0 {
 			t.PodClusterID = uint16(info.PodClusterID)
 		}

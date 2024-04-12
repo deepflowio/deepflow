@@ -63,7 +63,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 	resp = []string{}
 	for db, tables := range chCommon.DB_TABLE_MAP {
 		if db == DB_NAME_EXT_METRICS {
-			extMetrics, _ := metrics.GetExtMetrics(DB_NAME_EXT_METRICS, "", where, args.Context)
+			extMetrics, _ := metrics.GetExtMetrics(DB_NAME_EXT_METRICS, "", where, "", "", false, args.Context)
 			for _, v := range extMetrics {
 				// append telegraf metrics, e.g.: influxdb_internal_statsd__tcp_current_connections[influxdb_target__metric]
 				metricName := fmt.Sprintf("%s__%s__%s__%s", db, "metrics", strings.Replace(v.Table, ".", "_", 1), strings.TrimPrefix(v.DisplayName, "metrics."))
@@ -71,7 +71,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			}
 		} else if db == chCommon.DB_NAME_PROMETHEUS {
 			// prometheus samples should get all metrcis from `table`
-			samples := clickhouse.GetTables(db, ctx)
+			samples := clickhouse.GetTables(db, "", "", false, ctx)
 			for _, v := range samples.Values {
 				tableName := v.([]interface{})[0].(string)
 				// append ${metrics_name}
@@ -81,14 +81,14 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 				resp = append(resp, metricsName)
 			}
 		} else if db == DB_NAME_DEEPFLOW_SYSTEM {
-			deepflowSystem, _ := metrics.GetExtMetrics(DB_NAME_DEEPFLOW_SYSTEM, "", where, args.Context)
+			deepflowSystem, _ := metrics.GetExtMetrics(DB_NAME_DEEPFLOW_SYSTEM, "", where, "", "", false, args.Context)
 			for _, v := range deepflowSystem {
 				metricName := fmt.Sprintf("%s__%s__%s", db, strings.ReplaceAll(v.Table, ".", "_"), strings.TrimPrefix(v.DisplayName, "metrics."))
 				resp = append(resp, metricName)
 			}
 		} else {
 			for _, table := range tables {
-				tableMetrics, _ := metrics.GetMetricsByDBTable(db, table, where, args.Context)
+				tableMetrics, _ := metrics.GetMetricsByDBTable(db, table, where, "", "", false, args.Context)
 				for field, v := range tableMetrics {
 					if v.Category == METRICS_CATEGORY_TAG {
 						continue

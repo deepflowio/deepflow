@@ -26,6 +26,12 @@ const GO_BIRTHDAY = "2006-01-02 15:04:05"
 const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 const (
+	DEFAULT_ORG_ID  = 1
+	DEFAULT_TEAM_ID = 1
+	ORG_ID_MAX      = 1024
+)
+
+const (
 	REMOTE_API_TIMEOUT = 30
 	INGESTER_API_PORT  = 30106
 )
@@ -482,9 +488,9 @@ const (
 )
 
 const (
-	DATA_SOURCE_FLOW = "flow_metrics.vtap_flow*"
-	DATA_SOURCE_APP  = "flow_metrics.vtap_app*"
-	DATA_SOURCE_ACL  = "flow_metrics.vtap_acl"
+	DATA_SOURCE_NETWORK        = "flow_metrics.network*"
+	DATA_SOURCE_APPLICATION    = "flow_metrics.application*"
+	DATA_SOURCE_TRAFFIC_POLICY = "flow_metrics.traffic_policy"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1
@@ -668,4 +674,9 @@ const (
 
 const (
 	RUNNING_MODE_STANDALONE = "STANDALONE"
+)
+
+const (
+	HEADER_KEY_X_ORG_ID  = "X-Org-Id"
+	INGESTER_BODY_ORG_ID = "org-id"
 )

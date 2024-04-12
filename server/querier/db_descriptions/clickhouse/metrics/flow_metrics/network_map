@@ -1,0 +1,90 @@
+# Field                     , DBField                   , Type       , Category        , Permission
+byte                        , byte                      , counter    , L3 Throughput   , 111
+byte_tx                     , byte_tx                   , counter    , L3 Throughput   , 111
+byte_rx                     , byte_rx                   , counter    , L3 Throughput   , 111
+packet                      , packet                    , counter    , L3 Throughput   , 111
+packet_tx                   , packet_tx                 , counter    , L3 Throughput   , 111
+packet_rx                   , packet_rx                 , counter    , L3 Throughput   , 111
+l3_byte                     ,                           , counter    , L3 Throughput   , 111
+l3_byte_tx                  , l3_byte_tx                , counter    , L3 Throughput   , 111
+l3_byte_rx                  , l3_byte_rx                , counter    , L3 Throughput   , 111
+bpp                         ,                           , quotient   , L3 Throughput   , 111
+bpp_tx                      ,                           , quotient   , L3 Throughput   , 111
+bpp_rx                      ,                           , quotient   , L3 Throughput   , 111
+
+new_flow                    , new_flow                  , counter    , L4 Throughput   , 111
+closed_flow                 , closed_flow               , counter    , L4 Throughput   , 111
+flow_load                   , flow_load                 , gauge      , L4 Throughput   , 111
+syn_count                   , syn_count                 , counter    , L4 Throughput   , 111
+synack_count                , synack_count              , counter    , L4 Throughput   , 111
+l4_byte                     ,                           , counter    , L4 Throughput   , 111
+l4_byte_tx                  , l4_byte_tx                , counter    , L4 Throughput   , 111
+l4_byte_rx                  , l4_byte_rx                , counter    , L4 Throughput   , 111
+direction_score             , direction_score           , bounded_gauge      , L4 Throughput   , 111
+
+retrans_syn                 , retrans_syn               , counter    , TCP Slow   , 111
+retrans_synack              , retrans_synack            , counter    , TCP Slow   , 111
+retrans                     , retrans                   , counter    , TCP Slow   , 111
+retrans_tx                  , retrans_tx                , counter    , TCP Slow   , 111
+retrans_rx                  , retrans_rx                , counter    , TCP Slow   , 111
+zero_win                    , zero_win                  , counter    , TCP Slow   , 111
+zero_win_tx                 , zero_win_tx               , counter    , TCP Slow   , 111
+zero_win_rx                 , zero_win_rx               , counter    , TCP Slow   , 111
+retrans_syn_ratio           ,                           , percentage , TCP Slow   , 111
+retrans_synack_ratio        ,                           , percentage , TCP Slow   , 111
+retrans_ratio               ,                           , percentage , TCP Slow   , 111
+retrans_tx_ratio            ,                           , percentage , TCP Slow   , 111
+retrans_rx_ratio            ,                           , percentage , TCP Slow   , 111
+zero_win_ratio              ,                           , percentage , TCP Slow   , 111
+zero_win_tx_ratio           ,                           , percentage , TCP Slow   , 111
+zero_win_rx_ratio           ,                           , percentage , TCP Slow   , 111
+
+tcp_establish_fail          , tcp_establish_fail        , counter    , TCP Error   , 111
+client_establish_fail       , client_establish_fail     , counter    , TCP Error   , 111
+server_establish_fail       , server_establish_fail     , counter    , TCP Error   , 111
+tcp_establish_fail_ratio    ,                           , percentage , TCP Error   , 111
+client_establish_fail_ratio ,                           , percentage , TCP Error   , 111
+server_establish_fail_ratio ,                           , percentage , TCP Error   , 111
+tcp_transfer_fail           , tcp_transfer_fail         , counter    , TCP Error   , 111
+tcp_transfer_fail_ratio     ,                           , percentage , TCP Error   , 111
+tcp_rst_fail                , tcp_rst_fail              , counter    , TCP Error   , 111
+tcp_rst_fail_ratio          ,                           , percentage , TCP Error   , 111
+client_source_port_reuse    , client_source_port_reuse  , counter    , TCP Error   , 111
+server_syn_miss             , server_syn_miss           , counter    , TCP Error   , 111
+client_establish_other_rst  , client_establish_other_rst, counter    , TCP Error   , 111
+client_ack_miss             , client_ack_miss           , counter    , TCP Error   , 111
+server_reset                , server_reset              , counter    , TCP Error   , 111
+server_establish_other_rst  , server_establish_other_rst, counter    , TCP Error   , 111
+client_rst_flow             , client_rst_flow           , counter    , TCP Error   , 111
+server_rst_flow             , server_rst_flow           , counter    , TCP Error   , 111
+server_queue_lack           , server_queue_lack         , counter    , TCP Error   , 111
+tcp_timeout                 , tcp_timeout               , counter    , TCP Error   , 111
+client_half_close_flow      , client_half_close_flow    , counter    , TCP Error   , 111
+server_half_close_flow      , server_half_close_flow    , counter    , TCP Error   , 111
+
+rtt                         ,                           , delay      , Delay   , 111
+rtt_client                  ,                           , delay      , Delay   , 111
+rtt_server                  ,                           , delay      , Delay   , 111
+srt                         ,                           , delay      , Delay   , 111
+art                         ,                           , delay      , Delay   , 111
+cit                         ,                           , delay      , Delay   , 111
+rtt_max                     , rtt_max                   , delay      , Delay   , 111
+rtt_client_max              , rtt_client_max            , delay      , Delay   , 111
+rtt_server_max              , rtt_server_max            , delay      , Delay   , 111
+srt_max                     , srt_max                   , delay      , Delay   , 111
+art_max                     , art_max                   , delay      , Delay   , 111
+cit_max                     , cit_max                   , delay      , Delay   , 111
+
+l7_request                  , l7_request                , counter    , Application   , 111
+l7_response                 , l7_response               , counter    , Application   , 111
+rrt                         ,                           , delay      , Application   , 111
+rrt_max                     , rrt_max                   , delay      , Application   , 111
+l7_error                    , l7_error                  , counter    , Application   , 111
+l7_client_error             , l7_client_error           , counter    , Application   , 111
+l7_server_error             , l7_server_error           , counter    , Application   , 111
+l7_timeout                  , l7_timeout                , counter    , Application   , 111
+l7_error_ratio              ,                           , percentage , Application   , 111
+l7_client_error_ratio       ,                           , percentage , Application   , 111
+l7_server_error_ratio       ,                           , percentage , Application   , 111
+
+row                         ,                           , other      , Other         , 111 

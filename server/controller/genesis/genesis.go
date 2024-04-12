@@ -50,6 +50,8 @@ type Genesis struct {
 	mutex            sync.RWMutex
 	grpcPort         string
 	grpcMaxMSGLength int
+	listenPort       int
+	listenNodePort   int
 	cfg              gconfig.GenesisConfig
 	genesisSyncData  atomic.Value
 	kubernetesData   sync.Map
@@ -64,6 +66,8 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 		mutex:            sync.RWMutex{},
 		grpcPort:         cfg.GrpcPort,
 		grpcMaxMSGLength: cfg.GrpcMaxMessageLength,
+		listenPort:       cfg.ListenPort,
+		listenNodePort:   cfg.ListenNodePort,
 		cfg:              cfg.GenesisCfg,
 		genesisSyncData:  sData,
 		kubernetesData:   sync.Map{},
@@ -97,7 +101,7 @@ func (g *Genesis) Start() {
 		vUpdater := NewGenesisSyncRpcUpdater(vStorage, sQueue, g.cfg, ctx)
 		vUpdater.Start()
 
-		kStorage := NewKubernetesStorage(g.cfg, kubernetesDataChan, ctx)
+		kStorage := NewKubernetesStorage(g.listenPort, g.listenNodePort, g.cfg, kubernetesDataChan, ctx)
 		kStorage.Start()
 		kUpdater := NewKubernetesRpcUpdater(kStorage, kQueue, ctx)
 		kUpdater.Start()

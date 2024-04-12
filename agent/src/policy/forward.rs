@@ -114,7 +114,6 @@ pub struct Forward {
     mac_ip_tables: RwLock<TableLruCache>,
     vip_device_tables: RwLock<AHashMap<u64, bool>>,
 
-    queue_count: usize,
     capacity: usize,
 }
 
@@ -124,7 +123,6 @@ impl Forward {
         Self {
             mac_ip_tables: RwLock::new(TableLruCache::new(NonZeroUsize::new(capacity).unwrap())),
             vip_device_tables: RwLock::new(AHashMap::new()),
-            queue_count,
             capacity,
         }
     }

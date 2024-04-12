@@ -57,7 +57,7 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,
-			db.NewSubDomain(),
+			db.NewSubDomain().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.SubDomains,
 			cloudData,
 		),
@@ -77,7 +77,7 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 		DisplayName: cloudItem.DisplayName,
 		ClusterID:   cloudItem.ClusterID,
 		Config:      cloudItem.Config,
-		Domain:      d.cache.DomainLcuuid,
+		Domain:      d.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

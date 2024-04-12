@@ -1,0 +1,67 @@
+# Name                     , ClientName                , ServerName                , Type          , EnumFile             , Category          , Permission    , Deprecated
+time                       , time                      , time                      , time          ,                      , Timestamp         , 111           , 0
+
+region                     , region                    , region                    , resource      ,                      , Universal Tag     , 110           , 0
+az                         , az                        , az                        , resource      ,                      , Universal Tag     , 110           , 0
+host                       , host                      , host                      , resource      ,                      , Universal Tag     , 100           , 0
+chost                      , chost                     , chost                     , resource      ,                      , Universal Tag     , 111           , 0
+vpc                        , vpc                       , vpc                       , resource      ,                      , Universal Tag     , 111           , 0
+subnet                     , subnet                    , subnet                    , resource      ,                      , Universal Tag     , 111           , 0
+router                     , router                    , router                    , resource      ,                      , Universal Tag     , 110           , 0
+dhcpgw                     , dhcpgw                    , dhcpgw                    , resource      ,                      , Universal Tag     , 110           , 0
+lb                         , lb                        , lb                        , resource      ,                      , Universal Tag     , 110           , 0
+lb_listener                , lb_listener               , lb_listener               , resource      ,                      , Universal Tag     , 110           , 0
+natgw                      , natgw                     , natgw                     , resource      ,                      , Universal Tag     , 110           , 0
+redis                      , redis                     , redis                     , resource      ,                      , Universal Tag     , 110           , 0
+rds                        , rds                       , rds                       , resource      ,                      , Universal Tag     , 110           , 0
+pod_cluster                , pod_cluster               , pod_cluster               , resource      ,                      , Universal Tag     , 111           , 0
+pod_ns                     , pod_ns                    , pod_ns                    , resource      ,                      , Universal Tag     , 111           , 0
+pod_node                   , pod_node                  , pod_node                  , resource      ,                      , Universal Tag     , 111           , 0
+pod_ingress                , pod_ingress               , pod_ingress               , resource      ,                      , Universal Tag     , 111           , 0
+pod_service                , pod_service               , pod_service               , resource      ,                      , Universal Tag     , 111           , 0
+pod_group_type             , pod_group_type            , pod_group_type            , int_enum      , pod_group_type       , Universal Tag     , 111           , 0
+pod_group                  , pod_group                 , pod_group                 , resource      ,                      , Universal Tag     , 111           , 0
+pod                        , pod                       , pod                       , resource      ,                      , Universal Tag     , 111           , 0
+service                    , service                   , service                   , resource      ,                      , Universal Tag     , 111           , 0
+resource_gl0_type          , resource_gl0_type         , resource_gl0_type         , int_enum      , resource_gl0_type    , Universal Tag     , 111           , 1
+resource_gl0               , resource_gl0              , resource_gl0              , resource      ,                      , Universal Tag     , 111           , 1
+resource_gl1_type          , resource_gl1_type         , resource_gl1_type         , int_enum      , resource_gl1_type    , Universal Tag     , 111           , 1
+resource_gl1               , resource_gl1              , resource_gl1              , resource      ,                      , Universal Tag     , 111           , 1
+resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , int_enum      , resource_gl2_type    , Universal Tag     , 111           , 1
+resource_gl2               , resource_gl2              , resource_gl2              , resource      ,                      , Universal Tag     , 111           , 1
+auto_instance_type         , auto_instance_type        , auto_instance_type        , int_enum      , auto_instance_type   , Universal Tag     , 111           , 0
+auto_instance              , auto_instance             , auto_instance             , resource      ,                      , Universal Tag     , 111           , 0
+auto_service_type          , auto_service_type         , auto_service_type         , int_enum      , auto_service_type    , Universal Tag     , 111           , 0
+auto_service               , auto_service              , auto_service              , resource      ,                      , Universal Tag     , 111           , 0
+gprocess                   , gprocess                  , gprocess                  , resource      ,                      , Universal Tag     , 111           , 0
+host_ip                    , host_ip                   , host_ip                   , resource      ,                      , Universal Tag     , 111           , 0
+host_hostname              , host_hostname             , host_hostname             , resource      ,                      , Universal Tag     , 111           , 0
+chost_ip                   , chost_ip                  , chost_ip                  , resource      ,                      , Universal Tag     , 111           , 0
+chost_hostname             , chost_hostname            , chost_hostname            , resource      ,                      , Universal Tag     , 111           , 0
+pod_node_ip                , pod_node_ip               , pod_node_ip               , resource      ,                      , Universal Tag     , 111           , 0
+pod_node_hostname          , pod_node_hostname         , pod_node_hostname         , resource      ,                      , Universal Tag     , 111           , 0
+
+k8s.label                  , k8s.label                 , k8s.label                 , map           ,                      , Custom Tag        , 111           , 0
+k8s.annotation             , k8s.annotation            , k8s.annotation            , map           ,                      , Custom Tag        , 111           , 0
+k8s.env                    , k8s.env                   , k8s.env                   , map           ,                      , Custom Tag        , 111           , 0
+cloud.tag                  , cloud.tag                 , cloud.tag                 , map           ,                      , Custom Tag        , 111           , 0
+os.app                     , os.app                    , os.app                    , map           ,                      , Custom Tag        , 111           , 0
+
+ip                         , ip                        , ip                        , ip            ,                      , Network Layer     , 111           , 0
+is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum      , ip_type              , Network Layer     , 111           , 0
+protocol                   , protocol                  , protocol                  , int_enum      , protocol             , Network Layer     , 111           , 0
+
+server_port                , server_port               , server_port               , int_enum      , server_port          , Transport Layer   , 111           , 0
+
+l7_protocol                , l7_protocol               , l7_protocol               , int_enum      , l7_protocol          , Application Layer , 111           , 0
+app_service                , app_service               , app_service               , string        ,                      , Application Layer , 111           , 0
+app_instance               , app_instance              , app_instance              , string        ,                      , Application Layer , 111           , 0
+endpoint                   , endpoint                  , endpoint                  , string        ,                      , Application Layer , 111           , 0
+
+tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 110           , 1
+capture_network_type       , capture_network_type      , capture_network_type      , resource      ,                      , Capture Info      , 110           , 0
+vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111           , 1
+agent                      , agent                     , agent                     , resource      ,                      , Capture Info      , 111           , 0
+signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source     , Capture Info      , 111           , 0
+role                       , role                      , role                      , int_enum      , role                 , Capture Info      , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int           ,                      , Capture Info      , 111           , 0

@@ -57,7 +57,7 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
-			db.NewRDSInstance(),
+			db.NewRDSInstance().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.RDSInstances,
 			cloudData,
 		),
@@ -74,10 +74,10 @@ func (r *RDSInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RDSInstance) 
 func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*mysql.RDSInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	dbItem := &mysql.RDSInstance{
@@ -89,7 +89,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 		Version: cloudItem.Version,
 		Series:  cloudItem.Series,
 		Model:   cloudItem.Model,
-		Domain:  r.cache.DomainLcuuid,
+		Domain:  r.metadata.Domain.Lcuuid,
 		Region:  cloudItem.RegionLcuuid,
 		AZ:      cloudItem.AZLcuuid,
 		VPCID:   vpcID,

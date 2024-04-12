@@ -27,8 +27,8 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/queue"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 
 type WriterKey uint64
 
-func getWriterIpv6Key(ip net.IP, aclGID uint16, tapType zerodoc.TAPTypeEnum) WriterKey {
+func getWriterIpv6Key(ip net.IP, aclGID uint16, tapType flow_metrics.TAPTypeEnum) WriterKey {
 	ipHash := uint32(0)
 	for i := 0; i < len(ip); i += 4 {
 		ipHash ^= *(*uint32)(unsafe.Pointer(&ip[i]))
@@ -61,7 +61,7 @@ type WrappedWriter struct {
 	tapPort uint32
 	aclGID  uint16
 	vtapId  uint16
-	tapType zerodoc.TAPTypeEnum
+	tapType flow_metrics.TAPTypeEnum
 }
 
 type WorkerCounter struct {
@@ -122,7 +122,7 @@ func tapPortToMacString(tapPort uint32) string {
 	return fmt.Sprintf("%012x", tapPort)
 }
 
-func tapTypeToString(tapType zerodoc.TAPTypeEnum) string {
+func tapTypeToString(tapType flow_metrics.TAPTypeEnum) string {
 	if tapType == 3 {
 		return "tor"
 	}
@@ -133,7 +133,7 @@ func formatDuration(d time.Duration) string {
 	return time.Unix(0, int64(d)).Format(TIME_FORMAT)
 }
 
-func getTempFilename(tapType zerodoc.TAPTypeEnum, tapPort uint32, firstPacketTime time.Duration, index uint16) string {
+func getTempFilename(tapType flow_metrics.TAPTypeEnum, tapPort uint32, firstPacketTime time.Duration, index uint16) string {
 	return fmt.Sprintf("%s_%s_0_%s_.%d.pcap.temp", tapTypeToString(tapType), tapPortToMacString(tapPort), formatDuration(firstPacketTime), index)
 }
 
@@ -169,7 +169,7 @@ func (w *Worker) finishWriter(writer *WrappedWriter, newFilename string) {
 	w.FileCloses++
 }
 
-func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, aclGID uint16) {
+func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType flow_metrics.TAPTypeEnum, aclGID uint16) {
 	if w.writers[tapType] == nil {
 		w.writers[tapType] = make(map[WriterKey]*WrappedWriter)
 	}
@@ -201,7 +201,7 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 	writer.lastPacketTime = packet.Timestamp
 }
 
-func (w *Worker) generateWrappedWriter(tapType zerodoc.TAPTypeEnum, aclGID uint16, packet *datatype.MetaPacket) *WrappedWriter {
+func (w *Worker) generateWrappedWriter(tapType flow_metrics.TAPTypeEnum, aclGID uint16, packet *datatype.MetaPacket) *WrappedWriter {
 	if len(w.writers) >= w.maxConcurrentFiles {
 		if log.IsEnabledFor(logging.DEBUG) {
 			log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
@@ -251,11 +251,11 @@ func (w *Worker) cleanTimeoutFile(timeNow time.Duration) {
 	}
 }
 
-func (w *Worker) toZerodocTAPType(packet *datatype.MetaPacket) zerodoc.TAPTypeEnum {
+func (w *Worker) toZerodocTAPType(packet *datatype.MetaPacket) flow_metrics.TAPTypeEnum {
 	if packet.TapType != datatype.TAP_CLOUD {
-		return zerodoc.TAPTypeEnum(packet.TapType)
+		return flow_metrics.TAPTypeEnum(packet.TapType)
 	}
-	return zerodoc.CLOUD
+	return flow_metrics.CLOUD
 }
 
 func (w *Worker) Process() {

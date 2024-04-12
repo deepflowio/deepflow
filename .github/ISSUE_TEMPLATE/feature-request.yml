@@ -15,7 +15,7 @@
 #
 name: DeepFlow feature request
 description: Suggest an idea for this project
-title: "[FR] FR-XXX: "
+title: "[FEATURE REQUEST] "
 labels: [ "feature" ]
 body:
   - type: markdown

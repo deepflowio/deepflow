@@ -30,7 +30,11 @@ func NewIDEvent() *IDEvent {
 }
 
 func (e *IDEvent) Get(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
-	ids := idmng.GetSingleton().AllocateIDs(*in.Type, int(*in.Count))
+	mng, err := idmng.GetIDManager(int(in.GetOrgId()))
+	if err != nil {
+		return nil, err
+	}
+	ids := mng.AllocateIDs(*in.Type, int(*in.Count))
 	uIDs := make([]uint32, 0, len(ids))
 	for _, id := range ids {
 		uIDs = append(uIDs, uint32(id))
@@ -43,6 +47,10 @@ func (e *IDEvent) Release(ctx context.Context, in *api.ReleaseResourceIDRequest)
 	for _, uID := range in.Ids {
 		ids = append(ids, int(uID))
 	}
-	idmng.GetSingleton().RecycleIDs(*in.Type, ids)
+	mng, err := idmng.GetIDManager(int(in.GetOrgId()))
+	if err != nil {
+		return nil, err
+	}
+	mng.RecycleIDs(*in.Type, ids)
 	return &api.ReleaseResourceIDResponse{}, nil
 }

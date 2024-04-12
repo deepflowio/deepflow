@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use nom::{bytes, error, number, Err, IResult};
+use nom::{bytes, error, number, Err};
 use serde::Serialize;
 use std::fmt;
 
@@ -11,10 +11,10 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            decode_base64_to_string,
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
@@ -136,7 +136,7 @@ macro_rules! all_openwire_commands {
             fn try_from(value: u8) -> Result<Self> {
                 match value {
                     $($command_id => Ok(OpenWireCommand::$variant)),*,
-                    _ => Err(Error::OpenwireLogParseFailed)
+                    _ => Err(Error::OpenWireLogParseFailed)
                 }
             }
         }
@@ -233,7 +233,7 @@ macro_rules! impl_auto_marshaller {
                     $(OpenWireCommandMarshaller::$command_type(_) => {
                         $command_type::tight_unmarshal(parser, info, bs, payload)
                     })*
-                    _ => Err(Error::OpenwireLogParseUnimplemented),
+                    _ => Err(Error::OpenWireLogParseUnimplemented),
                 }
             }
             fn loose_unmarshal<'a>(
@@ -246,7 +246,7 @@ macro_rules! impl_auto_marshaller {
                     $(OpenWireCommandMarshaller::$command_type(_) => {
                         $command_type::loose_unmarshal(parser, info, payload)
                     })*
-                    _ => Err(Error::OpenwireLogParseUnimplemented),
+                    _ => Err(Error::OpenWireLogParseUnimplemented),
                 }
             }
             fn tight_unmarshal_command<'a>(
@@ -260,7 +260,10 @@ macro_rules! impl_auto_marshaller {
                     $(OpenWireCommandMarshaller::$command_type(_) => {
                         $command_type::tight_unmarshal(parser, info, bs, payload)
                     })*
-                    _ => BaseCommand::tight_unmarshal(parser, info, bs, payload),
+                    _ => {
+                        BaseCommand::tight_unmarshal(parser, info, bs, payload)?;
+                        Err(Error::OpenWireLogParseUnimplemented)
+                    }
                 }
             }
             fn loose_unmarshal_command<'a>(
@@ -273,7 +276,10 @@ macro_rules! impl_auto_marshaller {
                     $(OpenWireCommandMarshaller::$command_type(_) => {
                         $command_type::loose_unmarshal(parser, info, payload)
                     })*
-                    _ => BaseCommand::loose_unmarshal(parser, info, payload),
+                    _ => {
+                        BaseCommand::loose_unmarshal(parser, info, payload)?;
+                        Err(Error::OpenWireLogParseUnimplemented)
+                    }
                 }
             }
         }
@@ -322,14 +328,17 @@ struct BooleanStream<'a> {
     payload: &'a [u8],
     offset: usize,
     bitpos: usize,
+    // bytes consumed in payload (include the length)
+    bytes_consumed: usize,
 }
 
 impl<'a> BooleanStream<'a> {
-    fn new(payload: &'a [u8]) -> Self {
+    fn new(payload: &'a [u8], bytes_consumed: usize) -> Self {
         BooleanStream {
             payload,
             offset: 0,
             bitpos: 0,
+            bytes_consumed: bytes_consumed,
         }
     }
     fn read_bool(&mut self) -> Option<bool> {
@@ -345,47 +354,53 @@ impl<'a> BooleanStream<'a> {
         }
         Some(bit == 1)
     }
-    fn read_boolean_stream(payload: &'a [u8]) -> IResult<&'a [u8], Self> {
+    fn read_boolean_stream(payload: &'a [u8]) -> Result<(&'a [u8], Self)> {
         // read bollean stream length
-        let (mut payload, byte) = number::complete::be_u8(payload)?;
+        let (mut payload, byte) = parse_byte(payload)?;
         let mut bs_length = byte as usize;
+        let mut length_len = 1;
         match bs_length {
             0xC0 => {
-                let (new_payload, byte) = number::complete::be_u8(payload)?;
+                let (new_payload, byte) = parse_byte(payload)?;
                 bs_length = byte as usize;
+                length_len += 1;
                 payload = new_payload;
             }
             0x80 => {
-                let (new_payload, short) = number::complete::be_u16(payload)?;
+                let (new_payload, short) = parse_short(payload)?;
                 bs_length = short as usize;
+                length_len += 2;
                 payload = new_payload;
             }
             _ => {}
         }
+        if bs_length == 0 {
+            return Err(Error::OpenWireLogParseFailed);
+        }
         // read boolean stream
-        let (payload, bs) = bytes::complete::take(bs_length)(payload)?;
-        Ok((payload, Self::new(bs)))
+        let (payload, bs) = parse_bytes(payload, bs_length)?;
+        Ok((payload, Self::new(bs, length_len + bs_length)))
     }
 }
 
 fn parse_byte<'a>(payload: &'a [u8]) -> Result<(&'a [u8], u8)> {
     let (payload, byte) = number::complete::be_u8(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        .map_err(|_: Err<error::Error<_>>| Error::OpenWireLogParseEOF)?;
     Ok((payload, byte))
 }
 fn parse_short<'a>(payload: &'a [u8]) -> Result<(&'a [u8], u16)> {
     let (payload, short) = number::complete::be_u16(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        .map_err(|_: Err<error::Error<_>>| Error::OpenWireLogParseEOF)?;
     Ok((payload, short))
 }
 fn parse_integer<'a>(payload: &'a [u8]) -> Result<(&'a [u8], u32)> {
     let (payload, integer) = number::complete::be_u32(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        .map_err(|_: Err<error::Error<_>>| Error::OpenWireLogParseEOF)?;
     Ok((payload, integer))
 }
 fn parse_long<'a>(payload: &'a [u8]) -> Result<(&'a [u8], u64)> {
     let (payload, long) = number::complete::be_u64(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        .map_err(|_: Err<error::Error<_>>| Error::OpenWireLogParseEOF)?;
     Ok((payload, long))
 }
 fn parse_boolean<'a>(payload: &'a [u8]) -> Result<(&'a [u8], bool)> {
@@ -398,55 +413,65 @@ fn parse_boolean<'a>(payload: &'a [u8]) -> Result<(&'a [u8], bool)> {
 }
 fn parse_bytes<'a>(payload: &'a [u8], length: usize) -> Result<(&'a [u8], &'a [u8])> {
     let (payload, bytes) = bytes::complete::take(length)(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        .map_err(|_: Err<error::Error<_>>| Error::OpenWireLogParseEOF)?;
     Ok((payload, bytes))
 }
 fn parse_command_type(payload: &[u8]) -> Result<(&[u8], OpenWireCommand)> {
-    let (payload, command_type) = bytes::complete::take(1usize)(payload)
-        .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
-    let command_type = OpenWireCommand::try_from(command_type[0])?;
+    let (payload, command_type) = parse_byte(payload)?;
+    let command_type = OpenWireCommand::try_from(command_type)?;
     Ok((payload, command_type))
 }
-fn parse_sw8_trace_id(payload: &[u8]) -> Result<String> {
-    // header pattern: "sw8\x09<length in short type>1-<trace id>-"
+fn parse_trace_and_span(
+    payload: &[u8],
+    config: &L7LogDynamicConfig,
+) -> Result<(Option<String>, Option<String>)> {
+    // header pattern: "<TraceType>\x09<length in short type><values>"
+    // now only skywalking supports activemq
+    let trace_type = TraceType::Sw8;
+    let trace_parsable = config.trace_types.contains(&trace_type);
+    let span_parsable = config.span_types.contains(&trace_type);
+    if !span_parsable && !trace_parsable {
+        return Ok((None, None));
+    }
     let header_pattern = b"sw8\x09";
     let mut next_payload = payload;
     while next_payload.len() > header_pattern.len() {
         let payload = next_payload;
-        next_payload = next_payload.get(1..).unwrap_or_default();
-        // match "sw8\x09"
+        // match header_pattern
         let payload = match payload
             .windows(header_pattern.len())
             .position(|window| window == header_pattern)
         {
-            Some(index) => &payload[index + header_pattern.len()..],
-            None => continue,
+            Some(index) => {
+                next_payload = &payload[index + header_pattern.len()..];
+                &payload[index + header_pattern.len()..]
+            }
+            None => break,
         };
-        // parse length
-        let payload = match parse_short(payload) {
-            Ok((payload, _)) => payload,
+        // parse values length
+        let values = match parse_short(payload) {
+            Ok((payload, length)) => payload
+                .get(..length as usize)
+                .ok_or(Error::OpenWireLogParseEOF)?,
             Err(_) => continue,
         };
-        // match "1-"
-        if payload.get(0..2) != Some(b"1-") {
-            continue;
-        }
-        let payload = &payload[2..];
-        // find next "-"
-        let trace_id = match payload.iter().position(|&c| c == b'-') {
-            Some(index) => &payload[..index],
-            None => continue,
-        };
-        // parse trace_id
-        let trace_id = match std::str::from_utf8(&trace_id) {
-            Ok(trace_id) => trace_id,
+        let values = match std::str::from_utf8(values) {
+            Ok(values) => values,
             Err(_) => continue,
         };
-        // base64 decode
-        let trace_id = decode_base64_to_string(trace_id);
-        return Ok(trace_id);
+        let trace_id = if trace_parsable {
+            trace_type.decode_trace_id(values).map(|s| s.to_string())
+        } else {
+            None
+        };
+        let span_id = if span_parsable {
+            trace_type.decode_span_id(values).map(|s| s.to_string())
+        } else {
+            None
+        };
+        return Ok((trace_id, span_id));
     }
-    Err(Error::OpenwireLogParseFailed)
+    Err(Error::OpenWireLogParseFailed)
 }
 
 trait Unmarshal {
@@ -457,7 +482,7 @@ trait Unmarshal {
         bs: &mut BooleanStream,
         payload: &'a [u8],
     ) -> Result<&'a [u8]> {
-        Err(Error::OpenwireLogParseFailed)
+        Err(Error::OpenWireLogParseFailed)
     }
     #[allow(unused_variables)]
     fn loose_unmarshal<'a>(
@@ -465,7 +490,7 @@ trait Unmarshal {
         info: &mut OpenWireInfo,
         payload: &'a [u8],
     ) -> Result<&'a [u8]> {
-        Err(Error::OpenwireLogParseFailed)
+        Err(Error::OpenWireLogParseFailed)
     }
 }
 
@@ -478,6 +503,10 @@ impl Unmarshal for BaseCommand {
     ) -> Result<&'a [u8]> {
         // parse commandId
         let (payload, command_id) = parse_integer(payload)?;
+        // command id is unlikely to be larger than 2^24
+        if command_id > 0xffffff {
+            return Err(Error::OpenWireLogParseFailed);
+        }
         info.command_id = command_id;
         // parse responseRequired
         match bs.read_bool() {
@@ -485,7 +514,7 @@ impl Unmarshal for BaseCommand {
                 info.response_required = boolean;
                 Ok(payload)
             }
-            None => Err(Error::OpenwireLogParseFailed),
+            None => Err(Error::OpenWireLogParseFailed),
         }
     }
     fn loose_unmarshal<'a>(
@@ -496,6 +525,10 @@ impl Unmarshal for BaseCommand {
         // parse commandId
         let (payload, command_id) = parse_integer(payload)?;
         info.command_id = command_id;
+        // command id is unlikely to be larger than 2^24
+        if command_id > 0xffffff {
+            return Err(Error::OpenWireLogParseFailed);
+        }
         // parse responseRequired
         let (payload, boolean) = parse_boolean(payload)?;
         info.response_required = boolean;
@@ -515,35 +548,35 @@ impl BaseDataStream {
                     let (payload, string) = parse_bytes(payload, length as usize)?;
                     Ok((
                         payload,
-                        std::str::from_utf8(string).map_err(|_| Error::OpenwireLogParseFailed)?,
+                        std::str::from_utf8(string).map_err(|_| Error::OpenWireLogParseFailed)?,
                     ))
                 }
-                None => Err(Error::OpenwireLogParseFailed),
+                None => Err(Error::OpenWireLogParseFailed),
             },
             Some(false) => Ok((payload, "")),
-            None => Err(Error::OpenwireLogParseFailed),
+            None => Err(Error::OpenWireLogParseFailed),
         }
     }
     fn loose_unmarshal_string<'a>(payload: &'a [u8]) -> Result<(&'a [u8], &'a str)> {
-        match parse_boolean(payload) {
-            Ok((payload, true)) => {
+        let (payload, boolean) = parse_boolean(payload)?;
+        match boolean {
+            true => {
                 let (payload, length) = parse_short(payload)?;
                 let (payload, string) = parse_bytes(payload, length as usize)?;
                 Ok((
                     payload,
-                    std::str::from_utf8(string).map_err(|_| Error::OpenwireLogParseFailed)?,
+                    std::str::from_utf8(string).map_err(|_| Error::OpenWireLogParseFailed)?,
                 ))
             }
-            Ok((payload, false)) => Ok((payload, "")),
-            Err(_) => Err(Error::OpenwireLogParseFailed),
+            false => Ok((payload, "")),
         }
     }
     fn tight_unmarshal_long<'a>(
         payload: &'a [u8],
         bs: &mut BooleanStream,
     ) -> Result<(&'a [u8], u64)> {
-        if bs.read_bool().ok_or(Error::OpenwireLogParseFailed)? {
-            if bs.read_bool().ok_or(Error::OpenwireLogParseFailed)? {
+        if bs.read_bool().ok_or(Error::OpenWireLogParseFailed)? {
+            if bs.read_bool().ok_or(Error::OpenWireLogParseFailed)? {
                 let (payload, long) = parse_long(payload)?;
                 Ok((payload, long))
             } else {
@@ -551,7 +584,7 @@ impl BaseDataStream {
                 Ok((payload, integer as u64))
             }
         } else {
-            if bs.read_bool().ok_or(Error::OpenwireLogParseFailed)? {
+            if bs.read_bool().ok_or(Error::OpenWireLogParseFailed)? {
                 let (payload, long) = parse_short(payload)?;
                 Ok((payload, long as u64))
             } else {
@@ -573,7 +606,7 @@ impl BaseDataStream {
                 Ok((payload, Some(bytes)))
             }
             Some(false) => Ok((payload, None)),
-            None => Err(Error::OpenwireLogParseFailed),
+            None => Err(Error::OpenWireLogParseFailed),
         }
     }
     fn loose_unmarshal_byte_array<'a>(payload: &'a [u8]) -> Result<(&'a [u8], Option<&'a [u8]>)> {
@@ -598,13 +631,13 @@ impl BaseDataStream {
                 let data_type = OpenWireCommand::try_from(data_type)?;
                 // consume a boolean if is_marshall_aware is true
                 if Self::is_marshall_aware(data_type) {
-                    let _ = bs.read_bool().ok_or(Error::OpenwireLogParseFailed)?;
+                    let _ = bs.read_bool().ok_or(Error::OpenWireLogParseFailed)?;
                 }
                 let data_marshaller = OpenWireCommandMarshaller::from(data_type);
                 data_marshaller.tight_unmarshal(parser, info, bs, payload)
             }
             Some(false) => Ok(payload),
-            None => Err(Error::OpenwireLogParseFailed),
+            None => Err(Error::OpenWireLogParseFailed),
         }
     }
     fn loose_unmarshal_nested_object<'a>(
@@ -643,7 +676,7 @@ impl BaseDataStream {
                     // cannot parse cached object
                     Ok(payload)
                 }
-                None => Err(Error::OpenwireLogParseFailed),
+                None => Err(Error::OpenWireLogParseFailed),
             }
         } else {
             Self::tight_unmarshal_nested_object(parser, info, bs, payload)
@@ -687,10 +720,10 @@ impl BaseDataStream {
                 // parse exception message
                 let (_, err_msg) = Self::tight_unmarshal_string(payload, bs)?;
                 info.err_msg = Some(err_msg.to_string());
-                Err(Error::OpenwireLogParseUnimplemented)
+                Err(Error::OpenWireLogParseUnimplemented)
             }
             Some(false) => Ok(payload),
-            None => Err(Error::OpenwireLogParseFailed),
+            None => Err(Error::OpenWireLogParseFailed),
         }
     }
     fn loose_unmarshal_broker_error<'a>(
@@ -705,7 +738,7 @@ impl BaseDataStream {
                 // parse exception message
                 let (_, err_msg) = Self::loose_unmarshal_string(payload)?;
                 info.err_msg = Some(err_msg.to_string());
-                Err(Error::OpenwireLogParseUnimplemented)
+                Err(Error::OpenWireLogParseUnimplemented)
             }
             (payload, false) => Ok(payload),
         }
@@ -982,7 +1015,7 @@ impl Unmarshal for ConnectionInfo {
         // parse clientId
         let _ = BaseDataStream::tight_unmarshal_string(payload, bs)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
     fn loose_unmarshal<'a>(
         parser: &mut OpenWireLog,
@@ -996,7 +1029,7 @@ impl Unmarshal for ConnectionInfo {
         // parse clientId
         let _ = BaseDataStream::loose_unmarshal_string(payload)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
 }
 
@@ -1038,11 +1071,11 @@ impl Unmarshal for ConsumerInfo {
         // parse consumerId
         let payload = BaseDataStream::tight_unmarshal_cached_object(parser, info, bs, payload)?;
         // parse browser
-        let _ = bs.read_bool().ok_or(Error::OpenwireLogParseFailed)?;
+        let _ = bs.read_bool().ok_or(Error::OpenWireLogParseFailed)?;
         // parse destination
         let _ = BaseDataStream::tight_unmarshal_cached_object(parser, info, bs, payload)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
     fn loose_unmarshal<'a>(
         parser: &mut OpenWireLog,
@@ -1058,7 +1091,7 @@ impl Unmarshal for ConsumerInfo {
         // parse destination
         let _ = BaseDataStream::loose_unmarshal_cached_object(parser, info, payload)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
 }
 
@@ -1076,7 +1109,7 @@ impl Unmarshal for ProducerInfo {
         // parse destination
         let _ = BaseDataStream::tight_unmarshal_cached_object(parser, info, bs, payload)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
     fn loose_unmarshal<'a>(
         parser: &mut OpenWireLog,
@@ -1090,7 +1123,7 @@ impl Unmarshal for ProducerInfo {
         // parse destination
         let _ = BaseDataStream::loose_unmarshal_cached_object(parser, info, payload)?;
         // TODO: more fields are not supported
-        Err(Error::OpenwireLogParseUnimplemented)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
 }
 
@@ -1106,9 +1139,9 @@ impl Unmarshal for BrokerInfo {
         // parse brokerId
         let payload = BaseDataStream::tight_unmarshal_cached_object(parser, info, bs, payload)?;
         // parse brokerURL
-        let (payload, broker_url) = BaseDataStream::tight_unmarshal_string(payload, bs)?;
+        let (_, broker_url) = BaseDataStream::tight_unmarshal_string(payload, bs)?;
         info.broker_url = Some(broker_url.to_string());
-        Ok(payload)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
     fn loose_unmarshal<'a>(
         parser: &mut OpenWireLog,
@@ -1120,9 +1153,9 @@ impl Unmarshal for BrokerInfo {
         // parse brokerId
         let payload = BaseDataStream::loose_unmarshal_cached_object(parser, info, payload)?;
         // parse brokerURL
-        let (payload, broker_url) = BaseDataStream::loose_unmarshal_string(payload)?;
+        let (_, broker_url) = BaseDataStream::loose_unmarshal_string(payload)?;
         info.broker_url = Some(broker_url.to_string());
-        Ok(payload)
+        Err(Error::OpenWireLogParseUnimplemented)
     }
 }
 
@@ -1140,11 +1173,11 @@ impl Unmarshal for WireFormatInfo {
         match std::str::from_utf8(magic) {
             Ok(magic) => {
                 if magic != "ActiveMQ" {
-                    return Err(Error::OpenwireLogParseFailed);
+                    return Err(Error::OpenWireLogParseFailed);
                 }
             }
             _ => {
-                return Err(Error::OpenwireLogParseFailed);
+                return Err(Error::OpenWireLogParseFailed);
             }
         }
 
@@ -1183,7 +1216,7 @@ impl Unmarshal for WireFormatInfo {
                     let boolean = value != &0;
                     info.is_tight_encoding_enabled = boolean;
                 }
-                _ => return Err(Error::OpenwireLogParseFailed),
+                _ => return Err(Error::OpenWireLogParseEOF),
             }
         }
 
@@ -1195,7 +1228,7 @@ impl Unmarshal for WireFormatInfo {
                     let boolean = value != &0;
                     info.is_size_prefix_disabled = boolean;
                 }
-                _ => return Err(Error::OpenwireLogParseFailed),
+                _ => return Err(Error::OpenWireLogParseEOF),
             }
         }
 
@@ -1207,7 +1240,7 @@ impl Unmarshal for WireFormatInfo {
                     let boolean = value != &0;
                     info.is_cache_enabled = boolean;
                 }
-                _ => return Err(Error::OpenwireLogParseFailed),
+                _ => return Err(Error::OpenWireLogParseEOF),
             }
         }
 
@@ -1353,7 +1386,8 @@ impl Unmarshal for Response {
         // parse commandId and responseRequired
         let payload = BaseCommand::tight_unmarshal(parser, info, bs, payload)?;
         // parse correlationId
-        let (payload, _) = parse_integer(payload)?;
+        let (payload, correlation_id) = parse_integer(payload)?;
+        info.resp_command_id = correlation_id;
         Ok(payload)
     }
     fn loose_unmarshal<'a>(
@@ -1364,7 +1398,8 @@ impl Unmarshal for Response {
         // parse commandId and responseRequired
         let payload = BaseCommand::loose_unmarshal(parser, info, payload)?;
         // parse correlationId
-        let (payload, _) = parse_integer(payload)?;
+        let (payload, correlation_id) = parse_integer(payload)?;
+        info.resp_command_id = correlation_id;
         Ok(payload)
     }
 }
@@ -1392,6 +1427,73 @@ impl Unmarshal for ExceptionResponse {
         // parse exception
         let payload = BaseDataStream::loose_unmarshal_broker_error(parser, info, payload)?;
         Ok(payload)
+    }
+}
+
+impl Unmarshal for DataResponse {
+    fn tight_unmarshal<'a>(
+        parser: &mut OpenWireLog,
+        info: &mut OpenWireInfo,
+        bs: &mut BooleanStream,
+        payload: &'a [u8],
+    ) -> Result<&'a [u8]> {
+        // parse response
+        let payload = Response::tight_unmarshal(parser, info, bs, payload)?;
+        // parse data
+        let payload = BaseDataStream::tight_unmarshal_nested_object(parser, info, bs, payload)?;
+        Ok(payload)
+    }
+    fn loose_unmarshal<'a>(
+        parser: &mut OpenWireLog,
+        info: &mut OpenWireInfo,
+        payload: &'a [u8],
+    ) -> Result<&'a [u8]> {
+        // parse response
+        let payload = Response::loose_unmarshal(parser, info, payload)?;
+        // parse data
+        let payload = BaseDataStream::loose_unmarshal_nested_object(parser, info, payload)?;
+        Ok(payload)
+    }
+}
+
+impl Unmarshal for DataArrayResponse {
+    fn tight_unmarshal<'a>(
+        parser: &mut OpenWireLog,
+        info: &mut OpenWireInfo,
+        bs: &mut BooleanStream,
+        payload: &'a [u8],
+    ) -> Result<&'a [u8]> {
+        // parse response
+        let payload = Response::tight_unmarshal(parser, info, bs, payload)?;
+        // parse data array
+        if bs.read_bool().ok_or(Error::OpenWireLogParseFailed)? {
+            let (mut payload, length) = parse_short(payload)?;
+            for _ in 0..length {
+                payload = BaseDataStream::tight_unmarshal_nested_object(parser, info, bs, payload)?;
+            }
+            Ok(payload)
+        } else {
+            Ok(payload)
+        }
+    }
+    fn loose_unmarshal<'a>(
+        parser: &mut OpenWireLog,
+        info: &mut OpenWireInfo,
+        payload: &'a [u8],
+    ) -> Result<&'a [u8]> {
+        // parse response
+        let payload = Response::loose_unmarshal(parser, info, payload)?;
+        // parse data array
+        let (payload, boolean) = parse_boolean(payload)?;
+        if boolean {
+            let (mut payload, length) = parse_short(payload)?;
+            for _ in 0..length {
+                payload = BaseDataStream::loose_unmarshal_nested_object(parser, info, payload)?;
+            }
+            Ok(payload)
+        } else {
+            Ok(payload)
+        }
     }
 }
 
@@ -1425,7 +1527,7 @@ macro_rules! impl_message_marshaller {
                 // parse correlationId
                 let (_, correlation_id) = BaseDataStream::tight_unmarshal_string(payload, bs)?;
                 info.correlation_id = (!correlation_id.is_empty()).then(|| correlation_id.to_string());
-                Err(Error::OpenwireLogParseUnimplemented)
+                Err(Error::OpenWireLogParseUnimplemented)
             }
             fn loose_unmarshal<'a>(
                 parser: &mut OpenWireLog,
@@ -1453,7 +1555,7 @@ macro_rules! impl_message_marshaller {
                 // parse correlationId
                 let (_, correlation_id) = BaseDataStream::loose_unmarshal_string(payload)?;
                 info.correlation_id = (!correlation_id.is_empty()).then(|| correlation_id.to_string());
-                Err(Error::OpenwireLogParseUnimplemented)
+                Err(Error::OpenWireLogParseUnimplemented)
             }
         })*
     }
@@ -1507,6 +1609,8 @@ pub struct OpenWireInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    direction: PacketDirection,
 
     is_tight_encoding_enabled: bool,
     is_size_prefix_disabled: bool,
@@ -1527,6 +1631,7 @@ pub struct OpenWireInfo {
     pub command_type: OpenWireCommand,
     pub command_id: u32,
     pub response_required: bool,
+    pub resp_command_id: u32,
 
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: Option<u32>,
@@ -1539,6 +1644,8 @@ pub struct OpenWireInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub correlation_id: Option<String>,
 
     rtt: u64,
@@ -1549,6 +1656,7 @@ impl Default for OpenWireInfo {
         OpenWireInfo {
             msg_type: Default::default(),
             is_tls: false,
+            direction: PacketDirection::ClientToServer,
             is_tight_encoding_enabled: DEFAULT_TIGHT_ENCODING_ENABLED,
             is_size_prefix_disabled: DEFAULT_SIZE_PREFIX_DISABLED,
             is_cache_enabled: DEFAULT_CACHE_ENABLED,
@@ -1560,11 +1668,13 @@ impl Default for OpenWireInfo {
             command_type: OpenWireCommand::WireFormatInfo,
             command_id: 0,
             response_required: false,
+            resp_command_id: 0,
             req_msg_size: None,
             res_msg_size: None,
             status: L7ResponseStatus::Ok,
             err_msg: None,
             trace_id: None,
+            span_id: None,
             correlation_id: None,
             rtt: 0,
         }
@@ -1572,6 +1682,20 @@ impl Default for OpenWireInfo {
 }
 
 impl OpenWireInfo {
+    fn get_msg_size(&self) -> Option<u32> {
+        match self.msg_type {
+            LogMessageType::Request => self.req_msg_size,
+            LogMessageType::Response => self.res_msg_size,
+            LogMessageType::Session => {
+                if self.direction == PacketDirection::ClientToServer {
+                    self.req_msg_size
+                } else {
+                    self.res_msg_size
+                }
+            }
+            _ => None,
+        }
+    }
     fn merge(&mut self, res: &Self) {
         if self.res_msg_size.is_none() {
             self.res_msg_size = res.res_msg_size;
@@ -1585,7 +1709,11 @@ impl OpenWireInfo {
 
 impl L7ProtocolInfoInterface for OpenWireInfo {
     fn session_id(&self) -> Option<u32> {
-        self.session_id.map(|id| id as u32)
+        match self.msg_type {
+            LogMessageType::Request => Some(self.command_id),
+            LogMessageType::Response => Some(self.resp_command_id),
+            _ => None,
+        }
     }
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::OpenWireInfo(other) = other {
@@ -1602,6 +1730,13 @@ impl L7ProtocolInfoInterface for OpenWireInfo {
     }
     fn is_tls(&self) -> bool {
         self.is_tls
+    }
+
+    fn get_request_domain(&self) -> String {
+        self.broker_url.clone().unwrap_or_default()
+    }
+    fn get_endpoint(&self) -> Option<String> {
+        self.topic.clone()
     }
 }
 
@@ -1629,22 +1764,22 @@ impl From<OpenWireInfo> for L7ProtocolSendLog {
             },
             trace_info: Some(TraceInfo {
                 trace_id: f.trace_id,
+                span_id: f.span_id,
                 ..Default::default()
             }),
             version: Some(f.version.to_string()),
             flags,
-            ext_info: match f.msg_type {
-                LogMessageType::Request | LogMessageType::Session => Some(ExtendedInfo {
+            ext_info: match f.direction {
+                PacketDirection::ClientToServer => Some(ExtendedInfo {
                     request_id: Some(f.command_id),
                     x_request_id_0: f.correlation_id,
                     ..Default::default()
                 }),
-                LogMessageType::Response => Some(ExtendedInfo {
+                PacketDirection::ServerToClient => Some(ExtendedInfo {
                     request_id: Some(f.command_id),
                     x_request_id_1: f.correlation_id,
                     ..Default::default()
                 }),
-                _ => None,
             },
             ..Default::default()
         }
@@ -1672,8 +1807,6 @@ impl Default for WireFormatFlags {
 }
 
 pub struct OpenWireLog {
-    msg_type: LogMessageType,
-    status: L7ResponseStatus,
     client_wireformat_flags: Option<WireFormatFlags>,
     server_wireformat_flags: Option<WireFormatFlags>,
     is_tight_encoding_enabled: bool,
@@ -1683,14 +1816,14 @@ pub struct OpenWireLog {
     server_version: Option<u32>,
     version: u32,
 
+    client_next_skip_len: Option<usize>,
+    server_next_skip_len: Option<usize>,
     perf_stats: Option<L7PerfStats>,
 }
 
 impl Default for OpenWireLog {
     fn default() -> Self {
         OpenWireLog {
-            msg_type: Default::default(),
-            status: Default::default(),
             client_wireformat_flags: None,
             server_wireformat_flags: None,
             is_tight_encoding_enabled: DEFAULT_TIGHT_ENCODING_ENABLED,
@@ -1699,6 +1832,8 @@ impl Default for OpenWireLog {
             client_version: None,
             server_version: None,
             version: DEFAULT_VERSION,
+            client_next_skip_len: None,
+            server_next_skip_len: None,
             perf_stats: None,
         }
     }
@@ -1713,24 +1848,36 @@ impl L7ProtocolParserInterface for OpenWireLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        let mut info = self.parse(payload, param)?;
+        let mut infos = self.parse(payload, param);
 
-        info.cal_rrt(param, None).map(|rtt| {
-            info.rtt = rtt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+        infos.iter_mut().for_each(|info| {
+            let info = match info {
+                L7ProtocolInfo::OpenWireInfo(info) => info,
+                _ => return,
+            };
+            if info.msg_type != LogMessageType::Session {
+                info.cal_rrt(param, None).map(|rtt| {
+                    info.rtt = rtt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                });
+            }
+
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
         });
 
-        match param.direction {
-            PacketDirection::ClientToServer => {
-                self.perf_stats.as_mut().map(|p| p.inc_req());
-            }
-            PacketDirection::ServerToClient => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
-            }
-        }
-
-        if param.parse_log {
-            Ok(L7ParseResult::Single(info.into()))
+        if !param.parse_log {
+            Ok(L7ParseResult::None)
+        } else if infos.len() == 1 {
+            Ok(L7ParseResult::Single(infos.pop().unwrap()))
+        } else if infos.len() > 1 {
+            Ok(L7ParseResult::Multi(infos))
         } else {
             Ok(L7ParseResult::None)
         }
@@ -1747,12 +1894,65 @@ impl L7ProtocolParserInterface for OpenWireLog {
 }
 
 impl OpenWireLog {
-    fn do_unmarshal(&mut self, mut payload: &[u8]) -> Result<OpenWireInfo> {
-        let mut info = OpenWireInfo::default();
+    fn is_message_type_valid(command_type: OpenWireCommand) -> bool {
+        match command_type {
+            OpenWireCommand::WireFormatInfo
+            | OpenWireCommand::BrokerInfo
+            | OpenWireCommand::ConnectionInfo
+            | OpenWireCommand::SessionInfo
+            | OpenWireCommand::ConsumerInfo
+            | OpenWireCommand::ProducerInfo
+            | OpenWireCommand::TransactionInfo
+            | OpenWireCommand::DestinationInfo
+            | OpenWireCommand::RemoveSubscriptionInfo
+            | OpenWireCommand::KeepAliveInfo
+            | OpenWireCommand::ShutdownInfo
+            | OpenWireCommand::RemoveInfo
+            | OpenWireCommand::ControlCommand
+            | OpenWireCommand::FlushCommand
+            | OpenWireCommand::ConnectionError
+            | OpenWireCommand::ConsumerControl
+            | OpenWireCommand::ConnectionControl
+            | OpenWireCommand::ProducerAck
+            | OpenWireCommand::MessagePull
+            | OpenWireCommand::MessageDispatch
+            | OpenWireCommand::MessageAck
+            | OpenWireCommand::ActiveMQMessage
+            | OpenWireCommand::ActiveMQBytesMessage
+            | OpenWireCommand::ActiveMQMapMessage
+            | OpenWireCommand::ActiveMQObjectMessage
+            | OpenWireCommand::ActiveMQStreamMessage
+            | OpenWireCommand::ActiveMQTextMessage
+            | OpenWireCommand::ActiveMQBlobMessage
+            | OpenWireCommand::DiscoveryEvent
+            | OpenWireCommand::DurableSubscriptionInfo
+            | OpenWireCommand::PartialCommand
+            | OpenWireCommand::PartialLastCommand
+            | OpenWireCommand::Replay
+            | OpenWireCommand::MessageDispatchNotification
+            | OpenWireCommand::Response
+            | OpenWireCommand::ExceptionResponse
+            | OpenWireCommand::DataResponse
+            | OpenWireCommand::DataArrayResponse
+            | OpenWireCommand::IntegerResponse => true,
+            _ => false,
+        }
+    }
+    fn do_unmarshal<'a>(
+        &mut self,
+        info: &mut OpenWireInfo,
+        mut payload: &'a [u8],
+        param: &ParseParam,
+    ) -> Result<&'a [u8]> {
+        let original_len = payload.len();
         let mut msg_size = payload.len();
         if !self.is_size_prefix_disabled {
             let (updated_payload, length) = parse_integer(payload)?;
             msg_size = length as usize;
+            // message size is unlikely to be larger than 2^24
+            if msg_size > 0xffffff {
+                return Err(Error::OpenWireLogParseFailed);
+            }
             payload = updated_payload;
         }
         // parse commandtype
@@ -1796,8 +1996,11 @@ impl OpenWireLog {
             | OpenWireCommand::MessageDispatchNotification => {
                 info.msg_type = LogMessageType::Request;
                 info.req_msg_size = Some(msg_size as u32);
-                // parse sw8 trace_id
-                info.trace_id = parse_sw8_trace_id(payload).ok();
+                // parse sw8 trace_id and span_id
+                if let Some(config) = param.parse_config {
+                    (info.trace_id, info.span_id) =
+                        parse_trace_and_span(payload, &config.l7_log_dynamic).unwrap_or_default();
+                }
             }
             OpenWireCommand::Response
             | OpenWireCommand::ExceptionResponse
@@ -1807,35 +2010,41 @@ impl OpenWireLog {
                 info.msg_type = LogMessageType::Response;
                 info.res_msg_size = Some(msg_size as u32);
             }
-            _ => {
-                info.msg_type = LogMessageType::Other;
-                info.res_msg_size = Some(msg_size as u32);
-            }
+            _ => return Err(Error::OpenWireLogParseFailed),
         };
 
-        if self.is_tight_encoding_enabled && command_type != OpenWireCommand::WireFormatInfo {
-            let (payload, mut bs) = BooleanStream::read_boolean_stream(payload)
-                .map_err(|_: Err<error::Error<_>>| Error::OpenwireLogParseFailed)?;
+        let p = if self.is_tight_encoding_enabled && command_type != OpenWireCommand::WireFormatInfo
+        {
+            let (payload, mut bs) = BooleanStream::read_boolean_stream(payload)?;
+            if !self.is_size_prefix_disabled && bs.bytes_consumed + 1 > msg_size {
+                return Err(Error::OpenWireLogParseFailed);
+            }
             let data_marshaller = OpenWireCommandMarshaller::from(command_type);
-            let res = data_marshaller.tight_unmarshal_command(self, &mut info, &mut bs, payload);
-            // omit OpenwireLogParseUnimplemented error
-            match res {
-                Ok(_) | Err(Error::OpenwireLogParseUnimplemented) => Ok(info),
-                Err(_) => Err(Error::OpenwireLogParseFailed),
-            }
+            data_marshaller.tight_unmarshal_command(self, info, &mut bs, payload)?
         } else {
-            let res = OpenWireCommandMarshaller::from(command_type)
-                .loose_unmarshal_command(self, &mut info, payload);
-            // omit OpenwireLogParseUnimplemented error
-            match res {
-                Ok(_) | Err(Error::OpenwireLogParseUnimplemented) => Ok(info),
-                Err(_) => Err(Error::OpenwireLogParseFailed),
-            }
+            let data_marshaller = OpenWireCommandMarshaller::from(command_type);
+            data_marshaller.loose_unmarshal_command(self, info, payload)?
+        };
+        // check if the payload length is valid
+        if !self.is_size_prefix_disabled && original_len - p.len() != msg_size + 4 {
+            return Err(Error::OpenWireLogParseFailed);
         }
+        Ok(p)
     }
-    fn parse(&mut self, payload: &[u8], param: &ParseParam) -> Result<OpenWireInfo> {
-        let mut info = self.do_unmarshal(payload)?;
+    fn parse_one<'a>(
+        &mut self,
+        info: &mut OpenWireInfo,
+        payload: &'a [u8],
+        param: &ParseParam,
+    ) -> Result<&'a [u8]> {
+        let result = match self.do_unmarshal(info, payload, param) {
+            Ok(p) => Ok(p),
+            Err(Error::OpenWireLogParseUnimplemented) => Err(Error::OpenWireLogParseUnimplemented),
+            Err(Error::OpenWireLogParseEOF) => Err(Error::OpenWireLogParseEOF),
+            Err(e) => return Err(e),
+        };
         info.is_tls = param.is_tls();
+        info.direction = param.direction;
         // set status
         if info.err_msg.is_some() {
             if param.direction == PacketDirection::ClientToServer {
@@ -1847,7 +2056,9 @@ impl OpenWireLog {
         // set oneway request as session
         if info.msg_type == LogMessageType::Request && !info.response_required {
             info.msg_type = LogMessageType::Session;
-            info.res_msg_size = info.req_msg_size;
+            if param.direction == PacketDirection::ServerToClient {
+                info.res_msg_size = info.req_msg_size.take();
+            }
         }
         if info.command_type == OpenWireCommand::WireFormatInfo {
             // update version
@@ -1896,7 +2107,82 @@ impl OpenWireLog {
             info.is_size_prefix_disabled = self.is_size_prefix_disabled;
             info.is_cache_enabled = self.is_cache_enabled;
         }
-        Ok(info)
+        result
+    }
+    fn parse(&mut self, mut payload: &[u8], param: &ParseParam) -> Vec<L7ProtocolInfo> {
+        let mut infos = Vec::new();
+        let mut current_skip_len = if param.direction == PacketDirection::ClientToServer {
+            self.client_next_skip_len.take()
+        } else {
+            self.server_next_skip_len.take()
+        };
+        let mut next_skip_len = None;
+        let mut first_byte_parse_failed = true;
+        while !payload.is_empty() {
+            let mut info = OpenWireInfo::default();
+            match self.parse_one(&mut info, payload, param) {
+                Ok(p) => {
+                    payload = p;
+                    infos.push(L7ProtocolInfo::OpenWireInfo(info));
+                }
+                Err(Error::OpenWireLogParseUnimplemented) => {
+                    let msg_size = match info.get_msg_size() {
+                        Some(msg_size) => 4 + msg_size as usize,
+                        None => break,
+                    };
+                    infos.push(L7ProtocolInfo::OpenWireInfo(info));
+                    if !self.is_size_prefix_disabled {
+                        payload = match payload.get(msg_size..) {
+                            Some(p) => p,
+                            None => {
+                                next_skip_len = Some(msg_size - payload.len());
+                                break;
+                            }
+                        };
+                    } else {
+                        break;
+                    }
+                }
+                Err(Error::OpenWireLogParseEOF) => {
+                    let msg_size = match info.get_msg_size() {
+                        Some(msg_size) => 4 + msg_size as usize,
+                        None => break,
+                    };
+                    infos.push(L7ProtocolInfo::OpenWireInfo(info));
+                    if !self.is_size_prefix_disabled {
+                        next_skip_len = Some(msg_size - payload.len());
+                    }
+                    break;
+                }
+                Err(Error::OpenWireLogParseFailed) => {
+                    if first_byte_parse_failed {
+                        first_byte_parse_failed = false;
+                        // parse failed at the start of the payload,
+                        // try to skip the cached next_skip_len
+                        if infos.is_empty() {
+                            if let Some(skip_len) = current_skip_len.take() {
+                                match payload.get(skip_len..) {
+                                    Some(p) => {
+                                        payload = p;
+                                        continue;
+                                    }
+                                    // conservatively skip only one packet
+                                    None => break,
+                                };
+                            }
+                        }
+                    }
+                    payload = payload.get(1..).unwrap_or_default();
+                }
+                _ => break,
+            }
+        }
+        if param.direction == PacketDirection::ClientToServer {
+            self.client_next_skip_len = next_skip_len;
+        } else {
+            self.server_next_skip_len = next_skip_len;
+        }
+        infos
     }
     fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
@@ -1907,8 +2193,9 @@ impl OpenWireLog {
         }
         // only parse the initial WIREFORMAT_INFO command to check the protocol
         let mut parser = Self::default();
-        match parser.do_unmarshal(payload) {
-            Ok(res) => res.command_type == OpenWireCommand::WireFormatInfo,
+        let mut info = OpenWireInfo::default();
+        match parser.do_unmarshal(&mut info, payload, param) {
+            Ok(_) => info.command_type == OpenWireCommand::WireFormatInfo,
             Err(_) => false,
         }
     }
@@ -1923,6 +2210,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::config::{handler::LogParserConfig, ExtraLogFields};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -1932,7 +2220,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/openwire";
 
     fn run(name: &str) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1024));
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1500));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
@@ -1952,7 +2240,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -1962,12 +2250,32 @@ mod tests {
                 true,
             );
 
+            let config = L7LogDynamicConfig::new(
+                "".to_owned(),
+                vec![],
+                vec![TraceType::Sw8, TraceType::TraceParent],
+                vec![TraceType::Sw8, TraceType::TraceParent],
+                ExtraLogFields::default(),
+            );
+            let parse_config = &LogParserConfig {
+                l7_log_dynamic: config.clone(),
+                ..Default::default()
+            };
+            param.set_log_parse_config(parse_config);
+
             let is_openwire = OpenWireLog::check_protocol(payload, param);
-            match openwire.parse(payload, param) {
-                Ok(info) => {
-                    output.push_str(&format!("{:?} is_openwire: {}\n", info, is_openwire));
+            let infos = openwire.parse(payload, param);
+            if infos.is_empty() {
+                output.push_str("This packet payload cannot be parsed\n");
+            } else {
+                for info in infos {
+                    match info {
+                        L7ProtocolInfo::OpenWireInfo(info) => {
+                            output.push_str(&format!("{:?} is_openwire: {}\n", info, is_openwire));
+                        }
+                        _ => unreachable!(),
+                    }
                 }
-                Err(_) => unreachable!(),
             }
         }
         output
@@ -1998,6 +2306,7 @@ mod tests {
                 "openwire_loose_consumer.result",
             ),
             ("openwire_injected.pcap", "openwire_injected.result"),
+            ("openwire_segmented.pcap", "openwire_segmented.result"),
         ];
 
         for item in files.iter() {
@@ -2019,8 +2328,16 @@ mod tests {
 
     #[test]
     fn check_parse_sw8_header() {
-        let payload = b"\x00\x03sw8\x09\x01\x291-dGVzdA==-";
-        let trace_id = parse_sw8_trace_id(payload).unwrap();
-        assert_eq!(trace_id, "test");
+        let payload = b"\x00\x03sw8\x09\x00\x1E1-VFJBQ0VJRA==-U0VHTUVOVElE-3-";
+        let config = L7LogDynamicConfig::new(
+            "".to_owned(),
+            vec![],
+            vec![TraceType::Sw8, TraceType::TraceParent],
+            vec![TraceType::Sw8, TraceType::TraceParent],
+            ExtraLogFields::default(),
+        );
+        let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
+        assert_eq!(trace_id, Some("TRACEID".to_string()));
+        assert_eq!(span_id, Some("SEGMENTID-3".to_string()));
     }
 }

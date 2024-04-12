@@ -37,31 +37,84 @@ struct task_struct;
 /*
  * bpf helpers
  */
-static void *(*bpf_map_lookup_elem) (void *map, const void *key) = (void *)1;
-static long (*bpf_map_update_elem) (void *map, const void *key,
-				    const void *value, __u64 flags) = (void *)2;
-static long (*bpf_map_delete_elem) (void *map, const void *key) = (void *)3;
-static long (*bpf_probe_read) (void *dst, __u32 size, const void *unsafe_ptr) =
+static void
+    __attribute__ ((__unused__)) * (*bpf_map_lookup_elem) (void *map,
+							   const void *key) =
+    (void *)1;
+static long
+    __attribute__ ((__unused__)) (*bpf_map_update_elem) (void *map,
+							 const void *key,
+							 const void *value,
+							 __u64 flags) =
+    (void *)2;
+static long
+    __attribute__ ((__unused__)) (*bpf_map_delete_elem) (void *map,
+							 const void *key) =
+    (void *)3;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read) (void *dst, __u32 size,
+						    const void *unsafe_ptr) =
     (void *)4;
-static __u64(*bpf_ktime_get_ns) (void) = (void *)5;
-static long (*bpf_trace_printk) (const char *fmt, __u32 fmt_size, ...) =
+static __u64 __attribute__ ((__unused__)) (*bpf_ktime_get_ns) (void) =
+    (void *)5;
+static long
+    __attribute__ ((__unused__)) (*bpf_trace_printk) (const char *fmt,
+						      __u32 fmt_size, ...) =
     (void *)6;
-static __u32(*bpf_get_prandom_u32) (void) = (void *)7;
-static __u32(*bpf_get_smp_processor_id) (void) = (void *)8;
-static long (*bpf_tail_call) (void *ctx, void *prog_array_map, __u32 index) =
-    (void *)12;
-static __u64(*bpf_get_current_pid_tgid) (void) = (void *)14;
-static __u64(*bpf_get_current_uid_gid) (void) = (void *)15;
-static long (*bpf_get_current_comm) (void *buf, __u32 size_of_buf) = (void *)16;
-static __u64(*bpf_get_current_task) (void) = (void *)35;
-static long (*bpf_perf_event_output) (void *ctx, void *map, __u64 flags,
-				      void *data, __u64 size) = (void *)25;
-static long (*bpf_probe_read_str) (void *dst, __u32 size,
-				   const void *unsafe_ptr) = (void *)45;
-// bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
-static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4;	// real value is 112
+static __u32 __attribute__ ((__unused__)) (*bpf_get_prandom_u32) (void) =
+    (void *)7;
+static __u32 __attribute__ ((__unused__)) (*bpf_get_smp_processor_id) (void) =
+    (void *)8;
+static long
+    __attribute__ ((__unused__)) (*bpf_tail_call) (void *ctx,
+						   void *prog_array_map,
+						   __u32 index) = (void *)12;
+static __u64 __attribute__ ((__unused__)) (*bpf_get_current_pid_tgid) (void) =
+    (void *)14;
+static __u64 __attribute__ ((__unused__)) (*bpf_get_current_uid_gid) (void) =
+    (void *)15;
+static long
+    __attribute__ ((__unused__)) (*bpf_get_current_comm) (void *buf,
+							  __u32 size_of_buf) =
+    (void *)16;
+static __u64 __attribute__ ((__unused__)) (*bpf_get_current_task) (void) =
+    (void *)35;
+static long
+    __attribute__ ((__unused__)) (*bpf_perf_event_output) (void *ctx, void *map,
+							   __u64 flags,
+							   void *data,
+							   __u64 size) =
+    (void *)25;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read_str) (void *dst, __u32 size,
+							const void *unsafe_ptr)
+    = (void *)45;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read_user) (void *dst, __u32 size,
+							 const void *unsafe_ptr)
+    = (void *)112;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read_kernel) (void *dst,
+							   __u32 size,
+							   const void
+							   *unsafe_ptr) =
+    (void *)113;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read_user_str) (void *dst,
+							     __u32 size,
+							     const void
+							     *unsafe_ptr) =
+    (void *)114;
+static long
+    __attribute__ ((__unused__)) (*bpf_probe_read_kernel_str) (void *dst,
+							       __u32 size,
+							       const void
+							       *unsafe_ptr) =
+    (void *)115;
 
-static int (*bpf_get_stackid)(void *ctx, void *map, int flags) = (void *)27;
+static int
+    __attribute__ ((__unused__)) (*bpf_get_stackid) (void *ctx, void *map,
+						     int flags) = (void *)27;
 
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
@@ -221,7 +274,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define static_always_inline static inline __attribute__ ((__always_inline__))
 #endif
 
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
@@ -298,10 +351,10 @@ struct bpf_map_def SEC("maps") __ ## name = \
 
 #define MAP_STACK_TRACE(name, max) \
 struct bpf_map_def SEC("maps") __ ## name = { \
-        .type = BPF_MAP_TYPE_STACK_TRACE, \
-        .key_size = sizeof(__u32), \
-        .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
-        .max_entries = (max), \
+  .type = BPF_MAP_TYPE_STACK_TRACE, \
+  .key_size = sizeof(__u32), \
+  .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
+  .max_entries = (max), \
 };
 
 #define MAP_HASH(name, key_type, value_type, max_entries) \

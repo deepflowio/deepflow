@@ -30,12 +30,12 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/jfr"
@@ -275,8 +275,14 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 		labels = segment.NewKey(labelKey)
 		labels.Add("__name__", profileName)
 	}
+	// use app-profile with `from` params
+	startTime := time.Unix(int64(profile.From), 0)
+	// using ebpf-profile with `timestamp` nanoseconds parse
+	if profile.Timestamp > 0 {
+		startTime = time.Unix(0, int64(profile.Timestamp))
+	}
 	return ingestion.Metadata{
-		StartTime:       time.Unix(int64(profile.From), 0),
+		StartTime:       startTime,
 		EndTime:         time.Unix(int64(profile.Until), 0),
 		SpyName:         profile.SpyName,
 		Key:             labels,

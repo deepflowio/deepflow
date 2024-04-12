@@ -35,13 +35,14 @@ use crate::{
     utils::{
         process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
         stats::{
-            Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+            self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
+            StatsOption,
         },
     },
 };
 #[cfg(target_os = "linux")]
 use public::netns::{self, NsFile};
-use public::utils::net::link_list;
+use public::utils::net::{link_list, Link};
 
 #[derive(Default)]
 struct NetMetricArg {
@@ -285,11 +286,38 @@ impl RefCountable for SysLoad {
     fn get_counters(&self) -> Vec<Counter> {
         let mut sys = self.0.lock().unwrap();
         sys.refresh_cpu();
-        vec![(
-            "load1",
-            CounterType::Gauged,
-            CounterValue::Float(sys.load_average().one),
-        )]
+        vec![
+            (
+                "load1",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().one),
+            ),
+            (
+                "load5",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().five),
+            ),
+            (
+                "load15",
+                CounterType::Gauged,
+                CounterValue::Float(sys.load_average().fifteen),
+            ),
+        ]
+    }
+}
+
+struct NetStats<'a>(&'a Link);
+
+impl stats::Module for NetStats<'_> {
+    fn name(&self) -> &'static str {
+        "net"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("name", self.0.name.clone()),
+            StatsOption::Tag("mac", self.0.mac_addr.to_string()),
+        ]
     }
 }
 
@@ -379,13 +407,9 @@ impl Monitor {
                     continue;
                 }
                 let link_broker = Arc::new(LinkStatusBroker::new());
-                let mut options = vec![];
-                options.push(StatsOption::Tag("name", link.name.clone()));
-                options.push(StatsOption::Tag("mac", link.mac_addr.to_string()));
                 stats.register_countable(
-                    "net",
+                    &NetStats(&link),
                     Countable::Ref(Arc::downgrade(&link_broker) as Weak<dyn RefCountable>),
-                    options,
                 );
                 link_map_guard.insert(link.name.clone(), link_broker);
                 monitor_list.push(link.name.clone());
@@ -434,15 +458,13 @@ impl Monitor {
         }));
 
         self.stats.register_countable(
-            "monitor",
+            &stats::NoTagModule("monitor"),
             Countable::Ref(Arc::downgrade(&self.sys_monitor) as Weak<dyn RefCountable>),
-            vec![],
         );
 
         self.stats.register_countable(
-            "system",
+            &stats::NoTagModule("system"),
             Countable::Ref(Arc::downgrade(&self.sys_load) as Weak<dyn RefCountable>),
-            vec![],
         );
 
         info!("monitor started");

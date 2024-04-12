@@ -22,9 +22,9 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 const (
@@ -38,8 +38,8 @@ type Document struct {
 	pool.ReferenceCount
 
 	Timestamp uint32
-	zerodoc.Tagger
-	zerodoc.Meter
+	flow_metrics.Tagger
+	flow_metrics.Meter
 	Flags DocumentFlag
 }
 
@@ -127,29 +127,29 @@ func (d *Document) WriteToPB(p *pb.Document) error {
 	if p.Tag == nil {
 		p.Tag = &pb.MiniTag{}
 	}
-	d.Tagger.(*zerodoc.MiniTag).WriteToPB(p.Tag)
+	d.Tagger.(*flow_metrics.MiniTag).WriteToPB(p.Tag)
 	if p.Meter == nil {
 		p.Meter = &pb.Meter{}
 	}
 	p.Meter.MeterId = uint32(d.Meter.ID())
 	switch d.Meter.ID() {
-	case zerodoc.FLOW_ID:
+	case flow_metrics.FLOW_ID:
 		if p.Meter.Flow == nil {
 			p.Meter.Flow = &pb.FlowMeter{}
 		}
-		d.Meter.(*zerodoc.FlowMeter).WriteToPB(p.Meter.Flow)
+		d.Meter.(*flow_metrics.FlowMeter).WriteToPB(p.Meter.Flow)
 		p.Meter.Usage, p.Meter.App = nil, nil
-	case zerodoc.ACL_ID:
+	case flow_metrics.ACL_ID:
 		if p.Meter.Usage == nil {
 			p.Meter.Usage = &pb.UsageMeter{}
 		}
-		d.Meter.(*zerodoc.UsageMeter).WriteToPB(p.Meter.Usage)
+		d.Meter.(*flow_metrics.UsageMeter).WriteToPB(p.Meter.Usage)
 		p.Meter.Flow, p.Meter.App = nil, nil
-	case zerodoc.APP_ID:
+	case flow_metrics.APP_ID:
 		if p.Meter.App == nil {
 			p.Meter.App = &pb.AppMeter{}
 		}
-		d.Meter.(*zerodoc.AppMeter).WriteToPB(p.Meter.App)
+		d.Meter.(*flow_metrics.AppMeter).WriteToPB(p.Meter.App)
 		p.Meter.Usage, p.Meter.Flow = nil, nil
 	default:
 		return errors.New(fmt.Sprintf("unknown meter id %d", d.Meter.ID()))
@@ -160,11 +160,15 @@ func (d *Document) WriteToPB(p *pb.Document) error {
 }
 
 func (d *Document) WriteBlock(block *ckdb.Block) {
-	d.Tagger.(*zerodoc.Tag).WriteBlock(block, d.Timestamp)
+	d.Tagger.(*flow_metrics.Tag).WriteBlock(block, d.Timestamp)
 	d.Meter.WriteBlock(block)
 }
 
+func (d *Document) OrgID() uint16 {
+	return d.Tagger.(*flow_metrics.Tag).OrgId
+}
+
 func (d *Document) TableID() (uint8, error) {
-	tag, _ := d.Tagger.(*zerodoc.Tag)
+	tag, _ := d.Tagger.(*flow_metrics.Tag)
 	return tag.TableID((d.Flags & FLAG_PER_SECOND_METRICS) == 1)
 }

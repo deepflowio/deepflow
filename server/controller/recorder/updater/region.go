@@ -57,7 +57,7 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 		](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			wholeCache,
-			db.NewRegion(),
+			db.NewRegion().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.Regions,
 			cloudData,
 		),

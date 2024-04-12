@@ -17,7 +17,6 @@
 package decoder
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -33,13 +32,13 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("event.decoder")
@@ -162,6 +161,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = true
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
 	s.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
 	s.Duration = uint64(e.EndTime - e.StartTime)
@@ -173,18 +173,19 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(uint32(vtapId), e.Pid)
+	s.GProcessID = d.platformData.QueryProcessInfo(vtapId, e.Pid)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
-		s.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, s.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		s.ProcessKName = string(e.ProcessKname)
 		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id")
 		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
 		s.Bytes = ioData.BytesCount
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
 	s.VTAPID = vtapId
-	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
+	s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapId)
+	s.L3EpcID = d.platformData.QueryVtapEpc0(vtapId)
 
 	var info *grpc.Info
 	if e.PodId != 0 {
@@ -193,7 +194,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
-		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapId))
+		vtapInfo := d.platformData.QueryVtapInfo(vtapId)
 		if vtapInfo != nil {
 			vtapIP := net.ParseIP(vtapInfo.Ip)
 			if vtapIP != nil {
@@ -230,7 +231,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.IP4 = info.IP4
 		s.IP6 = info.IP6
 		// if it is just Pod Node, there is no need to match the service
-		if ingestercommon.IsPodServiceIP(zerodoc.DeviceType(s.L3DeviceType), s.PodID, 0) {
+		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
 			s.ServiceID = d.platformData.QueryService(
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 		}
@@ -291,6 +292,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = false
 	s.Time = uint32(event.Time)
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = event.TimeMilli * 1000 // convert to microsecond
 	s.EndTime = s.StartTime
 

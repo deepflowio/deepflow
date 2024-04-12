@@ -57,7 +57,7 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,
-			db.NewRedisInstance(),
+			db.NewRedisInstance().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.RedisInstances,
 			cloudData,
 		),
@@ -88,7 +88,7 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 		Version:      cloudItem.Version,
 		InternalHost: cloudItem.InternalHost,
 		PublicHost:   cloudItem.PublicHost,
-		Domain:       r.cache.DomainLcuuid,
+		Domain:       r.metadata.Domain.Lcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,

@@ -17,6 +17,9 @@
 package router
 
 import (
+	"fmt"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
@@ -48,7 +51,11 @@ func (a *Analyzer) RegisterTo(e *gin.Engine) {
 func getAnalyzer(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := service.GetAnalyzers(args)
+	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+	data, err := service.GetAnalyzers(orgID.(int), args)
+	if err != nil {
+		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+	}
 	JsonResponse(c, data, err)
 }
 
@@ -66,7 +73,12 @@ func getAnalyzers(c *gin.Context) {
 	if value, ok := c.GetQuery("region"); ok {
 		args["region"] = value
 	}
-	data, err := service.GetAnalyzers(args)
+
+	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+	data, err := service.GetAnalyzers(orgID.(int), args)
+	if err != nil {
+		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+	}
 	JsonResponse(c, data, err)
 }
 
@@ -95,7 +107,11 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.UpdateAnalyzer(lcuuid, patchMap, m, cfg)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.UpdateAnalyzer(orgID.(int), lcuuid, patchMap, m, cfg)
+		if err != nil {
+			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+		}
 		JsonResponse(c, data, err)
 	})
 }
@@ -110,7 +126,11 @@ func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		}
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.DeleteAnalyzer(lcuuid, m)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.DeleteAnalyzer(orgID.(int), lcuuid, m)
+		if err != nil {
+			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
+		}
 		JsonResponse(c, data, err)
 	})
 }

@@ -75,6 +75,10 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 	}
 
 	i64 new_file_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+	if (new_file_sz == 0) {
+		goto error;
+	}
+
 	if (new_file_sz > curr_local_sz)
 		*ret_val = JAVA_SYMS_NEED_UPDATE;
 	return;

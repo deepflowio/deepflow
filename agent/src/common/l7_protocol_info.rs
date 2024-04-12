@@ -25,9 +25,10 @@ use crate::{
     common::l7_protocol_log::LogCache,
     flow_generator::{
         protocol_logs::{
-            fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, DnsInfo, DubboInfo,
-            HttpInfo, KafkaInfo, MongoDBInfo, MqttInfo, MysqlInfo, NatsInfo, OpenWireInfo,
-            OracleInfo, PostgreInfo, RedisInfo, SofaRpcInfo, TlsInfo,
+            fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
+            DubboInfo, HttpInfo, KafkaInfo, MongoDBInfo, MqttInfo, MysqlInfo, NatsInfo,
+            OpenWireInfo, OracleInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo, TlsInfo,
+            ZmtpInfo,
         },
         AppProtoHead, LogMessageType, Result,
     },
@@ -68,10 +69,13 @@ all_protocol_info!(
     MongoDBInfo(MongoDBInfo),
     DubboInfo(DubboInfo),
     FastCGIInfo(FastCGIInfo),
+    BrpcInfo(BrpcInfo),
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
     AmqpInfo(AmqpInfo),
     NatsInfo(NatsInfo),
+    PulsarInfo(PulsarInfo),
+    ZmtpInfo(ZmtpInfo),
     PostgreInfo(PostgreInfo),
     OracleInfo(OracleInfo),
     SofaRpcInfo(SofaRpcInfo),
@@ -99,6 +103,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     fn get_endpoint(&self) -> Option<String> {
         None
+    }
+
+    fn get_biz_type(&self) -> u8 {
+        0
     }
 
     fn skip_send(&self) -> bool {
@@ -408,6 +416,14 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     fn tcp_seq_offset(&self) -> u32 {
         return 0;
+    }
+
+    fn get_request_domain(&self) -> String {
+        String::default()
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        0
     }
 }
 

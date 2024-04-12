@@ -58,6 +58,8 @@ func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
 	g := gin.New()
 	g.Use(gin.Recovery())
 	g.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
+	// set custom middleware
+	g.Use(HandleOrgIDMiddleware())
 	s.engine = g
 	return s
 }
@@ -112,6 +114,9 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewPlugin(),
 		router.NewMail(),
 		router.NewPrometheus(),
+		router.NewDatabase(s.controllerConfig),
+		// icon
+		router.NewIcon(s.controllerConfig),
 
 		// resource
 		resource.NewDomain(s.controllerConfig),

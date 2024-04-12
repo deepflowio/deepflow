@@ -31,7 +31,7 @@ use super::{
     consts::*,
     round_to_minute,
     types::{AppMeterWithFlow, MiniFlow},
-    MetricsType,
+    MetricsType, QgStats,
 };
 
 use crate::common::flow::{CloseType, L7Protocol, L7Stats, SignalSource};
@@ -40,7 +40,7 @@ use crate::metric::meter::{AppAnomaly, AppLatency, AppMeter, AppTraffic};
 use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     buffer::BatchedBox,
@@ -66,6 +66,7 @@ struct AppMeterWithL7Protocol {
     endpoint: Option<String>,
     endpoint_hash: u32,
     l7_protocol: L7Protocol,
+    biz_type: u8,
 }
 
 struct QuadrupleStash {
@@ -231,12 +232,16 @@ impl SubQuadGen {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         }
+
         let slot = (((time_in_second - self.window_start).as_secs() / self.slot_interval) as usize)
             .min(self.stashs.len() - 1);
         let stash = &mut self.stashs[slot];
         let value = stash.l7_stats.get_mut(&l7_stats.flow_id);
         if let Some(meters) = value {
-            if let Some(meter) = meters.iter_mut().find(|m| m.endpoint == l7_stats.endpoint) {
+            if let Some(meter) = meters
+                .iter_mut()
+                .find(|m| m.endpoint == l7_stats.endpoint && m.biz_type == l7_stats.biz_type)
+            {
                 // flow L7Protocol of different client ports on the same server port may be inconsistent.
                 // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
                 // so the L7Protocol of the same flow may be different. The principles are as follows:
@@ -253,6 +258,7 @@ impl SubQuadGen {
                     l7_protocol: l7_stats.l7_protocol,
                     endpoint: l7_stats.endpoint.clone(),
                     endpoint_hash,
+                    biz_type: l7_stats.biz_type,
                 };
                 meters.push(meter);
             }
@@ -272,6 +278,7 @@ impl SubQuadGen {
                         is_active_host0,
                         is_active_host1,
                         time_in_second: tagged_flow.flow.flow_stat_time,
+                        biz_type: meter.biz_type,
                     });
                     stash.meters.push(app_meter);
                 }
@@ -295,6 +302,7 @@ impl SubQuadGen {
                     is_active_host0,
                     is_active_host1,
                     time_in_second: tagged_flow.flow.flow_stat_time,
+                    biz_type: l7_stats.biz_type,
                 });
                 stash.meters.push(boxed_app_meter);
             } else {
@@ -303,6 +311,7 @@ impl SubQuadGen {
                     l7_protocol: l7_stats.l7_protocol,
                     endpoint: l7_stats.endpoint.clone(),
                     endpoint_hash,
+                    biz_type: l7_stats.biz_type,
                 };
                 let _ = stash.l7_stats.insert(l7_stats.flow_id, vec![meter]);
             }
@@ -487,12 +496,11 @@ impl L7QuadrupleGenerator {
                 quad_gen.stashs.push_back(QuadrupleStash::new());
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats {
+                    id,
+                    kind: "l7_second",
+                },
                 Countable::Ref(Arc::downgrade(&quad_gen.counter) as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "l7_second".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             second_quad_gen = Some(quad_gen);
         }
@@ -516,12 +524,11 @@ impl L7QuadrupleGenerator {
                 quad_gen.stashs.push_back(QuadrupleStash::new());
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats {
+                    id,
+                    kind: "l7_minute",
+                },
                 Countable::Ref(Arc::downgrade(&quad_gen.counter) as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "l7_minute".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             minute_quad_gen = Some(quad_gen);
         }

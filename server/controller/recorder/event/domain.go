@@ -30,10 +30,12 @@ func NewDomain(domainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQue
 		SubDomain{
 			domainLcuuid,
 			"",
-			EventManagerBase{
-				ToolDataSet: toolDS,
-				Queue:       eq,
-			},
+			newEventManagerBase(
+				"",
+				toolDS,
+				eq,
+			),
+			newTool(toolDS),
 		},
 	}
 }

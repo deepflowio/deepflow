@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common/printutil"
 	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 )
 
@@ -175,7 +176,7 @@ func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename st
 }
 
 func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename string) {
-	yamlFile, err := ioutil.ReadFile(updateFilename)
+	yamlFile, err := os.ReadFile(updateFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -188,14 +189,21 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 		return
 	}
 
-	vtapGroupID, ok := updateMap["vtap_group_id"]
-	if !ok {
-		fmt.Fprintln(os.Stderr, "must specify vtap_group_id")
+	var agentGroupID interface{}
+	if id, ok := updateMap["vtap_group_id"]; ok {
+		agentGroupID = id
+		printutil.WarnWithColor("use agent_group_id instead of vtap_group_id")
+	}
+	id, ok := updateMap["agent_group_id"]
+	if ok {
+		agentGroupID = id
+	}
+	if agentGroupID == nil {
+		fmt.Fprintln(os.Stderr, "must specify agent_group_id")
 		return
 	}
-
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, agentGroupID)
 	// call vtap-group api, get lcuuid
 	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {

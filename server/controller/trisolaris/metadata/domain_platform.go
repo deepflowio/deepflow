@@ -51,21 +51,21 @@ func newDomainToPlatformData() *DomainToPlatformData {
 	}
 }
 
-func (s DomainPlatformData) checkVersion(t DomainPlatformData) bool {
+func (s DomainPlatformData) checkVersion(t DomainPlatformData, orgID int) bool {
 	flag := true
 	for lcuuid, newDomainData := range t {
 		oldDomainData, ok := s[lcuuid]
 		if ok == false {
 			flag = false
 			newDomainData.initVersion()
-			log.Debug("add domain data. ", newDomainData)
+			log.Debugf("ORGID-%d: add domain data. %s", orgID, newDomainData)
 			continue
 		}
 
 		if !oldDomainData.equal(newDomainData) {
 			flag = false
 			newDomainData.setVersion(oldDomainData.GetVersion() + 1)
-			log.Infof("domain data changed, (%s) to (%s)", oldDomainData, newDomainData)
+			log.Infof("ORGID-%d: domain data changed, (%s) to (%s)", orgID, oldDomainData, newDomainData)
 		} else {
 			newDomainData.setVersion(oldDomainData.GetVersion())
 		}

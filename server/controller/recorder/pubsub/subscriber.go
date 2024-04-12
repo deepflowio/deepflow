@@ -16,18 +16,20 @@
 
 package pubsub
 
+import "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+
 type ResourceChangedSubscriber interface {
-	OnResourceChanged(msg interface{})
+	OnResourceChanged(md *message.Metadata, msg interface{})
 }
 
 type ResourceBatchAddedSubscriber interface {
-	OnResourceBatchAdded(msg interface{})
+	OnResourceBatchAdded(md *message.Metadata, msg interface{})
 }
 
 type ResourceUpdatedSubscriber interface {
-	OnResourceUpdated(msg interface{})
+	OnResourceUpdated(md *message.Metadata, msg interface{})
 }
 
 type ResourceBatchDeletedSubscriber interface {
-	OnResourceBatchDeleted(msg interface{})
+	OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool)
 }

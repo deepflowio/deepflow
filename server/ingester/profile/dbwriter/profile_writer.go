@@ -106,7 +106,8 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		writer.writerConfig.QueueCount,
 		writer.writerConfig.QueueSize,
 		writer.writerConfig.BatchSize,
-		writer.writerConfig.FlushTimeout)
+		writer.writerConfig.FlushTimeout,
+		config.Base.CKDB.Watcher)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -118,7 +119,7 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		BatchSize:    config.CKWriterConfig.BatchSize,
 		FlushTimeout: config.CKWriterConfig.FlushTimeout,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), PROFILE_DB, writer.ttl, DefaultPartition, config.Base, &flowTagWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), PROFILE_DB, writer.ttl, ckdb.TimeFuncTwelveHour, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}

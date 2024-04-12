@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,6 +82,7 @@ type CHEngine struct {
 	NoPreWhere         bool
 	IsDerivative       bool
 	DerivativeGroupBy  []string
+	ORGID              string
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -91,6 +93,10 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	sql := args.Sql
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
+	e.ORGID = common.DEFAULT_ORG_ID
+	if args.ORGID != "" {
+		e.ORGID = args.ORGID
+	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 
@@ -112,7 +118,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		return slimitResult, slimitDebug, err
 	}
 	// Parse showSql
-	result, sqlList, isShow, err := e.ParseShowSql(sql)
+	result, sqlList, isShow, err := e.ParseShowSql(sql, args)
 	if isShow {
 		if err != nil {
 			return nil, nil, err
@@ -143,7 +149,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
 		for _, showSql := range sqlList {
-			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 			showEngine.Init()
 			showParser := parse.Parser{Engine: showEngine}
 			err = showParser.ParseSQL(showSql)
@@ -163,8 +169,11 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			debug.Sql = chSql
 			params := &client.QueryParams{
 				Sql:             chSql,
+				UseQueryCache:   args.UseQueryCache,
+				QueryCacheTTL:   args.QueryCacheTTL,
 				QueryUUID:       query_uuid,
 				ColumnSchemaMap: ColumnSchemaMap,
+				ORGID:           args.ORGID,
 			}
 			result, err := chClient.DoQuery(params)
 			if err != nil {
@@ -210,9 +219,12 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	params := &client.QueryParams{
 		Sql:             chSql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: ColumnSchemaMap,
+		ORGID:           args.ORGID,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
@@ -221,7 +233,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	return rst, debug.Get(), err
 }
 
-func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, error) {
+func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
@@ -248,13 +260,25 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			where = strings.Join(sqlSplit[i+1:], " ")
 		}
 	}
+	switch table {
+	case "vtap_app_port":
+		table = "application"
+	case "vtap_app_edge_port":
+		table = "application_map"
+	case "vtap_flow_port":
+		table = "network"
+	case "vtap_flow_edge_port":
+		table = "network_map"
+	case "vtap_acl":
+		table = "traffic_policy"
+	}
 	switch strings.ToLower(sqlSplit[1]) {
 	case "metrics":
 		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
-			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
+			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 			if err != nil {
 				return nil, []string{}, true, err
 			}
@@ -291,6 +315,14 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 							if name == "lb_listener" || name == "pod_ingress" {
 								continue
 							}
+							notSupportedOperators := []string{}
+							if len(tagSlice) >= 9 {
+								notSupportedOperators = chCommon.ParseNotSupportedOperator(tagSlice[8])
+								// not support select
+								if slices.Contains(notSupportedOperators, "select") {
+									continue
+								}
+							}
 							clientName := tagSlice[1].(string)
 							serverName := tagSlice[2].(string)
 							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
@@ -299,7 +331,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 							if err != nil {
 								return nil, []string{}, true, err
 							}
-							if slices.Contains([]string{"l4_flow_log", "l7_flow_log"}, table) || strings.Contains(table, "edge") {
+							if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
 								if serverName == clientName {
 									clientNameMetric := []interface{}{
 										clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
@@ -352,16 +384,16 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 			return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
 			e.DB = "flow_tag"
 			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, e.Context)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return data, []string{}, true, err
 	case "tables":
-		return GetTables(e.DB, e.Context), []string{}, true, nil
+		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	}
@@ -369,7 +401,7 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 }
 
 func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
-	sql, callbacks, columnSchemaMap, err := e.ParseSlimitSql(sql)
+	sql, callbacks, columnSchemaMap, err := e.ParseSlimitSql(sql, args)
 	if err != nil {
 		log.Error(err)
 		return nil, nil, err
@@ -408,7 +440,7 @@ func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*comm
 	return rst, debug.Get(), err
 }
 
-func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
+func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
 	if !strings.Contains(sql, "SLIMIT") && !strings.Contains(sql, "slimit") {
 		return "", nil, nil, nil
 	}
@@ -488,7 +520,7 @@ func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.R
 	}
 
 	showTagsSql := "show tags from " + table
-	tags, _, _, err := e.ParseShowSql(showTagsSql)
+	tags, _, _, err := e.ParseShowSql(showTagsSql, args)
 	if err != nil {
 		return "", nil, nil, err
 	} else if len(tags.Values) == 0 {
@@ -649,7 +681,7 @@ func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.R
 				}
 			}
 		}
-		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 		innerEngine.Init()
 		if strings.Contains(innerSql, "Derivative") {
 			innerEngine.IsDerivative = true
@@ -669,7 +701,7 @@ func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.R
 		innerEngine.View = view.NewView(innerEngine.Model)
 		innerTransSql = innerEngine.ToSQLString()
 	}
-	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 	outerEngine.Init()
 	if strings.Contains(newSql, "Derivative") {
 		outerEngine.IsDerivative = true
@@ -725,7 +757,6 @@ func (e *CHEngine) ParseSlimitSql(sql string) (string, map[string]func(*common.R
 	for _, ColumnSchema := range outerEngine.ColumnSchemas {
 		columnSchemaMap[ColumnSchema.Name] = ColumnSchema
 	}
-
 	return outerSql, callbacks, columnSchemaMap, nil
 }
 
@@ -756,9 +787,12 @@ func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common
 	}
 	params := &client.QueryParams{
 		Sql:             sql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: columnSchemaMap,
+		ORGID:           args.ORGID,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
@@ -780,7 +814,7 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 	for _, match := range subMatches {
 		match = strings.TrimPrefix(match, "(")
 		match = strings.TrimSuffix(match, ")")
-		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		matchEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
 		matchEngine.Init()
 		matchParser := parse.Parser{Engine: matchEngine}
 		err := matchParser.ParseSQL(match)
@@ -811,6 +845,7 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 	e.Model.DB = e.DB
+	e.ORGID = common.DEFAULT_ORG_ID
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -834,8 +869,8 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in select
-	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) {
-		return errors.New("tap_port and tap_port_type must exist together in select")
+	if (common.IsValueInSliceString("tap_port", tagSlice) || common.IsValueInSliceString("capture_nic", tagSlice)) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("capture_nic_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", tagSlice) {
+		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in select")
 	}
 
 	e.AsTagMap = make(map[string]string)
@@ -1044,6 +1079,17 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := strings.Trim(sqlparser.String(from), "`")
+			if strings.Contains(table, "vtap_app_port") {
+				table = strings.ReplaceAll(table, "vtap_app_port", "application")
+			} else if strings.Contains(table, "vtap_app_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_app_edge_port", "application_map")
+			} else if strings.Contains(table, "vtap_flow_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_port", "network")
+			} else if strings.Contains(table, "vtap_flow_edge_port") {
+				table = strings.ReplaceAll(table, "vtap_flow_edge_port", "network_map")
+			} else if strings.Contains(table, "vtap_acl") {
+				table = strings.ReplaceAll(table, "vtap_acl", "traffic_policy")
+			}
 			e.Table = table
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
@@ -1062,16 +1108,25 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				e.Statements = append(e.Statements, &whereStmt)
 				table = "samples"
 			}
-			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource, e.ORGID)
 			if err != nil {
 				log.Error(err)
 				return err
 			}
 			e.Model.Time.DatasourceInterval = interval
+			newDB := e.DB
+			if e.ORGID != common.DEFAULT_ORG_ID && e.ORGID != "" {
+				orgIDInt, err := strconv.Atoi(e.ORGID)
+				if err != nil {
+					log.Error(err)
+					return err
+				}
+				newDB = fmt.Sprintf("%04d_%s", orgIDInt, e.DB)
+			}
 			if e.DataSource != "" {
-				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
+				e.AddTable(fmt.Sprintf("%s.`%s.%s`", newDB, table, e.DataSource))
 			} else {
-				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
+				e.AddTable(fmt.Sprintf("%s.`%s`", newDB, table))
 			}
 			virtualTableFilter, ok := GetVirtualTableFilter(e.DB, e.Table)
 			if ok {
@@ -1110,8 +1165,8 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in group
-	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) {
-		return errors.New("tap_port and tap_port_type must exist together in group")
+	if (common.IsValueInSliceString("tap_port", groupSlice) || common.IsValueInSliceString("capture_nic", groupSlice)) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("capture_nic_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) && !common.IsValueInSliceString("enum(capture_nic_type)", groupSlice) {
+		return errors.New("tap_port(capture_nic) and tap_port_type(capture_nic_type) must exist together in group")
 	}
 	for _, group := range groups {
 		colName, ok := group.(*sqlparser.ColName)

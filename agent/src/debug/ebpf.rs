@@ -50,9 +50,9 @@ impl EbpfDebugger {
 
     extern "C" fn ebpf_debug(data: *mut c_char, len: c_int) {
         unsafe {
-            if let Some(ebpf_debug_sender) = &EBPF_DEBUG_SENDER {
+            if let Some(sender) = EBPF_DEBUG_SENDER.as_ref() {
                 let datas = slice::from_raw_parts(data as *mut u8, len as usize).to_vec();
-                let _ = ebpf_debug_sender.send(datas);
+                let _ = sender.send(datas);
             }
         }
     }

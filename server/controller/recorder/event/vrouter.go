@@ -33,11 +33,11 @@ type VRouter struct {
 
 func NewVRouter(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VRouter {
 	mng := &VRouter{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_VROUTER,
 	}
 	return mng
@@ -97,7 +97,7 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = r.ToolDataSet.GetVRouterNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err)
+				log.Error(r.metadata.LogPre("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err))
 			}
 		}
 

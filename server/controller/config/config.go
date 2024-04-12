@@ -24,6 +24,7 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -86,6 +87,7 @@ type ControllerConfig struct {
 	ReportingDisabled              bool   `default:"false" yaml:"reporting-disabled"`
 	BillingMethod                  string `default:"license" yaml:"billing-method"`
 	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
+	NoTeamIDRefused                bool   `default:"false" yaml:"no-teamid-refused"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
 	FPermit      FPermit      `yaml:"fpermit"`
@@ -135,6 +137,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetBillingMethod(c.ControllerConfig.BillingMethod)
 	c.ControllerConfig.TrisolarisCfg.SetPodClusterInternalIPToIngester(c.ControllerConfig.PodClusterInternalIPToIngester)
 	c.ControllerConfig.TrisolarisCfg.SetGrpcMaxMessageLength(c.ControllerConfig.GrpcMaxMessageLength)
+	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)
@@ -143,6 +146,8 @@ func (c *Config) Load(path string) {
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetIngesterPort(ingesterPort)
 	}
+	// from ingester exporter setting
+	c.ControllerConfig.TrisolarisCfg.SetExportersEnabled(shared_common.ExportersEnabled(path))
 }
 
 func DefaultConfig() *Config {

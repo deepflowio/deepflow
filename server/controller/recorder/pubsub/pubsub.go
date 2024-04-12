@@ -19,6 +19,7 @@ package pubsub
 import (
 	"github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 )
 
@@ -42,7 +43,7 @@ func newPubSubComponent(pubsubType string) PubSubComponent {
 }
 
 func (p *PubSubComponent) Subscribe(topic int, subscriber interface{}) {
-	log.Infof("subscribe topic: %d to pubsub: %s from subscriber: %#v", topic, p.pubSubType, subscriber)
+	// log.Infof("subscribe topic: %d to pubsub: %s from subscriber: %#v", topic, p.pubSubType, subscriber)
 	if _, exists := p.subscribers[topic]; !exists {
 		p.subscribers[topic] = []interface{}{}
 	}
@@ -64,7 +65,7 @@ func (p *PubSubComponent) Unsubscribe(topic int, subscriber interface{}) {
 // PubSub interface for the whole cloud platform
 type DomainPubSub interface {
 	PubSub
-	PublishChange() // publish any change of the cloud platform, only notify the fact that the cloud platform has been changed, without specific changed data.
+	PublishChange(*message.Metadata) // publish any change of the cloud platform, only notify the fact that the cloud platform has been changed, without specific changed data.
 }
 
 const (
@@ -88,10 +89,10 @@ type ResourcePubSub[
 	MDT constraint.Delete,
 ] interface {
 	PubSub
-	PublishChange()           // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
-	PublishBatchAdded(MAPT)   // publish resource batch added notification, including specific data
-	PublishUpdated(MUPT)      // publish resource updated notification, including specific data
-	PublishBatchDeleted(MDPT) // publish resource batch deleted notification, including specific data
+	PublishChange(*message.Metadata)                   // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
+	PublishBatchAdded(*message.Metadata, MAPT)         // publish resource batch added notification, including specific data
+	PublishUpdated(*message.Metadata, MUPT)            // publish resource updated notification, including specific data
+	PublishBatchDeleted(*message.Metadata, MDPT, bool) // publish resource batch deleted notification, including specific data
 }
 
 type ResourcePubSubComponent[
@@ -108,55 +109,55 @@ type ResourcePubSubComponent[
 	PubSubComponent
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishChange() {
+func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishChange(md *message.Metadata) {
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceChanged {
 			for _, sub := range subs {
-				sub.(ResourceChangedSubscriber).OnResourceChanged(nil)
+				sub.(ResourceChangedSubscriber).OnResourceChanged(md, nil)
 			}
 		}
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(msg MAPT) {
-	log.Infof("publish add %#v", msg)
+func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
+	// TODO better log
+	// log.Infof("publish add %#v", msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchAddedMySQL {
 			for _, sub := range subs {
-				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(msg.GetMySQLItems())
+				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
 			}
 		}
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishUpdated(msg MUPT) {
-	log.Infof("publish update %#v", msg)
+func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishUpdated(md *message.Metadata, msg MUPT) {
+	// log.Infof("publish update %#v", msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceUpdatedFields {
 			for _, sub := range subs {
-				log.Infof("publish update %#v", msg.GetFields())
-				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(msg.GetFields().(MFUPT))
+				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg.GetFields().(MFUPT))
 			}
 		}
 		if topic == TopicResourceUpdatedMessageUpdate {
 			for _, sub := range subs {
-				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(msg)
+				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg)
 			}
 		}
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(msg MDPT) {
-	log.Infof("publish delete %#v", msg)
+func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT, softDelete bool) {
+	// log.Infof("publish delete %#v", msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchDeletedLcuuid {
 			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(msg.GetLcuuids())
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids(), softDelete)
 			}
 		}
 		if topic == TopicResourceBatchDeletedMySQL {
 			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(msg.GetMySQLItems())
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems(), softDelete)
 			}
 		}
 	}

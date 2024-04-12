@@ -42,7 +42,6 @@ type DomainAdditionalResource struct {
 type Base struct {
 	ID     int    `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID" mapstructure:"ID"`
 	Lcuuid string `gorm:"unique;column:lcuuid;type:char(64)" json:"LCUUID" mapstructure:"LCUUID"`
-	// TODO add CreatedAt/UpdatedAt/DeletedAt
 }
 
 func (b Base) GetID() int {
@@ -93,6 +92,7 @@ type Domain struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT" mapstructure:"SYNCED_AT"`
+	TeamID       int        `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID" mapstructure:"TEAM_ID"`
 	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME" mapstructure:"NAME"`
 	IconID       int        `gorm:"column:icon_id;type:int" json:"ICON_ID" mapstructure:"ICON_ID"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME" mapstructure:"DISPLAY_NAME"`
@@ -185,6 +185,7 @@ type VM struct {
 	CreateMethod   int               `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int               `gorm:"column:htype;type:int;default:1" json:"HTYPE" mapstructure:"HTYPE"`                         // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string            `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER" mapstructure:"LAUNCH_SERVER"`
+	HostID         int               `gorm:"column:host_id;type:int;default:0" json:"HOST_ID" mapstructure:"HOST_ID"`
 	VPCID          int               `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
 	Domain         string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	AZ             string            `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
@@ -211,9 +212,10 @@ func (VMPodNodeConnection) TableName() string {
 
 type VMSecurityGroup struct {
 	Base            `gorm:"embedded" mapstructure:",squash"`
-	SecurityGroupID int `gorm:"column:sg_id;type:int;not null" json:"SG_ID" mapstructure:"SG_ID"`
-	VMID            int `gorm:"column:vm_id;type:int;not null" json:"VM_ID" mapstructure:"VM_ID"`
-	Priority        int `gorm:"column:priority;type:int;not null" json:"PRIORITY" mapstructure:"PRIORITY"`
+	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" json:"SG_ID" mapstructure:"SG_ID"`
+	VMID            int    `gorm:"column:vm_id;type:int;not null" json:"VM_ID" mapstructure:"VM_ID"`
+	Priority        int    `gorm:"column:priority;type:int;not null" json:"PRIORITY" mapstructure:"PRIORITY"`
+	Domain          string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (VMSecurityGroup) TableName() string {
@@ -236,7 +238,7 @@ type Contact struct {
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:datetime;default:null" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
 }
 
-type VPCContact struct {
+type VPCContact struct { // TODO delete
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	CreateMethod int `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	VPCID        int `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
@@ -303,6 +305,7 @@ type Subnet struct {
 	Name      string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Label     string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL" mapstructure:"LABEL"`
 	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain    string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (Subnet) TableName() string {
@@ -333,6 +336,7 @@ type RoutingTable struct {
 	Destination string `gorm:"column:destination;type:text;default:''" json:"DESTINATION" mapstructure:"DESTINATION"`
 	NexthopType string `gorm:"column:nexthop_type;type:text;default:''" json:"NEXTHOP_TYPE" mapstructure:"NEXTHOP_TYPE"`
 	Nexthop     string `gorm:"column:nexthop;type:text;default:''" json:"NEXTHOP" mapstructure:"NEXTHOP"`
+	Domain      string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type DHCPPort struct {
@@ -456,6 +460,7 @@ type SecurityGroupRule struct {
 	Remote          string `gorm:"column:remote;type:text;default:''" json:"REMOTE" mapstructure:"REMOTE"`
 	Priority        int    `gorm:"column:priority;type:int;not null" json:"PRIORITY" mapstructure:"PRIORITY"`
 	Action          int    `gorm:"column:action;type:tinyint(1);not null;default:0" json:"ACTION" mapstructure:"ACTION"` // 0.Unknow 1.Accept 2.Drop
+	Domain          string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type NATGateway struct {
@@ -707,6 +712,7 @@ type PodIngressRule struct {
 	Host         string `gorm:"column:host;type:text;default:''" json:"HOST" mapstructure:"HOST"`
 	PodIngressID int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID" mapstructure:"POD_INGRESS_ID"`
 	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type PodIngressRuleBackend struct {
@@ -717,6 +723,7 @@ type PodIngressRuleBackend struct {
 	PodIngressRuleID int    `gorm:"column:pod_ingress_rule_id;type:int;default:null" json:"POD_INGRESS_RULE_ID" mapstructure:"POD_INGRESS_RULE_ID"`
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID" mapstructure:"POD_INGRESS_ID"`
 	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain           string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type PodService struct {
@@ -748,6 +755,7 @@ type PodServicePort struct {
 	NodePort     int    `gorm:"column:node_port;type:int;default:null" json:"NODE_PORT" mapstructure:"NODE_PORT"`
 	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
 	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type PodGroup struct {
@@ -774,6 +782,7 @@ type PodGroupPort struct {
 	PodGroupID   int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
 	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
 	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type PodReplicaSet struct {
@@ -826,6 +835,7 @@ type Pod struct {
 	ContainerIDs    string `gorm:"column:container_ids;type:text;default:''" json:"CONTAINER_IDS" mapstructure:"CONTAINER_IDS"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID" mapstructure:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
+	PodServiceID    int    `gorm:"column:pod_service_id;type:int;default:0" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodNodeID       int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`

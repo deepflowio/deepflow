@@ -49,6 +49,26 @@ use public::{
     utils::net::MacAddr,
 };
 
+struct NpbStats {
+    id: usize,
+    if_index: u32,
+    mac: MacAddr,
+}
+
+impl stats::Module for NpbStats {
+    fn name(&self) -> &'static str {
+        "fragmenter"
+    }
+
+    fn tags(&self) -> Vec<stats::StatsOption> {
+        vec![
+            StatsOption::Tag("index", self.id.to_string()),
+            StatsOption::Tag("mac", self.mac.to_string()),
+            StatsOption::Tag("ifIndex", self.if_index.to_string()),
+        ]
+    }
+}
+
 pub struct NpbBuilder {
     id: usize,
     mtu: usize,
@@ -268,13 +288,8 @@ impl NpbBuilder {
             );
 
             self.stats_collector.register_countable(
-                "fragmenter",
+                &NpbStats { id, mac, if_index },
                 Countable::Owned(Box::new(StatsNpbHandlerCounter(Arc::downgrade(&counter)))),
-                vec![
-                    StatsOption::Tag("index", id.to_string()),
-                    StatsOption::Tag("mac", mac.to_string()),
-                    StatsOption::Tag("ifIndex", if_index.to_string()),
-                ],
             );
         }
 

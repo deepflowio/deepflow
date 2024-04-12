@@ -61,7 +61,7 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
-			db.NewWANIP(),
+			db.NewWANIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.WANIPs,
 			nil,
 		),
@@ -105,7 +105,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 	}
 	dbItem := &mysql.WANIP{
 		IP:           ip,
-		Domain:       i.cache.DomainLcuuid,
+		Domain:       i.metadata.Domain.Lcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
 		SubnetID:     subnetID,

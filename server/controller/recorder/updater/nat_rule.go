@@ -57,7 +57,7 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,
-			db.NewNATRule(),
+			db.NewNATRule().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.NATRules,
 			cloudData,
 		),
@@ -77,10 +77,10 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 	if cloudItem.NATGatewayLcuuid != "" {
 		natGatewayID, exists = r.cache.ToolDataSet.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
-			))
+			)))
 			return nil, false
 		}
 	}
@@ -88,10 +88,10 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 	if cloudItem.VInterfaceLcuuid != "" {
 		vinterfaceID, exists = r.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, cloudItem.Lcuuid,
-			))
+			)))
 			return nil, false
 		}
 	}
@@ -105,7 +105,7 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 		FloatingIPPort: cloudItem.FloatingIPPort,
 		FixedIP:        cloudItem.FixedIP,
 		FixedIPPort:    cloudItem.FixedIPPort,
-		Domain:         r.cache.DomainLcuuid,
+		Domain:         r.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

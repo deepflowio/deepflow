@@ -32,6 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -60,7 +61,6 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
-	e.PATCH("/v1/vtaps-tap-mode/", batchUpdateVtapTapMode)
 
 	e.POST("/v1/vtaps-csv/", getVtapCSV)
 
@@ -226,6 +226,13 @@ func batchDeleteVtap(c *gin.Context) {
 
 func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// 如果不是masterController，将请求转发至是masterController
+		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
+		if !isMasterController {
+			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			return
+		}
+
 		args := make(map[string]interface{})
 		args["check"] = false
 		if value, ok := c.GetQuery("check"); ok {
@@ -247,24 +254,6 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		data, err := service.VTapRebalance(args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
 		JsonResponse(c, data, err)
 	})
-}
-
-func batchUpdateVtapTapMode(c *gin.Context) {
-	var err error
-	var vtapUpdateTapMode model.VtapUpdateTapMode
-
-	err = c.ShouldBindBodyWith(&vtapUpdateTapMode, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
-
-	if len(vtapUpdateTapMode.VTapLcuuids) == 0 {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "VTAP_LCUUIDS cannot be empty")
-		return
-	}
-	data, err := service.BatchUpdateVtapTapMode(&vtapUpdateTapMode)
-	JsonResponse(c, data, err)
 }
 
 func getVtapCSV(c *gin.Context) {

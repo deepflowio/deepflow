@@ -58,7 +58,7 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,
-			db.NewFloatingIP(),
+			db.NewFloatingIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.FloatingIPs,
 			cloudData,
 		),
@@ -75,37 +75,37 @@ func (f *FloatingIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.FloatingIP) (d
 func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mysql.FloatingIP, bool) {
 	networkID, exists := f.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
-		log.Error(resourceAForResourceBNotFound(
+		log.Error(f.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	vmID, exists := f.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
-		log.Error(resourceAForResourceBNotFound(
+		log.Error(f.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(resourceAForResourceBNotFound(
+		log.Error(f.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
-		log.Error(ipIsInvalid(
+		log.Error(f.metadata.LogPre(ipIsInvalid(
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
-		))
+		)))
 		return nil, false
 	}
 	dbItem := &mysql.FloatingIP{
-		Domain:    f.cache.DomainLcuuid,
+		Domain:    f.metadata.Domain.Lcuuid,
 		Region:    cloudItem.RegionLcuuid,
 		IP:        ip,
 		NetworkID: networkID,
@@ -122,10 +122,10 @@ func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(f.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid,
-			))
+			)))
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID

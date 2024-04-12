@@ -63,6 +63,7 @@ enum Exception {
     NPB_SOCKET_ERROR = 131072;
     INTEGRATION_SOCKET_ERROR = 262144;
     CGROUPS_CONFIG_ERROR = 524288;
+    SYSTEM_LOAD_CIRCUIT_BREAKER = 1048576;
     // 2^31及以下由采集器使用，采集器最大可用异常是2^31，顺序从前往后
     // 2^32及以上由控制器使用，顺序从后往前
 }
@@ -96,6 +97,7 @@ message SyncRequest {
     optional string vtap_group_id_request = 26;  // 支持采集器自动加入组
     optional bool kubernetes_force_watch = 27 [default = false];
     optional AgentIdentifier agent_unique_identifier = 28 [default = IP_AND_MAC];
+    optional string team_id = 29;   // agent team identity
 
     repeated CommunicationVtap communication_vtaps = 31;  // 仅对数据节点有意义
 
@@ -182,6 +184,12 @@ enum DecapType {
     DECAP_TYPE_GENEVE = 4;
 }
 
+enum SystemLoadMetric {
+    Load1 = 0;
+    Load5 = 1;
+    Load15 = 2;
+}
+
 message Config {
     optional bool enabled = 1 [default = true];
     optional uint32 max_cpus = 2 [default = 1];
@@ -232,6 +240,7 @@ message Config {
 
     optional uint32 vtap_id = 40;  // 限制在64000
     optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
+    optional uint32 platform_sync_interval = 42 [default = 10];
 
     optional SocketType collector_socket_type = 45 [default = TCP];
     // _ = 46; // deprecated
@@ -283,6 +292,9 @@ message Config {
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size = 502 [default = 1000];
     optional TapMode tap_mode = 503 [default = LOCAL];
+    optional float system_load_circuit_breaker_threshold = 504 [default = 1.0];
+    optional SystemLoadMetric system_load_circuit_breaker_metric = 505 [default = Load15];
+    optional float system_load_circuit_breaker_recover = 506 [default = 0.9];
 
     optional string local_config = 510;  // 全量的配置文件内容
 }
@@ -526,8 +538,10 @@ message PodIp {
 message VtapIp {
     optional uint32 vtap_id = 1;
     optional uint32 epc_id = 2;
-    optional string ip = 3;  // 采集器运行环境的IP
+    optional string ip = 3;             // 采集器运行环境的IP
     optional uint32 pod_cluster_id = 4;
+    optional uint32 team_id = 5;        // agent team id for ingester
+    optional uint32 org_id = 6;         // agent org id for ingester
 }
 
 message SkipInterface {
@@ -579,6 +593,7 @@ message SyncResponse {
 message UpgradeRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 3;
+    optional string team_id = 4;    // agent team identity
 }
 message UpgradeResponse {
     optional Status status = 1;     // 调用是否成功
@@ -613,6 +628,7 @@ message PluginRequest {
     optional string ctrl_mac = 2;
     optional PluginType plugin_type = 3;
     optional string plugin_name = 4;
+    optional string team_id = 5;  // agent team identity
 }
 
 message PluginResponse {
@@ -707,6 +723,7 @@ message GenesisSyncRequest {
     optional string kubernetes_cluster_id = 5;  // 仅对容器类型的采集器有意义
 
     optional string nat_ip = 6;
+    optional string team_id = 7;  // agent team identity
 
     optional GenesisPlatformData platform_data = 9;
     optional GenesisProcessData process_data = 10;
@@ -722,6 +739,7 @@ message KubernetesAPISyncRequest {
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
     optional string source_ip = 5;
+    optional string team_id = 6;  // agent team identity
     repeated common.KubernetesAPIInfo entries = 10;
 }
 
@@ -735,6 +753,7 @@ message PrometheusAPISyncRequest {
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
     optional string source_ip = 5;
+    optional string team_id = 6;  // agent team identity
     repeated common.PrometheusAPIInfo entries = 10;
 }
 
@@ -744,6 +763,7 @@ message PrometheusAPISyncResponse {
 
 message KubernetesClusterIDRequest {
     optional string ca_md5 = 1;                    // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
+    optional string team_id = 2;                   // agent team identity
     optional string kubernetes_cluster_name = 46;  // get that from deepflow-agent.yaml
 }
 
@@ -814,12 +834,14 @@ message GPIDSyncRequest {
     optional string ctrl_mac = 2;
     optional uint32 vtap_id = 3;
     optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 4 [default = COMPRESS_ALRO_NONE];
+    optional string team_id = 5;  // agent team identity
     repeated GPIDSyncEntry entries = 10;
 }
 
 message ShareGPIDSyncRequests {
     optional string server_ip = 1;
     repeated GPIDSyncRequest sync_requests = 2;
+    optional uint32 org_id = 3;
 }
 
 message GPIDSyncResponse {
@@ -892,6 +914,7 @@ message GPIDVTapData {
 message AgentCacheRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 2;
+    optional string team_id = 3; // agent team identity
 }
 
 message AgentCacheResponse {

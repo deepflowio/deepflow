@@ -9,18 +9,18 @@ FlowMetrics是用于接收trident包头统计数据的daemon
 ```
 db                     rp            measurement   tag
 --------------------------------------------------------------------------------------------------------------------
-vtap_flow              rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tap_type,vtap_id
-vtap_flow_port         rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tap_type,vtap_id
-vtap_flow_edge         rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,subnet_id_0,subnet_id_1,tap_port,tap_side,tap_type,vtap_id
-vtap_flow_edge_port    rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,server_port,subnet_id_0,subnet_id_1,tap_port,tap_side,tap_type,vtap_id
+vtap_flow              rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,capture_network_type_id,agent_id
+vtap_flow_port         rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,capture_network_type_id,agent_id
+vtap_flow_edge         rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,subnet_id_0,subnet_id_1,capture_nic,observation_point,capture_network_type_id,agent_id
+vtap_flow_edge_port    rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,server_port,subnet_id_0,subnet_id_1,capture_nic,observation_point,capture_network_type_id,agent_id
 
-vtap_acl               rp_1m         main          _id,_tid,acl_gid,tag_type,tag_value,vtap_id
+vtap_acl               rp_1m         main          _id,_tid,acl_gid,tag_type,tag_value,agent_id
 
-vtap_wan               rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
-vtap_wan_port          rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tag_type,tag_value,tap_type,vtap_id
+vtap_wan               rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tag_type,tag_value,capture_network_type_id,agent_id
+vtap_wan_port          rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tag_type,tag_value,capture_network_type_id,agent_id
 
-vtap_packet            rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
-vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,region_id_0,region_id_1,subnet_id_0,subnet_id_1,tag_type,tag_value,tap_side,tap_type,vtap_id
+vtap_packet            rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,region_id,subnet_id,tag_type,tag_value,capture_network_type_id,agent_id
+vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,region_id_0,region_id_1,subnet_id_0,subnet_id_1,tag_type,tag_value,observation_point,capture_network_type_id,agent_id
 ```
 
 `注意：所有双端（带edge的数据库）中tx、rx均是以客户端为视角的统计量`
@@ -86,16 +86,16 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host
 |                   |      |                         |              | 1-255: IP protocol number             |
 |                   |      |                         |              | 注意当存在server_port时仅有TCP/UDP    |
 | server_port       | 36   | 服务端端口              | 非负整数     | 0-65535，0表示无L4协议号或协议号为0   |
-| tap_type          | 39   | 流量采集点              | 正整数       | 1-2,4-30: 接入网络流量                |
+| capture_network_type_id          | 39   | 流量采集点              | 正整数       | 1-2,4-30: 接入网络流量                |
 |                   |      |                         |              | 3: 虚拟网络流量                       |
-| tap_port          | 39   | 采集网口标识            | 字符串       | 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF
+| capture_nic       | 39   | 采集网口标识            | 字符串       | 若capture_network_type_id为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF
 |                   |      |                         |              | 其他: 接入网络流量源，表示dispatcherID: 00000000~00000000F                       |
-| tap_side          | 39   | 流量采集位置            | 字符串       | c: 客户端(0侧)采集                    |
+| observation_point | 39   | 流量采集位置            | 字符串       | c: 客户端(0侧)采集                    |
 |                   |      |                         |              | s: 服务端(1侧)采集                    |
 | subnet_id         | 40   | ip对应的子网ID          | 非负整数     | 0: 未找到                             |
 | acl_direction     | 42   | ACL匹配的方向           | 字符串       | fwd: 正向匹配                         |
 |                   |      |                         |              | bwd: 反向匹配                         |
-| vtap_id           | 44   | 采集器控制IP的ID        | 非负整数     | 无特殊值                              |
+| agent_id           | 44   | 采集器控制IP的ID        | 非负整数     | 无特殊值                              |
 | pod_node_id       | 45   | ip对应的容器节点ID      | 非负整数     | 0表示没找到                           |
 | pod_group_id      | 45   | ip对应的容器组ID        | 非负整数     | 0表示没找到                           |
 | pod_ns_id         | 45   | ip对应的容器命名空间ID  | 非负整数     | 0表示没找到                           |
@@ -194,8 +194,8 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host
 | ------------------------| ------------------------------------- | ------------ | ---- |
 | client_rst_flow         | close_type: client other reset        | 1m, 1s       | 个   |
 | server_rst_flow         | close_type: server other reset        | 1m, 1s       | 个   |
-| client_syn_repeat       | close_type: client syn repeat         | 1m, 1s       | 个   |
-| server_syn_ack_repeat   | close_type: server syn/ack repeat     | 1m, 1s       | 个   |
+| server_syn_miss         | close_type: server syn miss           | 1m, 1s       | 个   |
+| client_ack_miss         | close_type: client ack miss           | 1m, 1s       | 个   |
 | client_half_close_flow  | close_type: client half close         | 1m, 1s       | 个   |
 | server_half_close_flow  | close_type: server half close         | 1m, 1s       | 个   |
 | client_source_port_reuse| close_type: client source port reuse  | 1m, 1s       | 个   |

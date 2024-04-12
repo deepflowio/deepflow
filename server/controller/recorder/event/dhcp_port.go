@@ -33,11 +33,11 @@ type DHCPPort struct {
 
 func NewDHCPPort(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *DHCPPort {
 	mng := &DHCPPort{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT,
 	}
 	return mng
@@ -84,7 +84,7 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = p.ToolDataSet.GetDHCPPortNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
+				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

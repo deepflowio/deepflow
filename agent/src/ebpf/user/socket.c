@@ -35,6 +35,7 @@
 #include "load.h"
 #include "btf_vmlinux.h"
 #include "config.h"
+#include "perf_reader.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_3_10_0.c"
@@ -97,6 +98,8 @@ static uint64_t io_event_minimal_duration = 1000000;
  * reclamation occurring if this value is exceeded.
  */
 static uint32_t conf_socket_map_max_reclaim;
+
+struct bpf_tracer *g_tracer;
 
 /*
  * The table for L7 protocol filtering ports.
@@ -606,7 +609,8 @@ static inline int dispatch_queue_index(uint64_t val, int count)
 
 // Some event types of data are handled by the user using a separate callback interface,
 // which completes the dispatch logic after reading the data from the Perf-Reader.
-static int register_events_handle(struct event_meta *meta,
+static int register_events_handle(struct reader_forward_info *fwd_info,
+				  struct event_meta *meta,
 				  int size, struct bpf_tracer *tracer)
 {
 	// Internal logic processing for process exec/exit.
@@ -628,13 +632,12 @@ static int register_events_handle(struct event_meta *meta,
 		return ETR_NOHANDLE;
 	}
 
-	int q_idx;
+	uint64_t q_idx;
 	struct queue *q;
 	int nr;
 	struct mem_block_head *block_head;
 
-	q_idx = dispatch_queue_index((uint64_t) meta->event_type,
-				     tracer->dispatch_workers_nr);
+	q_idx = fwd_info->queue_id;
 	q = &tracer->queues[q_idx];
 	block_head = malloc(sizeof(struct mem_block_head) + size);
 	if (block_head == NULL) {
@@ -666,9 +669,48 @@ static int register_events_handle(struct event_meta *meta,
 }
 
 // Read datas from perf ring-buffer and dispatch.
-static void reader_raw_cb(void *t, void *raw, int raw_size)
+static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+#ifdef TLS_DEBUG
+	struct debug_data *debug = raw;
+	if (debug->magic == 0xffff || debug->magic == 0xfffe) {
+		const char *fun;
+		if (debug->fun == 1)
+			fun = "go_tls_write_enter";
+		else if (debug->fun == 2)
+			fun = "go_tls_write_exit";
+		else if (debug->fun == 3)
+			fun = "go_tls_read_enter";
+		else if (debug->fun == 4)
+			fun = "go_tls_read_exit";
+		else
+			fun = "unknown";
+
+		const char *err = "";
+		if (debug->num == 1 || debug->num == 2)
+			err = "(E)";
+
+		if (debug->magic == 0xffff) {
+			fprintf(stdout,
+				">UPROBE DEBUG nobuf fun %s num %d%s len %d\n",
+				fun, debug->num, err, debug->len);
+		} else {
+			fprintf(stdout,
+				">UPROBE DEBUG buf fun %s num %d%s [%d(%c) "
+				"%d(%c) %d(%c) %d(%c)]\n", fun, debug->num, err,
+				debug->buf[0], debug->buf[0], debug->buf[1],
+				debug->buf[1], debug->buf[2], debug->buf[2],
+				debug->buf[3], debug->buf[3]);
+		}
+		fflush(stdout);
+		return;
+	}
+#endif
+
+	struct reader_forward_info *fwd_info = cookie;
+	ebpf_debug(stdout, "* fwd cpu %d -> queue %ld\n",
+		   fwd_info->cpu_id, fwd_info->queue_id);
+	struct bpf_tracer *tracer = g_tracer;
 	struct event_meta *ev_meta = raw;
 
 	/*
@@ -683,7 +725,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	}
 
 	if (ev_meta->event_type >= EVENT_TYPE_MIN) {
-		register_events_handle(ev_meta, raw_size, tracer);
+		register_events_handle(fwd_info, ev_meta, raw_size, tracer);
 		return;
 	}
 
@@ -691,7 +733,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	 * In the following, the socket data buffer is processed.
 	 */
 
-	int q_idx;
+	uint64_t q_idx;
 	struct queue *q;
 	int nr;
 	struct mem_block_head *block_head;	// 申请内存块的指针
@@ -737,8 +779,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	}
 
 	/* Determine which queue to distribute to based on the first socket_data. */
-	q_idx =
-	    dispatch_queue_index(sd->socket_id, tracer->dispatch_workers_nr);
+	q_idx = fwd_info->queue_id;
 	q = &tracer->queues[q_idx];
 
 	if (buf->events_num > MAX_PKT_BURST) {
@@ -1156,18 +1197,25 @@ static void process_events_handle_main(__unused void *arg)
 	}
 }
 
-static int update_offset_map_default(struct bpf_tracer *t)
+static int update_offset_map_default(struct bpf_tracer *t,
+				     enum linux_kernel_type kern_type)
 {
 	struct bpf_offset_param offset;
 	memset(&offset, 0, sizeof(offset));
 
-	if (k_version == KERNEL_VERSION(3, 10, 0)) {
+	switch (kern_type) {
+	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
 		offset.struct_files_private_data_offset = 0xa8;
-	} else {
+		break;
+	case K_TYPE_KYLIN:
+		offset.struct_files_struct_fdt_offset = 0x20;
+		offset.struct_files_private_data_offset = 0xc0;
+		break;
+	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc8;
-	}
+	};
 
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
@@ -1676,19 +1724,32 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 #endif
 
 extern __thread uword thread_index;	// for symbol pid caches hash
-static void poller(void *t)
+static void perf_buffer_read(void *arg)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	/*
+	 * Each "read" thread has its own independent epoll fd, used
+	 * to monitor the perf buffer belonging to its jurisdiction.
+	 */
+	uint64_t epoll_id = (uint64_t) arg;
+	thread_index = THREAD_PROC_ACT_IDX_BASE + epoll_id;	// for bihash
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		ebpf_warning("find_bpf_tracer() error\n");
+		return;
+	}
+
 	struct bpf_perf_reader *perf_reader;
 	int i;
-	thread_index = THREAD_PROC_ACT_IDX;
 	for (;;) {
 #ifndef PERFORMANCE_TEST
 		for (i = 0; i < tracer->perf_readers_count; i++) {
 			perf_reader = &tracer->readers[i];
-			perf_reader_poll(perf_reader->readers_count,
-					 perf_reader->readers,
-					 perf_reader->epoll_timeout);
+			struct epoll_event events[perf_reader->readers_count];
+			int nfds =
+			    reader_epoll_wait(perf_reader, events, epoll_id);
+			if (nfds > 0) {
+				reader_event_read(events, nfds);
+			}
 		}
 #else
 		uint64_t data_len, rand_seed;
@@ -1727,7 +1788,23 @@ static void poller(void *t)
 	/* return NULL; */
 }
 
-static int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
+static int perf_read_workers_setup(struct bpf_tracer *tracer)
+{
+	int i, ret;
+	struct bpf_perf_reader *r = &tracer->readers[0];
+	for (i = 0; i < r->epoll_fds_count; i++) {
+		ret = enable_tracer_reader_work("sk-reader", i,
+						tracer,
+						(void *)&perf_buffer_read);
+		if (ret)
+			return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+static int dispatch_workers_setup(struct bpf_tracer *tracer,
+				  unsigned int queue_size)
 {
 	int i, ret;
 
@@ -1773,11 +1850,6 @@ static int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
 		}
 	}
 
-	ret = enable_tracer_reader_work("socket-reader",
-					tracer, (void *)&poller);
-	if (ret)
-		return ETR_INVAL;
-
 	return ETR_OK;
 }
 
@@ -1793,7 +1865,8 @@ static int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
  *     Callback interface for upper-layer Application.
  * @thread_nr
  *     Number of worker threads, which refers to the number of user mode threads involved
- *     in data processing.
+ *     in data processing, at the same time, it is also the number of threads reading the
+ *     perf buffer.
  * @perf_pages_cnt
  *     Number of page frames with kernel shared memory footprint, the value is a power of 2.
  * @queue_size
@@ -1823,32 +1896,48 @@ int running_socket_tracer(tracer_callback_t handle,
 	void *bpf_bin_buffer;
 	int buffer_sz;
 
+	if (sys_cpus_count <= 0) {
+		ebpf_warning("sys_cpus_count(%d) <= 0, Please"
+			     " prioritize the execution of bpf_tracer_init().\n",
+			     sys_cpus_count);
+		return -EINVAL;
+	}
+	// Ensure that the number of worker threads does not exceed the
+	// number of CPUs
+	if (thread_nr > sys_cpus_count)
+		thread_nr = sys_cpus_count;
+
 	if (check_kernel_version(4, 14) != 0) {
 		return -EINVAL;
 	}
 
-	char sys_type[16];
-	memset(sys_type, 0, sizeof(sys_type));
-	if (fetch_system_type(sys_type, sizeof(sys_type) - 1) != ETR_OK) {
+	char sys_type_str[16];
+	memset(sys_type_str, 0, sizeof(sys_type_str));
+	if (fetch_system_type(sys_type_str, sizeof(sys_type_str) - 1) != ETR_OK) {
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	if (strcmp(sys_type, "ky10") == 0) {
+	enum linux_kernel_type k_type;
+	if (strcmp(sys_type_str, "ky10") == 0) {
+		k_type = K_TYPE_KYLIN;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-kylin");
 		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
 		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
 	} else if (major > 5 || (major == 5 && minor >= 2)) {
+		k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2_plus");
 		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
 		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
 	} else if (major == 3 && minor == 10) {
+		k_type = K_TYPE_VER_3_10;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-3.10.0");
 		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
 		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
 	} else {
+		k_type = K_TYPE_COMM;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");
 		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
@@ -1888,6 +1977,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (tracer == NULL)
 		return -EINVAL;
 
+	g_tracer = tracer;
 	probes_act = ACT_NONE;
 	tracer->adapt_success = false;
 
@@ -1918,7 +2008,7 @@ int running_socket_tracer(tracer_callback_t handle,
 					   reader_raw_cb,
 					   reader_lost_cb,
 					   perf_pages_cnt,
-					   PERF_READER_TIMEOUT_DEF);
+					   thread_nr, PERF_READER_TIMEOUT_DEF);
 	if (reader == NULL)
 		return -EINVAL;
 
@@ -1929,7 +2019,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
 		ebpf_info
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
-		if (update_offset_map_default(tracer) != ETR_OK) {
+		if (update_offset_map_default(tracer, k_type) != ETR_OK) {
 			ebpf_error
 			    ("Fatal error, failed to update default offset\n");
 		}
@@ -1986,7 +2076,10 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
 
-	if ((ret = dispatch_worker(tracer, queue_size)))
+	if ((ret = dispatch_workers_setup(tracer, queue_size)))
+		return ret;
+
+	if ((ret = perf_read_workers_setup(tracer)))
 		return ret;
 
 	// use for inference struct offset.

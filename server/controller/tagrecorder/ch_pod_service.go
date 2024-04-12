@@ -17,69 +17,69 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodService struct {
-	UpdaterComponent[mysql.ChPodService, IDKey]
+	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChPodService, IDKey]
 }
 
 func NewChPodService() *ChPodService {
-	updater := &ChPodService{
-		newUpdaterComponent[mysql.ChPodService, IDKey](
-			RESOURCE_TYPE_CH_POD_SERVICE,
+	mng := &ChPodService{
+		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChPodService, IDKey](
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
-	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodService) sourceToTarget(source *mysql.PodService) (keys []IDKey, targets []mysql.ChPodService) {
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodService)
-	for _, podService := range podServices {
-		if podService.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
-				ID:           podService.ID,
-				Name:         podService.Name + " (deleted)",
-				PodClusterID: podService.PodClusterID,
-				PodNsID:      podService.PodNamespaceID,
-			}
-		} else {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
-				ID:           podService.ID,
-				Name:         podService.Name,
-				PodClusterID: podService.PodClusterID,
-				PodNsID:      podService.PodNamespaceID,
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChPodService{
+		ID:           source.ID,
+		Name:         sourceName,
+		PodClusterID: source.PodClusterID,
+		PodNsID:      source.PodNamespaceID,
+	})
+	return
 }
 
-func (p *ChPodService) generateKey(dbItem mysql.ChPodService) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (p *ChPodService) generateUpdateInfo(oldItem, newItem mysql.ChPodService) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.PodClusterID != newItem.PodClusterID {
-		updateInfo["pod_cluster_id"] = newItem.PodClusterID
+	if fieldsUpdate.PodClusterID.IsDifferent() {
+		updateInfo["pod_cluster_id"] = fieldsUpdate.PodClusterID.GetNew()
 	}
-	if oldItem.PodClusterID != newItem.PodClusterID {
-		updateInfo["pod_ns_id"] = newItem.PodNsID
+	if fieldsUpdate.PodNamespaceID.IsDifferent() {
+		updateInfo["pod_ns_id"] = fieldsUpdate.PodNamespaceID.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChPodService
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
-	return nil, false
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodService) softDeletedTargetsUpdated(targets []mysql.ChPodService, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }

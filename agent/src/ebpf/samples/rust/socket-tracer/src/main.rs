@@ -223,12 +223,18 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("MQTT");
         } else if sk_proto_safe(sd) == SOCK_DATA_AMQP {
             proto_tag.push_str("AMQP");
+        } else if sk_proto_safe(sd) == SOCK_DATA_NATS {
+            proto_tag.push_str("NATS");
+        } else if sk_proto_safe(sd) == SOCK_DATA_PULSAR {
+            proto_tag.push_str("PULSAR");
         } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
             proto_tag.push_str("DUBBO");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
             proto_tag.push_str("SOFARPC");
         } else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
             proto_tag.push_str("FASTCGI");
+        } else if sk_proto_safe(sd) == SOCK_DATA_BRPC {
+            proto_tag.push_str("BRPC");
         } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
             proto_tag.push_str("MONGO");
         } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
@@ -237,6 +243,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("ORACLE");
         } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
             proto_tag.push_str("OPENWIRE");
+        } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
+            proto_tag.push_str("ZMTP");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -389,6 +397,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
+        enable_ebpf_protocol(SOCK_DATA_BRPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
@@ -396,6 +405,9 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
         enable_ebpf_protocol(SOCK_DATA_AMQP as c_int);
         enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
+        enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
+        enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
+        enable_ebpf_protocol(SOCK_DATA_PULSAR as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
@@ -481,6 +493,13 @@ fn main() {
                 .as_ptr(),
         );
         set_protocol_ports_bitmap(
+            SOCK_DATA_BRPC as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
             SOCK_DATA_MYSQL as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
@@ -524,6 +543,27 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_OPENWIRE as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_NATS as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_PULSAR as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_ZMTP as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
                 .as_c_str()

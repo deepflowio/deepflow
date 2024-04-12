@@ -70,6 +70,7 @@ type StaticConfig struct {
 	IngressFlavour                     *string                     `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                     *int                        `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout            *string                     `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
+	L7LogSessionQueueSize              *int                        `yaml:"l7-log-session-queue-size,omitempty"`
 	TapMacScript                       *string                     `yaml:"tap-mac-script,omitempty"`
 	BpfDisabled                        *bool                       `yaml:"bpf-disabled,omitempty"`
 	L7ProtocolInferenceMaxFailCount    *uint64                     `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
@@ -98,7 +99,6 @@ type StaticConfig struct {
 	OsProcSyncTaggedOnly               *bool                       `yaml:"os-proc-sync-tagged-only,omitempty"`
 	GuardInterval                      *string                     `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled              *bool                       `yaml:"check-core-file-disabled,omitempty"`
-	WasmPlugins                        []string                    `yaml:"wasm-plugins,omitempty"`
 	SoPlugins                          []string                    `yaml:"so-plugins,omitempty"`
 	MemoryTrimDisabled                 *bool                       `yaml:"memory-trim-disabled,omitempty"`
 	FastPathDisabled                   *bool                       `yaml:"fast-path-disabled,omitempty"`
@@ -113,6 +113,7 @@ type StaticConfig struct {
 	ExternalMetricIntegrationDisabled  *bool                       `yaml:"external-metric-integration-disabled,omitempty"`
 	NtpMaxInterval                     *string                     `yaml:"ntp-max-interval,omitempty"`
 	NtpMinInterval                     *string                     `yaml:"ntp-min-interval,omitempty"`
+	DispatcherQueue                    *bool                       `yaml:"dispatcher-queue,omitempty"`
 }
 
 type XflowCollectorConfig struct {
@@ -174,6 +175,7 @@ type OnCpuProfile struct {
 
 type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
+	GlobalEbpfPpsThreshold  *int                               `yaml:"global-ebpf-pps-threshold"`
 	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
 	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
 	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
@@ -219,9 +221,21 @@ type HttpEndpointExtraction struct {
 	MatchRules []MatchRule `yaml:"match-rules,omitempty"`
 }
 
+type ExtraLogFieldsInfo struct {
+	FieldName string `yaml:"field-name,omitempty"`
+	// SubFieldNames []string `yaml:"sub-field-names,omitempty"` // Future version support
+}
+
+type ExtraLogFields struct {
+	Http  []ExtraLogFieldsInfo `yaml:"http,omitempty"`
+	Http2 []ExtraLogFieldsInfo `yaml:"http2,omitempty"`
+	Grpc  []ExtraLogFieldsInfo `yaml:"grpc,omitempty"`
+}
+
 type L7ProtocolAdvancedFeatures struct {
 	HttpEndpointExtraction    *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
 	ObfuscateEnabledProtocols []string                `yaml:"obfuscate-enabled-protocols,omitempty"`
+	ExtraLogFields            *ExtraLogFields         `yaml:"extra-log-fields,omitempty"`
 }
 
 type OracleConfig struct {

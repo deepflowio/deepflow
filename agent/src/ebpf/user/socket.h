@@ -29,6 +29,13 @@
 #define CACHE_LINE_ROUNDUP(size) \
   (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
 
+enum linux_kernel_type {
+	K_TYPE_COMM,
+	K_TYPE_KYLIN,
+	K_TYPE_VER_5_2_PLUS,
+	K_TYPE_VER_3_10
+};
+
 enum probes_act_type {
 	ACT_NONE,
 	ACT_ATTACH,
@@ -210,6 +217,12 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "AMQP";
 	case PROTO_OPENWIRE:
 		return "OpenWire";
+	case PROTO_ZMTP:
+		return "ZMTP";
+	case PROTO_NATS:
+		return "NATS";
+	case PROTO_PULSAR:
+		return "Pulsar";
 	case PROTO_DUBBO:
 		return "Dubbo";
 	case PROTO_SOFARPC:
@@ -220,6 +233,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "Oracle";
 	case PROTO_FASTCGI:
 		return "FastCGI";
+	case PROTO_BRPC:
+		return "bRPC";
 	case PROTO_MONGO:
 		return "MongoDB";
 	case PROTO_TLS:

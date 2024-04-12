@@ -146,6 +146,7 @@ type ChIPRelation struct {
 	PodIngressName string `gorm:"column:pod_ingress_name;type:varchar(256);default:null" json:"POD_INGRESS_NAME"`
 	PodServiceID   int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
 	PodServiceName string `gorm:"column:pod_service_name;type:varchar(256);default:null" json:"POD_SERVICE_NAME"`
+	TeamID         int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChIPRelation) TableName() string {
@@ -271,8 +272,9 @@ type ChTapType struct {
 }
 
 type ChLBListener struct {
-	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChLBListener) TableName() string {
@@ -486,10 +488,12 @@ type ChPodService struct {
 }
 
 type ChChost struct {
-	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name    string `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	L3EPCID int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
-	HostID  int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name     string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	L3EPCID  int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
+	HostID   int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+	Hostname string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP       string `gorm:"column:ip;type:varchar(64)" json:"IP"`
 }
 
 type ChPolicy struct {
@@ -502,4 +506,14 @@ type ChPolicy struct {
 type ChNpbTunnel struct {
 	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
+
+type ChAlarmPolicy struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:char(128)" json:"NAME"`
+	UserID int    `gorm:"column:user_id;type:int" json:"USER_ID"`
+}
+
+func (ChAlarmPolicy) TableName() string {
+	return "ch_alarm_policy"
 }

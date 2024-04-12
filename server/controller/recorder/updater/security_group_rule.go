@@ -57,7 +57,7 @@ func NewSecurityGroupRule(wholeCache *cache.Cache, cloudData []cloudmodel.Securi
 		](
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			wholeCache,
-			db.NewSecurityGroupRule(),
+			db.NewSecurityGroupRule().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.SecurityGroupRules,
 			cloudData,
 		),
@@ -74,10 +74,10 @@ func (r *SecurityGroupRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.Securit
 func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGroupRule) (*mysql.SecurityGroupRule, bool) {
 	securityGroupID, exists := r.cache.ToolDataSet.GetSecurityGroupIDByLcuuid(cloudItem.SecurityGroupLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 
@@ -92,6 +92,7 @@ func (r *SecurityGroupRule) generateDBItemToAdd(cloudItem *cloudmodel.SecurityGr
 		Local:           cloudItem.Local,
 		Remote:          cloudItem.Remote,
 		Action:          cloudItem.Action,
+		Domain:          r.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

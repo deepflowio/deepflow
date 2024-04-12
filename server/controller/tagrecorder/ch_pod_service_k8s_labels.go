@@ -17,81 +17,66 @@
 package tagrecorder
 
 import (
-	"encoding/json"
-	"strings"
-
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodServiceK8sLabels struct {
-	UpdaterComponent[mysql.ChPodServiceK8sLabels, K8sLabelsKey]
+	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChPodServiceK8sLabels, K8sLabelsKey]
 }
 
 func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
-	updater := &ChPodServiceK8sLabels{
-		newUpdaterComponent[mysql.ChPodServiceK8sLabels, K8sLabelsKey](
-			RESOURCE_TYPE_CH_K8S_LABELS,
+	mng := &ChPodServiceK8sLabels{
+		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysql.PodService, mysql.ChPodServiceK8sLabels, K8sLabelsKey](
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABELS,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodServiceK8sLabels, bool) {
-	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
-
-	keyToItem := make(map[K8sLabelsKey]mysql.ChPodServiceK8sLabels)
-	for _, podService := range podServices {
-		labelsMap := map[string]string{}
-		splitLabel := strings.Split(podService.Label, ", ")
-		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
-			if len(splitSingleLabel) == 2 {
-				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
-			}
-		}
-		if len(labelsMap) > 0 {
-			labelsStr, err := json.Marshal(labelsMap)
-			if err != nil {
-				log.Error(err)
-				return nil, false
-			}
-			key := K8sLabelsKey{
-				ID: podService.ID,
-			}
-			keyToItem[key] = mysql.ChPodServiceK8sLabels{
-				ID:      podService.ID,
-				Labels:  string(labelsStr),
-				L3EPCID: podService.VPCID,
-				PodNsID: podService.PodNamespaceID,
-			}
-		}
-	}
-	return keyToItem, true
-}
-
-func (k *ChPodServiceK8sLabels) generateKey(dbItem mysql.ChPodServiceK8sLabels) K8sLabelsKey {
-	return K8sLabelsKey{ID: dbItem.ID}
-}
-
-func (k *ChPodServiceK8sLabels) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sLabels) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Labels != newItem.Labels {
-		updateInfo["labels"] = newItem.Labels
-	}
-	if oldItem.L3EPCID != newItem.L3EPCID {
-		updateInfo["l3_epc_id"] = newItem.L3EPCID
-	}
-	if oldItem.PodNsID != newItem.PodNsID {
-		updateInfo["pod_ns_id"] = newItem.PodNsID
+
+	var labels string
+	if fieldsUpdate.Label.IsDifferent() {
+		labels = common.StrToJsonstr(fieldsUpdate.Label.GetNew())
+		if labels != "" {
+			updateInfo["labels"] = labels
+		}
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChPodServiceK8sLabels
+		db.Where("id = ?", sourceID).First(&chItem)
+		if chItem.ID == 0 {
+			c.SubscriberComponent.dbOperator.add(
+				[]K8sLabelsKey{{ID: sourceID}},
+				[]mysql.ChPodServiceK8sLabels{{
+					ID:     sourceID,
+					Labels: updateInfo["labels"].(string),
+				}},
+				db,
+			)
+		} else {
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
+		}
 	}
-	return nil, false
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodServiceK8sLabels) sourceToTarget(item *mysql.PodService) (keys []K8sLabelsKey, targets []mysql.ChPodServiceK8sLabels) {
+	if item.Label == "" {
+		return
+	}
+	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sLabels{{
+		ID:     item.ID,
+		Labels: common.StrToJsonstr(item.Label),
+	}}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodServiceK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabels, db *mysql.DB) {
+
 }

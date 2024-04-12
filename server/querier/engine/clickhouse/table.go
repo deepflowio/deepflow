@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"context"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
@@ -33,19 +34,19 @@ func GetDatabases() *common.Result {
 	}
 }
 
-func GetTables(db string, ctx context.Context) *common.Result {
+func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) *common.Result {
 	var values []interface{}
 	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
-		values = append(values, chCommon.GetExtTables(db, ctx)...)
+		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
 	} else if db == chCommon.DB_NAME_PROMETHEUS {
-		values = append(values, chCommon.GetPrometheusTables(db, ctx)...)
+		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
 	} else {
 		for _, table := range tables {
-			datasource, err := chCommon.GetDatasources(db, table)
+			datasource, err := chCommon.GetDatasources(db, table, orgID)
 			if err != nil {
 				log.Error(err)
 			}

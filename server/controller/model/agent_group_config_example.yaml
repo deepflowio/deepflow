@@ -35,6 +35,33 @@ vtap_group_id: g-xxxxxx
 ## Unit: Mbps. Default: 1000. Range: [1, 100000]
 #max_npb_bps: 1000
 
+## System Load Circuit Breaker Threshold
+## Default: 1.0
+## Range: [0, 10.0]
+## Note: When the load of the Linux system divided by the number of
+##   CPU cores exceeds this value, the agent automatically enters
+##   the disabled state. It will automatically recover if it remains
+##   below 90% of this value for a continuous 5 minutes. Setting it
+##   to 0 disables this feature.
+#system_load_circuit_breaker_threshold: 1.0
+
+## System Load Circuit Breaker Recover
+## Default: 0.9
+## Range: [0, 10.0]
+## Note: When the system load of the Linux system divided by the
+##   number of CPU cores is continuously below this value for 5
+##   minutes, the agent can recover from the circuit breaker
+##   disabled state, and setting it to 0 means turning off the
+##   circuit breaker feature.
+#system_load_circuit_breaker_recover: 0.9
+
+## System Load Circuit Breaker Metric
+## Default: load15
+## Supported values: load1, load5, load15
+## Note: The system load circuit breaker mechanism uses this metric,
+##   and the agent will check this metric every 10 seconds by default.
+#system_load_circuit_breaker_metric: load15
+
 ## NPB (Packet Broker) Circuit Breaker Threshold
 ## Unit: Mbps. Default: 0. Range: [0, 100000]
 ## Note: When the outbound direction of the NPB interface
@@ -151,6 +178,12 @@ vtap_group_id: g-xxxxxx
 ## Note: The interval at which deepflow-agent actively requests configuration and
 ##   tag information from deepflow-server.
 #sync_interval: 60
+
+## Platform Sync Interval
+## Unit: second. Default: 10. Range: [10, 3600]
+## Note: The interval at which deepflow-agent actively reports resource information
+##   to deepflow-server.
+#platform_sync_interval: 10
 
 ## Maximum Escape Time
 ## Unit: seconds. Default: 3600. Range: [600, 2592000]
@@ -633,8 +666,7 @@ vtap_group_id: g-xxxxxx
   ## Dispatcher ##
   ################
   ## TAP NICs when tap_mode != 0
-  ## Note: The list of capture NICs when tap_mode is not equal to 0, in which
-  ##   case tap_interface_regex is invalid.
+  ## Note: Deprecated and instead use tap_interface_regex
   #src-interfaces:
   #- dummy0
   #- dummy1
@@ -643,6 +675,10 @@ vtap_group_id: g-xxxxxx
   ## Default: 1. Range: [1, +oo)
   ## Note: The configuration takes effect when tap_mode is 0 and extra_netns_regex is null
   #local-dispatcher-count: 1
+
+  ## Dispatcher queue
+  ## Note: The configuration takes effect when tap_mode is 0 or 2, dispatcher-queue is always true when tap_mode is 2
+  #dispatcher-queue: false
 
   ####################
   ## InMemory Queue ##
@@ -729,6 +765,28 @@ vtap_group_id: g-xxxxxx
   ## Format: $number$time_unit
   ## Example: 1s, 2m, 10h
   #l7-log-session-aggr-timeout: 120s
+
+  ## Capacity of Each l7_flow_log Aggregation Time Slot
+  ## Default: 1024. Range: [1024, +∞)
+  ## Note: By default, unidirectional l7_flow_log is aggregated into bidirectional
+  ##   request_log (session) with a caching time window of 2 minutes. During this
+  ##   period, every 5 seconds is considered as a time slot (i.e., a LRU). This
+  ##   configuration is used to specify the maximum number of unidirectional l7_flow_log
+  ##   entries that can be cached in each time slot.
+  ##       If the number of l7_flow_log entries cached in a time slot exceeds this
+  ##   configuration, 10% of the data in that time slot will be evicted based on the
+  ##   LRU strategy to reduce memory consumption. Note that the evicted data will not be
+  ##   discarded; instead, they will be sent to the deepflow-server as unidirectional
+  ##   request_log.
+  ##       The following metrics can be used as reference data for adjusting this
+  ##   configuration:
+  ##   - Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+  ##     Used to record the total memory occupied by the request_resource field of the
+  ##     unidirectional l7_flow_log cached in all time slots at the current moment, in bytes
+  ##   - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+  ##     Used to record the number of times eviction is triggered due to reaching the
+  ##     LRU capacity limit
+  #l7-log-session-slot-capacity: 1024
 
   ##########
   ## PCAP ##
@@ -837,7 +895,7 @@ vtap_group_id: g-xxxxxx
   ## Note: The DPDK RecvEngine is only started when this configuration item is turned on.
   ##   Note that you also need to set tap_mode to 1. Please refer to
   ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
-  #dpdk_enabled: false
+  #dpdk-enabled: false
 
   ########################
   ## Libpcap RecvEngine ##
@@ -942,10 +1000,11 @@ vtap_group_id: g-xxxxxx
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
   #l7-protocol-enabled:
-  #- HTTP ## for both HTTP and HTTP_TLS
-  #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- HTTP
+  #- HTTP2 ## for both HTTP2 and gRPC
   #- SofaRPC
   #- FastCGI
+  #- bRPC
   #- Dubbo
   #- MySQL
   #- PostgreSQL
@@ -956,20 +1015,21 @@ vtap_group_id: g-xxxxxx
   #- AMQP
   #- OpenWire
   #- NATS
+  #- Pulsar
+  #- ZMTP
   #- DNS
   #- TLS
   #- Custom ## custom protocol from plugin
 
   ## Application Protocol Port Numbers
-  ## Default: 53 for DNS, 443 for TLS, 1-65535 for other Protocols.
+  ## Default: 53,5353 for DNS, 443,6443 for TLS, 1-65535 for other Protocols.
   ## Format: map<protocol-name, port-list>
   ## Example: "HTTP": 80,1000-2000
   ## Note: HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
   ##   All data obtained through Uprobe is not subject to port restrictions.
   #l7-protocol-ports:
-    #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
-    #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
-    #"Custom": "1-65535" # plugins
+    #"HTTP": "1-65535"
+    #"HTTP2": "1-65535" # for both HTTP2 and gRPC
     #"SofaRPC": "1-65535"
     #"FastCGI": "1-65535"
     #"Dubbo": "1-65535"
@@ -980,8 +1040,10 @@ vtap_group_id: g-xxxxxx
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
     #"OpenWire": "1-65535"
+    #"ZMTP": "1-65535"
     #"DNS": "53,5353"
-    #"TLS": "443"
+    #"TLS": "443,6443"
+    #"Custom": "1-65535" # plugins
 
   ## L7 Protocol Advanced Features
   #l7-protocol-advanced-features:
@@ -1012,6 +1074,14 @@ vtap_group_id: g-xxxxxx
     ## - Redis
     #obfuscate-enabled-protocols: []
 
+    ## Configuration to extract the customized header fields of HTTP, HTTP2, GRPC protocol etc
+    #extra-log-fields:
+    ## for example:
+    ## http:
+    ## - field-name: "user-agent"
+    ## - field-name: "cookie"
+    #  http: []
+    #  http2: []
 
   #oracle-parse-config:
     #is-be: true
@@ -1079,6 +1149,10 @@ vtap_group_id: g-xxxxxx
     ## eBPF Switch
     ## Default: false
     #disabled: false
+
+    ## eBPF Packet Capture Rate Limit
+    ## Default: 0. Range: [0, +oo]
+    #global-ebpf-pps-threshold: 0
 
     ## Regex for Process Name
     ## Note: The name of the process where each feature of ebpf uprobe takes effect,
@@ -1237,17 +1311,6 @@ vtap_group_id: g-xxxxxx
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
 
-      ## The maximum limit space in the root directory of each Java process. deepflow-agent will
-      ## automatically create a `/deepflow/` directory to temporarily store the symbol files of the
-      ## Java process. The space occupied by the files written by deepflow-agent will not exceed this
-      ## configured value. All files are stored temporarily and are immediately cleared once the Java
-      ## symbol files are obtained.
-      ## Default: 10. Range: [2, 100]
-      ## Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
-      ## this range, the default value of 10(10Mi), will be used.
-      #java-symbol-file-max-space-limit: 10
-
-
       ## When deepflow-agent finds that an unresolved function name appears in the function call stack
       ## of a Java process, it will trigger the regeneration of the symbol file of the process.
       ## Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
@@ -1376,6 +1439,7 @@ vtap_group_id: g-xxxxxx
   ##   1. System free memory;
   ##   2. Get the number of threads of the agent itself by reading the file information under the /proc directory;
   ##   3. Size and number of log files generated by the agent.
+  ##   4. System load
   #guard-interval: 10s
 
   #################

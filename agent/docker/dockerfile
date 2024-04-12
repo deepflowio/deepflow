@@ -23,7 +23,9 @@ RUN --mount=target=/tmp-mount \
     cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/release/deepflow-agent-ctl /bin/  && \
     cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/src/ebpf/deepflow-ebpfctl /bin/  && \
     cp -raf /tmp-mount/agent/docker/require/${AGENT_BUILD_ARCH}/libpcap.so.1 /usr/lib/${AGENT_BUILD_ARCH}-linux-gnu/ && \
-    chmod 777 /usr/lib/${AGENT_BUILD_ARCH}-linux-gnu/libpcap.so.1
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/release/ecapture /usr/bin/ && \
+    chmod 777 /usr/lib/${AGENT_BUILD_ARCH}-linux-gnu/libpcap.so.1 && \
+    chmod 777 /usr/bin/ecapture
 
 USER root
 

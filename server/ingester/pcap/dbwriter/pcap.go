@@ -38,6 +38,11 @@ type PcapStore struct {
 	PacketCount uint32
 	PacketBatch []byte
 	AclGids     []uint16
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'flow_log', otherwise stored in '<OrgId>_flow_log'.
+	OrgId  uint16
+	TeamID uint16
 }
 
 func PcapStoreColumns() []*ckdb.Column {
@@ -46,10 +51,11 @@ func PcapStoreColumns() []*ckdb.Column {
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("packet_batch", ckdb.String).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
 		ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 	}
 }
 
@@ -62,7 +68,13 @@ func (s *PcapStore) WriteBlock(block *ckdb.Block) {
 		s.VtapID,
 		s.PacketCount,
 		utils.String(s.PacketBatch),
-		s.AclGids)
+		s.AclGids,
+		s.TeamID,
+	)
+}
+
+func (s *PcapStore) OrgID() uint16 {
+	return s.OrgId
 }
 
 func (p *PcapStore) Release() {
@@ -97,7 +109,7 @@ func ReleasePcapStore(l *PcapStore) {
 func GenPcapCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"flow_id", timeKey, "vtap_id"}
+	orderKeys := []string{"flow_id", timeKey, "agent_id"}
 
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,

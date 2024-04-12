@@ -36,7 +36,7 @@ use super::{get_sender_id, QUEUE_BATCH_SIZE};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{
-    Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+    self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
 };
 use public::proto::trident::{Exception, SocketType};
 use public::queue::{Error, Receiver};
@@ -169,8 +169,12 @@ impl<T: Sendable> Encoder<T> {
         self.buffer.len()
     }
 
-    pub fn get_buffer(&mut self) -> Vec<u8> {
-        self.buffer.drain(..).collect()
+    pub fn get_buffer(&self) -> &[u8] {
+        &self.buffer[..]
+    }
+
+    pub fn reset_buffer(&mut self) {
+        self.buffer.clear();
     }
 }
 
@@ -268,6 +272,18 @@ impl<T: Sendable> UniformSenderThread<T> {
     }
 }
 
+struct Connection {
+    tcp_stream: Option<TcpStream>,
+
+    reconnect_interval: u8,
+
+    dst_ip: String,
+    dst_port: u16,
+
+    reconnect: bool,
+    last_reconnect: Duration,
+}
+
 pub struct UniformSender<T> {
     id: usize,
     name: &'static str,
@@ -275,16 +291,10 @@ pub struct UniformSender<T> {
     input: Arc<Receiver<T>>,
     counter: Arc<SenderCounter>,
 
-    tcp_stream: Option<TcpStream>,
     encoder: Encoder<T>,
-    last_flush: Duration,
+    conn: Connection,
 
-    dst_ip: String,
-    dst_port: u16,
     config: SenderAccess,
-    reconnect: bool,
-    reconnect_interval: u8,
-    last_reconnect: Duration,
 
     running: Arc<AtomicBool>,
     stats: Arc<Collector>,
@@ -313,20 +323,22 @@ impl<T: Sendable> UniformSender<T> {
         exception_handler: ExceptionHandler,
         cached: bool,
     ) -> Self {
+        let cfg = config.load();
         Self {
             id,
             name,
             input,
             counter: Arc::new(SenderCounter::default()),
             encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
-            last_flush: Duration::ZERO,
-            dst_ip: config.load().dest_ip.clone(),
-            dst_port: config.load().dest_port,
             config,
-            tcp_stream: None,
-            reconnect: false,
-            reconnect_interval: Self::DEFAULT_RECONNECT_INTERVAL,
-            last_reconnect: Duration::ZERO,
+            conn: Connection {
+                tcp_stream: None,
+                reconnect_interval: Self::DEFAULT_RECONNECT_INTERVAL,
+                dst_ip: cfg.dest_ip.clone(),
+                dst_port: cfg.dest_port,
+                reconnect: false,
+                last_reconnect: Duration::ZERO,
+            },
             running,
             stats,
             stats_registered: false,
@@ -340,97 +352,95 @@ impl<T: Sendable> UniformSender<T> {
     }
 
     fn update_dst_ip_and_port(&mut self) {
-        if self.dst_ip != self.config.load().dest_ip {
-            info!(
-                "{} sender update dst ip from {} to {}",
-                self.name,
-                self.dst_ip,
-                self.config.load().dest_ip
-            );
-            self.reconnect = true;
-            self.last_reconnect = Duration::ZERO;
-            self.dst_ip = self.config.load().dest_ip.clone();
-        }
+        let cfg = self.config.load();
 
-        if self.dst_port != self.config.load().dest_port {
+        if self.conn.dst_ip != cfg.dest_ip || self.conn.dst_port != cfg.dest_port {
             info!(
-                "{} sender update dst port from {} to {}",
-                self.name,
-                self.dst_port,
-                self.config.load().dest_port
+                "{} sender update dst from {}:{} to {}:{}",
+                self.name, self.conn.dst_ip, self.conn.dst_port, cfg.dest_ip, cfg.dest_port
             );
-            self.reconnect = true;
-            self.last_reconnect = Duration::ZERO;
-            self.dst_port = self.config.load().dest_port;
+            self.conn.reconnect = true;
+            self.conn.last_reconnect = Duration::ZERO;
+            self.conn.dst_ip = cfg.dest_ip.clone();
+            self.conn.dst_port = cfg.dest_port;
         }
     }
 
     fn flush_encoder(&mut self) {
         if self.encoder.buffer_len() > 0 {
             self.encoder.set_header_frame_size();
-            let buffer = self.encoder.get_buffer();
-            self.send_buffer(buffer.as_slice());
+            Self::send_buffer(
+                &self.name,
+                &self.counter,
+                &self.exception_handler,
+                &mut self.conn,
+                &self.encoder.get_buffer(),
+            );
+            self.encoder.reset_buffer();
         }
     }
 
-    fn send_buffer(&mut self, buffer: &[u8]) {
-        if self.reconnect || self.tcp_stream.is_none() {
-            if let Some(t) = self.tcp_stream.take() {
+    fn send_buffer(
+        name: &str,
+        counter: &SenderCounter,
+        exception_handler: &ExceptionHandler,
+        conn: &mut Connection,
+        buffer: &[u8],
+    ) {
+        if conn.reconnect || conn.tcp_stream.is_none() {
+            if let Some(t) = conn.tcp_stream.take() {
                 if let Err(e) = t.shutdown(Shutdown::Both) {
-                    debug!("{} sender tcp stream shutdown failed {}", self.name, e);
+                    debug!("{} sender tcp stream shutdown failed {}", name, e);
                 }
             }
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap();
             // If the local timestamp adjustment requires recalculating the interval
-            if self.last_reconnect > now {
-                self.last_reconnect = now;
+            if conn.last_reconnect > now {
+                conn.last_reconnect = now;
             }
-            if self.last_reconnect + Duration::from_secs(self.reconnect_interval as u64) > now {
+            if conn.last_reconnect + Duration::from_secs(conn.reconnect_interval as u64) > now {
                 return;
             }
 
-            self.last_reconnect = now;
-            self.tcp_stream = TcpStream::connect((self.dst_ip.clone(), self.dst_port)).ok();
-            if let Some(tcp_stream) = self.tcp_stream.as_mut() {
+            conn.last_reconnect = now;
+            conn.tcp_stream = TcpStream::connect((conn.dst_ip.clone(), conn.dst_port)).ok();
+            if let Some(tcp_stream) = conn.tcp_stream.as_mut() {
                 if let Err(e) =
                     tcp_stream.set_write_timeout(Some(Duration::from_secs(Self::TCP_WRITE_TIMEOUT)))
                 {
-                    debug!(
-                        "{} sender tcp stream set write timeout failed {}",
-                        self.name, e
-                    );
-                    self.tcp_stream.take();
+                    debug!("{} sender tcp stream set write timeout failed {}", name, e);
+                    conn.tcp_stream.take();
                     return;
                 }
                 info!(
                     "{} sender tcp connection to {}:{} succeed.",
-                    self.name, self.dst_ip, self.dst_port
+                    name, conn.dst_ip, conn.dst_port
                 );
-                self.reconnect = false;
-                self.reconnect_interval = 0;
+                conn.reconnect = false;
+                conn.reconnect_interval = 0;
             } else {
-                if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                    self.exception_handler.set(Exception::AnalyzerSocketError);
-                    if self.dst_ip.is_empty() || self.dst_ip == "0.0.0.0" {
+                if counter.dropped.load(Ordering::Relaxed) == 0 {
+                    exception_handler.set(Exception::AnalyzerSocketError);
+                    if conn.dst_ip.is_empty() || conn.dst_ip == "0.0.0.0" {
                         warn!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
                     } else {
                         error!(
                             "{} sender tcp connection to {}:{} failed",
-                            self.name, self.dst_ip, self.dst_port,
+                            name, conn.dst_ip, conn.dst_port,
                         );
                     }
                 }
-                self.counter.dropped.fetch_add(1, Ordering::Relaxed);
+                counter.dropped.fetch_add(1, Ordering::Relaxed);
                 // reconnect after waiting 10 seconds + random 5 seconds to prevent frequent reconnection
-                self.reconnect_interval =
+                conn.reconnect_interval =
                     Self::DEFAULT_RECONNECT_INTERVAL + (thread_rng().next_u64() % 5) as u8;
                 return;
             }
         }
 
-        let tcp_stream = self.tcp_stream.as_mut().unwrap();
+        let tcp_stream = conn.tcp_stream.as_mut().unwrap();
 
         let mut write_offset = 0usize;
         loop {
@@ -439,27 +449,27 @@ impl<T: Sendable> UniformSender<T> {
                 Ok(size) => {
                     write_offset += size;
                     if write_offset == buffer.len() {
-                        self.counter.tx.fetch_add(1, Ordering::Relaxed);
-                        self.counter
+                        counter.tx.fetch_add(1, Ordering::Relaxed);
+                        counter
                             .tx_bytes
                             .fetch_add(buffer.len() as u64, Ordering::Relaxed);
                         break;
                     }
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                    debug!("{} sender tcp stream write data block {}", self.name, e);
+                    debug!("{} sender tcp stream write data block {}", name, e);
                     continue;
                 }
                 Err(e) => {
-                    if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                        self.exception_handler.set(Exception::AnalyzerSocketError);
+                    if counter.dropped.load(Ordering::Relaxed) == 0 {
+                        exception_handler.set(Exception::AnalyzerSocketError);
                         error!(
                             "{} sender tcp stream write data to {}:{} failed: {}",
-                            self.name, self.dst_ip, self.dst_port, e
+                            name, conn.dst_ip, conn.dst_port, e
                         );
                     }
-                    self.counter.dropped.fetch_add(1, Ordering::Relaxed);
-                    self.tcp_stream.take();
+                    counter.dropped.fetch_add(1, Ordering::Relaxed);
+                    conn.tcp_stream.take();
                     break;
                 }
             };
@@ -471,9 +481,8 @@ impl<T: Sendable> UniformSender<T> {
             return;
         }
         self.stats.register_countable(
-            "collect_sender",
+            &stats::SingleTagModule("collect_sender", "type", message_type),
             Countable::Ref(Arc::downgrade(&self.counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("type", message_type.to_string())],
         );
         self.stats_registered = true;
     }

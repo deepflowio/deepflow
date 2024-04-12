@@ -80,8 +80,8 @@ use crate::{
     },
     metric::document::BoxedDocument,
     monitor::Monitor,
-    platform::PlatformSynchronizer,
-    policy::{Policy, PolicySetter},
+    platform::synchronizer::Synchronizer as PlatformSynchronizer,
+    policy::{Policy, PolicyGetter, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
@@ -90,12 +90,12 @@ use crate::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
             get_env, kernel_check, running_in_container, tap_interface_check,
-            trident_process_check, K8S_MEM_LIMIT_FOR_DEEPFLOW,
+            trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
-        stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
+        stats::{self, ArcBatch, Countable, QueueStats, RefCountable},
     },
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -114,7 +114,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
+    proto::trident::{self, Exception, SocketType, TapMode},
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -200,11 +200,16 @@ pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 pub struct AgentId {
     pub ip: IpAddr,
     pub mac: MacAddr,
+    pub team_id: String,
 }
 
 impl fmt::Display for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.ip, self.mac)
+        if self.team_id.is_empty() {
+            write!(f, "{}/{}", self.ip, self.mac)
+        } else {
+            write!(f, "{}/{}/{}", self.ip, self.mac, self.team_id)
+        }
     }
 }
 
@@ -351,9 +356,8 @@ impl Trident {
         }
 
         stats_collector.register_countable(
-            "log_counter",
+            &stats::NoTagModule("log_counter"),
             stats::Countable::Owned(Box::new(log_level_counter)),
-            Default::default(),
         );
 
         info!("static_config {:#?}", config);
@@ -412,9 +416,7 @@ impl Trident {
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
-            if env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).is_err() {
-                warn!("the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is not set in the container , use the limit value from server instead");
-            }
+            warn!("When running in a container, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s or docker for resource limits.");
         }
 
         #[cfg(target_os = "linux")]
@@ -422,6 +424,7 @@ impl Trident {
             AgentId {
                 ip: ctrl_ip.clone(),
                 mac: ctrl_mac,
+                team_id: config_handler.static_config.team_id.clone(),
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
@@ -436,12 +439,17 @@ impl Trident {
             if let Err(e) = netns::reset_netns() {
                 return Err(anyhow!("reset netns error: {}", e));
             };
-            AgentId { ip, mac }
+            AgentId {
+                ip,
+                mac,
+                team_id: config_handler.static_config.team_id.clone(),
+            }
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
         let agent_id = AgentId {
             ip: ctrl_ip.clone(),
             mac: ctrl_mac,
+            team_id: config_handler.static_config.team_id.clone(),
         };
 
         info!(
@@ -484,15 +492,9 @@ impl Trident {
                 .kubernetes_cluster_id
                 .is_empty()
         {
-            config_handler.static_config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
-                &runtime,
-                &session,
-                config_handler
-                    .static_config
-                    .kubernetes_cluster_name
-                    .as_ref(),
-            );
-            warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
+            config_handler.static_config.kubernetes_cluster_id =
+                Config::get_k8s_cluster_id(&runtime, &session, &config_handler.static_config)
+                    .unwrap_or_default();
         }
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
@@ -517,9 +519,8 @@ impl Trident {
             ntp_diff,
         ));
         stats_collector.register_countable(
-            "ntp",
+            &stats::NoTagModule("ntp"),
             stats::Countable::Owned(Box::new(synchronizer.ntp_counter())),
-            Default::default(),
         );
         synchronizer.start();
 
@@ -528,6 +529,7 @@ impl Trident {
             session.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            config_handler.static_config.team_id.clone(),
             sidecar_mode,
             agent_id_tx,
         );
@@ -591,16 +593,11 @@ impl Trident {
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
+                config_handler.static_config.override_os_hostname.clone(),
                 synchronizer.agent_id.clone(),
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
-                config_handler
-                    .candidate_config
-                    .dispatcher
-                    .extra_netns_regex
-                    .clone(),
-                config_handler.static_config.override_os_hostname.clone(),
             ));
             ext.start();
             let poller = if sidecar_mode {
@@ -630,10 +627,10 @@ impl Trident {
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
+            config_handler.static_config.override_os_hostname.clone(),
             synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
-            config_handler.static_config.override_os_hostname.clone(),
         ));
         if matches!(
             config_handler.static_config.agent_mode,
@@ -689,7 +686,7 @@ impl Trident {
                     }
                     if let Some(c) = config.take() {
                         let agent_id = synchronizer.agent_id.read().clone();
-                        config_handler.on_config(
+                        let callbacks = config_handler.on_config(
                             c,
                             &exception_handler,
                             None,
@@ -709,6 +706,22 @@ impl Trident {
                             api_watcher.start();
                         } else {
                             api_watcher.stop();
+                        }
+
+                        if let Some(Components::Agent(c)) = components.as_mut() {
+                            for callback in callbacks {
+                                callback(&config_handler, c);
+                            }
+
+                            for d in c.dispatcher_components.iter_mut() {
+                                d.dispatcher_listener
+                                    .on_config_change(&config_handler.candidate_config.dispatcher);
+                            }
+                        } else {
+                            stats_collector
+                                .set_hostname(config_handler.candidate_config.stats.host.clone());
+                            stats_collector
+                                .set_min_interval(config_handler.candidate_config.stats.interval);
                         }
                     }
                     state_guard = cond.wait(state_guard).unwrap();
@@ -829,20 +842,24 @@ impl Trident {
                     components.config = config_handler.candidate_config.clone();
                     components.start();
 
-                    dispatcher_listener_callback(
-                        &config_handler.candidate_config.dispatcher,
+                    component_on_config_change(
+                        &config_handler,
                         components,
                         blacklist,
                         vm_mac_addrs,
                         gateway_vmac_addrs,
                         tap_types,
+                        &synchronizer,
+                        #[cfg(target_os = "linux")]
+                        libvirt_xml_extractor.clone(),
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
                     }
 
-                    for listener in components.dispatcher_listeners.iter_mut() {
-                        listener.on_config_change(&config_handler.candidate_config.dispatcher);
+                    for d in components.dispatcher_components.iter_mut() {
+                        d.dispatcher_listener
+                            .on_config_change(&config_handler.candidate_config.dispatcher);
                     }
                 }
                 _ => {
@@ -898,8 +915,8 @@ fn get_listener_links(
         }
         Ok(links) => {
             if links.is_empty() {
-                warn!(
-                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                info!(
+                    "tap-interface-regex({}) do not match any interface in {:?}",
                     conf.tap_interface_regex, netns,
                 );
             }
@@ -927,55 +944,121 @@ fn get_listener_links(
     }
 }
 
-fn dispatcher_listener_callback(
-    conf: &DispatcherConfig,
+fn component_on_config_change(
+    config_handler: &ConfigHandler,
     components: &mut AgentComponents,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
     gateway_vmac_addrs: Vec<MacAddr>,
     tap_types: Vec<trident::TapType>,
+    synchronizer: &Arc<Synchronizer>,
+    #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
 ) {
+    let conf = &config_handler.candidate_config.dispatcher;
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            for listener in components.dispatcher_listeners.iter() {
+            for d in components.dispatcher_components.iter() {
                 let interfaces = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
-                    listener.netns(),
+                    d.dispatcher_listener.netns(),
                 );
-                listener.on_tap_interface_change(
+                d.dispatcher_listener.on_tap_interface_change(
                     &interfaces,
                     if_mac_source,
                     conf.trident_type,
                     &blacklist,
                 );
-                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+                d.dispatcher_listener
+                    .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
             }
         }
-        TapMode::Mirror => {
-            for listener in components.dispatcher_listeners.iter() {
-                listener.on_tap_interface_change(
-                    &vec![],
-                    IfMacSource::IfMac,
-                    conf.trident_type,
-                    &blacklist,
-                );
-                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+        TapMode::Mirror | TapMode::Analyzer => {
+            // Obtain the currently configured network interfaces
+            let mut current_interfaces = get_listener_links(
+                conf,
+                #[cfg(target_os = "linux")]
+                &netns::NsFile::Root,
+            );
+            current_interfaces.sort();
+
+            if current_interfaces == components.tap_interfaces {
+                return;
             }
-        }
-        TapMode::Analyzer => {
-            for listener in components.dispatcher_listeners.iter() {
-                listener.on_tap_interface_change(
-                    &vec![],
-                    IfMacSource::IfMac,
-                    conf.trident_type,
-                    &blacklist,
-                );
-                listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+
+            // By comparing current_interfaces and components.tap_interfaces, we can determine which
+            // dispatcher_components should be closed and which dispatcher_components should be built
+            let interfaces_to_build: Vec<_> = current_interfaces
+                .iter()
+                .filter(|i| !components.tap_interfaces.contains(i))
+                .cloned()
+                .collect();
+
+            components.dispatcher_components.retain_mut(|d| {
+                let retain = current_interfaces.contains(&d.src_link);
+                if !retain {
+                    d.stop();
+                }
+                retain
+            });
+
+            let mut id = components.last_dispatcher_component_id;
+            components
+                .policy_setter
+                .reset_queue_size(id + interfaces_to_build.len() + 1);
+            let debugger_queue = components.debugger.clone_queue();
+            for i in interfaces_to_build {
+                id += 1;
+                match build_dispatchers(
+                    id,
+                    vec![i],
+                    components.stats_collector.clone(),
+                    config_handler,
+                    debugger_queue.clone(),
+                    components.is_ce_version,
+                    synchronizer,
+                    components.npb_bps_limit.clone(),
+                    components.npb_arp_table.clone(),
+                    components.rx_leaky_bucket.clone(),
+                    components.policy_getter,
+                    components.exception_handler.clone(),
+                    0,
+                    components.bpf_options.clone(),
+                    components.packet_sequence_uniform_output.clone(),
+                    components.proto_log_sender.clone(),
+                    components.pcap_batch_sender.clone(),
+                    components.tap_typer.clone(),
+                    vm_mac_addrs.clone(),
+                    gateway_vmac_addrs.clone(),
+                    components.toa_info_sender.clone(),
+                    components.l4_flow_aggr_sender.clone(),
+                    components.metrics_sender.clone(),
+                    #[cfg(target_os = "linux")]
+                    netns::NsFile::Root,
+                    #[cfg(target_os = "linux")]
+                    components.kubernetes_poller.clone(),
+                    #[cfg(target_os = "linux")]
+                    libvirt_xml_extractor.clone(),
+                ) {
+                    Ok(mut d) => {
+                        d.start();
+                        components.dispatcher_components.push(d);
+                    }
+                    Err(e) => {
+                        warn!("build dispatcher_component failed: {}", e);
+                        thread::sleep(Duration::from_secs(1));
+                        crate::utils::notify_exit(1);
+                    }
+                }
             }
-            parse_tap_type(components, tap_types);
+            components.last_dispatcher_component_id = id;
+            if conf.tap_mode == TapMode::Analyzer {
+                parse_tap_type(components, tap_types);
+            }
+            components.tap_interfaces = current_interfaces;
         }
+
         _ => {}
     }
 }
@@ -1004,6 +1087,7 @@ pub struct DomainNameListener {
     session: Arc<Session>,
     ips: Vec<String>,
     domain_names: Vec<String>,
+    team_id: String,
 
     sidecar_mode: bool,
 
@@ -1020,6 +1104,7 @@ impl DomainNameListener {
         session: Arc<Session>,
         domain_names: Vec<String>,
         ips: Vec<String>,
+        team_id: String,
         sidecar_mode: bool,
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
@@ -1028,6 +1113,7 @@ impl DomainNameListener {
             session,
             domain_names,
             ips,
+            team_id,
             sidecar_mode,
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -1060,6 +1146,7 @@ impl DomainNameListener {
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
+        let team_id = self.team_id.clone();
         let stopped = self.stopped.clone();
         let agent_id_tx = self.agent_id_tx.clone();
         let session = self.session.clone();
@@ -1113,7 +1200,7 @@ impl DomainNameListener {
                             );
                             #[cfg(target_os = "linux")]
                             let agent_id = if sidecar_mode {
-                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
+                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
                                 if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
@@ -1138,10 +1225,10 @@ impl DomainNameListener {
                                     thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
-                                AgentId { ip, mac }
+                                AgentId { ip, mac, team_id: team_id.clone() }
                             };
                             #[cfg(any(target_os = "windows", target_os = "android"))]
-                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
+                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() };
 
                             session.reset_server_ip(ips.clone());
                             let _ = agent_id_tx.send(agent_id);
@@ -1200,16 +1287,100 @@ impl WatcherComponents {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub struct EbpfDispatcherComponent {
+    pub ebpf_collector: Box<EbpfCollector>,
+    pub session_aggregator: SessionAggregator,
+    pub collector: CollectorThread,
+    pub l7_collector: L7CollectorThread,
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl EbpfDispatcherComponent {
+    pub fn start(&mut self) {
+        self.session_aggregator.start();
+        self.collector.start();
+        self.l7_collector.start();
+        self.ebpf_collector.start();
+    }
+
+    pub fn stop(&mut self) {
+        self.session_aggregator.stop();
+        self.collector.stop();
+        self.l7_collector.stop();
+        self.ebpf_collector.notify_stop();
+    }
+}
+
+pub struct MetricsServerComponent {
+    pub external_metrics_server: MetricServer,
+    pub l7_collector: L7CollectorThread,
+}
+
+impl MetricsServerComponent {
+    pub fn start(&mut self) {
+        self.external_metrics_server.start();
+        self.l7_collector.start();
+    }
+
+    pub fn stop(&mut self) {
+        self.external_metrics_server.stop();
+        self.l7_collector.stop();
+    }
+}
+
+pub struct DispatcherComponent {
+    pub id: usize,
+    pub dispatcher: Dispatcher,
+    pub dispatcher_listener: DispatcherListener,
+    pub session_aggregator: SessionAggregator,
+    pub collector: CollectorThread,
+    pub l7_collector: L7CollectorThread,
+    pub packet_sequence_parser: PacketSequenceParser,
+    pub pcap_assembler: PcapAssembler,
+    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub src_link: Link, // The original src_interface
+}
+
+impl DispatcherComponent {
+    pub fn start(&mut self) {
+        self.dispatcher.start();
+        self.session_aggregator.start();
+        self.collector.start();
+        self.l7_collector.start();
+        self.packet_sequence_parser.start();
+        self.pcap_assembler.start();
+        self.handler_builders
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .for_each(|y| {
+                y.start();
+            });
+    }
+    pub fn stop(&mut self) {
+        self.dispatcher.stop();
+        self.session_aggregator.stop();
+        self.collector.stop();
+        self.l7_collector.stop();
+        self.packet_sequence_parser.stop();
+        self.pcap_assembler.stop();
+        self.handler_builders
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .for_each(|y| {
+                y.stop();
+            });
+    }
+}
+
 pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
     pub tap_typer: Arc<TapTyper>,
     pub cur_tap_types: Vec<trident::TapType>,
-    pub dispatchers: Vec<Dispatcher>,
-    pub dispatcher_listeners: Vec<DispatcherListener>,
-    pub session_aggrs: Vec<SessionAggregator>,
-    pub collectors: Vec<CollectorThread>,
-    pub l7_collectors: Vec<L7CollectorThread>,
+    pub dispatcher_components: Vec<DispatcherComponent>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
@@ -1223,26 +1394,34 @@ pub struct AgentComponents {
     pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    pub ebpf_collector: Option<Box<EbpfCollector>>,
+    pub ebpf_dispatcher_component: Option<EbpfDispatcherComponent>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
-    pub external_metrics_server: MetricServer,
+    pub metrics_server_component: MetricsServerComponent,
     pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
     pub prometheus_uniform_sender: UniformSenderThread<BoxedPrometheusExtra>,
     pub telegraf_uniform_sender: UniformSenderThread<TelegrafMetric>,
     pub profile_uniform_sender: UniformSenderThread<Profile>,
-    pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub exception_handler: ExceptionHandler,
+    pub proto_log_sender: DebugSender<BoxAppProtoLogsData>,
+    pub pcap_batch_sender: DebugSender<BoxedPcapBatch>,
+    pub toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
+    pub l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
+    pub metrics_sender: DebugSender<BoxedDocument>,
     pub npb_bps_limit: Arc<LeakyBucket>,
-    pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
-    pub pcap_assemblers: Vec<PcapAssembler>,
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
     pub policy_setter: PolicySetter,
+    pub policy_getter: PolicyGetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
+    pub is_ce_version: bool, // Determine whether the current version is a ce version, CE-AGENT always set pcap-assembler disabled
+    pub tap_interfaces: Vec<Link>,
+    pub bpf_options: Arc<Mutex<BpfOptions>>,
+    pub last_dispatcher_component_id: usize,
 
     max_memory: u64,
     tap_mode: TapMode,
@@ -1277,12 +1456,11 @@ impl AgentComponents {
             );
             l4_log_sender_outer = Some(l4_log_sender);
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id,
+                    module: "2-second-flow-to-minute-aggrer",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
             let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
                 id,                                   // id
@@ -1293,9 +1471,8 @@ impl AgentComponents {
             );
             l4_flow_aggr_outer = Some(l4_flow_aggr);
             stats_collector.register_countable(
-                "flow_aggr",
+                &stats::SingleTagModule("flow_aggr", "index", id),
                 Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", id.to_string())],
             );
         }
 
@@ -1305,15 +1482,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-second-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-second-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
         let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
             yaml_config.quadruple_queue_size,
@@ -1321,15 +1494,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-minute-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-minute-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
@@ -1419,15 +1588,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-l7-second-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-l7-second-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
         let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
             yaml_config.quadruple_queue_size,
@@ -1435,15 +1600,11 @@ impl AgentComponents {
             queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id,
+                module: "2-flow-with-meter-to-l7-minute-collector",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-l7-minute-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
         );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
@@ -1526,7 +1687,6 @@ impl AgentComponents {
         let candidate_config = &config_handler.candidate_config;
         let yaml_config = &candidate_config.yaml_config;
         let ctrl_ip = config_handler.ctrl_ip;
-        let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
         let process_threshold = config_handler
             .candidate_config
@@ -1534,18 +1694,8 @@ impl AgentComponents {
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
-        #[cfg(target_os = "linux")]
-        {
-            // require an update because platfrom_synchronizer starts before receiving config from server
-            let regex = &candidate_config.dispatcher.extra_netns_regex;
-            let regex = if regex != "" {
-                info!("platform monitoring extra netns: /{}/", regex);
-                Some(regex::Regex::new(regex).unwrap())
-            } else {
-                info!("platform monitoring no extra netns");
-                None
-            };
-            platform_synchronizer.set_netns_regex(regex);
+        if !yaml_config.src_interfaces.is_empty() {
+            warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
         let mut stats_sender = UniformSenderThread::new(
@@ -1574,12 +1724,77 @@ impl AgentComponents {
             exception_handler.clone(),
         ));
 
+        #[cfg(target_os = "linux")]
+        let mut interfaces_and_ns: Vec<(Vec<Link>, netns::NsFile)> = vec![];
+        #[cfg(any(target_os = "windows", target_os = "android"))]
+        let mut interfaces_and_ns: Vec<Vec<Link>> = vec![];
+
+        #[cfg(target_os = "linux")]
+        if candidate_config.dispatcher.extra_netns_regex != "" {
+            if candidate_config.tap_mode == TapMode::Local {
+                let re = regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
+                let mut nss = netns::find_ns_files_by_regex(&re);
+                nss.sort_unstable();
+                for ns in nss.into_iter() {
+                    interfaces_and_ns
+                        .push((get_listener_links(&candidate_config.dispatcher, &ns), ns));
+                }
+            } else {
+                log::error!("When the TapMode is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local
+            && candidate_config.dispatcher.extra_netns_regex == ""
+        {
+            yaml_config.local_dispatcher_count
+        } else {
+            1
+        };
+        #[cfg(any(target_os = "windows", target_os = "android"))]
+        let local_dispatcher_count = 1;
+
+        if interfaces_and_ns.is_empty() {
+            let links = get_listener_links(
+                &candidate_config.dispatcher,
+                #[cfg(target_os = "linux")]
+                &netns::NsFile::Root,
+            );
+            if candidate_config.tap_mode != TapMode::Local {
+                for l in links {
+                    #[cfg(target_os = "linux")]
+                    interfaces_and_ns.push((vec![l], netns::NsFile::Root));
+                    #[cfg(any(target_os = "windows", target_os = "android"))]
+                    interfaces_and_ns.push(vec![l]);
+                }
+            } else {
+                for _ in 0..local_dispatcher_count {
+                    #[cfg(target_os = "linux")]
+                    interfaces_and_ns.push((links.clone(), netns::NsFile::Root));
+                    #[cfg(any(target_os = "windows", target_os = "android"))]
+                    interfaces_and_ns.push(links.clone());
+                }
+            }
+        }
+
         match candidate_config.tap_mode {
             TapMode::Analyzer => {
                 info!("Start check kernel...");
                 kernel_check();
                 info!("Start check tap interface...");
-                tap_interface_check(&yaml_config.src_interfaces);
+                #[cfg(target_os = "linux")]
+                let tap_interfaces: Vec<_> = interfaces_and_ns
+                    .iter()
+                    .filter_map(|i| i.0.get(0).map(|l| l.name.clone()))
+                    .collect();
+                #[cfg(any(target_os = "windows", target_os = "android"))]
+                let tap_interfaces: Vec<_> = interfaces_and_ns
+                    .iter()
+                    .filter_map(|i| i.get(0).map(|l| l.name.clone()))
+                    .collect();
+
+                tap_interface_check(&tap_interfaces);
             }
             _ => {
                 // NPF服务检查
@@ -1597,7 +1812,11 @@ impl AgentComponents {
         // =================================================================================
         // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1.max(yaml_config.src_interfaces.len()),
+            1.max(if candidate_config.tap_mode != TapMode::Local {
+                interfaces_and_ns.len()
+            } else {
+                1
+            }),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
             yaml_config.forward_capacity,
@@ -1690,12 +1909,7 @@ impl AgentComponents {
         let tap_typer = Arc::new(TapTyper::new());
 
         // TODO: collector enabled
-        let mut dispatchers = vec![];
-        let mut dispatcher_listeners = vec![];
-        let mut collectors = vec![];
-        let mut l7_collectors = vec![];
-        let mut session_aggrs = vec![];
-        let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
+        let mut dispatcher_components = vec![];
 
         // Sender/Collector
         info!(
@@ -1709,12 +1923,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: l4_flow_aggr_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                l4_flow_aggr_queue_name.to_string(),
-            )],
         );
         let l4_flow_uniform_sender = UniformSenderThread::new(
             l4_flow_aggr_queue_name,
@@ -1732,9 +1945,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: metrics_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", metrics_queue_name.to_string())],
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             metrics_queue_name,
@@ -1752,12 +1967,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: proto_log_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", proto_log_queue_name.to_string()),
-                StatsOption::Tag("index", "0".to_string()),
-            ],
         );
         let l7_flow_uniform_sender = UniformSenderThread::new(
             proto_log_queue_name,
@@ -1796,6 +2010,63 @@ impl AgentComponents {
                 }
             }
         };
+
+        let npb_bps_limit = Arc::new(LeakyBucket::new(Some(
+            config_handler.candidate_config.sender.npb_bps_threshold,
+        )));
+        let npb_arp_table = Arc::new(NpbArpTable::new(
+            config_handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+            exception_handler.clone(),
+        ));
+
+        let pcap_batch_queue = "2-pcap-batch-to-sender";
+        let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
+            queue::bounded_with_debug(
+                yaml_config.pcap.queue_size as usize,
+                pcap_batch_queue,
+                &queue_debugger,
+            );
+        stats_collector.register_countable(
+            &QueueStats {
+                module: pcap_batch_queue,
+                ..Default::default()
+            },
+            Countable::Owned(Box::new(pcap_batch_counter)),
+        );
+        let pcap_batch_uniform_sender = UniformSenderThread::new(
+            pcap_batch_queue,
+            Arc::new(pcap_batch_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            false,
+        );
+        // Enterprise Edition Feature: packet-sequence
+        let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
+        let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
+            queue::bounded_with_debug(
+                yaml_config.packet_sequence_queue_size,
+                packet_sequence_queue_name,
+                &queue_debugger,
+            );
+
+        stats_collector.register_countable(
+            &QueueStats {
+                module: packet_sequence_queue_name,
+                ..Default::default()
+            },
+            Countable::Owned(Box::new(counter)),
+        );
+
+        let packet_sequence_uniform_sender = UniformSenderThread::new(
+            packet_sequence_queue_name,
+            Arc::new(packet_sequence_uniform_input),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            true,
+        );
+
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
             vxlan_flags: yaml_config.vxlan_flags,
@@ -1810,32 +2081,6 @@ impl AgentComponents {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let bpf_syntax = bpf_builder.build_pcap_syntax();
 
-        // Enterprise Edition Feature: packet-sequence
-        let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
-        let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
-            queue::bounded_with_debug(
-                yaml_config.packet_sequence_queue_size,
-                packet_sequence_queue_name,
-                &queue_debugger,
-            );
-
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                packet_sequence_queue_name.to_string(),
-            )],
-        );
-        let packet_sequence_uniform_sender = UniformSenderThread::new(
-            packet_sequence_queue_name,
-            Arc::new(packet_sequence_uniform_input),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            true,
-        );
-
         let bpf_options = Arc::new(Mutex::new(BpfOptions {
             capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1843,324 +2088,49 @@ impl AgentComponents {
             bpf_syntax_str,
         }));
 
-        let npb_bps_limit = Arc::new(LeakyBucket::new(Some(
-            config_handler.candidate_config.sender.npb_bps_threshold,
-        )));
-        let mut handler_builders = Vec::new();
-        let npb_arp_table = Arc::new(NpbArpTable::new(
-            config_handler.candidate_config.npb.socket_type == SocketType::RawUdp,
-            exception_handler.clone(),
-        ));
-
-        let mut src_interfaces_and_namespaces = vec![];
-        for src_if in yaml_config.src_interfaces.iter() {
-            src_interfaces_and_namespaces.push((
-                src_if.clone(),
-                #[cfg(target_os = "linux")]
-                netns::NsFile::Root,
-            ));
-        }
-        #[cfg(target_os = "linux")]
-        if candidate_config.dispatcher.extra_netns_regex != "" {
-            let re = regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
-            let mut nss = netns::find_ns_files_by_regex(&re);
-            nss.sort_unstable();
-            for ns in nss {
-                src_interfaces_and_namespaces.push(("".into(), ns));
-            }
-        }
-        if src_interfaces_and_namespaces.is_empty() {
+        let mut tap_interfaces = vec![];
+        for (i, entry) in interfaces_and_ns.into_iter().enumerate() {
             #[cfg(target_os = "linux")]
-            let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local {
-                yaml_config.local_dispatcher_count
-            } else {
-                1
-            };
+            let links = entry.0;
             #[cfg(any(target_os = "windows", target_os = "android"))]
-            let local_dispatcher_count = 1;
-            for _ in 0..local_dispatcher_count {
-                src_interfaces_and_namespaces.push((
-                    "".into(),
-                    #[cfg(target_os = "linux")]
-                    netns::NsFile::Root,
-                ));
-            }
-        }
-
-        let mut pcap_assemblers = vec![];
-        let pcap_batch_queue = "2-pcap-batch-to-sender";
-        let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
-            queue::bounded_with_debug(
-                yaml_config.pcap.queue_size as usize,
-                pcap_batch_queue,
-                &queue_debugger,
-            );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(pcap_batch_counter)),
-            vec![StatsOption::Tag("module", pcap_batch_queue.to_string())],
-        );
-        let pcap_batch_uniform_sender = UniformSenderThread::new(
-            pcap_batch_queue,
-            Arc::new(pcap_batch_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            false,
-        );
-
-        let local_dispatcher_count = src_interfaces_and_namespaces.len();
-        for (i, entry) in src_interfaces_and_namespaces.into_iter().enumerate() {
-            let src_interface = entry.0;
+            let links = entry;
+            tap_interfaces.extend(links.clone());
             #[cfg(target_os = "linux")]
             let netns = entry.1;
-
-            let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-tagged-flow-to-quadruple-generator",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", i.to_string()),
-                ],
-            );
-
-            let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-l7-stats-to-quadruple-generator",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", i.to_string()),
-                ],
-            );
-
-            // create and start app proto logs
-            let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-tagged-flow-to-app-protocol-logs",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
-                    StatsOption::Tag("index", i.to_string()),
-                ],
-            );
-
-            let (session_aggr, counter) = SessionAggregator::new(
-                log_receiver,
-                proto_log_sender.clone(),
-                i as u32,
-                config_handler.log_parser(),
-                synchronizer.ntp_diff(),
-            );
-            stats_collector.register_countable(
-                "l7_session_aggr",
-                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", i.to_string())],
-            );
-            session_aggrs.push(session_aggr);
-
-            // Enterprise Edition Feature: packet-sequence
-            // create and start packet sequence
-            let (packet_sequence_sender, packet_sequence_receiver, counter) =
-                queue::bounded_with_debug(
-                    yaml_config.packet_sequence_queue_size,
-                    "1-packet-sequence-block-to-parser",
-                    &queue_debugger,
-                );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-packet-sequence-block-to-parser".to_string()),
-                    StatsOption::Tag("index", i.to_string()),
-                ],
-            );
-
-            let packet_sequence_parser = PacketSequenceParser::new(
-                packet_sequence_receiver,
-                packet_sequence_uniform_output.clone(),
-                i as u32,
-            );
-            packet_sequence_parsers.push(packet_sequence_parser);
-            let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
-                // CE-AGENT always set pcap-assembler disabled
+            let dispatcher_component = build_dispatchers(
+                i,
+                links,
+                stats_collector.clone(),
+                config_handler,
+                queue_debugger.clone(),
                 version_info.name != env!("AGENT_NAME"),
-                &yaml_config.pcap,
-                &stats_collector,
+                synchronizer,
+                npb_bps_limit.clone(),
+                npb_arp_table.clone(),
+                rx_leaky_bucket.clone(),
+                policy_getter,
+                exception_handler.clone(),
+                local_dispatcher_count,
+                bpf_options.clone(),
+                packet_sequence_uniform_output.clone(),
+                proto_log_sender.clone(),
                 pcap_batch_sender.clone(),
-                &queue_debugger,
-                synchronizer.ntp_diff(),
-                i,
-            );
-            pcap_assemblers.push(pcap_assembler);
-
-            let handler_builder = Arc::new(Mutex::new(vec![
-                PacketHandlerBuilder::Pcap(mini_packet_sender),
-                PacketHandlerBuilder::Npb(NpbBuilder::new(
-                    i,
-                    &config_handler.candidate_config.npb,
-                    &queue_debugger,
-                    npb_bps_limit.clone(),
-                    npb_arp_table.clone(),
-                    stats_collector.clone(),
-                )),
-            ]));
-            handler_builders.push(handler_builder.clone());
-
-            let tap_interfaces = get_listener_links(
-                &config_handler.candidate_config.dispatcher,
-                #[cfg(target_os = "linux")]
-                &netns,
-            );
-
-            let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
-                tap_interfaces.clone()
-            } else if candidate_config.tap_mode == TapMode::Mirror && yaml_config.dpdk_enabled {
-                vec![]
-            } else {
-                #[cfg(target_os = "linux")]
-                match netns::link_by_name_in_netns(&src_interface, &netns) {
-                    Ok(link) => vec![link],
-                    Err(e) => {
-                        warn!("link_by_name: {}, error: {}", src_interface, e);
-                        vec![]
-                    }
-                }
-                #[cfg(any(target_os = "windows", target_os = "android"))]
-                match public::utils::net::link_by_name(&src_interface) {
-                    Ok(link) => vec![link],
-                    Err(e) => {
-                        warn!("link_by_name: {}, error: {}", src_interface, e);
-                        vec![]
-                    }
-                }
-            };
-
-            let dispatcher_builder = DispatcherBuilder::new()
-                .id(i)
-                .pause(agent_mode == RunningMode::Managed)
-                .handler_builders(handler_builder)
-                .ctrl_mac(ctrl_mac)
-                .leaky_bucket(rx_leaky_bucket.clone())
-                .options(Arc::new(Mutex::new(dispatcher::Options {
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
-                    af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
-                    packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
-                    tap_mode: candidate_config.tap_mode,
-                    tap_mac_script: yaml_config.tap_mac_script.clone(),
-                    is_ipv6: ctrl_ip.is_ipv6(),
-                    npb_port: yaml_config.npb_port,
-                    vxlan_flags: yaml_config.vxlan_flags,
-                    controller_port: static_config.controller_port,
-                    controller_tls_port: static_config.controller_tls_port,
-                    libpcap_enabled: yaml_config.libpcap_enabled,
-                    snap_len: config_handler
-                        .candidate_config
-                        .dispatcher
-                        .capture_packet_size as usize,
-                    dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
-                    ..Default::default()
-                })))
-                .bpf_options(bpf_options.clone())
-                .default_tap_type(
-                    (yaml_config.default_tap_type as u16)
-                        .try_into()
-                        .unwrap_or(TapType::Cloud),
-                )
-                .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
-                .tap_typer(tap_typer.clone())
-                .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
-                .flow_output_queue(flow_sender.clone())
-                .l7_stats_output_queue(l7_stats_sender.clone())
-                .log_output_queue(log_sender.clone())
-                .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
-                .stats_collector(stats_collector.clone())
-                .flow_map_config(config_handler.flow())
-                .log_parse_config(config_handler.log_parser())
-                .collector_config(config_handler.collector())
-                .policy_getter(policy_getter)
-                .exception_handler(exception_handler.clone())
-                .ntp_diff(synchronizer.ntp_diff())
-                .src_interface(src_interface.clone())
-                .trident_type(candidate_config.dispatcher.trident_type)
-                .queue_debugger(queue_debugger.clone())
-                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
-                .pcap_interfaces(pcap_interfaces)
-                .local_dispatcher_count(local_dispatcher_count)
-                .analyzer_raw_packet_block_size(
-                    yaml_config.analyzer_raw_packet_block_size as usize,
-                );
-            #[cfg(target_os = "linux")]
-            let dispatcher_builder = dispatcher_builder
-                .netns(netns)
-                .libvirt_xml_extractor(libvirt_xml_extractor.clone())
-                .platform_poller(kubernetes_poller.clone());
-            let dispatcher = match dispatcher_builder.build() {
-                Ok(d) => d,
-                Err(e) => {
-                    warn!(
-                        "dispatcher creation failed: {}, deepflow-agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    return Err(e.into());
-                }
-            };
-            let mut dispatcher_listener = dispatcher.listener();
-            dispatcher_listener.on_config_change(&candidate_config.dispatcher);
-            dispatcher_listener.on_tap_interface_change(
-                &tap_interfaces,
-                candidate_config.dispatcher.if_mac_source,
-                candidate_config.dispatcher.trident_type,
-                &vec![],
-            );
-            dispatcher_listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
-            synchronizer.add_flow_acl_listener(Box::new(dispatcher_listener.clone()));
-
-            dispatchers.push(dispatcher);
-            dispatcher_listeners.push(dispatcher_listener);
-
-            // create and start collector
-            let collector = Self::new_collector(
-                i,
-                stats_collector.clone(),
-                flow_receiver,
+                tap_typer.clone(),
+                vm_mac_addrs.clone(),
+                gateway_vmac_addrs.clone(),
                 toa_sender.clone(),
-                Some(l4_flow_aggr_sender.clone()),
+                l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
-                MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler,
-                &queue_debugger,
-                &synchronizer,
-                agent_mode,
-            );
-            collectors.push(collector);
-            let l7_collector = Self::new_l7_collector(
-                i,
-                stats_collector.clone(),
-                l7_stats_receiver,
-                metrics_sender.clone(),
-                MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler,
-                &queue_debugger,
-                &synchronizer,
-                agent_mode,
-            );
-            l7_collectors.push(l7_collector);
+                #[cfg(target_os = "linux")]
+                netns,
+                #[cfg(target_os = "linux")]
+                kubernetes_poller.clone(),
+                #[cfg(target_os = "linux")]
+                libvirt_xml_extractor.clone(),
+            )?;
+            dispatcher_components.push(dispatcher_component);
         }
+        tap_interfaces.sort();
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
         let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
@@ -2169,12 +2139,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: proc_event_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                proc_event_queue_name.to_string(),
-            )],
         );
         let proc_event_uniform_sender = UniformSenderThread::new(
             proc_event_queue_name,
@@ -2192,9 +2161,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: profile_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
         );
         let profile_uniform_sender = UniformSenderThread::new(
             profile_queue_name,
@@ -2205,9 +2176,9 @@ impl AgentComponents {
             true,
         );
 
-        let ebpf_dispatcher_id = dispatchers.len();
+        let ebpf_dispatcher_id = dispatcher_components.len();
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        let mut ebpf_collector = None;
+        let mut ebpf_dispatcher_component = None;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
             && candidate_config.tap_mode != TapMode::Analyzer
@@ -2218,12 +2189,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-tagged-flow-to-quadruple-generator",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
 
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
@@ -2232,12 +2202,11 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-l7-stats-to-quadruple-generator",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
             let collector = Self::new_collector(
                 ebpf_dispatcher_id,
@@ -2258,14 +2227,13 @@ impl AgentComponents {
                 &queue_debugger,
             );
             stats_collector.register_countable(
-                "queue",
+                &QueueStats {
+                    id: ebpf_dispatcher_id,
+                    module: "1-tagged-flow-to-app-protocol-logs",
+                },
                 Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
-                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
-                ],
             );
-            let (session_aggr, counter) = SessionAggregator::new(
+            let (session_aggregator, counter) = SessionAggregator::new(
                 log_receiver,
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
@@ -2273,12 +2241,9 @@ impl AgentComponents {
                 synchronizer.ntp_diff(),
             );
             stats_collector.register_countable(
-                "l7_session_aggr",
+                &stats::SingleTagModule("l7_session_aggr", "index", ebpf_dispatcher_id),
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", ebpf_dispatcher_id.to_string())],
             );
-            session_aggrs.push(session_aggr);
-            collectors.push(collector);
             let l7_collector = Self::new_l7_collector(
                 ebpf_dispatcher_id,
                 stats_collector.clone(),
@@ -2290,7 +2255,6 @@ impl AgentComponents {
                 &synchronizer,
                 agent_mode,
             );
-            l7_collectors.push(l7_collector);
             match EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
@@ -2307,14 +2271,19 @@ impl AgentComponents {
                 &queue_debugger,
                 stats_collector.clone(),
             ) {
-                Ok(collector) => {
-                    synchronizer.add_flow_acl_listener(Box::new(collector.get_sync_dispatcher()));
+                Ok(ebpf_collector) => {
+                    synchronizer
+                        .add_flow_acl_listener(Box::new(ebpf_collector.get_sync_dispatcher()));
                     stats_collector.register_countable(
-                        "ebpf-collector",
-                        Countable::Owned(Box::new(collector.get_sync_counter())),
-                        vec![],
+                        &stats::NoTagModule("ebpf-collector"),
+                        Countable::Owned(Box::new(ebpf_collector.get_sync_counter())),
                     );
-                    ebpf_collector = Some(collector);
+                    ebpf_dispatcher_component = Some(EbpfDispatcherComponent {
+                        ebpf_collector,
+                        session_aggregator,
+                        collector,
+                        l7_collector,
+                    });
                 }
                 Err(e) => {
                     log::error!("ebpf collector error: {:?}", e);
@@ -2329,9 +2298,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: otel_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", otel_queue_name.to_string())],
         );
         let otel_uniform_sender = UniformSenderThread::new(
             otel_queue_name,
@@ -2350,12 +2321,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                id: otel_dispatcher_id,
+                module: "1-l7-stats-to-quadruple-generator",
+            },
             Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
-                StatsOption::Tag("index", otel_dispatcher_id.to_string()),
-            ],
         );
         let l7_collector = Self::new_l7_collector(
             otel_dispatcher_id,
@@ -2368,7 +2338,6 @@ impl AgentComponents {
             &synchronizer,
             agent_mode,
         );
-        l7_collectors.push(l7_collector);
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
@@ -2377,12 +2346,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: prometheus_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                prometheus_queue_name.to_string(),
-            )],
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             prometheus_queue_name,
@@ -2400,9 +2368,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: telegraf_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", telegraf_queue_name.to_string())],
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             telegraf_queue_name,
@@ -2420,12 +2390,11 @@ impl AgentComponents {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module: compressed_otel_queue_name,
+                ..Default::default()
+            },
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag(
-                "module",
-                compressed_otel_queue_name.to_string(),
-            )],
         );
         let compressed_otel_uniform_sender = UniformSenderThread::new(
             compressed_otel_queue_name,
@@ -2464,9 +2433,8 @@ impl AgentComponents {
         );
 
         stats_collector.register_countable(
-            "integration_collector",
+            &stats::NoTagModule("integration_collector"),
             Countable::Owned(Box::new(external_metrics_counter)),
-            Default::default(),
         );
 
         let sender_config = config_handler.sender().load();
@@ -2479,9 +2447,8 @@ impl AgentComponents {
         );
         synchronizer.add_flow_acl_listener(npb_bandwidth_watcher.clone());
         stats_collector.register_countable(
-            "npb_bandwidth_watcher",
+            &stats::NoTagModule("npb_bandwidth_watcher"),
             Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
-            Default::default(),
         );
 
         Ok(AgentComponents {
@@ -2489,10 +2456,6 @@ impl AgentComponents {
             rx_leaky_bucket,
             tap_typer,
             cur_tap_types: vec![],
-            dispatchers,
-            dispatcher_listeners,
-            collectors,
-            l7_collectors,
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
@@ -2505,12 +2468,14 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             prometheus_targets_watcher,
             debugger,
-            session_aggrs,
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            ebpf_collector,
+            ebpf_dispatcher_component,
             stats_collector,
             running: AtomicBool::new(false),
-            external_metrics_server,
+            metrics_server_component: MetricsServerComponent {
+                external_metrics_server,
+                l7_collector,
+            },
             exception_handler,
             max_memory,
             otel_uniform_sender,
@@ -2519,19 +2484,34 @@ impl AgentComponents {
             profile_uniform_sender,
             proc_event_uniform_sender,
             tap_mode: candidate_config.tap_mode,
+            packet_sequence_uniform_output, // Enterprise Edition Feature: packet-sequence
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
             npb_bps_limit,
-            handler_builders,
             compressed_otel_uniform_sender,
-            pcap_assemblers,
             pcap_batch_uniform_sender,
+            proto_log_sender,
+            pcap_batch_sender,
+            toa_info_sender: toa_sender,
+            l4_flow_aggr_sender,
+            metrics_sender,
             agent_mode,
             policy_setter,
+            policy_getter,
             npb_bandwidth_watcher,
             npb_arp_table,
             runtime,
+            dispatcher_components,
+            is_ce_version: version_info.name != env!("AGENT_NAME"),
+            tap_interfaces,
+            last_dispatcher_component_id: otel_dispatcher_id,
+            bpf_options,
         })
+    }
+
+    pub fn clear_dispatcher_components(&mut self) {
+        self.dispatcher_components.iter_mut().for_each(|d| d.stop());
+        self.dispatcher_components.clear();
+        self.tap_interfaces.clear();
     }
 
     fn start(&mut self) {
@@ -2559,9 +2539,6 @@ impl AgentComponents {
 
         // Enterprise Edition Feature: packet-sequence
         self.packet_sequence_uniform_sender.start();
-        for packet_sequence_parser in self.packet_sequence_parsers.iter() {
-            packet_sequence_parser.start();
-        }
 
         // When tap_mode is Analyzer mode and agent is not running in container and agent
         // in the environment where cgroup is not supported, we need to check free memory
@@ -2571,8 +2548,8 @@ impl AgentComponents {
         {
             match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {
-                    for dispatcher in self.dispatchers.iter() {
-                        dispatcher.start();
+                    for d in self.dispatcher_components.iter_mut() {
+                        d.start();
                     }
                 }
                 Err(e) => {
@@ -2580,26 +2557,14 @@ impl AgentComponents {
                 }
             }
         } else {
-            for dispatcher in self.dispatchers.iter() {
-                dispatcher.start();
+            for d in self.dispatcher_components.iter_mut() {
+                d.start();
             }
         }
 
-        for sess_aggr in self.session_aggrs.iter() {
-            sess_aggr.start();
-        }
-
-        for collector in self.collectors.iter_mut() {
-            collector.start();
-        }
-
-        for collector in self.l7_collectors.iter_mut() {
-            collector.start();
-        }
-
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
-            ebpf_collector.start();
+        if let Some(ebpf_dispatcher_component) = self.ebpf_dispatcher_component.as_mut() {
+            ebpf_dispatcher_component.start();
         }
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.otel_uniform_sender.start();
@@ -2609,19 +2574,12 @@ impl AgentComponents {
             self.profile_uniform_sender.start();
             self.proc_event_uniform_sender.start();
             if self.config.metric_server.enabled {
-                self.external_metrics_server.start();
+                self.metrics_server_component.start();
             }
             self.pcap_batch_uniform_sender.start();
         }
-        self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
-                y.start();
-            })
-        });
+
         self.npb_bandwidth_watcher.start();
-        for p in self.pcap_assemblers.iter() {
-            p.start();
-        }
         self.npb_arp_table.start();
         info!("Started agent components.");
     }
@@ -2633,7 +2591,8 @@ impl AgentComponents {
 
         let mut join_handles = vec![];
 
-        for d in self.dispatchers.iter_mut() {
+        self.policy_setter.reset_queue_size(0);
+        for d in self.dispatcher_components.iter_mut() {
             d.stop();
         }
 
@@ -2643,20 +2602,6 @@ impl AgentComponents {
         {
             self.kubernetes_poller.stop();
             self.prometheus_targets_watcher.stop();
-        }
-
-        for q in self.collectors.iter_mut() {
-            join_handles.append(&mut q.notify_stop());
-        }
-
-        for q in self.l7_collectors.iter_mut() {
-            join_handles.append(&mut q.notify_stop());
-        }
-
-        for p in self.session_aggrs.iter() {
-            if let Some(h) = p.notify_stop() {
-                join_handles.push(h);
-            }
         }
 
         if let Some(h) = self.l4_flow_uniform_sender.notify_stop() {
@@ -2670,12 +2615,13 @@ impl AgentComponents {
         }
 
         self.debugger.stop();
+
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if let Some(h) = self.ebpf_collector.as_mut().and_then(|t| t.notify_stop()) {
-            join_handles.push(h);
+        if let Some(d) = self.ebpf_dispatcher_component.as_mut() {
+            d.stop();
         }
 
-        self.external_metrics_server.stop();
+        self.metrics_server_component.stop();
         if let Some(h) = self.otel_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
@@ -2701,21 +2647,11 @@ impl AgentComponents {
         if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
-        self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
-                if let Some(h) = y.notify_stop() {
-                    join_handles.push(h);
-                }
-            })
-        });
+
         if let Some(h) = self.npb_bandwidth_watcher.notify_stop() {
             join_handles.push(h);
         }
-        for p in self.pcap_assemblers.iter() {
-            if let Some(h) = p.notify_stop() {
-                join_handles.push(h);
-            }
-        }
+
         if let Some(h) = self.npb_arp_table.notify_stop() {
             join_handles.push(h);
         }
@@ -2826,17 +2762,274 @@ fn build_pcap_assembler(
         ntp_diff,
     );
     stats_collector.register_countable(
-        "pcap_assembler",
+        &stats::SingleTagModule("pcap_assembler", "id", id),
         Countable::Ref(Arc::downgrade(&pcap_assembler.counter) as Weak<dyn RefCountable>),
-        vec![StatsOption::Tag("id", id.to_string())],
     );
     stats_collector.register_countable(
-        "queue",
+        &QueueStats {
+            id,
+            module: mini_packet_queue,
+        },
         Countable::Owned(Box::new(mini_packet_counter)),
-        vec![
-            StatsOption::Tag("module", mini_packet_queue.to_string()),
-            StatsOption::Tag("index", id.to_string()),
-        ],
     );
     (pcap_assembler, mini_packet_sender)
+}
+
+fn build_dispatchers(
+    id: usize,
+    links: Vec<Link>,
+    stats_collector: Arc<stats::Collector>,
+    config_handler: &ConfigHandler,
+    queue_debugger: Arc<QueueDebugger>,
+    is_ce_version: bool,
+    synchronizer: &Arc<Synchronizer>,
+    npb_bps_limit: Arc<LeakyBucket>,
+    npb_arp_table: Arc<NpbArpTable>,
+    rx_leaky_bucket: Arc<LeakyBucket>,
+    policy_getter: PolicyGetter,
+    exception_handler: ExceptionHandler,
+    local_dispatcher_count: usize,
+    bpf_options: Arc<Mutex<BpfOptions>>,
+    packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>,
+    proto_log_sender: DebugSender<BoxAppProtoLogsData>,
+    pcap_batch_sender: DebugSender<BoxedPcapBatch>,
+    tap_typer: Arc<TapTyper>,
+    vm_mac_addrs: Vec<MacAddr>,
+    gateway_vmac_addrs: Vec<MacAddr>,
+    toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
+    l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
+    metrics_sender: DebugSender<BoxedDocument>,
+    #[cfg(target_os = "linux")] netns: netns::NsFile,
+    #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
+    #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+) -> Result<DispatcherComponent> {
+    let candidate_config = &config_handler.candidate_config;
+    let yaml_config = &candidate_config.yaml_config;
+    let dispatcher_config = &candidate_config.dispatcher;
+    let static_config = &config_handler.static_config;
+    let agent_mode = static_config.agent_mode;
+    let ctrl_ip = config_handler.ctrl_ip;
+    let ctrl_mac = config_handler.ctrl_mac;
+    let src_link = links.get(0).map(|l| l.to_owned()).unwrap_or_default();
+
+    let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
+        yaml_config.flow_queue_size,
+        "1-tagged-flow-to-quadruple-generator",
+        &queue_debugger,
+    );
+    stats_collector.register_countable(
+        &QueueStats {
+            id,
+            module: "1-tagged-flow-to-quadruple-generator",
+        },
+        Countable::Owned(Box::new(counter)),
+    );
+
+    let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+        yaml_config.flow_queue_size,
+        "1-l7-stats-to-quadruple-generator",
+        &queue_debugger,
+    );
+    stats_collector.register_countable(
+        &QueueStats {
+            id,
+            module: "1-l7-stats-to-quadruple-generator",
+        },
+        Countable::Owned(Box::new(counter)),
+    );
+
+    // create and start app proto logs
+    let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
+        yaml_config.flow_queue_size,
+        "1-tagged-flow-to-app-protocol-logs",
+        &queue_debugger,
+    );
+    stats_collector.register_countable(
+        &QueueStats {
+            id,
+            module: "1-tagged-flow-to-app-protocol-logs",
+        },
+        Countable::Owned(Box::new(counter)),
+    );
+
+    let (session_aggr, counter) = SessionAggregator::new(
+        log_receiver,
+        proto_log_sender.clone(),
+        id as u32,
+        config_handler.log_parser(),
+        synchronizer.ntp_diff(),
+    );
+    stats_collector.register_countable(
+        &stats::SingleTagModule("l7_session_aggr", "index", id),
+        Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
+    );
+
+    // Enterprise Edition Feature: packet-sequence
+    // create and start packet sequence
+    let (packet_sequence_sender, packet_sequence_receiver, counter) = queue::bounded_with_debug(
+        yaml_config.packet_sequence_queue_size,
+        "1-packet-sequence-block-to-parser",
+        &queue_debugger,
+    );
+    stats_collector.register_countable(
+        &QueueStats {
+            id,
+            module: "1-packet-sequence-block-to-parser",
+        },
+        Countable::Owned(Box::new(counter)),
+    );
+
+    let packet_sequence_parser = PacketSequenceParser::new(
+        packet_sequence_receiver,
+        packet_sequence_uniform_output,
+        id as u32,
+    );
+    let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
+        is_ce_version,
+        &yaml_config.pcap,
+        &stats_collector,
+        pcap_batch_sender.clone(),
+        &queue_debugger,
+        synchronizer.ntp_diff(),
+        id,
+    );
+
+    let handler_builders = Arc::new(Mutex::new(vec![
+        PacketHandlerBuilder::Pcap(mini_packet_sender),
+        PacketHandlerBuilder::Npb(NpbBuilder::new(
+            id,
+            &candidate_config.npb,
+            &queue_debugger,
+            npb_bps_limit.clone(),
+            npb_arp_table.clone(),
+            stats_collector.clone(),
+        )),
+    ]));
+
+    let pcap_interfaces =
+        if candidate_config.tap_mode == TapMode::Mirror && yaml_config.dpdk_enabled {
+            vec![]
+        } else {
+            links.clone()
+        };
+
+    let dispatcher_builder = DispatcherBuilder::new()
+        .id(id)
+        .pause(agent_mode == RunningMode::Managed)
+        .handler_builders(handler_builders.clone())
+        .ctrl_mac(ctrl_mac)
+        .leaky_bucket(rx_leaky_bucket.clone())
+        .options(Arc::new(Mutex::new(dispatcher::Options {
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            af_packet_version: dispatcher_config.af_packet_version,
+            packet_blocks: dispatcher_config.af_packet_blocks,
+            tap_mode: candidate_config.tap_mode,
+            tap_mac_script: yaml_config.tap_mac_script.clone(),
+            is_ipv6: ctrl_ip.is_ipv6(),
+            npb_port: yaml_config.npb_port,
+            vxlan_flags: yaml_config.vxlan_flags,
+            controller_port: static_config.controller_port,
+            controller_tls_port: static_config.controller_tls_port,
+            libpcap_enabled: yaml_config.libpcap_enabled,
+            snap_len: dispatcher_config.capture_packet_size as usize,
+            dpdk_enabled: dispatcher_config.dpdk_enabled,
+            dispatcher_queue: dispatcher_config.dispatcher_queue,
+            ..Default::default()
+        })))
+        .bpf_options(bpf_options)
+        .default_tap_type(
+            (yaml_config.default_tap_type as u16)
+                .try_into()
+                .unwrap_or(TapType::Cloud),
+        )
+        .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
+        .tap_typer(tap_typer.clone())
+        .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
+        .flow_output_queue(flow_sender.clone())
+        .l7_stats_output_queue(l7_stats_sender.clone())
+        .log_output_queue(log_sender.clone())
+        .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
+        .stats_collector(stats_collector.clone())
+        .flow_map_config(config_handler.flow())
+        .log_parse_config(config_handler.log_parser())
+        .collector_config(config_handler.collector())
+        .policy_getter(policy_getter)
+        .exception_handler(exception_handler.clone())
+        .ntp_diff(synchronizer.ntp_diff())
+        .src_interface(if candidate_config.tap_mode != TapMode::Local {
+            src_link.name.clone()
+        } else {
+            "".into()
+        })
+        .trident_type(dispatcher_config.trident_type)
+        .queue_debugger(queue_debugger.clone())
+        .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+        .pcap_interfaces(pcap_interfaces.clone())
+        .local_dispatcher_count(local_dispatcher_count)
+        .analyzer_raw_packet_block_size(yaml_config.analyzer_raw_packet_block_size as usize);
+    #[cfg(target_os = "linux")]
+    let dispatcher_builder = dispatcher_builder
+        .netns(netns)
+        .libvirt_xml_extractor(libvirt_xml_extractor.clone())
+        .platform_poller(kubernetes_poller.clone());
+    let dispatcher = match dispatcher_builder.build() {
+        Ok(d) => d,
+        Err(e) => {
+            warn!(
+                "dispatcher creation failed: {}, deepflow-agent restart...",
+                e
+            );
+            thread::sleep(Duration::from_secs(1));
+            return Err(e.into());
+        }
+    };
+    let mut dispatcher_listener = dispatcher.listener();
+    dispatcher_listener.on_config_change(dispatcher_config);
+    dispatcher_listener.on_tap_interface_change(
+        &links,
+        dispatcher_config.if_mac_source,
+        dispatcher_config.trident_type,
+        &vec![],
+    );
+    dispatcher_listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+    synchronizer.add_flow_acl_listener(Box::new(dispatcher_listener.clone()));
+
+    // create and start collector
+    let collector = AgentComponents::new_collector(
+        id,
+        stats_collector.clone(),
+        flow_receiver,
+        toa_info_sender.clone(),
+        Some(l4_flow_aggr_sender.clone()),
+        metrics_sender.clone(),
+        MetricsType::SECOND | MetricsType::MINUTE,
+        config_handler,
+        &queue_debugger,
+        &synchronizer,
+        agent_mode,
+    );
+
+    let l7_collector = AgentComponents::new_l7_collector(
+        id,
+        stats_collector.clone(),
+        l7_stats_receiver,
+        metrics_sender.clone(),
+        MetricsType::SECOND | MetricsType::MINUTE,
+        config_handler,
+        &queue_debugger,
+        &synchronizer,
+        agent_mode,
+    );
+    Ok(DispatcherComponent {
+        id,
+        dispatcher,
+        dispatcher_listener,
+        session_aggregator: session_aggr,
+        collector,
+        l7_collector,
+        packet_sequence_parser,
+        pcap_assembler,
+        handler_builders,
+        src_link,
+    })
 }

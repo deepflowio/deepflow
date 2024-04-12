@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -28,10 +29,15 @@ import (
 const BLOCK_HEAD_SIZE = 16
 
 type L4Packet struct {
-	StartTime   int64
-	EndTime     int64
-	FlowID      uint64
-	VtapID      uint16
+	StartTime int64
+	EndTime   int64
+	FlowID    uint64
+	VtapID    uint16
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'flow_log', otherwise stored in '<OrgId>_flow_log'.
+	OrgId       uint16
+	TeamID      uint16
 	PacketCount uint32
 	PacketBatch []byte
 }
@@ -42,7 +48,8 @@ func L4PacketColumns() []*ckdb.Column {
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("packet_batch", ckdb.String).SetIndex(ckdb.IndexNone),
 	}
@@ -54,8 +61,13 @@ func (s *L4Packet) WriteBlock(block *ckdb.Block) {
 	block.Write(s.EndTime)
 	block.Write(s.FlowID)
 	block.Write(s.VtapID)
+	block.Write(s.TeamID)
 	block.Write(s.PacketCount)
 	block.Write(utils.String(s.PacketBatch))
+}
+
+func (s *L4Packet) OrgID() uint16 {
+	return s.OrgId
 }
 
 func (p *L4Packet) Release() {
@@ -99,6 +111,7 @@ func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) (*L4Packe
 	l4Packet.StartTime = l4Packet.EndTime - 5*US_TO_S_DEVISOR
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
 	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-BLOCK_HEAD_SIZE)...)
+	l4Packet.OrgId, l4Packet.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
 
 	return l4Packet, nil
 }

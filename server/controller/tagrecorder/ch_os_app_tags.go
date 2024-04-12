@@ -20,70 +20,84 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTags struct {
-	UpdaterComponent[mysql.ChOSAppTags, OSAPPTagsKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTags, OSAPPTagsKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
-	updater := &ChOSAppTags{
-		newUpdaterComponent[mysql.ChOSAppTags, OSAPPTagsKey](
-			RESOURCE_TYPE_CH_OS_APP_TAGS,
+	mng := &ChOSAppTags{
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTags, OSAPPTagsKey](
+			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
-		return nil, false
-	}
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
 
-	keyToItem := make(map[OSAPPTagsKey]mysql.ChOSAppTags)
-	for _, process := range processes {
+	if fieldsUpdate.OSAPPTags.IsDifferent() {
 		osAppTagsMap := map[string]string{}
-		splitOsAppTags := strings.Split(process.OSAPPTags, ", ")
-		for _, singleOsAppTag := range splitOsAppTags {
-			splitSingleTag := strings.Split(singleOsAppTag, ":")
+		splitTags := strings.Split(fieldsUpdate.OSAPPTags.GetNew(), ", ")
+
+		for _, splitTag := range splitTags {
+			splitSingleTag := strings.Split(splitTag, ":")
 			if len(splitSingleTag) == 2 {
 				osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
 			}
 		}
-		if len(osAppTagsMap) > 0 {
-			osAppTagsStr, err := json.Marshal(osAppTagsMap)
-			if err != nil {
-				log.Error(err)
-				return nil, false
-			}
-			key := OSAPPTagsKey{
-				PID: process.ID,
-			}
-			keyToItem[key] = mysql.ChOSAppTags{
-				PID:       process.ID,
-				OSAPPTags: string(osAppTagsStr),
-			}
+		bytes, err := json.Marshal(osAppTagsMap)
+		if err != nil {
+			log.Error(err)
+			return
 		}
-	}
-	return keyToItem, true
-}
-
-func (o *ChOSAppTags) generateKey(dbItem mysql.ChOSAppTags) OSAPPTagsKey {
-	return OSAPPTagsKey{PID: dbItem.PID}
-}
-
-func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem mysql.ChOSAppTags) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if oldItem.OSAPPTags != newItem.OSAPPTags {
-		updateInfo["os_app_tags"] = newItem.OSAPPTags
+		updateInfo["os_app_tags"] = string(bytes)
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChOSAppTags
+		db.Where("pid = ?", sourceID).First(&chItem)
+		if chItem.PID == 0 {
+			c.SubscriberComponent.dbOperator.add(
+				[]OSAPPTagsKey{{PID: sourceID}},
+				[]mysql.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
+				db,
+			)
+		} else {
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, OSAPPTagsKey{PID: sourceID}, db)
+		}
 	}
-	return nil, false
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTags) sourceToTarget(item *mysql.Process) (keys []OSAPPTagsKey, targets []mysql.ChOSAppTags) {
+	if item.OSAPPTags == "" {
+		return
+	}
+	osAppTagsMap := map[string]string{}
+	splitTags := strings.Split(item.OSAPPTags, ", ")
+
+	for _, splitTag := range splitTags {
+		splitSingleTag := strings.Split(splitTag, ":")
+		if len(splitSingleTag) == 2 {
+			osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+		}
+	}
+	bytes, err := json.Marshal(osAppTagsMap)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	return []OSAPPTagsKey{{PID: item.ID}}, []mysql.ChOSAppTags{{PID: item.ID, OSAPPTags: string(bytes)}}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []mysql.ChOSAppTags, db *mysql.DB) {
+
 }

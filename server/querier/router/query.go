@@ -42,8 +42,15 @@ func executeQuery() gin.HandlerFunc {
 		args := common.QuerierParams{}
 		args.Context = c.Request.Context()
 		args.Debug = c.Query("debug")
+		args.UseQueryCache, _ = strconv.ParseBool(c.DefaultQuery("use_query_cache", "false"))
+		args.QueryCacheTTL = c.Query("query_cache_ttl")
 		args.QueryUUID = c.Query("query_uuid")
 		args.NoPreWhere, _ = strconv.ParseBool(c.DefaultQuery("no_prewhere", "false"))
+		args.ORGID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		// if no org_id in header, set default org id
+		if args.ORGID == "" {
+			args.ORGID = common.DEFAULT_ORG_ID
+		}
 		if args.QueryUUID == "" {
 			query_uuid := uuid.New()
 			args.QueryUUID = query_uuid.String()

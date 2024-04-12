@@ -32,11 +32,11 @@ use super::{
     consts::*,
     round_to_minute,
     types::{FlowMeterWithFlow, MiniFlow},
-    MetricsType,
+    MetricsType, QgStats,
 };
 
 use crate::common::{
-    endpoint::EPC_FROM_INTERNET,
+    endpoint::EPC_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
     flow::{CloseType, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
@@ -48,7 +48,7 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     buffer::BatchedBox,
@@ -750,13 +750,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "second" },
                 Countable::Ref(Arc::downgrade(&second_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "second".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 
@@ -789,13 +785,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "minute" },
                 Countable::Ref(Arc::downgrade(&minute_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "minute".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 
@@ -850,7 +842,7 @@ impl QuadrupleGenerator {
             let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
             if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
                 || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
-                    && side.l3_epc_id != EPC_FROM_INTERNET)
+                    && side.l3_epc_id != EPC_INTERNET)
             {
                 no_endpoint_flag = false;
                 break;
@@ -937,10 +929,10 @@ impl QuadrupleGenerator {
                 match tagged_flow.flow.close_type {
                     CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
                     CloseType::Timeout => flow_meter.anomaly.tcp_timeout = 1,
-                    CloseType::ClientSynRepeat => flow_meter.anomaly.client_syn_repeat = 1,
+                    CloseType::ClientSynRepeat => flow_meter.anomaly.server_syn_miss = 1,
                     CloseType::ServerHalfClose => flow_meter.anomaly.server_half_close_flow = 1,
                     CloseType::TcpClientRst => flow_meter.anomaly.client_rst_flow = 1,
-                    CloseType::ServerSynAckRepeat => flow_meter.anomaly.server_synack_repeat = 1,
+                    CloseType::ServerSynAckRepeat => flow_meter.anomaly.client_ack_miss = 1,
                     CloseType::ClientHalfClose => flow_meter.anomaly.client_half_close_flow = 1,
                     CloseType::ClientSourcePortReuse => {
                         flow_meter.anomaly.client_source_port_reuse = 1

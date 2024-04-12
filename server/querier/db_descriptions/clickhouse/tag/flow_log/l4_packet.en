@@ -7,4 +7,5 @@ end_time                  , End Time                 , Unit: microseconds. Maxim
 
 packet_batch              , Compressed Packet Header ,
 
-vtap                      , Agent Name               ,
+vtap                      , Agent Name               , Deprecated，please use agent.
+agent                     , Agent Name               ,

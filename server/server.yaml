@@ -190,6 +190,16 @@ controller:
         custom_tag_len_max: 256
         # process name 最大长度限制
         process_name_len_max: 256
+        # 青云配置，对公有云和私有云同时生效
+        qingcloud_config:
+          # 对接青云 api 错误最大重试次数
+          max_retries: 4
+          # 对接青云 api 错误重试间隔，单位：秒
+          retry_duration: 60
+          # 对接青云定时执行，根据配置的时间点每日执行一次，配置后循环执行失效，格式：%H:%M ，例：05:30 ，每日5点30分执行一次对接
+          daily_trigger_time: ""
+          # 关闭 lb 监听器及后端主机对接
+          disable_sync_lb_listener: false
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
         cache_refresh_interval: 60
@@ -336,6 +346,7 @@ querier:
       cache-max-count: 1024 # max capacity of cache list
       cache-first-timeout: 10 # time out for first cache item load, uint: s
       cache-clean-interval: 3600 # clean interval for cache, unit: s
+      cache-allow-time-gap: 1 # when query end - cache end < gap, not update cache, unit: s
 
   auto-custom-tag:
     tag-name: 
@@ -623,7 +634,7 @@ ingester:
 
   #exporters:
   #  enabled: false
-  #  # export datas ranges: cbpf-net-span, ebpf-sys-span
+  #  # export datas ranges: cbpf-net-span, ebpf-sys-span (app spans from Opentelemetry are not supported)
   #  export-datas: [cbpf-net-span,ebpf-sys-span]
   #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]

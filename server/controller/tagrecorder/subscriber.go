@@ -18,12 +18,14 @@ package tagrecorder
 
 import (
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
-	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 var (
@@ -35,6 +37,8 @@ type SubscriberManager struct {
 	cfg                  config.ControllerConfig
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
+
+	subscribers []Subscriber
 }
 
 func GetSubscriberManager() *SubscriberManager {
@@ -48,32 +52,110 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *SubscriberManager) Start() {
+func (c *SubscriberManager) Start() (err error) {
 	log.Info("tagrecorder subscriber manager started")
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
-	subscribers := []Subscriber{
-		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
-		NewChChostCloudTag(),
-		NewChChostCloudTags(),
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = GetIconInfo(c.cfg)
+	if err != nil {
+		return err
 	}
-	for _, subscriber := range subscribers {
-		subscriber.SetConfig(c.cfg.TagRecorderCfg)
+	c.subscribers = c.getSubscribers()
+	log.Infof("tagrecorder run start")
+	for _, subscriber := range c.subscribers {
+		subscriber.SetConfig(c.cfg)
 		subscriber.Subscribe()
 	}
+	return nil
+}
+
+func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
+	ss := make([]Subscriber, 0)
+	for _, s := range m.subscribers {
+		if s.GetSubResourceType() == subResourceType {
+			ss = append(ss, s)
+		}
+	}
+	return ss
+}
+
+func (c *SubscriberManager) getSubscribers() []Subscriber {
+	subscribers := []Subscriber{
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
+		NewChVMDevice(c.resourceTypeToIconID),
+		NewChHostDevice(c.resourceTypeToIconID),
+		NewChVRouterDevice(c.resourceTypeToIconID),
+		NewChDHCPPortDevice(c.resourceTypeToIconID),
+		NewChNATGatewayDevice(c.resourceTypeToIconID),
+		NewChLBDevice(c.resourceTypeToIconID),
+		NewChRDSInstanceDevice(c.resourceTypeToIconID),
+		NewChRedisInstanceDevice(c.resourceTypeToIconID),
+		NewChPodServiceDevice(c.resourceTypeToIconID),
+		NewChPodDevice(c.resourceTypeToIconID),
+		NewChPodGroupDevice(c.resourceTypeToIconID),
+		NewChPodNodeDevice(c.resourceTypeToIconID),
+		NewChProcessDevice(c.resourceTypeToIconID),
+		NewChOSAppTag(),
+		NewChOSAppTags(),
+		NewChPodK8sLabel(),
+		NewChPodK8sLabels(),
+		NewChPodK8sAnnotation(),
+		NewChPodK8sAnnotations(),
+		NewChPodK8sEnv(),
+		NewChPodK8sEnvs(),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
+		NewChNetwork(c.resourceTypeToIconID),
+		NewChChost(),
+		NewChGProcess(c.resourceTypeToIconID),
+		NewChVPC(c.resourceTypeToIconID),
+		NewChPodCluster(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPodIngress(),
+		NewChPodNode(c.resourceTypeToIconID),
+		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodService(),
+
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodNSCloudTag(),
+		NewChPodNSCloudTags(),
+		NewChPodServiceK8sLabel(),
+		NewChPodServiceK8sLabels(),
+	}
+	return subscribers
+}
+
+func (c *SubscriberManager) HealthCheck() {
+	go func() {
+		log.Info("tagrecorder health check data run")
+		t := time.Now()
+		for _, subscriber := range c.subscribers {
+			if err := subscriber.Check(); err != nil {
+				log.Error(err)
+			}
+		}
+		log.Infof("tagrecorder health check data end, time since: %v", time.Since(t))
+	}()
 }
 
 type Subscriber interface {
 	Subscribe()
-	SetConfig(trconfig.TagRecorderConfig)
+	SetConfig(config.ControllerConfig)
+	Check() error
+	GetSubResourceType() string
+	pubsub.ResourceBatchAddedSubscriber
+	pubsub.ResourceUpdatedSubscriber
+	pubsub.ResourceBatchDeletedSubscriber
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
 	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
-	onResourceUpdated(int, MUPT)
+	onResourceUpdated(int, MUPT, *mysql.DB)
+	softDeletedTargetsUpdated([]CT, *mysql.DB)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
-	cfg trconfig.TagRecorderConfig
+	cfg config.ControllerConfig
 
 	subResourceTypeName string // 订阅表资源类型，即源表资源类型
 	resourceTypeName    string // CH表资源类型
@@ -92,6 +174,10 @@ func newSubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgcons
 	return s
 }
 
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) GetSubResourceType() string {
+	return s.subResourceTypeName
+}
+
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) initDBOperator() {
 	s.dbOperator = newOperator[CT, KT](s.resourceTypeName)
 }
@@ -107,7 +193,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(sources 
 	return keys, targets
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg config.ControllerConfig) {
 	s.cfg = cfg
 	s.dbOperator.setConfig(cfg)
 }
@@ -122,23 +208,42 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
 }
 
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
+	return check(s)
+}
+
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
 	keys, chItems := s.generateKeyTargets(items)
-	// TODO refresh control
-	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add)
+	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
-	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
 	keys, chItems := s.generateKeyTargets(items)
-	s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
+	if softDelete {
+		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
+	} else {
+		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
+	}
 }

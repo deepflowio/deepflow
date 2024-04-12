@@ -31,16 +31,18 @@ import (
 type Pod struct {
 	EventManagerBase
 	deviceType int
+	tool       *IPTool
 }
 
 func NewPod(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_POD_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD,
+		newTool(toolDS),
 	}
 	return mng
 }
@@ -64,11 +66,12 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagPodGroupID(item.PodGroupID),
+			eventapi.TagPodServiceID(item.PodServiceID),
 			eventapi.TagPodNodeID(item.PodNodeID),
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
 
-		l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, item.PodNodeID)
+		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(item.PodNodeID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
 			p.createAndEnqueue(
@@ -104,7 +107,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if ok {
 			name, err = p.ToolDataSet.GetPodNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid), err)
+				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid), err))
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
@@ -115,7 +118,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if oldPodNodeID != 0 {
 			oldPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.PodNodeLcuuid), err)
+				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.PodNodeLcuuid), err))
 			}
 		}
 
@@ -124,7 +127,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if newPodNodeID != 0 {
 			newPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, cloudItem.PodNodeLcuuid), err)
+				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, cloudItem.PodNodeLcuuid), err))
 			}
 		}
 
@@ -170,7 +173,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 		if ok {
 			name, err = p.ToolDataSet.GetPodNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
+				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

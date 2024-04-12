@@ -44,11 +44,11 @@ type VM struct {
 
 func NewVM(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_VM_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 	}
 	return mng
@@ -130,7 +130,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		id, name, err := v.getVMIDAndNameByLcuuid(lcuuid)
 		if err != nil {
-			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
+			log.Error(v.metadata.LogPre("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err))
 		}
 
 		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)

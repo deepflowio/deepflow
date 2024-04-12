@@ -104,6 +104,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    21:  PROTO_HTTP2\n");
 	fprintf(stderr, "    40:  PROTO_DUBBO\n");
 	fprintf(stderr, "    43:  PROTO_SOFARPC\n");
+	fprintf(stderr, "    45:  PROTO_BRPC\n");
 	fprintf(stderr, "    60:  PROTO_MYSQL\n");
 	fprintf(stderr, "    61:  PROTO_POSTGRESQL\n");
 	fprintf(stderr, "    62:  PROTO_ORACLE\n");
@@ -112,6 +113,9 @@ static void datadump_help(void)
 	fprintf(stderr, "    101: PROTO_MQTT\n");
 	fprintf(stderr, "    102: PROTO_AMQP\n");
 	fprintf(stderr, "    103: PROTO_OPENWIRE\n");
+	fprintf(stderr, "    104: PROTO_NATS\n");
+	fprintf(stderr, "    105: PROTO_PULSAR\n");
+	fprintf(stderr, "    106: PROTO_ZMTP\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
 	fprintf(stderr, "    121: PROTO_TLS\n");
 	fprintf(stderr, "PID:\n");

@@ -30,16 +30,19 @@ type SubDomain struct {
 	domainLcuuid    string
 	subDomainLcuuid string
 	EventManagerBase
+	tool *IPTool
 }
 
 func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQueue) *SubDomain {
 	return &SubDomain{
 		domainLcuuid,
 		subDomainLcuuid,
-		EventManagerBase{
-			ToolDataSet: toolDS,
-			Queue:       eq,
-		},
+		newEventManagerBase(
+			common.RESOURCE_TYPE_SUB_DOMAIN_EN,
+			toolDS,
+			eq,
+		),
+		newTool(toolDS),
 	}
 }
 
@@ -47,17 +50,17 @@ func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *tool.DataSet, eq
 // If the population fails, incomplete resource events are also written to the queue.
 func (r *SubDomain) ProduceFromMySQL() {
 	var dbItems []mysql.ResourceEvent
-	err := mysql.Db.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
+	err := r.metadata.DB.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
 	if err != nil {
-		log.Errorf("db query resource_event failed:%s", err.Error())
+		log.Error(r.metadata.LogPre("db query resource_event failed:%s", err.Error()))
 		return
 	}
 	for _, item := range dbItems {
 		var event *eventapi.ResourceEvent
 		err = json.Unmarshal([]byte(item.Content), &event)
 		if err != nil {
-			log.Errorf("json marshal event (detail: %#v) failed: %s", item, err.Error())
-			mysql.Db.Delete(&item)
+			log.Error(r.metadata.LogPre("json marshal event (detail: %#v) failed: %s", item, err.Error()))
+			r.metadata.DB.Delete(&item)
 			continue
 		}
 
@@ -67,7 +70,7 @@ func (r *SubDomain) ProduceFromMySQL() {
 			r.fillL3DeviceInfo(event)
 		}
 		r.convertAndEnqueue(item.ResourceLcuuid, event)
-		mysql.Db.Delete(&item)
+		r.metadata.DB.Delete(&item)
 	}
 }
 
@@ -90,12 +93,12 @@ func (r *SubDomain) fillL3DeviceInfo(event *eventapi.ResourceEvent) bool {
 	} else if event.InstanceType == common.VIF_DEVICE_TYPE_POD {
 		podInfo, err := r.ToolDataSet.GetPodInfoByID(int(event.InstanceID))
 		if err != nil {
-			log.Errorf("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error())
+			log.Error(r.metadata.LogPre("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error()))
 			return false
 		}
 		podNodeID = podInfo.PodNodeID
 	}
-	l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(r.ToolDataSet, podNodeID)
+	l3DeviceOpts, ok := r.tool.getL3DeviceOptionsByPodNodeID(podNodeID)
 	if ok {
 		for _, option := range l3DeviceOpts {
 			option(event)

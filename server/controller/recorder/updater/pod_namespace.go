@@ -60,7 +60,7 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			wholeCache,
-			db.NewPodNamespace(),
+			db.NewPodNamespace().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.PodNamespaces,
 			cloudData,
 		),
@@ -77,10 +77,10 @@ func (n *PodNamespace) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNamespace
 func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (*mysql.PodNamespace, bool) {
 	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	cloudTags := map[string]string{}
@@ -91,7 +91,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		Name:         cloudItem.Name,
 		PodClusterID: podClusterID,
 		SubDomain:    cloudItem.SubDomainLcuuid,
-		Domain:       n.cache.DomainLcuuid,
+		Domain:       n.metadata.Domain.Lcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		CloudTags:    cloudTags,

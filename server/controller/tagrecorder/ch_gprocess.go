@@ -17,76 +17,74 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChGProcess struct {
-	UpdaterComponent[mysql.ChGProcess, IDKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
-	updater := &ChGProcess{
-		newUpdaterComponent[mysql.ChGProcess, IDKey](
-			RESOURCE_TYPE_CH_GPROCESS,
+	mng := &ChGProcess{
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChGProcess, IDKey](
+			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_GPROCESS,
 		),
 		resourceTypeToIconID,
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChGProcess) sourceToTarget(source *mysql.Process) (keys []IDKey, targets []mysql.ChGProcess) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_GPROCESS,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChGProcess)
-	for _, process := range processes {
-		if process.DeletedAt.Valid {
-			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:      process.ID,
-				Name:    process.Name + " (deleted)",
-				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID: process.VMID,
-				L3EPCID: process.VPCID,
-			}
-		} else {
-			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:      process.ID,
-				Name:    process.Name,
-				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID: process.VMID,
-				L3EPCID: process.VPCID,
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChGProcess{
+		ID:      source.ID,
+		Name:    sourceName,
+		CHostID: source.VMID,
+		L3EPCID: source.VPCID,
+		IconID:  iconID,
+	})
+	return
 }
 
-func (p *ChGProcess) generateKey(dbItem mysql.ChGProcess) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysql.ChGProcess) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
-		updateInfo["icon_id"] = newItem.IconID
+	if fieldsUpdate.VMID.IsDifferent() {
+		updateInfo["chost_id"] = fieldsUpdate.VMID.GetNew()
 	}
-	if oldItem.CHostID != newItem.CHostID {
-		updateInfo["chost_id"] = newItem.CHostID
-	}
-	if oldItem.L3EPCID != newItem.L3EPCID {
-		updateInfo["l3_epc_id"] = newItem.L3EPCID
+	if fieldsUpdate.VPCID.IsDifferent() {
+		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChGProcess
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
-	return nil, false
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysql.ChGProcess, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }

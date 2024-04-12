@@ -58,7 +58,7 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
-			db.NewCEN(),
+			db.NewCEN().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.CENs,
 			cloudData,
 		),
@@ -77,10 +77,10 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-			))
+			)))
 			continue
 		}
 		vpcIDs = append(vpcIDs, vpcID)
@@ -88,7 +88,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	dbItem := &mysql.CEN{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
-		Domain: c.cache.DomainLcuuid,
+		Domain: c.metadata.Domain.Lcuuid,
 		VPCIDs: rcommon.IntSliceToString(vpcIDs),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
@@ -107,10 +107,10 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 			if !exists {
-				log.Errorf(resourceAForResourceBNotFound(
+				log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-				))
+				)))
 				continue
 			}
 			vpcIDs = append(vpcIDs, vpcID)

@@ -4,8 +4,6 @@ services:
     image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-agent:latest
     container_name: deepflow-agent
     restart: always
-    environment:
-      IN_CONTAINER:
     cap_add:
       - SYS_ADMIN
       - SYS_RESOURCE
@@ -26,3 +24,4 @@ services:
       - /etc/deepflow-agent.yaml:/etc/deepflow-agent/deepflow-agent.yaml:ro
       - /sys/kernel/debug:/sys/kernel/debug:ro
     network_mode: "host"
+    pid: "host"

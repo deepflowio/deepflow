@@ -57,7 +57,7 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
-			db.NewVMPodNodeConnection(),
+			db.NewVMPodNodeConnection().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
 			cloudData,
 		),
@@ -82,7 +82,7 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 	}
 
 	dbItem := &mysql.VMPodNodeConnection{
-		Domain:    c.cache.DomainLcuuid,
+		Domain:    c.metadata.Domain.Lcuuid,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
 		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),

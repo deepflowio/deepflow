@@ -41,9 +41,10 @@ const (
 )
 
 type ExtMetrics struct {
-	Config        *config.Config
-	Telegraf      *Metricsor
-	MetaflowStats *Metricsor
+	Config              *config.Config
+	Telegraf            *Metricsor
+	DeepflowAgentStats  *Metricsor
+	DeepflowServerStats *Metricsor
 }
 
 type Metricsor struct {
@@ -61,18 +62,23 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 	if err != nil {
 		return nil, err
 	}
-	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, platformDataManager, manager, recv, false)
+	deepflowAgentStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_AGENT_TABLE, config, platformDataManager, manager, recv, false)
+	if err != nil {
+		return nil, err
+	}
+	deepflowServerStats, err := NewMetricsor(datatype.MESSAGE_TYPE_SERVER_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_SERVER_TABLE, config, platformDataManager, manager, recv, false)
 	if err != nil {
 		return nil, err
 	}
 	return &ExtMetrics{
-		Config:        config,
-		Telegraf:      telegraf,
-		MetaflowStats: deepflowStats,
+		Config:              config,
+		Telegraf:            telegraf,
+		DeepflowAgentStats:  deepflowAgentStats,
+		DeepflowServerStats: deepflowServerStats,
 	}, nil
 }
 
-func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
+func NewMetricsor(msgType datatype.MessageType, flowTagTablePrefix string, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
@@ -96,7 +102,7 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 				return nil, err
 			}
 		}
-		metricsWriter, err := dbwriter.NewExtMetricsWriter(i, msgType, db, config)
+		metricsWriter, err := dbwriter.NewExtMetricsWriter(i, msgType, flowTagTablePrefix, config)
 		if err != nil {
 			return nil, err
 		}
@@ -139,11 +145,13 @@ func (m *Metricsor) Close() {
 
 func (s *ExtMetrics) Start() {
 	s.Telegraf.Start()
-	s.MetaflowStats.Start()
+	s.DeepflowAgentStats.Start()
+	s.DeepflowServerStats.Start()
 }
 
 func (s *ExtMetrics) Close() error {
 	s.Telegraf.Close()
-	s.MetaflowStats.Close()
+	s.DeepflowAgentStats.Close()
+	s.DeepflowServerStats.Close()
 	return nil
 }

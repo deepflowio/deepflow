@@ -23,52 +23,52 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (
-	EdgeCode    = zerodoc.IPPath | zerodoc.L3EpcIDPath
-	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.ServiceID | zerodoc.Resource
-	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.ServiceIDPath | zerodoc.ResourcePath
-	PortAddCode = zerodoc.IsKeyService
+	EdgeCode    = flow_metrics.IPPath | flow_metrics.L3EpcIDPath
+	MainAddCode = flow_metrics.RegionID | flow_metrics.HostID | flow_metrics.L3Device | flow_metrics.SubnetID | flow_metrics.PodNodeID | flow_metrics.AZID | flow_metrics.PodGroupID | flow_metrics.PodNSID | flow_metrics.PodID | flow_metrics.PodClusterID | flow_metrics.ServiceID | flow_metrics.Resource
+	EdgeAddCode = flow_metrics.RegionIDPath | flow_metrics.HostIDPath | flow_metrics.L3DevicePath | flow_metrics.SubnetIDPath | flow_metrics.PodNodeIDPath | flow_metrics.AZIDPath | flow_metrics.PodGroupIDPath | flow_metrics.PodNSIDPath | flow_metrics.PodIDPath | flow_metrics.PodClusterIDPath | flow_metrics.ServiceIDPath | flow_metrics.ResourcePath
+	PortAddCode = flow_metrics.IsKeyService
 
 	SIGNAL_SOURCE_OTEL = 4
 )
 
-func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
+func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
 	var info, info1 *grpc.Info
 	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
 		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
 		if t.GPID != 0 && t.PodID == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.GPID)
-			if podId != 0 && vtapId == uint32(t.VTAPID) {
+			if podId != 0 && vtapId == t.VTAPID {
 				t.PodID = podId
-				t.TagSource |= uint8(zerodoc.GpId)
+				t.TagSource |= uint8(flow_metrics.GpId)
 			}
 		}
 
 		// if podId exist, use vtapId + podId to match first
 		if t.PodID != 0 {
 			info = platformData.QueryPodIdInfo(t.PodID)
-			t.TagSource |= uint8(zerodoc.PodId)
+			t.TagSource |= uint8(flow_metrics.PodId)
 		}
 
 		// If vtapId + podId cannot be matched, finally use Mac/EpcIP to match resources
 		if info == nil {
 			if t.MAC != 0 {
-				t.TagSource |= uint8(zerodoc.Mac)
+				t.TagSource |= uint8(flow_metrics.Mac)
 				info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 				if info == nil {
-					t.TagSource |= uint8(zerodoc.EpcIP)
+					t.TagSource |= uint8(flow_metrics.EpcIP)
 					info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
 				}
 			} else if t.IsIPv6 != 0 {
-				t.TagSource |= uint8(zerodoc.EpcIP)
+				t.TagSource |= uint8(flow_metrics.EpcIP)
 				info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 			} else {
-				t.TagSource |= uint8(zerodoc.EpcIP)
+				t.TagSource |= uint8(flow_metrics.EpcIP)
 				info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 			}
 		}
@@ -77,31 +77,31 @@ func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*gr
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
 		if t.GPID1 != 0 && t.PodID1 == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.GPID1)
-			if podId != 0 && vtapId == uint32(t.VTAPID) {
+			if podId != 0 && vtapId == t.VTAPID {
 				t.PodID1 = podId
-				t.TagSource1 |= uint8(zerodoc.GpId)
+				t.TagSource1 |= uint8(flow_metrics.GpId)
 			}
 
 		}
 
 		if t.PodID1 != 0 {
 			info1 = platformData.QueryPodIdInfo(t.PodID1)
-			t.TagSource1 |= uint8(zerodoc.PodId)
+			t.TagSource1 |= uint8(flow_metrics.PodId)
 		}
 
 		if info1 == nil {
 			if t.MAC1 != 0 {
-				t.TagSource1 |= uint8(zerodoc.Mac)
+				t.TagSource1 |= uint8(flow_metrics.Mac)
 				info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
 				if info1 == nil {
-					t.TagSource1 |= uint8(zerodoc.EpcIP)
+					t.TagSource1 |= uint8(flow_metrics.EpcIP)
 					info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
 				}
 			} else if t.IsIPv6 != 0 {
-				t.TagSource1 |= uint8(zerodoc.EpcIP)
+				t.TagSource1 |= uint8(flow_metrics.EpcIP)
 				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
 			} else {
-				t.TagSource1 |= uint8(zerodoc.EpcIP)
+				t.TagSource1 |= uint8(flow_metrics.EpcIP)
 				info1 = platformData.QueryIPV4Infos(t.L3EpcID1, t.IP1)
 			}
 		}
@@ -111,18 +111,18 @@ func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*gr
 }
 
 func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) error {
-	t := doc.Tagger.(*zerodoc.Tag)
+	t := doc.Tagger.(*flow_metrics.Tag)
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
 
 	// vtap_acl 分钟级数据不用填充
-	if doc.Meter.ID() == zerodoc.ACL_ID &&
+	if doc.Meter.ID() == flow_metrics.ACL_ID &&
 		t.DatabaseSuffixID() == 1 { // 只有acl后缀
 		return nil
 	}
 
 	myRegionID := uint16(platformData.QueryRegionID())
 
-	if t.Code&zerodoc.ServerPort == zerodoc.ServerPort {
+	if t.Code&flow_metrics.ServerPort == flow_metrics.ServerPort {
 		t.Code |= PortAddCode
 	}
 
@@ -133,12 +133,13 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.Code |= MainAddCode
 	}
 
+	t.OrgId, t.TeamID = platformData.QueryVtapOrgAndTeamID(t.VTAPID)
 	podGroupType, podGroupType1 := uint8(0), uint8(0)
 	if info1 != nil {
 		t.RegionID1 = uint16(info1.RegionID)
 		t.HostID1 = uint16(info1.HostID)
 		t.L3DeviceID1 = info1.DeviceID
-		t.L3DeviceType1 = zerodoc.DeviceType(info1.DeviceType)
+		t.L3DeviceType1 = flow_metrics.DeviceType(info1.DeviceType)
 		t.SubnetID1 = uint16(info1.SubnetID)
 		t.PodNodeID1 = info1.PodNodeID
 		t.PodNSID1 = uint16(info1.PodNSID)
@@ -162,11 +163,11 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				t.RegionID = t.RegionID1
 				t.SubnetID = t.SubnetID1
 				t.AZID = t.AZID1
-				t.TagSource |= uint8(zerodoc.Peer)
+				t.TagSource |= uint8(flow_metrics.Peer)
 			}
 		}
 		if myRegionID != 0 && t.RegionID1 != 0 {
-			if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
+			if t.TAPSide == flow_metrics.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
 				platformData.AddOtherRegion()
 				return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
 			}
@@ -179,7 +180,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.RegionID = uint16(info.RegionID)
 		t.HostID = uint16(info.HostID)
 		t.L3DeviceID = info.DeviceID
-		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		t.L3DeviceType = flow_metrics.DeviceType(info.DeviceType)
 		t.SubnetID = uint16(info.SubnetID)
 		t.PodNodeID = info.PodNodeID
 		t.PodNSID = uint16(info.PodNSID)
@@ -209,13 +210,13 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				t.RegionID1 = t.RegionID
 				t.SubnetID1 = t.SubnetID
 				t.AZID1 = t.AZID
-				t.TagSource1 |= uint8(zerodoc.Peer)
+				t.TagSource1 |= uint8(flow_metrics.Peer)
 			}
 		}
 
 		if myRegionID != 0 && t.RegionID != 0 {
-			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
-				if t.TAPSide == zerodoc.Client && t.RegionID != myRegionID {
+			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
+				if t.TAPSide == flow_metrics.Client && t.RegionID != myRegionID {
 					platformData.AddOtherRegion()
 					return fmt.Errorf("My regionID is %d, but document regionID is %d", myRegionID, t.RegionID)
 				}
@@ -232,7 +233,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {
 		// only show OTel data for services as 'server side'
-		if t.TAPSide == zerodoc.ServerApp && t.ServerPort == 0 {
+		if t.TAPSide == flow_metrics.ServerApp && t.ServerPort == 0 {
 			t.ServerPort = 65535
 		}
 

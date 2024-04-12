@@ -40,8 +40,22 @@ func GetCURLIP(ip string) string {
 	return ip
 }
 
+type HeaderOption func(req *http.Request)
+
+func WithHeader(key, value string) HeaderOption {
+	return func(req *http.Request) {
+		req.Header.Set(key, value)
+	}
+}
+
+func WithORGHeader(value string) HeaderOption {
+	return func(req *http.Request) {
+		req.Header.Set(HEADER_KEY_X_ORG_ID, value)
+	}
+}
+
 // 功能：调用其他模块API并获取返回结果
-func CURLPerform(method string, url string, body map[string]interface{}) (*simplejson.Json, error) {
+func CURLPerform(method string, url string, body map[string]interface{}, options ...HeaderOption) (*simplejson.Json, error) {
 	log.Debugf("curl perform: %s %s %+v", method, url, body)
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
 
@@ -58,6 +72,9 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")
 	req.Header.Set("X-User-Type", "1")
+	for _, option := range options {
+		option(req)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

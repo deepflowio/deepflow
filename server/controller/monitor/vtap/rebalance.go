@@ -80,7 +80,7 @@ func (r *RebalanceCheck) Stop() {
 }
 
 func (r *RebalanceCheck) controllerRebalance() {
-	controllers, err := service.GetControllers(map[string]string{})
+	controllers, err := service.GetControllers(common.DEFAULT_ORG_ID, map[string]string{})
 	if err != nil {
 		log.Errorf("get controllers failed, (%v)", err)
 		return
@@ -108,7 +108,7 @@ func (r *RebalanceCheck) controllerRebalance() {
 
 func (r *RebalanceCheck) analyzerRebalance() {
 	// check if need rebalance
-	analyzers, err := service.GetAnalyzers(map[string]interface{}{})
+	analyzers, err := service.GetAnalyzers(common.DEFAULT_ORG_ID, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("get analyzers failed, (%v)", err)
 		return
@@ -143,8 +143,9 @@ func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 	}
 	if result.TotalSwitchVTapNum != 0 {
 		log.Infof("need rebalance, total switch vtap num(%d)", result.TotalSwitchVTapNum)
-		_, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration)
-		log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+		if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration); err != nil {
+			log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+		}
 		return
 	}
 }

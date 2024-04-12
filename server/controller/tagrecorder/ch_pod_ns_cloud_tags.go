@@ -19,66 +19,66 @@ package tagrecorder
 import (
 	"encoding/json"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodNSCloudTags struct {
-	UpdaterComponent[mysql.ChPodNSCloudTags, CloudTagsKey]
+	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTags, CloudTagsKey]
 }
 
 func NewChPodNSCloudTags() *ChPodNSCloudTags {
-	updater := &ChPodNSCloudTags{
-		newUpdaterComponent[mysql.ChPodNSCloudTags, CloudTagsKey](
-			RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
+	mng := &ChPodNSCloudTags{
+		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTags, CloudTagsKey](
+			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
 		),
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSCloudTags, bool) {
-	var podNamespaces []mysql.PodNamespace
-	err := mysql.Db.Unscoped().Find(&podNamespaces).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
-	}
-
-	keyToItem := make(map[CloudTagsKey]mysql.ChPodNSCloudTags)
-	for _, podNamespace := range podNamespaces {
-		cloudTagsMap := map[string]string{}
-		for k, v := range podNamespace.CloudTags {
-			cloudTagsMap[k] = v
-		}
-		if len(cloudTagsMap) > 0 {
-			cloudTagsStr, err := json.Marshal(cloudTagsMap)
-			if err != nil {
-				log.Error(err)
-				return nil, false
-			}
-			key := CloudTagsKey{
-				ID: podNamespace.ID,
-			}
-			keyToItem[key] = mysql.ChPodNSCloudTags{
-				ID:        podNamespace.ID,
-				CloudTags: string(cloudTagsStr),
-			}
-		}
-	}
-	return keyToItem, true
-}
-
-func (p *ChPodNSCloudTags) generateKey(dbItem mysql.ChPodNSCloudTags) CloudTagsKey {
-	return CloudTagsKey{ID: dbItem.ID}
-}
-
-func (p *ChPodNSCloudTags) generateUpdateInfo(oldItem, newItem mysql.ChPodNSCloudTags) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.CloudTags != newItem.CloudTags {
-		updateInfo["cloud_tags"] = newItem.CloudTags
+
+	if fieldsUpdate.CloudTags.IsDifferent() {
+		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		updateInfo["cloud_tags"] = string(bytes)
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChPodNSCloudTags
+		db.Where("id = ?", sourceID).First(&chItem)
+		if chItem.ID == 0 {
+			c.SubscriberComponent.dbOperator.add(
+				[]CloudTagsKey{{ID: sourceID}},
+				[]mysql.ChPodNSCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				db,
+			)
+		} else {
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
+		}
 	}
-	return nil, false
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTags) sourceToTarget(item *mysql.PodNamespace) (keys []CloudTagsKey, targets []mysql.ChPodNSCloudTags) {
+	if len(item.CloudTags) == 0 {
+		return
+	}
+	bytes, err := json.Marshal(item.CloudTags)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChPodNSCloudTags{{ID: item.ID, CloudTags: string(bytes)}}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysql.ChPodNSCloudTags, db *mysql.DB) {
+
 }

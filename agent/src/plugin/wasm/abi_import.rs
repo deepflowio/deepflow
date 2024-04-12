@@ -21,7 +21,8 @@ use crate::{
 
 use super::{
     read_wasm_str, StoreDataType, VmParseCtx, VmResult, IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO,
-    IMPORT_FUNC_HOST_READ_STR_RESULT, IMPORT_FUNC_VM_READ_CTX_BASE, IMPORT_FUNC_VM_READ_HTTP_REQ,
+    IMPORT_FUNC_HOST_READ_STR_RESULT, IMPORT_FUNC_VM_READ_CTX_BASE,
+    IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE, IMPORT_FUNC_VM_READ_HTTP_REQ,
     IMPORT_FUNC_VM_READ_HTTP_RESP, IMPORT_FUNC_VM_READ_PAYLOAD, LOG_LEVEL_ERR, LOG_LEVEL_INFO,
     LOG_LEVEL_WARN, WASM_MODULE_NAME,
 };
@@ -261,6 +262,51 @@ pub(super) fn vm_read_http_resp_info(
 }
 
 /*
+    import function, correspond to go func signature:
+
+    //go:wasm-module deepflow
+    //export vm_read_custom_message_info
+    func vmReadCustomMessageInfo(b *byte, length int) int
+*/
+pub(super) fn vm_read_custom_message_info(
+    mut caller: Caller<'_, StoreDataType>,
+    b: i32,
+    len: i32,
+) -> i32 {
+    if !check_memory(&mut caller, b, len, IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE) {
+        return 0;
+    }
+
+    let ctx = caller.data_mut().parse_ctx.take().unwrap();
+    let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
+    let mem_mut = mem.data_mut(caller.as_context_mut());
+
+    let VmParseCtx::OnCustomMessageCtx(ref msg_ctx) = ctx else {
+        wasm_error!(
+            ctx.get_ins_name(),
+            IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE,
+            "ctx type incorrect"
+        );
+        let _ = caller.data_mut().parse_ctx.insert(ctx);
+        return 0;
+    };
+
+    let size = msg_ctx.serialize_to_bytes(&mut mem_mut[b as usize..(b + len) as usize]);
+    if let Err(err) = size {
+        wasm_error!(
+            ctx.get_ins_name(),
+            IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE,
+            "serialize custom message ctx fail: {}",
+            err
+        );
+        return 0;
+    }
+
+    let _ = caller.data_mut().parse_ctx.insert(ctx);
+    size.unwrap() as i32
+}
+
+/*
     import function, host read the serialized l7 protocol info and deserizlize to CustomInfo.
 
     correspond to go func signature:
@@ -415,6 +461,13 @@ pub(super) fn get_linker(e: Engine, store: &mut Store<StoreDataType>) -> Linker<
         WASM_MODULE_NAME,
         IMPORT_FUNC_VM_READ_HTTP_RESP,
         vm_read_http_resp_info,
+    )
+    .unwrap();
+
+    link.func_wrap(
+        WASM_MODULE_NAME,
+        IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE,
+        vm_read_custom_message_info,
     )
     .unwrap();
 

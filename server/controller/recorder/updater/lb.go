@@ -57,7 +57,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
-			db.NewLB(),
+			db.NewLB().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LBs,
 			cloudData,
 		),
@@ -74,10 +74,10 @@ func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *diffbas
 func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(l.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 
@@ -87,7 +87,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 		UID:    cloudItem.Label,
 		Model:  cloudItem.Model,
 		VIP:    cloudItem.VIP,
-		Domain: l.cache.DomainLcuuid,
+		Domain: l.metadata.Domain.Lcuuid,
 		Region: cloudItem.RegionLcuuid,
 		VPCID:  vpcID,
 	}

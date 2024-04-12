@@ -21,6 +21,7 @@ mod base_dispatcher;
 
 mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
+mod local_plus_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
 use std::thread::{self, JoinHandle};
@@ -46,6 +47,7 @@ use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherLis
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
+use local_plus_mode_dispatcher::{LocalPlusModeDispatcher, LocalPlusModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
 pub use recv_engine::RecvEngine;
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -93,32 +95,36 @@ use public::{
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcher),
+    LocalPlus(LocalPlusModeDispatcher),
     Mirror(MirrorModeDispatcher),
 }
 
 impl DispatcherFlavor {
     fn init(&mut self) -> Result<()> {
         match self {
-            DispatcherFlavor::Analyzer(d) => d.base.init(), // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Local(d) => d.base.init(),
+            DispatcherFlavor::LocalPlus(d) => d.base.init(),
             DispatcherFlavor::Mirror(d) => d.init(),
+            DispatcherFlavor::Analyzer(d) => d.base.init(), // Enterprise Edition Feature: analyzer_mode
         }
     }
 
     fn run(&mut self) {
         match self {
-            DispatcherFlavor::Analyzer(d) => d.run(), // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Local(d) => d.run(),
+            DispatcherFlavor::LocalPlus(d) => d.run(),
             DispatcherFlavor::Mirror(d) => d.run(),
+            DispatcherFlavor::Analyzer(d) => d.run(), // Enterprise Edition Feature: analyzer_mode
         }
     }
 
     fn listener(&self) -> DispatcherListener {
         match self {
+            DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
+            DispatcherFlavor::LocalPlus(d) => DispatcherListener::LocalPlus(d.listener()),
+            DispatcherFlavor::Mirror(d) => DispatcherListener::Mirror(d.listener()),
             // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Analyzer(d) => DispatcherListener::Analyzer(d.listener()),
-            DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
-            DispatcherFlavor::Mirror(d) => DispatcherListener::Mirror(d.listener()),
         }
     }
 
@@ -197,6 +203,7 @@ impl Dispatcher {
 pub enum DispatcherListener {
     Analyzer(AnalyzerModeDispatcherListener), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcherListener),
+    LocalPlus(LocalPlusModeDispatcherListener),
     Mirror(MirrorModeDispatcherListener),
 }
 
@@ -213,6 +220,7 @@ impl FlowAclListener for DispatcherListener {
     ) -> Result<(), String> {
         match self {
             DispatcherListener::Local(a) => a.flow_acl_change(),
+            DispatcherListener::LocalPlus(a) => a.flow_acl_change(),
             DispatcherListener::Mirror(a) => a.flow_acl_change(),
             DispatcherListener::Analyzer(a) => a.flow_acl_change(),
         }
@@ -222,6 +230,7 @@ impl FlowAclListener for DispatcherListener {
     fn id(&self) -> usize {
         let id = match self {
             DispatcherListener::Local(a) => a.id(),
+            DispatcherListener::LocalPlus(a) => a.id(),
             DispatcherListener::Mirror(a) => a.id(),
             DispatcherListener::Analyzer(a) => a.id(),
         };
@@ -234,6 +243,7 @@ impl DispatcherListener {
     pub(super) fn netns(&self) -> &NsFile {
         match self {
             Self::Local(a) => a.netns(),
+            Self::LocalPlus(a) => a.netns(),
             Self::Mirror(a) => a.netns(),
             Self::Analyzer(a) => a.netns(),
         }
@@ -242,6 +252,7 @@ impl DispatcherListener {
     fn id(&self) -> usize {
         match self {
             Self::Local(a) => a.id(),
+            Self::LocalPlus(a) => a.id(),
             Self::Mirror(a) => a.id(),
             Self::Analyzer(a) => a.id(),
         }
@@ -250,6 +261,7 @@ impl DispatcherListener {
     fn local_dispatcher_count(&self) -> usize {
         match self {
             Self::Local(a) => a.local_dispatcher_count(),
+            Self::LocalPlus(a) => a.local_dispatcher_count(),
             _ => 1,
         }
     }
@@ -257,6 +269,7 @@ impl DispatcherListener {
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
+            Self::LocalPlus(l) => l.on_config_change(config),
             Self::Analyzer(l) => l.on_config_change(config), // Enterprise Edition Feature: analyzer_mode
             Self::Mirror(l) => l.on_config_change(config),
         }
@@ -275,6 +288,37 @@ impl DispatcherListener {
         }
     }
 
+    // When interfaces.len() is greater than local_dispatcher_count, interfaces is evenly distributed among each dispatcher;
+    // otherwise interfaces is evenly distributed among the preceding dispatcher, and the following dispatcher does not work
+    fn get_interfaces<'a>(&self, interfaces: &'a [Link]) -> &'a [Link] {
+        if self.local_dispatcher_count() == 1 {
+            return interfaces;
+        }
+        let id = self.id();
+        if interfaces.len() < self.local_dispatcher_count() {
+            if id < interfaces.len() {
+                return &interfaces[id..id + 1];
+            } else {
+                return &interfaces[0..0];
+            }
+        }
+        let width = interfaces.len() / self.local_dispatcher_count();
+        let remain = interfaces.len() % self.local_dispatcher_count();
+        let (start, width) = if id >= remain {
+            ((id * width) + remain, width)
+        } else {
+            (id * width + id, width + 1)
+        };
+
+        let interfaces = if id == self.local_dispatcher_count() - 1 {
+            &interfaces[start..]
+        } else {
+            &interfaces[start..start + width]
+        };
+
+        interfaces
+    }
+
     pub fn on_tap_interface_change(
         &self,
         interfaces: &[Link],
@@ -283,23 +327,18 @@ impl DispatcherListener {
         blacklist: &Vec<u64>,
     ) {
         match self {
-            Self::Local(l) => {
-                let id = self.id();
-                let width = interfaces.len() / self.local_dispatcher_count();
-                let remain = interfaces.len() % self.local_dispatcher_count();
-                let (start, width) = if id >= remain {
-                    ((id * width) + remain, width)
-                } else {
-                    (id * width + id, width + 1)
-                };
-
-                let interfaces = if id == self.local_dispatcher_count() - 1 {
-                    &interfaces[start..]
-                } else {
-                    &interfaces[start..start + width]
-                };
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
-            }
+            Self::LocalPlus(l) => l.on_tap_interface_change(
+                self.get_interfaces(interfaces),
+                if_mac_source,
+                trident_type,
+                blacklist,
+            ),
+            Self::Local(l) => l.on_tap_interface_change(
+                self.get_interfaces(interfaces),
+                if_mac_source,
+                trident_type,
+                blacklist,
+            ),
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source);
@@ -534,6 +573,7 @@ pub struct Options {
     pub tap_mode: TapMode,
     pub dpdk_enabled: bool,
     pub libpcap_enabled: bool,
+    pub dispatcher_queue: bool,
     pub tap_mac_script: String,
     pub is_ipv6: bool,
     pub vxlan_flags: u8,
@@ -857,6 +897,7 @@ impl DispatcherBuilder {
         let queue_debugger = self
             .queue_debugger
             .ok_or(Error::ConfigIncomplete("no queue debugger".into()))?;
+        let dispatcher_queue = options.lock().unwrap().dispatcher_queue;
         let engine = Self::get_engine(
             &self.pcap_interfaces,
             &mut self.src_interface,
@@ -992,9 +1033,8 @@ impl DispatcherBuilder {
             queue_debugger: queue_debugger.clone(),
         };
         collector.register_countable(
-            "dispatcher",
+            &stats::SingleTagModule("dispatcher", "id", base.id),
             stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
-            vec![stats::StatsOption::Tag("id", base.id.to_string())],
         );
         let mut dispatcher = match tap_mode {
             TapMode::Local => {
@@ -1002,11 +1042,31 @@ impl DispatcherBuilder {
                 let extractor = self
                     .libvirt_xml_extractor
                     .ok_or(Error::ConfigIncomplete("no libvirt xml extractor".into()))?;
-                DispatcherFlavor::Local(LocalModeDispatcher {
-                    base,
-                    #[cfg(target_os = "linux")]
-                    extractor,
-                })
+                if dispatcher_queue {
+                    DispatcherFlavor::LocalPlus(LocalPlusModeDispatcher {
+                        base,
+                        #[cfg(target_os = "linux")]
+                        extractor,
+                        queue_debugger,
+                        stats_collector: collector.clone(),
+                        flow_generator_thread_handler: None,
+                        pipeline_thread_handler: None,
+                        pool_raw_size: snap_len,
+                        inner_queue_size: self
+                            .analyzer_queue_size
+                            .take()
+                            .ok_or(Error::ConfigIncomplete("no analyzer-queue-size".into()))?,
+                        raw_packet_block_size: self.analyzer_raw_packet_block_size.take().ok_or(
+                            Error::ConfigIncomplete("no analyzer-raw-packet-block-size".into()),
+                        )?,
+                    })
+                } else {
+                    DispatcherFlavor::Local(LocalModeDispatcher {
+                        base,
+                        #[cfg(target_os = "linux")]
+                        extractor,
+                    })
+                }
             }
             TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher {
                 base,

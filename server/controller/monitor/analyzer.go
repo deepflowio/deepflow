@@ -37,7 +37,7 @@ type AnalyzerCheck struct {
 	cfg                   mconfig.MonitorConfig
 	healthCheckPort       int
 	healthCheckNodePort   int
-	ch                    chan string
+	ch                    chan dbAndIP
 	normalAnalyzerDict    map[string]*dfHostCheck
 	exceptionAnalyzerDict map[string]*dfHostCheck
 }
@@ -50,7 +50,7 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 		cfg:                   cfg.MonitorCfg,
 		healthCheckPort:       cfg.ListenPort,
 		healthCheckNodePort:   cfg.ListenNodePort,
-		ch:                    make(chan string, cfg.MonitorCfg.HealthCheckHandleChannelLen),
+		ch:                    make(chan dbAndIP, cfg.MonitorCfg.HealthCheckHandleChannelLen),
 		normalAnalyzerDict:    make(map[string]*dfHostCheck),
 		exceptionAnalyzerDict: make(map[string]*dfHostCheck),
 	}
@@ -59,13 +59,24 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 func (c *AnalyzerCheck) Start() {
 	log.Info("analyzer check start")
 	go func() {
+		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
+			c.SyncDefaultOrgData()
+		}
+	}()
+
+	go func() {
 		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
-			// 数据节点健康检查
-			c.healthCheck()
-			// 检查没有分配数据节点的采集器，并进行分配
-			c.vtapAnalyzerCheck()
-			// check az_analyzer_connection, delete unused item
-			c.azConnectionCheck()
+			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				// 数据节点健康检查
+				c.healthCheck(db)
+				// 检查没有分配数据节点的采集器，并进行分配
+				c.vtapAnalyzerCheck(db)
+				// check az_analyzer_connection, delete unused item
+				c.azConnectionCheck(db)
+				return nil
+			}); err != nil {
+				log.Error(err)
+			}
 		}
 	}()
 
@@ -73,10 +84,10 @@ func (c *AnalyzerCheck) Start() {
 	// 根据ch信息，针对部分采集器分配/重新分配数据节点
 	go func() {
 		for {
-			excludeIPs := <-c.ch
+			dbAndIP := <-c.ch
 
 			if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-				c.vtapAnalyzerAlloc(excludeIPs)
+				c.vtapAnalyzerAlloc(dbAndIP.db, dbAndIP.ip)
 			} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
 				rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(false, cfg.DataDuration)
 			} else {
@@ -98,20 +109,20 @@ func (c *AnalyzerCheck) Stop() {
 
 var checkExceptionAnalyzers = make(map[string]*dfHostCheck)
 
-func (c *AnalyzerCheck) healthCheck() {
+func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 	var controllers []mysql.Controller
 	var analyzers []mysql.Analyzer
 	var exceptionIPs []string
 
 	log.Info("analyzer health check start")
 
-	mysql.Db.Find(&controllers)
+	mysql.DefaultDB.Find(&controllers)
 	ipToController := make(map[string]*mysql.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
 	}
 
-	if err := mysql.Db.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
+	if err := mysql.DefaultDB.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
 		log.Errorf("get analyzer from db error: %v", err)
 		return
 	}
@@ -141,11 +152,11 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					if c.exceptionAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionAnalyzerDict, analyzer.IP)
-						mysql.Db.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION)
+						mysql.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION)
 						exceptionIPs = append(exceptionIPs, analyzer.IP)
 						log.Infof("set analyzer (%s) state to exception", analyzer.IP)
 						// 根据exceptionIP，重新分配对应采集器的数据节点
-						c.TriggerReallocAnalyzer(analyzer.IP)
+						c.TriggerReallocAnalyzer(orgDB, analyzer.IP)
 						if _, ok := checkExceptionAnalyzers[analyzer.IP]; ok == false {
 							checkExceptionAnalyzers[analyzer.IP] = newDFHostCheck()
 						}
@@ -162,7 +173,7 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {
 					if c.normalAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalAnalyzerDict, analyzer.IP)
-						mysql.Db.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE)
+						mysql.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE)
 						log.Infof("set analyzer (%s) state to normal", analyzer.IP)
 						delete(checkExceptionAnalyzers, analyzer.IP)
 					}
@@ -181,8 +192,8 @@ func (c *AnalyzerCheck) healthCheck() {
 	}
 	for ip, dfhostCheck := range checkExceptionAnalyzers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			mysql.Db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip)
-			err := mysql.Db.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
+			orgDB.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip)
+			err := mysql.DefaultDB.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete analyzer(%s) failed, err:%s", ip, err)
 			} else {
@@ -194,11 +205,11 @@ func (c *AnalyzerCheck) healthCheck() {
 	log.Info("analyzer health check end")
 }
 
-func (c *AnalyzerCheck) TriggerReallocAnalyzer(analyzerIP string) {
-	c.ch <- analyzerIP
+func (c *AnalyzerCheck) TriggerReallocAnalyzer(orgDB *mysql.DB, analyzerIP string) {
+	c.ch <- dbAndIP{db: orgDB, ip: analyzerIP}
 }
 
-func (c *AnalyzerCheck) vtapAnalyzerCheck() {
+func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 	var vtaps []mysql.VTap
 	var noAnalyzerVtapCount int64
 
@@ -209,13 +220,13 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 		log.Error(err)
 	}
 
-	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
 		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
 			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name)
 			vtap.AnalyzerIP = ""
-			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
+			orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
 		}
 
 		if vtap.AnalyzerIP == "" {
@@ -223,17 +234,17 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 			// 检查是否存在已分配数据节点，但异常未清除的采集器
 			exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-			mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+			orgDB.Model(&vtap).Update("exceptions", exceptions)
 		}
 	}
 	// 如果存在没有数据节点的采集器，触发数据节点重新分配
 	if noAnalyzerVtapCount > 0 {
-		c.TriggerReallocAnalyzer("")
+		c.TriggerReallocAnalyzer(orgDB, "")
 	}
 	log.Info("vtap analyzer check end")
 }
 
-func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
+func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 	var vtaps []mysql.VTap
 	var analyzers []mysql.Analyzer
 	var azs []mysql.AZ
@@ -241,8 +252,8 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 	log.Info("vtap analyzer alloc start")
 
-	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
-	mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
+	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取数据节点当前已分配的采集器个数
@@ -267,7 +278,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	}
 
 	// 根据可用区查询region信息
-	mysql.Db.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
+	orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
 	regionToAZLcuuids := make(map[string][]string)
 	regionLcuuids := mapset.NewSet()
 	for _, az := range azs {
@@ -276,7 +287,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	}
 
 	// 获取可用区中的数据节点IP
-	mysql.Db.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azAnalyzerConns)
+	orgDB.Where("region IN (?)", regionLcuuids.ToSlice()).Find(&azAnalyzerConns)
 	azToAnalyzerIPs := make(map[string][]string)
 	for _, conn := range azAnalyzerConns {
 		if conn.AZ == "ALL" {
@@ -310,7 +321,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 			if len(analyzerAvailableVTapNum) == 0 {
 				log.Warningf("no available analyzer for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				orgDB.Model(&vtap).Update("exceptions", exceptions)
 				continue
 			}
 			sort.Slice(analyzerAvailableVTapNum, func(i, j int) bool {
@@ -328,17 +339,17 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
 			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
+			orgDB.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
+				orgDB.Model(&vtap).Update("exceptions", exceptions)
 			}
 		}
 	}
 	log.Info("vtap analyzer alloc end")
 }
 
-func (c *AnalyzerCheck) azConnectionCheck() {
+func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 	var azs []mysql.AZ
 	var azAnalyzerConns []mysql.AZAnalyzerConnection
 	var analyzers []mysql.Analyzer
@@ -346,39 +357,49 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 
 	log.Info("az connection check start")
 
-	mysql.Db.Find(&azs)
+	orgDB.Find(&azs)
 	azLcuuidToName := make(map[string]string)
 	for _, az := range azs {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
 	analyzerIPToConn := make(map[string]mysql.AZAnalyzerConnection)
-	mysql.Db.Find(&azAnalyzerConns)
+	orgDB.Find(&azAnalyzerConns)
 	for _, conn := range azAnalyzerConns {
 		analyzerIPToConn[conn.AnalyzerIP] = conn
 		if conn.AZ == "ALL" {
 			continue
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
-			mysql.Db.Delete(&conn)
+			orgDB.Delete(&conn)
 			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
 		}
 	}
 
-	mysql.Db.Find(&regions)
+	orgDB.Find(&regions)
 	if len(regions) == 1 {
 		var deleteAnalyzers []mysql.Analyzer
-		mysql.Db.Find(&analyzers)
+		orgDB.Find(&analyzers)
 		for _, analyzer := range analyzers {
 			if _, ok := analyzerIPToConn[analyzer.IP]; ok == false {
 				deleteAnalyzers = append(deleteAnalyzers, analyzer)
 			}
 		}
 		for _, deleteAnalyzer := range deleteAnalyzers {
-			mysql.Db.Delete(&deleteAnalyzer)
+			orgDB.Delete(&deleteAnalyzer)
 			log.Infof("delete analyzer (%s) because no az_analyzer_conn", deleteAnalyzer.IP)
 		}
 	}
 
 	log.Info("az connection check end")
+}
+
+func (c *AnalyzerCheck) SyncDefaultOrgData() {
+	var analyzers []mysql.Analyzer
+	if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
+		log.Error(err)
+	}
+	if err := mysql.SyncDefaultOrgData(analyzers); err != nil {
+		log.Error(err)
+	}
 }

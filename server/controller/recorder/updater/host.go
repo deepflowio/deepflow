@@ -57,7 +57,7 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
-			db.NewHost(),
+			db.NewHost().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.Hosts,
 			cloudData,
 		),
@@ -86,7 +86,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 		State:      ctrlrcommon.HOST_STATE_COMPLETE,
 		AZ:         cloudItem.AZLcuuid,
 		Region:     cloudItem.RegionLcuuid,
-		Domain:     h.cache.DomainLcuuid,
+		Domain:     h.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

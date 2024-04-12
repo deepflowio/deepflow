@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 
 	api "github.com/deepflowio/deepflow/message/controller"
@@ -37,7 +38,7 @@ func GetMasterGRPCConn() (*grpc.ClientConn, error) {
 	return grpc.Dial(grpcServer, grpc.WithInsecure())
 }
 
-func GetIDs(resourceType string, count int) (ids []int, err error) {
+func GetIDs(orgID int, resourceType string, count int) (ids []int, err error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
 		log.Errorf("create grpc connection failed: %s", err.Error())
@@ -46,8 +47,7 @@ func GetIDs(resourceType string, count int) (ids []int, err error) {
 	defer conn.Close()
 
 	client := api.NewControllerClient(conn)
-	uCount := uint32(count)
-	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: &uCount})
+	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: proto.Uint32(uint32(count)), OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
 		log.Error("get %s id failed: %s", resourceType, err.Error())
 		return
@@ -59,7 +59,7 @@ func GetIDs(resourceType string, count int) (ids []int, err error) {
 	return
 }
 
-func ReleaseIDs(resourceType string, ids []int) (err error) {
+func ReleaseIDs(orgID int, resourceType string, ids []int) (err error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
 		log.Errorf("create grpc connection failed: %s", err.Error())
@@ -72,7 +72,7 @@ func ReleaseIDs(resourceType string, ids []int) (err error) {
 		uIDs = append(uIDs, uint32(id))
 	}
 	client := api.NewControllerClient(conn)
-	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType})
+	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType, OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
 		log.Errorf("release %s id failed: %s", resourceType, err.Error())
 	}

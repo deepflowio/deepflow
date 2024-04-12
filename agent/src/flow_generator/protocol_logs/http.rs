@@ -216,7 +216,7 @@ pub struct HttpInfo {
 }
 
 impl HttpInfo {
-    pub fn merge_custom_to_http1(&mut self, custom: CustomInfo) {
+    pub fn merge_custom_to_http(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
             self.host = custom.req.domain;
@@ -320,6 +320,14 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn tcp_seq_offset(&self) -> u32 {
         self.headers_offset
+    }
+
+    fn get_request_domain(&self) -> String {
+        self.host.clone()
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
     }
 }
 
@@ -566,9 +574,6 @@ impl L7ProtocolParserInterface for HttpLog {
         match self.proto {
             L7Protocol::Http1 => {
                 self.parse_http_v1(payload, param, &mut info)?;
-                if param.parse_log {
-                    self.wasm_hook(param, payload, &mut info);
-                }
             }
             L7Protocol::Http2 | L7Protocol::Grpc => {
                 if self.http2_req_decoder.is_none() {
@@ -589,6 +594,13 @@ impl L7ProtocolParserInterface for HttpLog {
             _ => unreachable!(),
         }
         if param.parse_log {
+            // In uprobe mode, headers are reported in a way different from other modes:
+            // one payload contains one header.
+            // Calling wasm plugin on every payload would be wasted effort,
+            // in this condition the call to the wasm plugin will be skipped.
+            if param.ebpf_type != EbpfType::GoHttp2Uprobe {
+                self.wasm_hook(param, payload, &mut info);
+            }
             if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
                 && !config.http_endpoint_disabled
                 && info.path.len() > 0
@@ -1105,8 +1117,6 @@ impl HttpLog {
                     info.proto = L7Protocol::Grpc;
                 }
             }
-            "user-agent" => info.user_agent = Some(String::from_utf8_lossy(val).into_owned()),
-            "referer" => info.referer = Some(String::from_utf8_lossy(val).into_owned()),
             _ => {}
         }
 
@@ -1139,6 +1149,33 @@ impl HttpLog {
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
             info.client_ip = Some(val.to_owned());
         }
+
+        fn process_attributes(
+            config: &L7LogDynamicConfig,
+            info: &mut HttpInfo,
+            key: &str,
+            val: &str,
+        ) {
+            let field_iter = match info.proto {
+                L7Protocol::Http1 => config.extra_log_fields.http.iter(),
+                L7Protocol::Http2 | L7Protocol::Grpc => config.extra_log_fields.http2.iter(),
+                _ => return,
+            };
+
+            info.attributes.extend(field_iter.filter_map(|f| {
+                if f.field_name.eq_ignore_ascii_case(key) {
+                    Some(KeyVal {
+                        key: key.replace("-", "_"),
+                        val: val.to_owned(),
+                    })
+                } else {
+                    None
+                }
+            }));
+        }
+
+        process_attributes(config, info, key, val);
+
         Ok(())
     }
 
@@ -1252,7 +1289,7 @@ impl HttpLog {
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
         }
         .map(|custom| {
-            info.merge_custom_to_http1(custom);
+            info.merge_custom_to_http(custom);
         });
     }
 }
@@ -1497,7 +1534,8 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 #[cfg(test)]
 mod tests {
     use crate::config::{
-        handler::LogParserConfig, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
+        handler::LogParserConfig, ExtraLogFields, HttpEndpointExtraction, HttpEndpointTrie,
+        MatchRule,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
@@ -1538,6 +1576,7 @@ mod tests {
             vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
+            ExtraLogFields::default(),
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,

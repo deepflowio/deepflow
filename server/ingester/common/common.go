@@ -24,10 +24,10 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
-	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"
@@ -182,7 +182,7 @@ func GetAutoService(serviceID, podGroupID, gpID, podNodeID, l3DeviceID uint32, l
 	return 0, IpType
 }
 
-func IsPodServiceIP(deviceType zerodoc.DeviceType, podId, podNodeId uint32) bool {
+func IsPodServiceIP(deviceType flow_metrics.DeviceType, podId, podNodeId uint32) bool {
 	// 如果是NodeIP,clusterIP或后端podIP需要匹配service_id
-	return deviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) || podId != 0 || podNodeId != 0
+	return deviceType == flow_metrics.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) || podId != 0 || podNodeId != 0
 }

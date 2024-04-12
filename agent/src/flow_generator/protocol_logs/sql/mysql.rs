@@ -16,6 +16,8 @@
 
 mod comment_parser;
 
+use std::str;
+
 use log::{debug, trace};
 use serde::Serialize;
 
@@ -112,6 +114,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.context.len()
+    }
 }
 
 impl MysqlInfo {
@@ -193,10 +199,20 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
-        let context = attempt_obfuscation(obfuscate_cache, payload)
-            .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
-                String::from_utf8_lossy(&m).to_string()
-            });
+        let context = match attempt_obfuscation(obfuscate_cache, payload) {
+            Some(mut m) => {
+                let valid_len = match str::from_utf8(&m) {
+                    Ok(_) => m.len(),
+                    Err(e) => e.valid_up_to(),
+                };
+                m.truncate(valid_len);
+                unsafe {
+                    // SAFTY: str in m is checked to be valid utf8 up to `valid_len`
+                    String::from_utf8_unchecked(m)
+                }
+            }
+            _ => String::from_utf8_lossy(payload).to_string(),
+        };
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
         }
@@ -327,6 +343,8 @@ pub struct MysqlLog {
     pub protocol_version: u8,
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
+
+    has_request: bool,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -354,10 +372,12 @@ impl L7ProtocolParserInterface for MysqlLog {
             // ignore greeting
             return Ok(L7ParseResult::None);
         }
-        info.cal_rrt(param, None).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
+        if info.msg_type != LogMessageType::Session {
+            info.cal_rrt(param, None).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {
@@ -574,8 +594,16 @@ impl MysqlLog {
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => msg_type = self.request(config, &payload[offset..], info)?,
-            LogMessageType::Response => self.response(&payload[offset..], info)?,
+            LogMessageType::Request => {
+                msg_type = self.request(config, &payload[offset..], info)?;
+                if msg_type == LogMessageType::Request {
+                    self.has_request = true;
+                }
+            }
+            LogMessageType::Response if self.has_request => {
+                self.response(&payload[offset..], info)?;
+                self.has_request = false;
+            }
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
                 return Ok(true);
@@ -662,7 +690,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::handler::TraceType,
+        config::{handler::TraceType, ExtraLogFields},
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -793,7 +821,7 @@ mod tests {
                 "mysql.pcap",
                 L7PerfStats {
                     request_count: 6,
-                    response_count: 7,
+                    response_count: 5,
                     err_client_count: 0,
                     err_server_count: 0,
                     err_timeout: 0,
@@ -807,7 +835,7 @@ mod tests {
                 "mysql-error.pcap",
                 L7PerfStats {
                     request_count: 4,
-                    response_count: 4,
+                    response_count: 3,
                     err_client_count: 0,
                     err_server_count: 1,
                     err_timeout: 0,
@@ -900,6 +928,7 @@ mod tests {
                 TraceType::Customize("TraceID".to_owned()),
             ],
             vec![TraceType::TraceParent],
+            ExtraLogFields::default(),
         );
         for (input, tid, sid) in testcases {
             info.trace_id = None;

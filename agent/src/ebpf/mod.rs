@@ -59,6 +59,8 @@ pub const SOCK_DATA_SOFARPC: u16 = 43;
 #[allow(dead_code)]
 pub const SOCK_DATA_FASTCGI: u16 = 44;
 #[allow(dead_code)]
+pub const SOCK_DATA_BRPC: u16 = 45;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;
@@ -76,6 +78,12 @@ pub const SOCK_DATA_MQTT: u16 = 101;
 pub const SOCK_DATA_AMQP: u16 = 102;
 #[allow(dead_code)]
 pub const SOCK_DATA_OPENWIRE: u16 = 103;
+#[allow(dead_code)]
+pub const SOCK_DATA_NATS: u16 = 104;
+#[allow(dead_code)]
+pub const SOCK_DATA_PULSAR: u16 = 105;
+#[allow(dead_code)]
+pub const SOCK_DATA_ZMTP: u16 = 106;
 #[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]

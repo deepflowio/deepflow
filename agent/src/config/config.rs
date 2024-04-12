@@ -24,7 +24,6 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
-use public::l7_protocol::{DEFAULT_DNS_PORT, DEFAULT_TLS_PORT};
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -57,7 +56,7 @@ use public::{
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
-const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
 
@@ -124,6 +123,7 @@ pub struct Config {
     pub agent_unique_identifier: AgentIdType,
     #[cfg(target_os = "linux")]
     pub pid_file: String,
+    pub team_id: String,
 }
 
 impl Config {
@@ -176,33 +176,27 @@ impl Config {
         }
     }
 
-    pub async fn async_get_k8s_cluster_id(
-        session: &Session,
-        kubernetes_cluster_name: Option<&String>,
-    ) -> String {
-        let ca_md5 = loop {
-            match fs::read_to_string(K8S_CA_CRT_PATH) {
-                Ok(c) => {
-                    break Some(
-                        Md5::digest(c.as_bytes())
-                            .into_iter()
-                            .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "get kubernetes_cluster_id error: failed to read {} error: {}",
-                        K8S_CA_CRT_PATH, e
-                    );
-                    tokio::time::sleep(MINUTE).await;
-                }
+    pub async fn async_get_k8s_cluster_id(session: &Session, config: &Config) -> Option<String> {
+        let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
+            Ok(c) => Some(
+                Md5::digest(c.as_bytes())
+                    .into_iter()
+                    .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
+            ),
+            Err(e) => {
+                info!(
+                    "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
+                    K8S_CA_CRT_PATH, e
+                );
+                return None;
             }
         };
 
         loop {
             let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
-                kubernetes_cluster_name: kubernetes_cluster_name.map(Clone::clone),
+                kubernetes_cluster_name: config.kubernetes_cluster_name.clone(),
+                team_id: Some(config.team_id.clone()),
             };
 
             match session
@@ -231,7 +225,7 @@ impl Config {
                             // ==============================================================================================
                             // FIXME: 这里获取成功后 Session 中的 Channel 会失效，所以在这里重置 Session
                             session.reset();
-                            return id;
+                            return Some(id);
                         }
                         None => {
                             error!("call get_kubernetes_cluster_id return response is none")
@@ -255,12 +249,9 @@ impl Config {
     pub fn get_k8s_cluster_id(
         runtime: &Runtime,
         session: &Session,
-        kubernetes_cluster_name: Option<&String>,
-    ) -> String {
-        runtime.block_on(Self::async_get_k8s_cluster_id(
-            session,
-            kubernetes_cluster_name,
-        ))
+        config: &Config,
+    ) -> Option<String> {
+        runtime.block_on(Self::async_get_k8s_cluster_id(session, config))
     }
 }
 
@@ -282,6 +273,7 @@ impl Default for Config {
             agent_unique_identifier: Default::default(),
             #[cfg(target_os = "linux")]
             pid_file: Default::default(),
+            team_id: "".into(),
         }
     }
 }
@@ -357,6 +349,7 @@ impl Default for OnCpuProfile {
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
+    pub global_ebpf_pps_threshold: u64,
     pub kprobe_whitelist: EbpfKprobePortlist,
     pub kprobe_blacklist: EbpfKprobePortlist,
     #[serde(rename = "uprobe-process-name-regexs")]
@@ -379,6 +372,7 @@ impl Default for EbpfYamlConfig {
         EbpfYamlConfig {
             disabled: false,
             log_file: String::new(),
+            global_ebpf_pps_threshold: 0,
             thread_num: 1,
             perf_pages_count: 128,
             ring_size: 65536,
@@ -441,9 +435,38 @@ pub struct HttpEndpointExtraction {
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFieldsInfo {
+    pub field_name: String,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFields {
+    pub http: Vec<ExtraLogFieldsInfo>,
+    pub http2: Vec<ExtraLogFieldsInfo>,
+}
+
+impl ExtraLogFields {
+    pub fn deduplicate(&mut self) {
+        fn deduplicate_fields(fields: &mut Vec<ExtraLogFieldsInfo>) {
+            fields
+                .iter_mut()
+                .for_each(|f| f.field_name.make_ascii_lowercase());
+            fields.sort_by(|a, b| a.field_name.cmp(&b.field_name));
+            fields.dedup_by(|a, b| a.field_name == b.field_name);
+        }
+
+        deduplicate_fields(&mut self.http);
+        deduplicate_fields(&mut self.http2);
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
     pub obfuscate_enabled_protocols: Vec<String>,
+    pub extra_log_fields: ExtraLogFields,
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -483,6 +506,7 @@ pub struct YamlConfig {
     pub analyzer_raw_packet_block_size: usize,
     pub batched_buffer_size_limit: usize,
     pub dpdk_enabled: bool,
+    pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
@@ -503,6 +527,7 @@ pub struct YamlConfig {
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
     pub kubernetes_namespace: String,
@@ -566,6 +591,9 @@ pub struct YamlConfig {
 }
 
 impl YamlConfig {
+    const DEFAULT_DNS_PORTS: &'static str = "53,5353";
+    const DEFAULT_TLS_PORTS: &'static str = "443,6443";
+
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
         Self::load(&contents, tap_mode)
@@ -581,7 +609,7 @@ impl YamlConfig {
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?
         };
 
-        if c.pcap.queue_size < 1 << 16 {
+        if c.pcap.queue_size == 0 {
             c.pcap.queue_size = 1 << 16;
         }
         if c.pcap.flow_buffer_size <= 0 {
@@ -599,13 +627,13 @@ impl YamlConfig {
         {
             c.flow.flush_interval = Duration::from_secs(1);
         }
-        if c.flow_queue_size < 1 << 16 {
+        if c.flow_queue_size == 0 {
             c.flow_queue_size = 1 << 16;
         }
-        if c.quadruple_queue_size < 1 << 18 {
+        if c.quadruple_queue_size == 0 {
             c.quadruple_queue_size = 1 << 18;
         }
-        if c.analyzer_queue_size < 1 << 17 {
+        if c.analyzer_queue_size == 0 {
             c.analyzer_queue_size = 1 << 17;
         }
         if c.analyzer_raw_packet_block_size < 65536 {
@@ -638,6 +666,10 @@ impl YamlConfig {
         // L7Log Session timeout must more than or equal 10s to keep window
         if c.l7_log_session_aggr_timeout.as_secs() < 10 {
             c.l7_log_session_aggr_timeout = Duration::from_secs(10);
+        }
+
+        if c.l7_log_session_slot_capacity < 1024 {
+            c.l7_log_session_slot_capacity = 1024;
         }
 
         if c.external_metrics_sender_queue_size == 0 {
@@ -799,14 +831,14 @@ impl YamlConfig {
         let mut new = self.l7_protocol_ports.clone();
 
         let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
-        // dns default only parse 53 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
+        // dns default only parse 53,5353 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
         if !self.l7_protocol_ports.contains_key(dns_str) {
-            new.insert(dns_str.to_string(), DEFAULT_DNS_PORT.to_string());
+            new.insert(dns_str.to_string(), Self::DEFAULT_DNS_PORTS.to_string());
         }
         let tls_str = L7ProtocolParser::TLS(TlsLog::default()).as_str();
-        // tls default only parse 443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+        // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
         if !self.l7_protocol_ports.contains_key(tls_str) {
-            new.insert(tls_str.to_string(), DEFAULT_TLS_PORT.to_string());
+            new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
         }
 
         new
@@ -859,6 +891,7 @@ impl Default for YamlConfig {
             analyzer_raw_packet_block_size: 65536,
             batched_buffer_size_limit: 131072,
             dpdk_enabled: false,
+            dispatcher_queue: false,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
@@ -881,6 +914,7 @@ impl Default for YamlConfig {
             analyzer_ip: "".into(),
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
+            l7_log_session_slot_capacity: 1024,
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
             kubernetes_namespace: "".into(),
@@ -915,8 +949,8 @@ impl Default for YamlConfig {
 
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([
-                (String::from("DNS"), String::from("53,5353")),
-                (String::from("TLS"), String::from("443")),
+                (String::from("DNS"), String::from(Self::DEFAULT_DNS_PORTS)),
+                (String::from("TLS"), String::from(Self::DEFAULT_TLS_PORTS)),
             ]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
@@ -1119,8 +1153,9 @@ pub struct RuntimeConfig {
     pub enabled: bool,
     pub max_cpus: u32,
     pub max_memory: u64,
-    pub sync_interval: u64,  // unit(second)
-    pub stats_interval: u64, // unit(second)
+    pub sync_interval: u64,          // unit(second)
+    pub platform_sync_interval: u64, // unit(second)
+    pub stats_interval: u64,         // unit(second)
     #[serde(rename = "max_collect_pps")]
     pub global_pps_threshold: u64,
     #[cfg(target_os = "linux")]
@@ -1148,6 +1183,12 @@ pub struct RuntimeConfig {
     pub l7_log_ignore_tap_sides: Vec<TapSide>,
     #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_threshold: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_recover: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
     #[serde(skip)]
     pub server_tx_bandwidth_threshold: u64,
     #[serde(skip)]
@@ -1221,7 +1262,7 @@ pub struct RuntimeConfig {
     #[serde(deserialize_with = "bool_from_int")]
     pub external_agent_http_proxy_enabled: bool,
     pub external_agent_http_proxy_port: u16,
-    #[serde(skip)]
+    #[serde(deserialize_with = "to_tap_mode")]
     pub tap_mode: TapMode,
     pub prometheus_http_api_addresses: Vec<String>,
     #[serde(skip)]
@@ -1261,6 +1302,7 @@ impl RuntimeConfig {
             max_cpus: 1,
             max_memory: 768,
             sync_interval: 60,
+            platform_sync_interval: 10,
             stats_interval: 10,
             global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
@@ -1275,6 +1317,9 @@ impl RuntimeConfig {
             collector_enabled: true,
             l4_log_store_tap_types: vec![0],
             platform_enabled: false,
+            system_load_circuit_breaker_threshold: 1.0,
+            system_load_circuit_breaker_recover: 0.9,
+            system_load_circuit_breaker_metric: trident::SystemLoadMetric::Load15,
             server_tx_bandwidth_threshold: 1,
             bandwidth_probe_interval: Duration::from_secs(60),
             npb_vlan_mode: trident::VlanMode::None,
@@ -1337,6 +1382,12 @@ impl RuntimeConfig {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "sync-interval {:?} not in [1s, 1h]",
                 Duration::from_secs(self.sync_interval)
+            )));
+        }
+        if self.platform_sync_interval < 10 || self.platform_sync_interval > 60 * 60 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "platform-sync-interval {:?} not in [10s, 1h]",
+                Duration::from_secs(self.platform_sync_interval)
             )));
         }
         if self.stats_interval < 1 || self.stats_interval > 60 * 60 {
@@ -1431,6 +1482,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             max_cpus: conf.max_cpus(),
             max_memory: (conf.max_memory() as u64) << 20,
             sync_interval: conf.sync_interval() as u64,
+            platform_sync_interval: conf.platform_sync_interval() as u64,
             stats_interval: conf.stats_interval() as u64,
             global_pps_threshold: conf.global_pps_threshold(),
             #[cfg(target_os = "linux")]
@@ -1455,6 +1507,9 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                 })
                 .collect(),
             platform_enabled: conf.platform_enabled(),
+            system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold(),
+            system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover(),
+            system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
             bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
             npb_vlan_mode: conf.npb_vlan_mode(),
@@ -1655,6 +1710,21 @@ where
         0 => Ok(trident::VlanMode::None),
         1 => Ok(trident::VlanMode::Qinq),
         2 => Ok(trident::VlanMode::Vlan),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_tap_mode<'de, D>(deserializer: D) -> Result<TapMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(TapMode::Local),
+        1 => Ok(TapMode::Mirror),
+        2 => Ok(TapMode::Analyzer),
         other => Err(de::Error::invalid_value(
             Unexpected::Unsigned(other as u64),
             &"0|1|2",

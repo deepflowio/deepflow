@@ -85,7 +85,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 		w.ttl = config.PerfTTL
 		w.writerConfig = config.PerfCKWriterConfig
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, DefaultPartition, config.Base, &w.writerConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err
 	}

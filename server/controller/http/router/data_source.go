@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -46,7 +47,8 @@ func (ds *DataSource) RegisterTo(e *gin.Engine) {
 func getDataSource(c *gin.Context) {
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
-	data, err := service.GetDataSources(args, nil)
+	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+	data, err := service.GetDataSources(orgID.(int), args, nil)
 	JsonResponse(c, data, err)
 }
 
@@ -59,7 +61,8 @@ func getDataSources(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if value, ok := c.GetQuery("name"); ok {
 			args["name"] = value
 		}
-		data, err := service.GetDataSources(args, &cfg.Spec)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.GetDataSources(orgID.(int), args, &cfg.Spec)
 		JsonResponse(c, data, err)
 	})
 }
@@ -72,8 +75,8 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&dataSourceCreate, binding.JSON)
 		if dataSourceCreate != nil &&
-			!(dataSourceCreate.DataTableCollection == "flow_metrics.vtap_app*" || dataSourceCreate.DataTableCollection == "flow_metrics.vtap_flow*") {
-			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, "tsdb type only supports flow_metrics.vtap_app* and flow_metrics.vtap_flow*")
+			!(dataSourceCreate.DataTableCollection == "flow_metrics.application*" || dataSourceCreate.DataTableCollection == "flow_metrics.network*") {
+			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, "tsdb type only supports flow_metrics.application* and flow_metrics.network*")
 			return
 		}
 		if err != nil {
@@ -81,7 +84,8 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := service.CreateDataSource(dataSourceCreate, cfg)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.CreateDataSource(orgID.(int), dataSourceCreate, cfg)
 		JsonResponse(c, data, err)
 	})
 }
@@ -99,7 +103,8 @@ func updateDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.UpdateDataSource(lcuuid, dataSourceUpdate, cfg)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.UpdateDataSource(orgID.(int), lcuuid, dataSourceUpdate, cfg)
 		JsonResponse(c, data, err)
 	})
 }
@@ -109,7 +114,8 @@ func deleteDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		var err error
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.DeleteDataSource(lcuuid, cfg)
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		data, err := service.DeleteDataSource(orgID.(int), lcuuid, cfg)
 		JsonResponse(c, data, err)
 	})
 }

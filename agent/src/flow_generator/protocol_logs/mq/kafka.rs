@@ -105,6 +105,18 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.topic_name.is_empty() {
+            None
+        } else {
+            Some(self.topic_name.clone())
+        }
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.topic_name.len()
+    }
 }
 
 impl KafkaInfo {
@@ -544,7 +556,15 @@ impl KafkaLog {
             let start_index = payload[start + index..].find("00-");
             if let Some(current_index) = start_index {
                 let trace_id_index = start + index + current_index + 3;
+                if !payload.is_char_boundary(trace_id_index) {
+                    start += index + tag.len();
+                    continue;
+                }
                 let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
+                if !payload.is_char_boundary(trace_id_index + trace_id_length) {
+                    start += index + tag.len();
+                    continue;
+                }
                 trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
                 break;
             }
@@ -580,7 +600,15 @@ impl KafkaLog {
             let start_index = payload[start + index..].find("1-");
             if let Some(current_index) = start_index {
                 let trace_id_index = start + index + current_index + 2;
+                if !payload.is_char_boundary(trace_id_index) {
+                    start += index + tag.len();
+                    continue;
+                }
                 let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
+                if !payload.is_char_boundary(trace_id_index + trace_id_length) {
+                    start += index + tag.len();
+                    continue;
+                }
                 trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
                 break;
             }

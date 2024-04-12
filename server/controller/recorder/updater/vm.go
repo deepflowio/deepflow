@@ -60,7 +60,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
-			db.NewVM(),
+			db.NewVM().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VMs,
 			cloudData,
 		),
@@ -77,11 +77,15 @@ func (m *VM) getDiffBaseByCloudItem(cloudItem *cloudmodel.VM) (diffBase *diffbas
 func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(m.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
+	}
+	var hostID int
+	if cloudItem.LaunchServer != "" {
+		hostID, _ = m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
 	}
 	cloudTags := map[string]string{}
 	if cloudItem.CloudTags != nil {
@@ -96,7 +100,8 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		State:        cloudItem.State,
 		HType:        cloudItem.HType,
 		LaunchServer: cloudItem.LaunchServer,
-		Domain:       m.cache.DomainLcuuid,
+		HostID:       hostID,
+		Domain:       m.metadata.Domain.Lcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,
@@ -115,10 +120,10 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
+			log.Error(m.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-			))
+			)))
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
@@ -152,6 +157,13 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
 		mapInfo["launch_server"] = cloudItem.LaunchServer
 		structInfo.LaunchServer.Set(diffBase.LaunchServer, cloudItem.LaunchServer)
+	}
+	if cloudItem.LaunchServer != "" {
+		hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+		if diffBase.HostID != hostID {
+			mapInfo["host_id"] = hostID
+			structInfo.HostID.Set(diffBase.HostID, hostID)
+		}
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

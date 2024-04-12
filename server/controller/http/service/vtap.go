@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
@@ -37,7 +36,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
-	vtapop "github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
 const (
@@ -800,115 +798,6 @@ func VTapRebalance(args map[string]interface{}, cfg config.IngesterLoadBalancing
 				common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
 		}
 	}
-}
-
-func formatLKResult(vtapLKResult *vtapop.VTapLKResult, updateMap map[string]interface{}) {
-	updateMap["type"] = vtapLKResult.VTapType
-	updateMap["launch_server"] = vtapLKResult.LaunchServer
-	updateMap["launch_server_id"] = vtapLKResult.LaunchServerID
-	updateMap["name"] = vtapLKResult.VTapName
-	updateMap["az"] = vtapLKResult.AZ
-	updateMap["lcuuid"] = vtapLKResult.Lcuuid
-}
-
-func updateVTapTapMode(lcuuid string, tapMode int) error {
-	var vtap mysql.VTap
-	var az mysql.AZ
-	if err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap).Error; err != nil {
-		log.Error(err)
-		return fmt.Errorf("vtap (%s) not found", lcuuid)
-	}
-	if err := mysql.Db.Where("lcuuid = ?", vtap.AZ).First(&az).Error; err != nil {
-		log.Error(err)
-		return fmt.Errorf("vtap az(%s) not found", vtap.AZ)
-	}
-	if vtap.TapMode == tapMode {
-		return nil
-	}
-	if changeTapModes, ok := common.VTapToChangeTapModes[vtap.Type]; ok {
-		if utils.Find[int](changeTapModes, tapMode) == false {
-			return fmt.Errorf("the vtap(name=%s type=%d) dose not support changing to %d tap_mode",
-				vtap.Name, vtap.Type, tapMode)
-		}
-	}
-
-	updateMap := make(map[string]interface{})
-	switch vtap.Type {
-	case common.VTAP_TYPE_KVM, common.VTAP_TYPE_HYPER_V,
-		common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM, common.VTAP_TYPE_K8S_SIDECAR:
-
-		if tapMode == common.TAPMODE_LOCAL || tapMode == common.TAPMODE_MIRROR {
-			updateMap["tap_mode"] = tapMode
-		}
-	case common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P:
-		if tapMode == common.TAPMODE_LOCAL {
-			updateMap["tap_mode"] = tapMode
-		} else if tapMode == common.TAPMODE_MIRROR {
-			vtapLKData := vtapop.NewVTapLkData(vtap.CtrlIP, vtap.CtrlMac, []string{vtap.CtrlIP}, "", az.Region)
-			vtapLKResult := vtapLKData.LookUpMirrorVTapByIP(mysql.Db)
-			if vtapLKResult != nil {
-				updateMap["tap_mode"] = tapMode
-				formatLKResult(vtapLKResult, updateMap)
-			}
-		}
-	case common.VTAP_TYPE_ESXI:
-		if tapMode == common.TAPMODE_LOCAL {
-			vtapLKData := vtapop.NewVTapLkData(vtap.CtrlIP, vtap.CtrlMac, []string{vtap.CtrlIP}, "", az.Region)
-			vtapLKResult := vtapLKData.LookUpLocalVTapByIP(mysql.Db)
-			if vtapLKResult != nil {
-				updateMap["tap_mode"] = tapMode
-				formatLKResult(vtapLKResult, updateMap)
-			}
-		} else if tapMode == common.TAPMODE_MIRROR {
-			updateMap["tap_mode"] = tapMode
-		}
-	default:
-		return fmt.Errorf("vtap(%s) type(%d) dose not support changing tap_mode", vtap.Name, vtap.Type)
-	}
-
-	if len(updateMap) == 0 {
-		return fmt.Errorf("the vtap(name=%s type=%d) failed to modify %d tap_mode",
-			vtap.Name, vtap.Type, tapMode)
-	}
-
-	return mysql.Db.Model(&vtap).Updates(updateMap).Error
-}
-
-func concurrentUpdateVTapTapMode(lcuuid string, tapMode int, response chan string, wg *sync.WaitGroup) {
-	defer wg.Done()
-	err := updateVTapTapMode(lcuuid, tapMode)
-	if err != nil {
-		response <- err.Error()
-	}
-}
-
-func BatchUpdateVtapTapMode(vtapUpdate *model.VtapUpdateTapMode) (interface{}, error) {
-	if len(vtapUpdate.VTapLcuuids) == 0 {
-		return nil, nil
-	}
-	errorMessage := make([]string, 0, len(vtapUpdate.VTapLcuuids))
-	responseChannel := make(chan string, len(vtapUpdate.VTapLcuuids))
-	wg := &sync.WaitGroup{}
-	wgResponse := &sync.WaitGroup{}
-	go func() {
-		wgResponse.Add(1)
-		for response := range responseChannel {
-			errorMessage = append(errorMessage, response)
-		}
-		wgResponse.Done()
-	}()
-	for _, lcuuid := range vtapUpdate.VTapLcuuids {
-		wg.Add(1)
-		go concurrentUpdateVTapTapMode(lcuuid, vtapUpdate.TapMode, responseChannel, wg)
-	}
-	wg.Wait()
-	close(responseChannel)
-	wgResponse.Wait()
-	if len(errorMessage) > 0 {
-		return nil, NewError(httpcommon.SERVER_ERROR, strings.Join(errorMessage, ";"))
-	}
-
-	return nil, nil
 }
 
 // GetVTapPortsCount gets the number of virtual network cards covered by the deployed vtap,

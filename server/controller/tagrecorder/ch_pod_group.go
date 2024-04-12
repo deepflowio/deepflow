@@ -17,81 +17,79 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodGroup struct {
-	UpdaterComponent[mysql.ChPodGroup, IDKey]
+	SubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysql.PodGroup, mysql.ChPodGroup, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
-	updater := &ChPodGroup{
-		newUpdaterComponent[mysql.ChPodGroup, IDKey](
-			RESOURCE_TYPE_CH_POD_GROUP,
+	mng := &ChPodGroup{
+		newSubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysql.PodGroup, mysql.ChPodGroup, IDKey](
+			common.RESOURCE_TYPE_POD_GROUP_EN, RESOURCE_TYPE_CH_POD_GROUP,
 		),
 		resourceTypeToIconID,
 	}
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
-	var podGroups []mysql.PodGroup
-	err := mysql.Db.Unscoped().Find(&podGroups).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodGroup) sourceToTarget(source *mysql.PodGroup) (keys []IDKey, targets []mysql.ChPodGroup) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD_GROUP,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodGroup)
-	for _, podGroup := range podGroups {
-		if podGroup.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
-				ID:           podGroup.ID,
-				Name:         podGroup.Name + " (deleted)",
-				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				PodClusterID: podGroup.PodClusterID,
-				PodNsID:      podGroup.PodNamespaceID,
-			}
-		} else {
-			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
-				ID:           podGroup.ID,
-				Name:         podGroup.Name,
-				PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				PodClusterID: podGroup.PodClusterID,
-				PodNsID:      podGroup.PodNamespaceID,
-			}
-		}
-	}
-	return keyToItem, true
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChPodGroup{
+		ID:           source.ID,
+		Name:         sourceName,
+		IconID:       iconID,
+		PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		PodClusterID: source.PodClusterID,
+		PodNsID:      source.PodNamespaceID,
+	})
+	return
 }
 
-func (p *ChPodGroup) generateKey(dbItem mysql.ChPodGroup) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (p *ChPodGroup) generateUpdateInfo(oldItem, newItem mysql.ChPodGroup) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodGroup) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if oldItem.PodGroupType != newItem.PodGroupType {
-		updateInfo["pod_group_type"] = newItem.PodGroupType
+	if fieldsUpdate.Type.IsDifferent() {
+		updateInfo["pod_group_type"] = RESOURCE_POD_GROUP_TYPE_MAP[fieldsUpdate.Type.GetNew()]
 	}
-	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
-		updateInfo["icon_id"] = newItem.IconID
+	if fieldsUpdate.PodClusterID.IsDifferent() {
+		updateInfo["pod_cluster_id"] = fieldsUpdate.PodClusterID.GetNew()
 	}
-	if oldItem.PodClusterID != newItem.PodClusterID {
-		updateInfo["pod_cluster_id"] = newItem.PodClusterID
-	}
-	if oldItem.PodClusterID != newItem.PodClusterID {
-		updateInfo["pod_ns_id"] = newItem.PodNsID
+	if fieldsUpdate.PodNamespaceID.IsDifferent() {
+		updateInfo["pod_ns_id"] = fieldsUpdate.PodNamespaceID.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChPodGroup
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
-	return nil, false
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodGroup) softDeletedTargetsUpdated(targets []mysql.ChPodGroup, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }

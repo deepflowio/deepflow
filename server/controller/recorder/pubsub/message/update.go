@@ -184,6 +184,7 @@ type HostFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
 	IP           fieldDetail[string]
+	UID          fieldDetail[string]
 	HType        fieldDetail[int]
 	VCPUNum      fieldDetail[int]
 	MemTotal     fieldDetail[int]
@@ -209,6 +210,8 @@ type VMFieldsUpdate struct {
 	HType        fieldDetail[int]
 	LaunchServer fieldDetail[string]
 	CloudTags    fieldDetail[map[string]string]
+	HostID       fieldDetail[int]
+	UID          fieldDetail[string]
 	Hostname     fieldDetail[string]
 	VPCID        fieldDetail[int]
 	VPCLcuuid    fieldDetail[string]
@@ -241,6 +244,7 @@ type VPCFieldsUpdate struct {
 	CIDR         fieldDetail[string]
 	TunnelID     fieldDetail[int]
 	RegionLcuuid fieldDetail[string]
+	UID          fieldDetail[string]
 }
 
 type VPCUpdate struct {
@@ -440,6 +444,7 @@ type NATGatewayFieldsUpdate struct {
 	Name         fieldDetail[string]
 	FloatingIPs  fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
+	UID          fieldDetail[string]
 }
 type NATGatewayUpdate struct {
 	Fields[NATGatewayFieldsUpdate]
@@ -471,6 +476,7 @@ type NATVMConnectionUpdate struct {
 type LBFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	Model        fieldDetail[int]
 	VIP          fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
@@ -551,6 +557,7 @@ type CENUpdate struct {
 type RDSInstanceFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	State        fieldDetail[int]
 	Series       fieldDetail[int]
 	Model        fieldDetail[int]
@@ -567,6 +574,7 @@ type RDSInstanceUpdate struct {
 type RedisInstanceFieldsUpdate struct {
 	Key
 	Name         fieldDetail[string]
+	UID          fieldDetail[string]
 	State        fieldDetail[int]
 	PublicHost   fieldDetail[string]
 	AZLcuuid     fieldDetail[string]
@@ -598,6 +606,8 @@ type PodNamespaceFieldsUpdate struct {
 	CloudTags    fieldDetail[map[string]string]
 	AZLcuuid     fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
+	Name         fieldDetail[string]
+	PodClusterID fieldDetail[int]
 }
 type PodNamespaceUpdate struct {
 	Fields[PodNamespaceFieldsUpdate]
@@ -615,6 +625,7 @@ type PodNodeFieldsUpdate struct {
 	MemTotal     fieldDetail[int]
 	AZLcuuid     fieldDetail[string]
 	RegionLcuuid fieldDetail[string]
+	Name         fieldDetail[string]
 }
 type PodNodeUpdate struct {
 	Fields[PodNodeFieldsUpdate]
@@ -667,6 +678,9 @@ type PodServiceFieldsUpdate struct {
 	PodIngressLcuuid fieldDetail[string]
 	AZLcuuid         fieldDetail[string]
 	RegionLcuuid     fieldDetail[string]
+	PodNamespaceID   fieldDetail[int]
+	VPCID            fieldDetail[int]
+	PodClusterID     fieldDetail[int]
 }
 type PodServiceUpdate struct {
 	Fields[PodServiceFieldsUpdate]
@@ -688,12 +702,14 @@ type PodServicePortUpdate struct {
 
 type PodGroupFieldsUpdate struct {
 	Key
-	Name         fieldDetail[string]
-	Label        fieldDetail[string]
-	Type         fieldDetail[int]
-	PodNum       fieldDetail[int]
-	AZLcuuid     fieldDetail[string]
-	RegionLcuuid fieldDetail[string]
+	Name           fieldDetail[string]
+	Label          fieldDetail[string]
+	Type           fieldDetail[int]
+	PodNum         fieldDetail[int]
+	AZLcuuid       fieldDetail[string]
+	RegionLcuuid   fieldDetail[string]
+	PodClusterID   fieldDetail[int]
+	PodNamespaceID fieldDetail[int]
 }
 type PodGroupUpdate struct {
 	Fields[PodGroupFieldsUpdate]
@@ -738,7 +754,9 @@ type PodFieldsUpdate struct {
 	ContainerIDs        fieldDetail[string]
 	CreatedAt           fieldDetail[time.Time]
 	PodGroupID          fieldDetail[int]
+	PodServiceID        fieldDetail[int]
 	PodGroupLcuuid      fieldDetail[string]
+	PodServiceLcuuid    fieldDetail[string]
 	PodReplicaSetID     fieldDetail[int]
 	PodReplicaSetLcuuid fieldDetail[string]
 	PodNodeID           fieldDetail[int]
@@ -747,6 +765,8 @@ type PodFieldsUpdate struct {
 	VPCLcuuid           fieldDetail[string]
 	AZLcuuid            fieldDetail[string]
 	RegionLcuuid        fieldDetail[string]
+	PodNamespaceID      fieldDetail[int]
+	PodClusterID        fieldDetail[int]
 }
 type PodUpdate struct {
 	Fields[PodFieldsUpdate]
@@ -760,6 +780,8 @@ type ProcessFieldsUpdate struct {
 	Name        fieldDetail[string]
 	ContainerID fieldDetail[string]
 	OSAPPTags   fieldDetail[string]
+	VMID        fieldDetail[int]
+	VPCID       fieldDetail[int]
 }
 type ProcessUpdate struct {
 	Fields[ProcessFieldsUpdate]

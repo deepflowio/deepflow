@@ -22,7 +22,7 @@ pod_service                , K8s 容器服务               ,
 pod_group_type             , K8s 工作负载类型           ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
-service                    , 服务                       , 
+service                    , 服务                       ,
 resource_gl0_type          , 类型-容器 POD 优先         , 已废弃，请使用 auto_instance_type。
 resource_gl0               , 资源-容器 POD 优先         , 已废弃，请使用 auto_instance。
 resource_gl1_type          , 类型-工作负载优先          , 已废弃，请使用 auto_service_type。
@@ -33,6 +33,12 @@ auto_instance_type         , 类型-容器 POD 优先         , `auto_instance`�
 auto_instance              , 资源-容器 POD 优先         , IP 对应的实例，实例为IP时，auto_instance_id显示为子网ID。
 auto_service_type          , 类型-服务优先              , `auto_service`实例对应的类型。
 auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务，实例为IP时，auto_service_id显示为子网ID。
+host_ip                    , 宿主机                     , 宿主机的管理 IP。
+host_hostname              , 宿主机                     , 宿主机的 Hostname。
+chost_ip                   , 云服务器                   , 云服务器的主 IP。
+chost_hostname             , 云服务器                   , 云服务器的 Hostname。
+pod_node_ip                , K8s 容器节点               , 容器节点的主 IP。
+pod_node_hostname          , K8s 容器节点               , 容器节点的 Hostname。
 
 k8s.label                  , K8s Label                  ,
 cloud.tag                  , Cloud Tag                  ,
@@ -41,4 +47,5 @@ os.app                     , OS APP                     ,
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
 
-vtap                       , 采集器                     ,
+vtap                       , 采集器                     , 已废弃，请使用 agent。
+agent                      , 采集器                     ,

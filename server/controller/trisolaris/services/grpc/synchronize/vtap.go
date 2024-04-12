@@ -73,8 +73,7 @@ func (e *VTapEvent) getPlugins(vConfig *vtap.VTapConfig) *api.PluginConfig {
 	}
 }
 
-func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api.Config {
-	gVTapInfo := trisolaris.GetGVTapInfo()
+func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTapInfo *vtap.VTapInfo) *api.Config {
 	vtapConfig := c.GetVTapConfig()
 	if vtapConfig == nil {
 		return &api.Config{}
@@ -96,10 +95,18 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
 	vtapID := uint32(c.GetVTapID())
-	tridentType := common.TridentType(c.GetVTapType())
+
+	tridentType := common.TridentType(0)
+	if clusterID != "" { // if agent report cluster_id, force set tridentType = VTAP_TYPE_POD_VM
+		tridentType = common.TridentType(VTAP_TYPE_POD_VM)
+	} else {
+		tridentType = common.TridentType(c.GetVTapType())
+	}
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -108,6 +115,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
 		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
 		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
 		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
@@ -147,7 +155,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		KubernetesApiEnabled:          proto.Bool(false),
 		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
-		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig(gVTapInfo))),
+		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig())),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
 		PrometheusHttpApiAddresses:    strings.Split(vtapConfig.PrometheusHttpAPIAddresses, ","),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
@@ -171,6 +179,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		PodClusterId: &podClusterId,
 
 		Plugins: e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &loadMetric,
 	}
 
 	cacheTSBIP := c.GetTSDBIP()
@@ -238,6 +250,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	return configure
 }
 
+// convertBreakerMetric make the first letter of a string uppercase, such as load1 to Load1.
+func convertBreakerMetric(breakerMetric string) string {
+	var breakerMetricStr string
+	if len(breakerMetric) >= 2 {
+		breakerMetricStr = strings.ToUpper(string(breakerMetric[0])) + breakerMetric[1:]
+	}
+	return breakerMetricStr
+}
+
 func isOpenK8sSyn(vtapType int) bool {
 	switch vtapType {
 	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P,
@@ -269,35 +290,48 @@ func getRealRevision(revision string) string {
 	return realRevision
 }
 
+func (e *VTapEvent) GetFailedResponse(in *api.SyncRequest, gVTapInfo *vtap.VTapInfo) *api.SyncResponse {
+	return &api.SyncResponse{
+		Status:        &STATUS_FAILED,
+		Revision:      proto.String(in.GetRevision()),
+		SelfUpdateUrl: proto.String(gVTapInfo.GetSelfUpdateUrl()),
+	}
+}
+
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	if trisolaris.GetConfig().DomainAutoRegister && in.GetKubernetesClusterId() != "" {
-		gKubernetesInfo := trisolaris.GetGKubernetesInfo()
-		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+		gKubernetesInfo := trisolaris.GetGKubernetesInfo(in.GetTeamId())
+		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
 		if !exists {
-			log.Infof("call me from ip: %s with cluster_id: %s, cluster_name: %s", getRemote(ctx), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+			log.Infof("call me from ip: %s with team_id: %s, cluster_id: %s, cluster_name: %s", getRemote(ctx), in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
 		}
 	}
 
-	gVTapInfo := trisolaris.GetGVTapInfo()
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
+	teamIDStr := in.GetTeamId()
+	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	if gVTapInfo == nil {
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is %s-%d org_id %d not found vtapInfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
+		return e.GetFailedResponse(in, gVTapInfo), nil
+	}
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
-	vtapCache, err := e.getVTapCache(in)
+	vtapCache, err := e.getVTapCache(in, orgID)
 	if err != nil {
-		log.Warningf("err:%s ctrlIp is %s, ctrlMac is %s, hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
-			err, ctrlIP, ctrlMac, in.GetHostIps(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
-		return &api.SyncResponse{
-			Status:        &STATUS_FAILED,
-			Revision:      proto.String(in.GetRevision()),
-			SelfUpdateUrl: proto.String(gVTapInfo.GetSelfUpdateUrl()),
-		}, nil
+		log.Warningf("err:%s ctrlIp is %s, ctrlMac is %s, team_id is %s-%d, org_id is %d, hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
+			err, ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
 	if vtapCache == nil {
-		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
+		if len(teamIDStr) == 0 && trisolaris.GetIsRefused() {
+			log.Errorf("ctrlIp is %s, ctrlMac is %s, not team_id refuse(%v) register", ctrlIP, ctrlMac, trisolaris.GetIsRefused())
+			return e.GetFailedResponse(in, nil), nil
+		}
+		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: %s-%d, org_id is %d, host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
 			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
-
 		// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
 		// resulting in unsuccessful registration and a large number of error logs.
 		if !in.GetKubernetesForceWatch() {
@@ -308,9 +342,10 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 				in.GetHostIps(),
 				in.GetHost(),
 				in.GetVtapGroupIdRequest(),
-				int(in.GetAgentUniqueIdentifier()))
+				int(in.GetAgentUniqueIdentifier()),
+				teamIDInt)
 		}
-		return e.noVTapResponse(in), nil
+		return e.noVTapResponse(in, orgID), nil
 	}
 
 	vtapID := int(vtapCache.GetVTapID())
@@ -320,23 +355,23 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
-		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
+		log.Infof("ctrl_ip is %s, ctrl_mac is %s, team_id is %s-%d, org_id is %d, host_ips is %s, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(),
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(),
 			versionPlatformData, in.GetVersionPlatformData(),
 			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
-		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
+		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, team_id is %s-%d, org_id is %d, host_ips is %s,"+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(),
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(),
 			versionPlatformData, in.GetVersionPlatformData(),
 			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
@@ -404,14 +439,15 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id is %s-%d, org_id is %d, kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac,
+				teamIDStr, teamIDInt, orgID, in.GetKubernetesForceWatch())
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
@@ -439,8 +475,8 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}, nil
 }
 
-func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
-	vtapConfig := trisolaris.GetGVTapInfo().GetVTapConfigFromShortID(groupID)
+func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Config {
+	vtapConfig := trisolaris.GetGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
 	if vtapConfig == nil {
 		return nil
 	}
@@ -460,6 +496,8 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
 	tapMode := api.TapMode(vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -468,6 +506,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
 		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
 		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
 		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
@@ -519,12 +558,16 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
 		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		Plugins:             e.getPlugins(vtapConfig),
+
+		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
+		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerMetric:    &loadMetric,
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
 	}
 	configure.LocalConfig = proto.String(
-		trisolaris.GetGVTapInfo().GetVTapLocalConfigByShortID(groupID))
+		trisolaris.GetGVTapInfo(orgID).GetVTapLocalConfigByShortID(groupID))
 
 	if vtapConfig.ProxyControllerIP != "" {
 		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
@@ -536,13 +579,13 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	return configure
 }
 
-func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
+func (e *VTapEvent) noVTapResponse(in *api.SyncRequest, orgID int) *api.SyncResponse {
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 
-	configInfo := e.generateNoVTapCacheConfig(in.GetVtapGroupIdRequest())
-	gVTapInfo := trisolaris.GetGVTapInfo()
+	configInfo := e.generateNoVTapCacheConfig(in.GetVtapGroupIdRequest(), orgID)
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
 	if in.GetKubernetesClusterId() != "" {
 		tridentType := common.TridentType(VTAP_TYPE_POD_VM)
 		if configInfo == nil {
@@ -558,8 +601,8 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 		if value == vtapCacheKey {
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
+				"ORGID-%d: open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
+				orgID, in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
 		}
 		return &api.SyncResponse{
 			Status: &STATUS_SUCCESS,
@@ -601,15 +644,14 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	}
 }
 
-func (e *VTapEvent) getVTapCache(in *api.SyncRequest) (*vtap.VTapCache, error) {
-	gVTapInfo := trisolaris.GetGVTapInfo()
+func (e *VTapEvent) getVTapCache(in *api.SyncRequest, orgID int) (*vtap.VTapCache, error) {
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	if !gVTapInfo.GetVTapCacheIsReady() {
-		return nil, fmt.Errorf("VTap cache data not ready")
+		return nil, fmt.Errorf("ORGID-%d: VTap cache data not ready", orgID)
 	}
-
 	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
 		vtapCache = gVTapInfo.GetVTapCache(ctrlIP)
@@ -627,9 +669,20 @@ func (e *VTapEvent) getVTapCache(in *api.SyncRequest) (*vtap.VTapCache, error) {
 func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error) {
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
+	teamIDStr := in.GetTeamId()
+	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
-	gVTapInfo := trisolaris.GetGVTapInfo()
-	vtapCache, err := e.getVTapCache(in)
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	if gVTapInfo == nil {
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is %s-%d org_id %d not found  vtapinfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
+		return &api.SyncResponse{
+			Status:        &STATUS_FAILED,
+			Revision:      proto.String(in.GetRevision()),
+			SelfUpdateUrl: proto.String(gVTapInfo.GetSelfUpdateUrl()),
+		}, nil
+
+	}
+	vtapCache, err := e.getVTapCache(in, orgID)
 	if err != nil {
 		return &api.SyncResponse{
 			Status:        &STATUS_FAILED,
@@ -638,7 +691,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		}, err
 	}
 	if vtapCache == nil {
-		return e.noVTapResponse(in), fmt.Errorf("no find vtap(%s %s) cache", ctrlIP, ctrlMac)
+		return e.noVTapResponse(in, orgID), fmt.Errorf("ORGID-%d: no find vtap(%s %s) cache", orgID, ctrlIP, ctrlMac)
 	}
 	vtapID := int(vtapCache.GetVTapID())
 	functions := vtapCache.GetFunctions()
@@ -648,25 +701,26 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	pushVersionGroups := vtapCache.GetPushVersionGroups()
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
+	newAcls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
-		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, "+
+		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, team_id: %s-%d, org_id is %d, "+
 			"(platform data version  %d -> %d), "+
-			"(acls version %d -> %d), "+
+			"(acls version %d -> %d datalen: %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac,
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID,
 			versionPlatformData, pushVersionPlatformData,
-			versionPolicy, pushVersionPolicy,
+			versionPolicy, pushVersionPolicy, len(newAcls),
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
-		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, "+
+		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, team_id: %s-%d, org_id is %d, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac,
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID,
 			versionPlatformData, pushVersionPlatformData,
 			versionPolicy, pushVersionPolicy,
 			versionGroups, pushVersionGroups,
@@ -682,7 +736,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		groups = gVTapInfo.GetGroupData()
 	}
 	acls := []byte{}
-	if versionPolicy != in.GetVersionAcls() {
+	if versionPolicy != pushVersionPolicy {
 		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	}
 
@@ -692,7 +746,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())

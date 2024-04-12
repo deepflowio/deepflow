@@ -25,6 +25,7 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	MaxNpbBps:                     &DefaultMaxNpbBps,
 	MaxCPUs:                       &DefaultMaxCPUs,
 	MaxMemory:                     &DefaultMaxMemory,
+	PlatformSyncInterval:          &DefaultPlatformSyncInterval,
 	SyncInterval:                  &DefaultSyncInterval,
 	StatsInterval:                 &DefaultStatsInterval,
 	RsyslogEnabled:                &DefaultRsyslogEnabled,
@@ -84,6 +85,10 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	AnalyzerIP:                    &DefaultAnalyzerIP,
 	WasmPlugins:                   &DefaultWasmPlugins,
 	SoPlugins:                     &DefaultSoPlugins,
+
+	SystemLoadCircuitBreakerThreshold: &DefaultSystemLoadCircuitBreakerThreshold,
+	SystemLoadCircuitBreakerRecover:   &DefaultSystemLoadCircuitBreakerRecover,
+	SystemLoadCircuitBreakerMetric:    &DefaultSystemLoadCircuitBreakerMetric,
 }
 
 var (
@@ -91,6 +96,7 @@ var (
 	DefaultMaxNpbBps                     = int64(1000000000)
 	DefaultMaxCPUs                       = 1
 	DefaultMaxMemory                     = 768
+	DefaultPlatformSyncInterval          = 10
 	DefaultSyncInterval                  = 60
 	DefaultStatsInterval                 = 10
 	DefaultRsyslogEnabled                = 1
@@ -151,4 +157,8 @@ var (
 	DefaultAnalyzerIP                    = ""
 	DefaultWasmPlugins                   = ""
 	DefaultSoPlugins                     = ""
+
+	DefaultSystemLoadCircuitBreakerThreshold = float32(1.0)
+	DefaultSystemLoadCircuitBreakerRecover   = float32(0.9)
+	DefaultSystemLoadCircuitBreakerMetric    = "load15"
 )

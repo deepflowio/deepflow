@@ -33,11 +33,11 @@ type LB struct {
 
 func NewLB(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LB {
 	mng := &LB{
-		EventManagerBase{
-			resourceType: ctrlrcommon.RESOURCE_TYPE_LB_EN,
-			ToolDataSet:  toolDS,
-			Queue:        eq,
-		},
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_LB_EN,
+			toolDS,
+			eq,
+		),
 		ctrlrcommon.VIF_DEVICE_TYPE_LB,
 	}
 	return mng
@@ -83,7 +83,7 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = l.ToolDataSet.GetLBNameByID(id)
 			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(l.resourceType, lcuuid), err)
+				log.Error(l.metadata.LogPre("%v, %v", idByLcuuidNotFound(l.resourceType, lcuuid), err))
 			}
 		} else {
 			log.Error(nameByIDNotFound(l.resourceType, id))

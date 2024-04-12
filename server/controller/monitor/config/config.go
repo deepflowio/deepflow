@@ -34,6 +34,7 @@ type MonitorConfig struct {
 	VTapAutoDeleteInterval      int                           `default:"3600" yaml:"vtap_auto_delete_interval"` // uint: second
 	Warrant                     Warrant                       `yaml:"warrant"`
 	IngesterLoadBalancingConfig IngesterLoadBalancingStrategy `yaml:"ingester-load-balancing-strategy"`
+	SyncDefaultORGDataInterval  int                           `default:"10" yaml:"sync_default_org_data_interval"`
 }
 
 type IngesterLoadBalancingStrategy struct {

@@ -20,12 +20,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"gorm.io/gorm"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -36,6 +39,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("cloud")
@@ -49,6 +53,8 @@ type Cloud struct {
 	resource                model.Resource
 	platform                platform.Platform
 	taskCost                statsd.CloudTaskStatsd
+	domainRefreshSignal     *queue.OverwriteQueue
+	subDomainRefreshSignals cmap.ConcurrentMap[string, *queue.OverwriteQueue]
 	kubernetesGatherTaskMap map[string]*KubernetesGatherTask
 }
 
@@ -80,6 +86,8 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 		taskCost: statsd.CloudTaskStatsd{
 			TaskCost: make(map[string][]float64),
 		},
+		domainRefreshSignal:     queue.NewOverwriteQueue(fmt.Sprintf("cloud-task-%s", domain.Name), 1),
+		subDomainRefreshSignals: cmap.New[*queue.OverwriteQueue](),
 	}
 }
 
@@ -90,6 +98,7 @@ func (c *Cloud) Start() {
 
 func (c *Cloud) Stop() {
 	c.platform.ClearDebugLog()
+	c.domainRefreshSignal.Close()
 	if c.cCancel != nil {
 		c.cCancel()
 	}
@@ -103,18 +112,87 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 	return c.basicInfo
 }
 
+func (c *Cloud) GetDomainRefreshSignal() *queue.OverwriteQueue {
+	return c.domainRefreshSignal
+}
+
+func (c *Cloud) GetSubDomainRefreshSignals() cmap.ConcurrentMap[string, *queue.OverwriteQueue] {
+	return c.subDomainRefreshSignals
+}
+
+func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource {
+	hostIPToHostName, vmLcuuidToHostName, err := cloudcommon.GetHostAndVmHostNameByDomain(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("cloud suffix operation get vtap info error : (%s)", err.Error())
+		return resource
+	}
+
+	vinterfaceLcuuidToIP := map[string]string{}
+	for _, ip := range resource.IPs {
+		vinterfaceLcuuidToIP[ip.VInterfaceLcuuid] = ip.IP
+	}
+	vmLcuuidToIPs := map[string][]string{}
+	for _, vinterface := range resource.VInterfaces {
+		if vinterface.DeviceType != common.VIF_DEVICE_TYPE_VM {
+			continue
+		}
+		ip, ok := vinterfaceLcuuidToIP[vinterface.Lcuuid]
+		if !ok || ip == "" {
+			continue
+		}
+		vmLcuuidToIPs[vinterface.DeviceLcuuid] = append(vmLcuuidToIPs[vinterface.DeviceLcuuid], ip)
+	}
+
+	var retHosts []model.Host
+	for _, host := range resource.Hosts {
+		// add hostname to host
+		if hostName, ok := hostIPToHostName[host.IP]; ok && host.Hostname == "" {
+			host.Hostname = hostName
+		}
+		retHosts = append(retHosts, host)
+	}
+
+	var retVMs []model.VM
+	for _, vm := range resource.VMs {
+		// return a default map, when not found cloud tags
+		if vm.CloudTags == nil {
+			vm.CloudTags = map[string]string{}
+		}
+		// select the first of the existing ips, when the ip is empty
+		if vm.IP == "" {
+			ips, ok := vmLcuuidToIPs[vm.Lcuuid]
+			if ok && len(ips) > 0 {
+				sort.Strings(ips)
+				vm.IP = ips[0]
+			}
+		}
+		// add hostname to vm
+		if hostName, ok := vmLcuuidToHostName[vm.Lcuuid]; ok && vm.Hostname == "" {
+			vm.Hostname = hostName
+		}
+		retVMs = append(retVMs, vm)
+	}
+	resource.Hosts = retHosts
+	resource.VMs = retVMs
+	return resource
+}
+
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
 	if c.basicInfo.Type != common.KUBERNETES {
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified {
 			cResource.SubDomainResources = c.getSubDomainData(cResource)
 			cResource = c.appendResourceVIPs(cResource)
 		}
+	} else {
+		cResource = c.getKubernetesData()
 	}
 
 	if cResource.Verified {
 		cResource = c.appendAddtionalResourcesData(cResource)
 		cResource = c.appendResourceProcess(cResource)
+		// don't move c.suffixResourceOperation, it need to always hold the last position
+		cResource = c.suffixResourceOperation(cResource)
 	}
 	return cResource
 }
@@ -130,6 +208,10 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 }
 
 func (c *Cloud) getCloudGatherInterval() int {
+	if (c.basicInfo.Type == common.QINGCLOUD || c.basicInfo.Type == common.QINGCLOUD_PRIVATE) && c.cfg.QingCloudConfig.DailyTriggerTime != "" {
+		log.Infof("qing and qing private daily trigger time is (%s), sync timer is default (%d)s", c.cfg.QingCloudConfig.DailyTriggerTime, cloudcommon.CLOUD_SYNC_TIMER_DEFAULT)
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
+	}
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
@@ -175,20 +257,21 @@ func (c *Cloud) getCloudData() {
 				ErrorState:   cResource.ErrorState,
 			}
 		}
-	} else {
-		cResource, cloudCost = c.getKubernetesData()
-	}
-
-	if len(cResource.VMs) == 0 {
-		cResource = model.Resource{
-			ErrorState:   cResource.ErrorState,
-			ErrorMessage: cResource.ErrorMessage,
+		if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
+			cResource = model.Resource{
+				ErrorState:   cResource.ErrorState,
+				ErrorMessage: "invalid vm count (0). " + cResource.ErrorMessage,
+			}
+		}
+		cResource.SyncAt = time.Now()
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+			c.sendStatsd(cloudCost)
 		}
 	}
 
-	cResource.SyncAt = time.Now()
 	c.resource = cResource
-	c.sendStatsd(cloudCost)
+	// trigger recorder refresh domain resource
+	c.domainRefreshSignal.Put(struct{}{})
 }
 
 func (c *Cloud) sendStatsd(cloudCost float64) {
@@ -256,7 +339,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		}
 		c.mutex.Lock()
 		c.kubernetesGatherTaskMap[domain.Lcuuid] = kubernetesGatherTask
-		c.kubernetesGatherTaskMap[domain.Lcuuid].Start()
+		c.kubernetesGatherTaskMap[domain.Lcuuid].Start(c.domainRefreshSignal)
 		c.mutex.Unlock()
 
 	} else {
@@ -287,6 +370,11 @@ func (c *Cloud) runKubernetesGatherTask() {
 			c.mutex.Lock()
 			delete(c.kubernetesGatherTaskMap, lcuuid)
 			c.mutex.Unlock()
+			kGatherQueue, ok := c.subDomainRefreshSignals.Get(lcuuid)
+			if ok {
+				kGatherQueue.Close()
+				c.subDomainRefreshSignals.Remove(lcuuid)
+			}
 		}
 
 		// 对于新增的subDomain，启动Task，并纳入Manger管理
@@ -297,9 +385,12 @@ func (c *Cloud) runKubernetesGatherTask() {
 			if kubernetesGatherTask == nil {
 				continue
 			}
+
+			gatherQueue := queue.NewOverwriteQueue(fmt.Sprintf("sub-domain-task-%s", lcuuid), 1)
+			c.subDomainRefreshSignals.SetIfAbsent(lcuuid, gatherQueue)
 			c.mutex.Lock()
 			c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
-			c.kubernetesGatherTaskMap[lcuuid].Start()
+			c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 			c.mutex.Unlock()
 		}
 
@@ -319,10 +410,15 @@ func (c *Cloud) runKubernetesGatherTask() {
 					continue
 				}
 
+				gatherQueue, ok := c.subDomainRefreshSignals.Get(lcuuid)
+				if !ok {
+					gatherQueue = queue.NewOverwriteQueue(fmt.Sprintf("sub-domain-task-%s", lcuuid), 1)
+					c.subDomainRefreshSignals.Set(lcuuid, gatherQueue)
+				}
 				c.mutex.Lock()
 				delete(c.kubernetesGatherTaskMap, lcuuid)
 				c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
-				c.kubernetesGatherTaskMap[lcuuid].Start()
+				c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 				c.mutex.Unlock()
 			}
 		}

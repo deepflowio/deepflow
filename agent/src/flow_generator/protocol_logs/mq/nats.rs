@@ -15,7 +15,6 @@
  */
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{collections::BTreeMap, str};
 
 const MAX_METHOD_LEN: usize = 8;
@@ -32,10 +31,13 @@ use crate::{
     flow_generator::{
         error::Result,
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            pb_adapter::{
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+            },
             AppProtoHead, LogMessageType,
         },
     },
+    plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -84,7 +86,7 @@ pub struct Pub {
     #[serde(rename = "payload_size")]
     payload_size: usize,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -102,7 +104,7 @@ pub struct Hpub {
     #[serde(rename = "headers")]
     headers: BTreeMap<String, String>,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -134,7 +136,7 @@ pub struct Msg {
     #[serde(rename = "payload_size")]
     payload_size: usize,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -154,7 +156,7 @@ pub struct Hmsg {
     #[serde(rename = "headers")]
     headers: BTreeMap<String, String>,
     #[serde(rename = "payload")]
-    payload: String,
+    payload: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -211,6 +213,11 @@ pub struct NatsInfo {
     span_id: Option<String>,
 
     message: NatsMessage,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
+
+    l7_protocol_str: Option<String>,
 }
 
 #[derive(Default)]
@@ -323,7 +330,7 @@ impl Parsable for Pub {
             _ => return None,
         }
         let (payload, body) = slice_split(payload, pub_obj.payload_size)?;
-        pub_obj.payload = slice_to_string(body);
+        pub_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], pub_obj))
         } else {
@@ -358,7 +365,7 @@ impl Parsable for Hpub {
             read_headers(payload, hpub_obj.header_size, &mut hpub_obj.header_version)?;
         let (payload, body) = slice_split(payload, hpub_obj.payload_size)?;
         hpub_obj.headers = headers;
-        hpub_obj.payload = slice_to_string(body);
+        hpub_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], hpub_obj))
         } else {
@@ -433,7 +440,7 @@ impl Parsable for Msg {
             _ => return None,
         }
         let (payload, body) = slice_split(payload, msg_obj.payload_size)?;
-        msg_obj.payload = slice_to_string(body);
+        msg_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], msg_obj))
         } else {
@@ -469,7 +476,7 @@ impl Parsable for Hmsg {
             read_headers(payload, hmsg_obj.header_size, &mut hmsg_obj.header_version)?;
         let (payload, body) = slice_split(payload, hmsg_obj.payload_size)?;
         hmsg_obj.headers = headers;
-        hmsg_obj.payload = slice_to_string(body);
+        hmsg_obj.payload = body.to_vec();
         if payload.starts_with(b"\r\n") {
             Some((&payload[2..], hmsg_obj))
         } else {
@@ -620,6 +627,40 @@ impl NatsInfo {
         Some((payload, info))
     }
 
+    fn get_subject(&self) -> Option<&str> {
+        match &self.message {
+            NatsMessage::Info(_)
+            | NatsMessage::Connect(_)
+            | NatsMessage::Unsub(_)
+            | NatsMessage::Ping(_)
+            | NatsMessage::Pong(_)
+            | NatsMessage::Ok(_)
+            | NatsMessage::Err(_) => None,
+            NatsMessage::Pub(x) => Some(x.subject.as_str()),
+            NatsMessage::Hpub(x) => Some(x.subject.as_str()),
+            NatsMessage::Sub(x) => Some(x.subject.as_str()),
+            NatsMessage::Msg(x) => Some(x.subject.as_str()),
+            NatsMessage::Hmsg(x) => Some(x.subject.as_str()),
+        }
+    }
+
+    fn get_name(&self) -> &'static str {
+        match self.message {
+            NatsMessage::Info(_) => "INFO",
+            NatsMessage::Connect(_) => "CONNECT",
+            NatsMessage::Pub(_) => "PUB",
+            NatsMessage::Hpub(_) => "HPUB",
+            NatsMessage::Sub(_) => "SUB",
+            NatsMessage::Unsub(_) => "UNSUB",
+            NatsMessage::Msg(_) => "MSG",
+            NatsMessage::Hmsg(_) => "HMSG",
+            NatsMessage::Ping(_) => "PING",
+            NatsMessage::Pong(_) => "PONG",
+            NatsMessage::Ok(_) => "OK",
+            NatsMessage::Err(_) => "ERR",
+        }
+    }
+
     fn parse_trace_span(&self, config: &L7LogDynamicConfig) -> (Option<String>, Option<String>) {
         let headers = match &self.message {
             NatsMessage::Hpub(x) => &x.headers,
@@ -660,21 +701,12 @@ impl From<NatsInfo> for L7ProtocolSendLog {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
         };
-        let (name, subject) = match info.message {
-            NatsMessage::Info(_) => ("INFO", "".into()),
-            NatsMessage::Connect(_) => ("CONNECT", "".into()),
-            NatsMessage::Pub(x) => ("PUB", x.subject),
-            NatsMessage::Hpub(x) => ("HPUB", x.subject),
-            NatsMessage::Sub(x) => ("SUB", x.subject),
-            NatsMessage::Unsub(_) => ("UNSUB", "".into()),
-            NatsMessage::Msg(x) => ("MSG", x.subject),
-            NatsMessage::Hmsg(x) => ("HMSG", x.subject),
-            NatsMessage::Ping(_) => ("PING", "".into()),
-            NatsMessage::Pong(_) => ("PONG", "".into()),
-            NatsMessage::Ok(_) => ("OK", "".into()),
-            NatsMessage::Err(_) => ("ERR", "".into()),
-        };
-        let endpoint = subject.split('.').next().unwrap_or_default().to_string();
+        let name = info.get_name();
+        let subject = info
+            .get_subject()
+            .map(|x| x.to_string())
+            .unwrap_or_default();
+        let endpoint = info.get_endpoint().unwrap_or_default();
         let log = L7ProtocolSendLog {
             flags,
             version: Some(info.version),
@@ -695,6 +727,17 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                 span_id: info.span_id,
                 ..Default::default()
             }),
+            ext_info: Some(ExtendedInfo {
+                attributes: {
+                    if info.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(info.attributes)
+                    }
+                },
+                protocol_str: info.l7_protocol_str,
+                ..Default::default()
+            }),
             ..Default::default()
         };
         log
@@ -708,6 +751,12 @@ impl L7ProtocolInfoInterface for NatsInfo {
 
     fn session_id(&self) -> Option<u32> {
         None
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        self.get_subject()
+            .and_then(|x| x.split('.').next())
+            .map(|x| x.to_string())
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
@@ -726,6 +775,62 @@ impl L7ProtocolInfoInterface for NatsInfo {
             rrt: self.rtt,
         })
     }
+
+    fn get_request_domain(&self) -> String {
+        self.server_name.clone()
+    }
+}
+
+impl NatsLog {
+    fn wasm_hook(&self, param: &ParseParam, payload: &[u8], info: &mut NatsInfo) {
+        let (subject, reply_to, nats_payload) = {
+            match &info.message {
+                NatsMessage::Msg(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Hmsg(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Pub(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                NatsMessage::Hpub(msg) => (
+                    msg.subject.clone(),
+                    msg.reply_to.clone(),
+                    msg.payload.clone(),
+                ),
+                _ => return,
+            }
+        };
+
+        let wasm_nats_message = WasmNatsMessage {
+            subject,
+            reply_to: reply_to.unwrap_or_default(),
+            payload: nats_payload,
+        };
+
+        let mut vm_ref = param.wasm_vm.borrow_mut();
+        let Some(vm) = vm_ref.as_mut() else {
+            return;
+        };
+
+        let wasm_data = WasmData::from_request(self.protocol(), wasm_nats_message);
+
+        if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
+            if !custom.attributes.is_empty() {
+                info.attributes.extend(custom.attributes);
+            }
+            if custom.proto_str.len() > 0 {
+                info.l7_protocol_str = Some(custom.proto_str);
+            }
+        }
+    }
 }
 
 impl L7ProtocolParserInterface for NatsLog {
@@ -736,32 +841,8 @@ impl L7ProtocolParserInterface for NatsLog {
         if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
-        let (payload, method) = read_field(payload).unwrap_or_default();
-        let method = slice_to_string(method);
-        if !method.eq_ignore_ascii_case("INFO") {
-            return false;
-        }
-        let binding = serde_json::Map::new();
-        let json = read_line(payload)
-            .and_then(|x| Some(x.1))
-            .and_then(|x| str::from_utf8(x).ok())
-            .and_then(|x| serde_json::from_str::<Value>(x).ok())
-            .unwrap_or(Value::Null);
-        let json = json.as_object().unwrap_or(&binding);
-        const REQUIRED_FIELDS: [&str; 9] = [
-            "server_id",
-            "server_name",
-            "version",
-            "go",
-            "host",
-            "port",
-            "headers",
-            "proto",
-            "max_payload",
-        ];
-        REQUIRED_FIELDS
-            .iter()
-            .all(|field| json.contains_key(*field))
+
+        NatsInfo::try_parse(payload, param.parse_config).is_some()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -785,13 +866,18 @@ impl L7ProtocolParserInterface for NatsLog {
 
         for info in &mut vec {
             if let L7ProtocolInfo::NatsInfo(info) = info {
-                info.cal_rrt(param, None).map(|rtt| {
-                    info.rtt = rtt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                });
+                if info.msg_type != LogMessageType::Session {
+                    info.cal_rrt(param, None).map(|rtt| {
+                        info.rtt = rtt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                    });
+                }
+
                 info.is_tls = param.is_tls();
                 info.version = self.version.clone();
                 info.server_name = self.server_name.clone();
+
+                self.wasm_hook(param, payload, info);
 
                 match param.direction {
                     PacketDirection::ClientToServer => {
@@ -846,7 +932,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::handler::TraceType,
+        config::{handler::TraceType, ExtraLogFields},
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -890,6 +976,7 @@ mod tests {
                 vec![],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
+                ExtraLogFields::default(),
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),

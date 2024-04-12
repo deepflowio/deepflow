@@ -34,6 +34,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/grpc"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	"github.com/deepflowio/deepflow/server/controller/http"
 	"github.com/deepflowio/deepflow/server/controller/http/router"
 	"github.com/deepflowio/deepflow/server/controller/manager"
@@ -44,9 +46,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
-
-	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
-	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/debug"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/cache"
@@ -89,8 +88,13 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
-	err := mysql.InitMySQL(cfg.MySqlCfg)
+	err := mysql.InitMySQL(cfg.MySqlCfg) // TODO remove
 	if err != nil {
+		log.Errorf("init mysql failed: %s", err.Error())
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+	if err := mysql.GetDBs().Init(cfg.MySqlCfg); err != nil {
 		log.Errorf("init mysql failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
@@ -98,9 +102,9 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	// 启动资源ID管理器
 	router.SetInitStageForHealthChecker("Resource ID manager init")
-	recorderResource := recorder.GetSingletonResource().Init(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
+	recorderResource := recorder.GetResource().Init(ctx, cfg.ManagerCfg.TaskCfg.RecorderCfg)
 	if isMasterController {
-		err := recorderResource.IDManager.Start()
+		err := recorderResource.IDManagers.Start()
 		if err != nil {
 			log.Errorf("resource id manager start failed: %s", err.Error())
 			time.Sleep(time.Second)
@@ -129,6 +133,17 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	g := genesis.NewGenesis(cfg)
 	g.Start()
 
+	// start tagrecorder before manager to prevent recorder from publishing message when tagrecorder is not ready
+	router.SetInitStageForHealthChecker("TagRecorder init")
+	tr := tagrecorder.GetSingleton()
+	tr.Init(ctx, *cfg)
+	err = tr.SubscriberManager.Start()
+	if err != nil {
+		log.Errorf("get icon failed: %s", err.Error())
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+
 	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
@@ -137,8 +152,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Trisolaris init")
 	// 启动trisolaris
-	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
-	go t.Start()
+	tm := trisolaris.NewTrisolarisManager(&cfg.TrisolarisCfg, mysql.Db)
+	go tm.Start()
 
 	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
@@ -150,10 +165,6 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 		prometheus.Encoder.Start()
 	}
 
-	router.SetInitStageForHealthChecker("TagRecorder init")
-	tr := tagrecorder.GetSingleton()
-	tr.Init(ctx, *cfg)
-	tr.SubscriberManager.Start()
 	go checkAndStartAllRegionMasterFunctions()
 
 	router.SetInitStageForHealthChecker("Master function init")

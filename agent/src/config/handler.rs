@@ -43,7 +43,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::OracleParseConfig;
+use super::config::{ExtraLogFields, OracleParseConfig};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -65,7 +65,7 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
+    utils::environment::{free_memory_check, get_container_mem_limit, running_in_container},
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
@@ -90,7 +90,6 @@ use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
-const MINUTE: Duration = Duration::from_secs(60);
 
 type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
 
@@ -192,7 +191,7 @@ impl fmt::Debug for CollectorConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EnvironmentConfig {
     pub max_memory: u64,
     pub max_cpus: u32,
@@ -201,6 +200,9 @@ pub struct EnvironmentConfig {
     pub sys_free_memory_limit: u32,
     pub log_file_size: u32,
     pub tap_mode: TapMode,
+    pub system_load_circuit_breaker_threshold: f32,
+    pub system_load_circuit_breaker_recover: f32,
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -292,6 +294,8 @@ pub struct PlatformConfig {
     pub tap_mode: TapMode,
     pub os_proc_scan_conf: OsProcScanConfig,
     pub agent_enabled: bool,
+    #[cfg(target_os = "linux")]
+    pub extra_netns_regex: String,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -328,6 +332,7 @@ pub struct DispatcherConfig {
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
+    pub dispatcher_queue: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -687,6 +692,7 @@ impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_session_slot_capacity: usize,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub http_endpoint_disabled: bool,
@@ -699,6 +705,7 @@ impl Default for LogParserConfig {
         Self {
             l7_log_collect_nps_threshold: 0,
             l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_session_slot_capacity: 1024,
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
             http_endpoint_disabled: false,
@@ -718,6 +725,10 @@ impl fmt::Debug for LogParserConfig {
             .field(
                 "l7_log_session_aggr_timeout",
                 &self.l7_log_session_aggr_timeout,
+            )
+            .field(
+                "l7_log_session_slot_capacity",
+                &self.l7_log_session_slot_capacity,
             )
             .field("l7_log_dynamic", &self.l7_log_dynamic)
             .field(
@@ -1062,6 +1073,7 @@ pub struct L7LogDynamicConfig {
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
+    pub extra_log_fields: ExtraLogFields,
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -1070,6 +1082,7 @@ impl PartialEq for L7LogDynamicConfig {
             && self.x_request_id == other.x_request_id
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
+            && self.extra_log_fields == other.extra_log_fields
     }
 }
 
@@ -1081,6 +1094,7 @@ impl L7LogDynamicConfig {
         x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
+        mut extra_log_fields: ExtraLogFields,
     ) -> Self {
         proxy_client.make_ascii_lowercase();
 
@@ -1107,6 +1121,12 @@ impl L7LogDynamicConfig {
             span_set.insert(t.to_owned());
         }
 
+        extra_log_fields.deduplicate();
+
+        for f in extra_log_fields.http2.iter() {
+            expected_headers_set.insert(f.field_name.as_bytes().to_vec());
+        }
+
         Self {
             proxy_client,
             x_request_id: x_request_id_set,
@@ -1115,6 +1135,7 @@ impl L7LogDynamicConfig {
             trace_set,
             span_set,
             expected_headers_set: Arc::new(expected_headers_set),
+            extra_log_fields,
         }
     }
 
@@ -1134,7 +1155,7 @@ pub struct MetricServerConfig {
     pub compressed: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ModuleConfig {
     pub enabled: bool,
     pub tap_mode: TapMode,
@@ -1179,9 +1200,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
         let (static_config, mut conf) = conf;
-        if let Some(k8s_mem_limit) = k8s_mem_limit_for_deepflow() {
-            // If the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is set, its value is preferred as the memory limit
-            conf.max_memory = k8s_mem_limit;
+        if running_in_container() {
+            conf.max_memory = get_container_mem_limit().unwrap_or(conf.max_memory);
         }
         let controller_ip = static_config.controller_ips[0].parse::<IpAddr>().unwrap();
         let dest_ip = if conf.analyzer_ip.len() > 0 {
@@ -1214,6 +1234,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 sys_free_memory_limit: conf.sys_free_memory_limit,
                 log_file_size: conf.log_file_size,
                 tap_mode: conf.tap_mode,
+                system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold,
+                system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover,
+                system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: Duration::from_secs(conf.sync_interval),
@@ -1231,6 +1254,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
                 dpdk_enabled: conf.yaml_config.dpdk_enabled,
+                dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,
@@ -1325,7 +1349,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             pcap: conf.yaml_config.pcap.clone(),
             platform: PlatformConfig {
-                sync_interval: MINUTE,
+                sync_interval: Duration::from_secs(conf.platform_sync_interval),
                 kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
                 libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
                 kubernetes_poller_type: conf.yaml_config.kubernetes_poller_type,
@@ -1379,11 +1403,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 os_proc_scan_conf: OsProcScanConfig {},
                 prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
                 agent_enabled: conf.enabled,
+                #[cfg(target_os = "linux")]
+                extra_netns_regex: conf.extra_netns_regex.to_string(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
+                l7_log_session_slot_capacity: conf.yaml_config.l7_log_session_slot_capacity,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
                     conf.http_log_x_request_id
@@ -1398,6 +1425,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
+                    conf.yaml_config
+                        .l7_protocol_advanced_features
+                        .extra_log_fields
+                        .clone(),
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
@@ -1691,6 +1722,9 @@ impl ConfigHandler {
         if candidate_config.tap_mode != new_config.tap_mode {
             info!("tap_mode set to {:?}", new_config.tap_mode);
             candidate_config.tap_mode = new_config.tap_mode;
+            if let Some(c) = components.as_mut() {
+                c.clear_dispatcher_components();
+            }
         }
 
         if candidate_config.tap_mode != TapMode::Analyzer
@@ -1703,23 +1737,6 @@ impl ConfigHandler {
             {
                 warn!("{}", e);
             }
-        }
-
-        if !yaml_config
-            .src_interfaces
-            .eq(&new_config.yaml_config.src_interfaces)
-        {
-            yaml_config
-                .src_interfaces
-                .clone_from(&new_config.yaml_config.src_interfaces);
-            info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
-        }
-
-        if candidate_config.tap_mode != TapMode::Local
-            && yaml_config.src_interfaces.is_empty()
-            && !yaml_config.dpdk_enabled
-        {
-            warn!("src_interfaces should be set in Analyzer mode or Mirror mode");
         }
 
         if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
@@ -1891,7 +1908,6 @@ impl ConfigHandler {
                         return vec![];
                     }
 
-                    c.platform_synchronizer.set_netns_regex(regex.clone());
                     c.kubernetes_poller.set_netns_regex(regex);
                 }
             }
@@ -1911,9 +1927,10 @@ impl ConfigHandler {
                     != new_config.dispatcher.tap_interface_regex
             {
                 fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
-                    for dispatcher in comp.dispatchers.iter() {
-                        if let Err(e) =
-                            dispatcher.switch_recv_engine(&handler.candidate_config.dispatcher)
+                    for d in comp.dispatcher_components.iter() {
+                        if let Err(e) = d
+                            .dispatcher
+                            .switch_recv_engine(&handler.candidate_config.dispatcher)
                         {
                             log::error!(
                                 "switch RecvEngine error: {}, deepflow-agent restart...",
@@ -1951,8 +1968,8 @@ impl ConfigHandler {
                     fn start_dispatcher(handler: &ConfigHandler, components: &mut AgentComponents) {
                         match handler.candidate_config.tap_mode {
                             TapMode::Analyzer => {
-                                for dispatcher in components.dispatchers.iter() {
-                                    dispatcher.start();
+                                for d in components.dispatcher_components.iter_mut() {
+                                    d.start();
                                 }
                             }
                             _ => {
@@ -1964,8 +1981,8 @@ impl ConfigHandler {
                                         &components.exception_handler,
                                     ) {
                                         Ok(()) => {
-                                            for dispatcher in components.dispatchers.iter() {
-                                                dispatcher.start();
+                                            for d in components.dispatcher_components.iter_mut() {
+                                                d.start();
                                             }
                                         }
                                         Err(e) => {
@@ -1979,8 +1996,8 @@ impl ConfigHandler {
                     callbacks.push(start_dispatcher);
                 } else {
                     fn stop_dispatcher(_: &ConfigHandler, components: &mut AgentComponents) {
-                        for dispatcher in components.dispatchers.iter() {
-                            dispatcher.stop();
+                        for d in components.dispatcher_components.iter_mut() {
+                            d.stop();
                         }
                     }
                     callbacks.push(stop_dispatcher);
@@ -2231,6 +2248,51 @@ impl ConfigHandler {
                 new_config.environment.log_file_size
             );
             candidate_config.environment.log_file_size = new_config.environment.log_file_size;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_metric
+            != new_config.environment.system_load_circuit_breaker_metric
+        {
+            info!(
+                "system_load_circuit_breaker_metric set to {:?}",
+                new_config.environment.system_load_circuit_breaker_metric
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_metric =
+                new_config.environment.system_load_circuit_breaker_metric;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_recover
+            != new_config.environment.system_load_circuit_breaker_recover
+        {
+            info!(
+                "system_load_circuit_breaker_recover set to {:?}",
+                new_config.environment.system_load_circuit_breaker_recover
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_recover =
+                new_config.environment.system_load_circuit_breaker_recover;
+        }
+
+        if candidate_config
+            .environment
+            .system_load_circuit_breaker_threshold
+            != new_config.environment.system_load_circuit_breaker_threshold
+        {
+            info!(
+                "system_load_circuit_breaker_threshold set to {}",
+                new_config.environment.system_load_circuit_breaker_threshold
+            );
+            candidate_config
+                .environment
+                .system_load_circuit_breaker_threshold =
+                new_config.environment.system_load_circuit_breaker_threshold;
         }
 
         if candidate_config.flow != new_config.flow {
@@ -2596,8 +2658,9 @@ impl ConfigHandler {
             candidate_config.ebpf = new_config.ebpf;
 
             fn ebpf_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
-                    ebpf_collector.on_config_change(&handler.candidate_config.ebpf);
+                if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
+                    d.ebpf_collector
+                        .on_config_change(&handler.candidate_config.ebpf);
                 }
             }
             callbacks.push(ebpf_callback);
@@ -2615,9 +2678,9 @@ impl ConfigHandler {
             if candidate_config.metric_server.enabled != new_config.metric_server.enabled {
                 if let Some(c) = components.as_mut() {
                     if new_config.metric_server.enabled {
-                        c.external_metrics_server.start();
+                        c.metrics_server_component.start();
                     } else {
-                        c.external_metrics_server.stop();
+                        c.metrics_server_component.stop();
                     }
                 }
             }
@@ -2625,7 +2688,8 @@ impl ConfigHandler {
             // 当端口更新后，在enabled情况下需要重启服务器重新监听
             if candidate_config.metric_server.port != new_config.metric_server.port {
                 if let Some(c) = components.as_mut() {
-                    c.external_metrics_server
+                    c.metrics_server_component
+                        .external_metrics_server
                         .set_port(new_config.metric_server.port);
                 }
             }
@@ -2635,6 +2699,7 @@ impl ConfigHandler {
                     components: &mut AgentComponents,
                 ) {
                     components
+                        .metrics_server_component
                         .external_metrics_server
                         .enable_compressed(handler.candidate_config.metric_server.compressed);
                 }
@@ -2649,9 +2714,9 @@ impl ConfigHandler {
 
         if candidate_config.npb != new_config.npb {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                let dispatcher_builders = &components.handler_builders;
+                let dispatcher_builders = &components.dispatcher_components;
                 for e in dispatcher_builders {
-                    let mut builders = e.lock().unwrap();
+                    let mut builders = e.handler_builders.lock().unwrap();
                     for e in builders.iter_mut() {
                         match e {
                             PacketHandlerBuilder::Npb(n) => {
@@ -2682,8 +2747,8 @@ impl ConfigHandler {
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
-                for dispatcher in components.dispatchers.iter() {
-                    dispatcher.stop();
+                for d in components.dispatcher_components.iter_mut() {
+                    d.stop();
                 }
                 if handler.candidate_config.tap_mode != TapMode::Analyzer
                     && !running_in_container()
@@ -2696,8 +2761,8 @@ impl ConfigHandler {
                         &components.exception_handler,
                     ) {
                         Ok(()) => {
-                            for dispatcher in components.dispatchers.iter() {
-                                dispatcher.start();
+                            for d in components.dispatcher_components.iter_mut() {
+                                d.start();
                             }
                         }
                         Err(e) => {
@@ -2705,8 +2770,8 @@ impl ConfigHandler {
                         }
                     }
                 } else {
-                    for dispatcher in components.dispatchers.iter() {
-                        dispatcher.start();
+                    for d in components.dispatcher_components.iter_mut() {
+                        d.start();
                     }
                 }
             }

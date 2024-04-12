@@ -15,7 +15,7 @@
  */
 
 use std::ffi::{CStr, CString};
-use std::ptr::null_mut;
+use std::ptr::{self, null_mut};
 use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -50,6 +50,7 @@ use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
     l7_protocol::L7Protocol,
+    leaky_bucket::LeakyBucket,
     proto::{common::TridentType, metric},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
@@ -214,6 +215,7 @@ impl EbpfDispatcher {
             true, // from_ebpf
         );
         let ebpf_config = self.config.load();
+        let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.global_ebpf_pps_threshold));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while unsafe { SWITCH } {
@@ -238,6 +240,10 @@ impl EbpfDispatcher {
             }
 
             for mut packet in batch.drain(..) {
+                if !leaky_bucket.acquire(1) {
+                    continue;
+                }
+
                 counter.rx.fetch_add(1, Ordering::Relaxed);
 
                 packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
@@ -306,8 +312,9 @@ impl EbpfCollector {
                 return;
             }
 
-            let container_id = Self::convert_to_string((*sd).container_id.as_ptr());
-            let event_type = EventType::from((*sd).source);
+            let container_id =
+                Self::convert_to_string(ptr::addr_of!((*sd).container_id) as *const u8);
+            let event_type = EventType::from(ptr::addr_of!((*sd).source).read_unaligned());
             if event_type != EventType::OtherEvent {
                 // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
                 let event = ProcEvent::from_ebpf(sd, event_type);

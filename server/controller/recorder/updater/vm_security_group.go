@@ -57,7 +57,7 @@ func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecuri
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			wholeCache,
-			db.NewVMSecurityGroup(),
+			db.NewVMSecurityGroup().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VMSecurityGroups,
 			cloudData,
 		),
@@ -74,18 +74,18 @@ func (z *VMSecurityGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMSecurit
 func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGroup) (*mysql.VMSecurityGroup, bool) {
 	securityGroupID, exists := v.cache.ToolDataSet.GetSecurityGroupIDByLcuuid(cloudItem.SecurityGroupLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(v.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, cloudItem.SecurityGroupLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 	vmID, exists := v.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
+		log.Error(v.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, cloudItem.Lcuuid,
-		))
+		)))
 		return nil, false
 	}
 
@@ -93,6 +93,7 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 		VMID:            vmID,
 		SecurityGroupID: securityGroupID,
 		Priority:        cloudItem.Priority,
+		Domain:          v.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

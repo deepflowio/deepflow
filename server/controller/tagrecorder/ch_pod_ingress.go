@@ -17,61 +17,59 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodIngress struct {
-	UpdaterComponent[mysql.ChPodIngress, IDKey]
-	resourceTypeToIconID map[IconKey]int
+	SubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysql.PodIngress, mysql.ChPodIngress, IDKey]
 }
 
-func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
-	updater := &ChPodIngress{
-		newUpdaterComponent[mysql.ChPodIngress, IDKey](
-			RESOURCE_TYPE_CH_POD_INGRESS,
+func NewChPodIngress() *ChPodIngress {
+	mng := &ChPodIngress{
+		newSubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysql.PodIngress, mysql.ChPodIngress, IDKey](
+			common.RESOURCE_TYPE_POD_INGRESS_EN, RESOURCE_TYPE_CH_POD_INGRESS,
 		),
-		resourceTypeToIconID,
 	}
-
-	updater.updaterDG = updater
-	return updater
+	mng.subscriberDG = mng
+	return mng
 }
 
-func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
-	var podIngresses []mysql.PodIngress
-	err := mysql.Db.Unscoped().Find(&podIngresses).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
-		return nil, false
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodIngress) sourceToTarget(source *mysql.PodIngress) (keys []IDKey, targets []mysql.ChPodIngress) {
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
 	}
-	keyToItem := make(map[IDKey]mysql.ChPodIngress)
-	for _, podIngress := range podIngresses {
-		if podIngress.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name + " (deleted)",
-			}
-		} else {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name,
-			}
-		}
-	}
-	return keyToItem, true
+
+	keys = append(keys, IDKey{ID: source.ID})
+	targets = append(targets, mysql.ChPodIngress{
+		ID:   source.ID,
+		Name: sourceName,
+	})
+	return
 }
 
-func (p *ChPodIngress) generateKey(dbItem mysql.ChPodIngress) IDKey {
-	return IDKey{ID: dbItem.ID}
-}
-
-func (p *ChPodIngress) generateUpdateInfo(oldItem, newItem mysql.ChPodIngress) (map[string]interface{}, bool) {
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodIngress) onResourceUpdated(sourceID int, fieldsUpdate *message.PodIngressFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		return updateInfo, true
+		var chItem mysql.ChPodIngress
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
-	return nil, false
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodIngress) softDeletedTargetsUpdated(targets []mysql.ChPodIngress, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
 }

@@ -845,6 +845,7 @@ dependencies = [
  "bson",
  "bytesize",
  "cadence",
+ "cfg-if",
  "cgroups-rs",
  "chrono",
  "clap 3.2.25",
@@ -1481,10 +1482,17 @@ dependencies = [
 [[package]]
 name = "hpack"
 version = "0.3.0"
-source = "git+https://github.com/deepflowio/hpack-rs/#230591a8255598370cf0fc8f2a86b2754baab9c5"
+source = "git+https://github.com/deepflowio/hpack-rs/#d65b96c29b8ee101438e815d98668f43381860da"
 dependencies = [
+ "httlib-huffman",
  "log 0.3.9",
 ]
+
+[[package]]
+name = "httlib-huffman"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a9fcbcc408c5526c3ab80d534e5c86e7967c1fb7aa0a8c76abd1edc27deb877"
 
 [[package]]
 name = "http"
@@ -2794,6 +2802,7 @@ dependencies = [
  "bitflags 1.3.2",
  "cadence",
  "flate2",
+ "ipnet",
  "libc",
  "log 0.4.18",
  "neli",

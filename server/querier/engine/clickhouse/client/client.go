@@ -19,6 +19,8 @@ package client
 import (
 	"context"
 	"reflect"
+	"strconv"
+	"strings"
 
 	//"database/sql"
 	"fmt"
@@ -39,9 +41,12 @@ var log = logging.MustGetLogger("clickhouse.client")
 
 type QueryParams struct {
 	Sql             string
+	UseQueryCache   bool
+	QueryCacheTTL   string
 	Callbacks       map[string]func(result *common.Result) error
 	QueryUUID       string
 	ColumnSchemaMap map[string]*common.ColumnSchema
+	ORGID           string
 }
 
 // All ClickHouse Client share one connection
@@ -104,6 +109,22 @@ func (c *Client) Close() error {
 
 func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error) {
 	sqlstr, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
+	queryCacheStr := ""
+	if params.UseQueryCache {
+		queryCacheStr = " SETTINGS use_query_cache = true, query_cache_store_results_of_queries_with_nondeterministic_functions = 1"
+		if params.QueryCacheTTL != "" {
+			queryCacheStr += fmt.Sprintf(", query_cache_ttl = %s", params.QueryCacheTTL)
+		}
+		sqlstr += queryCacheStr
+	}
+	// ORGID
+	if params.ORGID != common.DEFAULT_ORG_ID && params.ORGID != "" {
+		orgIDInt, err := strconv.Atoi(params.ORGID)
+		if err != nil {
+			return nil, err
+		}
+		sqlstr = strings.ReplaceAll(sqlstr, "flow_tag", fmt.Sprintf("%04d_flow_tag", orgIDInt))
+	}
 	err = c.init(query_uuid)
 	if err != nil {
 		return nil, err

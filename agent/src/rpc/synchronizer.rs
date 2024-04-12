@@ -47,7 +47,7 @@ use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
-use crate::common::endpoint::EPC_FROM_INTERNET;
+use crate::common::endpoint::EPC_INTERNET;
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
@@ -168,7 +168,7 @@ impl Default for Status {
             ntp_min_interval: Duration::from_secs(10),
             ntp_max_interval: Duration::from_secs(300),
 
-            local_epc: EPC_FROM_INTERNET,
+            local_epc: EPC_INTERNET,
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,
@@ -821,7 +821,7 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled {
+        if !runtime_config.enabled || exception_handler.has(Exception::SystemLoadCircuitBreaker) {
             *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
@@ -1124,6 +1124,7 @@ impl Synchronizer {
             .grpc_upgrade_with_statsd(tp::UpgradeRequest {
                 ctrl_ip: Some(agent_id.ip.to_string()),
                 ctrl_mac: Some(agent_id.mac.to_string()),
+                team_id: Some(agent_id.team_id.clone()),
             })
             .await;
         if let Err(m) = response {
@@ -1252,6 +1253,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
+        let flow_acl_listener = self.flow_acl_listener.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let runtime_config =
@@ -1267,6 +1269,18 @@ impl Synchronizer {
                             continue;
                         }
                     };
+
+                for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+                    let _ = listener.flow_acl_change(
+                        runtime_config.trident_type,
+                        runtime_config.epc_id as i32,
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                        &vec![],
+                    );
+                }
 
                 max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
                 let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);

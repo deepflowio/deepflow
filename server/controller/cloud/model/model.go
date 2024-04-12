@@ -471,6 +471,7 @@ type Pod struct {
 	PodReplicaSetLcuuid string    `json:"pod_replica_set_lcuuid"`
 	PodNodeLcuuid       string    `json:"pod_node_lcuuid" binding:"required"`
 	PodGroupLcuuid      string    `json:"pod_group_lcuuid" binding:"required"`
+	PodServiceLcuuid    string    `json:"pod_service_lcuuid" binding:"required"`
 	PodNamespaceLcuuid  string    `json:"pod_namespace_lcuuid" binding:"required"`
 	PodClusterLcuuid    string    `json:"pod_cluster_lcuuid" binding:"required"`
 	VPCLcuuid           string    `json:"vpc_lcuuid" binding:"required"`

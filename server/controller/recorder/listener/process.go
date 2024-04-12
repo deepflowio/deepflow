@@ -45,7 +45,7 @@ func (p *Process) OnUpdaterAdded(addedDBItems []*mysql.Process) {
 
 func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *diffbase.Process) {
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
 func (p *Process) OnUpdaterDeleted(lcuuids []string) {
