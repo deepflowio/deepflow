@@ -87,8 +87,7 @@ impl SystemLoadGuard {
             self.last_exceeded = Duration::ZERO;
         }
 
-        let mut system = self.system.lock().unwrap();
-        system.refresh_cpu();
+        let system = self.system.lock().unwrap();
 
         let cpu_count = system.cpus().len() as f32;
         let system_load = match system_load_circuit_breaker_metric {
@@ -256,11 +255,8 @@ impl Guard {
     }
 
     fn check_cpu(system: Arc<Mutex<System>>, pid: Pid, cpu_limit: u32) -> bool {
-        let mut system_guard = system.lock().unwrap();
-        if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
-            warn!("refresh process with cpu failed");
-            return false;
-        }
+        let system_guard = system.lock().unwrap();
+
         let cpu_usage = match system_guard.process(pid) {
             Some(process) => process.cpu_usage(),
             None => {
@@ -305,6 +301,10 @@ impl Guard {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
                 let cpu_limit = config.max_cpus;
+                let mut system_guard = system.lock().unwrap();
+                if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
+                    warn!("refresh process with cpu failed");
+                }
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
