@@ -1140,6 +1140,10 @@ vtap_group_id: g-xxxxxx
     ## Default: false
     #disabled: false
 
+    ## eBPF Packet Capture Rate Limit
+    ## Default: 0. Range: [0, +oo]
+    #global-ebpf-pps-threshold: 0
+
     ## Regex for Process Name
     ## Note: The name of the process where each feature of ebpf uprobe takes effect,
     ##   which is configured using regular expressions
