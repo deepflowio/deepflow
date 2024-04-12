@@ -394,7 +394,7 @@ impl MongoDBHeader {
         if payload.len() < 16 {
             return -1;
         }
-        self.length = bytes::read_u32_le(payload) & 0xffffff;
+        self.length = bytes::read_u32_le(payload);
         if self.length < payload.len() as u32 {
             return -1;
         }
