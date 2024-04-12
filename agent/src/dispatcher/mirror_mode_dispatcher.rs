@@ -29,10 +29,7 @@ use arc_swap::access::Access;
 use log::debug;
 use log::{info, warn};
 
-#[cfg(windows)]
 use super::TapTypeHandler;
-
-#[cfg(windows)]
 use crate::common::decapsulate::TunnelTypeBitmap;
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, Poller};
@@ -55,7 +52,6 @@ use crate::{
     utils::environment::is_tt_hyper_v_compute,
 };
 use packet_dedup::PacketDedupMap;
-#[cfg(windows)]
 use public::packet::Packet;
 use public::{
     proto::{common::TridentType, trident::IfMacSource},
@@ -66,7 +62,7 @@ const IF_INDEX_MAX_SIZE: usize = 1000;
 
 #[derive(Clone)]
 pub struct MirrorModeDispatcherListener {
-    local_vm_mac_set: Arc<Mutex<HashMap<u32, bool>>>,
+    local_vm_mac_set: Arc<Mutex<HashMap<u32, MacAddr>>>,
     updated: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
@@ -90,28 +86,39 @@ impl MirrorModeDispatcherListener {
     pub fn on_vm_change_with_bridge_macs(
         &self,
         vm_mac_addrs: &[MacAddr],
+        gateway_vmac_addrs: &[MacAddr],
         tap_bridge_macs: &Vec<MacAddr>,
     ) {
         let mut new_vm_mac_set = HashMap::new();
 
-        vm_mac_addrs.iter().for_each(|e| {
-            let key = e.to_lower_32b();
-            new_vm_mac_set.insert(key, true);
-        });
+        vm_mac_addrs
+            .iter()
+            .zip(gateway_vmac_addrs)
+            .for_each(|(vm_mac, gw_vmac)| {
+                new_vm_mac_set.insert(vm_mac.to_lower_32b(), gw_vmac.clone());
+            });
         tap_bridge_macs.iter().for_each(|e| {
             let key = e.to_lower_32b();
-            new_vm_mac_set.insert(key, true);
+            new_vm_mac_set.insert(key, *e);
         });
         let mut old_vm_mac_set = self.local_vm_mac_set.lock().unwrap();
         let mut new_macs = vec![];
         let mut delete_macs = vec![];
         new_vm_mac_set.iter().for_each(|e| {
-            if old_vm_mac_set.get(e.0).is_none() {
+            if let Some(v) = old_vm_mac_set.get(e.0) {
+                if e.1 != v {
+                    new_macs.push(MacAddr::try_from(*e.0 as u64).unwrap());
+                }
+            } else {
                 new_macs.push(MacAddr::try_from(*e.0 as u64).unwrap());
             }
         });
         old_vm_mac_set.iter().for_each(|e| {
-            if new_vm_mac_set.get(e.0).is_none() {
+            if let Some(v) = new_vm_mac_set.get(e.0) {
+                if e.1 != v {
+                    delete_macs.push(MacAddr::try_from(*e.0 as u64).unwrap());
+                }
+            } else {
                 delete_macs.push(MacAddr::try_from(*e.0 as u64).unwrap());
             }
         });
@@ -131,10 +138,11 @@ impl MirrorModeDispatcherListener {
         self.updated.store(true, Ordering::Relaxed);
     }
 
-    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr]) {
+    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr], gateway_vmac_addrs: &[MacAddr]) {
         #[cfg(target_os = "linux")]
         self.on_vm_change_with_bridge_macs(
             vm_mac_addrs,
+            gateway_vmac_addrs,
             &self.tap_bridge_inner_macs(self.base.src_interface_index),
         );
         #[cfg(any(target_os = "windows", target_os = "android"))]
@@ -204,7 +212,7 @@ pub(super) struct LastTimestamps {
 pub(super) struct MirrorModeDispatcher {
     pub(super) base: BaseDispatcher,
     pub(super) dedup: PacketDedupMap,
-    pub(super) local_vm_mac_set: Arc<Mutex<HashMap<u32, bool>>>,
+    pub(super) local_vm_mac_set: Arc<Mutex<HashMap<u32, MacAddr>>>,
     pub(super) local_segment_macs: Vec<MacAddr>,
     pub(super) tap_bridge_macs: Vec<MacAddr>,
     #[cfg(target_os = "linux")]
@@ -237,10 +245,10 @@ impl MirrorModeDispatcher {
     }
 
     fn get_key(
-        vm_mac_set: &Arc<Mutex<HashMap<u32, bool>>>,
+        vm_mac_set: &Arc<Mutex<HashMap<u32, MacAddr>>>,
         overlay_packet: &[u8],
         tunnel_info: TunnelInfo,
-    ) -> (u32, u32, bool, bool) {
+    ) -> (u32, u32, u32, u32) {
         let (da_key, sa_key) =
             if tunnel_info.tier == 0 && overlay_packet.len() >= super::L2_MAC_ADDR_OFFSET {
                 let mut da_mac: [u8; 6] = [0; 6];
@@ -256,12 +264,16 @@ impl MirrorModeDispatcher {
             };
 
         let vm_mac_set = vm_mac_set.lock().unwrap();
-        return (
-            da_key,
-            sa_key,
-            vm_mac_set.contains_key(&da_key),
-            vm_mac_set.contains_key(&sa_key),
-        );
+        let da_gateway_vmac = vm_mac_set
+            .get(&da_key)
+            .unwrap_or(&MacAddr::ZERO)
+            .to_lower_32b();
+        let sa_gateway_vmac = vm_mac_set
+            .get(&sa_key)
+            .unwrap_or(&MacAddr::ZERO)
+            .to_lower_32b();
+
+        return (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac);
     }
 
     fn get_pipeline<'a>(
@@ -362,6 +374,7 @@ impl MirrorModeDispatcher {
             trident_type,
             mac,
             npb_dedup,
+            config.flow.cloud_gateway_traffic,
         );
         // flowProcesser
         flow_map.inject_meta_packet(&config, &mut meta_packet);
@@ -425,9 +438,6 @@ impl MirrorModeDispatcher {
             if self.base.pause.load(Ordering::Relaxed) {
                 continue;
             }
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let (packet, mut timestamp) = recved.unwrap();
-            #[cfg(target_os = "windows")]
             let (mut packet, mut timestamp) = recved.unwrap();
 
             match Self::swap_last_timestamp(
@@ -435,6 +445,7 @@ impl MirrorModeDispatcher {
                 &self.base.counter,
                 packet.if_index,
                 timestamp,
+                config.flow.cloud_gateway_traffic,
             ) {
                 Ok(last_timestamp) => timestamp = last_timestamp,
                 Err(_) => continue,
@@ -446,9 +457,6 @@ impl MirrorModeDispatcher {
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let decap_length = 0;
-            #[cfg(target_os = "windows")]
             let decap_length = {
                 // Mirror Mode运行于Windows环境下时目前只有Hyper-V一个场景，由于Hyper-V加了VXLAN隧道，
                 // 这里需要decap并将tunnel信息保存在flow中，目前仅保存最外层的tunnel
@@ -476,18 +484,19 @@ impl MirrorModeDispatcher {
                 continue;
             }
 
-            let (da_key, sa_key, dst_local, src_local) = Self::get_key(
+            let (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac) = Self::get_key(
                 &self.local_vm_mac_set,
                 overlay_packet,
                 self.base.tunnel_info,
             );
             let trident_type = self.trident_type.lock().unwrap().clone();
-            if !src_local && !dst_local {
+            let cloud_gateway_traffic = config.flow.cloud_gateway_traffic;
+            if sa_gateway_vmac == 0 && da_gateway_vmac == 0 {
                 let _ = Self::handler(
                     self.base.id,
                     self.mac, // In order for two-way traffic to be handled by the same pipeline, self.mac is used as the key here
-                    src_local,
-                    dst_local,
+                    false,
+                    false,
                     overlay_packet,
                     timestamp,
                     original_length,
@@ -505,7 +514,7 @@ impl MirrorModeDispatcher {
                 continue;
             }
 
-            if src_local {
+            if sa_gateway_vmac > 0 {
                 let _ = Self::handler(
                     self.base.id,
                     sa_key,
@@ -522,11 +531,15 @@ impl MirrorModeDispatcher {
                     &mut flow_map,
                     &self.base.counter,
                     trident_type,
-                    self.mac,
+                    if cloud_gateway_traffic {
+                        sa_gateway_vmac
+                    } else {
+                        self.mac
+                    },
                     self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
-            if dst_local {
+            if da_gateway_vmac > 0 {
                 let _ = Self::handler(
                     self.base.id,
                     da_key,
@@ -543,7 +556,11 @@ impl MirrorModeDispatcher {
                     &mut flow_map,
                     &self.base.counter,
                     trident_type,
-                    self.mac,
+                    if cloud_gateway_traffic {
+                        da_gateway_vmac
+                    } else {
+                        self.mac
+                    },
                     self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
@@ -563,12 +580,17 @@ impl MirrorModeDispatcher {
         trident_type: TridentType,
         mac: u32,
         npb_dedup: bool,
+        cloud_gateway_traffic: bool,
     ) {
         let nat_source = meta_packet.lookup_key.get_nat_source();
-        if is_tt_hyper_v_compute(trident_type) {
-            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
+        if cloud_gateway_traffic {
+            meta_packet.tap_port = TapPort::from_gateway_mac(tunnel_type, mac);
         } else {
-            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
+            if is_tt_hyper_v_compute(trident_type) {
+                meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
+            } else {
+                meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
+            }
         }
 
         BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
@@ -580,10 +602,17 @@ impl MirrorModeDispatcher {
         counter: &Arc<PacketCounter>,
         if_index: isize,
         timestamp: Duration,
+        cloud_gateway_traffic: bool,
     ) -> Result<Duration> {
         for i in last_timestamp_array.iter_mut() {
             if if_index == i.if_index {
                 if timestamp + Duration::from_millis(1) < i.last_timestamp {
+                    // In the DPDK Gateway scenario, the timestamp of the mirrored packet may be out of order,
+                    // which may be due to the collection of multiple NIC or the packet timestamp being
+                    // independently calculated by the corresponding virtual NIC.
+                    if cloud_gateway_traffic {
+                        return Ok(i.last_timestamp);
+                    }
                     // FIXME: just in case
                     counter.retired.fetch_add(1, Ordering::Relaxed);
                     return Err(Error::PacketInvalid("invalid timestamp".to_string()));
@@ -603,10 +632,7 @@ impl MirrorModeDispatcher {
         });
         Ok(timestamp)
     }
-}
 
-#[cfg(target_os = "windows")]
-impl MirrorModeDispatcher {
     fn decap_tunnel(
         packet: &mut Packet,
         tap_type_handler: &TapTypeHandler,

@@ -1407,6 +1407,17 @@ pub fn get_direction(
                 }
             }
             TridentType::TtProcess => {
+                if cloud_gateway_traffic {
+                    if l2_end {
+                        // 云网关镜像（腾讯TCE等）
+                        // 注意c/s方向与0/1相反
+                        return (
+                            Direction::ServerGatewayToClient,
+                            Direction::ClientGatewayToServer,
+                        );
+                    }
+                    return (Direction::None, Direction::None);
+                }
                 if is_ep {
                     if tunnel_tier == 0 {
                         return (Direction::ClientToServer, Direction::ServerToClient);
