@@ -39,9 +39,3 @@ fn exec_command(program: &str, args: &[&str]) -> Result<String> {
             .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
     }
 }
-
-pub fn get_hostname() -> Result<String> {
-    hostname::get()?
-        .into_string()
-        .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
-}

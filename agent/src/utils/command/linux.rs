@@ -15,10 +15,13 @@
  */
 
 use std::{
-    fs,
+    fs::{self, File},
     io::{Error, ErrorKind, Result},
+    os::unix::io::AsRawFd,
     path::Path,
 };
+
+use nix::sched::{setns, CloneFlags};
 
 use super::exec_command;
 
@@ -166,4 +169,26 @@ pub fn get_all_vm_xml<P: AsRef<Path>>(xml_path: P) -> Result<String> {
 
     result = format!("<domains>\n{}</domains>\n", result);
     Ok(result)
+}
+
+const ROOT_UTS_PATH: &'static str = "/proc/1/ns/uts";
+const ORIGIN_UTS_PATH: &'static str = "/proc/self/ns/uts";
+
+fn set_utsns(fp: &File) -> Result<()> {
+    setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWUTS).map_err(|e| Error::new(ErrorKind::Other, e))
+}
+
+pub fn get_hostname() -> Result<String> {
+    let origin_fp = File::open(Path::new(ORIGIN_UTS_PATH))?;
+    let root_fp = File::open(Path::new(ROOT_UTS_PATH))?;
+    if let Err(e) = set_utsns(&root_fp) {
+        return Err(Error::new(ErrorKind::Other, e));
+    }
+    let name = hostname::get()?
+        .into_string()
+        .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"));
+    if let Err(e) = set_utsns(&origin_fp) {
+        return Err(Error::new(ErrorKind::Other, e));
+    }
+    name
 }
