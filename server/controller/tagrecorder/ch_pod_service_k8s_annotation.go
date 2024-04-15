@@ -111,16 +111,18 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) sourceToTarget(source *mysql.PodService) (keys []K8sAnnotationKey, targets []mysql.ChPodServiceK8sAnnotation) {
+func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []K8sAnnotationKey, targets []mysql.ChPodServiceK8sAnnotation) {
 	splitAnnotation := strings.Split(source.Annotation, ", ")
 	for _, singleAnnotation := range splitAnnotation {
 		splitSingleAnnotation := strings.Split(singleAnnotation, ":")
 		if len(splitSingleAnnotation) == 2 {
 			keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: splitSingleAnnotation[0]})
 			targets = append(targets, mysql.ChPodServiceK8sAnnotation{
-				ID:    source.ID,
-				Key:   splitSingleAnnotation[0],
-				Value: splitSingleAnnotation[1],
+				ID:       source.ID,
+				Key:      splitSingleAnnotation[0],
+				Value:    splitSingleAnnotation[1],
+				TeamID:   md.TeamID,
+				DomainID: md.DomainID,
 			})
 		}
 	}

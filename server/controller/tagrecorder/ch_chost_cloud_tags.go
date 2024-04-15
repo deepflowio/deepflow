@@ -65,7 +65,7 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, targets []mysql.ChChostCloudTags) {
+func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, item *mysql.VM) (keys []CloudTagsKey, targets []mysql.ChChostCloudTags) {
 	if len(item.CloudTags) == 0 {
 		return
 	}
@@ -74,7 +74,7 @@ func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, 
 		log.Error(err)
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes)}}
+	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

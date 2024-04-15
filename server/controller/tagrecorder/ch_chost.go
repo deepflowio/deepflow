@@ -39,7 +39,7 @@ func NewChChost() *ChChost {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChChost) sourceToTarget(source *mysql.VM) (keys []IDKey, targets []mysql.ChChost) {
+func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysql.VM) (keys []IDKey, targets []mysql.ChChost) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
@@ -53,6 +53,8 @@ func (c *ChChost) sourceToTarget(source *mysql.VM) (keys []IDKey, targets []mysq
 		HostID:   source.HostID,
 		Hostname: source.Hostname,
 		IP:       source.IP,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

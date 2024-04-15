@@ -42,7 +42,7 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChNetwork) sourceToTarget(source *mysql.Network) (keys []IDKey, targets []mysql.ChNetwork) {
+func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *mysql.Network) (keys []IDKey, targets []mysql.ChNetwork) {
 	networkName := source.Name
 	if source.DeletedAt.Valid {
 		networkName += " (deleted)"
@@ -55,6 +55,8 @@ func (c *ChNetwork) sourceToTarget(source *mysql.Network) (keys []IDKey, targets
 		IconID: c.resourceTypeToIconID[IconKey{
 			NodeType: RESOURCE_TYPE_VL2,
 		}],
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

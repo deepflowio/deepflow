@@ -41,7 +41,7 @@ func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodGroup) sourceToTarget(source *mysql.PodGroup) (keys []IDKey, targets []mysql.ChPodGroup) {
+func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *mysql.PodGroup) (keys []IDKey, targets []mysql.ChPodGroup) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_GROUP,
 	}]
@@ -58,6 +58,8 @@ func (c *ChPodGroup) sourceToTarget(source *mysql.PodGroup) (keys []IDKey, targe
 		PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
+		TeamID:       md.TeamID,
+		DomainID:     md.DomainID,
 	})
 	return
 }
