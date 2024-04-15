@@ -224,8 +224,10 @@ func (k *KubernetesCluster) getClusterID(clusterID string, value string, force b
 		dbKubernetesClusteID, err := mgr.GetFromClusterID(clusterID)
 		if err == nil {
 			k.add(clusterID, dbKubernetesClusteID)
-			result = dbKubernetesClusteID.Value
+		} else {
+			log.Error(k.Log(err.Error()))
 		}
+		result = value
 	} else {
 		if result == value {
 			k.updateSyncTime(clusterID)
@@ -233,12 +235,15 @@ func (k *KubernetesCluster) getClusterID(clusterID string, value string, force b
 			mgr := dbmgr.DBMgr[models.KubernetesCluster](k.db)
 			dbKubernetesClusteID, err := mgr.GetFromClusterID(clusterID)
 			if err == nil {
+				log.Info(k.Logf("ClusteID(%s) sync changed from %s to %s", clusterID, dbKubernetesClusteID.Value, value))
 				dbKubernetesClusteID.Value = value
 				dbKubernetesClusteID.SyncedAt = time.Now()
 				mgr.Save(dbKubernetesClusteID)
 				k.add(clusterID, dbKubernetesClusteID)
-				result = dbKubernetesClusteID.Value
+			} else {
+				log.Error(k.Log(err.Error()))
 			}
+			result = value
 		}
 	}
 
