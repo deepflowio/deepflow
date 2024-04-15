@@ -41,7 +41,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodCluster) sourceToTarget(source *mysql.PodCluster) (keys []IDKey, targets []mysql.ChPodCluster) {
+func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysql.PodCluster) (keys []IDKey, targets []mysql.ChPodCluster) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_CLUSTER,
 	}]
@@ -52,9 +52,11 @@ func (c *ChPodCluster) sourceToTarget(source *mysql.PodCluster) (keys []IDKey, t
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChPodCluster{
-		ID:     source.ID,
-		Name:   sourceName,
-		IconID: iconID,
+		ID:       source.ID,
+		Name:     sourceName,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

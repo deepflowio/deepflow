@@ -59,11 +59,11 @@ func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) sourceToTarget(item *mysql.Pod) (keys []K8sLabelsKey, targets []mysql.ChPodK8sLabels) {
+func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, item *mysql.Pod) (keys []K8sLabelsKey, targets []mysql.ChPodK8sLabels) {
 	if item.Label == "" {
 		return
 	}
-	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: item.Label}}
+	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: item.Label, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

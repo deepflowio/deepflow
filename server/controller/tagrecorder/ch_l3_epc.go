@@ -41,7 +41,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChVPC) sourceToTarget(source *mysql.VPC) (keys []IDKey, targets []mysql.ChVPC) {
+func (c *ChVPC) sourceToTarget(md *message.Metadata, source *mysql.VPC) (keys []IDKey, targets []mysql.ChVPC) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_VPC,
 	}]
@@ -52,10 +52,12 @@ func (c *ChVPC) sourceToTarget(source *mysql.VPC) (keys []IDKey, targets []mysql
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChVPC{
-		ID:     source.ID,
-		Name:   sourceName,
-		UID:    source.UID,
-		IconID: iconID,
+		ID:       source.ID,
+		Name:     sourceName,
+		UID:      source.UID,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

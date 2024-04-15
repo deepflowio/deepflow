@@ -114,7 +114,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) sourceToTarget(source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
+func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
 	osAppTagsMap := map[string]string{}
 	splitTags := strings.Split(source.OSAPPTags, ", ")
 
@@ -127,9 +127,11 @@ func (c *ChOSAppTag) sourceToTarget(source *mysql.Process) (keys []OSAPPTagKey, 
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
 		targets = append(targets, mysql.ChOSAppTag{
-			PID:   source.ID,
-			Key:   k,
-			Value: v,
+			PID:      source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return

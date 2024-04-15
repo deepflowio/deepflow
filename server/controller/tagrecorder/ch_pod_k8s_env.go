@@ -114,7 +114,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) sourceToTarget(source *mysql.Pod) (keys []K8sEnvKey, targets []mysql.ChPodK8sEnv) {
+func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sEnvKey, targets []mysql.ChPodK8sEnv) {
 	envMap := map[string]string{}
 	splitTags := strings.Split(source.ENV, ", ")
 
@@ -127,9 +127,11 @@ func (c *ChPodK8sEnv) sourceToTarget(source *mysql.Pod) (keys []K8sEnvKey, targe
 	for k, v := range envMap {
 		keys = append(keys, K8sEnvKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sEnv{
-			ID:    source.ID,
-			Key:   k,
-			Value: v,
+			ID:       source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return

@@ -111,16 +111,18 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) sourceToTarget(source *mysql.PodService) (keys []K8sLabelKey, targets []mysql.ChPodServiceK8sLabel) {
+func (c *ChPodServiceK8sLabel) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []K8sLabelKey, targets []mysql.ChPodServiceK8sLabel) {
 	splitLabel := strings.Split(source.Label, ", ")
 	for _, singleLabel := range splitLabel {
 		splitSingleLabel := strings.Split(singleLabel, ":")
 		if len(splitSingleLabel) == 2 {
 			keys = append(keys, K8sLabelKey{ID: source.ID, Key: splitSingleLabel[0]})
 			targets = append(targets, mysql.ChPodServiceK8sLabel{
-				ID:    source.ID,
-				Key:   splitSingleLabel[0],
-				Value: splitSingleLabel[1],
+				ID:       source.ID,
+				Key:      splitSingleLabel[0],
+				Value:    splitSingleLabel[1],
+				TeamID:   md.TeamID,
+				DomainID: md.DomainID,
 			})
 		}
 	}

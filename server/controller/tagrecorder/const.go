@@ -219,6 +219,18 @@ const (
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_REGION_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
 		"    `icon_id` Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
@@ -230,7 +242,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
-		"    `uid` String\n" +
+		"    `uid` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -265,7 +279,9 @@ const (
 		"    `icon_id` Int64,\n" +
 		"    `uid` String,\n" +
 		"    `hostname` String,\n" +
-		"    `ip` String\n" +
+		"    `ip` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY devicetype, deviceid\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -376,6 +392,17 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(FLAT())"
+	CREATE_POD_INGRESS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 30 MAX %d)\n" +
+		"LAYOUT(FLAT())"
 	CREATE_LB_LISTENER_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -392,7 +419,9 @@ const (
 		"    `key` String,\n" +
 		"    `value` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -403,7 +432,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `labels` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -493,7 +524,9 @@ const (
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `key` String,\n" +
-		"    `value` String\n" +
+		"    `value` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -502,7 +535,9 @@ const (
 	CREATE_CLOUD_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
-		"    `cloud_tags` String\n" +
+		"    `cloud_tags` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -512,7 +547,9 @@ const (
 		"(\n" +
 		"    `pid` UInt64,\n" +
 		"    `key` String,\n" +
-		"    `value` String\n" +
+		"    `value` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY pid, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -521,7 +558,9 @@ const (
 	CREATE_OS_APP_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `pid` UInt64,\n" +
-		"    `os_app_tags` String\n" +
+		"    `os_app_tags` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY pid\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -534,7 +573,9 @@ const (
 		"    `key` String,\n" +
 		"    `value` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -545,7 +586,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `annotations` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -557,7 +600,9 @@ const (
 		"    `key` String,\n" +
 		"    `value` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -568,7 +613,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `envs` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -630,7 +677,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
-		"    `pod_cluster_id` UInt64\n" +
+		"    `pod_cluster_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -645,7 +694,9 @@ const (
 		"    `pod_ns_id` UInt64,\n" +
 		"    `pod_node_id` UInt64,\n" +
 		"    `pod_service_id` UInt64,\n" +
-		"    `pod_group_id` UInt64\n" +
+		"    `pod_group_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -656,7 +707,9 @@ const (
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `pod_cluster_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -669,32 +722,38 @@ const (
 		"    `host_id` UInt64,\n" +
 		"    `l3_epc_id` UInt64,\n" +
 		"    `hostname` String,\n" +
-		"    `ip` String\n" +
+		"    `ip` String,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(FLAT())"
-	CREATE_CH_POD_GROUP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+	CREATE_POD_GROUP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `pod_group_type` UInt64,\n" +
 		"    `icon_id` Int64,\n" +
 		"    `pod_cluster_id` UInt64,\n" +
-		"    `pod_ns_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
 		"LAYOUT(FLAT())"
-	CREATE_CH_GPROCESS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+	CREATE_GPROCESS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `icon_id` Int64,\n" +
 		"    `chost_id` Int64,\n" +
-		"    `l3_epc_id` Int64\n" +
+		"    `l3_epc_id` Int64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
@@ -786,14 +845,14 @@ var IconNameToDomainType = map[string][]int{
 }
 
 var CREATE_SQL_MAP = map[string]string{
-	CH_DICTIONARY_REGION:                 CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_REGION:                 CREATE_REGION_DICTIONARY_SQL,
 	CH_DICTIONARY_AZ:                     CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_VPC:                    CREATE_VPC_DICTIONARY_SQL,
 	CH_DICTIONARY_VL2:                    CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_CLUSTER:            CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NAMESPACE:          CREATE_POD_NS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NODE:               CREATE_DICTIONARY_SQL,
-	CH_DICTIONARY_POD_GROUP:              CREATE_CH_POD_GROUP_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_GROUP:              CREATE_POD_GROUP_DICTIONARY_SQL,
 	CH_DICTIONARY_POD:                    CREATE_POD_DICTIONARY_SQL,
 	CH_DICTIONARY_DEVICE:                 CREATE_DEVICE_DICTIONARY_SQL,
 	CH_DICTIONARY_VTAP_PORT:              CREATE_VTAP_PORT_DICTIONARY_SQL,
@@ -807,7 +866,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_SERVER_PORT:            CREATE_SERVER_PORT_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RELATION:            CREATE_IP_RELATION_DICTIONARY_SQL,
 	CH_DICTIONARY_LB_LISTENER:            CREATE_LB_LISTENER_DICTIONARY_SQL,
-	CH_DICTIONARY_POD_INGRESS:            CREATE_ID_NAME_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_INGRESS:            CREATE_POD_INGRESS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_LABEL:          CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_K8S_LABELS:         CREATE_K8S_LABELS_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RESOURCE:            CREATE_IP_RESOURCE_DICTIONARY_SQL,
@@ -820,7 +879,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_NS_CLOUD_TAGS:      CREATE_CLOUD_TAGS_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAG:             CREATE_OS_APP_TAG_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAGS:            CREATE_OS_APP_TAGS_DICTIONARY_SQL,
-	CH_DICTIONARY_GPROCESS:               CREATE_CH_GPROCESS_DICTIONARY_SQL,
+	CH_DICTIONARY_GPROCESS:               CREATE_GPROCESS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABEL:  CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABELS: CREATE_K8S_LABELS_DICTIONARY_SQL,
 
