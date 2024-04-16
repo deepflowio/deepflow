@@ -252,7 +252,7 @@ impl Session {
         self.server_dispatcher.read().get_current_ip()
     }
 
-    async fn update_current_server(&self) -> bool {
+    pub async fn update_current_server(&self) -> bool {
         let changed = self.server_dispatcher.write().update_current_ip();
         if changed || self.get_client().is_none() {
             let (ip, port) = self.server_dispatcher.read().get_current_ip();

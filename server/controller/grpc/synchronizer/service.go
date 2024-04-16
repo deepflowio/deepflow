@@ -174,3 +174,7 @@ func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer)
 func (s *service) GetUniversalTagNameMaps(ctx context.Context, in *api.UniversalTagNameMapsRequest) (*api.UniversalTagNameMapsResponse, error) {
 	return s.tsdbEvent.GetUniversalTagNameMaps(ctx, in)
 }
+
+func (s *service) RemoteExecute(in api.Synchronizer_RemoteExecuteServer) error {
+	return nil
+}

@@ -58,7 +58,7 @@ parking_lot = "0.11"
 pcap_assembler = { path = "plugins/pcap_assembler" }
 pcap-sys = "0.1.3"
 pnet = "^0.29"
-prost = "0.11.0"
+prost = "0.11"
 public = { path = "crates/public" }
 rand = "0.8.5"
 regex = "1"
