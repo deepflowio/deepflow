@@ -259,7 +259,15 @@ static int kernel_offset_infer_client(void)
 	      rcv_loop:
 		len = recv(cli_fd, buf, sizeof(buf), 0);
 		if (len > 0) {
+			/*
+			 * Another send action occurs here to avoid
+			 * failure to infer the value of 'write_seq'.
+			 * Troubleshoot the invalid kernel adaptation
+			 * mechanism in EulerOS 2.9 and EulerOS 2.10
+			 * (Linux 4.18).
+			 */
 			buf[len] = '\0';
+			send(cli_fd, buf, len, 0);
 			break;
 		} else if (len == 0) {
 			break;
