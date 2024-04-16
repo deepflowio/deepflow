@@ -59,7 +59,12 @@ func (v *VTapLicenseAllocation) Start() {
 	log.Info("vtap license allocation and check start")
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
-			v.allocLicense()
+			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				v.allocLicense(db)
+				return nil
+			}); err != nil {
+				log.Error(err)
+			}
 		}
 	}()
 }
@@ -71,18 +76,18 @@ func (v *VTapLicenseAllocation) Stop() {
 	log.Info("vtap license allocation and check stopped")
 }
 
-func (v *VTapLicenseAllocation) allocLicense() {
-	log.Info("alloc license starting")
+func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
+	log.Info("ORG(id=%d database=%s) alloc license starting", orgDB.ORGID, orgDB.Name)
 
 	whereSQL := "license_type IS NULL OR license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
-	mysql.Db.Model(&mysql.VTap{}).Where(whereSQL, licenseFunctions).Updates(
+	orgDB.Model(&mysql.VTap{}).Where(whereSQL, licenseFunctions).Updates(
 		map[string]interface{}{
 			"license_type":      VTAP_LICENSE_TYPE_DEFAULT,
 			"license_functions": licenseFunctions,
 		},
 	)
-	log.Info("alloc license complete")
+	log.Info("ORG(id=%d database=%s)  alloc license complete", orgDB.ORGID, orgDB.Name)
 }
 
 func GetSupportedLicenseType(vtapType int) []int {

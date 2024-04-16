@@ -60,6 +60,7 @@ type ChVTapPort struct {
 	DeviceID   int    `gorm:"column:device_id;type:int;not null" json:"DEVICE_ID"`
 	DeviceName string `gorm:"column:device_name;type:varchar(256);not null" json:"DEVICE_NAME"`
 	IconID     int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID     int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChVTapPort) TableName() string {
@@ -260,6 +261,7 @@ type ChVTap struct {
 	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	Type   int    `gorm:"column:type;type:int;not null" json:"TYPE"`
 	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
 func (ChVTap) TableName() string {

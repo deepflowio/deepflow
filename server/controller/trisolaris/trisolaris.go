@@ -67,28 +67,47 @@ type TrisolarisManager struct {
 var trisolarisManager *TrisolarisManager
 
 func GetMetaData() *metadata.MetaData {
-	return trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].metaData
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris == nil {
+		return nil
+	}
+	return trisolaris.metaData
 }
 
 func GetOrgInfoByTeamID(teamIDStr string) (orgID int, teamID int) {
+	if trisolarisManager == nil {
+		return
+	}
 	orgID, teamID = trisolarisManager.GetOrgInfoByTeamID(teamIDStr)
 	return
 }
 
 func GetOrgIDByTeamID(teamID string) int {
+	if trisolarisManager == nil {
+		return 0
+	}
 	return trisolarisManager.GetOrgIDByTeamID(teamID)
 }
 
 func GetGVTapInfo(orgID int) *vtap.VTapInfo {
+	if trisolarisManager == nil {
+		return nil
+	}
 	return trisolarisManager.GetVTapInfo(orgID)
 }
 
 func GetGNodeInfo() *node.NodeInfo {
-	return trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].nodeInfo
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris == nil {
+		return nil
+	}
+	return trisolaris.nodeInfo
 }
 
-// TODO support org
 func TeamIDToTrisolaris(teamID string) *Trisolaris {
+	if trisolarisManager == nil {
+		return nil
+	}
 	return trisolarisManager.orgToTrisolaris[GetOrgIDByTeamID(teamID)]
 }
 
@@ -124,28 +143,53 @@ func GetIsRefused() bool {
 	return trisolarisManager.config.GetNoTeamIDRefused()
 }
 
+func GetTrisolaris(orgID int) *Trisolaris {
+	if trisolarisManager == nil {
+		return nil
+	}
+
+	return trisolarisManager.orgToTrisolaris[orgID]
+}
 func PutPlatformData() {
-	trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].metaData.PutChPlatformData()
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris != nil {
+		trisolaris.metaData.PutChPlatformData()
+	}
 }
 
 func PutTapType() {
-	trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].metaData.PutChTapType()
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris != nil {
+		trisolaris.metaData.PutChTapType()
+	}
 }
 
 func PutNodeInfo() {
-	trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].nodeInfo.PutChNodeInfo()
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris != nil {
+		trisolaris.nodeInfo.PutChNodeInfo()
+	}
 }
 
 func PutVTapCache() {
+	if trisolarisManager == nil {
+		return
+	}
 	trisolarisManager.PutVTapCacheRefresh(DEFAULT_ORG_ID)
 }
 
 func PutFlowACL() {
-	trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].metaData.PutChPolicy()
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris != nil {
+		trisolaris.metaData.PutChPolicy()
+	}
 }
 
 func PutGroup() {
-	trisolarisManager.orgToTrisolaris[DEFAULT_ORG_ID].metaData.PutChGroup()
+	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+	if trisolaris != nil {
+		trisolaris.metaData.PutChGroup()
+	}
 }
 
 func getStartTime() int64 {
@@ -290,7 +334,10 @@ func (m *TrisolarisManager) PutVTapCacheRefresh(orgID int) {
 	if m.CheckOrgID(orgID) == false {
 		return
 	}
-	m.orgToTrisolaris[orgID].vTapInfo.PutVTapCacheRefresh()
+	trisolaris := m.orgToTrisolaris[orgID]
+	if trisolaris != nil {
+		trisolaris.vTapInfo.PutVTapCacheRefresh()
+	}
 }
 
 func (m *TrisolarisManager) GetVTapInfo(orgID int) *vtap.VTapInfo {

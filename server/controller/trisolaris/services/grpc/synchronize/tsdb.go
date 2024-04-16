@@ -57,6 +57,11 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	tsdbIP := in.GetCtrlIp()
 	processName := in.GetProcessName()
 	nodeInfo := trisolaris.GetGNodeInfo()
+	if nodeInfo == nil {
+		return &api.SyncResponse{
+			Status: &STATUS_FAILED,
+		}, nil
+	}
 	versionPlatformData := nodeInfo.GetPlatformDataVersion()
 	versionGroups := nodeInfo.GetGroupsVersion()
 	versionPolicy := nodeInfo.GetPolicyVersion()
@@ -141,6 +146,11 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	tsdbIP := in.GetCtrlIp()
 	processName := in.GetProcessName()
 	nodeInfo := trisolaris.GetGNodeInfo()
+	if nodeInfo == nil {
+		return &api.SyncResponse{
+			Status: &STATUS_FAILED,
+		}, fmt.Errorf("no find nodeInfo(%s)", tsdbIP)
+	}
 	if processName == TSDB_PROCESS_NAME {
 		tsdbCache := nodeInfo.GetTSDBCache(tsdbIP)
 		if tsdbCache == nil {

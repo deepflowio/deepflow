@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS ch_ip_relation (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 
 -- update db_version to latest, remeber update DB_VERSION_EXPECT in migrate/init.go
-UPDATE db_version SET version='6.5.1.18';
+UPDATE db_version SET version='6.5.1.19';
 -- modify end
 
