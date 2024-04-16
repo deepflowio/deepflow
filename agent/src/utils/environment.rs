@@ -54,7 +54,6 @@ use public::proto::{common::TridentType, trident::Exception};
 #[cfg(target_os = "windows")]
 use super::process::get_memory_rss;
 use super::process::get_process_num_by_name;
-use public::consts::DAEMONSET_NAME;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use public::utils::net::get_link_enabled_features;
 use public::utils::net::{
@@ -547,7 +546,7 @@ pub async fn get_current_k8s_image() -> Option<String> {
 
     let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
 
-    let Ok(daemonset) = daemonsets.get(DAEMONSET_NAME).await else {
+    let Ok(daemonset) = daemonsets.get(public::consts::DAEMONSET_NAME).await else {
         warn!("failed to get daemonsets");
         return None;
     };

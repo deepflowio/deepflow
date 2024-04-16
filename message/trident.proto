@@ -21,6 +21,8 @@ service Synchronizer {
     rpc GetPrometheusLabelIDs(PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
     rpc GetPrometheusTargets(PrometheusTargetRequest) returns (PrometheusTargetResponse) {}
     rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
+    // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
+    rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
 }
 
 // debug service
@@ -1025,4 +1027,76 @@ message UniversalTagNameMapsResponse {
     repeated IdNameMap subnet_map = 12;
     repeated IdNameMap gprocess_map = 13;
     repeated IdNameMap vtap_map = 14;
+}
+
+message AgentId {
+    optional string ip = 1;
+    optional string mac = 2;
+    optional string team_id = 3;
+}
+
+enum OutputFormat {
+    TEXT = 0;
+    BINARY = 1;
+}
+
+enum CommandType {
+    LINUX = 0;
+    KUBERNETES = 1;
+}
+
+message RemoteCommand {
+    optional uint32 id = 1;
+    optional string cmd = 2;
+    repeated string param_names = 3;
+    optional OutputFormat output_format = 4;
+    optional CommandType cmd_type = 5;
+}
+
+message LinuxNamespace {
+    optional uint64 id = 1;
+    optional string ns_type = 2;
+    optional string user = 3;
+    optional uint32 pid = 4;
+    optional string cmd = 5;
+}
+
+message CommandResult {
+    optional int32 errno = 1;
+    optional string errmsg = 2; // error message in command execution
+    optional bytes content = 3;
+    // will only be populated in the last segment
+    // also used as end of result
+    optional string md5 = 4;
+    optional uint64 total_len = 5;
+    optional uint32 pkt_count = 6;
+}
+
+enum ExecutionType {
+    LIST_COMMAND = 0;
+    LIST_NAMESPACE = 1;
+    RUN_COMMAND = 2;
+}
+
+message Parameter {
+    optional string key = 1;
+    optional string value = 2; // accepts [A-Za-z0-9-_]
+}
+
+// message from server to agent
+message RemoteExecRequest {
+    optional ExecutionType exec_type = 1;
+    optional uint32 command_id = 2;
+    repeated Parameter params = 3; // parameters to use in commands
+    optional uint32 linux_ns_pid = 4; // execute command in agent namespace if null
+    optional uint32 batch_len = 5 [default = 1048576]; // batch len of command execution results, min 1024
+}
+
+// message from agent to server
+message RemoteExecResponse {
+    optional AgentId agent_id = 1;
+
+    repeated RemoteCommand commands = 2;
+    repeated LinuxNamespace linux_namespaces = 3;
+    optional CommandResult command_result = 4;
 }
