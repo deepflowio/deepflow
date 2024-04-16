@@ -89,6 +89,7 @@ message SyncRequest {
     optional uint64 version_platform_data = 9 [default = 0]; /* only platform data */
     optional uint64 version_acls = 10 [default = 0];
     optional uint64 version_groups = 11 [default = 0];
+    optional string current_k8s_image = 12;
 
     optional string ctrl_ip = 21;
     optional string host = 22;      // 仅作为注册使用
@@ -596,6 +597,7 @@ message UpgradeResponse {
     optional string md5 = 3;        // 文件MD5
     optional uint64 total_len = 4;  // 数据总长
     optional uint32 pkt_count = 5;  // 包总个数
+    optional string k8s_image = 6;  // When k8s_image is not empty, ignore content
 }
 
 message NtpRequest {
