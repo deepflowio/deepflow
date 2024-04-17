@@ -108,6 +108,8 @@ pub struct ZmtpInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+    #[serde(skip)]
+    l7_protocol_str: Option<String>,
 }
 
 impl ZmtpInfo {
@@ -146,6 +148,9 @@ impl ZmtpInfo {
             if !custom.attributes.is_empty() {
                 self.attributes.extend(custom.attributes);
             }
+            if custom.proto_str.len() > 0 {
+                self.l7_protocol_str = Some(custom.proto_str);
+            }
         }
     }
 }
@@ -182,6 +187,7 @@ impl From<ZmtpInfo> for L7ProtocolSendLog {
                         Some(f.attributes)
                     }
                 },
+                protocol_str: f.l7_protocol_str,
                 ..Default::default()
             }),
             ..Default::default()
