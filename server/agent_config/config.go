@@ -27,6 +27,7 @@ type AgentGroupConfig struct {
 	MaxCollectPps                     *int          `json:"MAX_COLLECT_PPS" yaml:"max_collect_pps,omitempty"`
 	MaxNpbBps                         *int64        `json:"MAX_NPB_BPS" yaml:"max_npb_bps,omitempty"` // unit: bps
 	MaxCPUs                           *int          `json:"MAX_CPUS" yaml:"max_cpus,omitempty"`
+	MaxMilliCPUs                      *int          `json:"MAX_MILLICPUS" yaml:"max_millicpus,omitempty"`
 	MaxMemory                         *int          `json:"MAX_MEMORY" yaml:"max_memory,omitempty"` // unit: M
 	SyncInterval                      *int          `json:"SYNC_INTERVAL" yaml:"sync_interval,omitempty"`
 	PlatformSyncInterval              *int          `json:"PLATFORM_SYNC_INTERVAL" yaml:"platform_sync_interval,omitempty"`

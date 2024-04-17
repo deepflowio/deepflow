@@ -54,6 +54,10 @@ func RegisterRepoCommand() *cobra.Command {
 	return repo
 }
 
+var repoAgentCreateExample = `deepflow-ctl repo agent create --arch x86 --image deepflow-agent
+deepflow-ctl repo agent create --arch x86 --version-image /root/deepflow-agent --image deepflow-agent.exe 
+deepflow-ctl repo agent create --arch x86 --version-image /root/deepflow-agent --k8s-image registry.cn-beijing.aliyuncs.com/deepflow-ce/deepflowio-agent:latest`
+
 func registerAgentCommand() *cobra.Command {
 	agent := &cobra.Command{
 		Use:   "agent",
@@ -63,29 +67,33 @@ func registerAgentCommand() *cobra.Command {
 		},
 	}
 
-	var arch, image, versionImage string
+	var arch, image, versionImage, k8sImage string
 	timeout := common.DefaultTimeout
 	create := &cobra.Command{
 		Use:     "create",
 		Short:   "create repo agent",
-		Example: "deepflow-ctl repo agent create --arch x86 --image deepflow-agent",
+		Example: repoAgentCreateExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
-				fmt.Printf("file %s not found\n", image)
+			if len(k8sImage) != 0 && len(image) != 0 {
+				printutil.ErrorfWithColor("only one flag is supported: 'image' or 'k8s-image'", image, versionImage)
 				return
 			}
-			if strings.HasSuffix(image, ".exe") {
+			if strings.HasSuffix(image, ".exe") || len(k8sImage) != 0 {
 				if versionImage == "" {
-					printutil.ErrorWithColor("version-image must be set when uploading a window image")
+					printutil.ErrorWithColor("'version-image' must be specified when uploading an image to retrieve its version")
 					return
 				}
 				if _, err := os.Stat(versionImage); errors.Is(err, os.ErrNotExist) {
 					fmt.Printf("file %s not found\n", versionImage)
 					return
 				}
-				printutil.WarnfWithColor("make sure %s and %s have the same version", image, versionImage)
+				imageName := image
+				if len(imageName) == 0 {
+					imageName = k8sImage
+				}
+				printutil.WarnfWithColor("make sure %s and %s have the same version", imageName, versionImage)
 			}
-			if err := createRepoAgent(cmd, arch, image, versionImage); err != nil {
+			if err := createRepoAgent(cmd, arch, image, versionImage, k8sImage); err != nil {
 				fmt.Println(err)
 			}
 		},
@@ -93,8 +101,8 @@ func registerAgentCommand() *cobra.Command {
 	create.Flags().StringVarP(&arch, "arch", "", "", "arch of deepflow-agent")
 	create.Flags().StringVarP(&image, "image", "", "", "deepflow-agent image to upload")
 	create.Flags().StringVarP(&versionImage, "version-image", "", "", "deepflow-agent image to get branch, rev_count and commit_id")
+	create.Flags().StringVarP(&k8sImage, "k8s-image", "", "", "deepflow-agent Kubernetes image: if k8s-image is not empty, the image flag will be ignored.")
 	create.Flags().DurationVar(&timeout, "timeout", 0, "timeout duration(default: 30s), e.g., 1s 1m 1h")
-	create.MarkFlagsRequiredTogether("arch", "image")
 
 	list := &cobra.Command{
 		Use:     "list",
@@ -122,9 +130,9 @@ func registerAgentCommand() *cobra.Command {
 	return agent
 }
 
-func createRepoAgent(cmd *cobra.Command, arch, image, versionImage string) error {
+func createRepoAgent(cmd *cobra.Command, arch, image, versionImage, k8sImage string) error {
 	execImage := image
-	if versionImage != "" {
+	if versionImage != "" || len(k8sImage) != 0 {
 		execImage = versionImage
 	}
 	agentOutput, err := getAgentOutput(execImage)
@@ -135,27 +143,34 @@ func createRepoAgent(cmd *cobra.Command, arch, image, versionImage string) error
 
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
-	bodyWriter.WriteField("NAME", path.Base(image))
+	if len(k8sImage) != 0 {
+		bodyWriter.WriteField("NAME", k8sImage)
+	} else {
+		bodyWriter.WriteField("NAME", path.Base(image))
+	}
 	bodyWriter.WriteField("ARCH", arch)
 	bodyWriter.WriteField("BRANCH", branch)
 	bodyWriter.WriteField("REV_COUNT", revCount)
 	bodyWriter.WriteField("COMMIT_ID", commitID)
+	bodyWriter.WriteField("K8S_IMAGE", k8sImage)
 	osStr := "Linux"
 	if strings.HasSuffix(image, ".exe") {
 		osStr = "Windows"
 	}
 	bodyWriter.WriteField("OS", osStr)
 
-	fileWriter, err := bodyWriter.CreateFormFile("IMAGE", path.Base(image))
-	f, err := os.Open(image)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err = io.Copy(fileWriter, f); err != nil {
-		return err
-	}
 	contentType := bodyWriter.FormDataContentType()
+	if len(image) > 0 {
+		fileWriter, err := bodyWriter.CreateFormFile("IMAGE", path.Base(image))
+		f, err := os.Open(image)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if _, err = io.Copy(fileWriter, f); err != nil {
+			return err
+		}
+	}
 	bodyWriter.Close()
 
 	server := common.GetServerInfo(cmd)
@@ -216,10 +231,11 @@ func listRepoAgent(cmd *cobra.Command) {
 		branchMaxSize   = jsonparser.GetTheMaxSizeOfAttr(data, "BRANCH")
 		revCountMaxSize = jsonparser.GetTheMaxSizeOfAttr(data, "REV_COUNT")
 		commitIDMaxSize = jsonparser.GetTheMaxSizeOfAttr(data, "COMMIT_ID")
+		k8sImageMaxSize = jsonparser.GetTheMaxSizeOfAttr(data, "K8S_IMAGE")
 	)
-	cmdFormat := "%-*s %-*s %-*s %-*s %-*s %-19s %-*s\n"
+	cmdFormat := "%-*s %-*s %-*s %-*s %-*s %-19s %-*s %-*s\n"
 	fmt.Printf(cmdFormat, nameMaxSize, "NAME", archMaxSize, "ARCH", osMaxSize, "OS", branchMaxSize, "BRANCH",
-		revCountMaxSize, "REV_COUNT", "UPDATED_AT", commitIDMaxSize, "COMMIT_ID")
+		revCountMaxSize, "REV_COUNT", "UPDATED_AT", commitIDMaxSize, "COMMIT_ID", k8sImageMaxSize, "K8S_IMAGE")
 	for i := range data.MustArray() {
 		d := data.GetIndex(i)
 		fmt.Printf(cmdFormat,
@@ -230,6 +246,7 @@ func listRepoAgent(cmd *cobra.Command) {
 			revCountMaxSize, d.Get("REV_COUNT").MustString(),
 			d.Get("UPDATED_AT").MustString(),
 			commitIDMaxSize, d.Get("COMMIT_ID").MustString(),
+			k8sImageMaxSize, d.Get("K8S_IMAGE").MustString(),
 		)
 	}
 }
@@ -241,9 +258,13 @@ func deleteRepoAgent(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("must specify one name.\nExample: %s", cmd.Example)
 	}
 
+	body := map[string]interface{}{
+		"image_name": args[0],
+	}
+
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/%s/", server.IP, server.Port, args[0])
-	_, err := common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
+	_, err := common.CURLPerform("DELETE", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
 	if err != nil {
 		return err
 	}

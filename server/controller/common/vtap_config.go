@@ -24,6 +24,7 @@ var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
 	MaxCollectPps:                 &DefaultMaxCollectPps,
 	MaxNpbBps:                     &DefaultMaxNpbBps,
 	MaxCPUs:                       &DefaultMaxCPUs,
+	MaxMilliCPUs:                  &DefaultMaxMilliCPUs,
 	MaxMemory:                     &DefaultMaxMemory,
 	PlatformSyncInterval:          &DefaultPlatformSyncInterval,
 	SyncInterval:                  &DefaultSyncInterval,
@@ -95,6 +96,7 @@ var (
 	DefaultMaxCollectPps                 = 200000
 	DefaultMaxNpbBps                     = int64(1000000000)
 	DefaultMaxCPUs                       = 1
+	DefaultMaxMilliCPUs                  = 1000
 	DefaultMaxMemory                     = 768
 	DefaultPlatformSyncInterval          = 10
 	DefaultSyncInterval                  = 60

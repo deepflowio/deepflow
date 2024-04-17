@@ -191,6 +191,7 @@ type VTap struct {
 	Os                 string    `gorm:"column:os;type:varchar(256);default:null" json:"OS"`
 	KernelVersion      string    `gorm:"column:kernel_version;type:varchar(256);default:null" json:"KERNEL_VERSION"`
 	ProcessName        string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
+	CurrentK8sImage    string    `gorm:"column:current_k8s_image;type:varchar(512);default:null" json:"CURRENT_K8S_IMAGE"`
 	LicenseType        int       `gorm:"column:license_type;type:int;default:null" json:"LICENSE_TYPE"`   // 1: A类 2: B类 3: C类
 	LicenseFunctions   string    `gorm:"column:license_functions;type:char(64)" json:"LICENSE_FUNCTIONS"` // separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控
 	TapMode            int       `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"`
@@ -396,7 +397,8 @@ type VTapRepo struct {
 	Branch    string          `gorm:"column:branch;type:varchar(256);default:''" json:"BRANCH"`
 	RevCount  string          `gorm:"column:rev_count;type:varchar(256);default:''" json:"REV_COUNT"`
 	CommitID  string          `gorm:"column:commit_id;type:varchar(256);default:''" json:"COMMIT_ID"`
-	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	Image     compressedBytes `gorm:"column:image;type:logblob" json:"IMAGE"`
+	K8sImage  string          `gorm:"column:k8s_image;type:varchar(512);default:''" json:"K8S_IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }

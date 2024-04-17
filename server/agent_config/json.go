@@ -20,6 +20,7 @@ type AgentGroupConfigResponse struct {
 	MaxCollectPps                     *int           `json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         *int64         `json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           *int           `json:"MAX_CPUS"`
+	MaxMilliCPUs                      *int           `json:"MAX_MILLICPUS"`
 	MaxMemory                         *int           `json:"MAX_MEMORY"` // unit: M
 	SyncInterval                      *int           `json:"SYNC_INTERVAL"`
 	PlatformSyncInterval              *int           `json:"PLATFORM_SYNC_INTERVAL"`
