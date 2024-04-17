@@ -522,7 +522,8 @@ type VTapRepo struct {
 	Branch    string          `gorm:"column:branch;type:varchar(256);default:''" json:"BRANCH"`
 	RevCount  string          `gorm:"column:rev_count;type:varchar(256);default:''" json:"REV_COUNT"`
 	CommitID  string          `gorm:"column:commit_id;type:varchar(256);default:''" json:"COMMIT_ID"`
-	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	Image     compressedBytes `gorm:"column:image;type:logblob" json:"IMAGE"`
+	K8sImage  string          `gorm:"column:k8s_image;type:varchar(512);default:''" json:"K8S_IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }

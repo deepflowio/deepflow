@@ -183,6 +183,7 @@ type VtapRepo struct {
 	RevCount  string `json:"REV_COUNT"`
 	CommitID  string `json:"COMMIT_ID"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
+	K8sImage  string `json:"K8S_IMAGE"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
 
