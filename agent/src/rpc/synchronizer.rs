@@ -31,6 +31,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
+#[cfg(any(target_os = "linux"))]
+use k8s_openapi::api::apps::v1::DaemonSet;
+#[cfg(any(target_os = "linux"))]
+use kube::{
+    api::{Api, Patch, PatchParams},
+    Client, Config,
+};
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
@@ -56,14 +63,18 @@ use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
 use crate::trident::{self, AgentId, ChangedConfig, RunningMode, TridentState, VersionInfo};
+#[cfg(any(target_os = "linux"))]
+use crate::utils::environment::get_current_k8s_image;
 use crate::utils::{
     command::get_hostname,
     environment::{
-        get_executable_path, is_tt_pod, running_in_container, running_in_only_watch_k8s_mode,
+        get_executable_path, get_k8s_namespace, is_tt_pod, running_in_container, running_in_k8s,
+        running_in_only_watch_k8s_mode,
     },
     stats,
 };
 use public::{
+    consts::{CONTAINER_NAME, DAEMONSET_NAME},
     proto::{
         common::TridentType,
         trident::{self as tp, Exception, TapMode},
@@ -91,6 +102,7 @@ pub struct StaticConfig {
 
     pub override_os_hostname: Option<String>,
     pub agent_unique_identifier: crate::config::AgentIdType,
+    pub current_k8s_image: Option<String>,
 }
 
 const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
@@ -116,6 +128,7 @@ impl Default for StaticConfig {
             kubernetes_cluster_name: Default::default(),
             override_os_hostname: None,
             agent_unique_identifier: Default::default(),
+            current_k8s_image: None,
         }
     }
 }
@@ -479,6 +492,10 @@ impl Synchronizer {
                 kubernetes_cluster_name,
                 override_os_hostname,
                 agent_unique_identifier,
+                #[cfg(any(target_os = "linux"))]
+                current_k8s_image: runtime.block_on(get_current_k8s_image()),
+                #[cfg(any(target_os = "windows", target_os = "android"))]
+                current_k8s_image: None,
             }),
             agent_id: Arc::new(RwLock::new(agent_id)),
             trident_state,
@@ -566,6 +583,7 @@ impl Synchronizer {
             version_groups: Some(status.version_groups),
             state: Some(tp::State::Running.into()),
             revision: Some(static_config.version_info.revision.to_owned()),
+            current_k8s_image: static_config.current_k8s_image.clone(),
             exception: Some(exception_handler.take()),
             process_name: Some(static_config.version_info.name.to_owned()),
             ctrl_mac: Some(agent_id.mac.to_string()),
@@ -1109,6 +1127,85 @@ impl Synchronizer {
         });
     }
 
+    #[cfg(target_os = "linux")]
+    async fn upgrade_k8s_image(
+        running: &AtomicBool,
+        session: &Session,
+        agent_id: &AgentId,
+        current_k8s_image: &Option<String>,
+    ) -> Result<(), String> {
+        let Some(current_k8s_image) = current_k8s_image else {
+            return Err("empty current_k8s_image".to_owned());
+        };
+        let response = session
+            .grpc_upgrade_with_statsd(tp::UpgradeRequest {
+                ctrl_ip: Some(agent_id.ip.to_string()),
+                ctrl_mac: Some(agent_id.mac.to_string()),
+                team_id: Some(agent_id.team_id.clone()),
+            })
+            .await;
+        if let Err(m) = response {
+            return Err(format!("rpc error {:?}", m));
+        }
+        let mut stream = response.unwrap().into_inner();
+        while let Some(message) = stream
+            .message()
+            .await
+            .map_err(|e| format!("rpc error {:?}", e))?
+        {
+            if !running.load(Ordering::SeqCst) {
+                return Err("upgrade terminated".to_owned());
+            }
+            if message.status() != tp::Status::Success {
+                return Err("upgrade failed in server response".to_owned());
+            }
+            let new_k8s_image = message.k8s_image().to_owned();
+            info!(
+                "current_k8s_image: {}, new_k8s_image: {}",
+                current_k8s_image, &new_k8s_image
+            );
+            if current_k8s_image != &new_k8s_image {
+                let Ok(mut config) = Config::infer().await else {
+                    return Err("failed to infer kubernetes config".to_owned());
+                };
+                config.accept_invalid_certs = true;
+
+                let Ok(client) = Client::try_from(config) else {
+                    return Err("failed to create kubernetes client".to_owned());
+                };
+
+                let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
+
+                // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
+                let patch = serde_json::json!({
+                    "apiVersion": "apps/v1",
+                    "kind": "DaemonSet",
+                    "spec": {
+                        "template":{
+                            "spec":{
+                                "containers": [{
+                                    "name": CONTAINER_NAME,
+                                    "image": new_k8s_image,
+                                }],
+                            }
+                        }
+                    }
+                });
+                let params = PatchParams::default();
+                let patch = Patch::Strategic(&patch);
+                if let Err(e) = daemonsets.patch(DAEMONSET_NAME, &params, &patch).await {
+                    return Err(format!(
+                        "patch deepflow-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
+                        &current_k8s_image, e
+                    ));
+                }
+            } else {
+                info!("k8s_image has not changed, not upgraded");
+            }
+        }
+        Ok(())
+    }
+
     async fn upgrade(
         running: &AtomicBool,
         session: &Session,
@@ -1116,7 +1213,7 @@ impl Synchronizer {
         agent_id: &AgentId,
     ) -> Result<(), String> {
         if running_in_container() {
-            info!("running in a container, exit directly and try to recreate myself using a new version docker image...");
+            info!("running in a non-k8s containter, exit directly and try to recreate myself using a new version docker image...");
             return Ok(());
         }
 
@@ -1395,19 +1492,34 @@ impl Synchronizer {
                 };
                 if let Some(revision) = new_revision {
                     let id = agent_id.read().clone();
-                    match Self::upgrade(&running, &session, &revision, &id).await {
-                        Ok(_) => {
-                            let (ts, cvar) = &*trident_state;
-                            *ts.lock().unwrap() = trident::State::Terminated;
-                            cvar.notify_one();
-                            warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
-                            crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
-                            return;
-                        },
-                        Err(e) => {
-                            exception_handler.set(Exception::ControllerSocketError);
-                            error!("upgrade failed: {:?}", e);
-                        },
+                    if running_in_k8s() {
+                        #[cfg(target_os = "linux")]
+                        match Self::upgrade_k8s_image(&running, &session, &id, &static_config.current_k8s_image).await {
+                            Ok(_) => {
+                                warn!("agent upgrade is successful and don't ternimate or restart it, wait for the k8s to recreate it");
+                            }
+                            Err(e) => {
+                                exception_handler.set(Exception::ControllerSocketError);
+                                error!("upgrade failed: {:?}", e);
+                            }
+                        }
+                        #[cfg(any(target_os = "windows", target_os = "android"))]
+                        warn!("does not support upgrading environment");
+                    } else {
+                        match Self::upgrade(&running, &session, &revision, &id).await {
+                            Ok(_) => {
+                                let (ts, cvar) = &*trident_state;
+                                *ts.lock().unwrap() = trident::State::Terminated;
+                                cvar.notify_one();
+                                warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
+                                crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                return;
+                            },
+                            Err(e) => {
+                                exception_handler.set(Exception::ControllerSocketError);
+                                error!("upgrade failed: {:?}", e);
+                            },
+                        }
                     }
                     status.write().new_revision = None;
                 }
