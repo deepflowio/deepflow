@@ -29,6 +29,10 @@ use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
 use std::{io::Read, os::unix::fs::MetadataExt};
 
 use bytesize::ByteSize;
+#[cfg(any(target_os = "linux"))]
+use k8s_openapi::api::apps::v1::DaemonSet;
+#[cfg(any(target_os = "linux"))]
+use kube::{api::Api, Client, Config};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use log::info;
 use log::{error, warn};
@@ -50,6 +54,7 @@ use public::proto::{common::TridentType, trident::Exception};
 #[cfg(target_os = "windows")]
 use super::process::get_memory_rss;
 use super::process::get_process_num_by_name;
+use public::consts::DAEMONSET_NAME;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use public::utils::net::get_link_enabled_features;
 use public::utils::net::{
@@ -66,6 +71,7 @@ const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
 const IN_CONTAINER: &str = "IN_CONTAINER";
 pub const K8S_MEM_LIMIT_FOR_DEEPFLOW: &str = "K8S_MEM_LIMIT_FOR_DEEPFLOW";
 const ONLY_WATCH_K8S_RESOURCE: &str = "ONLY_WATCH_K8S_RESOURCE";
+const K8S_NAMESPACE_FOR_DEEPFLOW: &str = "K8S_NAMESPACE_FOR_DEEPFLOW";
 
 const BYTES_PER_MEGABYTE: u64 = 1024 * 1024;
 const MIN_MEMORY_LIMIT_MEGABYTE: u64 = 128; // uint: Megabyte
@@ -456,7 +462,7 @@ pub fn running_in_container() -> bool {
     env::var_os(IN_CONTAINER).is_some()
 }
 
-fn running_in_k8s() -> bool {
+pub fn running_in_k8s() -> bool {
     // Judge whether Agent is running in k8s according to the existence of K8S_CA_CRT_PATH
     fs::metadata(K8S_CA_CRT_PATH).is_ok()
 }
@@ -505,6 +511,7 @@ pub fn get_env() -> String {
         IN_CONTAINER,
         K8S_MEM_LIMIT_FOR_DEEPFLOW,
         ONLY_WATCH_K8S_RESOURCE,
+        K8S_NAMESPACE_FOR_DEEPFLOW,
     ];
     items
         .into_iter()
@@ -515,6 +522,54 @@ pub fn get_env() -> String {
 
 pub fn running_in_only_watch_k8s_mode() -> bool {
     running_in_container() && env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some()
+}
+
+pub fn get_k8s_namespace() -> String {
+    env::var(K8S_NAMESPACE_FOR_DEEPFLOW).unwrap_or("deepflow".to_owned())
+}
+
+#[cfg(any(target_os = "linux"))]
+pub async fn get_current_k8s_image() -> Option<String> {
+    let Ok(mut config) = Config::infer().await else {
+        warn!("failed to infer kubernetes config");
+        return None;
+    };
+    config.accept_invalid_certs = true;
+
+    let Ok(client) = Client::try_from(config) else {
+        warn!("failed to create kubernetes client");
+        return None;
+    };
+
+    let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
+
+    let Ok(daemonset) = daemonsets.get(DAEMONSET_NAME).await else {
+        warn!("failed to get daemonsets");
+        return None;
+    };
+
+    // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
+    // The deepflow-agent DaemonSet.spec format is as follows:
+    // {
+    //   "spec":{
+    //     "template":{
+    //       "spec":{
+    //         "containers":[{
+    //           "name":"deepflow-agent",
+    //           "image":"deepflow-agent:latest",
+    //         }]
+    //       }
+    //     }
+    //   }
+    // }
+    if let Some(spec) = daemonset.spec {
+        if let Some(s) = spec.template.spec {
+            for container in s.containers {
+                return Some(container.image.unwrap_or_default());
+            }
+        }
+    }
+    None
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
