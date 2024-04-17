@@ -228,7 +228,7 @@ impl fmt::Display for Resource {
         match *self {
             Resource::No | Resource::Node | Resource::Nodes => write!(f, "nodes"),
             Resource::Ns | Resource::Namespace | Resource::Namespaces => write!(f, "namespaces"),
-            Resource::Svc | Resource::Service | Resource::Services => write!(f, "namespaces"),
+            Resource::Svc | Resource::Service | Resource::Services => write!(f, "services"),
             Resource::Deploy | Resource::Deployment | Resource::Deployments => {
                 write!(f, "deployments")
             }
