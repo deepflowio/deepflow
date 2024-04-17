@@ -20,6 +20,8 @@ use std::time::Duration;
 pub const PROCESS_NAME: &str = "deepflow-agent";
 #[cfg(target_os = "windows")]
 pub const PROCESS_NAME: &str = "deepflow-agent.exe";
+pub const DAEMONSET_NAME: &str = "deepflow-agent";
+pub const CONTAINER_NAME: &str = "deepflow-agent";
 
 pub const DEFAULT_INGESTER_PORT: u16 = 30033;
 pub const DEFAULT_CONTROLLER_PORT: u16 = 30035;
