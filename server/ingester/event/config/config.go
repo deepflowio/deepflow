@@ -43,12 +43,15 @@ type Config struct {
 	CKWriterConfig        config.CKWriterConfig `yaml:"event-ck-writer"`
 	DecoderQueueCount     int                   `yaml:"event-decoder-queue-count"`
 	DecoderQueueSize      int                   `yaml:"event-decoder-queue-size"`
-	TTL                   int                   `yaml:"event-ttl"`
+	EventTTL              int                   `yaml:"event-ttl"`
 	PerfCKWriterConfig    config.CKWriterConfig `yaml:"perf-event-ck-writer"`
 	PerfDecoderQueueCount int                   `yaml:"perf-event-decoder-queue-count"`
 	PerfDecoderQueueSize  int                   `yaml:"perf-event-decoder-queue-size"`
-	PerfTTL               int                   `yaml:"perf-event-ttl"`
-	AlarmTTL              int                   `yaml:"alarm-event-ttl"`
+	PerfEventTTL          int                   `yaml:"perf-event-ttl"`
+	AlarmEventTTL         int                   `yaml:"alarm-event-ttl"`
+	K8sCKWriterConfig     config.CKWriterConfig `yaml:"k8s-event-ck-writer"`
+	K8sDecoderQueueCount  int                   `yaml:"k8s-event-decoder-queue-count"`
+	K8sDecoderQueueSize   int                   `yaml:"k8s-event-decoder-queue-size"`
 }
 
 type EventConfig struct {
@@ -62,8 +65,8 @@ func (c *Config) Validate() error {
 	if c.DecoderQueueSize == 0 {
 		c.DecoderQueueSize = DefaultDecoderQueueSize
 	}
-	if c.TTL <= 0 {
-		c.TTL = DefaultEventTTL
+	if c.EventTTL <= 0 {
+		c.EventTTL = DefaultEventTTL
 	}
 	if c.PerfDecoderQueueCount == 0 {
 		c.PerfDecoderQueueCount = DefaultPerfDecoderQueueCount
@@ -71,11 +74,17 @@ func (c *Config) Validate() error {
 	if c.PerfDecoderQueueSize == 0 {
 		c.PerfDecoderQueueSize = DefaultPerfDecoderQueueSize
 	}
-	if c.PerfTTL <= 0 {
-		c.TTL = DefaultPerfEventTTL
+	if c.PerfEventTTL <= 0 {
+		c.PerfEventTTL = DefaultPerfEventTTL
 	}
-	if c.AlarmTTL <= 0 {
-		c.TTL = DefaultAlarmEventTTL
+	if c.AlarmEventTTL <= 0 {
+		c.AlarmEventTTL = DefaultAlarmEventTTL
+	}
+	if c.K8sDecoderQueueCount == 0 {
+		c.K8sDecoderQueueCount = DefaultDecoderQueueCount
+	}
+	if c.K8sDecoderQueueSize == 0 {
+		c.K8sDecoderQueueSize = DefaultDecoderQueueSize
 	}
 
 	return nil
@@ -88,13 +97,16 @@ func Load(base *config.Config, path string) *Config {
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
-			TTL:               DefaultEventTTL,
+			EventTTL:          DefaultEventTTL,
 
 			PerfCKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
 			PerfDecoderQueueCount: DefaultPerfDecoderQueueCount,
 			PerfDecoderQueueSize:  DefaultPerfDecoderQueueSize,
-			PerfTTL:               DefaultPerfEventTTL,
-			AlarmTTL:              DefaultAlarmEventTTL,
+			PerfEventTTL:          DefaultPerfEventTTL,
+			AlarmEventTTL:         DefaultAlarmEventTTL,
+			K8sCKWriterConfig:     config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
+			K8sDecoderQueueCount:  DefaultDecoderQueueCount,
+			K8sDecoderQueueSize:   DefaultDecoderQueueSize,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
