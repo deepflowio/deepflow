@@ -426,19 +426,13 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	var (
 		vtapController string
 		vtapLcuuid     string
-		vtapType       int
 	)
 
 	if len(response.Get("DATA").MustArray()) > 0 {
 		vtapLcuuid = response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 		vtapController = response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
-		vtapType = response.Get("DATA").GetIndex(0).Get("TYPE").MustInt()
 	} else {
 		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
-		return
-	}
-	if vtapType == int(common.VTAP_TYPE_POD_VM) || vtapType == int(common.VTAP_TYPE_POD_HOST) || vtapType == int(common.VTAP_TYPE_K8S_SIDECAR) {
-		fmt.Printf("agent (%s) type is %v, not supported upgrade by cli\n", vtapName, common.VtapType(vtapType))
 		return
 	}
 	if vtapController == "" || vtapLcuuid == "" {

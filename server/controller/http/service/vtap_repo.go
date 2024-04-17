@@ -68,7 +68,7 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
-	fieldsExculdImage := []string{"id", "name", "arch", "os", "branch", "rev_count", "commit_id", "created_at", "updated_at"}
+	fieldsExculdImage := []string{"id", "name", "arch", "os", "branch", "rev_count", "commit_id", "created_at", "updated_at", "k8s_image"}
 	db.Order("updated_at DESC").Select(fieldsExculdImage).Find(&vtapRepoes)
 
 	var resp []model.VtapRepo
@@ -80,6 +80,7 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 			Branch:    vtapRepo.Branch,
 			RevCount:  vtapRepo.RevCount,
 			CommitID:  vtapRepo.CommitID,
+			K8sImage:  vtapRepo.K8sImage,
 			UpdatedAt: vtapRepo.UpdatedAt.Format(common.GO_BIRTHDAY),
 		}
 		resp = append(resp, temp)
