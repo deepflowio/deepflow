@@ -34,19 +34,19 @@ type Logger struct {
 func NewLogger(orgID int) *Logger {
 	return &Logger{
 		ORGID:  orgID,
-		MsgPre: fmt.Sprintf("oid: %d, ", orgID),
+		MsgPre: fmt.Sprintf("[OID-%d] ", orgID),
 	}
 }
 
 func (l *Logger) InitMsgPre() {
 	if l.ORGID != 0 {
-		l.MsgPre = fmt.Sprintf("oid: %d, ", l.ORGID)
+		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.ORGID)
 	}
 	if l.DomainName != "" {
-		l.MsgPre += fmt.Sprintf("dn: %s, ", l.DomainName)
+		l.MsgPre += fmt.Sprintf("[DN-%s] ", l.DomainName)
 	}
 	if l.SubDomainName != "" {
-		l.MsgPre += fmt.Sprintf("sdn: %s, ", l.SubDomainName)
+		l.MsgPre += fmt.Sprintf("[SDN-%s] ", l.SubDomainName)
 	}
 }
 
