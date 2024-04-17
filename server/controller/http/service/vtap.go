@@ -144,6 +144,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			OsType:           common.GetOsType(vtap.Os),
 			KernelVersion:    vtap.KernelVersion,
 			ProcessName:      vtap.ProcessName,
+			CurrentK8sImage:  vtap.CurrentK8sImage,
 			LicenseType:      vtap.LicenseType,
 			ExpectedRevision: vtap.ExpectedRevision,
 			UpgradePackage:   vtap.UpgradePackage,

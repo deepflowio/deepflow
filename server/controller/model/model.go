@@ -162,6 +162,7 @@ type Vtap struct {
 	OsType             int     `json:"OS_TYPE"`
 	KernelVersion      string  `json:"KERNEL_VERSION"`
 	ProcessName        string  `json:"PROCESS_NAME"`
+	CurrentK8sImage    string  `json:"CURRENT_K8S_IMAGE"`
 	LicenseType        int     `json:"LICENSE_TYPE"`
 	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
 	ExpectedRevision   string  `json:"EXPECTED_REVISION"`
@@ -187,6 +188,7 @@ type VtapRepo struct {
 	RevCount  string `json:"REV_COUNT"`
 	CommitID  string `json:"COMMIT_ID"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
+	K8sImage  string `json:"K8S_IMAGE"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
 

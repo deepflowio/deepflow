@@ -5,6 +5,7 @@ type AgentGroupConfigModel struct {
 	MaxCollectPps                     *int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         *int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           *int     `gorm:"column:max_cpus;type:int;default:null" json:"MAX_CPUS"`
+	MaxMilliCPUs                      *int     `gorm:"column:max_millicpus;type:int;default:null" json:"MAX_MILLICPUS"`
 	MaxMemory                         *int     `gorm:"column:max_memory;type:int;default:null" json:"MAX_MEMORY"` // unit: M
 	PlatformSyncInterval              *int     `gorm:"column:platform_sync_interval;type:int;default:null" json:"PLATFORM_SYNC_INTERVAL"`
 	SyncInterval                      *int     `gorm:"column:sync_interval;type:int;default:null" json:"SYNC_INTERVAL"`
@@ -86,6 +87,7 @@ type RAgentGroupConfigModel struct {
 	MaxCollectPps                     int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           int     `gorm:"column:max_cpus;type:int;default:null" json:"MAX_CPUS"`
+	MaxMilliCPUs                      int     `gorm:"column:max_millicpus;type:int;default:null" json:"MAX_MILLICPUS"`
 	MaxMemory                         int     `gorm:"column:max_memory;type:int;default:null" json:"MAX_MEMORY"` // unit: M
 	PlatformSyncInterval              int     `gorm:"column:platform_sync_interval;type:int;default:null" json:"PLATFORM_SYNC_INTERVAL"`
 	SyncInterval                      int     `gorm:"column:sync_interval;type:int;default:null" json:"SYNC_INTERVAL"`

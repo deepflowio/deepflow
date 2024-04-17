@@ -1084,6 +1084,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.Os = cacheVTap.GetOs()
 			dbVTap.KernelVersion = cacheVTap.GetKernelVersion()
 			dbVTap.ProcessName = cacheVTap.GetProcessName()
+			dbVTap.CurrentK8sImage = cacheVTap.GetCurrentK8SImage()
 			dbVTap.CtrlMac = cacheVTap.GetCtrlMac()
 			dbVTap.RawHostname = cacheVTap.GetVTapRawHostname()
 			cacheExceptions := cacheVTap.GetExceptions()

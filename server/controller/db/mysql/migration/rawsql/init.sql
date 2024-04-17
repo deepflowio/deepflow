@@ -18,13 +18,14 @@ TRUNCATE TABLE plugin;
 
 CREATE TABLE IF NOT EXISTS vtap_repo (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                CHAR(64),
+    name                VCHAR(512),
     arch                VARCHAR(256) DEFAULT '',
     os                  VARCHAR(256) DEFAULT '',
     branch              VARCHAR(256) DEFAULT '',
     rev_count           VARCHAR(256) DEFAULT '',
     commit_id           VARCHAR(256) DEFAULT '',
-    image               LONGBLOB NOT NULL,
+    image               LONGBLOB,
+    k8s_image           VARCHAR(512) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='store deepflow-agent for easy upgrade';
@@ -1045,6 +1046,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     os                      VARCHAR(256),
     kernel_version          VARCHAR(256),
     process_name            VARCHAR(256),
+    current_k8s_image       VARCHAR(512),
     license_type            INTEGER COMMENT '1: A类 2: B类 3: C类',
     license_functions       CHAR(64) COMMENT 'separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控',
     tap_mode                INTEGER,
@@ -1623,6 +1625,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     max_collect_pps                         INTEGER        DEFAULT NULL,
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,
+    max_millicpus                           INTEGER        DEFAULT NULL,
     max_memory                              INTEGER        DEFAULT NULL     COMMENT 'unit: M',
     platform_sync_interval                  INTEGER        DEFAULT NULL,
     sync_interval                           INTEGER        DEFAULT NULL,

@@ -37,6 +37,7 @@ type UpgradeData struct {
 	pktCount uint32
 	md5Sum   string
 	step     uint64
+	k8sImage string
 }
 
 func NewUpgradeEvent() *UpgradeEvent {
@@ -79,6 +80,7 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 		pktCount: pktCount,
 		md5Sum:   md5Sum,
 		step:     step,
+		k8sImage: vtapRrepo.K8sImage,
 	}, err
 }
 
@@ -102,22 +104,33 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
 		return sendFailed(in)
 	}
-	for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {
-		end := start + upgradeData.step
-		if end > upgradeData.totalLen {
-			end = upgradeData.totalLen
-		}
+	if isPodVTap(vtapCache.GetVTapType()) {
 		response := &api.UpgradeResponse{
 			Status:   &STATUS_SUCCESS,
-			Content:  upgradeData.content[start:end],
-			Md5:      proto.String(upgradeData.md5Sum),
-			PktCount: proto.Uint32(upgradeData.pktCount),
-			TotalLen: proto.Uint64(upgradeData.totalLen),
+			K8SImage: proto.String(upgradeData.k8sImage),
 		}
 		err = in.Send(response)
 		if err != nil {
 			log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
-			break
+		}
+	} else {
+		for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {
+			end := start + upgradeData.step
+			if end > upgradeData.totalLen {
+				end = upgradeData.totalLen
+			}
+			response := &api.UpgradeResponse{
+				Status:   &STATUS_SUCCESS,
+				Content:  upgradeData.content[start:end],
+				Md5:      proto.String(upgradeData.md5Sum),
+				PktCount: proto.Uint32(upgradeData.pktCount),
+				TotalLen: proto.Uint64(upgradeData.totalLen),
+			}
+			err = in.Send(response)
+			if err != nil {
+				log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
+				break
+			}
 		}
 	}
 
