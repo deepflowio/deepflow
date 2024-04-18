@@ -30,9 +30,9 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
-	cmodel "github.com/deepflowio/deepflow/server/controller/model"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -371,7 +371,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 	v := c.vTapInfo
 	// modify static config
-	yamlConfig := &cmodel.StaticConfig{}
+	yamlConfig := &agent_config.StaticConfig{}
 	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
 	if err != nil {
 		log.Error(v.Logf("%s", err))
@@ -388,7 +388,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledCallMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -398,10 +398,10 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledFunctionMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{}
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{}
 		}
 		if yamlConfig.Ebpf.OnCpuProfile == nil {
-			yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
+			yamlConfig.Ebpf.OnCpuProfile = &agent_config.OnCpuProfile{
 				Disabled: proto.Bool(true),
 			}
 		} else {
