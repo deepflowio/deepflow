@@ -282,6 +282,9 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		vIF.IPs = strings.Join(validIPs, ",")
 		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)), uuid.Nil)
 		ifaceNSName := iface.GetNetns()
+		if len(ipAddrs) == 1 {
+			ifaceNSName = netNSs[0]
+		}
 		if gIF, ok := ifIndexToInterface[fmt.Sprintf("%v%v", ifaceNSName, iface.GetTapIndex())]; ok && isContainer {
 			vIF.TapName = gIF.Name
 			vIF.TapMac = gIF.MAC
