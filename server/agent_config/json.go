@@ -15,8 +15,8 @@ type TapSideInfo struct {
 	Name string `json:"NAME"`
 }
 
-// FIXME: This structure is very similar to VTapGroupConfiguration. It should be merged to reduce code redundancy.
-type VTapGroupConfigurationResponse struct {
+// FIXME: This structure is very similar to AgentGroupConfig. It should be merged to reduce code redundancy.
+type AgentGroupConfigResponse struct {
 	MaxCollectPps                     *int           `json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         *int64         `json:"MAX_NPB_BPS"` // unit: bps
 	MaxCPUs                           *int           `json:"MAX_CPUS"`

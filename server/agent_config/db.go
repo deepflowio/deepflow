@@ -1,6 +1,6 @@
 package agent_config
 
-type VTapGroupConfigurationModel struct {
+type AgentGroupConfigModel struct {
 	ID                                int      `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	MaxCollectPps                     *int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         *int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps
@@ -75,12 +75,13 @@ type VTapGroupConfigurationModel struct {
 	YamlConfig                        *string  `gorm:"column:yaml_config;type:text;default:null" json:"YAML_CONFIG"`
 }
 
-func (VTapGroupConfigurationModel) TableName() string {
+func (AgentGroupConfigModel) TableName() string {
 	return "vtap_group_configuration"
 }
 
-// VtapGroupConfiguration [...]
-type RVTapGroupConfigurationModel struct {
+// FIXME: This structure is very similar to AgentGroupConfigModel. It should be merged to reduce code redundancy.
+// AgentGroupConfigModel [...]
+type RAgentGroupConfigModel struct {
 	ID                                int     `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	MaxCollectPps                     int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
 	MaxNpbBps                         int64   `gorm:"column:max_npb_bps;type:bigint;default:null" json:"MAX_NPB_BPS"` // unit: bps

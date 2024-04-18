@@ -40,7 +40,7 @@ type DBDataCache struct {
 	azs                     []*models.AZ
 	hostDevices             []*models.Host
 	podNodes                []*models.PodNode
-	vtapGroupConfigurations []*agent_config.VTapGroupConfigurationModel
+	agentGroupConfigs       []*agent_config.AgentGroupConfigModel
 	domains                 []*models.Domain
 	subDomains              []*models.SubDomain
 	chVTapPorts             []*models.ChVTapPort
@@ -170,12 +170,12 @@ func (d *DBDataCache) GetVipDomains() []*models.Domain {
 	return d.vipDomains
 }
 
-func (d *DBDataCache) GetVTapGroupConfigurationsFromDB(db *gorm.DB) []*agent_config.VTapGroupConfigurationModel {
-	vtapGroupConfigurations, err := dbmgr.DBMgr[agent_config.VTapGroupConfigurationModel](db).Gets()
+func (d *DBDataCache) GetAgentGroupConfigsFromDB(db *gorm.DB) []*agent_config.AgentGroupConfigModel {
+	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
 	if err != nil {
 		log.Error(d.Log(err.Error()))
 	}
-	return vtapGroupConfigurations
+	return agentGroupConfigs
 }
 
 func (d *DBDataCache) GetDomains() []*models.Domain {
@@ -379,9 +379,9 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	vtapGroupConfigurations, err := dbmgr.DBMgr[agent_config.VTapGroupConfigurationModel](db).Gets()
+	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
 	if err == nil {
-		d.vtapGroupConfigurations = vtapGroupConfigurations
+		d.agentGroupConfigs = agentGroupConfigs
 	} else {
 		log.Error(d.Log(err.Error()))
 	}

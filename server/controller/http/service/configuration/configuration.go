@@ -19,5 +19,6 @@ package configuration
 
 import "github.com/gin-gonic/gin"
 
+// FIXME: rename GetVTapGroupconfiguration to GetAgentGroupConfig
 // GetVTapGroupconfiguration will be replaced in enterprise edition
 func GetVTapGroupconfiguration(c *gin.Context) {}

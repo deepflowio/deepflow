@@ -474,8 +474,8 @@ type AdditionalResource struct {
 }
 
 type DetailedConfig struct {
-	RealConfig    *agent_config.VTapGroupConfigurationResponse `json:"REAL_CONFIG"`
-	DefaultConfig *agent_config.VTapGroupConfigurationResponse `json:"DEFAULT_CONFIG"`
+	RealConfig    *agent_config.AgentGroupConfigResponse `json:"REAL_CONFIG"`
+	DefaultConfig *agent_config.AgentGroupConfigResponse `json:"DEFAULT_CONFIG"`
 }
 
 type VTapInterface struct {
