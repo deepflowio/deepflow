@@ -18,7 +18,7 @@ TRUNCATE TABLE plugin;
 
 CREATE TABLE IF NOT EXISTS vtap_repo (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                VCHAR(512),
+    name                VARCHAR(512),
     arch                VARCHAR(256) DEFAULT '',
     os                  VARCHAR(256) DEFAULT '',
     branch              VARCHAR(256) DEFAULT '',
