@@ -33,7 +33,7 @@ use crate::{
         protocol_logs::{
             decode_base64_to_string,
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            AppProtoHead, LogMessageType,
+            set_captured_byte, AppProtoHead, LogMessageType,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be, read_u64_be},
@@ -285,6 +285,9 @@ pub struct AmqpInfo {
     trace_id: Option<String>,
     #[serde(rename = "span_id", skip_serializing_if = "Option::is_none")]
     span_id: Option<String>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 
     req_len: Option<u32>,
     resp_len: Option<u32>,
@@ -707,6 +710,8 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             info.queue.unwrap_or_default()
         };
         let log = L7ProtocolSendLog {
+            captured_request_byte: info.captured_request_byte,
+            captured_response_byte: info.captured_response_byte,
             version: Some(std::str::from_utf8(AMQPVERSION).unwrap().to_string()),
             flags,
             req_len: info.req_len,
@@ -759,6 +764,7 @@ impl L7ProtocolInfoInterface for AmqpInfo {
             if req.exchange.as_ref().map_or(0, |r| r.len()) == 0 {
                 req.exchange = rsp.exchange.clone();
             }
+            req.captured_response_byte = rsp.captured_response_byte;
         }
         Ok(())
     }
@@ -905,7 +911,7 @@ impl L7ProtocolParserInterface for AmqpLog {
                     });
                 }
                 info.is_tls = param.is_tls();
-
+                set_captured_byte!(info, param);
                 match info.msg_type {
                     LogMessageType::Request => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -986,7 +992,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -995,7 +1001,7 @@ mod tests {
                 true,
                 true,
             );
-
+            param.set_captured_byte(payload.len());
             if first_packet {
                 first_packet = false;
                 if !amqp.check_payload(payload, param) {

@@ -29,7 +29,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
-        protocol_logs::{L7ResponseStatus, LogMessageType},
+        protocol_logs::{set_captured_byte, L7ResponseStatus, LogMessageType},
         Error, Result,
     },
     plugin::{
@@ -171,7 +171,7 @@ impl L7ProtocolParserInterface for SoLog {
                             Ok(mut info) => {
                                 info.proto_str = self.proto_str.clone();
                                 info.proto = self.proto_num.unwrap();
-
+                                set_captured_byte!(info, param);
                                 match info.msg_type {
                                     LogMessageType::Request => {
                                         self.perf_stats.as_mut().map(|p| p.inc_req());

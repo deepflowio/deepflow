@@ -74,6 +74,7 @@ fn get_req_param<'a>(
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
+        captured_byte: 999,
         oracle_parse_conf: OracleParseConfig::default(),
     }
 }
@@ -110,6 +111,7 @@ fn get_resq_param<'a>(
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
+        captured_byte: 999,
         oracle_parse_conf: OracleParseConfig::default(),
     }
 }

@@ -32,7 +32,7 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            L7ResponseStatus,
+            set_captured_byte, L7ResponseStatus,
         },
         AppProtoHead, Error, HttpLog, LogMessageType, Result,
     },
@@ -181,6 +181,8 @@ pub struct SofaRpcInfo {
 
     req_len: u32,
     resp_len: u32,
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 
     resp_code: u16,
     status: L7ResponseStatus,
@@ -211,6 +213,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
             self.resp_len = s.resp_len;
             self.resp_code = s.resp_code;
             self.status = s.status;
+            self.captured_response_byte = s.captured_response_byte;
         }
         Ok(())
     }
@@ -244,6 +247,8 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         Self {
+            captured_request_byte: s.captured_request_byte,
+            captured_response_byte: s.captured_response_byte,
             req_len: Some(s.req_len),
             resp_len: Some(s.resp_len),
             req: L7Request {
@@ -302,6 +307,7 @@ impl L7ProtocolParserInterface for SofaRpcLog {
                 }
                 self.cal_perf(param, &mut info);
                 info.is_tls = param.is_tls();
+                set_captured_byte!(info, param);
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
                 } else {
@@ -674,6 +680,7 @@ mod test {
             true,
         );
         let req_payload = p[0].get_l4_payload().unwrap();
+        req_param.set_captured_byte(req_payload.len());
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
             .parse_payload(req_payload, req_param)
@@ -691,6 +698,7 @@ mod test {
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.req_len, 874);
             assert_eq!(k.target_serv, "com.mycompany.app.common.ServInterface:1.0");
+            assert_eq!(k.captured_request_byte, req_payload.len() as u32);
         } else {
             unreachable!()
         }
@@ -706,7 +714,9 @@ mod test {
             true,
             true,
         );
+
         let resp_payload = p[1].get_l4_payload().unwrap();
+        resp_param.set_captured_byte(resp_payload.len());
 
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
@@ -720,6 +730,7 @@ mod test {
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.resp_code, 0);
             assert_eq!(k.resp_len, 210);
+            assert_eq!(k.captured_response_byte, resp_payload.len() as u32);
         } else {
             unreachable!()
         }
@@ -760,6 +771,7 @@ mod test {
             true,
         );
         let req_payload = p[0].get_l4_payload().unwrap();
+        req_param.set_captured_byte(req_payload.len());
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
             .parse_payload(req_payload, req_param)
@@ -777,6 +789,7 @@ mod test {
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.req_len, 730);
             assert_eq!(k.target_serv, "com.mycompany.app.common.ServInterface:1.0");
+            assert_eq!(k.captured_request_byte, req_payload.len() as u32);
         } else {
             unreachable!()
         }
@@ -793,6 +806,7 @@ mod test {
             true,
         );
         let resp_payload = p[1].get_l4_payload().unwrap();
+        resp_param.set_captured_byte(resp_payload.len());
 
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
@@ -806,6 +820,7 @@ mod test {
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.resp_code, 0);
             assert_eq!(k.resp_len, 210);
+            assert_eq!(k.captured_response_byte, resp_payload.len() as u32);
         } else {
             unreachable!()
         }

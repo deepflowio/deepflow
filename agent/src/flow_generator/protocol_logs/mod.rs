@@ -491,6 +491,28 @@ macro_rules! swap_if {
     };
 }
 
+macro_rules! set_captured_byte {
+    ($this:expr, $param:expr) => {
+        match $this.msg_type {
+            LogMessageType::Request => $this.captured_request_byte = $param.captured_byte as u32,
+            LogMessageType::Response => $this.captured_response_byte = $param.captured_byte as u32,
+            LogMessageType::Session => {
+                match LogMessageType::from($param.direction) {
+                    LogMessageType::Request => {
+                        $this.captured_request_byte = $param.captured_byte as u32
+                    }
+                    LogMessageType::Response => {
+                        $this.captured_response_byte = $param.captured_byte as u32
+                    }
+                    _ => unimplemented!(),
+                };
+            }
+            _ => unimplemented!(),
+        }
+    };
+}
+
+pub(crate) use set_captured_byte;
 pub(crate) use swap_if;
 
 #[cfg(test)]

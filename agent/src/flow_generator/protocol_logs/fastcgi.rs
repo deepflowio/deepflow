@@ -24,7 +24,7 @@ use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam};
 use crate::common::meta_packet::EbpfFlags;
 use crate::config::handler::L7LogDynamicConfig;
-use crate::flow_generator::protocol_logs::value_is_default;
+use crate::flow_generator::protocol_logs::{set_captured_byte, value_is_default};
 use crate::flow_generator::{Error, Result};
 use crate::HttpLog;
 
@@ -90,6 +90,9 @@ pub struct FastCGIInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub x_request_id_1: String,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     #[serde(skip)]
     rrt: u64,
 
@@ -109,6 +112,7 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
         if let L7ProtocolInfo::FastCGIInfo(info) = other {
             self.status = info.status;
             self.status_code = info.status_code;
+            self.captured_response_byte = info.captured_response_byte;
             super::swap_if!(self, trace_id, is_empty, info);
             super::swap_if!(self, span_id, is_empty, info);
         }
@@ -252,6 +256,8 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         Self {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req: L7Request {
                 req_type: f.method,
                 domain: f.host,
@@ -502,6 +508,7 @@ impl L7ProtocolParserInterface for FastCGILog {
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
         info.is_tls = param.is_tls();
+        set_captured_byte!(info, param);
         Ok(L7ParseResult::Single(L7ProtocolInfo::FastCGIInfo(info)))
     }
 
@@ -621,6 +628,8 @@ mod test {
             status_code: Some(200),
             status: L7ResponseStatus::Ok,
             seq_off: 16,
+            captured_request_byte: 576,
+            captured_response_byte: 88,
             ..Default::default()
         };
 
@@ -661,13 +670,14 @@ mod test {
             true,
         );
         let req_payload = p[0].get_l4_payload().unwrap();
+        req_param.set_captured_byte(req_payload.len());
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
 
         (&mut parser).reset();
 
-        let resp_param = &ParseParam::new(
+        let resp_param = &mut ParseParam::new(
             &p[1],
             log_cache.clone(),
             Default::default(),
@@ -677,6 +687,7 @@ mod test {
             true,
         );
         let resp_payload = p[1].get_l4_payload().unwrap();
+        resp_param.set_captured_byte(resp_payload.len());
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)

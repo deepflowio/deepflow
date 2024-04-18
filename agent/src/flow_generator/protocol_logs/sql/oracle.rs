@@ -17,7 +17,7 @@
 use serde::Serialize;
 
 use super::super::{value_is_default, LogMessageType};
-use crate::flow_generator::protocol_logs::L7ResponseStatus;
+use crate::flow_generator::protocol_logs::{set_captured_byte, L7ResponseStatus};
 use crate::flow_generator::Error;
 use crate::{
     common::{
@@ -58,6 +58,9 @@ pub struct OracleInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     pub rrt: u64,
 }
 impl OracleInfo {
@@ -66,6 +69,7 @@ impl OracleInfo {
         self.ret_code = other.ret_code;
         std::mem::swap(&mut self.error_message, &mut other.error_message);
         self.status = other.status;
+        self.captured_response_byte = other.captured_response_byte;
     }
 
     fn get_req_type(&self) -> String {
@@ -119,6 +123,8 @@ impl L7ProtocolInfoInterface for OracleInfo {
 impl From<OracleInfo> for L7ProtocolSendLog {
     fn from(f: OracleInfo) -> Self {
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             row_effect: f.affected_rows.unwrap_or_default(),
             req: L7Request {
                 req_type: f.get_req_type(),
@@ -193,7 +199,10 @@ impl L7ProtocolParserInterface for OracleLog {
                 _ => L7ResponseStatus::ClientError,
             },
             rrt: 0,
+            captured_request_byte: 0,
+            captured_response_byte: 0,
         };
+        set_captured_byte!(log_info, param);
         match log_info.status {
             L7ResponseStatus::ServerError => {
                 self.perf_stats.as_mut().map(|p| p.inc_resp_err());
