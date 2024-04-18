@@ -74,6 +74,10 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 	return &DB{db, orgID, copiedCfg.Database}, nil
 }
 
+func (d *DB) PreORGID(format string, a ...any) string { // TODO optimize
+	return fmt.Sprintf("[OID-%d] %s", d.ORGID, fmt.Sprintf(format, a...))
+}
+
 type DBs struct {
 	cfg config.MySqlConfig
 
@@ -128,6 +132,16 @@ func (c *DBs) NewDBIfNotExists(orgID int) (*DB, error) {
 
 	c.set(orgID, db)
 	return db, nil
+}
+
+func (c *DBs) All() []*DB {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	var dbs []*DB
+	for _, db := range c.orgIDToDB {
+		dbs = append(dbs, db)
+	}
+	return dbs
 }
 
 func (c *DBs) Delete(orgID int) {

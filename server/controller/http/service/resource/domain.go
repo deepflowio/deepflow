@@ -55,7 +55,7 @@ var DOMAIN_PASSWORD_KEYS = map[string]bool{
 	"token":               false,
 }
 
-func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (string, string) {
+func getGrpcServerAndPort(db *mysql.DB, controllerIP string, cfg *config.ControllerConfig) (string, string) {
 	// get local controller ip
 	localControllerIP := os.Getenv(common.NODE_IP_KEY)
 	if localControllerIP == "" {
@@ -66,13 +66,13 @@ func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (st
 	// get controller region
 	var localAZConn mysql.AZControllerConnection
 	var localRegion string
-	if ret := mysql.Db.Where("controller_ip = ?", localControllerIP).First(&localAZConn); ret.Error == nil {
+	if ret := db.Where("controller_ip = ?", localControllerIP).First(&localAZConn); ret.Error == nil {
 		localRegion = localAZConn.Region
 	}
 
 	var azConn mysql.AZControllerConnection
 	var region string
-	if ret := mysql.Db.Where("controller_ip = ?", controllerIP).First(&azConn); ret.Error == nil {
+	if ret := db.Where("controller_ip = ?", controllerIP).First(&azConn); ret.Error == nil {
 		region = azConn.Region
 	}
 
@@ -300,7 +300,7 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 	// encrypt password/access_key
 	for key := range DOMAIN_PASSWORD_KEYS {
 		if _, ok := domainCreate.Config[key]; ok && cfg != nil {
-			serverIP, grpcServerPort := getGrpcServerAndPort(domain.ControllerIP, cfg)
+			serverIP, grpcServerPort := getGrpcServerAndPort(db, domain.ControllerIP, cfg)
 			encryptKey, err := common.GetEncryptKey(
 				serverIP, grpcServerPort, domainCreate.Config[key].(string),
 			)
@@ -364,7 +364,7 @@ func createKubernetesRelatedResources(db *mysql.DB, domain mysql.Domain, regionL
 	vpc.Domain = domain.Lcuuid
 	vpc.Region = regionLcuuid
 	vpc.CreateMethod = common.CREATE_METHOD_LEARN
-	err = mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&vpc).Error
+	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&vpc).Error
 	if err != nil {
 		log.Errorf("create vpc failed: %s", err)
 	}
@@ -430,7 +430,7 @@ func UpdateDomain(
 		if region, ok := configUpdate["region_uuid"]; ok {
 			if region != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name)
-				cleanSoftDeletedResource(lcuuid)
+				cleanSoftDeletedResource(db, lcuuid)
 			}
 		}
 
@@ -440,7 +440,7 @@ func UpdateDomain(
 				if configUpdate[key] == common.DEFAULT_ENCRYPTION_PASSWORD {
 					configUpdate[key] = config[key]
 				} else {
-					serverIP, grpcServerPort := getGrpcServerAndPort(domain.ControllerIP, cfg)
+					serverIP, grpcServerPort := getGrpcServerAndPort(db, domain.ControllerIP, cfg)
 					// encrypt password/access_key
 					encryptKey, err := common.GetEncryptKey(
 						serverIP, grpcServerPort, configUpdate[key].(string),
@@ -468,32 +468,32 @@ func UpdateDomain(
 	return &response[0], nil
 }
 
-func cleanSoftDeletedResource(lcuuid string) {
+func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	condition := "domain = ? AND deleted_at IS NOT NULL"
 	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid)
-	forceDelete[mysql.CEN](condition, lcuuid)
-	forceDelete[mysql.PeerConnection](condition, lcuuid)
-	forceDelete[mysql.RedisInstance](condition, lcuuid)
-	forceDelete[mysql.RDSInstance](condition, lcuuid)
-	forceDelete[mysql.LBListener](condition, lcuuid)
-	forceDelete[mysql.LB](condition, lcuuid)
-	forceDelete[mysql.NATGateway](condition, lcuuid)
-	forceDelete[mysql.SecurityGroup](condition, lcuuid)
-	forceDelete[mysql.DHCPPort](condition, lcuuid)
-	forceDelete[mysql.VRouter](condition, lcuuid)
-	forceDelete[mysql.Pod](condition, lcuuid)
-	forceDelete[mysql.PodReplicaSet](condition, lcuuid)
-	forceDelete[mysql.PodGroup](condition, lcuuid)
-	forceDelete[mysql.PodService](condition, lcuuid)
-	forceDelete[mysql.PodIngress](condition, lcuuid)
-	forceDelete[mysql.PodNamespace](condition, lcuuid)
-	forceDelete[mysql.PodNode](condition, lcuuid)
-	forceDelete[mysql.PodCluster](condition, lcuuid)
-	forceDelete[mysql.VM](condition, lcuuid)
-	forceDelete[mysql.Host](condition, lcuuid)
-	forceDelete[mysql.Network](condition, lcuuid)
-	forceDelete[mysql.VPC](condition, lcuuid)
-	forceDelete[mysql.AZ](condition, lcuuid)
+	forceDelete[mysql.CEN](db, condition, lcuuid)
+	forceDelete[mysql.PeerConnection](db, condition, lcuuid)
+	forceDelete[mysql.RedisInstance](db, condition, lcuuid)
+	forceDelete[mysql.RDSInstance](db, condition, lcuuid)
+	forceDelete[mysql.LBListener](db, condition, lcuuid)
+	forceDelete[mysql.LB](db, condition, lcuuid)
+	forceDelete[mysql.NATGateway](db, condition, lcuuid)
+	forceDelete[mysql.SecurityGroup](db, condition, lcuuid)
+	forceDelete[mysql.DHCPPort](db, condition, lcuuid)
+	forceDelete[mysql.VRouter](db, condition, lcuuid)
+	forceDelete[mysql.Pod](db, condition, lcuuid)
+	forceDelete[mysql.PodReplicaSet](db, condition, lcuuid)
+	forceDelete[mysql.PodGroup](db, condition, lcuuid)
+	forceDelete[mysql.PodService](db, condition, lcuuid)
+	forceDelete[mysql.PodIngress](db, condition, lcuuid)
+	forceDelete[mysql.PodNamespace](db, condition, lcuuid)
+	forceDelete[mysql.PodNode](db, condition, lcuuid)
+	forceDelete[mysql.PodCluster](db, condition, lcuuid)
+	forceDelete[mysql.VM](db, condition, lcuuid)
+	forceDelete[mysql.Host](db, condition, lcuuid)
+	forceDelete[mysql.Network](db, condition, lcuuid)
+	forceDelete[mysql.VPC](db, condition, lcuuid)
+	forceDelete[mysql.AZ](db, condition, lcuuid)
 	log.Info("clean soft deleted resources completed")
 }
 
@@ -876,10 +876,10 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB) (map[string]string, error) {
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func forceDelete[MT constraint.MySQLSoftDeleteModel](query interface{}, args ...interface{}) { // TODO common func
-	err := mysql.Db.Unscoped().Where(query, args...).Delete(new(MT)).Error
+func forceDelete[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, query interface{}, args ...interface{}) { // TODO common func
+	err := db.Unscoped().Where(query, args...).Delete(new(MT)).Error
 	if err != nil {
-		log.Errorf("mysql delete resource: %v %v failed: %s", query, args, err)
+		log.Error(db.PreORGID("mysql delete resource: %v %v failed: %s", query, args, err))
 	}
 }
 
@@ -894,8 +894,8 @@ func NewDomainCheck(ctx context.Context) *DomainChecker {
 }
 
 func (c *DomainChecker) Start() {
-	log.Info("domain check startted")
-	c.TimedCheck()
+	log.Info("domain check started")
+	c.CheckRegularly()
 }
 
 func (c *DomainChecker) Stop() {
@@ -905,25 +905,26 @@ func (c *DomainChecker) Stop() {
 	log.Info("domain check stopped")
 }
 
-func (c *DomainChecker) TimedCheck() {
-	c.checkAndAllocateController()
+func (c *DomainChecker) CheckRegularly() {
 	go func() {
 		for range time.Tick(time.Duration(5) * time.Minute) {
-			c.checkAndAllocateController()
+			for _, db := range mysql.GetDBs().All() {
+				c.checkAndAllocateController(db)
+			}
 		}
 	}()
 }
 
-func (c *DomainChecker) checkAndAllocateController() {
-	log.Infof("check domain controller health started")
+func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
+	log.Info(db.PreORGID("check domain controller health started"))
 	controllerIPToRegionLcuuid := make(map[string]string)
 	var azCConns []*mysql.AZControllerConnection
-	mysql.Db.Find(&azCConns)
+	db.Find(&azCConns)
 	for _, c := range azCConns {
 		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
 	}
 	var controllers []*mysql.Controller
-	mysql.Db.Find(&controllers)
+	db.Find(&controllers)
 	regionLcuuidToHealthyControllerIPs := make(map[string][]string)
 	for _, c := range controllers {
 		if c.State == common.CONTROLLER_STATE_NORMAL {
@@ -935,7 +936,7 @@ func (c *DomainChecker) checkAndAllocateController() {
 	log.Debug(regionLcuuidToHealthyControllerIPs)
 
 	var domains []*mysql.Domain
-	mysql.Db.Find(&domains)
+	db.Find(&domains)
 	for _, domain := range domains {
 		config := make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &config)
@@ -951,9 +952,10 @@ func (c *DomainChecker) checkAndAllocateController() {
 				config["controller_ip"] = ip
 				configStr, _ := json.Marshal(config)
 				domain.Config = string(configStr)
-				mysql.Db.Save(&domain)
-				log.Infof("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP)
+				db.Save(&domain)
+				log.Info(db.PreORGID("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP))
 			}
 		}
 	}
+	log.Info(db.PreORGID("check domain controller health ended"))
 }
