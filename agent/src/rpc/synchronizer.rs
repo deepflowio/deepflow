@@ -588,6 +588,7 @@ impl Synchronizer {
             process_name: Some(static_config.version_info.name.to_owned()),
             ctrl_mac: Some(agent_id.mac.to_string()),
             ctrl_ip: Some(agent_id.ip.to_string()),
+            team_id: Some(agent_id.team_id.clone()),
             tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
             host_ips: {
@@ -620,7 +621,6 @@ impl Synchronizer {
             agent_unique_identifier: Some(tp::AgentIdentifier::from(
                 static_config.agent_unique_identifier,
             ) as i32),
-
             ..Default::default()
         }
     }

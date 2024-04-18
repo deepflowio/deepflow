@@ -179,9 +179,9 @@ impl SocketSynchronizer {
                     continue;
                 }
 
-                let (ctrl_ip, ctrl_mac) = {
+                let (ctrl_ip, ctrl_mac, team_id) = {
                     let id = agent_id.read();
-                    (id.ip.to_string(), id.mac.to_string())
+                    (id.ip.to_string(), id.mac.to_string(), id.team_id.clone())
                 };
                 let mut policy_getter = policy_getter.lock().unwrap();
 
@@ -228,6 +228,7 @@ impl SocketSynchronizer {
                     session.gpid_sync(GpidSyncRequest {
                         ctrl_ip: Some(ctrl_ip),
                         ctrl_mac: Some(ctrl_mac),
+                        team_id: Some(team_id),
                         vtap_id: Some(conf_guard.vtap_id as u32),
                         entries: sock_entries
                             .into_iter()
