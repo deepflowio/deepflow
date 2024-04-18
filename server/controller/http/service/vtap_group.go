@@ -23,6 +23,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
+	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -283,7 +284,7 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 
 	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 	mysql.Db.Delete(&vtapGroup)
-	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&mysql.VTapGroupConfiguration{})
+	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.VTapGroupConfigurationModel{})
 	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
