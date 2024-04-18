@@ -34,6 +34,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
@@ -391,7 +392,7 @@ func (v *VTapInfo) loadPlugins() {
 }
 
 func (v *VTapInfo) loadConfigData() {
-	deafaultConfiguration := &models.RVTapGroupConfiguration{}
+	deafaultConfiguration := &agent_config.RVTapGroupConfigurationModel{}
 	b, err := json.Marshal(DefaultVTapGroupConfig)
 	if err == nil {
 		err = json.Unmarshal(b, deafaultConfiguration)
@@ -483,7 +484,7 @@ func DefaultFieldNone(filed string) bool {
 	return false
 }
 
-func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
+func (v *VTapInfo) convertConfig(configs []*agent_config.VTapGroupConfigurationModel) {
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
@@ -503,7 +504,7 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 		} else {
 			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = ""
 		}
-		tapConfiguration := &models.VTapGroupConfiguration{}
+		tapConfiguration := &agent_config.VTapGroupConfigurationModel{}
 		typeOfVTapConfiguration := reflect.ValueOf(tapConfiguration).Elem()
 		tt := reflect.TypeOf(config).Elem()
 		tv := reflect.ValueOf(config).Elem()
@@ -522,7 +523,7 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 			}
 		}
 		// 转换结构体类型
-		rtapConfiguration := &models.RVTapGroupConfiguration{}
+		rtapConfiguration := &agent_config.RVTapGroupConfigurationModel{}
 		b, err := json.Marshal(tapConfiguration)
 		if err == nil {
 			err = json.Unmarshal(b, rtapConfiguration)

@@ -40,7 +40,7 @@ import (
 )
 
 type VTapConfig struct {
-	models.RVTapGroupConfiguration
+	agent_config.RVTapGroupConfigurationModel
 	ConvertedL4LogTapTypes       []uint32
 	ConvertedL4LogIgnoreTapSides []uint32
 	ConvertedL7LogIgnoreTapSides []uint32
@@ -124,9 +124,9 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *models.RVTapGroupConfiguration) *VTapConfig {
+func NewVTapConfig(config *agent_config.RVTapGroupConfigurationModel) *VTapConfig {
 	vTapConfig := &VTapConfig{}
-	vTapConfig.RVTapGroupConfiguration = *config
+	vTapConfig.RVTapGroupConfigurationModel = *config
 	vTapConfig.convertData()
 	return vTapConfig
 }

@@ -19,6 +19,7 @@ package metadata
 import (
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -39,7 +40,7 @@ type DBDataCache struct {
 	azs                     []*models.AZ
 	hostDevices             []*models.Host
 	podNodes                []*models.PodNode
-	vtapGroupConfigurations []*models.VTapGroupConfiguration
+	vtapGroupConfigurations []*agent_config.VTapGroupConfigurationModel
 	domains                 []*models.Domain
 	subDomains              []*models.SubDomain
 	chVTapPorts             []*models.ChVTapPort
@@ -169,8 +170,8 @@ func (d *DBDataCache) GetVipDomains() []*models.Domain {
 	return d.vipDomains
 }
 
-func (d *DBDataCache) GetVTapGroupConfigurationsFromDB(db *gorm.DB) []*models.VTapGroupConfiguration {
-	vtapGroupConfigurations, err := dbmgr.DBMgr[models.VTapGroupConfiguration](db).Gets()
+func (d *DBDataCache) GetVTapGroupConfigurationsFromDB(db *gorm.DB) []*agent_config.VTapGroupConfigurationModel {
+	vtapGroupConfigurations, err := dbmgr.DBMgr[agent_config.VTapGroupConfigurationModel](db).Gets()
 	if err != nil {
 		log.Error(d.Log(err.Error()))
 	}
@@ -378,7 +379,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	vtapGroupConfigurations, err := dbmgr.DBMgr[models.VTapGroupConfiguration](db).Gets()
+	vtapGroupConfigurations, err := dbmgr.DBMgr[agent_config.VTapGroupConfigurationModel](db).Gets()
 	if err == nil {
 		d.vtapGroupConfigurations = vtapGroupConfigurations
 	} else {

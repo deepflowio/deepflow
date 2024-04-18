@@ -41,7 +41,7 @@ func Test_copyStruct(t *testing.T) {
 			name: "ignore name test",
 			args: args{
 				ignoreName: ignoreName,
-				from:       &mysql.VTapGroupConfiguration{},
+				from:       &agent_config.VTapGroupConfigurationModel{},
 				to:         &model.VTapGroupConfigurationResponse{},
 			},
 			assertFunc: func(t *testing.T, data *model.VTapGroupConfigurationResponse) {
