@@ -21,7 +21,7 @@ import _ "embed"
 //go:embed example.yaml
 var YamlAgentGroupConfig []byte
 
-type VTapGroupConfiguration struct {
+type AgentGroupConfig struct {
 	VTapGroupID                       *string       `json:"VTAP_GROUP_ID" yaml:"vtap_group_id,omitempty"`
 	VTapGroupLcuuid                   *string       `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
 	MaxCollectPps                     *int          `json:"MAX_COLLECT_PPS" yaml:"max_collect_pps,omitempty"`

@@ -284,7 +284,7 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 
 	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 	mysql.Db.Delete(&vtapGroup)
-	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.VTapGroupConfigurationModel{})
+	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.AgentGroupConfigModel{})
 	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

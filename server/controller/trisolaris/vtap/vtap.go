@@ -392,7 +392,7 @@ func (v *VTapInfo) loadPlugins() {
 }
 
 func (v *VTapInfo) loadConfigData() {
-	deafaultConfiguration := &agent_config.RVTapGroupConfigurationModel{}
+	deafaultConfiguration := &agent_config.RAgentGroupConfigModel{}
 	b, err := json.Marshal(DefaultVTapGroupConfig)
 	if err == nil {
 		err = json.Unmarshal(b, deafaultConfiguration)
@@ -405,7 +405,7 @@ func (v *VTapInfo) loadConfigData() {
 
 	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration)
 	dbDataCache := v.metaData.GetDBDataCache()
-	configs := dbDataCache.GetVTapGroupConfigurationsFromDB(v.db)
+	configs := dbDataCache.GetAgentGroupConfigsFromDB(v.db)
 	v.convertConfig(configs)
 	v.loadPlugins()
 }
@@ -484,7 +484,7 @@ func DefaultFieldNone(filed string) bool {
 	return false
 }
 
-func (v *VTapInfo) convertConfig(configs []*agent_config.VTapGroupConfigurationModel) {
+func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) {
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
@@ -504,7 +504,7 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.VTapGroupConfigurationM
 		} else {
 			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = ""
 		}
-		tapConfiguration := &agent_config.VTapGroupConfigurationModel{}
+		tapConfiguration := &agent_config.AgentGroupConfigModel{}
 		typeOfVTapConfiguration := reflect.ValueOf(tapConfiguration).Elem()
 		tt := reflect.TypeOf(config).Elem()
 		tv := reflect.ValueOf(config).Elem()
@@ -523,7 +523,7 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.VTapGroupConfigurationM
 			}
 		}
 		// 转换结构体类型
-		rtapConfiguration := &agent_config.RVTapGroupConfigurationModel{}
+		rtapConfiguration := &agent_config.RAgentGroupConfigModel{}
 		b, err := json.Marshal(tapConfiguration)
 		if err == nil {
 			err = json.Unmarshal(b, rtapConfiguration)

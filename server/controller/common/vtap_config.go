@@ -20,7 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/agent_config"
 )
 
-var DefaultVTapGroupConfig = &agent_config.VTapGroupConfigurationModel{
+var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
 	MaxCollectPps:                 &DefaultMaxCollectPps,
 	MaxNpbBps:                     &DefaultMaxNpbBps,
 	MaxCPUs:                       &DefaultMaxCPUs,
