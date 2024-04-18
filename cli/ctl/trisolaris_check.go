@@ -45,6 +45,7 @@ type ParamData struct {
 	CtrlMac    string
 	GroupID    string
 	ClusterID  string
+	TeamID     string
 	RpcIP      string
 	RpcPort    string
 	Type       string
@@ -215,6 +216,7 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "agent ctrl ip")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "agent ctrl mac")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "agent group ID")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.TeamID, "tid", "", "", "agent team ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "agent k8s cluster ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
@@ -247,12 +249,13 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		return
 	}
 	defer conn.Close()
-	var name, groupID, clusterID string
+	var name, groupID, clusterID, teamID string
 	switch paramData.Type {
 	case "trident":
 		name = paramData.Type
 		groupID = paramData.GroupID
 		clusterID = paramData.ClusterID
+		teamID = paramData.TeamID
 	case "analyzer":
 		name = paramData.Type
 	default:
@@ -267,6 +270,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		VtapGroupIdRequest:  &groupID,
 		KubernetesClusterId: &clusterID,
 		ProcessName:         &name,
+		TeamId:              &teamID,
 	}
 	var response *trident.SyncResponse
 	var err error

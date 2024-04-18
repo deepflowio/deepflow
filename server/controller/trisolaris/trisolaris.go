@@ -288,21 +288,34 @@ func (m *TrisolarisManager) Start() error {
 		trisolaris.Start()
 		m.orgToTrisolaris[orgID] = trisolaris
 	}
-	teams, err := dbmgr.DBMgr[mysql.Team](m.defaultDB).Gets()
-	if err != nil {
-		log.Errorf("get team failed, err(%s)", err)
-	}
 
-	teamIDToOrgID := make(map[string]int)
-	teamIDStrToInt := make(map[string]int)
-	for _, team := range teams {
-		teamIDToOrgID[team.ShortLcuuid] = team.OrgLoopID
-		teamIDStrToInt[team.ShortLcuuid] = team.LoopID
-	}
-	m.teamIDToOrgID = teamIDToOrgID
-	m.teamIDStrToInt = teamIDStrToInt
+	m.getTeamData(orgIDs)
 	log.Infof("finish orgdata init %v", orgIDs)
 	return nil
+}
+
+func (m *TrisolarisManager) getTeamData(orgIDs []int) {
+	teamIDToOrgID := make(map[string]int)
+	teamIDStrToInt := make(map[string]int)
+	for _, orgID := range orgIDs {
+		db, err := mysql.GetDB(orgID)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		teams, err := dbmgr.DBMgr[mysql.Team](db.DB).Gets()
+		if err != nil {
+			log.Errorf("get org(id=%d) team failed, err(%s)", orgID, err)
+			continue
+		}
+		for _, team := range teams {
+			teamIDToOrgID[team.ShortLcuuid] = team.OrgLoopID
+			teamIDStrToInt[team.ShortLcuuid] = team.LoopID
+		}
+	}
+
+	m.teamIDToOrgID = teamIDToOrgID
+	m.teamIDStrToInt = teamIDStrToInt
 }
 
 func (m *TrisolarisManager) TeamIDLcuuidToInt(teamID string) int {
@@ -389,21 +402,7 @@ func (m *TrisolarisManager) checkORG() {
 			}
 		}
 	}
-
-	teams, err := dbmgr.DBMgr[mysql.Team](m.defaultDB).Gets()
-	if err != nil {
-		log.Errorf("get team failed, err(%s)", err)
-		return
-	}
-
-	teamIDToOrgID := make(map[string]int)
-	teamIDStrToInt := make(map[string]int)
-	for _, team := range teams {
-		teamIDToOrgID[team.ShortLcuuid] = team.OrgLoopID
-		teamIDStrToInt[team.ShortLcuuid] = team.LoopID
-	}
-	m.teamIDToOrgID = teamIDToOrgID
-	m.teamIDStrToInt = teamIDStrToInt
+	m.getTeamData(orgIDs)
 }
 
 func (m *TrisolarisManager) TimedCheckORG() {
