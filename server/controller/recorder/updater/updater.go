@@ -115,7 +115,10 @@ func newUpdaterBase[
 		diffBaseData: diffBaseData,
 		cloudData:    cloudData,
 	}
+	log.Infof("metadata: %#v", u.metadata)
+	log.Infof("metadata domain: %#v", u.metadata.Domain)
 	u.msgMetadata = message.NewMetadata(u.metadata.ORGID, u.metadata.Domain.TeamID, u.metadata.Domain.ID)
+	log.Infof("msgMetadata: %#v", u.msgMetadata)
 	u.initPubSub()
 	return u
 }

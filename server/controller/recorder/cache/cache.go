@@ -44,6 +44,8 @@ type CacheManager struct {
 }
 
 func NewCacheManager(ctx context.Context, cfg config.RecorderConfig, md *rcommon.Metadata) *CacheManager {
+	log.Infof("metadata: %#v", md)
+	log.Infof("metadata domain: %#v", md.Domain)
 	mng := &CacheManager{
 		ctx: ctx,
 
@@ -90,6 +92,7 @@ type Cache struct {
 }
 
 func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.Duration) *Cache {
+	log.Infof("metadata domain: %#v", md.Domain)
 	c := &Cache{
 		ctx: ctx,
 

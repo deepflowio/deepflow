@@ -51,6 +51,7 @@ type domain struct {
 }
 
 func newDomain(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, md *rcommon.Metadata) *domain {
+	log.Infof("metadata domain: %#v", md.Domain)
 	cacheMng := cache.NewCacheManager(ctx, cfg, md)
 	return &domain{
 		metadata: md,

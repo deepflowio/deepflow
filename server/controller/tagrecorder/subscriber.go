@@ -214,6 +214,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
+	log.Infof("metadata: %#v", md)
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
@@ -225,6 +226,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *me
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
+	log.Infof("metadata: %#v", md)
 	updateFields := msg.(MUPT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
@@ -235,6 +237,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
+	log.Infof("metadata: %#v", md)
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {

@@ -110,6 +110,7 @@ type ResourcePubSubComponent[
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishChange(md *message.Metadata) {
+	log.Infof("metadata: %#v", md)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceChanged {
 			for _, sub := range subs {
@@ -120,6 +121,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
+	log.Infof("metadata: %#v", md)
 	// TODO better log
 	// log.Infof("publish add %#v", msg)
 	for topic, subs := range p.subscribers {
@@ -132,6 +134,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishUpdated(md *message.Metadata, msg MUPT) {
+	log.Infof("metadata: %#v", md)
 	// log.Infof("publish update %#v", msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceUpdatedFields {
@@ -148,6 +151,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT, softDelete bool) {
+	log.Infof("metadata: %#v", md)
 	// log.Infof("publish delete %#v", msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchDeletedLcuuid {
