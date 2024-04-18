@@ -88,6 +88,8 @@ pub struct L7ProtocolSendLog {
     pub trace_info: Option<TraceInfo>,
     pub ext_info: Option<ExtendedInfo>,
     pub flags: u32,
+    pub captured_request_byte: u32,
+    pub captured_response_byte: u32,
 }
 
 impl L7ProtocolSendLog {
@@ -105,9 +107,21 @@ impl L7ProtocolSendLog {
         } else {
             -1
         };
+        let captured_request_byte = if self.captured_request_byte > 0 {
+            self.captured_request_byte as i32
+        } else {
+            -1
+        };
+        let captured_response_byte = if self.captured_response_byte > 0 {
+            self.captured_response_byte as i32
+        } else {
+            -1
+        };
 
         log.req_len = req_len;
         log.resp_len = resp_len;
+        log.captured_request_byte = captured_request_byte;
+        log.captured_response_byte = captured_response_byte;
         log.row_effect = self.row_effect;
 
         log.req = Some(flow_log::L7Request {

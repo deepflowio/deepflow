@@ -73,6 +73,8 @@ pub struct CustomInfo {
 
     pub req_len: Option<u32>,
     pub resp_len: Option<u32>,
+    pub captured_request_byte: u32,
+    pub captured_response_byte: u32,
 
     pub request_id: Option<u32>,
 
@@ -411,6 +413,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
             if w.is_req_end {
                 self.is_req_end = true;
             }
+            self.captured_request_byte += w.captured_request_byte;
 
             // resp merge
             if self.resp.status == L7ResponseStatus::default() {
@@ -431,6 +434,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
             if w.is_resp_end {
                 self.is_resp_end = true;
             }
+            self.captured_response_byte += w.captured_response_byte;
 
             // trace merge
             swap_if!(self.trace, trace_id, is_none, w.trace);
@@ -475,6 +479,8 @@ impl From<CustomInfo> for L7ProtocolSendLog {
         Self {
             req_len: w.req_len,
             resp_len: w.resp_len,
+            captured_request_byte: w.captured_request_byte,
+            captured_response_byte: w.captured_response_byte,
 
             req: L7Request {
                 req_type: w.req.req_type,

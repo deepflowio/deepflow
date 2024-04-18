@@ -370,8 +370,15 @@ impl FirstPath {
             return true;
         };
         let memory_limit = self.memory_limit.load(Ordering::Relaxed);
+        if memory_limit == 0 {
+            return true;
+        }
+        if current >= memory_limit {
+            warn!("The current memory usage is greater than the memory threshold, Please reconfigure the memory threshold.");
+            return false;
+        }
 
-        memory_limit == 0 || current + size < memory_limit
+        current + size < memory_limit
     }
 
     fn generate_acl_bits(&mut self, acls: &mut Vec<Acl>) -> PResult<u64> {

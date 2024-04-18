@@ -16,7 +16,8 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
+            LogMessageType,
         },
     },
 };
@@ -1648,6 +1649,9 @@ pub struct OpenWireInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub correlation_id: Option<String>,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     rtt: u64,
 }
 
@@ -1677,6 +1681,8 @@ impl Default for OpenWireInfo {
             span_id: None,
             correlation_id: None,
             rtt: 0,
+            captured_request_byte: 0,
+            captured_response_byte: 0,
         }
     }
 }
@@ -1704,6 +1710,7 @@ impl OpenWireInfo {
             self.status = res.status;
             self.err_msg = res.err_msg.clone();
         }
+        self.captured_response_byte = res.captured_response_byte;
     }
 }
 
@@ -1750,6 +1757,8 @@ impl From<OpenWireInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.res_msg_size,
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             row_effect: 0,
             req: L7Request {
                 req_type: f.command_type.to_string(),
@@ -1861,6 +1870,7 @@ impl L7ProtocolParserInterface for OpenWireLog {
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                 });
             }
+            set_captured_byte!(info, param);
 
             match param.direction {
                 PacketDirection::ClientToServer => {
@@ -2249,6 +2259,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
                 "".to_owned(),
