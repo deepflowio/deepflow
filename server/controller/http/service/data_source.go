@@ -241,8 +241,8 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	for _, analyzer := range analyzers {
 		if ingesterErr := CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port); ingesterErr != nil {
 			errStr := fmt.Sprintf(
-				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
-				analyzer.Name, analyzer.IP, dataSource.DisplayName,
+				"failed to config analyzer (name:%s, ip:%s) add data_source(%s), error: %s",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
 			errStrs = append(errStrs, errStr)
 			continue
