@@ -304,6 +304,7 @@ impl<T> Sender<T> {
     }
 
     // This method clears the Vec on success, and leave it as it is on failure
+    // The length of msgs cannot exceed queue size, or it will return Error::BatchTooLarge
     pub fn send_all(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
         unsafe {
             match self.counter().queue.raw_send(msgs.as_ptr(), msgs.len()) {
@@ -316,22 +317,6 @@ impl<T> Sender<T> {
                 Err(Error::BatchTooLarge(_)) => Err(Error::BatchTooLarge(None)),
                 _ => unreachable!(),
             }
-        }
-    }
-
-    pub fn send_large(&self, mut msgs: Vec<T>) -> Result<(), Error<T>> {
-        const SEND_BATCH: usize = 1024;
-        unsafe {
-            for chunk in msgs.chunks(SEND_BATCH) {
-                match self.counter().queue.raw_send(chunk.as_ptr(), chunk.len()) {
-                    Ok(_) => continue,
-                    Err(Error::Terminated(..)) => return Err(Error::Terminated(None, Some(msgs))),
-                    _ => unreachable!(),
-                }
-            }
-            // drop the vector without dropping elements within
-            msgs.set_len(0);
-            Ok(())
         }
     }
 }
