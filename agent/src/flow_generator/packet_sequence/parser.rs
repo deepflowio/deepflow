@@ -73,9 +73,7 @@ impl PacketSequenceParser {
                             batch.reserve(blocks.len());
                             batch.extend(blocks.drain(..).map(|f| BoxedPacketSequenceBlock(f)));
                             if let Err(e) = output_queue.send_all(&mut batch) {
-                                warn!(
-                                    "packet sequence block to queue failed, because {:?}", e    
-                                );
+                                warn!("packet sequence block to queue failed, because {:?}", e);
                                 batch.clear();
                             }
                         }
