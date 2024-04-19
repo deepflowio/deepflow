@@ -19,7 +19,7 @@ package model
 import (
 	"time"
 
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 )
 
 type ControllerUpdate struct {
@@ -474,8 +474,8 @@ type AdditionalResource struct {
 }
 
 type DetailedConfig struct {
-	RealConfig    *agent_config.AgentGroupConfigResponse `json:"REAL_CONFIG"`
-	DefaultConfig *agent_config.AgentGroupConfigResponse `json:"DEFAULT_CONFIG"`
+	RealConfig    *agentconfig.AgentGroupConfigResponse `json:"REAL_CONFIG"`
+	DefaultConfig *agentconfig.AgentGroupConfigResponse `json:"DEFAULT_CONFIG"`
 }
 
 type VTapInterface struct {

@@ -19,7 +19,7 @@ package metadata
 import (
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -40,7 +40,7 @@ type DBDataCache struct {
 	azs                     []*models.AZ
 	hostDevices             []*models.Host
 	podNodes                []*models.PodNode
-	agentGroupConfigs       []*agent_config.AgentGroupConfigModel
+	agentGroupConfigs       []*agentconfig.AgentGroupConfigModel
 	domains                 []*models.Domain
 	subDomains              []*models.SubDomain
 	chVTapPorts             []*models.ChVTapPort
@@ -170,8 +170,8 @@ func (d *DBDataCache) GetVipDomains() []*models.Domain {
 	return d.vipDomains
 }
 
-func (d *DBDataCache) GetAgentGroupConfigsFromDB(db *gorm.DB) []*agent_config.AgentGroupConfigModel {
-	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
+func (d *DBDataCache) GetAgentGroupConfigsFromDB(db *gorm.DB) []*agentconfig.AgentGroupConfigModel {
+	agentGroupConfigs, err := dbmgr.DBMgr[agentconfig.AgentGroupConfigModel](db).Gets()
 	if err != nil {
 		log.Error(d.Log(err.Error()))
 	}
@@ -379,7 +379,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
+	agentGroupConfigs, err := dbmgr.DBMgr[agentconfig.AgentGroupConfigModel](db).Gets()
 	if err == nil {
 		d.agentGroupConfigs = agentGroupConfigs
 	} else {

@@ -17,10 +17,10 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 )
 
-var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
+var DefaultVTapGroupConfig = &agentconfig.AgentGroupConfigModel{
 	MaxCollectPps:                 &DefaultMaxCollectPps,
 	MaxNpbBps:                     &DefaultMaxNpbBps,
 	MaxCPUs:                       &DefaultMaxCPUs,

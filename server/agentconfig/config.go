@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package agent_config
+package agentconfig
 
 import _ "embed"
 
@@ -94,6 +94,10 @@ type AgentGroupConfig struct {
 	WasmPlugins                       []string      `json:"WASM_PLUGINS" yaml:"wasm_plugins,omitempty"`
 	SoPlugins                         []string      `json:"SO_PLUGINS" yaml:"so_plugins,omitempty"`
 	YamlConfig                        *StaticConfig `yaml:"static_config,omitempty"`
+}
+
+func (AgentGroupConfig) TableName() string {
+	return "vtap_group_configuration"
 }
 
 type StaticConfig struct {

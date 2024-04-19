@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -115,22 +115,22 @@ var DecapTypeData = map[int]string{
 	3: "GRE",
 }
 
-func getTypeInfo(tapTypeValue int, idToTapTypeName map[int]string) *agent_config.TypeInfo {
-	var typeInfo *agent_config.TypeInfo
+func getTypeInfo(tapTypeValue int, idToTapTypeName map[int]string) *agentconfig.TypeInfo {
+	var typeInfo *agentconfig.TypeInfo
 	switch tapTypeValue {
 	case 0:
-		typeInfo = &agent_config.TypeInfo{
+		typeInfo = &agentconfig.TypeInfo{
 			ID:   tapTypeValue,
 			Name: "全部",
 		}
 	case -1:
-		typeInfo = &agent_config.TypeInfo{
+		typeInfo = &agentconfig.TypeInfo{
 			ID:   tapTypeValue,
 			Name: "无",
 		}
 	default:
 		name := idToTapTypeName[tapTypeValue]
-		typeInfo = &agent_config.TypeInfo{
+		typeInfo = &agentconfig.TypeInfo{
 			ID:   tapTypeValue,
 			Name: name,
 		}
@@ -162,8 +162,8 @@ var tapSideIDToName = map[int]string{
 var DeprecatedTapSideID = []int{48, 49, 50}
 
 func convertDBToJson(
-	sData *agent_config.AgentGroupConfigModel,
-	tData *agent_config.AgentGroupConfigResponse,
+	sData *agentconfig.AgentGroupConfigModel,
+	tData *agentconfig.AgentGroupConfigResponse,
 	idToTapTypeName map[int]string,
 	lcuuidToDomain map[string]string) {
 
@@ -190,7 +190,7 @@ func convertDBToJson(
 			for _, tapSideValue := range tapSides {
 				if name, ok := tapSideIDToName[tapSideValue]; ok {
 					tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides,
-						&agent_config.TapSideInfo{
+						&agentconfig.TapSideInfo{
 							ID:   tapSideValue,
 							Name: name,
 						})
@@ -204,7 +204,7 @@ func convertDBToJson(
 			for _, tapSideValue := range tapSides {
 				if name, ok := tapSideIDToName[tapSideValue]; ok {
 					tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides,
-						&agent_config.TapSideInfo{
+						&agentconfig.TapSideInfo{
 							ID:   tapSideValue,
 							Name: name,
 						})
@@ -230,7 +230,7 @@ func convertDBToJson(
 		cDecapType, err := ConvertStrToIntList(*sData.DecapType)
 		if err == nil {
 			for _, decapType := range cDecapType {
-				typeInfo := &agent_config.TypeInfo{
+				typeInfo := &agentconfig.TypeInfo{
 					ID:   decapType,
 					Name: DecapTypeData[decapType],
 				}
@@ -244,15 +244,15 @@ func convertDBToJson(
 	if sData.Domains != nil {
 		cDomains := strings.Split(*sData.Domains, ",")
 		for _, domain := range cDomains {
-			var domainInfo *agent_config.DomainInfo
+			var domainInfo *agentconfig.DomainInfo
 			if domain == "0" {
-				domainInfo = &agent_config.DomainInfo{
+				domainInfo = &agentconfig.DomainInfo{
 					ID:   domain,
 					Name: "全部",
 				}
 			}
 			if domainInfo == nil && domain != "" {
-				domainInfo = &agent_config.DomainInfo{
+				domainInfo = &agentconfig.DomainInfo{
 					ID:   domain,
 					Name: lcuuidToDomain[domain],
 				}
@@ -289,7 +289,7 @@ func convertDBToJson(
 	}
 }
 
-func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_config.AgentGroupConfig) {
+func convertDBToYaml(sData *agentconfig.AgentGroupConfigModel, tData *agentconfig.AgentGroupConfig) {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
@@ -297,7 +297,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 	}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
-		yamlConfig := &agent_config.StaticConfig{}
+		yamlConfig := &agentconfig.StaticConfig{}
 		if err := yaml.Unmarshal([]byte(*sData.YamlConfig), yamlConfig); err == nil {
 			tData.YamlConfig = yamlConfig
 		} else {
@@ -397,11 +397,11 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 	}
 }
 
-func convertJsonToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
+func convertJsonToDb(sData *agentconfig.AgentGroupConfig, tData *agentconfig.AgentGroupConfigModel) {
 	convertToDb(sData, tData)
 }
 
-func convertYamlToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
+func convertYamlToDb(sData *agentconfig.AgentGroupConfig, tData *agentconfig.AgentGroupConfigModel) {
 	if sData.YamlConfig != nil {
 		b, err := yaml.Marshal(sData.YamlConfig)
 		if err == nil {
@@ -417,7 +417,7 @@ func convertYamlToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.A
 	convertToDb(sData, tData)
 }
 
-func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
+func convertToDb(sData *agentconfig.AgentGroupConfig, tData *agentconfig.AgentGroupConfigModel) {
 	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
@@ -498,12 +498,12 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 	}
 }
 
-func CreateVTapGroupConfig(createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func CreateVTapGroupConfig(createData *agentconfig.AgentGroupConfig) (*agentconfig.AgentGroupConfigModel, error) {
 	if createData.VTapGroupLcuuid == nil {
 		return nil, fmt.Errorf("vtap_group_lcuuid is emty")
 	}
 	vTapGroupLcuuid := *createData.VTapGroupLcuuid
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	db := mysql.Db
 	ret := db.Where("vtap_group_lcuuid = ?", vTapGroupLcuuid).First(dbConfig)
 	if ret.Error == nil {
@@ -515,7 +515,7 @@ func CreateVTapGroupConfig(createData *agent_config.AgentGroupConfig) (*agent_co
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
 	}
-	dbData := &agent_config.AgentGroupConfigModel{}
+	dbData := &agentconfig.AgentGroupConfigModel{}
 	convertJsonToDb(createData, dbData)
 	dbData.VTapGroupLcuuid = createData.VTapGroupLcuuid
 	lcuuid := uuid.New().String()
@@ -525,13 +525,13 @@ func CreateVTapGroupConfig(createData *agent_config.AgentGroupConfig) (*agent_co
 	return dbData, nil
 }
 
-func DeleteVTapGroupConfig(lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
+func DeleteVTapGroupConfig(lcuuid string) (*agentconfig.AgentGroupConfigModel, error) {
 	if lcuuid == "" {
 		return nil, fmt.Errorf("lcuuid is None")
 	}
 
 	db := mysql.Db
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
@@ -541,13 +541,13 @@ func DeleteVTapGroupConfig(lcuuid string) (*agent_config.AgentGroupConfigModel, 
 	return dbConfig, nil
 }
 
-func UpdateVTapGroupConfig(lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func UpdateVTapGroupConfig(lcuuid string, updateData *agentconfig.AgentGroupConfig) (*agentconfig.AgentGroupConfigModel, error) {
 	if lcuuid == "" {
 		return nil, fmt.Errorf("lcuuid is None")
 	}
 
 	db := mysql.Db
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
@@ -587,12 +587,12 @@ func isBlank(value reflect.Value) bool {
 	return reflect.DeepEqual(value.Interface(), reflect.Zero(value.Type()).Interface())
 }
 
-func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_config.AgentGroupConfigModel {
+func getRealVTapGroupConfig(config *agentconfig.AgentGroupConfigModel) *agentconfig.AgentGroupConfigModel {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "Lcuuid"}
 	typeOfDefaultConfig := reflect.ValueOf(common.DefaultVTapGroupConfig).Elem()
 	tt := reflect.TypeOf(config).Elem()
 	tv := reflect.ValueOf(config).Elem()
-	realConfiguration := &agent_config.AgentGroupConfigModel{}
+	realConfiguration := &agentconfig.AgentGroupConfigModel{}
 	typeOfRealConfiguration := reflect.ValueOf(realConfiguration).Elem()
 	for i := 0; i < tv.NumField(); i++ {
 		field := tt.Field(i)
@@ -611,8 +611,8 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 	return realConfiguration
 }
 
-func GetVTapGroupConfigs(filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
-	var dbConfigs []*agent_config.AgentGroupConfigModel
+func GetVTapGroupConfigs(filter map[string]interface{}) ([]*agentconfig.AgentGroupConfigResponse, error) {
+	var dbConfigs []*agentconfig.AgentGroupConfigModel
 	var tapTypes []*mysql.TapType
 	var domains []*mysql.Domain
 	var vtapGroups []*mysql.VTapGroup
@@ -637,7 +637,7 @@ func GetVTapGroupConfigs(filter map[string]interface{}) ([]*agent_config.AgentGr
 	for i, vtapGroup := range vtapGroups {
 		lcuuidToVTapGroup[vtapGroup.Lcuuid] = vtapGroups[i]
 	}
-	result := make([]*agent_config.AgentGroupConfigResponse, 0, len(dbConfigs))
+	result := make([]*agentconfig.AgentGroupConfigResponse, 0, len(dbConfigs))
 	for _, config := range dbConfigs {
 		if config.VTapGroupLcuuid == nil || *config.VTapGroupLcuuid == "" {
 			continue
@@ -647,7 +647,7 @@ func GetVTapGroupConfigs(filter map[string]interface{}) ([]*agent_config.AgentGr
 			continue
 		}
 		realConfig := getRealVTapGroupConfig(config)
-		mData := &agent_config.AgentGroupConfigResponse{}
+		mData := &agentconfig.AgentGroupConfigResponse{}
 		mData.VTapGroupID = &vtapGroup.ShortUUID
 		mData.VTapGroupName = &vtapGroup.Name
 		convertDBToJson(realConfig, mData, idToTapTypeName, lcuuidToDomain)
@@ -662,13 +662,13 @@ func GetVTapGroupDetailedConfig(lcuuid string) (*model.DetailedConfig, error) {
 		return nil, fmt.Errorf("lcuuid is None")
 	}
 	db := mysql.Db
-	realConfig := &agent_config.AgentGroupConfigModel{}
+	realConfig := &agentconfig.AgentGroupConfigModel{}
 	ret := db.Where("lcuuid = ?", lcuuid).First(realConfig)
 	if ret.Error != nil {
 		ret = db.Where("vtap_group_lcuuid = ?", lcuuid).First(realConfig)
 		if ret.Error != nil {
 			log.Errorf("vtap group configuration(%s) not found", lcuuid)
-			realConfig = &agent_config.AgentGroupConfigModel{}
+			realConfig = &agentconfig.AgentGroupConfigModel{}
 		}
 	}
 	var tapTypes []*mysql.TapType
@@ -683,9 +683,9 @@ func GetVTapGroupDetailedConfig(lcuuid string) (*model.DetailedConfig, error) {
 	for _, domain := range domains {
 		lcuuidToDomain[domain.Lcuuid] = domain.Name
 	}
-	realData := &agent_config.AgentGroupConfigResponse{}
+	realData := &agentconfig.AgentGroupConfigResponse{}
 	convertDBToJson(realConfig, realData, idToTapTypeName, lcuuidToDomain)
-	defaultData := &agent_config.AgentGroupConfigResponse{}
+	defaultData := &agentconfig.AgentGroupConfigResponse{}
 	convertDBToJson(common.DefaultVTapGroupConfig, defaultData, idToTapTypeName, lcuuidToDomain)
 	response := &model.DetailedConfig{
 		RealConfig:    realData,
@@ -702,12 +702,12 @@ func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
 		return "", fmt.Errorf("lcuuid is None")
 	}
 	db := mysql.Db
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	response := &agent_config.AgentGroupConfig{}
+	response := &agentconfig.AgentGroupConfig{}
 	convertDBToYaml(dbConfig, response)
 	b, err := yaml.Marshal(response)
 	if err != nil {
@@ -720,7 +720,7 @@ func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
 }
 
 func GetVTapGroupAdvancedConfigs() ([]string, error) {
-	var dbConfigs []agent_config.AgentGroupConfigModel
+	var dbConfigs []agentconfig.AgentGroupConfigModel
 	var dbGroups []mysql.VTapGroup
 	lcuuidToShortUUID := make(map[string]string)
 	db := mysql.Db
@@ -734,7 +734,7 @@ func GetVTapGroupAdvancedConfigs() ([]string, error) {
 		if dbConfig.VTapGroupLcuuid == nil || *dbConfig.VTapGroupLcuuid == "" {
 			continue
 		}
-		response := &agent_config.AgentGroupConfig{}
+		response := &agentconfig.AgentGroupConfig{}
 		convertDBToYaml(&dbConfig, response)
 		shortUUID := lcuuidToShortUUID[*dbConfig.VTapGroupLcuuid]
 		response.VTapGroupID = &shortUUID
@@ -748,9 +748,9 @@ func GetVTapGroupAdvancedConfigs() ([]string, error) {
 	return result, nil
 }
 
-func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *agent_config.AgentGroupConfig) (string, error) {
+func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *agentconfig.AgentGroupConfig) (string, error) {
 	db := mysql.Db
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
@@ -760,7 +760,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *agent_config.Agent
 	if ret.Error != nil {
 		return "", fmt.Errorf("save config failed, %s", ret.Error)
 	}
-	response := &agent_config.AgentGroupConfig{}
+	response := &agentconfig.AgentGroupConfig{}
 	convertDBToYaml(dbConfig, response)
 	b, err := yaml.Marshal(response)
 	if err != nil {
@@ -773,7 +773,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *agent_config.Agent
 	return string(b), nil
 }
 
-func CreateVTapGroupAdvancedConfig(createData *agent_config.AgentGroupConfig) (string, error) {
+func CreateVTapGroupAdvancedConfig(createData *agentconfig.AgentGroupConfig) (string, error) {
 	if createData.VTapGroupID == nil {
 		return "", fmt.Errorf("vtap_group_id is None")
 	}
@@ -784,7 +784,7 @@ func CreateVTapGroupAdvancedConfig(createData *agent_config.AgentGroupConfig) (s
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", *shortUUID)
 	}
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
 	if ret.Error == nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration already exist", *shortUUID)
@@ -797,7 +797,7 @@ func CreateVTapGroupAdvancedConfig(createData *agent_config.AgentGroupConfig) (s
 	if ret.Error != nil {
 		return "", fmt.Errorf("save config failed, %s", ret.Error)
 	}
-	response := &agent_config.AgentGroupConfig{}
+	response := &agentconfig.AgentGroupConfig{}
 	convertDBToYaml(dbConfig, response)
 	response.VTapGroupID = shortUUID
 	b, err := yaml.Marshal(response)
@@ -819,12 +819,12 @@ func GetVTapGroupConfigByFilter(args map[string]string) (string, error) {
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
 	}
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration not found", shortUUID)
 	}
-	response := &agent_config.AgentGroupConfig{}
+	response := &agentconfig.AgentGroupConfig{}
 	convertDBToYaml(dbConfig, response)
 	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
@@ -846,13 +846,13 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
 	}
 
-	dbConfig := &agent_config.AgentGroupConfigModel{}
+	dbConfig := &agentconfig.AgentGroupConfigModel{}
 	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration not found", shortUUID)
 	}
 	db.Delete(dbConfig)
-	response := &agent_config.AgentGroupConfig{}
+	response := &agentconfig.AgentGroupConfig{}
 	convertDBToYaml(dbConfig, response)
 	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
@@ -864,5 +864,5 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 }
 
 func GetVTapGroupExampleConfig() (string, error) {
-	return string(agent_config.YamlAgentGroupConfig), nil
+	return string(agentconfig.YamlAgentGroupConfig), nil
 }

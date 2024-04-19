@@ -1,4 +1,4 @@
-package agent_config
+package agentconfig
 
 type TypeInfo struct {
 	ID   int    `json:"ID"`

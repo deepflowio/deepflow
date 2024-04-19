@@ -30,7 +30,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
@@ -40,7 +40,7 @@ import (
 )
 
 type VTapConfig struct {
-	agent_config.RAgentGroupConfigModel
+	agentconfig.RAgentGroupConfigModel
 	ConvertedL4LogTapTypes       []uint32
 	ConvertedL4LogIgnoreTapSides []uint32
 	ConvertedL7LogIgnoreTapSides []uint32
@@ -124,7 +124,7 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *agent_config.RAgentGroupConfigModel) *VTapConfig {
+func NewVTapConfig(config *agentconfig.RAgentGroupConfigModel) *VTapConfig {
 	vTapConfig := &VTapConfig{}
 	vTapConfig.RAgentGroupConfigModel = *config
 	vTapConfig.convertData()
@@ -371,7 +371,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 	v := c.vTapInfo
 	// modify static config
-	yamlConfig := &agent_config.StaticConfig{}
+	yamlConfig := &agentconfig.StaticConfig{}
 	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
 	if err != nil {
 		log.Error(v.Logf("%s", err))
@@ -388,7 +388,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledCallMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &agent_config.EbpfConfig{
+			yamlConfig.Ebpf = &agentconfig.EbpfConfig{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -398,10 +398,10 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledFunctionMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &agent_config.EbpfConfig{}
+			yamlConfig.Ebpf = &agentconfig.EbpfConfig{}
 		}
 		if yamlConfig.Ebpf.OnCpuProfile == nil {
-			yamlConfig.Ebpf.OnCpuProfile = &agent_config.OnCpuProfile{
+			yamlConfig.Ebpf.OnCpuProfile = &agentconfig.OnCpuProfile{
 				Disabled: proto.Bool(true),
 			}
 		} else {

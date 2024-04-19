@@ -22,7 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/agentconfig"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
@@ -50,7 +50,7 @@ func (cgc *VTapGroupConfig) RegisterTo(e *gin.Engine) {
 }
 
 func createVTapGroupConfig(c *gin.Context) {
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
+	vTapGroupConfig := &agentconfig.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
 	if err == nil {
 		data, err := service.CreateVTapGroupConfig(vTapGroupConfig)
@@ -68,7 +68,7 @@ func deleteVTapGroupConfig(c *gin.Context) {
 
 func updateVTapGroupConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
+	vTapGroupConfig := &agentconfig.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
 	if err == nil {
 		data, err := service.UpdateVTapGroupConfig(lcuuid, vTapGroupConfig)
@@ -101,7 +101,7 @@ func getVTapGroupAdvancedConfig(c *gin.Context) {
 
 func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
+	vTapGroupConfig := &agentconfig.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
 	if err == nil || err == io.EOF {
 		data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
@@ -112,7 +112,7 @@ func updateVTapGroupAdvancedConfig(c *gin.Context) {
 }
 
 func createVTapGroupAdvancedConfig(c *gin.Context) {
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
+	vTapGroupConfig := &agentconfig.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
 	if err == nil {
 		data, err := service.CreateVTapGroupAdvancedConfig(vTapGroupConfig)

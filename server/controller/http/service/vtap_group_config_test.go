@@ -19,7 +19,6 @@ package service
 import (
 	"testing"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -41,7 +40,7 @@ func Test_copyStruct(t *testing.T) {
 			name: "ignore name test",
 			args: args{
 				ignoreName: ignoreName,
-				from:       &agent_config.AgentGroupConfigModel{},
+				from:       &agentconfig.AgentGroupConfigModel{},
 				to:         &model.AgentGroupConfigResponse{},
 			},
 			assertFunc: func(t *testing.T, data *model.AgentGroupConfigResponse) {

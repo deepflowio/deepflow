@@ -1,4 +1,4 @@
-package agent_config
+package agentconfig
 
 type AgentGroupConfigModel struct {
 	ID                                int      `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
