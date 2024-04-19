@@ -103,6 +103,7 @@ struct SubQuadGen {
     delay_seconds: u64,
 
     stashs: VecDeque<QuadrupleStash>, // flow_generator will not have a delay of more than 2 minutes
+    batch_buffer: Vec<Box<AppMeterWithFlow>>,
     ntp_diff: Arc<AtomicI64>,
 }
 
@@ -189,10 +190,20 @@ impl SubQuadGen {
         self.stashs.push_back(QuadrupleStash::new());
         let mut stash = self.stashs.swap_remove_back(stash_index).unwrap();
         stash.l7_stats.clear();
-        if !stash.meters.is_empty() {
-            if let Err(_) = self.l7_output.send_large(stash.meters) {
-                debug!("l7 qg push l7 stats to queue failed maybe queue have terminated");
+
+        self.batch_buffer.clear();
+        while stash.meters.len() >= QUEUE_BATCH_SIZE {
+            self.batch_buffer
+                .extend(stash.meters.drain(..QUEUE_BATCH_SIZE));
+            if let Err(e) = self.l7_output.send_all(&mut self.batch_buffer) {
+                debug!("l7 qg push l7 stats to queue failed: {}", e);
+                self.batch_buffer.clear();
             }
+        }
+        // send the remaining data (not drained) in stash.meters
+        if let Err(e) = self.l7_output.send_all(&mut stash.meters) {
+            debug!("l7 qg push l7 stats to queue failed: {}", e);
+            stash.meters.clear();
         }
     }
 
@@ -478,6 +489,7 @@ impl L7QuadrupleGenerator {
                 number_of_slots: second_slots as u64,
                 delay_seconds: second_delay_seconds,
                 stashs: VecDeque::with_capacity(second_slots),
+                batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
@@ -507,6 +519,7 @@ impl L7QuadrupleGenerator {
                 number_of_slots: minute_slots as u64,
                 delay_seconds: minute_delay_seconds,
                 stashs: VecDeque::with_capacity(minute_slots),
+                batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
