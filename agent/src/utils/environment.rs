@@ -530,6 +530,9 @@ pub fn get_k8s_namespace() -> String {
 
 #[cfg(any(target_os = "linux"))]
 pub async fn get_current_k8s_image() -> Option<String> {
+    if !running_in_k8s() {
+        return None;
+    }
     let Ok(mut config) = Config::infer().await else {
         warn!("failed to infer kubernetes config");
         return None;
