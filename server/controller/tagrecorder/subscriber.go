@@ -68,6 +68,9 @@ func (c *SubscriberManager) Start() (err error) {
 }
 
 func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
+	if subResourceType == pubsub.PubSubTypeDomain {
+		return m.subscribers
+	}
 	ss := make([]Subscriber, 0)
 	for _, s := range m.subscribers {
 		if s.GetSubResourceType() == subResourceType {
@@ -146,6 +149,7 @@ type Subscriber interface {
 	pubsub.ResourceBatchAddedSubscriber
 	pubsub.ResourceUpdatedSubscriber
 	pubsub.ResourceBatchDeletedSubscriber
+	OnDomainDeleted(md *message.Metadata)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -245,5 +249,13 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
+	}
+}
+
+// Delete resource by domain
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
+	var chModel CT
+	if err := mysql.Db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
+		log.Error(err)
 	}
 }
