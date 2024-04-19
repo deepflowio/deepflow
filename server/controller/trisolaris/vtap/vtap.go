@@ -989,6 +989,9 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 
 func (v *VTapInfo) GetKubernetesClusterID(clusterID string, value string, force bool) string {
 	if v == nil {
+		if force {
+			return value
+		}
 		return ""
 	}
 	return v.kcData.getClusterID(clusterID, value, force)

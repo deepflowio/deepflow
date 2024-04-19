@@ -42,10 +42,10 @@ func check[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpda
 		return err
 	}
 	var newItems []CT
-	for _, resource := range resources {
-		_, targets := component.subscriberDG.sourceToTarget(&resource)
-		newItems = append(newItems, targets...)
-	}
+	// for _, resource := range resources {
+	// 	_, targets := component.subscriberDG.sourceToTarget(&resource)
+	// 	newItems = append(newItems, targets...)
+	// }
 
 	var oldItems []CT
 	var err error

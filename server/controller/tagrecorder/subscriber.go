@@ -149,7 +149,7 @@ type Subscriber interface {
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
-	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
+	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT, *mysql.DB)
 	softDeletedTargetsUpdated([]CT, *mysql.DB)
 }
@@ -182,11 +182,11 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) initDBOperator() {
 	s.dbOperator = newOperator[CT, KT](s.resourceTypeName)
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(sources []*MT) ([]KT, []CT) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
 	keys := []KT{}
 	targets := []CT{}
 	for _, item := range sources {
-		ks, ts := s.subscriberDG.sourceToTarget(item)
+		ks, ts := s.subscriberDG.sourceToTarget(md, item)
 		keys = append(keys, ks...)
 		targets = append(targets, ts...)
 	}
@@ -219,7 +219,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *me
 	if err != nil {
 		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
-	keys, chItems := s.generateKeyTargets(items)
+	keys, chItems := s.generateKeyTargets(md, items)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
@@ -240,7 +240,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 	if err != nil {
 		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
-	keys, chItems := s.generateKeyTargets(items)
+	keys, chItems := s.generateKeyTargets(md, items)
 	if softDelete {
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {

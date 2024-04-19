@@ -70,13 +70,15 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) sourceToTarget(item *mysql.PodService) (keys []K8sAnnotationsKey, targets []mysql.ChPodServiceK8sAnnotations) {
+func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysql.PodService) (keys []K8sAnnotationsKey, targets []mysql.ChPodServiceK8sAnnotations) {
 	if item.Annotation == "" {
 		return
 	}
 	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sAnnotations{{
 		ID:          item.ID,
 		Annotations: common.StrToJsonstr(item.Annotation),
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
 	}}
 }
 

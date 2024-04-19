@@ -39,7 +39,7 @@ func NewChPodIngress() *ChPodIngress {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodIngress) sourceToTarget(source *mysql.PodIngress) (keys []IDKey, targets []mysql.ChPodIngress) {
+func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysql.PodIngress) (keys []IDKey, targets []mysql.ChPodIngress) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
@@ -47,8 +47,10 @@ func (c *ChPodIngress) sourceToTarget(source *mysql.PodIngress) (keys []IDKey, t
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChPodIngress{
-		ID:   source.ID,
-		Name: sourceName,
+		ID:       source.ID,
+		Name:     sourceName,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

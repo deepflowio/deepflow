@@ -40,7 +40,7 @@ func (a *Aliyun) getAZs(region model.Region) ([]model.AZ, error) {
 
 			zoneId := az.Get("ZoneId").MustString()
 			retAZ := model.AZ{
-				Lcuuid:       common.GenerateUUID(a.uuidGenerate + "_" + zoneId),
+				Lcuuid:       common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
 				Name:         az.Get("LocalName").MustString(),
 				Label:        zoneId,
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),

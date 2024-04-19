@@ -39,7 +39,7 @@ func NewChPodService() *ChPodService {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodService) sourceToTarget(source *mysql.PodService) (keys []IDKey, targets []mysql.ChPodService) {
+func (c *ChPodService) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []IDKey, targets []mysql.ChPodService) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
@@ -51,6 +51,8 @@ func (c *ChPodService) sourceToTarget(source *mysql.PodService) (keys []IDKey, t
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
+		TeamID:       md.TeamID,
+		DomainID:     md.DomainID,
 	})
 	return
 }

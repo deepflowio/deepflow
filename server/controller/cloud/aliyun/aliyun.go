@@ -33,9 +33,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-var log = logging.MustGetLogger("cloud.aliyun")
+var log *logging.Logger
 
 type Aliyun struct {
+	orgID          int
 	uuid           string
 	uuidGenerate   string
 	regionUuid     string
@@ -54,7 +55,9 @@ type Aliyun struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewAliyun(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error) {
+func NewAliyun(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error) {
+	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.aliyun", orgID))
+
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -92,7 +95,8 @@ func NewAliyun(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error
 	}
 
 	return &Aliyun{
-		uuid: domain.Lcuuid,
+		orgID: orgID,
+		uuid:  domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),

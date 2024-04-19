@@ -41,7 +41,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChGProcess) sourceToTarget(source *mysql.Process) (keys []IDKey, targets []mysql.ChGProcess) {
+func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []IDKey, targets []mysql.ChGProcess) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_GPROCESS,
 	}]
@@ -52,11 +52,13 @@ func (c *ChGProcess) sourceToTarget(source *mysql.Process) (keys []IDKey, target
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChGProcess{
-		ID:      source.ID,
-		Name:    sourceName,
-		CHostID: source.VMID,
-		L3EPCID: source.VPCID,
-		IconID:  iconID,
+		ID:       source.ID,
+		Name:     sourceName,
+		CHostID:  source.VMID,
+		L3EPCID:  source.VPCID,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }

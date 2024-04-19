@@ -40,6 +40,7 @@ const (
 	SIGNAL_SOURCE_UNKNOWN SignalSource = iota
 	SIGNAL_SOURCE_RESOURCE
 	SIGNAL_SOURCE_IO
+	SIGNAL_SOURCE_K8S
 )
 
 type EventStore struct {
@@ -158,7 +159,7 @@ func (e *EventStore) Table() string {
 	if e.HasMetrics {
 		return common.PERF_EVENT.TableName()
 	}
-	return common.RESOURCE_EVENT.TableName()
+	return common.RESOURCE_EVENT.TableName() // the same as common.K8S_EVENT.TableName()
 }
 
 func (e *EventStore) Release() {

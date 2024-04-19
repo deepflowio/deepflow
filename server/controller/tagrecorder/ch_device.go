@@ -43,7 +43,7 @@ func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChVMDevice) sourceToTarget(source *mysql.VM) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *mysql.VM) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_VM,
 		SubType:  source.HType,
@@ -63,6 +63,8 @@ func (c *ChVMDevice) sourceToTarget(source *mysql.VM) (keys []DeviceKey, targets
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -121,7 +123,7 @@ func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChHostDevice) sourceToTarget(source *mysql.Host) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *mysql.Host) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_HOST,
 		SubType:  source.HType,
@@ -140,6 +142,8 @@ func (c *ChHostDevice) sourceToTarget(source *mysql.Host) (keys []DeviceKey, tar
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -200,7 +204,7 @@ func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChVRouterDevice) sourceToTarget(source *mysql.VRouter) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *mysql.VRouter) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_VGW,
 	}]
@@ -216,6 +220,8 @@ func (c *ChVRouterDevice) sourceToTarget(source *mysql.VRouter) (keys []DeviceKe
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -261,7 +267,7 @@ func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) sourceToTarget(source *mysql.DHCPPort) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *mysql.DHCPPort) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_DHCP_PORT,
 	}]
@@ -277,6 +283,8 @@ func (c *ChDHCPPortDevice) sourceToTarget(source *mysql.DHCPPort) (keys []Device
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -322,7 +330,7 @@ func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDe
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) sourceToTarget(source *mysql.NATGateway) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *mysql.NATGateway) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_NAT_GATEWAY,
 	}]
@@ -339,6 +347,8 @@ func (c *ChNATGatewayDevice) sourceToTarget(source *mysql.NATGateway) (keys []De
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -387,7 +397,7 @@ func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChLBDevice) sourceToTarget(source *mysql.LB) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *mysql.LB) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_LB,
 	}]
@@ -404,6 +414,8 @@ func (c *ChLBDevice) sourceToTarget(source *mysql.LB) (keys []DeviceKey, targets
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -452,7 +464,7 @@ func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstance
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) sourceToTarget(source *mysql.RDSInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *mysql.RDSInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_RDS,
 	}]
@@ -469,6 +481,8 @@ func (c *ChRDSInstanceDevice) sourceToTarget(source *mysql.RDSInstance) (keys []
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -517,7 +531,7 @@ func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInst
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChRedisInstanceDevice) sourceToTarget(source *mysql.RedisInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *mysql.RedisInstance) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_REDIS,
 	}]
@@ -534,6 +548,8 @@ func (c *ChRedisInstanceDevice) sourceToTarget(source *mysql.RedisInstance) (key
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -582,7 +598,7 @@ func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDe
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceDevice) sourceToTarget(source *mysql.PodService) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_SERVICE,
 	}]
@@ -598,6 +614,8 @@ func (c *ChPodServiceDevice) sourceToTarget(source *mysql.PodService) (keys []De
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 
 	// service
@@ -608,6 +626,8 @@ func (c *ChPodServiceDevice) sourceToTarget(source *mysql.PodService) (keys []De
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -653,7 +673,7 @@ func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodDevice) sourceToTarget(source *mysql.Pod) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD,
 	}]
@@ -669,6 +689,8 @@ func (c *ChPodDevice) sourceToTarget(source *mysql.Pod) (keys []DeviceKey, targe
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -714,7 +736,7 @@ func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodGroupDevice) sourceToTarget(source *mysql.PodGroup) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *mysql.PodGroup) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_GROUP,
 	}]
@@ -730,6 +752,8 @@ func (c *ChPodGroupDevice) sourceToTarget(source *mysql.PodGroup) (keys []Device
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -776,7 +800,7 @@ func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodNodeDevice) sourceToTarget(source *mysql.PodNode) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysql.PodNode) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_NODE,
 	}]
@@ -792,6 +816,8 @@ func (c *ChPodNodeDevice) sourceToTarget(source *mysql.PodNode) (keys []DeviceKe
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }
@@ -837,7 +863,7 @@ func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChProcessDevice) sourceToTarget(source *mysql.Process) (keys []DeviceKey, targets []mysql.ChDevice) {
+func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []DeviceKey, targets []mysql.ChDevice) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_GPROCESS,
 	}]
@@ -853,6 +879,8 @@ func (c *ChProcessDevice) sourceToTarget(source *mysql.Process) (keys []DeviceKe
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
 	})
 	return
 }

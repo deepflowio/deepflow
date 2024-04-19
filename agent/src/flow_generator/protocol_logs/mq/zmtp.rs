@@ -8,9 +8,13 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+            pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
+    },
+    plugin::wasm::{
+        wasm_plugin::{zmtp_message, ZmtpMessage},
+        WasmData,
     },
 };
 use serde::Serialize;
@@ -100,6 +104,12 @@ pub struct ZmtpInfo {
     frame_type: FrameType,
     mechanism: Option<Mechanism>,
     command_name: Option<String>,
+    payload: Vec<u8>,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
+    #[serde(skip)]
+    l7_protocol_str: Option<String>,
 }
 
 impl ZmtpInfo {
@@ -110,13 +120,37 @@ impl ZmtpInfo {
             _ => "".to_string(),
         }
     }
-    fn merge(&mut self, res: &Self) {
+    fn merge(&mut self, res: &mut Self) {
         if self.res_msg_size.is_none() {
-            self.res_msg_size = res.res_msg_size;
+            self.res_msg_size = res.res_msg_size.take();
         }
         if self.status == L7ResponseStatus::Ok {
             self.status = res.status;
-            self.err_msg = res.err_msg.clone();
+            self.err_msg = res.err_msg.take();
+        }
+    }
+    fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) {
+        let mut vm_ref = param.wasm_vm.borrow_mut();
+        let Some(vm) = vm_ref.as_mut() else {
+            return;
+        };
+        let wasm_data = WasmData::from_request(
+            L7Protocol::ZMTP,
+            ZmtpMessage {
+                payload: self.payload.drain(..).collect(),
+                subscription: self
+                    .subscription
+                    .clone()
+                    .map(|s| zmtp_message::Subscription::MatchPattern(s)),
+            },
+        );
+        if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
+            if !custom.attributes.is_empty() {
+                self.attributes.extend(custom.attributes);
+            }
+            if custom.proto_str.len() > 0 {
+                self.l7_protocol_str = Some(custom.proto_str);
+            }
         }
     }
 }
@@ -145,6 +179,17 @@ impl From<ZmtpInfo> for L7ProtocolSendLog {
             },
             version: Some(f.get_version()),
             flags,
+            ext_info: Some(ExtendedInfo {
+                attributes: {
+                    if f.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(f.attributes)
+                    }
+                },
+                protocol_str: f.l7_protocol_str,
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
@@ -427,7 +472,8 @@ impl ZmtpLog {
         };
         info.req_msg_size = Some(size);
         // message body
-        let (payload, _) = parse_bytes(payload, size as usize).ok_or(Error::ZmtpLogParseEOF)?;
+        let (payload, bytes) = parse_bytes(payload, size as usize).ok_or(Error::ZmtpLogParseEOF)?;
+        info.payload = bytes.to_vec();
         Ok(payload)
     }
     fn try_parse<'a>(&mut self, payload: &'a [u8], info: &mut ZmtpInfo) -> Result<&'a [u8]> {
@@ -558,6 +604,8 @@ impl L7ProtocolParserInterface for ZmtpLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
+
+            info.wasm_hook(param, payload);
         });
 
         if !param.parse_log {

@@ -1945,6 +1945,8 @@ CREATE TABLE IF NOT EXISTS ch_az (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_az;
@@ -1954,6 +1956,8 @@ CREATE TABLE IF NOT EXISTS ch_l3_epc (
     name                    VARCHAR(256),
     uid                     CHAR(64),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_l3_epc;
@@ -1962,6 +1966,8 @@ CREATE TABLE IF NOT EXISTS ch_subnet (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_subnet;
@@ -1970,6 +1976,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_cluster (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_cluster;
@@ -1978,6 +1986,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_node (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_node;
@@ -1987,6 +1997,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns (
     name                    VARCHAR(256),
     icon_id                 INTEGER,
     pod_cluster_id          INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns;
@@ -1998,6 +2010,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_group (
     icon_id                 INTEGER,
     pod_cluster_id          INTEGER,
     pod_ns_id               INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_group;
@@ -2011,6 +2025,8 @@ CREATE TABLE IF NOT EXISTS ch_pod (
     pod_node_id             INTEGER,
     pod_service_id          INTEGER,
     pod_group_id            INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod;
@@ -2023,6 +2039,8 @@ CREATE TABLE IF NOT EXISTS ch_device (
     icon_id                 INTEGER,
     ip                      CHAR(64),
     hostname                VARCHAR(256),
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (devicetype, deviceid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2039,6 +2057,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap_port (
     device_id               INTEGER,
     device_name             VARCHAR(256),
     icon_id                 INTEGER,
+    team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (vtap_id, tap_port)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2056,6 +2075,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
     name                    VARCHAR(256),
     type                    INTEGER,
     icon_id                 INTEGER,
+    team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_vtap;
@@ -2066,6 +2086,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     `value`         VARCHAR(256),
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2076,6 +2098,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
     `labels`        TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_labels;
@@ -2242,6 +2266,8 @@ TRUNCATE TABLE ch_lb_listener;
 CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ingress;
@@ -2440,6 +2466,8 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
     `id`            INTEGER NOT NULL,
     `key`           VARCHAR(256) NOT NULL,
     `value`         VARCHAR(256),
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2449,6 +2477,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     `id`            INTEGER NOT NULL,
     `key`           VARCHAR(256) NOT NULL,
     `value`         VARCHAR(256),
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2457,6 +2487,8 @@ TRUNCATE TABLE ch_pod_ns_cloud_tag;
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
     `id`            INTEGER NOT NULL PRIMARY KEY,
     `cloud_tags`    TEXT,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost_cloud_tags;
@@ -2464,6 +2496,8 @@ TRUNCATE TABLE ch_chost_cloud_tags;
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
     `id`            INTEGER NOT NULL PRIMARY KEY,
     `cloud_tags`    TEXT,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
@@ -2472,6 +2506,8 @@ CREATE TABLE IF NOT EXISTS ch_os_app_tag (
     `pid`           INTEGER NOT NULL,
     `key`           VARCHAR(256) NOT NULL,
     `value`         VARCHAR(256),
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`pid`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2480,6 +2516,8 @@ TRUNCATE TABLE ch_os_app_tag;
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
     `pid`           INTEGER NOT NULL PRIMARY KEY,
     `os_app_tags`   TEXT,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tags;
@@ -2490,6 +2528,8 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     icon_id                 INTEGER,
     chost_id                INTEGER,
     l3_epc_id               INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;
@@ -2500,6 +2540,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
     `value`         VARCHAR(256),
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2510,6 +2552,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
     `labels`        TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_labels;
@@ -2520,6 +2564,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     `value`         VARCHAR(256),
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2530,6 +2576,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
     `annotations`   TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
@@ -2540,6 +2588,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
     `value`         VARCHAR(256),
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2550,6 +2600,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
     `annotations`   TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
@@ -2624,6 +2676,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     `value`         VARCHAR(256),
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2634,6 +2688,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
     `envs`          TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
+    `team_id`       INTEGER,
+    `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_envs;
@@ -2693,6 +2749,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service (
     `name`            VARCHAR(256),
     `pod_cluster_id`  INTEGER,
     `pod_ns_id`       INTEGER,
+    `team_id`         INTEGER,
+    `domain_id`       INTEGER,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service;
@@ -2704,6 +2762,8 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     `l3_epc_id`       INTEGER,
     `ip`              CHAR(64),
     `hostname`        VARCHAR(256),
+    `team_id`         INTEGER,
+    `domain_id`       INTEGER,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;

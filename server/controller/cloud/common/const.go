@@ -54,3 +54,8 @@ const (
 const (
 	SVC_RULE_RESOURCE_NAME = "virtual-kubelet.io/provider-resource-name"
 )
+
+const (
+	K8S_VPC_NAME       = "kubernetes_vpc"
+	K8S_VERSION_PREFIX = "Kubernetes"
+)

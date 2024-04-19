@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,21 +14,10 @@
  * limitations under the License.
  */
 
-package kubernetes_gather
+package common
 
-import (
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-)
+import "fmt"
 
-func (k *KubernetesGather) getAZ() (model.AZ, error) {
-	log.Debug("get az starting")
-	k.azLcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(k.orgID, k.UuidGenerate)
-	az := model.AZ{
-		Lcuuid:       k.azLcuuid,
-		Name:         k.Name,
-		RegionLcuuid: k.RegionUUID,
-	}
-	log.Debug("get az complete")
-	return az, nil
+func FmtLog(orgID int, format string, a ...any) string {
+	return fmt.Sprintf("[OID-%d] %s", orgID, fmt.Sprintf(format, a...))
 }

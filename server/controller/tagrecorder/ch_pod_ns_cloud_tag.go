@@ -94,13 +94,15 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) sourceToTarget(source *mysql.PodNamespace) (keys []CloudTagKey, targets []mysql.ChPodNSCloudTag) {
+func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysql.PodNamespace) (keys []CloudTagKey, targets []mysql.ChPodNSCloudTag) {
 	for k, v := range source.CloudTags {
 		keys = append(keys, CloudTagKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodNSCloudTag{
-			ID:    source.ID,
-			Key:   k,
-			Value: v,
+			ID:       source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return

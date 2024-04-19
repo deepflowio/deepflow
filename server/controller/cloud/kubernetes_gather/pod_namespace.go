@@ -19,6 +19,7 @@ package kubernetes_gather
 import (
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
@@ -45,13 +46,14 @@ func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 			log.Infof("pod namespace (%s) name not found", uID)
 			continue
 		}
-		k.namespaceToLcuuid[name] = uID
+		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
+		k.namespaceToLcuuid[name] = uLcuuid
 		clusterNativeName := metaData.GetPath("labels", "virtual-kubelet.io/provider-cluster-native-name").MustString()
 		if clusterNativeName != "" {
 			k.namespaceToExLabels[name] = map[string]interface{}{"virtual-kubelet.io/provider-cluster-native-name": clusterNativeName}
 		}
 		podNamespace := model.PodNamespace{
-			Lcuuid:           uID,
+			Lcuuid:           uLcuuid,
 			Name:             name,
 			PodClusterLcuuid: k.podClusterLcuuid,
 			RegionLcuuid:     k.RegionUUID,

@@ -93,13 +93,15 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) sourceToTarget(source *mysql.VM) (keys []CloudTagKey, targets []mysql.ChChostCloudTag) {
+func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *mysql.VM) (keys []CloudTagKey, targets []mysql.ChChostCloudTag) {
 	for k, v := range source.CloudTags {
 		keys = append(keys, c.newTargetKey(source.ID, k))
 		targets = append(targets, mysql.ChChostCloudTag{
-			ID:    source.ID,
-			Key:   k,
-			Value: v,
+			ID:       source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return

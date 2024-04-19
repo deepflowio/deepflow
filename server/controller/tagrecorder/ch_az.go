@@ -56,7 +56,7 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
+func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
 	iconID := a.domainLcuuidToIconID[az.Domain]
 	var err error
 	if iconID == 0 {
@@ -77,9 +77,11 @@ func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ)
 		name += " (deleted)"
 	}
 	targets = append(targets, mysql.ChAZ{
-		ID:     az.ID,
-		Name:   name,
-		IconID: iconID,
+		ID:       az.ID,
+		Name:     name,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }
