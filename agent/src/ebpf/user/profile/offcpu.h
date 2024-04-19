@@ -17,13 +17,17 @@
 #ifndef DF_USER_OFFCPU_H
 #define DF_USER_OFFCPU_H
 
-#define TRACEPOINT_SEC_NAME "tracepoint/sched/sched_switch"
+#define TP_HOOK_NAME "tracepoint/sched/sched_switch"
+#define KP_HOOK_NAME "finish_task_switch"
 
 #undef CP_PROFILE_SET_PROBES
 #define CP_PROFILE_SET_PROBES(T)			\
 do {							\
 	int index = 0, curr_idx;			\
-	tps_set_symbol((T), TRACEPOINT_SEC_NAME);	\
+	probes_set_enter_symbol((T), KP_HOOK_NAME);  	\
+	tps->kprobes_nr = index;			\
+	index = 0;					\
+	tps_set_symbol((T), TP_HOOK_NAME);		\
 	(T)->tps_nr = index;				\
 } while(0)
 

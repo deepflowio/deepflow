@@ -19,91 +19,159 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
-struct key_t {
-	int pid;
-	int tgid;
-	int userstack;
-	int kernstack;
-	char name[TASK_COMM_LEN];
-};
+/*
+ * It works by tracking when threads are blocked and when they return
+ * to the CPU, measuring their time spent in the "off-CPU" state along with
+ * the blocked stack trace and task name. The output summary assists in
+ * identifying the reasons for thread blocking and quantifying their time
+ * spent in the "off-CPU" state. This encompasses typical blocking activities
+ * in user programs such as disk I/O, network I/O, locks, etc.
+ */
+
+#include "offcpu.h"
 
 /* *INDENT-OFF* */
+// Records offcpu information
+BPF_HASH(offcpu_sched_map, int, struct sched_info_s)
+// Used to calculate the offcpu time
+BPF_HASH(offcpu_start_map, int, __u64)
+// It is used to record control information and statistics 
+//MAP_ARRAY(offcpu_state_map, __u32, __u64, OFFCPU_CNT)
+// For dual-buffer mechanism output
 MAP_PERF_EVENT(offcpu_output_a, int, __u32, MAX_CPU)
 MAP_PERF_EVENT(offcpu_output_b, int, __u32, MAX_CPU)
+// Used for dual buffer stack map
 MAP_STACK_TRACE(offcpu_stack_map_a, STACK_MAP_ENTRIES)
 MAP_STACK_TRACE(offcpu_stack_map_b, STACK_MAP_ENTRIES)
-BPF_HASH(offcpu_count_map, struct key_t, __u64)
+
+// For process filtering
+
 /* *INDENT-ON* */
 
-// /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
-/* *INDENT-OFF* */
-struct sched_switch_ctx {
-	short unsigned int common_type;		/*     0     2 */
-	unsigned char common_flags;		/*     2     1 */
-	unsigned char common_preempt_count;	/*     3     1 */
-	int common_pid;				/*     4     4 */
-	char prev_comm[16];			/*     8    16 */
-	int prev_pid;				/*    24     4 */
-	int prev_prio;				/*    28     4 */
-	long int prev_state;			/*    32     8 */
-	char next_comm[16];			/*    40    16 */
-	int next_pid;				/*    56     4 */
-	int next_prio;				/*    60     4 */
+static inline int record_sched_info(struct sched_switch_ctx *ctx)
+{
+	__u64 id = bpf_get_current_pid_tgid();
 
-	/* size: 64, cachelines: 1, members: 11 */
-};
-/* *INDENT-ON* */
+	// CPU idle process does not perform any processing.
+	if (id >> 32 == 0 && (__u32) id == 0)
+		return -1;
+
+	/* TODO: Threads filter */
+
+	/* 
+	 * On Linux, involuntary context switches occur for state TASK_RUNNING,
+	 * whereas the blocking events we're usually interested in are in
+	 * TASK_INTERRUPTIBLE (0x01) or TASK_UNINTERRUPTIBLE (0x02).
+	 *
+	 * TASK_INTERRUPTIBLE ('S'): interruptible sleep (waiting for an event to complete)
+	 * TASK_UNINTERRUPTIBLE ('D'): uninterruptible sleep (usually IO)
+	 */
+	if (!(((ctx->prev_state & (TASK_REPORT_MAX - 1)) & 0x01)
+	      || ((ctx->prev_state & (TASK_REPORT_MAX - 1)) & 0x02)))
+		return -1;
+
+	// Filter out the high volume of scheduling events caused by self-monitoring.
+	char comm[TASK_COMM_LEN];
+	bpf_get_current_comm(comm, sizeof(comm));
+	if ((comm[0] == 't' && comm[1] == 'c' && comm[2] == '\0')
+	    || (comm[0] == 's' && comm[1] == 's' && comm[2] == 'h')
+	    || (comm[0] == 'p' && comm[1] == 'e' && comm[2] == 'r'))
+		return -1;
+
+	struct sched_info_s val = {};
+	val.prev_pid = ctx->prev_pid;
+	int pid = ctx->next_pid;
+	offcpu_sched_map__update(&pid, &val);
+
+	return 0;
+}
+
+static inline __u64 fetch_delta_time(int curr_pid, int offcpu_pid)
+{
+	int pid = curr_pid;
+	int prev_pid = offcpu_pid;
+	__u64 ts, *tsp;
+	ts = bpf_ktime_get_ns();
+	offcpu_start_map__update(&prev_pid, &ts);
+	tsp = offcpu_start_map__lookup(&pid);
+	if (tsp == NULL)
+		return 0;
+
+	// calculate schedule thread's delta time
+	__u64 delta_ns = ts - *tsp;
+	offcpu_start_map__delete(&pid);
+
+	/*
+	 * Note:
+	 * Scheduler events are still high-frequency events, as their rate may exceed
+	 * 1 million events per second, so caution should still be exercised.
+	 *
+	 * If overhead remains an issue, you can check the 'MINBLOCK_US' tunable parameter
+	 * in the code. If your goal is to trace longer blocking events, then increasing
+	 * this parameter can filter out shorter blocking events, further reducing overhead.
+	 */
+	__u64 delta_us = delta_ns / 1000;
+	if ((delta_us < MINBLOCK_US) || (delta_us > MAXBLOCK_US))
+		return 0;
+
+	return delta_ns;
+}
+
+// The current task is a new task that has been scheduled.
+static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
+{
+	// create map key
+	struct offcpu_data_s data = {};
+	data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
+					 USER_STACKID_FLAGS);
+
+	/* 
+	 * It only handles user-space programs. If there's no
+	 * user-space stack, it won't process.
+	 */
+	if (data.userstack < 0)
+		return 0;
+
+	data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
+					 KERN_STACKID_FLAGS);
+	data.pid = pid;
+	data.tgid = tgid;
+	data.duration_ns = delta_ns;
+	bpf_get_current_comm(&data.name, sizeof(data.name));
+
+	bpf_perf_event_output(ctx, &NAME(offcpu_output_a),
+			      BPF_F_CURRENT_CPU, &data, sizeof(data));
+
+	return 0;
+}
 
 /*
- * prev_state=%s%s
- * (REC->prev_state & ((((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) - 1)) ?
- *   __print_flags(REC->prev_state & ((((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) - 1), "|", { 0x01, "S" }, { 0x02, "D" }, { 0x04, "T" }, { 0x08, "t" }, { 0x10, "X" }, { 0x20, "Z" }, { 0x40, "P" }, { 0x80, "I" }) : "R", REC->prev_state & (((0x0000 | 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040) + 1) << 1) ? "+" : ""
+ * Here is an indication of where the probes are located:
+ *
+ * schedule() -> trace_sched_switch -> switch_to() -> finish_task_switch()                  
+ *                (oncpu old task)    stack switch      (oncpu new task) 
  */
+
+// /sys/kernel/debug/tracing/events/sched/sched_switch/format 
 TP_SCHED_PROG(sched_switch) (struct sched_switch_ctx * ctx) {
+	return record_sched_info(ctx);
+}
 
-	struct key_t key;
-	key.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
-					KERN_STACKID_FLAGS);
-	key.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
-					USER_STACKID_FLAGS);
-	int pid = ctx->prev_pid;
+// static struct rq *finish_task_switch(struct task_struct *prev)
+KPROG(finish_task_switch) (struct pt_regs * ctx) {
+	__u64 id = bpf_get_current_pid_tgid();
+	int pid = (int)id, tgid = (int)(id >> 32);
+	struct sched_info_s *v;
+	v = offcpu_sched_map__lookup(&pid);
+	if (v == NULL)
+		return 0;
 
-	bpf_debug("pid %d\n", pid);
-#if 0
-	int pid = 0;
-	unsigned long long duration = 0;
-	struct sched_switch_event *event = NULL;
+	int prev_pid = v->prev_pid;
+	offcpu_sched_map__delete(&pid);
 
-	// 上一个线程 offcpu
-	pid = ctx->prev_pid;
-	// 如果要监控这个线程,就在用户态向 map 中插入 key, 这样就能实现在用户态动态调整待监控的线程了
-	event = bpf_map_lookup_elem(&sched_switch_event_map, &pid);
-	// 在 map 中查找这个线程号,只处理能够找到的线程
-	if (event) {
-		// 拿 stackid,需要在 offcpu 的时候拿,因为在执行这段 eBPF 代码时还没有切换上下文
-		event->stackid =
-		    bpf_get_stackid(ctx, &stack_trace_map,
-				    BPF_F_FAST_STACK_CMP | BPF_F_USER_STACK);
-		// 如果 offcpu 是由用户态的行为传递下来的,这里取到的值会大于 0,
-		// 如果用户态进程在运行过程被抢占了也会走到这里,这种情况下应该去看 oncpu,已经在前文讨论过了
-		if (event->stackid > 0) {
-			// 当能成功拿到 stackid 的时候设置 timestamp, timestamp 除了记录时间,
-			// 还用来做标记,当值为 0 时表示 event 值无效,这个值会 oncpu 时检查
-			event->offcpu_timestamp = bpf_ktime_get_boot_ns();
-		}
-	}
-	// 下一个线程 oncpu
-	pid = ctx->next_pid;
-	event = bpf_map_lookup_elem(&sched_switch_event_map, &pid);
-	// 检查 event 在 oncpu 前是否 offcpu 了
-	if (event && event->offcpu_timestamp) {
-		// 计算 offcpu 的时间并上报
-		duration = bpf_ktime_get_boot_ns() - event->offcpu_timestamp;
-		LOG("offcpu: pid=%d duration=%llu stackid=%d", pid, duration,
-		    event->stackid);
-		// 使用后标记无效,等待 offcpu 时重新赋值
-		event->offcpu_timestamp = 0;
-	}
-#endif
-	return 0;
+	__u64 delta_ns = fetch_delta_time(pid, prev_pid);
+	if (delta_ns == 0)
+		return 0;
+
+	return oncpu(ctx, pid, tgid, delta_ns);
 }

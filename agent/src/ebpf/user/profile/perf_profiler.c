@@ -1130,6 +1130,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
 
+	if (tracer_probes_init(tracer))
+		return (-1);
+
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
 
