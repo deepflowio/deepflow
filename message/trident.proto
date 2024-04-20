@@ -195,7 +195,7 @@ message Config {
     optional uint32 max_cpus = 2 [default = 1];
     optional uint32 max_memory = 3 [default = 768];  // in MiB
     optional uint32 sync_interval = 4 [default = 60];
-    optional uint32 stats_interval = 5 [default = 60];
+    optional uint32 stats_interval = 5 [default = 10];
     optional uint64 global_pps_threshold = 6 [default = 200000];
 
     // capture network namespace regex besides root ns
