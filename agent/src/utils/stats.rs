@@ -37,7 +37,8 @@ use public::{
 };
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
-const TICK_CYCLE: Duration = Duration::from_secs(10);
+const TICK_CYCLE: Duration = Duration::from_secs(1);
+const DEFAULT_INTERVAL: Duration = Duration::from_secs(10);
 const STATS_SENDER_QUEUE_SIZE: usize = 4096;
 
 pub enum StatsOption {
@@ -201,7 +202,7 @@ pub struct Collector {
 
 impl Collector {
     pub fn new<S: AsRef<str>>(hostname: S, ntp_diff: Arc<AtomicI64>) -> Self {
-        Self::with_min_interval(hostname, TICK_CYCLE, ntp_diff)
+        Self::with_min_interval(hostname, DEFAULT_INTERVAL, ntp_diff)
     }
 
     pub fn with_min_interval<S: AsRef<str>>(
