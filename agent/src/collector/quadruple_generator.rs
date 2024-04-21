@@ -1142,9 +1142,9 @@ impl QuadrupleGenerator {
                         }
                     }
                     if send_batch.len() > 0 {
-                        if let Err(_) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
+                        if let Err(e) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
                         {
-                            debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
+                            debug!("qg push TaggedFlow to l4_flow queue failed, because {:?}", e);
                             send_batch.clear();
                         }
                     }
