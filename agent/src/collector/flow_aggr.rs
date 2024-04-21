@@ -446,8 +446,11 @@ impl ThrottlingQueue {
             != self.last_flush_cache_with_throttling_time.as_secs() >> Self::THROTTLE_BUCKET_BITS
         {
             self.update_throttle();
-            if let Err(_) = self.output.send_all(&mut self.cache_with_throttling) {
-                debug!("l4 flow throttle push aggred flow to sender queue failed, maybe queue have terminated");
+            if let Err(e) = self.output.send_all(&mut self.cache_with_throttling) {
+                debug!(
+                    "l4 flow throttle push aggred flow to sender queue failed, because {:?}",
+                    e
+                );
                 self.cache_with_throttling.clear();
             }
 
@@ -476,9 +479,10 @@ impl ThrottlingQueue {
                 != self.last_flush_cache_without_throttling_time.as_secs()
                     >> Self::THROTTLE_BUCKET_BITS
         {
-            if let Err(_) = self.output.send_all(&mut self.cache_without_throttling) {
+            if let Err(e) = self.output.send_all(&mut self.cache_without_throttling) {
                 debug!(
-                    "l4 flow push aggred flow to sender queue failed, maybe queue have terminated"
+                    "l4 flow push aggred flow to sender queue failed, because {:?}",
+                    e
                 );
                 self.cache_without_throttling.clear();
             }
