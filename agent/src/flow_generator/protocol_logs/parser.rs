@@ -715,10 +715,8 @@ impl SessionQueue {
                 .fetch_sub(slot.len() as u64, Ordering::Relaxed);
             while let Some((_, item)) = slot.pop_lru() {
                 if batch.len() >= QUEUE_BATCH_SIZE {
-                    if let Err(queue::Error::Terminated(..)) =
-                        self.output_queue.send_all(&mut batch)
-                    {
-                        warn!("output queue terminated");
+                    if let Err(e) = self.output_queue.send_all(&mut batch) {
+                        warn!("output queue failed to send data, because {:?}", e);
                         batch.clear();
                         break 'outer;
                     }
@@ -733,8 +731,8 @@ impl SessionQueue {
             slot.resize(NonZeroUsize::new(self.l7_log_session_slot_capacity).unwrap());
         }
         if !batch.is_empty() {
-            if let Err(queue::Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
-                warn!("output queue terminated");
+            if let Err(e) = self.output_queue.send_all(&mut batch) {
+                warn!("output queue failed to send data, because {:?}", e);
             }
         }
         self.time_window.replace(time_window);
@@ -788,9 +786,8 @@ impl SessionQueue {
             return;
         }
 
-        if let Err(queue::Error::Terminated(..)) = self.output_queue.send(BoxAppProtoLogsData(item))
-        {
-            warn!("output queue terminated");
+        if let Err(e) = self.output_queue.send(BoxAppProtoLogsData(item)) {
+            warn!("output queue failed to send data, because: {:?}", e);
         }
     }
 
