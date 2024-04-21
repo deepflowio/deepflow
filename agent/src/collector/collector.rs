@@ -770,8 +770,11 @@ impl Stash {
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         for (_, mut doc) in self.inner.drain() {
             if batch.len() >= QUEUE_BATCH_SIZE {
-                if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
-                    warn!("{} queue terminated", self.context.name);
+                if let Err(e) = self.sender.send_all(&mut batch) {
+                    warn!(
+                        "{} queue failed to send data, because {:?}",
+                        self.context.name, e
+                    );
                     return;
                 }
             }
@@ -780,8 +783,11 @@ impl Stash {
             batch.push(BoxedDocument(Box::new(doc)))
         }
         if batch.len() > 0 {
-            if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
-                warn!("{} queue terminated", self.context.name);
+            if let Err(e) = self.sender.send_all(&mut batch) {
+                warn!(
+                    "{} queue failed to send data, because {:?}",
+                    self.context.name, e
+                );
             }
         }
 

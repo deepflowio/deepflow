@@ -584,11 +584,9 @@ impl FlowMap {
                     if self.packet_sequence_enabled {
                         if let Some(block) = node.packet_sequence_block.take() {
                             // flush the packet_sequence_block at the regular time
-                            if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block)
+                            if let Err(e) = self.packet_sequence_queue.as_ref().unwrap().send(block)
                             {
-                                warn!(
-                                    "packet sequence block to queue failed maybe queue have terminated"
-                                );
+                                warn!("packet sequence block to queue failed, because {:?}", e);
                             }
                         }
                     }
@@ -778,13 +776,13 @@ impl FlowMap {
                 packet_sequence_start_time as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
-                if let Err(_) = self
+                if let Err(e) = self
                     .packet_sequence_queue
                     .as_ref()
                     .unwrap()
                     .send(node.packet_sequence_block.take().unwrap())
                 {
-                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                    warn!("packet sequence block to queue failed, because {:?}", e);
                 }
 
                 node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
@@ -1556,6 +1554,15 @@ impl FlowMap {
 
                 self.l7_stats_buffer
                     .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+                if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
+                    if let Err(e) = self
+                        .l7_stats_output_queue
+                        .send_all(&mut self.l7_stats_buffer)
+                    {
+                        warn!("flow-map push l7 stats to queue failed, because {:?}", e);
+                        self.l7_stats_buffer.clear();
+                    }
+                }
             }
         }
         // FIXME: the endpoint may be None after parsed
@@ -1766,18 +1773,19 @@ impl FlowMap {
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now > config.flush_interval + self.last_queue_flush {
             if self.l7_stats_buffer.len() > 0 {
-                if let Err(_) = self
+                if let Err(e) = self
                     .l7_stats_output_queue
                     .send_all(&mut self.l7_stats_buffer)
                 {
-                    warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                    warn!("flow-map push l7 stats to queue failed, because {:?}", e);
                     self.l7_stats_buffer.clear();
                 }
             }
             if self.output_buffer.len() > 0 {
-                if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
+                if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
                     warn!(
-                        "flow-map push tagged flows to queue failed because queue have terminated"
+                        "flow-map push tagged flows to queue failed, because {:?}",
+                        e
                     );
                     self.output_buffer.clear();
                 }
@@ -1788,11 +1796,11 @@ impl FlowMap {
 
     fn push_to_flow_stats_queue(&mut self, tagged_flow: Arc<BatchedBox<TaggedFlow>>) {
         if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(_) = self
+            if let Err(e) = self
                 .l7_stats_output_queue
                 .send_all(&mut self.l7_stats_buffer)
             {
-                warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                warn!("flow-map push l7 stats to queue failed, because {:?}", e);
                 self.l7_stats_buffer.clear();
             }
         }
@@ -1804,8 +1812,11 @@ impl FlowMap {
 
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
-                warn!("flow-map push tagged flows to queue failed because queue have terminated");
+            if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
+                warn!(
+                    "flow-map push tagged flows to queue failed, because {:?}",
+                    e
+                );
                 self.output_buffer.clear();
             }
         }
@@ -1838,8 +1849,8 @@ impl FlowMap {
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::TCP {
             if let Some(block) = node.packet_sequence_block.take() {
-                if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
-                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                if let Err(e) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
+                    warn!("packet sequence block to queue failed, because {:?}", e);
                 }
             }
         }
@@ -2018,8 +2029,11 @@ impl FlowMap {
 
     fn flush_app_protolog(&mut self) {
         if self.protolog_buffer.len() > 0 {
-            if let Err(_) = self.out_log_queue.send_all(&mut self.protolog_buffer) {
-                warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+            if let Err(e) = self.out_log_queue.send_all(&mut self.protolog_buffer) {
+                warn!(
+                    "flow-map push MetaAppProto to queue failed, because {:?}",
+                    e
+                );
                 self.protolog_buffer.clear();
             }
         }
