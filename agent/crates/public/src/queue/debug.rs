@@ -60,11 +60,6 @@ impl<T: Debug> DebugSender<T> {
         self.send_debug(&msgs);
         self.sender.send_all(msgs)
     }
-
-    pub fn send_large(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
-        self.send_debug(&msgs);
-        self.sender.send_large(msgs)
-    }
 }
 
 impl<T> Clone for DebugSender<T> {

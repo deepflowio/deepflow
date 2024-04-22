@@ -250,8 +250,8 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 	for _, analyzer := range analyzers {
 		if ingesterErr := CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port); ingesterErr != nil {
 			errStr := fmt.Sprintf(
-				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
-				analyzer.Name, analyzer.IP, dataSource.DisplayName,
+				"failed to config analyzer (name:%s, ip:%s) add data_source(%s), error: %s",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
 			errStrs = append(errStrs, errStr)
 			continue
@@ -263,7 +263,7 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 	}
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
-		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
 		log.Error(errMsg)
 	}
 
@@ -346,7 +346,7 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 			).Error; err != nil {
 				return model.DataSource{}, err
 			}
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
+			err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
 			break
 		}
 	}

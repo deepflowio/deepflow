@@ -62,6 +62,14 @@ func ServiceUnavailableResponse(c *gin.Context, data interface{}, optStatus stri
 	})
 }
 
+func StatusPartialContentResponse(c *gin.Context, data interface{}, optStatus string, description string) {
+	c.JSON(http.StatusPartialContent, Response{
+		OptStatus:   "PARTIAL_RESULT",
+		Description: description,
+		Data:        data,
+	})
+}
+
 func JsonResponse(c *gin.Context, data interface{}, err error) {
 	if err != nil {
 		switch t := err.(type) {
@@ -75,6 +83,8 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 				InternalErrorResponse(c, data, t.Status, t.Message)
 			case httpcommon.SERVICE_UNAVAILABLE:
 				ServiceUnavailableResponse(c, data, t.Status, t.Message)
+			case httpcommon.STATUES_PARTIAL_CONTENT:
+				StatusPartialContentResponse(c, data, t.Status, t.Message)
 			}
 		default:
 			InternalErrorResponse(c, data, httpcommon.FAIL, err.Error())

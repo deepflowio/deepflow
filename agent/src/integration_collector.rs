@@ -74,7 +74,7 @@ use public::{
         metric,
         trident::Exception,
     },
-    queue::{DebugSender, Error},
+    queue::DebugSender,
     utils::net::ipv6_enabled,
 };
 
@@ -644,10 +644,8 @@ async fn handler(
                 e
             })?;
             if !decode_data.1.is_empty() {
-                if let Err(Error::Terminated(..)) =
-                    otel_l7_stats_sender.send_all(&mut decode_data.1)
-                {
-                    warn!("sender queue has terminated");
+                if let Err(e) = otel_l7_stats_sender.send_all(&mut decode_data.1) {
+                    warn!("otel_l7_stats_sender failed to send data, because {:?}", e);
                 }
             }
             if compressed {
@@ -658,14 +656,17 @@ async fn handler(
                 counter
                     .compressed
                     .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
-                if let Err(Error::Terminated(..)) =
+                if let Err(e) =
                     compressed_otel_sender.send(OpenTelemetryCompressed(compressed_data))
                 {
-                    warn!("sender queue has terminated");
+                    warn!(
+                        "compressed_otel_sender failed to send data, because {:?}",
+                        e
+                    );
                 }
             } else {
-                if let Err(Error::Terminated(..)) = otel_sender.send(OpenTelemetry(decode_data.0)) {
-                    warn!("sender queue has terminated");
+                if let Err(e) = otel_sender.send(OpenTelemetry(decode_data.0)) {
+                    warn!("otel_sender failed to send data, because {:?}", e);
                 }
             }
 
@@ -721,10 +722,10 @@ async fn handler(
                 extra_label_names,
                 extra_label_values,
             };
-            if let Err(Error::Terminated(..)) =
+            if let Err(e) =
                 prometheus_sender.send(BoxedPrometheusExtra(Box::new(prometheus_with_extra)))
             {
-                warn!("sender queue has terminated");
+                warn!("prometheus_sender failed to send data, because {:?}", e);
             }
 
             Ok(Response::builder().body(Body::empty()).unwrap())
@@ -747,8 +748,8 @@ async fn handler(
                     debug!("telegraf metric: {}", r)
                 }
             }
-            if let Err(Error::Terminated(..)) = telegraf_sender.send(TelegrafMetric(metric)) {
-                warn!("sender queue has terminated");
+            if let Err(e) = telegraf_sender.send(TelegrafMetric(metric)) {
+                warn!("telegraf_sender failed to send data, because {:?}", e);
             }
             Ok(Response::builder().body(Body::empty()).unwrap())
         }
@@ -778,8 +779,8 @@ async fn handler(
                 profile.content_type = content_type.as_bytes().to_vec();
             }
 
-            if let Err(Error::Terminated(..)) = profile_sender.send(Profile(profile)) {
-                warn!("profile sender queue has terminated");
+            if let Err(e) = profile_sender.send(Profile(profile)) {
+                warn!("profile_sender failed to send data, because {:?}", e);
             }
 
             Ok(Response::builder().body(Body::empty()).unwrap())

@@ -19,10 +19,14 @@ mod overwrite_queue;
 
 pub use debug::{bounded_with_debug, DebugSender};
 pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
+use thiserror::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum Error<T> {
+    #[error("the queue sending operation has timed out")]
     Timeout,
+    #[error("the queue has terminated")]
     Terminated(Option<T>, Option<Vec<T>>),
+    #[error("the quantity for batch sending to the queue is too large, you can consider adjusting the corresponding queue size")]
     BatchTooLarge(Option<Vec<T>>),
 }
