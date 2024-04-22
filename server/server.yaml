@@ -550,7 +550,8 @@ ingester:
   #prometheus-label-cache-expiration: 86400
 
   #ck-disk-monitor:
-  #  check-interval: 180 # 检查时间间隔(单位: 秒)
+  #  check-interval: 180 # check time interval (unit: seconds)
+  #  ttl-check-disabled: false # whether to not check TTL expired data
   ## 磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space, 或磁盘占用大于used-space, 开始清理数据
   ## When the disk space is insufficient, the disk occupancy > 'used-percent' and the disk idle < 'free-space' are met at the same time, or the disk occupancy > 'used-space', then the data is cleaned up
   #  disk-cleanups:
