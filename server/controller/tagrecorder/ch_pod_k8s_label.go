@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -49,25 +47,9 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Label.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.Label.GetNew()
-		oldStr := fieldsUpdate.Label.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
+		_, new := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.Label.GetOld())
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -115,15 +97,7 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sLabelKey, targets []mysql.ChPodK8sLabel) {
-	labelMap := map[string]string{}
-	splitTags := strings.Split(source.Label, ", ")
-
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			labelMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
+	_, labelMap := common.StrToJsonAndMap(source.Label)
 	for k, v := range labelMap {
 		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sLabel{

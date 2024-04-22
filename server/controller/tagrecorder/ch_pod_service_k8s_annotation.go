@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -46,48 +44,34 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 	targetsToDelete := make([]mysql.ChPodServiceK8sAnnotation, 0)
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		new := fieldsUpdate.Annotation.GetNew()
-		old := fieldsUpdate.Annotation.GetOld()
-		oldMap := make(map[string]string)
-		newMap := make(map[string]string)
+		_, oldMap := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
+		_, newMap := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 
-		for _, pairStr := range strings.Split(old, ", ") {
-			pair := strings.Split(pairStr, ":")
-			if len(pair) == 2 {
-				oldMap[pair[0]] = pair[1]
-			}
-		}
-		for _, pairStr := range strings.Split(new, ", ") {
-			pair := strings.Split(pairStr, ":")
-			if len(pair) == 2 {
-				k, v := pair[0], pair[1]
-				newMap[k] = v
-
-				oldV, ok := oldMap[k]
-				if !ok {
-					keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
-					targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sAnnotation{
-						ID:      sourceID,
-						Key:     k,
-						Value:   v,
-						L3EPCID: fieldsUpdate.VPCID.GetNew(),
-						PodNsID: fieldsUpdate.PodNamespaceID.GetNew(),
-					})
-				} else {
-					if oldV != v {
-						key := K8sAnnotationKey{ID: sourceID, Key: k}
-						var chItem mysql.ChPodServiceK8sAnnotation
-						db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-						if chItem.ID == 0 {
-							keysToAdd = append(keysToAdd, key)
-							targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sAnnotation{
-								ID:    sourceID,
-								Key:   k,
-								Value: v,
-							})
-						} else {
-							c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key, db)
-						}
+		for k, v := range newMap {
+			oldV, ok := oldMap[k]
+			if !ok {
+				keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
+				targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sAnnotation{
+					ID:      sourceID,
+					Key:     k,
+					Value:   v,
+					L3EPCID: fieldsUpdate.VPCID.GetNew(),
+					PodNsID: fieldsUpdate.PodNamespaceID.GetNew(),
+				})
+			} else {
+				if oldV != v {
+					key := K8sAnnotationKey{ID: sourceID, Key: k}
+					var chItem mysql.ChPodServiceK8sAnnotation
+					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+					if chItem.ID == 0 {
+						keysToAdd = append(keysToAdd, key)
+						targetsToAdd = append(targetsToAdd, mysql.ChPodServiceK8sAnnotation{
+							ID:    sourceID,
+							Key:   k,
+							Value: v,
+						})
+					} else {
+						c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key, db)
 					}
 				}
 			}
@@ -112,19 +96,16 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 
 // sourceToTarget implements SubscriberDataGenerator
 func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []K8sAnnotationKey, targets []mysql.ChPodServiceK8sAnnotation) {
-	splitAnnotation := strings.Split(source.Annotation, ", ")
-	for _, singleAnnotation := range splitAnnotation {
-		splitSingleAnnotation := strings.Split(singleAnnotation, ":")
-		if len(splitSingleAnnotation) == 2 {
-			keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: splitSingleAnnotation[0]})
-			targets = append(targets, mysql.ChPodServiceK8sAnnotation{
-				ID:       source.ID,
-				Key:      splitSingleAnnotation[0],
-				Value:    splitSingleAnnotation[1],
-				TeamID:   md.TeamID,
-				DomainID: md.DomainID,
-			})
-		}
+	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
+	for k, v := range annotationMap {
+		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
+		targets = append(targets, mysql.ChPodServiceK8sAnnotation{
+			ID:       source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
+		})
 	}
 	return
 }

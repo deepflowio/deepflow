@@ -41,7 +41,8 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *mess
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		updateInfo["annotations"] = fieldsUpdate.Annotation.GetNew()
+		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		updateInfo["annotations"] = annotations
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sAnnotations
@@ -63,7 +64,8 @@ func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysql.P
 	if item.Annotation == "" {
 		return
 	}
-	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodK8sAnnotations{{ID: item.ID, Annotations: item.Annotation, TeamID: md.TeamID, DomainID: md.DomainID}}
+	annotations, _ := common.StrToJsonAndMap(item.Annotation)
+	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodK8sAnnotations{{ID: item.ID, Annotations: annotations, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

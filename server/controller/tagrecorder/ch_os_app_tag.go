@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -49,25 +47,9 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.OSAPPTags.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.OSAPPTags.GetNew()
-		oldStr := fieldsUpdate.OSAPPTags.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
+		_, new := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetOld())
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -115,15 +97,8 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
-	osAppTagsMap := map[string]string{}
-	splitTags := strings.Split(source.OSAPPTags, ", ")
+	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
 		targets = append(targets, mysql.ChOSAppTag{

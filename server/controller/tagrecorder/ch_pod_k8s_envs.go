@@ -41,7 +41,8 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
-		updateInfo["envs"] = fieldsUpdate.ENV.GetNew()
+		envs, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		updateInfo["envs"] = envs
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sEnvs
@@ -63,7 +64,8 @@ func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *mysql.Pod) (ke
 	if item.ENV == "" {
 		return
 	}
-	return []K8sEnvsKey{{ID: item.ID}}, []mysql.ChPodK8sEnvs{{ID: item.ID, Envs: item.ENV, TeamID: md.TeamID, DomainID: md.DomainID}}
+	envs, _ := common.StrToJsonAndMap(item.ENV)
+	return []K8sEnvsKey{{ID: item.ID}}, []mysql.ChPodK8sEnvs{{ID: item.ID, Envs: envs, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

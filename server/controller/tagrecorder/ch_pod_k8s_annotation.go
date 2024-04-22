@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -49,25 +47,9 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.Annotation.GetNew()
-		oldStr := fieldsUpdate.Annotation.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
+		_, new := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -115,15 +97,8 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sAnnotationKey, targets []mysql.ChPodK8sAnnotation) {
-	annotationMap := map[string]string{}
-	splitTags := strings.Split(source.Annotation, ", ")
+	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
 
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			annotationMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
 	for k, v := range annotationMap {
 		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sAnnotation{

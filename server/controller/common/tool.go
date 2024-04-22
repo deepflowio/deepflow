@@ -34,19 +34,20 @@ func Contains[T Comparable](slice []T, val T) bool {
 	return false
 }
 
-// a:b,c:d -> {"a":"b","c":"d"}
-func StrToJsonstr(str string) (result string) {
+// a:b,c:d -> {"a":"b","c":"d"}, map[string]string{"a":"b","c":"d"}
+func StrToJsonAndMap(str string) (resJson string, resMap map[string]string) {
 	if str == "" {
 		return
 	}
 	m := map[string]string{}
-	multiPairStr := strings.Split(str, ", ")
+	multiPairStr := strings.Split(str, ",")
 	for _, pairStr := range multiPairStr {
 		pair := strings.Split(pairStr, ":")
 		if len(pair) == 2 {
-			m[pair[0]] = pair[1]
+			m[strings.Trim(pair[0], " ")] = strings.Trim(pair[1], " ")
 		}
 	}
+	resMap = m
 	if len(m) == 0 {
 		return
 	}
@@ -55,5 +56,6 @@ func StrToJsonstr(str string) (result string) {
 		log.Error(err)
 		return
 	}
-	return string(jsonStr)
+	resJson = string(jsonStr)
+	return
 }
