@@ -309,8 +309,8 @@ func (m *TrisolarisManager) getTeamData(orgIDs []int) {
 			continue
 		}
 		for _, team := range teams {
-			teamIDToOrgID[team.ShortLcuuid] = team.OrgLoopID
-			teamIDStrToInt[team.ShortLcuuid] = team.LoopID
+			teamIDToOrgID[team.ShortLcuuid] = team.ORGID
+			teamIDStrToInt[team.ShortLcuuid] = team.TeamID
 		}
 	}
 

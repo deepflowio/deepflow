@@ -486,15 +486,15 @@ func (AlarmPolicy) TableName() string {
 }
 
 type Org struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
-	LoopID int    `gorm:"column:loop_id;type:int;default:0" json:"LOOP_ID"`
+	ID    int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name  string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
+	ORGID int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
 }
 
 type Team struct {
 	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name        string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
-	LoopID      int    `gorm:"column:loop_id;type:int;default:0" json:"LOOP_ID"`
+	TeamID      int    `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
 	ShortLcuuid string `gorm:"column:short_lcuuid;type:char(64);default:''" json:"SHORT_LCUUID"`
-	OrgLoopID   int    `gorm:"column:org_loop_id;type:int;default:1" json:"ORG_LOOP_ID"`
+	ORGID       int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
 }

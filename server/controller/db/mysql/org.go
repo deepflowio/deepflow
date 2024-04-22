@@ -56,7 +56,7 @@ func GetNonDefaultORGIDs() ([]int, error) {
 		return ids, err
 	}
 	for _, org := range orgs {
-		ids = append(ids, org.LoopID)
+		ids = append(ids, org.ORGID)
 	}
 	return ids, nil
 }
