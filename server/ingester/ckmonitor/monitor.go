@@ -278,6 +278,11 @@ func (m *Monitor) start() {
 					}
 				}
 			}
+
+			// the frequency of TTL check is 1/16 of disk check
+			if counter%(m.checkInterval<<4) == 0 && !m.cfg.CKDiskMonitor.TTLCheckDisabled {
+				checkAndDropExpiredPartition(connect)
+			}
 		}
 	}
 }
