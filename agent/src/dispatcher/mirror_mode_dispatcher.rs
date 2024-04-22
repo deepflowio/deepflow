@@ -146,7 +146,7 @@ impl MirrorModeDispatcherListener {
             &self.tap_bridge_inner_macs(self.base.src_interface_index),
         );
         #[cfg(any(target_os = "windows", target_os = "android"))]
-        self.on_vm_change_with_bridge_macs(vm_mac_addrs, &vec![]);
+        self.on_vm_change_with_bridge_macs(vm_mac_addrs, gateway_vmac_addrs, &vec![]);
     }
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
