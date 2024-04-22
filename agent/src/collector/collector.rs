@@ -15,7 +15,7 @@
  */
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap, VecDeque},
     hash::Hash,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::{
@@ -39,7 +39,7 @@ use crate::{
     common::{
         endpoint::EPC_INTERNET,
         enums::{EthernetType, IpProtocol},
-        flow::{L7Protocol, SignalSource},
+        flow::{CloseType, L7Protocol, SignalSource},
     },
     config::handler::{CollectorAccess, CollectorConfig},
     metric::{
@@ -324,6 +324,7 @@ impl StashKey {
 
 struct Stash {
     sender: DebugSender<BoxedDocument>,
+    closed_docs: Vec<BoxedDocument>,
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
@@ -358,6 +359,7 @@ impl Stash {
         let stash_init_capacity = inner.capacity();
         Self {
             sender,
+            closed_docs: Vec::with_capacity(QUEUE_BATCH_SIZE),
             counter,
             start_time,
             global_thread_id: ctx.id as u8 + 1,
@@ -454,7 +456,7 @@ impl Stash {
                     ..Default::default()
                 };
                 let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
-                self.add(key, tagger, Meter::Usage(usage_meter));
+                self.add(key, tagger, Meter::Usage(usage_meter), flow.close_type);
             }
             let id_map = &acc_flow.id_maps[1];
             for (&acl_gid, &ip_id) in id_map.iter() {
@@ -476,7 +478,7 @@ impl Stash {
                     ..Default::default()
                 };
                 let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
-                self.add(key, tagger, Meter::Usage(usage_meter));
+                self.add(key, tagger, Meter::Usage(usage_meter), flow.close_type);
             }
         }
 
@@ -523,7 +525,7 @@ impl Stash {
                     acc_flow.l7_protocol,
                     self.context.agent_mode,
                 );
-                self.fill_single_l4_stats(tagger, flow_meter);
+                self.fill_single_l4_stats(tagger, flow_meter, acc_flow.flow.close_type);
             }
             let tagger = get_edge_tagger(
                 self.global_thread_id,
@@ -539,7 +541,7 @@ impl Stash {
             );
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
-            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
+            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter, acc_flow.flow.close_type);
         }
         // edge_stats: If both ends of direction are None, record the
         // statistical data with direction=0 (corresponding tap-side=rest)
@@ -562,11 +564,16 @@ impl Stash {
                 acc_flow.l7_protocol,
                 self.context.agent_mode,
             );
-            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
+            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter, acc_flow.flow.close_type);
         }
     }
 
-    fn fill_single_l4_stats(&mut self, tagger: Tagger, flow_meter: FlowMeter) {
+    fn fill_single_l4_stats(
+        &mut self,
+        tagger: Tagger,
+        flow_meter: FlowMeter,
+        close_type: CloseType,
+    ) {
         // We collect the single-ended metrics data from Packet, XFlow, EBPF, Otel to the table (vtap_app_port).
         // In the case of signal_source grouping, the single_stats data is not duplicate.
         // Only data whose direction is c|s|local has flow_meter.
@@ -575,18 +582,18 @@ impl Stash {
             || tagger.direction == Direction::LocalToLocal
         {
             let key = StashKey::new(&tagger, tagger.ip, None, 0);
-            self.add(key, tagger, Meter::Flow(flow_meter));
+            self.add(key, tagger, Meter::Flow(flow_meter), close_type);
         }
     }
 
-    fn fill_edge_l4_stats(&mut self, tagger: Tagger, flow_meter: FlowMeter) {
+    fn fill_edge_l4_stats(&mut self, tagger: Tagger, flow_meter: FlowMeter, close_type: CloseType) {
         // network metrics (vtap_flow_edge_port)
         // Packet data and XFlow data have L4 info
         if tagger.signal_source == SignalSource::Packet
             || tagger.signal_source == SignalSource::XFlow
         {
             let key = StashKey::new(&tagger, tagger.ip, Some(tagger.ip1), 0);
-            self.add(key, tagger, Meter::Flow(flow_meter));
+            self.add(key, tagger, Meter::Flow(flow_meter), close_type);
         }
     }
 
@@ -692,7 +699,12 @@ impl Stash {
                     self.context.agent_mode,
                 );
                 tagger.code |= Code::L7_PROTOCOL;
-                self.fill_single_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
+                self.fill_single_l7_stats(
+                    tagger,
+                    meter.endpoint_hash,
+                    meter.app_meter,
+                    flow.close_type,
+                );
             }
             let mut tagger = get_edge_tagger(
                 self.global_thread_id,
@@ -709,7 +721,12 @@ impl Stash {
             tagger.code |= Code::L7_PROTOCOL;
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
-            self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
+            self.fill_edge_l7_stats(
+                tagger,
+                meter.endpoint_hash,
+                meter.app_meter,
+                flow.close_type,
+            );
         }
         // edge_stats: If both ends of direction are None, record the
         // statistical data with direction=0 (corresponding tap-side=rest)
@@ -733,11 +750,22 @@ impl Stash {
                 self.context.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
-            self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
+            self.fill_edge_l7_stats(
+                tagger,
+                meter.endpoint_hash,
+                meter.app_meter,
+                flow.close_type,
+            );
         }
     }
 
-    fn fill_single_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u32, app_meter: AppMeter) {
+    fn fill_single_l7_stats(
+        &mut self,
+        tagger: Tagger,
+        endpoint_hash: u32,
+        app_meter: AppMeter,
+        close_type: CloseType,
+    ) {
         // The l7_protocol of otel data may not be available, so report all otel data metrics.
         if tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel {
             // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app|app has app_meter.
@@ -749,28 +777,63 @@ impl Stash {
                 || tagger.signal_source != SignalSource::Packet
             {
                 let key = StashKey::new(&tagger, tagger.ip, None, endpoint_hash);
-                self.add(key, tagger, Meter::App(app_meter));
+                self.add(key, tagger, Meter::App(app_meter), close_type);
             }
         }
     }
 
-    fn fill_edge_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u32, app_meter: AppMeter) {
+    fn fill_edge_l7_stats(
+        &mut self,
+        tagger: Tagger,
+        endpoint_hash: u32,
+        app_meter: AppMeter,
+        close_type: CloseType,
+    ) {
         // The l7_protocol of otel data may not be available, so report all otel data metrics.
         // application metrics (vtap_app_edge_port)
         if tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel {
             let key = StashKey::new(&tagger, tagger.ip, Some(tagger.ip1), endpoint_hash);
-            self.add(key, tagger, Meter::App(app_meter));
+            self.add(key, tagger, Meter::App(app_meter), close_type);
         }
     }
 
-    fn add(&mut self, key: StashKey, tagger: Tagger, meter: Meter) {
-        if let Some(doc) = self.inner.get_mut(&key) {
-            doc.meter.sequential_merge(&meter);
-            return;
+    fn push_closed_doc(&mut self, closed_doc: BoxedDocument) {
+        self.closed_docs.push(closed_doc);
+        if self.closed_docs.len() >= QUEUE_BATCH_SIZE {
+            if let Err(e) = self.sender.send_all(&mut self.closed_docs) {
+                warn!("queue failed to send Document data, because {:?}", e);
+                self.closed_docs.clear();
+            }
         }
-        let mut doc = Document::new(meter);
-        doc.tagger = tagger;
-        self.inner.insert(key, doc);
+    }
+
+    fn add(&mut self, key: StashKey, tagger: Tagger, meter: Meter, close_type: CloseType) {
+        if close_type != CloseType::Unknown && close_type != CloseType::ForcedReport {
+            match self.inner.entry(key) {
+                Entry::Occupied(o) => {
+                    let mut doc = o.remove();
+                    doc.meter.sequential_merge(&meter);
+                    self.push_closed_doc(BoxedDocument(Box::new(doc)));
+                }
+                Entry::Vacant(_) => {
+                    let mut doc = Document::new(meter);
+                    doc.tagger = tagger;
+                    self.push_closed_doc(BoxedDocument(Box::new(doc)));
+                }
+            }
+        } else {
+            match self.inner.entry(key) {
+                Entry::Occupied(mut o) => {
+                    let doc = o.get_mut();
+                    doc.meter.sequential_merge(&meter);
+                }
+                Entry::Vacant(o) => {
+                    let mut doc = Document::new(meter);
+                    doc.tagger = tagger;
+                    o.insert(doc);
+                }
+            }
+        }
     }
 
     fn flush_stats(&mut self) {
@@ -1173,13 +1236,24 @@ impl Collector {
                                 let time_in_second = flow.time_in_second.as_secs();
                                 stash.collect_l4(Some(*flow), time_in_second, &config);
                             }
+                            if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
+                                warn!("queue failed to send l4 Document data, because {:?}", e);
+                                stash.closed_docs.clear();
+                            }
                             stash.calc_stash_counters();
                         }
-                        Err(Error::Timeout) => stash.collect_l4(
-                            None,
-                            get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
-                            &config,
-                        ),
+                        Err(Error::Timeout) => {
+                            stash.collect_l4(
+                                None,
+                                get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed))
+                                    .as_secs(),
+                                &config,
+                            );
+                            if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
+                                warn!("queue failed to send l4 Document data, because {:?}", e);
+                                stash.closed_docs.clear();
+                            }
+                        }
                         Err(Error::Terminated(..)) => break,
                         Err(Error::BatchTooLarge(_)) => unreachable!(),
                     }
@@ -1304,13 +1378,24 @@ impl L7Collector {
                                 let ts = meter.time_in_second.as_secs();
                                 stash.collect_l7(Some(*meter), ts, &config);
                             }
+                            if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
+                                warn!("queue failed to send l7 Document data, because {:?}", e);
+                                stash.closed_docs.clear();
+                            }
                             stash.calc_stash_counters();
                         }
-                        Err(Error::Timeout) => stash.collect_l7(
-                            None,
-                            get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
-                            &config,
-                        ),
+                        Err(Error::Timeout) => {
+                            stash.collect_l7(
+                                None,
+                                get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed))
+                                    .as_secs(),
+                                &config,
+                            );
+                            if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
+                                warn!("queue failed to send l7 Document data, because {:?}", e);
+                                stash.closed_docs.clear();
+                            }
+                        }
                         Err(Error::Terminated(..)) => break,
                         Err(Error::BatchTooLarge(_)) => unreachable!(),
                     }
