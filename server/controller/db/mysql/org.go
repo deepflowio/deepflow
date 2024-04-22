@@ -51,7 +51,7 @@ func GetNonDefaultORGIDs() ([]int, error) {
 	}
 
 	var orgs []*Org
-	if err := DefaultDB.Where("loop_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
+	if err := DefaultDB.Where("org_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
 		log.Errorf("failed to get org ids: %v", err.Error())
 		return ids, err
 	}
