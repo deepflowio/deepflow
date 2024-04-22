@@ -64,7 +64,7 @@ func ServiceUnavailableResponse(c *gin.Context, data interface{}, optStatus stri
 
 func StatusPartialContentResponse(c *gin.Context, data interface{}, optStatus string, description string) {
 	c.JSON(http.StatusPartialContent, Response{
-		OptStatus:   optStatus,
+		OptStatus:   "PARTIAL_RESULT",
 		Description: description,
 		Data:        data,
 	})
