@@ -250,8 +250,8 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 	for _, analyzer := range analyzers {
 		if ingesterErr := CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port); ingesterErr != nil {
 			errStr := fmt.Sprintf(
-				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
-				analyzer.Name, analyzer.IP, dataSource.DisplayName,
+				"failed to config analyzer (name:%s, ip:%s) add data_source(%s), error: %s",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
 			errStrs = append(errStrs, errStr)
 			continue
