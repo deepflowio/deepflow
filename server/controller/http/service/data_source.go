@@ -263,7 +263,7 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 	}
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
-		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
 		log.Error(errMsg)
 	}
 
@@ -346,7 +346,7 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 			).Error; err != nil {
 				return model.DataSource{}, err
 			}
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
+			err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
 			break
 		}
 	}
