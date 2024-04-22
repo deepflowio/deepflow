@@ -21,7 +21,7 @@ use super::quadruple_generator::QgKey;
 use crate::{
     common::{
         enums::EthernetType,
-        flow::{Flow, FlowKey, FlowMetricsPeer, L7Protocol, SignalSource},
+        flow::{CloseType, Flow, FlowKey, FlowMetricsPeer, L7Protocol, SignalSource},
         tagged_flow::TaggedFlow,
         Timestamp,
     },
@@ -39,6 +39,7 @@ pub struct MiniFlow {
     pub signal_source: SignalSource,
     pub directions: [Direction; 2],
     pub is_active_service: bool,
+    pub close_type: CloseType,
 
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
@@ -57,6 +58,7 @@ impl From<&Flow> for MiniFlow {
             signal_source: flow.signal_source,
             directions: flow.directions,
             is_active_service: flow.is_active_service,
+            close_type: flow.close_type,
 
             otel_service: flow.otel_service.clone(),
             otel_instance: flow.otel_instance.clone(),
