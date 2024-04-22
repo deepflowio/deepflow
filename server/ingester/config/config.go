@@ -70,9 +70,10 @@ type DiskCleanup struct {
 }
 
 type CKDiskMonitor struct {
-	CheckInterval int             `yaml:"check-interval"` // s
-	DiskCleanups  []DiskCleanup   `yaml:"disk-cleanups"`
-	PriorityDrops []DatabaseTable `yaml:"priority-drops"`
+	CheckInterval    int             `yaml:"check-interval"` // s
+	TTLCheckDisabled bool            `yaml:"ttl-check-disabled"`
+	DiskCleanups     []DiskCleanup   `yaml:"disk-cleanups"`
+	PriorityDrops    []DatabaseTable `yaml:"priority-drops"`
 }
 
 type Disk struct {
@@ -382,6 +383,7 @@ func Load(path string) *Config {
 			TCPReaderBuffer: 1 << 20,
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
+				false,
 				[]DiskCleanup{
 					{
 						DefaultSystemDiskPrefix,
