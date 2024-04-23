@@ -282,7 +282,7 @@ impl RedisLog {
 
         match direction {
             // only parse the request with payload start with '*' which indicate is a command start, otherwise assume tcp fragment of request
-            PacketDirection::ClientToServer if payload[0] == b'*' => {
+            PacketDirection::ClientToServer if payload.get(0) == Some(&b'*') => {
                 self.fill_request(CommandLine::new(payload)?, info)
             }
             // When packet comes from AfPacket, there must be a request before parsing the response.
@@ -456,19 +456,19 @@ mod stringifier {
     fn validate_null(payload: &[u8]) -> Result<&[u8]> {
         assert_eq!(payload[0], b'_');
 
-        if payload.len() < 3 || &payload[1..3] != b"\r\n" {
-            return Err(Error::RedisLogParseFailed);
+        if payload.get(1..3) == Some(b"\r\n") {
+            Ok(&payload[3..])
+        } else {
+            Err(Error::RedisLogParseFailed)
         }
-
-        Ok(&payload[3..])
     }
 
     // #<t|f>\r\n
     fn validate_boolean(payload: &[u8]) -> Result<&[u8]> {
         assert_eq!(payload[0], b'#');
 
-        match &payload[1..4] {
-            b"t\r\n" | b"f\r\n" => Ok(&payload[4..]),
+        match payload.get(1..4) {
+            Some(b"t\r\n") | Some(b"f\r\n") => Ok(&payload[4..]),
             _ => Err(Error::RedisLogParseFailed),
         }
     }
@@ -1022,8 +1022,10 @@ mod tests {
             (("-1\r\n", true), Some("-1")),
             // _\r\n
             (("_\r\n", true), Some("")),
+            (("_\r", true), None),
             // #<t|f>\r\n
             (("#t\r\n", true), Some("")),
+            (("#t\r", true), None),
             // ,[<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]\r\n
             // ,inf\r\n
             // ,-inf\r\n
