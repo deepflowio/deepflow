@@ -942,9 +942,10 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&q->enqueue_nr, nr);
 }
 
-static void reader_lost_cb(void *t, uint64_t lost)
+static void reader_lost_cb(void *cookie, uint64_t lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct reader_forward_info *fwd_info = cookie;
+	struct bpf_tracer *tracer = fwd_info->tracer;
 	atomic64_add(&tracer->lost, lost);
 }
 

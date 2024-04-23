@@ -292,16 +292,16 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	}
 }
 
-static void reader_lost_cb_a(void *t, u64 lost)
+static void reader_lost_cb_a(void *cookie, u64 lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
 	perf_buf_lost_a_count++;
 }
 
-static void reader_lost_cb_b(void *t, u64 lost)
+static void reader_lost_cb_b(void *cookie, u64 lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
 	perf_buf_lost_b_count++;
 }

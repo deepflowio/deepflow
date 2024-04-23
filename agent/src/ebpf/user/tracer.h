@@ -454,6 +454,7 @@ struct bpf_tracer_param_array {
 struct reader_forward_info {
 	uint64_t queue_id;
 	int cpu_id;
+	struct bpf_tracer *tracer;
 };
 
 extern volatile uint32_t *tracers_lock;
