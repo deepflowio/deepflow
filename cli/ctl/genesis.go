@@ -331,8 +331,12 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 	for i := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
 		ipsString := data.Get("IPS").MustString()
-		for _, ip := range strings.Split(ipsString, ",") {
-			if ip == "" {
+		ips := strings.Split(ipsString, ",")
+		if len(ips) == 0 {
+			ips = []string{""}
+		}
+		for index, ip := range ips {
+			if index != 0 && ip == "" {
 				continue
 			}
 			tableItem := []string{}
