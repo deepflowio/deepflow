@@ -1992,6 +1992,9 @@ impl FlowMap {
                     );
                     self.protolog_buffer
                         .push(Box::new(AppProto::PseudoAppProto(app_proto)));
+                    if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
+                        self.flush_app_protolog();
+                    }
                 }
             }
             _ => {}
