@@ -2049,9 +2049,6 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
     ) {
-        if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
-            self.flush_app_protolog();
-        }
         let domain = l7_info.get_request_domain();
         if !domain.is_empty() {
             node.tagged_flow.flow.request_domain = domain;
@@ -2067,6 +2064,9 @@ impl FlowMap {
             {
                 self.protolog_buffer
                     .push(Box::new(AppProto::MetaAppProto(app_proto)));
+                if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
+                    self.flush_app_protolog();
+                }
             }
         }
     }
