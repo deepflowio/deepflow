@@ -303,7 +303,7 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 	}
 
 	response, _ := GetVtaps(map[string]interface{}{"lcuuid": vtap.Lcuuid})
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 

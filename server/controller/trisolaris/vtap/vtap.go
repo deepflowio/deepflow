@@ -766,6 +766,8 @@ func (v *VTapInfo) generateVTapIP() {
 			EpcId:        proto.Uint32(uint32(cacheVTap.GetVPCID())),
 			Ip:           proto.String(cacheVTap.GetLaunchServer()),
 			PodClusterId: proto.Uint32(uint32(cacheVTap.GetPodClusterID())),
+			TeamId:       proto.Uint32(uint32(cacheVTap.GetTeamID())),
+			OrgId:        proto.Uint32(uint32(v.ORGID)),
 		}
 		vTapIPs = append(vTapIPs, data)
 	}
@@ -876,7 +878,7 @@ func (v *VTapInfo) generatePlatformDataAndSegment() {
 	v.generateAllVTapPlatformData()
 	log.Info(v.Log("platform data changed generate all vtap segment"))
 	v.generateAllVTapSegements()
-	pushmanager.Broadcast()
+	pushmanager.Broadcast(int(v.ORGID))
 }
 
 func (v *VTapInfo) monitorDataChanged() {
@@ -1271,7 +1273,7 @@ func (v *VTapInfo) timedRefreshVTapCache() {
 		case <-v.chVTapCacheRefresh:
 			log.Info(v.Logf("start generate vtap cache data from rpc"))
 			v.GenerateVTapCache()
-			pushmanager.Broadcast()
+			pushmanager.Broadcast(v.GetORGID())
 			log.Info(v.Logf("end generate vtap cache data from rpc"))
 		case <-v.ctx.Done():
 			log.Info(v.Log("exit generate vtap cache data"))
