@@ -28,7 +28,7 @@ use cadence::{Metric, MetricBuilder, MetricError, MetricResult, MetricSink, Stat
 use log::{debug, info, warn};
 use prost::Message;
 
-use crate::rpc::get_timestamp;
+use crate::{rpc::get_timestamp, utils::command::get_hostname};
 pub use public::counter::*;
 use public::{
     proto::stats,
@@ -340,7 +340,10 @@ impl Collector {
                 .name("stats-collector".to_owned())
                 .spawn(move || {
                     loop {
-                        let host = hostname.lock().unwrap().clone();
+                        let mut host = hostname.lock().unwrap().clone();
+                        if host.is_empty() {
+                            host = get_hostname().unwrap_or("Unknown".to_string());
+                        }
                         {
                             pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
                         }
