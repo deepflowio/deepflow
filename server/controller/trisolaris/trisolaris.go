@@ -304,8 +304,8 @@ func getStartTime() int64 {
 
 func (t *Trisolaris) Start() {
 	log.Infof("start ORG(id=%d database=%s) data generate", t.mDB.ORGID, t.mDB.Name)
+	t.metaData.InitData(t.startTime) // 需要先初始化
 	go func() {
-		t.metaData.InitData(t.startTime) // 需要先初始化
 		go t.metaData.TimedRefreshMetaData()
 		go t.kubernetesInfo.TimedRefreshClusterID()
 		go t.vTapInfo.Run()
@@ -929,6 +929,7 @@ func (m *TrisolarisManager) generateIngesterPolicyData() {
 }
 
 func (m *TrisolarisManager) TimedGenerateTSDBData() {
+	m.generateTSDBData()
 	interval := time.Duration(60)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
