@@ -136,14 +136,15 @@ type PromWriter struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	conf       flowmetricsconfig.PromWriterConfig
-	client     *http.Client
-	queues     queue.FixedMultiQueue
-	queueCount int
-	filter     map[string]struct{}
-	seq        int32
-	closed     bool
-	counter    *PromWriterCounter
+	conf         flowmetricsconfig.PromWriterConfig
+	client       *http.Client
+	queues       queue.FixedMultiQueue
+	queueCount   int
+	filter       map[string]struct{}
+	seq          int32
+	closed       bool
+	counter      *PromWriterCounter
+	podNsFilters [][2]int
 }
 
 func (pw *PromWriter) GetCounter() interface{} {
@@ -177,12 +178,52 @@ func NewPromWriter(conf flowmetricsconfig.PromWriterConfig) *PromWriter {
 		filter:     filter,
 		counter:    &PromWriterCounter{},
 	}
+	pw.parsePodNsFilters()
+
 	common.RegisterCountableForIngester("prom_writer", pw, stats.OptionStatTags{"queue_count": strconv.Itoa(int(conf.QueueCount))})
 
 	for i := 0; i < conf.QueueCount; i++ {
 		go pw.loopConsume(i)
 	}
 	return pw
+}
+
+func (pw *PromWriter) parsePodNsFilters() {
+	podNsFilters := make([][2]int, 0)
+	for _, podIdFilter := range pw.conf.PodNsFilters {
+		var podNs [2]int
+		if podIdFilter.NS0 == "" {
+			podNs[0] = -1
+		} else if ns0, err := strconv.Atoi(podIdFilter.NS0); err == nil {
+			podNs[0] = ns0
+		} else {
+			continue
+		}
+		if podIdFilter.NS1 == "" {
+			podNs[1] = -1
+		} else if ns1, err := strconv.Atoi(podIdFilter.NS1); err == nil {
+			podNs[1] = ns1
+		} else {
+			continue
+		}
+		podNsFilters = append(podNsFilters, podNs)
+	}
+	pw.podNsFilters = podNsFilters
+}
+
+func (pw *PromWriter) IsMatchPodNS(doc *app.Document) bool {
+	if len(pw.conf.PodNsFilters) == 0 {
+		return true
+	}
+
+	tag, _ := doc.Tagger.(*zerodoc.Tag)
+	for _, podIds := range pw.podNsFilters {
+		if (podIds[0] == -1 || uint16(podIds[0]) == tag.PodNSID) &&
+			(podIds[1] == -1 || uint16(podIds[1]) == tag.PodNSID1) {
+			return true
+		}
+	}
+	return false
 }
 
 // multi thread will call Put
@@ -208,6 +249,11 @@ func (pw *PromWriter) Put(items ...interface{}) error {
 			doc.Release()
 			continue
 		}
+		if !pw.IsMatchPodNS(doc) {
+			doc.Release()
+			continue
+		}
+
 		t := int64(doc.Timestamp) * 1000 // 转换为 ms
 
 		var metrics map[string]float64

@@ -668,3 +668,8 @@ ingester:
   #  queue-count: 2
   #  queue-size:  1000000
   #  metrics-filter: [app] # only support: 'app', means flow_metrics.'vtap_app_edgp_port.1s'/'vtap_app_port.1s'
+  #  pod-ns-filters: # if pod_ns_id_0,pod_ns_id_1 matchs one of the list, then export
+  #  - ns_0: 1
+  #    ns_1: 2
+  #  - ns_0: 3
+  #  - ns_1: 4
