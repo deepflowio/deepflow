@@ -52,6 +52,10 @@ type FlowMetricsTTL struct {
 	VtapApp1M  int `yaml:"vtap-app-1m"`
 	VtapApp1S  int `yaml:"vtap-app-1s"`
 }
+type PodNSFilter struct {
+	NS0 string `yaml:"ns_0"`
+	NS1 string `yaml:"ns_1"`
+}
 
 type PromWriterConfig struct {
 	Enabled       bool              `yaml:"enabled"`
@@ -62,6 +66,7 @@ type PromWriterConfig struct {
 	QueueCount    int               `yaml:"queue-count"`
 	QueueSize     int               `yaml:"queue-size"`
 	MetricsFilter []string          `yaml:"metrics-filter"`
+	PodNsFilters  []PodNSFilter     `yaml:"pod-ns-filters"`
 }
 
 type Config struct {
