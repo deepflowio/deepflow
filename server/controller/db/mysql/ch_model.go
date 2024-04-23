@@ -278,7 +278,6 @@ type ChVTap struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	Type   int    `gorm:"column:type;type:int;not null" json:"TYPE"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	TeamID int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 }
 
@@ -561,17 +560,20 @@ type ChPolicy struct {
 	TunnelType int    `gorm:"primaryKey;column:tunnel_type;type:int;not null" json:"TUNNEL_TYPE"`
 	ID         int    `gorm:"column:id;type:int;not null" json:"ID"`
 	Name       string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	TeamID     int    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 type ChNpbTunnel struct {
-	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	TeamID int    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 type ChAlarmPolicy struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name   string `gorm:"column:name;type:char(128)" json:"NAME"`
 	UserID int    `gorm:"column:user_id;type:int" json:"USER_ID"`
+	TeamID int    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 func (ChAlarmPolicy) TableName() string {

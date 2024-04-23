@@ -36,7 +36,7 @@ func NewChNpbTunnel() *ChNpbTunnel {
 
 func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChNpbTunnel, bool) {
 	var npbTunnels []mysql.NpbTunnel
-	err := db.Unscoped().Select("id", "name").Find(&npbTunnels).Error
+	err := db.Unscoped().Select("id", "name", "team_id").Find(&npbTunnels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -45,8 +45,9 @@ func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChNpbTunnel
 	keyToItem := make(map[IDKey]mysql.ChNpbTunnel)
 	for _, npbTunnel := range npbTunnels {
 		keyToItem[IDKey{ID: npbTunnel.ID}] = mysql.ChNpbTunnel{
-			ID:   npbTunnel.ID,
-			Name: npbTunnel.Name,
+			ID:     npbTunnel.ID,
+			Name:   npbTunnel.Name,
+			TeamID: npbTunnel.TeamID,
 		}
 	}
 	return keyToItem, true

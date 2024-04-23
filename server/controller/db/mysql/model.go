@@ -324,6 +324,7 @@ type NpbPolicy struct {
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	TeamID           int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 func (NpbPolicy) TableName() string {
@@ -340,6 +341,7 @@ type NpbTunnel struct {
 	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	TeamID       int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 func (NpbTunnel) TableName() string {
@@ -360,6 +362,7 @@ type PcapPolicy struct {
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	TeamID           int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 func (PcapPolicy) TableName() string {
@@ -480,6 +483,7 @@ type AlarmPolicy struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name   string `gorm:"column:name;type:char(128)" json:"NAME"`
 	UserID int    `gorm:"column:user_id;type:int" json:"USER_ID"`
+	TeamID int    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 }
 
 func (AlarmPolicy) TableName() string {

@@ -39,12 +39,12 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 		pcapPolicys []mysql.PcapPolicy
 		npbPolicys  []mysql.NpbPolicy
 	)
-	err := db.Unscoped().Select("id", "name", "policy_acl_group_id").Find(&pcapPolicys).Error
+	err := db.Unscoped().Select("id", "name", "policy_acl_group_id", "team_id").Find(&pcapPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = db.Unscoped().Select("id", "name", "policy_acl_group_id", "npb_tunnel_id").Find(&npbPolicys).Error
+	err = db.Unscoped().Select("id", "name", "policy_acl_group_id", "npb_tunnel_id", "team_id").Find(&npbPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -57,6 +57,7 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 			TunnelType: 0, // Pcap
 			ID:         pcapPolicy.ID,
 			Name:       pcapPolicy.Name,
+			TeamID:     pcapPolicy.TeamID,
 		}
 	}
 	for _, npbPolicy := range npbPolicys {
@@ -65,6 +66,7 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 			TunnelType: 1, // Npb
 			ID:         npbPolicy.ID,
 			Name:       npbPolicy.Name,
+			TeamID:     npbPolicy.TeamID,
 		}
 	}
 	return keyToItem, true

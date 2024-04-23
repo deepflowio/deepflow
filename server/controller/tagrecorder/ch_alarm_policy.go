@@ -49,6 +49,7 @@ func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChAlarmPo
 			ID:     alarmPolicy.ID,
 			Name:   alarmPolicy.Name,
 			UserID: alarmPolicy.UserID,
+			TeamID: alarmPolicy.TeamID,
 		}
 	}
 	return keyToItem, true
