@@ -96,7 +96,7 @@ func (c *ControllerCheck) Start() {
 		for {
 			dbAndIP := <-c.ch
 			c.vtapControllerAlloc(dbAndIP.db, dbAndIP.ip)
-			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+			refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
 

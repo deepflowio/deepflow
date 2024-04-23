@@ -51,13 +51,14 @@ func NewRefreshOP(db *gorm.DB, nodeIP string) *RefreshOP {
 
 var urlFormat = "http://%s:%d/v1/caches/?"
 
-func RefreshCache(dataTypes []common.DataChanged) {
+// orgid equal to 0 means refreshing all organization data
+func RefreshCache(orgID int, dataTypes []common.DataChanged) {
 	if refreshOP != nil {
-		go refreshOP.refreshCache(dataTypes)
+		go refreshOP.refreshCache(orgID, dataTypes)
 	}
 }
 
-func (r *RefreshOP) refreshCache(dataTypes []common.DataChanged) {
+func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
 	localControllerIPs := r.localRefreshIPs
 	remoteControllerIPs := r.remoteRefreshIPs
 	if len(dataTypes) == 0 || (len(localControllerIPs) == 0 && len(remoteControllerIPs) == 0) {
@@ -65,9 +66,11 @@ func (r *RefreshOP) refreshCache(dataTypes []common.DataChanged) {
 	}
 	log.Infof("refresh cache for trisolaris(%v %v)", localControllerIPs, remoteControllerIPs)
 	params := url.Values{}
+	params.Add("org_id", string(orgID))
 	for _, dataType := range dataTypes {
 		params.Add("type", string(dataType))
 	}
+	params.Add("org_id", string(orgID))
 	paramsEncode := params.Encode()
 	for _, controllerIP := range localControllerIPs {
 		err := common.IsTCPActive(controllerIP, common.GConfig.HTTPPort)

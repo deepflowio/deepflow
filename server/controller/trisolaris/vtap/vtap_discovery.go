@@ -38,6 +38,7 @@ type VTapRegister struct {
 	agentUniqueIdentifier int
 	teamID                int
 	vTapInfo              *VTapInfo
+	registerBy            string
 	VTapLKData
 	ORGID
 }
@@ -115,6 +116,10 @@ func (r *VTapRegister) String() string {
 	return fmt.Sprintf("%+v", *r)
 }
 
+func (r *VTapRegister) setRegisterBy(registerBy string) {
+	r.registerBy = registerBy
+}
+
 func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
 	if r.vTapGroupID != "" {
 		vtapGroup := &models.VTapGroup{}
@@ -132,9 +137,9 @@ func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
 
 func (r *VTapRegister) finishLog(dbVTap *models.VTap) {
 	log.Infof(r.Logf(
-		"finish register vtap (type: %d tap_mode:%d, name:%s ctrl_ip: %s ctrl_mac: %s "+
+		"finish register(%s) vtap (type: %d tap_mode:%d, name:%s ctrl_ip: %s ctrl_mac: %s "+
 			"launch_server: %s launch_server_id: %d vtap_group_lcuuid: %s az: %s team_id: %d lcuuid: %s)",
-		dbVTap.Type, dbVTap.TapMode, dbVTap.Name, dbVTap.CtrlIP, dbVTap.CtrlMac, dbVTap.LaunchServer,
+		r.registerBy, dbVTap.Type, dbVTap.TapMode, dbVTap.Name, dbVTap.CtrlIP, dbVTap.CtrlMac, dbVTap.LaunchServer,
 		dbVTap.LaunchServerID, dbVTap.VtapGroupLcuuid, dbVTap.AZ, dbVTap.TeamID, dbVTap.Lcuuid))
 }
 
@@ -235,6 +240,7 @@ func (l *VTapLKData) LookUpVTapByHost(db *gorm.DB) *VTapLKResult {
 }
 
 func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerVTapByHost")
 	vtapLKData := r.LookUpVTapByHost(db)
 	if vtapLKData == nil {
 		return nil, false
@@ -365,6 +371,7 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 }
 
 func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerVTapByPodNode")
 	vtapLKResult := r.LookUpVTapByPodNode(db)
 	if vtapLKResult == nil {
 		return nil, false
@@ -447,6 +454,7 @@ func (l *VTapLKData) LookUpVTapByPod(db *gorm.DB) *VTapLKResult {
 }
 
 func (r *VTapRegister) registerVTapByPod(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerVTapByPod")
 	vtapLKResult := r.LookUpVTapByPod(db)
 	if vtapLKResult == nil {
 		return nil, false
@@ -617,6 +625,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 }
 
 func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerMirrorVTapByIP")
 	vtapLKResult := r.LookUpMirrorVTapByIP(db)
 	if vtapLKResult == nil {
 		return nil, false
@@ -705,6 +714,7 @@ func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
 }
 
 func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerLocalVTapByIP")
 	vtapLKResult := r.LookUpLocalVTapByIP(db)
 	if vtapLKResult == nil {
 		return nil, false
@@ -729,6 +739,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 }
 
 func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) (*models.VTap, bool) {
+	r.setRegisterBy("registerVTapAnalyzerTapMode")
 	az, err := dbmgr.DBMgr[models.AZ](db).GetFromRegion(r.region)
 	if err != nil {
 		log.Errorf(r.Logf("failed to register agent(%s), because no az in region %s", r.getKey(), r.region))

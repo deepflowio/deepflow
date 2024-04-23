@@ -120,6 +120,10 @@ func (m *MetaData) GetPlatformDataOP() *PlatformDataOP {
 	return m.platformDataOP
 }
 
+func (m *MetaData) GetPolicyDataOP() *PolicyDataOP {
+	return m.policyDataOP
+}
+
 func (m *MetaData) GetGroupDataOP() *GroupDataOP {
 	return m.groupDataOP
 }
@@ -202,13 +206,13 @@ func (m *MetaData) timedRefreshMetaData() {
 			m.groupDataOP.generateGroupData()
 			m.policyDataOP.generatePolicyData()
 			log.Info(m.Log("end generate policy from rpc"))
-			pushmanager.Broadcast()
+			pushmanager.Broadcast(m.GetORGID())
 		case <-m.chGroup:
 			log.Info(m.Log("start generate group from rpc"))
 			m.generateDbDataCache()
 			m.groupDataOP.generateGroupData()
 			log.Info(m.Log("end generate group from rpc"))
-			pushmanager.Broadcast()
+			pushmanager.Broadcast(m.GetORGID())
 		case <-m.chTapType:
 			log.Info(m.Log("start generate tap type from rpc"))
 			m.tapType.generateTapTypes()
