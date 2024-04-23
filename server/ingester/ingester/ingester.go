@@ -167,8 +167,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			receiver)
 
 		exporters := exporters.NewExporters(exportersConfig)
-		exporters.Start()
-		closers = append(closers, exporters)
+		if exporters != nil {
+			exporters.Start()
+			closers = append(closers, exporters)
+		}
 
 		// 写流日志数据
 		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager, exporters)
