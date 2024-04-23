@@ -519,6 +519,37 @@ static int inline __reclaim_map(int map_fd, struct list_head *h)
 
 #define CACHE_LINE_BYTES 64
 
+/* *INDENT-OFF* */
+// For process execute/exit events.
+struct probe_process_event {
+	struct list_head list;  // list add to proc_events_head
+	struct bpf_tracer *tracer;      // link to struct bpf_tracer
+	uint8_t type;           // EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
+	char *path;             // Full path "/proc/<pid>/root/..."
+	int pid;                // Process ID
+	uint32_t expire_time;   // Expiration Date, the number of seconds since the system started.
+};
+/* *INDENT-ON* */
+
+struct proc_events_record {
+	volatile uint32_t *golang_list_lock;
+	struct list_head golang_events_head;
+	volatile uint32_t *ssl_list_lock;
+	struct list_head ssl_events_head;
+};
+
+static inline void proc_events_lock(volatile uint32_t *lock)
+{
+	while (__atomic_test_and_set(lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static inline void proc_events_unlock(volatile uint32_t *lock)
+{
+	__atomic_clear(lock, __ATOMIC_RELEASE);
+}
+
+void find_and_clear_event_from_list(int pid, struct list_head *head);
 int set_allow_port_bitmap(void *bitmap);
 int set_bypass_port_bitmap(void *bitmap);
 int enable_ebpf_protocol(int protocol);

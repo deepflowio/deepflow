@@ -44,7 +44,7 @@
 
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
-
+extern __thread uword thread_index;     // for bihash
 /*
  * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
  * when the number of probes is very large. Because we have to spend a
@@ -174,7 +174,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 
 	// 周期性触发用于缓存的数据的超时检查
@@ -1183,6 +1184,7 @@ static void check_datadump_timeout(void)
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
+	thread_index = THREAD_PROC_EVENTS_IDX;
 	struct bpf_tracer *t = arg;
 	for (;;) {
 		/*

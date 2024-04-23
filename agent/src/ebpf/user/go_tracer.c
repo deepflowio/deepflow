@@ -50,23 +50,11 @@
 #include "socket.h"
 #include "elf.h"
 
-/* *INDENT-OFF* */
-// For process execute/exit events.
-struct process_event {
-	struct list_head list;	// list add to proc_events_head
-	struct bpf_tracer *tracer;	// link to struct bpf_tracer
-	uint8_t type;		// EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
-	char *path;		// Full path "/proc/<pid>/root/..."
-	int pid;		// Process ID
-	uint32_t expire_time;	// Expiration Date, the number of seconds since the system started.
-};
-/* *INDENT-ON* */
-
 extern uint32_t k_version;
+extern struct proc_events_record proc_ev_record;
+
 static char build_info_magic[] = "\xff Go buildinf:";
 static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
-static struct list_head proc_events_head;	// For process execute/exit events list.
-static pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */
 /* ------------- offsets info -------------- */
@@ -595,10 +583,8 @@ static int resolve_bin_file(const char *path, int pid,
 		for (int k = 0; k < NELEMS(offsets); k++) {
 			off = &offsets[k];
 			int offset = struct_member_offset_analyze(binary_path,
-								  off->
-								  structure,
-								  off->
-								  field_name);
+								  off->structure,
+								  off->field_name);
 			if (offset == ETR_INVAL)
 				offset = off->default_offset;
 
@@ -744,9 +730,7 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
-	init_list_head(&proc_events_head);
 	init_list_head(&proc_info_head);
-	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	if (!is_feature_enabled(FEATURE_UPROBE_GOLANG))
 		return ETR_OK;
@@ -966,26 +950,12 @@ static void process_execute_handle(int pid, struct bpf_tracer *tracer)
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
 }
 
-// The caller needs 'mutex_proc_events_lock' for protection
-static inline void find_and_clear_event_from_list(int pid)
-{
-	struct process_event *pe;
-	struct list_head *p, *n;
-	list_for_each_safe(p, n, &proc_events_head) {
-		pe = container_of(p, struct process_event, list);
-		if (pe->pid == pid) {
-			list_head_del(&pe->list);
-			free(pe->path);
-			free(pe);
-		}
-	}
-}
-
 static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 {
-	pthread_mutex_lock(&mutex_proc_events_lock);
-	find_and_clear_event_from_list(pid);
-	pthread_mutex_unlock(&mutex_proc_events_lock);
+	struct proc_events_record *r = &proc_ev_record;
+	proc_events_lock(r->golang_list_lock);
+	find_and_clear_event_from_list(pid, &r->golang_events_head);
+	proc_events_unlock(r->golang_list_lock);
 
 	// Protect the probes operation in multiple threads, similar to process_execute_handle()
 	pthread_mutex_lock(&tracer->mutex_probes_lock);
@@ -1011,7 +981,7 @@ static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 		return;
 	}
 
-	struct process_event *pe = calloc(1, sizeof(struct process_event));
+	struct probe_process_event *pe = calloc(1, sizeof(struct probe_process_event));
 	if (pe == NULL) {
 		free(path);
 		ebpf_warning("Without memory.\n");
@@ -1024,10 +994,10 @@ static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 	pe->type = type;
 	pe->expire_time = get_sys_uptime() + PROC_EVENT_DELAY_HANDLE_DEF;
 
-	pthread_mutex_lock(&mutex_proc_events_lock);
-	find_and_clear_event_from_list(pid);
-	list_add_tail(&pe->list, &proc_events_head);
-	pthread_mutex_unlock(&mutex_proc_events_lock);
+	struct proc_events_record *r = &proc_ev_record;
+	proc_events_lock(r->golang_list_lock);
+	list_add_tail(&pe->list, &r->golang_events_head);
+	proc_events_unlock(r->golang_list_lock);
 }
 
 /**
@@ -1077,19 +1047,20 @@ void go_process_exit(int pid)
  */
 void go_process_events_handle(void)
 {
-	struct process_event *pe;
+	struct proc_events_record *r = &proc_ev_record;
+	struct probe_process_event *pe;
 	do {
-		// Multithreaded safe fetch 'struct process_event'
-		pthread_mutex_lock(&mutex_proc_events_lock);
-		if (!list_empty(&proc_events_head)) {
-			pe = list_first_entry(&proc_events_head,
-					      struct process_event, list);
+		// Multithreaded safe fetch 'struct probe_process_event'
+		proc_events_lock(r->golang_list_lock);
+		if (!list_empty(&r->golang_events_head)) {
+			pe = list_first_entry(&r->golang_events_head,
+					      struct probe_process_event, list);
 		} else {
 			pe = NULL;
 		}
 
 		if (pe == NULL) {
-			pthread_mutex_unlock(&mutex_proc_events_lock);
+			proc_events_unlock(r->golang_list_lock);
 			break;
 		}
 
@@ -1101,16 +1072,26 @@ void go_process_events_handle(void)
 			list_head_del(&pe->list);
 			free(pe->path);
 			free(pe);
-			pthread_mutex_unlock(&mutex_proc_events_lock);
+			proc_events_unlock(r->golang_list_lock);
+			if (path == NULL)
+				break;
+
 			if (type == EVENT_TYPE_PROC_EXEC) {
 				if (access(path, F_OK) == 0) {
-					process_execute_handle(pid, tracer);
+					struct version_info go_version;
+					memset(&go_version, 0,
+					       sizeof(go_version));
+					if (fetch_go_elf_version
+					    (path, &go_version)) {
+						process_execute_handle(pid,
+								       tracer);
+					}
 				}
 			}
-			free(path);
 
+			free(path);
 		} else {
-			pthread_mutex_unlock(&mutex_proc_events_lock);
+			proc_events_unlock(r->golang_list_lock);
 			break;
 		}
 	} while (true);

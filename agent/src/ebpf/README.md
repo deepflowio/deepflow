@@ -456,7 +456,7 @@ graph LR
 - 8 rust extra events callback
   - We provide a function that the user can register a callback interface for a specific event. e.g. Use rust function process these events.
 - 9.1 add_event_to_proc_header
-  - Add `struct process_event` to list-head(proc_events_head), need to set a expire time in `struct process_event`, see the description of [TLS/SSL Tracing](https://github.com/deepflowio/deepflow/tree/main/agent/src/ebpf#tlsssl-tracing) for the reason.
+  - Add `struct probe_process_event` to list-head(proc_events_head), need to set a expire time in `struct probe_process_event`, see the description of [TLS/SSL Tracing](https://github.com/deepflowio/deepflow/tree/main/agent/src/ebpf#tlsssl-tracing) for the reason.
 - 14.2.1 clear_probes_by_pid
   - Clear all probe, when process id == pid (event fetched).
 - 14.2.2 proc_parse_and_register

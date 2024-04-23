@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+* Copyright (c) 2022 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,17 +31,8 @@
 #include <ctype.h>
 
 extern uint32_t k_version;
-
-struct ssl_process_create_event {
-	struct list_head list;
-	int pid;
-	uint32_t expire_time;
-	struct bpf_tracer *tracer;
-};
-
-static struct list_head proc_events_list;
-static pthread_mutex_t proc_events_list_mutex;
-
+extern struct proc_events_record proc_ev_record;
+/* *INDENT-OFF* */
 static struct symbol openssl_syms[] = {
 	{
 		.type = OPENSSL_UPROBE,
@@ -81,6 +72,7 @@ static struct bcc_symbol_option bcc_elf_foreach_sym_option = {
 	.lazy_symbolize = 1,
 	.use_symbol_type = bcc_use_symbol_type,
 };
+/* *INDENT-ON* */
 
 struct bcc_elf_foreach_sym_payload {
 	uint64_t addr;
@@ -92,7 +84,7 @@ struct bcc_elf_foreach_sym_payload {
 static inline bool openssl_kern_check(void)
 {
 	return ((k_version == KERNEL_VERSION(3, 10, 0))
-	    || (k_version >= KERNEL_VERSION(4, 17, 0)));
+		|| (k_version >= KERNEL_VERSION(4, 17, 0)));
 }
 
 static inline bool openssl_process_check(int pid)
@@ -266,7 +258,7 @@ static void clear_ssl_probes_by_pid(struct bpf_tracer *tracer, int pid)
 	struct list_head *p, *n;
 	struct symbol_uprobe *sym_uprobe;
 
-	list_for_each_safe (p, n, &tracer->probes_head) {
+	list_for_each_safe(p, n, &tracer->probes_head) {
 		probe = container_of(p, struct probe, list);
 		if (!(probe->type == UPROBE && probe->private_data != NULL))
 			continue;
@@ -286,44 +278,27 @@ static void clear_ssl_probes_by_pid(struct bpf_tracer *tracer, int pid)
 	}
 }
 
-static void add_event_to_proc_list(struct bpf_tracer *tracer, int pid)
+static void add_event_to_proc_list(struct bpf_tracer *tracer, int pid,
+				   char *path)
 {
 	static const uint32_t PROC_EVENT_HANDLE_DELAY = 120;
-	struct ssl_process_create_event *event = NULL;
+	struct probe_process_event *event = NULL;
 
-	event = calloc(1, sizeof(struct ssl_process_create_event));
+	event = calloc(1, sizeof(struct probe_process_event));
 	if (!event) {
 		ebpf_warning("no memory.\n");
 		return;
 	}
 
+	event->path = path;
 	event->tracer = tracer;
 	event->pid = pid;
 	event->expire_time = get_sys_uptime() + PROC_EVENT_HANDLE_DELAY;
 
-	pthread_mutex_lock(&proc_events_list_mutex);
-	list_add_tail(&event->list, &proc_events_list);
-	pthread_mutex_unlock(&proc_events_list_mutex);
-	return;
-}
-
-static struct ssl_process_create_event *get_first_event(void)
-{
-	struct ssl_process_create_event *event = NULL;
-	pthread_mutex_lock(&proc_events_list_mutex);
-	if (!list_empty(&proc_events_list)) {
-		event = list_first_entry(&proc_events_list,
-					 struct ssl_process_create_event, list);
-	}
-	pthread_mutex_unlock(&proc_events_list_mutex);
-	return event;
-}
-
-static void remove_event(struct ssl_process_create_event *event)
-{
-	pthread_mutex_lock(&proc_events_list_mutex);
-	list_head_del(&event->list);
-	pthread_mutex_unlock(&proc_events_list_mutex);
+	struct proc_events_record *r = &proc_ev_record;
+	proc_events_lock(r->ssl_list_lock);
+	list_add_tail(&event->list, &r->ssl_events_head);
+	proc_events_unlock(r->ssl_list_lock);
 }
 
 int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
@@ -337,12 +312,10 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 		return ETR_OK;
 
 	if (!openssl_kern_check()) {
-		ebpf_warning("Uprobe openssl requires Linux version 4.17+ or Linux 3.10.0\n");
+		ebpf_warning
+		    ("Uprobe openssl requires Linux version 4.17+ or Linux 3.10.0\n");
 		return ETR_OK;
 	}
-
-	init_list_head(&proc_events_list);
-	pthread_mutex_init(&proc_events_list_mutex, NULL);
 
 	fddir = opendir("/proc/");
 	if (!fddir) {
@@ -375,25 +348,31 @@ void ssl_process_exec(int pid)
 	if (!openssl_kern_check())
 		return;
 	path = get_elf_path_by_pid(pid);
-	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, path);
-	free(path);
-	if (!matched)
+	if (path == NULL)
 		return;
+
+	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, path);
+	if (!matched)
+		goto exit;
 
 	tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL)
-		return;
+		goto exit;
 
 	if (tracer->state != TRACER_RUNNING)
-		return;
+		goto exit;
 
 	if (tracer->probes_count > OPEN_FILES_MAX) {
 		ebpf_warning("Probes count too many. The maximum is %d\n",
 			     OPEN_FILES_MAX);
-		return;
+		goto exit;
 	}
 
-	add_event_to_proc_list(tracer, pid);
+	add_event_to_proc_list(tracer, pid, path);
+	return;
+
+exit:
+	free(path);
 }
 
 void ssl_process_exit(int pid)
@@ -413,6 +392,11 @@ void ssl_process_exit(int pid)
 	if (tracer->state != TRACER_RUNNING)
 		return;
 
+	struct proc_events_record *r = &proc_ev_record;
+	proc_events_lock(r->ssl_list_lock);
+	find_and_clear_event_from_list(pid, &r->ssl_events_head);
+	proc_events_unlock(r->ssl_list_lock);
+
 	pthread_mutex_lock(&tracer->mutex_probes_lock);
 	clear_ssl_probes_by_pid(tracer, pid);
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
@@ -420,28 +404,53 @@ void ssl_process_exit(int pid)
 
 void ssl_events_handle(void)
 {
-	struct ssl_process_create_event *event = NULL;
+	struct probe_process_event *event = NULL;
 	struct bpf_tracer *tracer = NULL;
 	int count = 0;
+	struct proc_events_record *r = &proc_ev_record;
 	do {
-		event = get_first_event();
-		if (!event)
-			break;
+		proc_events_lock(r->ssl_list_lock);
+		if (!list_empty(&r->ssl_events_head)) {
+			event = list_first_entry(&r->ssl_events_head,
+						 struct probe_process_event,
+						 list);
+		} else {
+			event = NULL;
+		}
 
-		if (get_sys_uptime() < event->expire_time)
+		if (event == NULL) {
+			proc_events_unlock(r->ssl_list_lock);
 			break;
+		}
+
+		if (get_sys_uptime() < event->expire_time) {
+			proc_events_unlock(r->ssl_list_lock);
+			break;
+		}
 
 		tracer = event->tracer;
+		char *path = strdup(event->path);
+		int pid = event->pid;
+		list_head_del(&event->list);
+		free(event->path);
+		free(event);
+		proc_events_unlock(r->ssl_list_lock);
+		if (path == NULL)
+			break;
+
+		if (access(path, F_OK) != 0) {
+			free(path);
+			break;
+		}
+
+		free(path);
+
 		if (tracer) {
 			pthread_mutex_lock(&tracer->mutex_probes_lock);
-			openssl_parse_and_register(event->pid, tracer->tps);
+			openssl_parse_and_register(pid, tracer->tps);
 			tracer_uprobes_update(tracer);
 			tracer_hooks_process(tracer, HOOK_ATTACH, &count);
 			pthread_mutex_unlock(&tracer->mutex_probes_lock);
 		}
-
-		remove_event(event);
-		free(event);
-
 	} while (true);
 }

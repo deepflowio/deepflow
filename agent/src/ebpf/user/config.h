@@ -67,7 +67,11 @@ enum {
 
 //thread index for bihash
 enum {
+	// cp-reader-0
 	THREAD_PROFILER_READER_IDX = 0,
+	// proc-events
+	THREAD_PROC_EVENTS_IDX,
+	// sk-reader-0 ...
 	THREAD_PROC_ACT_IDX_BASE
 };
 

@@ -76,8 +76,6 @@ static volatile int ready_flag_cpus[MAX_CPU_NR];
 
 /* Registration of additional transactions 额外事务处理的注册 */
 static struct list_head extra_waiting_head;
-/* Registration for periodic event handling 周期性事件处理的注册 */
-static struct list_head period_events_head;
 
 int sys_cpus_count;
 bool *cpu_online;		// 用于判断CPU是否是online
@@ -92,6 +90,28 @@ static int tracepoint_attach(struct tracepoint *tp);
 static int perf_reader_setup(struct bpf_perf_reader *perf_readerm,
 			     int thread_nr);
 static void perf_reader_release(struct bpf_perf_reader *perf_reader);
+
+/* Registration for periodic event handling 周期性事件处理的注册 */
+static struct list_head period_events_head;
+
+// Detecting process start and exit events.
+struct proc_events_record proc_ev_record;
+
+// The caller needs 'mutex_proc_events_lock' for protection
+void find_and_clear_event_from_list(int pid, struct list_head *head)
+{
+	struct probe_process_event *pe;
+	struct list_head *p, *n;
+	list_for_each_safe(p, n, head) {
+		pe = container_of(p, struct probe_process_event, list);
+		if (pe->pid == pid) {
+			list_head_del(&pe->list);
+			if (pe->path)
+				free(pe->path);
+			free(pe);
+		}
+	}
+}
 
 /*
  * 内核版本依赖检查
@@ -254,7 +274,7 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 	char name[TASK_COMM_LEN];
 	snprintf(name, sizeof(name), "%s-%d", prefix_name, idx);
 	ret = pthread_create(&tracer->perf_worker[idx], NULL, fn,
-			     (void *)(uint64_t)idx);
+			     (void *)(uint64_t) idx);
 	if (ret) {
 		ebpf_warning("tracer reader(%s), pthread_create "
 			     "is error:%s\n", name, strerror(errno));
@@ -968,21 +988,18 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->progs[i].
-							       prog_fd,
+				    program__attach_perf_event(obj->
+							       progs[i].prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->
-							       sample_freq,
+							       tracer->sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->
-							       per_cpu_fds,
+							       tracer->per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->
-								per_cpu_fds));
+							       (tracer->per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1010,8 +1027,8 @@ perf_event:
 			errno = 0;
 			int ret =
 			    program__detach_perf_event(tracer->per_cpu_fds,
-						       ARRAY_SIZE(tracer->
-								  per_cpu_fds));
+						       ARRAY_SIZE
+						       (tracer->per_cpu_fds));
 			if (!ret) {
 				ebpf_info
 				    ("tracer \"%s\" detach perf event prog successful.\n",
@@ -1169,7 +1186,7 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 			spread_id = 0;
 
 		struct reader_forward_info *fwd_info =
-			malloc(sizeof(struct reader_forward_info));
+		    malloc(sizeof(struct reader_forward_info));
 		if (fwd_info == NULL) {
 			ebpf_error("reader_forward_info malloc() failed.\n");
 			return ETR_NOMEM;
@@ -1180,12 +1197,10 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 
 		ebpf_info("Perf buffer reader cpu(%d) -> queue(%d)\n",
 			  fwd_info->cpu_id, fwd_info->queue_id);
-		reader =
-		    (struct perf_reader *)
+		reader = (struct perf_reader *)
 		    bpf_open_perf_buffer(perf_reader->raw_cb,
 					 perf_reader->lost_cb,
-					 (void *)fwd_info, -1, i,
-					 pages_cnt);
+					 (void *)fwd_info, -1, i, pages_cnt);
 		if (reader == NULL) {
 			ebpf_error("bpf_open_perf_buffer() failed.\n");
 			return ETR_NORESOURCE;
@@ -1581,6 +1596,31 @@ bool is_feature_matched(int feature, const char *path)
 	return !error;
 }
 
+static int init_proc_events_record(const char *name)
+{
+	init_list_head(&proc_ev_record.golang_events_head);
+	init_list_head(&proc_ev_record.ssl_events_head);
+
+	proc_ev_record.golang_list_lock =
+	    clib_mem_alloc_aligned("go_proc_ev_lock",
+				   CLIB_CACHE_LINE_BYTES,
+				   CLIB_CACHE_LINE_BYTES, NULL);
+	proc_ev_record.ssl_list_lock =
+	    clib_mem_alloc_aligned("ssl_proc_ev_lock",
+				   CLIB_CACHE_LINE_BYTES,
+				   CLIB_CACHE_LINE_BYTES, NULL);
+	if (proc_ev_record.golang_list_lock == NULL ||
+	    proc_ev_record.ssl_list_lock == NULL) {
+		ebpf_error("process events lock alloc memory failed.\n");
+		return (-1);
+	}
+
+	proc_ev_record.golang_list_lock[0] = 0;
+	proc_ev_record.ssl_list_lock[0] = 0;
+
+	return (0);
+}
+
 int bpf_tracer_init(const char *log_file, bool is_stdout)
 {
 	init_list_head(&extra_waiting_head);
@@ -1667,6 +1707,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 
 	if ((err = sockopt_register(&trace_sockopts)) != ETR_OK)
 		return err;
+
+	if (init_proc_events_record("proc_event_record"))
+		return ETR_INVAL;
 
 	err = pthread_create(&ctrl_pthread, NULL, (void *)&ctrl_main, NULL);
 	if (err) {
