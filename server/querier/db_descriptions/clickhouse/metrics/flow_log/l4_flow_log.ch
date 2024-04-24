@@ -1,37 +1,37 @@
 # Field                     , DisplayName             , Unit , Description
-byte                        , 字节                    , 字节 , ————
+byte                        , 字节                    , 字节 , 
 byte_tx                     , 发送字节                , 字节 , 请求方向字节数总和（含 Ethernet 头）
 byte_rx                     , 接收字节                , 字节 , 响应方向字节数总和（含 Ethernet 头）
 total_byte_tx               , 累计发送字节            , 字节 ,
 total_byte_rx               , 累计接收字节            , 字节 ,
-packet                      , 包数                    , 包   , ————
+packet                      , 包数                    , 包   , 
 packet_tx                   , 发送包数                , 包   , 请求方向包数总和
 packet_rx                   , 接收包数                , 包   , 响应方向包数总和
 total_packet_tx             , 累计发送包数            , 包  ,
 total_packet_rx             , 累计接收包数            , 包  ,
-l3_byte                     , 网络层载荷              , 字节 , ————
+l3_byte                     , 网络层载荷              , 字节 , 
 l3_byte_tx                  , 发送网络层载荷          , 字节 , 请求方向网络层载荷字节数总和（不含 IP 头）
 l3_byte_rx                  , 接收网络层载荷          , 字节 , 响应方向网络层载荷字节数总和（不含 IP 头）
-bpp                         , 平均包长                , 字节 , ————
-bpp_tx                      , 平均发送包长            , 字节 , ————
-bpp_rx                      , 平均接收包长            , 字节 , ————
+bpp                         , 平均包长                , 字节 , 
+bpp_tx                      , 平均发送包长            , 字节 , 
+bpp_rx                      , 平均接收包长            , 字节 , 
 
-new_flow                    , 新建连接                , 连接 , ————
-closed_flow                 , 关闭连接                , 连接 , ————
+new_flow                    , 新建连接                , 连接 , 
+closed_flow                 , 关闭连接                , 连接 , 
 syn_count                   , SYN 包数                , 包   , SYN 包的总数
 synack_count                , SYN-ACK 包数            , 包   , SYN-ACK 包的总数
-l4_byte                     , 传输层载荷              , 字节 , ————
+l4_byte                     , 传输层载荷              , 字节 , 
 l4_byte_tx                  , 发送传输层载荷          , 字节 , 请求方向包传输层载荷字节数总和（不含 TCP/UDP 头部）
 l4_byte_rx                  , 接收传输层载荷          , 字节 , 响应方向包传输层载荷字节数总和（不含 TCP/UDP 头部）
 direction_score             , 方向得分                ,      , 算法推理传输协议连接方向时的准确性得分值，得分越高连接方向的准确性越高，得分为 255 表示连接方向的推理结果绝对正确。
-log_count                   , 日志总量                , 个   , ————
+log_count                   , 日志总量                , 个   , 
 
 retrans_syn                 , SYN 重传                , 包   , SYN 包的重传次数
 retrans_synack              , SYN-ACK 重传            , 包   , SYN-ACK 包的重传次数
-retrans                     , TCP 重传                , 包   , ————
+retrans                     , TCP 重传                , 包   , 
 retrans_tx                  , TCP 客户端重传          , 包   , TCP 连接请求方向的重传包次数
 retrans_rx                  , TCP 服务端重传          , 包   , TCP 连接响应方向的重传包次数
-zero_win                    , TCP 零窗                , 包   , ————
+zero_win                    , TCP 零窗                , 包   , 
 zero_win_tx                 , TCP 客户端零窗          , 包   , TCP 连接请求方向的零窗包次数
 zero_win_rx                 , TCP 服务端零窗          , 包   , TCP 连接响应方向的零窗包次数
 retrans_syn_ratio           , SYN 重传比例            , %    ,
@@ -80,24 +80,24 @@ rtt_server_max              , 最大 TCP 建连服务端时延 , 微秒 ,
 srt_max                     , 最大 TCP/ICMP 系统时延  , 微秒 ,
 art_max                     , 最大数据时延            , 微秒 ,
 cit_max                     , 最大客户端等待时延      , 微秒 ,
-srt_sum                     , 累计 TCP/ICMP 系统时延  , 微秒 ,
-srt_count                   , TCP/ICMP 系统时延次数   , 次   ,
-art_sum                     , 累计数据时延            , 微秒 ,
-art_count                   , 数据时延次数            , 次   ,
-cit_sum                     , 累计客户端等待时延      , 微秒 ,
-cit_count                   , 客户端等待时延次数      , 次   ,
+srt_sum                     , 累计 TCP/ICMP 系统时延  , 微秒 , 采集周期内全部`TCP/ICMP 系统时延`的加和
+srt_count                   , TCP/ICMP 系统时延次数   , 次   , 采集周期内`TCP/ICMP 系统时延`的次数
+art_sum                     , 累计数据时延            , 微秒 , 采集周期内全部`数据时延`的加和
+art_count                   , 数据时延次数            , 次   , 采集周期内`数据时延`的次数
+cit_sum                     , 累计客户端等待时延      , 微秒 , 采集周期内全部`客户端等待时延`的加和
+cit_count                   , 客户端等待时延次数      , 次   , 采集周期内`客户端等待时延`的次数
 duration                    , 流持续时间              , 微秒 , 表示流的首包到尾包（注意不是 end_time）的时长。
 
 l7_request                  , 应用请求                , 个   ,
 l7_response                 , 应用响应                , 个   ,
 rrt                         , 平均应用时延            , 微秒 ,
-rrt_sum                     , 累计应用时延            , 微秒 ,
-rrt_count                   , 应用时延次数            , 次   ,
+rrt_sum                     , 累计应用时延            , 微秒 , 采集周期内全部`应用时延`的加和
+rrt_count                   , 应用时延次数            , 次   , 采集周期内`应用时延`的次数
 rrt_max                     , 最大应用时延            , 微秒 ,
 l7_error                    , 应用异常                , 个   ,
-l7_client_error             , 应用客户端异常          , 个   ,
-l7_server_error             , 应用服务端异常          , 个   ,
-l7_server_timeout           , 应用服务端超时          , 个   ,
+l7_client_error             , 应用客户端异常          , 个   , 根据具体应用协议的响应码判断异常，不同协议的定义见 `l7_flow_log` 中 response_status 字段的说明 
+l7_server_error             , 应用服务端异常          , 个   , 根据具体应用协议的响应码判断异常，不同协议的定义见 `l7_flow_log` 中 response_status 字段的说明
+l7_server_timeout           , 应用服务端超时          , 个   , 未采集到响应的请求总数，默认超时时间 TCP 1800s，UDP 150s
 l7_error_ratio              , 应用异常比例            , %    ,
 l7_client_error_ratio       , 应用客户端异常比例      , %    ,
 l7_server_error_ratio       , 应用服务端异常比例      , %    ,
