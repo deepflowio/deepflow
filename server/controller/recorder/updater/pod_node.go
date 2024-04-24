@@ -119,6 +119,10 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 		mapInfo["hostname"] = cloudItem.Hostname
 		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
+	if diffBase.IP != cloudItem.IP {
+		mapInfo["ip"] = cloudItem.IP
+		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State
 		structInfo.State.Set(diffBase.State, cloudItem.State)

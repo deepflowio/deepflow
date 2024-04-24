@@ -816,6 +816,8 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysql.Pod
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
+		Hostname:   source.Hostname,
+		IP:         source.IP,
 		TeamID:     md.TeamID,
 		DomainID:   md.DomainID,
 	})
@@ -825,9 +827,14 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysql.Pod
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.Hostname.IsDifferent() {
+		updateInfo["hostname"] = fieldsUpdate.Hostname.GetNew()
+	}
+	if fieldsUpdate.IP.IsDifferent() {
+		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChDevice
