@@ -22,7 +22,7 @@ l4_byte_tx                  , 发送传输层载荷          , 字节 , 请求�
 l4_byte_rx                  , 接收传输层载荷          , 字节 , 响应方向包传输层载荷字节数总和（不含 TCP/UDP 头部）
 
 retrans_syn                 , SYN 重传                , 包   , SYN 包的重传次数
-retrans_synack              , SYN-ACK 重传            , 包   , SYN 包的重传次数
+retrans_synack              , SYN-ACK 重传            , 包   , SYN-ACK 包的重传次数
 retrans                     , TCP 重传                , 包   , `TCP 客户端重传 + TCP 服务端重传`
 retrans_tx                  , TCP 客户端重传          , 包   , TCP 连接请求方向的重传包次数
 retrans_rx                  , TCP 服务端重传          , 包   , TCP 连接响应方向的重传包次数
