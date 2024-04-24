@@ -56,6 +56,7 @@ pub struct NpbBuilder {
     enable_qos_bypass: bool,
     underlay_is_ipv6: bool,
     underlay_has_vlan: bool,
+    ignore_overlay_vlan: bool,
     overlay_vlan_mode: VlanMode,
 
     sender: DebugSender<(u64, usize, Vec<u8>)>,
@@ -234,6 +235,7 @@ impl NpbBuilder {
             underlay_is_ipv6: config.underlay_is_ipv6,
             underlay_has_vlan: config.output_vlan > 0,
             overlay_vlan_mode: config.vlan_mode,
+            ignore_overlay_vlan: config.ignore_overlay_vlan,
             sender,
             npb_packet_sender: Some(Arc::new(NpbPacketSender::new(
                 id,
@@ -289,6 +291,7 @@ impl NpbBuilder {
             self.pseudo_tunnel_header.clone(),
             underlay_vlan_header_size,
             self.overlay_vlan_mode,
+            self.ignore_overlay_vlan,
             self.bps_limit.clone(),
             counter,
             self.sender.clone(),
