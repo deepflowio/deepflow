@@ -102,6 +102,7 @@ impl NpbHandler {
         _pseudo_tunnel_header: [Vec<u8>; NpbTunnelType::Max as usize],
         _underlay_vlan_header_size: usize,
         _overlay_vlan_mode: VlanMode,
+        _ignore_overlay_vlan: bool,
         _bps_limit: Arc<LeakyBucket>,
         _counter: Arc<NpbHandlerCounter>,
         _sender: DebugSender<(u64, usize, Vec<u8>)>,
