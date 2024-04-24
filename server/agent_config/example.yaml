@@ -928,6 +928,13 @@ vtap_group_id: g-xxxxxx
   ##   that the VNI bit is set, the value configured here will be used after |= 0x8.
   #vxlan-flags: 0xff
 
+  ## NPB Packet ignoring VLAN Header in overlay
+  ## Default: false. Range: [true, false]
+  ## Note:
+  ##   This configuration only ignores the VLAN header in the captured original message
+  ## and does not affect the configuration item: npb_vlan_mode
+  #ignore-overlay-vlan: false
+
   ############
   ## Tunnel ##
   ############
