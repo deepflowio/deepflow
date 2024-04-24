@@ -246,6 +246,7 @@ pub struct NpbConfig {
     pub mtu: u32,
     pub vlan_mode: trident::VlanMode,
     pub socket_type: trident::SocketType,
+    pub ignore_overlay_vlan: bool,
 }
 
 impl Default for NpbConfig {
@@ -1305,6 +1306,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 underlay_is_ipv6: controller_ip.is_ipv6(),
                 npb_port: conf.yaml_config.npb_port,
                 vxlan_flags: conf.yaml_config.vxlan_flags,
+                ignore_overlay_vlan: conf.yaml_config.ignore_overlay_vlan,
                 enable_qos_bypass: conf.yaml_config.enable_qos_bypass,
                 output_vlan: conf.output_vlan,
                 vlan_mode: conf.npb_vlan_mode,

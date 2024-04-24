@@ -50,6 +50,7 @@ type StaticConfig struct {
 	XflowCollector                     *XflowCollectorConfig       `yaml:"xflow-collector,omitempty"`
 	NpbPort                            *uint16                     `yaml:"npb-port,omitempty"`
 	VxlanFlags                         *uint8                      `yaml:"vxlan-flags,omitempty"`
+	IgnoreOverlayVlan                  *bool                       `yaml:"ignore-overlay-vlan,omitempty"`
 	CollectorSenderQueueSize           *int                        `yaml:"collector-sender-queue-size,omitempty"`
 	CollectorSenderQueueCount          *int                        `yaml:"collector-sender-queue-count,omitempty"`
 	ToaSenderQueueSize                 *int                        `yaml:"toa-sender-queue-size,omitempty"`
