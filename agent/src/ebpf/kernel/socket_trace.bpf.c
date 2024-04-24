@@ -879,7 +879,7 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	}
 }
 
-static __inline bool infer_offset_check_tgid(void)
+static __inline bool check_pid_validity(void)
 {
 	__u32 k0 = 0;
 	__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
@@ -901,7 +901,7 @@ static __inline int infer_offset_phase_1(int fd)
 		return OFFSET_NO_READY;
 
 	if (unlikely(!offset->ready)) {
-		if (!infer_offset_check_tgid())
+		if (!check_pid_validity())
 			return OFFSET_NO_READY;
 
 		void *infer_sk =
@@ -925,7 +925,7 @@ static __inline int infer_offset_phase_2(int fd)
 		return OFFSET_NO_READY;
 
 	if (unlikely(!offset->ready)) {
-		if (!infer_offset_check_tgid())
+		if (!check_pid_validity())
 			return OFFSET_NO_READY;
 
 		if (unlikely
@@ -2117,6 +2117,10 @@ exit:
 // Here, the tracepoint is used to periodically send the data residing in the cache but not
 // yet transmitted to the user-level receiving program for processing.
 TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
+	// Only pre-specified Pid is allowed to trigger.
+	if (!check_pid_validity())
+		return 0;
+
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
