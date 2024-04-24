@@ -307,6 +307,7 @@ pub struct YamlConfig {
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_port: u16,
     pub vxlan_flags: u8,
+    pub ignore_overlay_vlan: bool,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
     pub flow_sender_queue_size: usize,
@@ -574,6 +575,7 @@ impl Default for YamlConfig {
             xflow_collector: Default::default(),
             vxlan_port: 4789,
             vxlan_flags: 0xff,
+            ignore_overlay_vlan: false,
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
