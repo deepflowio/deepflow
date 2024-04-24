@@ -381,10 +381,9 @@ impl Stash {
             return;
         }
 
-        // timeInSecond needs to be corrected here.
-        // because doc time is used to push the time window, no correction is made to the timestamp in doc.
-        // for tick in queue (that is, accFlow = = nil), the time is modified to time_in_second-delay_seconds.
-        // for minute collector, minus 60s
+        // time_in_second needs to be corrected here. because doc time is used to push the time window,
+        // no correction is made to the timestamp in doc. for tick in queue (that is, accFlow == nil),
+        // the time is modified to time_in_second - delay_seconds. for minute collector, minus 60s
         if acc_flow.is_none() && time_in_second >= self.context.delay_seconds {
             match self.context.metric_type {
                 MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
@@ -603,10 +602,23 @@ impl Stash {
             return;
         }
 
-        // timeInSecond needs to be corrected here.
-        // because doc time is used to push the time window, no correction is made to the timestamp in doc.
-        // for tick in queue (that is, accFlow = = nil), the time is modified to time_in_second-delay_seconds.
-        // for minute collector, minus 60s
+        // if the flow is closed, fill and send the stats data as soon as possible, and do not push the time window
+        if let Some(m) = meter.as_ref() {
+            if m.flow.close_type != CloseType::Unknown
+                && m.flow.close_type != CloseType::ForcedReport
+            {
+                if !m.is_active_host0 && !m.is_active_host1 && !config.inactive_ip_enabled {
+                    self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
+                    return;
+                }
+                self.fill_l7_stats(m, &m.flow.directions, &config);
+                return;
+            }
+        }
+
+        // time_in_second needs to be corrected here, because doc time is used to push the time window,
+        // no correction is made to the timestamp in doc, for tick in queue (that is, meter == nil),
+        // the time is modified to time_in_second - delay_seconds, for minute collector, minus 60s
         if meter.is_none() && time_in_second >= self.context.delay_seconds {
             match self.context.metric_type {
                 MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
