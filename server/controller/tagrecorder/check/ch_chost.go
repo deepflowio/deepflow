@@ -59,17 +59,21 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 	for _, chost := range chosts {
 		if chost.DeletedAt.Valid {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name + " (deleted)",
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
+				ID:       chost.ID,
+				Name:     chost.Name + " (deleted)",
+				L3EPCID:  chost.VPCID,
+				HostID:   ipToHostID[chost.LaunchServer],
+				Hostname: chost.Hostname,
+				IP:       chost.IP,
 			}
 		} else {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name,
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
+				ID:       chost.ID,
+				Name:     chost.Name,
+				L3EPCID:  chost.VPCID,
+				HostID:   ipToHostID[chost.LaunchServer],
+				Hostname: chost.Hostname,
+				IP:       chost.IP,
 			}
 		}
 	}
