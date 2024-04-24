@@ -212,7 +212,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 }
 
 func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
-	kData, err := genesis.GenesisService.GetKubernetesResponse(k.ClusterID)
+	kData, err := genesis.GenesisService.GetKubernetesResponse(k.orgID, k.ClusterID)
 	if err != nil {
 		return map[string][]string{}, err
 	}

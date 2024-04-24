@@ -131,24 +131,24 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	}
 }
 
-func GetGenesisData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
-	return g.GetGenesisSyncData(), nil
+func GetGenesisData(orgID int, g *genesis.Genesis) (genesis.GenesisSyncDataResponse, error) {
+	return g.GetGenesisSyncData(orgID), nil
 }
 
-func GetGenesisSyncData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
-	return g.GetGenesisSyncResponse()
+func GetGenesisSyncData(orgID int, g *genesis.Genesis) (genesis.GenesisSyncDataResponse, error) {
+	return g.GetGenesisSyncResponse(orgID)
 }
 
-func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
-	return g.GetKubernetesResponse(clusterID)
+func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (map[string][]string, error) {
+	return g.GetKubernetesResponse(orgID, clusterID)
 }
 
-func GetGenesisPrometheusData(g *genesis.Genesis, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
-	return g.GetPrometheusResponse(clusterID)
+func GetGenesisPrometheusData(g *genesis.Genesis, orgID int, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
+	return g.GetPrometheusResponse(orgID, clusterID)
 }
 
-func GetAgentStats(g *genesis.Genesis, param string) ([]genesis.TridentStats, error) {
-	return genesis.Synchronizer.GetAgentStats(param), nil
+func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (genesis.TridentStats, error) {
+	return genesis.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
 func GetGenesisAgentStorage(vtapIDString string) (model.GenesisStorage, error) {

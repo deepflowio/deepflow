@@ -550,7 +550,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse(c.orgID)
 	if err != nil {
 		log.Error(err.Error())
 		return resource
@@ -609,7 +609,7 @@ func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse(c.orgID)
 	if err != nil {
 		log.Error(err.Error())
 		return resource
