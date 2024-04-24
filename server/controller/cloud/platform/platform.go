@@ -55,7 +55,7 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig, db *mysql.DB) (Pla
 	case common.AWS:
 		platform, err = aws.NewAws(domain, cfg)
 	case common.AGENT_SYNC:
-		platform, err = genesis.NewGenesis(domain, cfg)
+		platform, err = genesis.NewGenesis(db.ORGID, domain, cfg)
 	case common.QINGCLOUD:
 		platform, err = qingcloud.NewQingCloud(domain, cfg)
 	case common.BAIDU_BCE:

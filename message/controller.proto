@@ -16,7 +16,8 @@ service Controller {
 }
 
 message GenesisSharingK8SRequest {
-    optional string cluster_id = 1;
+    optional uint32 org_id = 1;
+    optional string cluster_id = 2;
 }
 
 message GenesisSharingK8SResponse {
@@ -26,7 +27,8 @@ message GenesisSharingK8SResponse {
 }
 
 message GenesisSharingPrometheusRequest {
-    optional string cluster_id = 1;
+    optional uint32 org_id = 1;
+    optional string cluster_id = 2;
 }
 
 message GenesisSharingPrometheusResponse {
@@ -163,6 +165,7 @@ message GenesisSyncData{
 }
 
 message GenesisSharingSyncRequest {
+    optional uint32 org_id = 1;
 }
 
 message GenesisSharingSyncResponse {

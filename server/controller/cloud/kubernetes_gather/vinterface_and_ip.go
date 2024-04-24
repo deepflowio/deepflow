@@ -61,7 +61,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		err = errors.New("genesis service is nil")
 		return
 	}
-	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse(k.orgID)
 	if err != nil {
 		log.Error(err.Error())
 		return

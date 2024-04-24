@@ -44,7 +44,7 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/info/:lcuuid/", getCloudResource(d.m))
 	e.GET("/v1/genesis/:type/", getGenesisSyncData(d.g, true))
 	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
-	e.GET("/v1/agent-stats/:ipOrID/", getAgentStats(d.g))
+	e.GET("/v1/agent-stats/:vtapID/", getAgentStats(d.g))
 	e.GET("/v1/genesis-storage/:vtapID/", getGenesisStorage(d.g))
 	e.GET("/v1/kubernetes-refresh/", triggerKubernetesRefresh(d.m)) // TODO: Move to a better path
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
@@ -157,7 +157,12 @@ func getRecorderCacheToolMap(m *manager.Manager) gin.HandlerFunc {
 
 func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetAgentStats(g, c.Param("ipOrID"))
+		orgID, err := GetContextOrgID(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			return
+		}
+		data, err := service.GetAgentStats(g, strconv.Itoa(orgID), c.Param("vtapID"))
 		JsonResponse(c, data, err)
 	})
 }
@@ -171,14 +176,18 @@ func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 
 func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		orgID, err := GetContextOrgID(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			return
+		}
 		dataType := c.Param("type")
-		var ret genesis.GenesisSyncData
-		var err error
+		var ret genesis.GenesisSyncDataResponse
 
 		if isLocal {
-			ret, err = service.GetGenesisData(g)
+			ret, err = service.GetGenesisData(orgID, g)
 		} else {
-			ret, err = service.GetGenesisSyncData(g)
+			ret, err = service.GetGenesisSyncData(orgID, g)
 		}
 
 		var data interface{}
@@ -213,14 +222,24 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisKubernetesData(g, c.Param("clusterID"))
+		orgID, err := GetContextOrgID(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			return
+		}
+		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }
 
 func getGenesisPrometheusData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisPrometheusData(g, c.Param("clusterID"))
+		orgID, err := GetContextOrgID(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			return
+		}
+		data, err := service.GetGenesisPrometheusData(g, orgID, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }
