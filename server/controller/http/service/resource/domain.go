@@ -331,13 +331,14 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 		} else {
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
-		createKubernetesRelatedResources(db, domain, regionLcuuid)
 	}
 	err := db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
-
+	if domainCreate.Type == common.KUBERNETES {
+		createKubernetesRelatedResources(db, domain, regionLcuuid)
+	}
 	response, _ := GetDomains(db, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
 }
