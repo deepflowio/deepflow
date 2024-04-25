@@ -56,7 +56,7 @@ type L4FlowLog struct {
 
 type DataLinkLayer struct {
 	MAC0    uint64 `json:"mac_0" category:"$tag" sub:"data_link_layer" to_string:"MacString"`
-	MAC1    uint64 `json:"mac_1" category:"$tag" to_string:"MacString"`
+	MAC1    uint64 `json:"mac_1" category:"$tag" sub:"data_link_layer" to_string:"MacString"`
 	EthType uint16 `json:"eth_type" category:"$tag" sub:"data_link_layer"`
 	VLAN    uint16 `json:"vlan" category:"$tag" sub:"data_link_layer"`
 }
@@ -376,28 +376,28 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
 }
 
 type FlowInfo struct {
-	Time         uint32   `json:"time" category:"$tag" sub:"flow_info"` // s
-	CloseType    uint16   `json:"close_type" category:"$tag" sub:"flow_info" enumfile:"close_type"`
-	SignalSource uint16   `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l4_signal_source"`
-	FlowID       uint64   `json:"flow_id" category:"$tag" sub:"flow_info"`
-	TapType      uint8    `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
-	NatSource    uint8    `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
-	TapPortType  uint8    `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort      uint32   `json:"capture_nic" category:"$tag" sub:"capture_info"`
-	TapSide      string   `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	VtapID       uint16   `json:"agent_id" category:"$tag" sub:"capture_info"`
-	L2End0       bool     `json:"l2_end_0" category:"$tag" sub:"capture_info"`
-	L2End1       bool     `json:"l2_end_1" category:"$tag" sub:"capture_info"`
-	L3End0       bool     `json:"l3_end_0" category:"$tag" sub:"capture_info"`
-	L3End1       bool     `json:"l3_end_1" category:"$tag" sub:"capture_info"`
-	StartTime    int64    `json:"start_time" category:"$tag" sub:"flow_info"` // us
-	EndTime      int64    `json:"end_time" category:"$tag" sub:"flow_info"`   // us
-	Duration     uint64   `json:"duration" category:"$metrics" sub:"delay"`   // us
-	IsNewFlow    uint8    `json:"is_new_flow" category:"$tag" sub:"flow_info"`
-	Status       uint8    `json:"status" category:"$tag" sub:"flow_info" enumfile:"status"`
-	AclGids      []uint16 `json:"acl_gids" category:"$tag" sub:"flow_info"`
-	GPID0        uint32   `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
-	GPID1        uint32   `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
+	Time         uint32 `json:"time" category:"$tag" sub:"flow_info"` // s
+	CloseType    uint16 `json:"close_type" category:"$tag" sub:"flow_info" enumfile:"close_type"`
+	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l4_signal_source"`
+	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
+	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType  uint8  `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	L2End0       bool   `json:"l2_end_0" category:"$tag" sub:"capture_info"`
+	L2End1       bool   `json:"l2_end_1" category:"$tag" sub:"capture_info"`
+	L3End0       bool   `json:"l3_end_0" category:"$tag" sub:"capture_info"`
+	L3End1       bool   `json:"l3_end_1" category:"$tag" sub:"capture_info"`
+	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	Duration     uint64 `json:"duration" category:"$metrics" sub:"delay"`   // us
+	IsNewFlow    uint8  `json:"is_new_flow" category:"$tag" sub:"flow_info"`
+	Status       uint8  `json:"status" category:"$tag" sub:"flow_info" enumfile:"status"`
+	AclGids      []uint16
+	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
 
 	NatRealIP0   uint32 `json:"nat_real_ip_0" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
 	NatRealIP1   uint32 `json:"nat_real_ip_1" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
@@ -488,10 +488,10 @@ type Metrics struct {
 	L7Response    uint32 `json:"l7_response" category:"$metrics" sub:"application"`
 	L7ParseFailed uint32 `json:"l7_parse_failed" category:"$metrics" sub:"application"`
 
-	RTT       uint32 `json:"rtt" category:"$metrics" sub:"delay"`         // us
-	RTTClient uint32 `json:"rtt_client" category:"$metrics" sub:"delay"`  // us
-	RTTServer uint32 `json:"rtt_server" category:"$metrics" sub:"delay"`  // us
-	TLSRTT    uint32 `json:"tls_rtt_sum" category:"$metrics" sub:"delay"` // us
+	RTT       uint32 `json:"rtt" category:"$metrics" sub:"delay"`        // us
+	RTTClient uint32 `json:"rtt_client" category:"$metrics" sub:"delay"` // us
+	RTTServer uint32 `json:"rtt_server" category:"$metrics" sub:"delay"` // us
+	TLSRTT    uint32 `json:"tls_rtt" category:"$metrics" sub:"delay"`    // us
 
 	SRTSum uint32 `json:"srt_sum" category:"$metrics" sub:"delay"`
 	ARTSum uint32 `json:"art_sum" category:"$metrics" sub:"delay"`

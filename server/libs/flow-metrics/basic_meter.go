@@ -551,6 +551,12 @@ type Anomaly struct {
 	ServerEstablishReset  uint64 `json:"server_establish_other_rst" category:"$metrics" sub:"tcp_error"`
 	TCPTimeout            uint64 `json:"tcp_timeout" category:"$metrics" sub:"tcp_error"`
 
+	ClientEstablishFail uint64 `json:"client_establish_fail" category:"$metrics" sub:"tcp_error"`
+	ServerEstablishFail uint64 `json:"server_establish_fail" category:"$metrics" sub:"tcp_error"`
+	TCPEstablishFail    uint64 `json:"tcp_establish_fail" category:"$metrics" sub:"tcp_error"`
+	TCPTransferFail     uint64 `json:"tcp_transfer_fail" category:"$metrics" sub:"tcp_error"`
+	TCPRstFail          uint64 `json:"tcp_rst_fail" category:"$metrics" sub:"tcp_error"`
+
 	L7ClientError uint32 `json:"l7_client_error" category:"$metrics" sub:"application"`
 	L7ServerError uint32 `json:"l7_server_error" category:"$metrics" sub:"application"`
 	L7Timeout     uint32 `json:"l7_timeout" category:"$metrics" sub:"application"`
@@ -594,6 +600,14 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.ServerQueueLack = p.ServerQueueLack
 	a.ServerEstablishReset = p.ServerEstablishReset
 	a.TCPTimeout = p.TcpTimeout
+
+	a.ClientEstablishFail = a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
+	a.ServerEstablishFail = a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
+	a.TCPEstablishFail = a.ClientEstablishFail + a.ServerEstablishFail
+	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-连接超时次数
+	a.TCPTransferFail = a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.TCPTimeout
+	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
+	a.TCPRstFail = a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
 
 	a.L7ClientError = p.L7ClientError
 	a.L7ServerError = p.L7ServerError
@@ -726,13 +740,6 @@ func AnomalyColumns() []*ckdb.Column {
 
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
 func (a *Anomaly) WriteBlock(block *ckdb.Block) {
-	clientFail := a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
-	serverFail := a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
-	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-连接超时次数
-	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.TCPTimeout
-	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
-	rstFail := a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
-
 	block.Write(
 		a.ClientRstFlow,
 		a.ServerRstFlow,
@@ -752,12 +759,11 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 
 		a.TCPTimeout,
 
-		clientFail,
-		serverFail,
-		clientFail+serverFail,
-
-		transferFail,
-		rstFail,
+		a.ClientEstablishFail,
+		a.ServerEstablishFail,
+		a.TCPEstablishFail,
+		a.TCPTransferFail,
+		a.TCPRstFail,
 
 		a.L7ClientError,
 		a.L7ServerError,
@@ -767,7 +773,7 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 }
 
 type FlowLoad struct {
-	Load uint64 `json:"flow_load" category:"$metrics"`
+	Load uint64 `json:"flow_load" category:"$metrics" sub:"l4_throughput"`
 }
 
 func (l *FlowLoad) Reverse() {

@@ -300,7 +300,7 @@ type Field struct {
 	ACLGID     uint16
 	Direction  DirectionEnum     `json:"role" category:"$tag" sub:"capture_info" datasource:"n|a"`
 	Protocol   layers.IPProtocol `json:"protocol" category:"$tag" sub:"network_layer" enumfile:"protocol"`
-	ServerPort uint16            `json:"server_port" category:"$tag" sub:"network_layer"`
+	ServerPort uint16            `json:"server_port" category:"$tag" sub:"transport_layer"`
 	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_metrics', otherwise stored in '<OrgId>_flow_metrics'.
@@ -312,11 +312,11 @@ type Field struct {
 	IsIPv4       uint8            `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
 	L7Protocol   datatype.L7Protocol `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol" datasource:"a|am"`
-	AppService   string              `json:"app_service" category:"$tag" sub:"application_layer" datasource:"a|am"`
-	AppInstance  string              `json:"app_instance" category:"$tag" sub:"application_layer" datasource:"a|am"`
-	Endpoint     string              `json:"endpoint" category:"$tag" sub:"application_layer" datasource:"a|am"`
-	BizType      uint8               `json:"biz_type" category:"$tag" sub:"application_layer" datasource:"a|am"`
-	SignalSource uint16              `json:"signal_source" category:"$tag" sub:"application_layer" enumfile:"l7_signal_source"` // FIXME: network,network_1m should use l4_signal_source for translate
+	AppService   string              `json:"app_service" category:"$tag" sub:"service_info" datasource:"a|am"`
+	AppInstance  string              `json:"app_instance" category:"$tag" sub:"service_info" datasource:"a|am"`
+	Endpoint     string              `json:"endpoint" category:"$tag" sub:"service_info" datasource:"a|am"`
+	BizType      uint8               `json:"biz_type" category:"$tag" sub:"capture_info" datasource:"a|am"`
+	SignalSource uint16              `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"` // FIXME: network,network_1m should use l4_signal_source for translate
 
 	TagSource, TagSource1 uint8
 

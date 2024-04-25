@@ -338,14 +338,15 @@ type ExporterCfg struct {
 	Endpoints       []string       `yaml:"endpoints"`
 	RandomEndpoints []string       // gen by `Endpoints`     `
 
-	QueueCount                   int  `yaml:"queue-count"`
-	QueueSize                    int  `yaml:"queue-size"`
-	BatchSize                    int  `yaml:"batch-size"`
-	FlusTimeout                  int  `yaml:"flush-timeout"`
-	TagOmitemptyDisabled         bool `yaml:"tag-omitempty-disabled"`
-	MetricsOmitempty             bool `yaml:"metrics-omitempty"`
-	EnumToStringDisabled         bool `yaml:"enum-to-string-disabled"`
-	UniversalTagToStringDisabled bool `yaml:"universal-tag-to-string-disabled"`
+	QueueCount  int `yaml:"queue-count"`
+	QueueSize   int `yaml:"queue-size"`
+	BatchSize   int `yaml:"batch-size"`
+	FlusTimeout int `yaml:"flush-timeout"`
+
+	ExportEmptyTag                      bool `yaml:"export-empty-tag"`
+	ExportEmptyMetricsDisabled          bool `yaml:"export-empty-metrics-disabled"`
+	EnumTranslateToNameDisabled         bool `yaml:"enum-translate-to-name-disabled"`
+	UniversalTagTranslateToNameDisabled bool `yaml:"universal-tag-translate-to-name-disabled"`
 
 	TagFilters              []TagFilter `yaml:"tag-filters"`
 	ExportFields            []string    `yaml:"export-fields"`
@@ -521,7 +522,6 @@ var categoryStringMap = map[string]uint64{
 	CATEGORY_TAG:        TAG, // contains the sucategories before METRICS
 	"flow_info":         FLOW_INFO,
 	"universal_tag":     UNIVERSAL_TAG,
-	"custom_tag":        CUSTOM_TAG,
 	"native_tag":        NATIVE_TAG,
 	"network_layer":     NETWORK_LAYER,
 	"tunnel_info":       TUNNEL_INFO,
