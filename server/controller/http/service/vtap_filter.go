@@ -46,6 +46,10 @@ func GetUserInfo(c *gin.Context) *UserInfo {
 }
 
 func GetUnauthorizedTeamIDs(userInfo *UserInfo, fpermitCfg *config.FPermit) (map[int]struct{}, error) {
+	if !fpermitCfg.Enabled {
+		return nil, nil
+	}
+
 	body := make(map[string]interface{})
 	response, err := common.CURLPerform(
 		http.MethodGet,
@@ -83,7 +87,14 @@ func getAgentByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtaps []mysq
 
 	var results []mysql.VTap
 	for _, vtap := range vtaps {
-		if _, ok := teamIDMap[vtap.TeamID]; !ok {
+		if fpermitCfg.Enabled {
+			if _, ok := teamIDMap[vtap.TeamID]; !ok {
+				results = append(results, vtap)
+			}
+			continue
+		}
+
+		if vtap.TeamID == common.DEFAULT_TEAM_ID {
 			results = append(results, vtap)
 		}
 	}
@@ -98,7 +109,14 @@ func getAgentGroupByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtapGro
 
 	var results []*mysql.VTapGroup
 	for _, vtapGroup := range vtapGroups {
-		if _, ok := teamIDMap[vtapGroup.TeamID]; !ok {
+		if fpermitCfg.Enabled {
+			if _, ok := teamIDMap[vtapGroup.TeamID]; !ok {
+				results = append(results, vtapGroup)
+			}
+			continue
+		}
+
+		if vtapGroup.TeamID == common.DEFAULT_TEAM_ID {
 			results = append(results, vtapGroup)
 		}
 	}
