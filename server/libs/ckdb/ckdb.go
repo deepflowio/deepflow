@@ -113,6 +113,7 @@ const (
 	FixString8
 	LowCardinalityString
 	ArrayLowCardinalityString
+	ENUM8
 )
 
 var cloumnTypeString = []string{
@@ -150,6 +151,7 @@ var cloumnTypeString = []string{
 	FixString8:                "FixedString(8)",
 	LowCardinalityString:      "LowCardinality(String)",
 	ArrayLowCardinalityString: "Array(LowCardinality(String))",
+	ENUM8:                     "Enum8(%s)",
 }
 
 func (t ColumnType) HasDFTimeZone() bool {
@@ -178,7 +180,7 @@ var codecTypeString = []string{
 	CodecDefault:     "",
 	CodecLZ4:         "LZ4",
 	CodecLZ4HC:       "LZ4HC",
-	CodecZSTD:        "ZSTD",
+	CodecZSTD:        "ZSTD(1)",
 	CodecT64:         "T64",
 	CodecDelta:       "Delta",
 	CodecDoubleDelta: "DoubleDelta",
@@ -197,6 +199,7 @@ const (
 	IndexMinmax
 	IndexSet
 	IndexBloomfilter
+	IndexTokenbf
 )
 
 var indexTypeString = []string{
@@ -204,6 +207,7 @@ var indexTypeString = []string{
 	IndexMinmax:      "minmax",
 	IndexSet:         "set(300)",
 	IndexBloomfilter: "bloom_filter",
+	IndexTokenbf:     "tokenbf_v1(32768, 3, 0)",
 }
 
 func (t IndexType) String() string {
@@ -297,12 +301,13 @@ const (
 )
 
 type Column struct {
-	Name    string     // 列名
-	Type    ColumnType // 数据类型
-	Codec   CodecType  // 压缩算法
-	Index   IndexType  // 二级索引
-	GroupBy bool       // 在AggregatingMergeTree表中用于group by的字段
-	Comment string     // 列注释
+	Name     string     // 列名
+	Type     ColumnType // 数据类型
+	TypeArgs string
+	Codec    CodecType // 压缩算法
+	Index    IndexType // 二级索引
+	GroupBy  bool      // 在AggregatingMergeTree表中用于group by的字段
+	Comment  string    // 列注释
 }
 
 func (c *Column) MakeModifyTimeZoneSQL(database, table, timeZone string) string {
@@ -333,6 +338,11 @@ func (c *Column) SetComment(comment string) *Column {
 	return c
 }
 
+func (c *Column) SetTypeArgs(args string) *Column {
+	c.TypeArgs = args
+	return c
+}
+
 func NewColumn(name string, t ColumnType) *Column {
 	index := IndexNone
 	codec := CodecDefault
@@ -351,7 +361,7 @@ func NewColumn(name string, t ColumnType) *Column {
 		codec = CodecGorilla
 		index = IndexMinmax
 	}
-	return &Column{name, t, codec, index, false, ""}
+	return &Column{name, t, "", codec, index, false, ""}
 }
 
 func NewColumnWithGroupBy(name string, t ColumnType) *Column {

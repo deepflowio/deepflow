@@ -247,7 +247,7 @@ index 6994106..5951410 100644
 +	return fmt.Errorf("unsupport")
 +}
 +func (col *Enum8) AppendStringRow(elem string) error {
-+	return fmt.Errorf("unsupport")
++       return col.AppendRow(elem)
 +}
 +func (Nothing) AppendStringRow(string) error {
 +	return fmt.Errorf("unsupport")
@@ -371,13 +371,13 @@ index 6994106..5951410 100644
 +}
 +func (col *Enum16) Reset() {
 +	col.values.data = col.values.data[:0]
-+	col.iv = make(map[string]uint16)
-+	col.vi = make(map[uint16]string)
++	// FIXME: Since the line numbers of the patch files are aligned, we will not delete them yet, just comment them out. col.iv = make(map[string]uint16)
++	// FIXME: Since the line numbers of the patch files are aligned, we will not delete them yet, just comment them out. col.vi = make(map[uint16]string)
 +}
 +func (col *Enum8) Reset() {
 +	col.values.data = col.values.data[:0]
-+	col.iv = make(map[string]uint8)
-+	col.vi = make(map[uint8]string)
++	// FIXME: Since the line numbers of the patch files are aligned, we will not delete them yet, just comment them out. col.iv = make(map[string]uint8)
++	// FIXME: Since the line numbers of the patch files are aligned, we will not delete them yet, just comment them out. col.vi = make(map[uint8]string)
 +}
 +func (Nothing) Reset() {
 +}

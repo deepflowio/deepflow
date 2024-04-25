@@ -416,14 +416,6 @@ ingester:
   ## controller listening port
   #controller-port: 20035
 
-  ## es的相关的配置syslog写es
-  #es-host-port:
-  #  - 127.0.0.1:20042
-
-  #es-auth:
-  #  user:
-  #  password:
-
   ## stats collect interval(unit: s)
   # stats-interval: 10
 
@@ -564,6 +556,21 @@ ingester:
   ## prometheus cache expiration of label ids. uint: s
   #prometheus-label-cache-expiration: 86400
 
+  ## application log data writer config
+  #application-log-ck-writer:
+  #  queue-count: 2      # parallelism of table writing
+  #  queue-size: 25600   # size of writing queue
+  #  batch-size: 12800   # size of batch writing
+  #  flush-timeout: 5   # timeout of table writing
+
+  ## app log decoder queue count/size
+  #application-log-decoder-queue-count: 2
+  #application-log-decoder-queue-size: 16384
+
+  ## app log database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
+  #application-log-ttl-hour: 168
+
   #ck-disk-monitor:
   #  check-interval: 180 # check time interval (unit: seconds)
   #  ttl-check-disabled: false # whether to not check TTL expired data
@@ -589,12 +596,6 @@ ingester:
 
   # whether to enable deepflow-aget syslog to write to files in syslog-directory
   #agent-log-to-file: false
-
-  ## syslog存储位置
-  #syslog-directory: /var/log/deepflow-agent
-
-  ## syslog是否写入elasticsearch，默认启用
-  #es-syslog: true
 
   ## udp socket receiver buffer: 64M
   #udp-read-buffer: 67108864

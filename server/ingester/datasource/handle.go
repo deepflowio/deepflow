@@ -54,6 +54,7 @@ const (
 	EVENT_PERF_EVENT                         = "event.perf_event"
 	EVENT_ALARM_EVENT                        = "event.alarm_event"
 	PROFILE                                  = "profile.in_process"
+	APPLOG                                   = "application_log.log"
 )
 
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
@@ -68,6 +69,7 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
 	EVENT_ALARM_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
 	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
+	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
