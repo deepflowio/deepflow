@@ -285,10 +285,22 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		)
 	}
 	oldRetentionTime := dataSource.RetentionTime
-	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
+	isUpdateName := false
 	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
 		dataSource.DisplayName = dataSourceUpdate.DisplayName
+		isUpdateName = true
 	}
+
+	// only update display name
+	if dataSource.RetentionTime == dataSourceUpdate.RetentionTime && isUpdateName {
+		err := mysql.Db.Save(&dataSource).Error
+		if err != nil {
+			return model.DataSource{}, err
+		}
+		response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
+		return response[0], nil
+	}
+	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
@@ -297,7 +309,6 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	}
 
 	var err error
-	var errAnalyzerIP string
 	var errs []error
 	for _, analyzer := range analyzers {
 		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
@@ -340,7 +351,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	for _, e := range errs {
 		if errors.Is(e, httpcommon.ErrorPending) {
-			warnMsg := fmt.Sprintf("config analyzer (name: %s, ip:%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.DisplayName)
+			warnMsg := fmt.Sprintf("pending %s", e.Error())
 			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
 			err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
 			break
@@ -389,10 +400,10 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	var errStrs []string
 	for _, analyzer := range analyzers {
-		if CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
+		if ingesterErr := CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port); ingesterErr != nil {
 			errStr := fmt.Sprintf(
-				"failed to config analyzer (name: %s, ip:%s) add data_source (%s) error(%s)",
-				analyzer.Name, analyzer.IP, dataSource.DisplayName,
+				"failed to config analyzer (name: %s, ip:%s) delete data_source (%s) error(%s)",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
 			errStrs = append(errStrs, errStr)
 			continue
@@ -443,6 +454,9 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), rozePort)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body)
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 
@@ -459,6 +473,9 @@ func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body)
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 
@@ -474,6 +491,9 @@ func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), rozePort)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body)
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 
