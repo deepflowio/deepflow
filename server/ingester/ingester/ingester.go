@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/ingester/app_log"
 	"github.com/deepflowio/deepflow/server/ingester/ckmonitor"
 	"github.com/deepflowio/deepflow/server/ingester/datasource"
 	"github.com/deepflowio/deepflow/server/ingester/exporters"
@@ -37,11 +38,11 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	servercommon "github.com/deepflowio/deepflow/server/common"
+	applicationlogcfg "github.com/deepflowio/deepflow/server/ingester/app_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/ckissu"
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	dropletcfg "github.com/deepflowio/deepflow/server/ingester/droplet/config"
-	"github.com/deepflowio/deepflow/server/ingester/droplet/droplet"
 	eventcfg "github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/event"
 	exporterscfg "github.com/deepflowio/deepflow/server/ingester/exporters/config"
@@ -99,7 +100,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 
 	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer, cfg.TCPReaderBuffer)
 
-	closers := droplet.Start(dropletConfig, receiver)
+	closers := []io.Closer{}
 
 	if cfg.IngesterEnabled {
 		flowLogConfig := flowlogcfg.Load(cfg, configPath)
@@ -129,6 +130,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		prometheusConfig := prometheuscfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(prometheusConfig)
 		log.Infof("prometheus config:\n%s", string(bytes))
+
+		applicationLogConfig := applicationlogcfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(applicationLogConfig)
+		log.Infof("application log  config:\n%s", string(bytes))
 
 		exportersConfig := exporterscfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(exportersConfig)
@@ -214,6 +219,12 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			checkError(err)
 			prometheus.Start()
 			closers = append(closers, prometheus)
+
+			// write application log data
+			applicationLog, err := app_log.NewApplicationLogger(applicationLogConfig, receiver, platformDataManager)
+			checkError(err)
+			applicationLog.Start()
+			closers = append(closers, applicationLog)
 
 			// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 			cm, err := ckmonitor.NewCKMonitor(cfg)

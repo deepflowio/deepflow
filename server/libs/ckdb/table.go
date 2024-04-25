@@ -106,10 +106,15 @@ func (t *Table) makeLocalTableCreateSQL(database string) string {
 		if c.Codec != CodecDefault {
 			codec = fmt.Sprintf("CODEC(%s)", c.Codec.String())
 		}
-		columns = append(columns, fmt.Sprintf("`%s` %s %s %s", c.Name, c.Type.String(), comment, codec))
+
+		columnType := c.Type.String()
+		if c.TypeArgs != "" {
+			columnType = fmt.Sprintf(c.Type.String(), c.TypeArgs)
+		}
+		columns = append(columns, fmt.Sprintf("`%s` %s %s %s", c.Name, columnType, comment, codec))
 
 		if c.Index != IndexNone {
-			columns = append(columns, fmt.Sprintf("INDEX %s_idx (%s) TYPE %s GRANULARITY 3", c.Name, c.Name, c.Index.String()))
+			columns = append(columns, fmt.Sprintf("INDEX %s_idx (%s) TYPE %s GRANULARITY 2", c.Name, c.Name, c.Index.String()))
 		}
 	}
 
