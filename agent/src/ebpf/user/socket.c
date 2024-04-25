@@ -1838,10 +1838,11 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset)
 {
-	struct bpf_offset_param offs[MAX_CPU_NR];
+	int nr_cpus = get_num_possible_cpus();
+	struct bpf_offset_param offs[nr_cpus];
 	int i;
 	memset(&offs, 0, sizeof(offs));
-	for (i = 0; i < MAX_CPU_NR; i++) {
+	for (i = 0; i < nr_cpus; i++) {
 		offs[i] = *offset;
 	}
 
