@@ -20,6 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChDevice struct {
@@ -143,6 +144,8 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
 				Hostname:   host.Hostname,
 				IP:         host.IP,
+				TeamID:     tagrecorder.DomainToTeamID[host.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[host.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -152,6 +155,8 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
 				Hostname:   host.Hostname,
 				IP:         host.IP,
+				TeamID:     tagrecorder.DomainToTeamID[host.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[host.Domain],
 			}
 		}
 
@@ -182,6 +187,8 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
 				Hostname:   vm.Hostname,
 				IP:         vm.IP,
+				TeamID:     tagrecorder.DomainToTeamID[vm.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -192,6 +199,8 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
 				Hostname:   vm.Hostname,
 				IP:         vm.IP,
+				TeamID:     tagrecorder.DomainToTeamID[vm.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		}
 	}
@@ -220,6 +229,8 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) b
 			DeviceID:   vrouter.ID,
 			Name:       vrouterName,
 			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VGW}],
+			TeamID:     tagrecorder.DomainToTeamID[vrouter.Domain],
+			DomainID:   tagrecorder.DomainToDomainID[vrouter.Domain],
 		}
 	}
 	return true
@@ -245,6 +256,8 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 				DeviceID:   dhcpPort.ID,
 				Name:       dhcpPort.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
+				TeamID:     tagrecorder.DomainToTeamID[dhcpPort.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[dhcpPort.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -252,6 +265,8 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 				DeviceID:   dhcpPort.ID,
 				Name:       dhcpPort.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
+				TeamID:     tagrecorder.DomainToTeamID[dhcpPort.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[dhcpPort.Domain],
 			}
 		}
 	}
@@ -279,6 +294,8 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 				Name:       natGateway.Name + " (deleted)",
 				UID:        natGateway.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
+				TeamID:     tagrecorder.DomainToTeamID[natGateway.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[natGateway.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -287,6 +304,8 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 				Name:       natGateway.Name,
 				UID:        natGateway.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
+				TeamID:     tagrecorder.DomainToTeamID[natGateway.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[natGateway.Domain],
 			}
 		}
 	}
@@ -314,6 +333,8 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				Name:       lb.Name + " (deleted)",
 				UID:        lb.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
+				TeamID:     tagrecorder.DomainToTeamID[lb.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[lb.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -322,6 +343,8 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 				Name:       lb.Name,
 				UID:        lb.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
+				TeamID:     tagrecorder.DomainToTeamID[lb.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[lb.Domain],
 			}
 		}
 	}
@@ -349,6 +372,8 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 				Name:       rdsInstance.Name + " (deleted)",
 				UID:        rdsInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
+				TeamID:     tagrecorder.DomainToTeamID[rdsInstance.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[rdsInstance.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -357,6 +382,8 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 				Name:       rdsInstance.Name,
 				UID:        rdsInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
+				TeamID:     tagrecorder.DomainToTeamID[rdsInstance.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[rdsInstance.Domain],
 			}
 		}
 	}
@@ -384,6 +411,8 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 				Name:       redisInstance.Name + " (deleted)",
 				UID:        redisInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
+				TeamID:     tagrecorder.DomainToTeamID[redisInstance.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[redisInstance.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -392,6 +421,8 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 				Name:       redisInstance.Name,
 				UID:        redisInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
+				TeamID:     tagrecorder.DomainToTeamID[redisInstance.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[redisInstance.Domain],
 			}
 		}
 	}
@@ -418,6 +449,8 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 				Name:       podService.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
 			}
 
 			// service
@@ -430,6 +463,8 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 				Name:       podService.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
 			}
 		} else {
 			// pod_service
@@ -442,6 +477,8 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 				Name:       podService.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
 			}
 
 			// service
@@ -454,6 +491,8 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 				Name:       podService.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
 			}
 		}
 	}
@@ -479,6 +518,8 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 				DeviceID:   pod.ID,
 				Name:       pod.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -486,6 +527,8 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 				DeviceID:   pod.ID,
 				Name:       pod.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
 			}
 		}
 	}
@@ -511,6 +554,8 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 				DeviceID:   podGroup.ID,
 				Name:       podGroup.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -518,6 +563,8 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 				DeviceID:   podGroup.ID,
 				Name:       podGroup.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		}
 	}
@@ -545,6 +592,8 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
 				Hostname:   podNode.Hostname,
 				IP:         podNode.IP,
+				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -554,6 +603,8 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
 				Hostname:   podNode.Hostname,
 				IP:         podNode.IP,
+				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
 			}
 		}
 	}
@@ -602,6 +653,8 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				DeviceID:   process.ID,
 				Name:       process.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
@@ -609,6 +662,8 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				DeviceID:   process.ID,
 				Name:       process.Name,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
 			}
 		}
 	}

@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChost struct {
@@ -65,6 +66,8 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 				HostID:   ipToHostID[chost.LaunchServer],
 				Hostname: chost.Hostname,
 				IP:       chost.IP,
+				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
+				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
@@ -74,6 +77,8 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 				HostID:   ipToHostID[chost.LaunchServer],
 				Hostname: chost.Hostname,
 				IP:       chost.IP,
+				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
+				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
 		}
 	}
