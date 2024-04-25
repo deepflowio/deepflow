@@ -162,7 +162,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 			ret := structTags.ToStringFunc.Call([]reflect.Value{reflect.ValueOf(value)})
 			valueStr = ret[0].String()
 			isString = true
-		} else if structTags.UniversalTagMapID > 0 && !exporterCfg.UniversalTagToStringDisabled {
+		} else if structTags.UniversalTagMapID > 0 && !exporterCfg.UniversalTagTranslateToNameDisabled {
 			// skip '_id'
 			if pos := strings.Index(keyStr, "_id"); pos != -1 {
 				keyStr = (keyStr[:pos]) + keyStr[pos+3:] // 3 is  length of '_id'
@@ -173,7 +173,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 				valueStr = uTags0.GetTagValue(structTags.UniversalTagMapID)
 			}
 			isString = true
-		} else if structTags.EnumFile != "" && !exporterCfg.EnumToStringDisabled {
+		} else if structTags.EnumFile != "" && !exporterCfg.EnumTranslateToNameDisabled {
 			if isString {
 				valueStr = structTags.EnumStringMap[valueStr]
 			} else if isFloat64 {
@@ -183,7 +183,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 		}
 
 		// not export empty tags
-		if !exporterCfg.TagOmitemptyDisabled &&
+		if !exporterCfg.ExportEmptyTag &&
 			(structTags.CategoryBit&config.TAG) != 0 &&
 			((isString && valueStr == "") ||
 				(isStringSlice && len(stringSlice) == 0)) {
@@ -191,7 +191,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 		}
 
 		// not export empty metrics
-		if exporterCfg.MetricsOmitempty &&
+		if exporterCfg.ExportEmptyMetricsDisabled &&
 			(structTags.CategoryBit&config.METRICS) != 0 &&
 			((isString && valueStr == "") || (isFloat64 && valueFloat64 == 0) ||
 				(isFloat64Slice && len(float64Slice) == 0)) {

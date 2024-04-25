@@ -665,13 +665,13 @@ ingester:
   #  batch-size: 1024
   #  flush-timeout: 10
   #  # the value of tag is "", whether to export
-  #  tag-omitempty-disabled: false
+  #  export-empty-tag: false
   #  # the value of metrics is 0, whether to export
-  #  metrics-omitempty: false
+  #  export-empty-metrics-disabled: false
   #  # whether the id value of the enumeration type is not converted into a string for output
-  #  enum-to-string-disabled: false
+  #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
-  #  universaltag-to-string-disabled: false
+  #  universal-tag-translate-to-name-disabled: false
   #  tag-filters:
   #  - field-name: signal_source # database column name
   #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
@@ -705,10 +705,10 @@ ingester:
   #  extra-headers:  # type: map[string]string, extra http request headers
   #    key1: value1
   #    key2: value2
-  #  tag-omitempty-disabled: false
-  #  metrics-omitempty: false
-  #  enum-to-string-disabled: false
-  #  universaltag-to-string-disabled: false
+  #  export-empty-tag: false
+  #  export-empty-metrics-disabled: false
+  #  enum-translate-to-name-disabled: false
+  #  universal-tag-translate-to-name-disabled: false
   #- protocol: opentemetry
   #  enabled: true
   #  # Randomly select an address that can be sent successfully, otlp address format as: 127.0.0.1:4317, only supports grpc protocol
@@ -727,10 +727,10 @@ ingester:
   #  - $tag
   #  - $metrics
   #  - $k8s.label
-  #  tag-omitempty-disabled: false
-  #  metrics-omitempty: false
-  #  enum-to-string-disabled: false
-  #  universaltag-to-string-disabled: false
+  #  export-empty-tag: false
+  #  export-empty-metrics-disabled: false
+  #  enum-translate-to-name-disabled: false
+  #  universal-tag-translate-to-name-disabled: false
   #  extra-headers:  # type: map[string]string, extra http request headers
   #    key1: value1
   #    key2: value2

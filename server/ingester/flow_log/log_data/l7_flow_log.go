@@ -60,11 +60,11 @@ type L7Base struct {
 
 	// 流信息
 	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
-	TapType      uint8  `json:"capture_network_type" category:"$tag" sub:"flow_info"`
-	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"flow_info" enumfile:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type category:"$tag" sub:"flow_info"`
+	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType  uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
 	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
-	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"flow_info"`
+	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
 	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
 	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
 	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
@@ -76,10 +76,10 @@ type L7Base struct {
 	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
 	BizType      uint8  `json:"biz_type" category:"$tag" sub:"capture_info"`
 
-	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"tracing_info"`
-	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"tracing_info"`
-	ProcessKName0          string `json:"process_kname_0" category:"$tag" sub:"tracing_info"`
-	ProcessKName1          string `json:"process_kname_1" category:"$tag" sub:"tracing_info"`
+	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
+	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
+	ProcessKName0          string `json:"process_kname_0" category:"$tag" sub:"service_info"`
+	ProcessKName1          string `json:"process_kname_1" category:"$tag" sub:"service_info"`
 	SyscallTraceIDRequest  uint64 `json:"syscall_trace_id_request" category:"$tag" sub:"tracing_info"`
 	SyscallTraceIDResponse uint64 `json:"syscall_trace_id_response" category:"$tag" sub:"tracing_info"`
 	SyscallThread0         uint32 `json:"syscall_thread_0" category:"$tag" sub:"tracing_info"`
@@ -234,15 +234,15 @@ type L7FlowLog struct {
 	responseLength   int64
 	SqlAffectedRows  *uint64 `json:"sql_affected_rows" category:"$metrics" sub:"throughput" data_type:"*uint64"`
 	sqlAffectedRows  uint64
-	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"throughput"`
+	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
-	MetricsNames  []string  `json:"metrics_names" category:"$metrics" sub:"application_layer" data_type:"[]string"`
-	MetricsValues []float64 `json:"metrics_values" category:"$metrics" sub:"application_layer" data_type:"[]float64"`
+	MetricsNames  []string  `json:"metrics_names" category:"$metrics" data_type:"[]string"`
+	MetricsValues []float64 `json:"metrics_values" category:"$metrics" data_type:"[]float64"`
 
-	Events string
+	Events string `json:"events" category:"$tag" sub:"application_layer"`
 }
 
 func L7FlowLogColumns() []*ckdb.Column {
