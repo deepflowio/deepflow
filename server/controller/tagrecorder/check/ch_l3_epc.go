@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChVPC struct {
@@ -48,17 +49,21 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 	for _, vpc := range vpcs {
 		if vpc.DeletedAt.Valid {
 			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name + " (deleted)",
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+				ID:       vpc.ID,
+				Name:     vpc.Name + " (deleted)",
+				UID:      vpc.UID,
+				IconID:   v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+				TeamID:   tagrecorder.DomainToTeamID[vpc.Domain],
+				DomainID: tagrecorder.DomainToDomainID[vpc.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-				ID:     vpc.ID,
-				Name:   vpc.Name,
-				UID:    vpc.UID,
-				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+				ID:       vpc.ID,
+				Name:     vpc.Name,
+				UID:      vpc.UID,
+				IconID:   v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+				TeamID:   tagrecorder.DomainToTeamID[vpc.Domain],
+				DomainID: tagrecorder.DomainToDomainID[vpc.Domain],
 			}
 		}
 	}

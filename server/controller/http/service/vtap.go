@@ -27,30 +27,45 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	"github.com/deepflowio/deepflow/server/controller/monitor/config"
+	monitorconf "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
+type Agent struct {
+	cfg *config.ControllerConfig
+
+	userInfo *UserInfo
+}
+
+func NewAgent(userInfo *UserInfo, cfg *config.ControllerConfig) *Agent {
+	return &Agent{userInfo: userInfo, cfg: cfg}
+}
+
 const (
 	VTAP_LICENSE_CHECK_EXCEPTION = "采集器(%s)不支持修改为指定授权类型"
 )
 
-func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
+func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	var response []model.Vtap
-	var vtaps []mysql.VTap
+	var allVTaps []mysql.VTap
 	var vtapGroups []mysql.VTapGroup
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var vtapRepos []mysql.VTapRepo
 
-	Db := mysql.Db
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	Db := dbInfo.DB
 	for _, param := range []string{
 		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip",
 	} {
@@ -64,7 +79,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			Db = Db.Where("name IN (?)", filter["names"].([]string))
 		}
 	}
-	if err := Db.Find(&vtaps).Error; err != nil {
+	if err := Db.Find(&allVTaps).Error; err != nil {
 		return nil, err
 	}
 	if err := mysql.Db.Find(&vtapGroups).Error; err != nil {
@@ -102,7 +117,11 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
-	for _, vtap := range vtaps {
+	agents, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	if err != nil {
+		return nil, err
+	}
+	for _, vtap := range agents {
 		vtapResp := model.Vtap{
 			ID:               vtap.ID,
 			Name:             vtap.Name,
@@ -128,6 +147,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			ExpectedRevision: vtap.ExpectedRevision,
 			UpgradePackage:   vtap.UpgradePackage,
 			TapMode:          vtap.TapMode,
+			TeamID:           vtap.TeamID,
 		}
 		// state
 		if vtap.Enable == common.VTAP_ENABLE_FALSE {
@@ -149,7 +169,8 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			if upgradeRevision, ok := vtapRepoNameToRevision[vtap.UpgradePackage]; ok {
 				vtapResp.UpgradeRevision = upgradeRevision
 			} else {
-				log.Errorf("vtap upgrade package(%v) cannot assoicated with vtap repo", vtap.UpgradePackage)
+				log.Errorf("ORG(id=%d database=%s) vtap upgrade package(%v) cannot assoicated with vtap repo",
+					dbInfo.ORGID, dbInfo.Name, vtap.UpgradePackage)
 			}
 		}
 		// exceptions
@@ -213,18 +234,22 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	return response, nil
 }
 
-func CreateVtap(vtapCreate model.VtapCreate) (model.Vtap, error) {
-	var vtap mysql.VTap
-	var err error
+func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return model.Vtap{}, err
+	}
+	db := dbInfo.DB
 
-	if ret := mysql.Db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
+	var vtap mysql.VTap
+	if ret := db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("vtap (ctrl_ip: %s) already exist", vtapCreate.CtrlIP),
 		)
 	}
 
-	if ret := mysql.Db.Where("name = ?", vtapCreate.Name).First(&vtap); ret.Error == nil {
+	if ret := db.Where("name = ?", vtapCreate.Name).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("vtap (%s) already exist", vtapCreate.Name),
@@ -248,35 +273,42 @@ func CreateVtap(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	vtap.AZ = vtapCreate.AZ
 	vtap.Region = vtapCreate.Region
 	vtap.VtapGroupLcuuid = vtapCreate.VtapGroupLcuuid
+	vtap.TeamID = vtapCreate.TeamID
 	switch vtapCreate.Type {
 	case common.VTAP_TYPE_DEDICATED:
 		vtap.TapMode = common.TAPMODE_ANALYZER
 	case common.VTAP_TYPE_TUNNEL_DECAPSULATION:
 		vtap.TapMode = common.TAPMODE_DECAP
 	}
-	mysql.Db.Create(&vtap)
+	db.Create(&vtap)
 
-	response, _ := GetVtaps(map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
 	return response[0], err
 }
 
-func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
+func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return model.Vtap{}, err
+	}
+	db := dbInfo.DB
+
 	var vtap mysql.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
-		if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
+		if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 			return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 		}
 	} else if name != "" {
-		if ret := mysql.Db.Where("name = ?", name).First(&vtap); ret.Error != nil {
+		if ret := db.Where("name = ?", name).First(&vtap); ret.Error != nil {
 			return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", name))
 		}
 	} else {
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
 
-	log.Infof("update vtap (%s) config %v", vtap.Name, vtapUpdate)
+	log.Infof("ORG(id=%d database=%s) update vtap (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
 
 	// enable/state/vtap_group_lcuuid
 	for _, key := range []string{"ENABLE", "STATE", "VTAP_GROUP_LCUUID", "LICENSE_TYPE"} {
@@ -293,28 +325,28 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 	}
 
-	mysql.Db.Model(&vtap).Updates(dbUpdateMap)
+	db.Model(&vtap).Updates(dbUpdateMap)
 
 	if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
 		key := vtap.CtrlIP + "-" + vtap.CtrlMac
-		if err := mysql.Db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
-			log.Error(err)
+		if err := db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
+			log.Errorf("ORG(id=%d database=%s) error: %v", dbInfo.ORGID, dbInfo.Name, err)
 		}
 	}
 
-	response, _ := GetVtaps(map[string]interface{}{"lcuuid": vtap.Lcuuid})
-	refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	response, _ := a.Get(map[string]interface{}{"lcuuid": vtap.Lcuuid})
+	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
-func BatchUpdateVtap(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
+func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
 	var description string
 	var succeedLcuuids []string
 	var failedLcuuids []string
 
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
-			_, _err := UpdateVtap(lcuuid, "", vtapUpdate)
+			_, _err := a.Update(lcuuid, "", vtapUpdate)
 			if _err != nil {
 				description += _err.Error()
 				failedLcuuids = append(failedLcuuids, lcuuid)
@@ -336,7 +368,7 @@ func BatchUpdateVtap(updateMap []map[string]interface{}) (resp map[string][]stri
 	}
 }
 
-func checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
+func (a *Agent) checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 	// check current vtap if support wanted licenseType
 	supportedLicenseTypes := license.GetSupportedLicenseType(vtap.Type)
 	if len(supportedLicenseTypes) > 0 {
@@ -351,22 +383,28 @@ func checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 	return nil
 }
 
-func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
+func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return model.Vtap{}, err
+	}
+	db := dbInfo.DB
+
 	var vtap mysql.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
 
-	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate)
+	log.Infof("ORG(id=%d database=%s) update vtap (%s) license %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
 
 	if _, ok := vtapUpdate["LICENSE_TYPE"]; ok {
 		dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
 		licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
 
 		// 检查是否可以修改
-		err := checkLicenseType(vtap, licenseType)
+		err := a.checkLicenseType(vtap, licenseType)
 		if err != nil {
 			return model.Vtap{}, err
 		}
@@ -381,13 +419,19 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 	}
 
 	// 更新vtap DB
-	mysql.Db.Model(&vtap).Updates(dbUpdateMap)
+	db.Model(&vtap).Updates(dbUpdateMap)
 
-	response, _ := GetVtaps(map[string]interface{}{"lcuuid": vtap.Lcuuid})
+	response, _ := a.Get(map[string]interface{}{"lcuuid": vtap.Lcuuid})
 	return response[0], nil
 }
 
-func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
+func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
+
 	var description string
 	var succeedLcuuids []string
 	var failedLcuuids []string
@@ -398,12 +442,12 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 			var vtap mysql.VTap
 			var dbUpdateMap = make(map[string]interface{})
 
-			if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
+			if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 				_err = NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 			} else {
 				// 检查是否可以修改
 				licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
-				_err = checkLicenseType(vtap, licenseType)
+				_err = a.checkLicenseType(vtap, licenseType)
 				if _err == nil {
 					// 更新vtap DB
 					dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
@@ -418,7 +462,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 						}
 						dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 					}
-					mysql.Db.Model(&vtap).Updates(dbUpdateMap)
+					db.Model(&vtap).Updates(dbUpdateMap)
 				}
 			}
 			if _err != nil {
@@ -442,27 +486,32 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	}
 }
 
-func DeleteVtap(lcuuid string) (resp map[string]string, err error) {
-	var vtap mysql.VTap
+func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
+	var vtap mysql.VTap
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
 
-	log.Infof("delete vtap (%s)", vtap.Name)
+	log.Infof("ORG(id=%d database=%s) delete vtap (%s)", dbInfo.ORGID, dbInfo.Name, vtap.Name)
 
-	mysql.Db.Delete(&vtap)
+	db.Delete(&vtap)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func BatchDeleteVtap(deleteMap []map[string]string) (resp map[string][]string, err error) {
+func (a *Agent) BatchDelete(deleteMap []map[string]string) (resp map[string][]string, err error) {
 	var description string
 	var deleteLcuuids []string
 	var failedLcuuids []string
 
 	for _, vtapDelete := range deleteMap {
 		if lcuuid, ok := vtapDelete["LCUUID"]; ok {
-			_, _err := DeleteVtap(lcuuid)
+			_, _err := a.Delete(lcuuid)
 			if _err != nil {
 				description += _err.Error()
 				failedLcuuids = append(failedLcuuids, lcuuid)
@@ -764,7 +813,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 	return response, nil
 }
 
-func VTapRebalance(args map[string]interface{}, cfg config.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
+func VTapRebalance(args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
 	var azs []mysql.AZ
 
 	hostType := "controller"

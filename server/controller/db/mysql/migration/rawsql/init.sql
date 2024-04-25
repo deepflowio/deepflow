@@ -1057,6 +1057,7 @@ TRUNCATE TABLE vtap;
 
 CREATE TABLE IF NOT EXISTS vtap_group (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER,
     name                    VARCHAR(64) NOT NULL,
     created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1615,6 +1616,7 @@ TRUNCATE TABLE policy_acl_group;
 
 CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     id                                      INTEGER        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                                 INTEGER,
     max_collect_pps                         INTEGER        DEFAULT NULL,
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,

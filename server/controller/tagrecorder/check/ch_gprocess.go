@@ -19,6 +19,7 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChGProcess struct {
@@ -48,19 +49,23 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 	for _, process := range processes {
 		if process.DeletedAt.Valid {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:      process.ID,
-				Name:    process.Name + " (deleted)",
-				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID: process.VMID,
-				L3EPCID: process.VPCID,
+				ID:       process.ID,
+				Name:     process.Name + " (deleted)",
+				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID:  process.VMID,
+				L3EPCID:  process.VPCID,
+				TeamID:   tagrecorder.DomainToTeamID[process.Domain],
+				DomainID: tagrecorder.DomainToDomainID[process.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:      process.ID,
-				Name:    process.Name,
-				IconID:  p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID: process.VMID,
-				L3EPCID: process.VPCID,
+				ID:       process.ID,
+				Name:     process.Name,
+				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID:  process.VMID,
+				L3EPCID:  process.VPCID,
+				TeamID:   tagrecorder.DomainToTeamID[process.Domain],
+				DomainID: tagrecorder.DomainToDomainID[process.Domain],
 			}
 		}
 	}
