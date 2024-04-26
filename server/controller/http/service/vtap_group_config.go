@@ -724,6 +724,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 		return nil, err
 	}
 	realData.TeamID = vtapGroup.TeamID
+	defaultData.TeamID = common.DEFAULT_TEAM_ID
 
 	response := &model.DetailedConfig{
 		RealConfig:    realData,
