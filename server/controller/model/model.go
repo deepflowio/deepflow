@@ -235,7 +235,7 @@ type VtapGroupCreate struct {
 	Enable      int      `json:"ENABLE"`
 	VtapLcuuids []string `json:"VTAP_LCUUIDS"`
 	GroupID     string   `json:"GROUP_ID"`
-	TeamID      int      `json:"TEAM_ID" binding:"required"`
+	TeamID      int      `json:"TEAM_ID"`
 }
 
 type VtapGroupUpdate struct {
