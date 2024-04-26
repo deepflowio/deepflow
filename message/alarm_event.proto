@@ -31,4 +31,7 @@ message AlarmEvent {
     optional string policy_threshold_critical = 24;
     optional string policy_threshold_error = 25;
     optional string policy_threshold_warning = 26;
+
+    optional uint32 org_id = 27;
+    optional uint32 team_id = 28;
 }
