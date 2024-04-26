@@ -39,11 +39,10 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-
-	var annotations string
 	var chItem mysql.ChPodServiceK8sAnnotations
+
 	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations = common.StrToJsonstr(fieldsUpdate.Annotation.GetNew())
+		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		if annotations != "" {
 			updateInfo["annotations"] = annotations
 		}
@@ -74,9 +73,10 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *
 	if item.Annotation == "" {
 		return
 	}
+	annotations, _ := common.StrToJsonAndMap(item.Annotation)
 	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sAnnotations{{
 		ID:          item.ID,
-		Annotations: common.StrToJsonstr(item.Annotation),
+		Annotations: annotations,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
 	}}

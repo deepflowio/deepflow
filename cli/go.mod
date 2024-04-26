@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240418031757-2823b3184166
-	github.com/deepflowio/deepflow/server v0.0.0-20240313030613-182e7a10446e
+	github.com/deepflowio/deepflow/message v0.0.0-20240423024840-ece29545d0ac
+	github.com/deepflowio/deepflow/server v0.0.0-20240423024840-ece29545d0ac
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
@@ -68,7 +68,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535 // indirect
 	github.com/paulmach/orb v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
-	github.com/pierrec/lz4/v4 v4.1.15 // indirect
+	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/common v0.35.0 // indirect

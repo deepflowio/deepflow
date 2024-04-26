@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
-
+	logging "github.com/op/go-logging"
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
 
 	dropletqueue "github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
@@ -43,7 +43,6 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	libqueue "github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
-	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("flow_log")
@@ -65,12 +64,10 @@ type Logger struct {
 	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
-func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowLog, error) {
+func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*FlowLog, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_FLOW_LOG_QUEUE)
 
 	if config.Base.StorageDisabled {
-		exporters := exporters.NewExporters(config)
-
 		l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, nil, exporters)
 		if err != nil {
 			return nil, err
@@ -90,10 +87,8 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	if err != nil {
 		return nil, err
 	}
-	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
+	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, exporters)
 
-	// the exporters cannot be shared by multiple logger decoder.
-	exporters := exporters.NewExporters(config)
 	l7FlowLogger, err := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, exporters)
 	if err != nil {
 		return nil, err
@@ -172,7 +167,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 	}, nil
 }
 
-func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, exporters *exporters.Exporters) *Logger {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -213,7 +208,7 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			nil,
-			nil,
+			exporters,
 			config,
 		)
 	}

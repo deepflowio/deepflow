@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNSCloudTags struct {
@@ -62,6 +63,8 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 			keyToItem[key] = mysql.ChPodNSCloudTags{
 				ID:        podNamespace.ID,
 				CloudTags: string(cloudTagsStr),
+				TeamID:    tagrecorder.DomainToTeamID[podNamespace.Domain],
+				DomainID:  tagrecorder.DomainToDomainID[podNamespace.Domain],
 			}
 		}
 	}

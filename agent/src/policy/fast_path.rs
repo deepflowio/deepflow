@@ -420,14 +420,12 @@ impl FastPath {
             self.generate_ebpf_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst);
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let endpoints = Arc::new(endpoints);
-
         self.ebpf_table.put(key, endpoints.clone());
-        if key_0 == key_1 {
-            return endpoints;
-        }
+
+        // NOTE: key_0 and key_1 cannot be the same.
         let key = (key_1 as u128) << 64 | key_0 as u128;
+        self.ebpf_table.put(key, Arc::new(endpoints.reversed()));
 
-        self.ebpf_table.put(key, endpoints.clone());
         return endpoints;
     }
 
@@ -772,5 +770,31 @@ mod test {
         for i in 0xc0a9..0xc0b0 {
             assert_eq!(table.mask_from_ipgroup.read().unwrap()[i], 0xfff80000);
         }
+    }
+
+    #[test]
+    fn test_ebpf_fast() {
+        let mut table = FastPath::new(1, 1024);
+        let ip_src = IpAddr::from("192.169.1.100".parse::<Ipv4Addr>().unwrap());
+        let ip_dst = IpAddr::from("172.29.2.200".parse::<Ipv4Addr>().unwrap());
+        let mut endpoints: EndpointData = Default::default();
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l3_epc_id = 20;
+
+        let e = table.ebpf_add_endpoints(ip_src, ip_dst, 10, 0, endpoints);
+        assert_eq!(10, e.src_info.l3_epc_id);
+        assert_eq!(20, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 10, 0).unwrap();
+        assert_eq!(10, e.src_info.l3_epc_id);
+        assert_eq!(20, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_dst, ip_src, 0, 10).unwrap();
+        assert_eq!(20, e.src_info.l3_epc_id);
+        assert_eq!(10, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 0);
+        assert!(e.is_none());
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 10);
+        assert!(e.is_none());
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 10, 20);
+        assert!(e.is_none());
     }
 }

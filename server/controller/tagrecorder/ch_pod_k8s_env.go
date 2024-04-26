@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -49,25 +47,9 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.ENV.GetNew()
-		oldStr := fieldsUpdate.ENV.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
+		_, new := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.ENV.GetOld())
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -115,15 +97,8 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sEnvKey, targets []mysql.ChPodK8sEnv) {
-	envMap := map[string]string{}
-	splitTags := strings.Split(source.ENV, ", ")
+	_, envMap := common.StrToJsonAndMap(source.ENV)
 
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			envMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
 	for k, v := range envMap {
 		keys = append(keys, K8sEnvKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sEnv{

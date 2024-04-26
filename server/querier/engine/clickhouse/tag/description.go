@@ -970,13 +970,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 	var sql string
 	var whereSql string
 	var limitSql string
-	var isAdminFlag bool
 	var orderBy = "value"
-	if strings.Contains(rawSql, "value!=''") || strings.Contains(rawSql, "value!=0") {
-		isAdminFlag = false
-	} else {
-		isAdminFlag = true
-	}
 	if strings.Contains(strings.ToLower(rawSql), "like") || strings.Contains(strings.ToLower(rawSql), "regexp") {
 		orderBy = "length(display_name)"
 	}
@@ -1008,327 +1002,174 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 	if len(limitList) > 1 {
 		limitSql = " LIMIT " + limitList[1]
 	}
-	if !isAdminFlag {
-		switch tag {
-		case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
-			results := &common.Result{}
-			for resourceKey, resourceType := range AutoMap {
-				if resourceKey == "gprocess" {
-					continue
-				} else {
-					// 增加资源ID
-					resourceId := resourceKey + "_id"
-					resourceName := resourceKey + "_name"
-					sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
-				}
-				sql = strings.ReplaceAll(sql, " like ", " ilike ")
-				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-			}
-			autoMap := map[string]map[string]int{
-				"resource_gl0":  AutoPodMap,
-				"auto_instance": AutoPodMap,
-				"resource_gl1":  AutoServiceMap,
-				"resource_gl2":  AutoServiceMap,
-				"auto_service":  AutoServiceMap,
-			}
-			for resourceKey, resourceType := range autoMap[tag] {
-				if slices.Contains(PodGroupTypeSlice, resourceKey) {
-					continue
-				}
-				resourceId := resourceKey + "_id"
-				resourceName := resourceKey + "_name"
-				if resourceKey == "service" {
-					resourceId = "pod_service_id"
-					resourceName = "pod_service_name"
-				}
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-			}
-			return results, sqlList, nil
-		}
+	// querier will be called later, so there is no need to display the declaration db
+	deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
+	if ok {
+		if tag == "chost" || tag == "pod_service" {
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
 
-		switch tag {
-		case "chost", "rds", "redis", "lb", "natgw":
-			resourceId := tag + "_id"
-			resourceName := tag + "_name"
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
-
-		case "vpc", "l2_vpc":
-			sql = fmt.Sprintf("SELECT l3_epc_id AS value, l3_epc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-
-		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
-			resourceId := tag + "_id"
-			resourceName := tag + "_name"
-			if tag == "ip" {
-				resourceId = "ip"
-				resourceName = "ip"
-			} else if tag == "service" {
-				resourceId = "pod_service_id"
-				resourceName = "pod_service_name"
-			}
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
-
-		case "tap", "capture_network_type":
-			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		case "vtap", "agent":
-			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
-		case "gprocess":
-			return &common.Result{}, sqlList, nil
-		case "policy_name":
-			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE, common.CAPTURE_NIC_HOST, common.CAPTURE_NIC_CHOST, common.CAPTURE_NIC_POD_NODE:
+		} else {
 			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+				whereSql += fmt.Sprintf("AND devicetype=%d", deviceType)
 			} else {
-				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+				whereSql = fmt.Sprintf("WHERE devicetype=%d", deviceType)
 			}
-			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		default:
-			if strings.HasPrefix(tag, "k8s.label.") {
-				labelTag := strings.TrimPrefix(tag, "k8s.label.")
-				if whereSql != "" {
-					whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
-				} else {
-					whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
-				}
-				results := &common.Result{}
-				for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
-					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-					log.Debug(sql)
-					sqlList = append(sqlList, sql)
-				}
-				return results, sqlList, nil
-			} else if strings.HasPrefix(tag, "k8s.annotation.") {
-				annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
-				if whereSql != "" {
-					whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
-				} else {
-					whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
-				}
-				results := &common.Result{}
-				for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
-					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-					log.Debug(sql)
-					sqlList = append(sqlList, sql)
-				}
-				return results, sqlList, nil
-			} else if strings.HasPrefix(tag, "k8s.env.") {
-				envTag := strings.TrimPrefix(tag, "k8s.env.")
-				if whereSql != "" {
-					whereSql += fmt.Sprintf(" AND `key`='%s'", envTag)
-				} else {
-					whereSql = fmt.Sprintf("WHERE `key`='%s'", envTag)
-				}
-				results := &common.Result{}
-
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM pod_k8s_env_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-
-				return results, sqlList, nil
-			} else if strings.HasPrefix(tag, "cloud.tag.") {
-				results := &common.Result{}
-				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
-				if whereSql != "" {
-					whereSql += fmt.Sprintf(" AND `key`='%s'", cloudTag)
-				} else {
-					whereSql = fmt.Sprintf("WHERE `key`='%s'", cloudTag)
-				}
-
-				for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
-					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-					sqlList = append(sqlList, sql)
-				}
-				return results, sqlList, nil
-			} else if strings.HasPrefix(tag, "os.app.") {
-				osAPPTag := strings.TrimPrefix(tag, "os.app.")
-				if whereSql != "" {
-					whereSql += fmt.Sprintf(" AND `key`='%s'", osAPPTag)
-				} else {
-					whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
-				}
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-			} else {
-				return GetExternalTagValues(db, table, rawSql)
-			}
+			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		}
+	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
+		sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
+	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
+		var autoDeviceTypes []string
+		for _, deviceType := range AutoMap {
+			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+		}
+		autoMap := map[string]map[string]int{
+			"resource_gl0":  AutoPodMap,
+			"auto_instance": AutoPodMap,
+			"resource_gl1":  AutoServiceMap,
+			"resource_gl2":  AutoServiceMap,
+			"auto_service":  AutoServiceMap,
+		}
+		for _, deviceType := range autoMap[tag] {
+			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+		}
+		if whereSql != "" {
+			whereSql += fmt.Sprintf("AND devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
+		} else {
+			whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
+		}
+		sql = fmt.Sprintf(
+			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
+			whereSql, orderBy, limitSql,
+		)
+	} else if tag == "vpc" || tag == "l2_vpc" {
+		sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "ip" {
+		sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "tap" || tag == "capture_network_type" {
+		sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "vtap" || tag == "agent" {
+		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "lb_listener" {
+		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "policy" || tag == "npb_tunnel" {
+		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
+	} else if tag == "policy_name" {
+		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE || tag == common.CAPTURE_NIC_HOST || tag == common.CAPTURE_NIC_CHOST || tag == common.CAPTURE_NIC_POD_NODE {
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+		} else {
+			whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+		}
+		sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "pod_ingress" {
+		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if strings.HasPrefix(tag, "k8s.label.") {
+		labelTag := strings.TrimPrefix(tag, "k8s.label.")
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
+		} else {
+			whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 		}
 		results := &common.Result{}
-		log.Debug(sql)
-		sqlList = append(sqlList, sql)
-		return results, sqlList, nil
-	} else {
-		// querier will be called later, so there is no need to display the declaration db
-		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
-		if ok {
-			if tag == "chost" || tag == "pod_service" {
-				sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
-
-			} else {
-				if whereSql != "" {
-					whereSql += fmt.Sprintf("AND devicetype=%d", deviceType)
-				} else {
-					whereSql = fmt.Sprintf("WHERE devicetype=%d", deviceType)
-				}
-				sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-			}
-		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
-		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
-			var autoDeviceTypes []string
-			for _, deviceType := range AutoMap {
-				autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
-			}
-			autoMap := map[string]map[string]int{
-				"resource_gl0":  AutoPodMap,
-				"auto_instance": AutoPodMap,
-				"resource_gl1":  AutoServiceMap,
-				"resource_gl2":  AutoServiceMap,
-				"auto_service":  AutoServiceMap,
-			}
-			for _, deviceType := range autoMap[tag] {
-				autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
-			}
-			if whereSql != "" {
-				whereSql += fmt.Sprintf("AND devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
-			} else {
-				whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
-			}
-			sql = fmt.Sprintf(
-				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
-				whereSql, orderBy, limitSql,
-			)
-		} else if tag == "vpc" || tag == "l2_vpc" {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "ip" {
-			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "tap" || tag == "capture_network_type" {
-			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "vtap" || tag == "agent" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "lb_listener" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "policy" || tag == "npb_tunnel" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
-		} else if tag == "policy_name" {
-			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE || tag == common.CAPTURE_NIC_HOST || tag == common.CAPTURE_NIC_CHOST || tag == common.CAPTURE_NIC_POD_NODE {
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
-			} else {
-				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
-			}
-			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if tag == "pod_ingress" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if strings.HasPrefix(tag, "k8s.label.") {
-			labelTag := strings.TrimPrefix(tag, "k8s.label.")
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
-			} else {
-				whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
-			}
-			results := &common.Result{}
-			for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-			}
-			return results, sqlList, nil
-		} else if strings.HasPrefix(tag, "k8s.annotation.") {
-			annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
-			} else {
-				whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
-			}
-			results := &common.Result{}
-			for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-			}
-			return results, sqlList, nil
-		} else if strings.HasPrefix(tag, "k8s.env.") {
-			envTag := strings.TrimPrefix(tag, "k8s.env.")
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND `key`='%s'", envTag)
-			} else {
-				whereSql = fmt.Sprintf("WHERE `key`='%s'", envTag)
-			}
-			results := &common.Result{}
-
-			sql = fmt.Sprintf("SELECT value, value AS display_name FROM pod_k8s_env_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
 			log.Debug(sql)
 			sqlList = append(sqlList, sql)
-
-			return results, sqlList, nil
-		} else if strings.HasPrefix(tag, "cloud.tag.") {
-			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND `key`='%s'", cloudTag)
-			} else {
-				whereSql = fmt.Sprintf("WHERE `key`='%s'", cloudTag)
-			}
-			results := &common.Result{}
-			for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
-				log.Debug(sql)
-				sqlList = append(sqlList, sql)
-			}
-			return results, sqlList, nil
-		} else if strings.HasPrefix(tag, "os.app.") {
-			osAPPTag := strings.TrimPrefix(tag, "os.app.")
-			if whereSql != "" {
-				whereSql += fmt.Sprintf(" AND `key`='%s'", osAPPTag)
-			} else {
-				whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
-			}
-			sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		}
+		return results, sqlList, nil
+	} else if strings.HasPrefix(tag, "k8s.annotation.") {
+		annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
 		} else {
-			for resourceName, resourceInfo := range HOSTNAME_IP_DEVICE_MAP {
-				if tag != resourceName {
-					continue
-				}
+			whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
+		}
+		results := &common.Result{}
+		for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+			log.Debug(sql)
+			sqlList = append(sqlList, sql)
+		}
+		return results, sqlList, nil
+	} else if strings.HasPrefix(tag, "k8s.env.") {
+		envTag := strings.TrimPrefix(tag, "k8s.env.")
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `key`='%s'", envTag)
+		} else {
+			whereSql = fmt.Sprintf("WHERE `key`='%s'", envTag)
+		}
+		results := &common.Result{}
 
-				if resourceInfo.ResourceType == VIF_DEVICE_TYPE_VM {
-					if whereSql != "" {
-						whereSql += " AND display_name!=''"
-					} else {
-						whereSql = " WHERE display_name!=''"
-					}
-					sql = strings.Join([]string{
-						"SELECT id AS value,", resourceInfo.FieldName, "AS display_name",
-						"FROM chost_map", whereSql,
-						"GROUP BY value, display_name",
-						"ORDER BY", orderBy, "ASC", limitSql,
-					}, " ")
-				} else {
-					deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
-					if whereSql != "" {
-						whereSql += " AND devicetype=" + deviceTypeStr
-					} else {
-						whereSql = " WHERE devicetype=" + deviceTypeStr
-					}
-					sql = strings.Join([]string{
-						"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
-						"FROM device_map", whereSql, "AND display_name!=''",
-						"GROUP BY value, display_name",
-						"ORDER BY", orderBy, "ASC", limitSql,
-					}, " ")
-				}
-				break
-			}
-		}
-		if sql == "" {
-			return GetExternalTagValues(db, table, rawSql)
-		}
+		sql = fmt.Sprintf("SELECT value, value AS display_name FROM pod_k8s_env_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
-		return nil, sqlList, nil
+
+		return results, sqlList, nil
+	} else if strings.HasPrefix(tag, "cloud.tag.") {
+		cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `key`='%s'", cloudTag)
+		} else {
+			whereSql = fmt.Sprintf("WHERE `key`='%s'", cloudTag)
+		}
+		results := &common.Result{}
+		for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+			log.Debug(sql)
+			sqlList = append(sqlList, sql)
+		}
+		return results, sqlList, nil
+	} else if strings.HasPrefix(tag, "os.app.") {
+		osAPPTag := strings.TrimPrefix(tag, "os.app.")
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `key`='%s'", osAPPTag)
+		} else {
+			whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
+		}
+		sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else {
+		for resourceName, resourceInfo := range HOSTNAME_IP_DEVICE_MAP {
+			if tag != resourceName {
+				continue
+			}
+
+			if resourceInfo.ResourceType == VIF_DEVICE_TYPE_VM {
+				if whereSql != "" {
+					whereSql += " AND display_name!=''"
+				} else {
+					whereSql = " WHERE display_name!=''"
+				}
+				sql = strings.Join([]string{
+					"SELECT id AS value,", resourceInfo.FieldName, "AS display_name",
+					"FROM chost_map", whereSql,
+					"GROUP BY value, display_name",
+					"ORDER BY", orderBy, "ASC", limitSql,
+				}, " ")
+			} else {
+				deviceTypeStr := strconv.Itoa(resourceInfo.ResourceType)
+				if whereSql != "" {
+					whereSql += " AND devicetype=" + deviceTypeStr
+				} else {
+					whereSql = " WHERE devicetype=" + deviceTypeStr
+				}
+				sql = strings.Join([]string{
+					"SELECT deviceid AS value,", resourceInfo.FieldName, "AS display_name",
+					"FROM device_map", whereSql, "AND display_name!=''",
+					"GROUP BY value, display_name",
+					"ORDER BY", orderBy, "ASC", limitSql,
+				}, " ")
+			}
+			break
+		}
 	}
+	if sql == "" {
+		return GetExternalTagValues(db, table, rawSql)
+	}
+	log.Debug(sql)
+	sqlList = append(sqlList, sql)
+	return nil, sqlList, nil
 }
 
 func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, error) {

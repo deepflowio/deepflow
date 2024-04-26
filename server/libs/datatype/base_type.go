@@ -107,3 +107,14 @@ func (m *MACAddr) String() string {
 func (m *MACAddr) Int() uint64 {
 	return m.addrInt
 }
+
+type IP4 uint32
+
+func (ip4 IP4) String() string {
+	ip := make(net.IP, 4)
+	ip[0] = byte(ip4 >> 24)
+	ip[1] = byte(ip4 >> 16)
+	ip[2] = byte(ip4 >> 8)
+	ip[3] = byte(ip4)
+	return ip.String()
+}

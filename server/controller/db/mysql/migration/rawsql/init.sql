@@ -1057,6 +1057,7 @@ TRUNCATE TABLE vtap;
 
 CREATE TABLE IF NOT EXISTS vtap_group (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER,
     name                    VARCHAR(64) NOT NULL,
     created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1077,6 +1078,7 @@ CREATE TABLE IF NOT EXISTS acl (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     business_id            INTEGER NOT NULL,
     name                   CHAR(64),
+    team_id                INTEGER DEFAULT 1,
     type                   INTEGER DEFAULT 2 COMMENT '1-epc; 2-custom',
     tap_type               INTEGER DEFAULT 3 COMMENT '1-WAN; 3-LAN',
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
@@ -1096,6 +1098,7 @@ TRUNCATE TABLE acl;
 
 CREATE TABLE IF NOT EXISTS `resource_group` (
   `id`                      INT(11) NOT NULL AUTO_INCREMENT,
+  `team_id`                 INTEGER DEFAULT 1,
   `business_id`             INTEGER NOT NULL,
   `lcuuid`                  VARCHAR(64) NOT NULL,
   `name`                    VARCHAR(200) NOT NULL DEFAULT '',
@@ -1117,6 +1120,7 @@ CREATE TABLE IF NOT EXISTS `resource_group` (
 
 CREATE TABLE IF NOT EXISTS resource_group_extra_info (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                INTEGER DEFAULT 1,
     resource_type          INTEGER NOT NULL COMMENT '1: epc, 2: vm, 3: pod_service, 4: pod_group, 5: vl2, 6: pod_cluster, 7: pod',
     resource_id            INTEGER NOT NULL,
     resource_sub_type      INTEGER,
@@ -1127,6 +1131,7 @@ TRUNCATE TABLE resource_group_extra_info;
 
 CREATE TABLE IF NOT EXISTS npb_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                INTEGER DEFAULT 1,
     name                   CHAR(64),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
     business_id            INTEGER NOT NULL,
@@ -1162,6 +1167,7 @@ TRUNCATE TABLE pcap_policy;
 
 CREATE TABLE IF NOT EXISTS group_acl (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                INTEGER DEFAULT 1,
     group_id               INTEGER NOT NULL,
     acl_id                 INTEGER NOT NULL,
     lcuuid                 CHAR(64)
@@ -1602,6 +1608,7 @@ TRUNCATE TABLE report_policy;
 
 CREATE TABLE IF NOT EXISTS policy_acl_group (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
     acl_ids                 TEXT NOT NULL COMMENT 'separated by ,',
     `count`                 INTEGER NOT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
@@ -1609,6 +1616,7 @@ TRUNCATE TABLE policy_acl_group;
 
 CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     id                                      INTEGER        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                                 INTEGER,
     max_collect_pps                         INTEGER        DEFAULT NULL,
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,
@@ -1685,6 +1693,7 @@ TRUNCATE TABLE vtap_group_configuration;
 
 CREATE TABLE IF NOT EXISTS npb_tunnel (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id             INTEGER DEFAULT 1,
     name                CHAR(64) NOT NULL,
     ip                  CHAR(64),
     type                INTEGER COMMENT '(0-VXLAN；1-ERSPAN)',

@@ -17,10 +17,10 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/agent_config"
 )
 
-var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
+var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
 	MaxCollectPps:                 &DefaultMaxCollectPps,
 	MaxNpbBps:                     &DefaultMaxNpbBps,
 	MaxCPUs:                       &DefaultMaxCPUs,

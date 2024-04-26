@@ -282,7 +282,7 @@ impl DispatcherListener {
                 l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             Self::Mirror(l) => {
-                l.on_vm_change(vm_mac_addrs);
+                l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             _ => {}
         }

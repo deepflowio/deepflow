@@ -65,7 +65,7 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 					}
 					vpcLcuuids = append(
 						vpcLcuuids,
-						common.GenerateUUID(cenAttr.Get("ChildInstanceId").MustString()),
+						common.GenerateUUIDByOrgID(a.orgID, cenAttr.Get("ChildInstanceId").MustString()),
 					)
 				}
 			}
@@ -73,7 +73,7 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 				continue
 			}
 			retCens = append(retCens, model.CEN{
-				Lcuuid:     common.GenerateUUID(cenId),
+				Lcuuid:     common.GenerateUUIDByOrgID(a.orgID, cenId),
 				Name:       cenName,
 				Label:      cenId,
 				VPCLcuuids: vpcLcuuids,

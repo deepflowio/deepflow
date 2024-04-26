@@ -32,4 +32,7 @@ const (
 	GET_ORG_DB_FAIL                 = "GET_ORG_DB_FAIL"
 	K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
 	ORG_ID_INVALID                  = "ORG_ID_INVALID"
+
+	// http status codes
+	STATUES_PARTIAL_CONTENT = "STATUES_PARTIAL_CONTENT" // 206
 )

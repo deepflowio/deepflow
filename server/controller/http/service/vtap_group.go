@@ -22,7 +22,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -36,16 +38,30 @@ const VTAP_GROUP_SHORT_UUID_PREFIX = "g-"
 
 var vtapGroupShortUUIDRegexp, _ = regexp.Compile(`^g-[A-Za-z0-9]{10}$`)
 
-func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
+type AgentGroup struct {
+	cfg *config.ControllerConfig
+
+	userInfo *UserInfo
+}
+
+func NewAgentGroup(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroup {
+	return &AgentGroup{userInfo: userInfo, cfg: cfg}
+}
+
+func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
 	var response []model.VtapGroup
-	var vtaps []mysql.VTap
-	var vtapGroups []mysql.VTapGroup
+	var allVTaps []mysql.VTap
+	var allVTapGroups []*mysql.VTapGroup
 	var vtapGroupLcuuids []string
 	var groupToVtapLcuuids map[string][]string
 	var groupToPendingVtapLcuuids map[string][]string
 	var groupToDisableVtapLcuuids map[string][]string
 
-	Db := mysql.Db
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	Db := dbInfo.DB
 	if _, ok := filter["lcuuid"]; ok {
 		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
 	}
@@ -55,12 +71,20 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 	if _, ok := filter["short_uuid"]; ok {
 		Db = Db.Where("short_uuid = ?", filter["short_uuid"])
 	}
-	Db.Order("created_at DESC").Find(&vtapGroups)
+	Db.Order("created_at DESC").Find(&allVTapGroups)
+	vtapGroups, err := getAgentGroupByUser(a.userInfo, &a.cfg.FPermit, allVTapGroups)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuids = append(vtapGroupLcuuids, vtapGroup.Lcuuid)
 	}
-	mysql.Db.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&vtaps)
+	mysql.Db.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&allVTaps)
+	vtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	if err != nil {
+		return nil, err
+	}
 
 	groupToVtapLcuuids = make(map[string][]string)
 	groupToPendingVtapLcuuids = make(map[string][]string)
@@ -82,6 +106,7 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 			Name:               vtapGroup.Name,
 			ShortUUID:          vtapGroup.ShortUUID,
 			Lcuuid:             vtapGroup.Lcuuid,
+			TeamID:             vtapGroup.TeamID,
 			UpdatedAt:          vtapGroup.UpdatedAt.Format(common.GO_BIRTHDAY),
 			VtapLcuuids:        []string{},
 			PendingVtapLcuuids: []string{},
@@ -107,15 +132,21 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 	return response, nil
 }
 
-func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
+func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.VtapGroup, err error) {
+	cfg := a.cfg
 	var vtapGroupCount int64
 
-	mysql.Db.Model(&mysql.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&vtapGroupCount)
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return model.VtapGroup{}, err
+	}
+	db := dbInfo.DB
+	db.Model(&mysql.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group (%s) already exist", vtapGroupCreate.Name))
 	}
 
-	mysql.Db.Model(&mysql.VTapGroup{}).Count(&vtapGroupCount)
+	db.Model(&mysql.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {
 		return model.VtapGroup{}, NewError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
@@ -133,7 +164,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	shortUUID := VTAP_GROUP_SHORT_UUID_PREFIX + common.GenerateShortUUID()
 	groupID := vtapGroupCreate.GroupID
 	// verify vtap group id in deepflow-ctl command model
-	if err := verifyGroupID(groupID); err != nil {
+	if err := verifyGroupID(db, groupID); err != nil {
 		return model.VtapGroup{}, NewError(httpcommon.INVALID_POST_DATA, err.Error())
 	}
 	if groupID != "" {
@@ -145,16 +176,21 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	vtapGroup.Lcuuid = lcuuid
 	vtapGroup.ShortUUID = shortUUID
 	vtapGroup.Name = vtapGroupCreate.Name
-	mysql.Db.Create(&vtapGroup)
+	vtapGroup.TeamID = vtapGroupCreate.TeamID
+	db.Create(&vtapGroup)
 
-	var vtaps []mysql.VTap
-	mysql.Db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&vtaps)
+	var allVTaps []mysql.VTap
+	db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&allVTaps)
+	vtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	if err != nil {
+		return model.VtapGroup{}, err
+	}
 	for _, vtap := range vtaps {
-		mysql.Db.Model(&vtap).Update("vtap_group_lcuuid", lcuuid)
+		db.Model(&vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid, "team_id": vtapGroupCreate.TeamID})
 	}
 
-	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
+	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -164,7 +200,7 @@ func IsVtapGroupShortUUID(uuid string) bool {
 	return len(result) != 0
 }
 
-func verifyGroupID(groupID string) error {
+func verifyGroupID(db *gorm.DB, groupID string) error {
 	if groupID == "" {
 		return nil
 	}
@@ -177,22 +213,27 @@ func verifyGroupID(groupID string) error {
 	}
 
 	var vtapGroupCount int64
-	mysql.Db.Model(&mysql.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
+	db.Model(&mysql.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
 		return NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
 	}
 	return nil
 }
 
-func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
+func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return model.VtapGroup{}, err
+	}
+	db := dbInfo.DB
+
 	var vtapGroup mysql.VTapGroup
 	var dbUpdateMap = make(map[string]interface{})
-
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
-	log.Infof("update vtap_group (%s) config %v", vtapGroup.Name, vtapGroupUpdate)
+	log.Infof("ORG(id=%d database=%s) update vtap_group (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name, vtapGroupUpdate)
 
 	// 修改名称
 	if _, ok := vtapGroupUpdate["NAME"]; ok {
@@ -201,12 +242,24 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 
 	// 修改状态
 	if _, ok := vtapGroupUpdate["STATE"]; ok {
-		mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("state", vtapGroupUpdate["STATE"])
+		db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("state", vtapGroupUpdate["STATE"])
 	}
 
 	// 注册采集器
 	if _, ok := vtapGroupUpdate["ENABLE"]; ok {
-		mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("enable", vtapGroupUpdate["ENABLE"])
+		db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("enable", vtapGroupUpdate["ENABLE"])
+	}
+
+	if _, ok := vtapGroupUpdate["TEAM_ID"]; ok {
+		dbUpdateMap["team_id"] = vtapGroupUpdate["TEAM_ID"]
+		// update vtap team id
+		var vtaps []mysql.VTap
+		db.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&vtaps)
+		for _, vtap := range vtaps {
+			log.Infof("ORG(id=%d database=%s) update team(%v -> %v)",
+				dbInfo.ORGID, dbInfo.Name, vtap.TeamID, dbUpdateMap["team_id"])
+			db.Model(vtap).Update("team_id", dbUpdateMap["team_id"])
+		}
 	}
 
 	// 修改组内采集器
@@ -218,10 +271,18 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 			)
 		}
 
-		var oldVtaps []mysql.VTap
-		var newVtaps []mysql.VTap
-		mysql.Db.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&oldVtaps)
-		mysql.Db.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&newVtaps)
+		var allOldVtaps []mysql.VTap
+		var allNewVtaps []mysql.VTap
+		db.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
+		oldVtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allOldVtaps)
+		if err != nil {
+			return model.VtapGroup{}, err
+		}
+		db.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&allNewVtaps)
+		newVtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allNewVtaps)
+		if err != nil {
+			return model.VtapGroup{}, err
+		}
 
 		lcuuidToOldVtap := make(map[string]*mysql.VTap)
 		lcuuidToNewVtap := make(map[string]*mysql.VTap)
@@ -242,48 +303,59 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 		addVtapLcuuids = newVtapLcuuids.Difference(oldVtapLcuuids)
 
 		var defaultVtapGroup mysql.VTapGroup
-		if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
+		if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
 			return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 		}
 
 		for _, lcuuid := range delVtapLcuuids.ToSlice() {
 			vtap := lcuuidToOldVtap[lcuuid.(string)]
-			// TODO：记录操作日志
-			mysql.Db.Model(vtap).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
+			log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s -> %s), team(%v -> %v)",
+				dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, defaultVtapGroup.Lcuuid, vtapGroup.TeamID, common.DEFAULT_TEAM_ID)
+			db.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": common.DEFAULT_TEAM_ID})
 		}
 
+		teamID := dbUpdateMap["team_id"]
+		if teamID == "" {
+			teamID = vtapGroup.TeamID
+		}
 		for _, lcuuid := range addVtapLcuuids.ToSlice() {
 			vtap := lcuuidToNewVtap[lcuuid.(string)]
-			// TODO：记录操作日志
-			mysql.Db.Model(vtap).Update("vtap_group_lcuuid", vtapGroup.Lcuuid)
+			log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s - > %s), team(%v -> %v)",
+				dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, vtapGroup.Lcuuid, vtapGroup.TeamID, teamID)
+			db.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": vtapGroup.Lcuuid, "team_id": teamID})
 		}
 	}
 
 	// 更新vtap_group DB
-	mysql.Db.Model(&vtapGroup).Updates(dbUpdateMap)
+	db.Model(&vtapGroup).Updates(dbUpdateMap)
 
-	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
+	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
-func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
-	var vtapGroup mysql.VTapGroup
+func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
+	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
+	var vtapGroup mysql.VTapGroup
+	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
 	var defaultVtapGroup mysql.VTapGroup
-	if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
+	if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 	}
 
-	log.Infof("delete vtap_group (%s)", vtapGroup.Name)
+	log.Infof("ORG(id=%d database=%s) delete vtap_group (%s)", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name)
 
-	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
-	mysql.Db.Delete(&vtapGroup)
-	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&mysql.VTapGroupConfiguration{})
-	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+	db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
+	db.Delete(&vtapGroup)
+	db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.AgentGroupConfigModel{})
+	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

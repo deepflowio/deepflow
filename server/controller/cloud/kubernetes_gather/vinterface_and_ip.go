@@ -30,7 +30,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/mikioh/ipaddr"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {
@@ -154,7 +153,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			vMac = common.VIF_DEFAULT_MAC
 		}
 
-		vinterfaceLcuuid := common.GetUUID(podLcuuid+vItem.Mac, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, podLcuuid+vItem.Mac)
 		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 			vinterfaceLcuuids.Add(vinterfaceLcuuid)
 			vinterface := model.VInterface{
@@ -197,7 +196,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 			ip := ipPrefix.IP()
 			ipMask, _ := ipPrefix.IPNet().Mask.Size()
-			ipLcuuid := common.GetUUID(vinterfaceLcuuid+ip.String(), uuid.Nil)
+			ipLcuuid := common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+ip.String())
 			subnetLcuuid := ""
 			for _, podNetworkCIDR := range k.podNetworkLcuuidCIDRs.cidrs {
 				netPrefix, err := netaddr.ParseIPPrefix(podNetworkCIDR)
@@ -206,7 +205,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					continue
 				}
 				if netPrefix.Contains(ip) {
-					subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+podNetworkCIDR, uuid.Nil)
+					subnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+podNetworkCIDR)
 					break
 				}
 			}
@@ -232,7 +231,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					if !ok {
 						log.Warningf("vinterface,ip pod ip (%s) to cidr format not valid", ipString)
 					}
-					subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String(), uuid.Nil)
+					subnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String())
 					if _, ok := subnetLcuuidToCIDR[subnetLcuuid]; !ok {
 						podSubnets = append(podSubnets, model.Subnet{
 							Lcuuid:        subnetLcuuid,
@@ -272,7 +271,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		existCIDR = append(existCIDR, cPrefix)
 
 		// 顺便生成已获取的 pod 子网
-		pSubnetLcuuid := common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
+		pSubnetLcuuid := common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+cidr)
 		podSubnets = append(podSubnets, model.Subnet{
 			Lcuuid:        pSubnetLcuuid,
 			Name:          k.Name + "_POD_NET",
@@ -370,7 +369,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	noMaskCIDRs := append(noMaskPodV4CIDRs, noMaskPodV6CIDRs...)
 	aggNoMaskNets := append(aggNoMaskV4Nets, aggNoMaskV6Nets...)
 	for _, ipPrefix := range noMaskCIDRs {
-		subnetLcuuid := common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+"NO_MASK"+ipPrefix.String(), uuid.Nil)
+		subnetLcuuid := common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+"NO_MASK"+ipPrefix.String())
 		podSubnets = append(podSubnets, model.Subnet{
 			Lcuuid:        subnetLcuuid,
 			Name:          ipPrefix.String() + "_POD_NET",
@@ -389,7 +388,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 			vinterfaceLcuuid := ipToVinterfaceLcuuid[noMaskIPString]
 			noMaskIPPrefix, _ := netaddr.ParseIPPrefix(noMaskIPString)
-			ipLcuuid := common.GetUUID(vinterfaceLcuuid+noMaskIPPrefix.IP().String(), uuid.Nil)
+			ipLcuuid := common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+noMaskIPPrefix.IP().String())
 			podIPModel, ok := podIPsMap[ipLcuuid]
 			if !ok {
 				log.Debugf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
@@ -481,7 +480,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					nodeCIDRs[rangePrefix.String()] = ""
 					k.nodeNetworkLcuuidCIDRs.cidrs = cloudcommon.StringStringMapKeys(nodeCIDRs)
 				}
-				vinterfaceLcuuid := common.GetUUID(k.UuidGenerate+nMAC, uuid.Nil)
+				vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nMAC)
 				nodeLcuuid := k.nodeIPToLcuuid[ipPrefix.IP().String()]
 				vinterface := model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
@@ -499,11 +498,11 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
 
 				modelIP := model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ipPrefix.IP().String(), uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+ipPrefix.IP().String()),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipPrefix.IP().String(),
 					RegionLcuuid:     k.RegionUUID,
-					SubnetLcuuid:     common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String(), uuid.Nil),
+					SubnetLcuuid:     common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String()),
 				}
 				nodeIPs = append(nodeIPs, modelIP)
 				k8sNodeIPs.Remove(ipPrefix.IP().String())
@@ -529,7 +528,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						continue
 					}
 					if nodeIPPrefix.Contains(hostip) {
-						nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil)
+						nodeSubnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid)
 					}
 				}
 
@@ -541,7 +540,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							continue
 						}
 						if podIPPrefix.Contains(hostip) {
-							nodeSubnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pCIDR, uuid.Nil)
+							nodeSubnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+pCIDR)
 						}
 					}
 					if nodeSubnetLcuuid != "" {
@@ -567,7 +566,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						log.Errorf("vinterface,ip gnenerate host cidr (%s) error: (%s)", ipPrefix.IP().String(), err.Error())
 						continue
 					}
-					nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
+					nodeSubnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr)
 					if _, ok := subnetLcuuidToCIDR[nodeSubnetLcuuid]; !ok {
 						nodeSubnets = append(nodeSubnets, model.Subnet{
 							Lcuuid:        nodeSubnetLcuuid,
@@ -582,9 +581,9 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 
 				vinterfaceLcuuid := ""
 				if nMAC == common.VIF_DEFAULT_MAC {
-					vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+hostip.String(), uuid.Nil)
+					vinterfaceLcuuid = common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nMAC+hostip.String())
 				} else {
-					vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC, uuid.Nil)
+					vinterfaceLcuuid = common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nMAC)
 				}
 				if !nodeVinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 					vinterface := model.VInterface{
@@ -603,7 +602,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
 				}
 				modelIP := model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ipPrefix.IP().String(), uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+ipPrefix.IP().String()),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipPrefix.IP().String(),
 					RegionLcuuid:     k.RegionUUID,
@@ -616,7 +615,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 
 	// 以获取到的node ip为依据，生成node子网
 	for _, nCIDR := range k.nodeNetworkLcuuidCIDRs.cidrs {
-		nodeSubnetLcuuid := common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+nCIDR, uuid.Nil)
+		nodeSubnetLcuuid := common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid+nCIDR)
 		nodeSubnets = append(nodeSubnets, model.Subnet{
 			Lcuuid:        nodeSubnetLcuuid,
 			Name:          k.Name + "_NODE_NET",
@@ -634,7 +633,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		if !k8sNodeIPs.Contains(nodeIP) {
 			continue
 		}
-		vinterfaceLcuuid := common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+nodeLcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid+nodeLcuuid+common.VIF_DEFAULT_MAC)
 		nodeVInterfaces = append(nodeVInterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_WAN,
@@ -654,7 +653,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 		}
 		nodeIPs = append(nodeIPs, model.IP{
-			Lcuuid:           common.GetUUID(vinterfaceLcuuid+nodeIP, uuid.Nil),
+			Lcuuid:           common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+nodeIP),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               nodeIP,
 			RegionLcuuid:     k.RegionUUID,
@@ -673,7 +672,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		if _, ok := k.nodeIPToLcuuid[pIP]; ok {
 			continue
 		}
-		vinterfaceLcuuid := common.GetUUID(pLcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, pLcuuid+common.VIF_DEFAULT_MAC)
 		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 			vinterface := model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
@@ -714,7 +713,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			continue
 		}
 		modelIP := model.IP{
-			Lcuuid:           common.GetUUID(vinterfaceLcuuid+pLcuuid, uuid.Nil),
+			Lcuuid:           common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+pLcuuid),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               pIP,
 			RegionLcuuid:     k.RegionUUID,
@@ -728,7 +727,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		pV4cidrs = cloudcommon.AggregateCIDR(podV4Cidrs, 0)
 		if len(pV4cidrs) == 1 {
 			pV4cidr = pV4cidrs[0]
-			pV4SLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pV4cidr, uuid.Nil)
+			pV4SLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+pV4cidr)
 			podSubnets = append(podSubnets, model.Subnet{
 				Lcuuid:        pV4SLcuuid,
 				Name:          k.Name + "_POD_NET",
@@ -742,7 +741,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		pV6cidrs = cloudcommon.AggregateCIDR(podV6Cidrs, 0)
 		if len(pV6cidrs) == 1 {
 			pV6cidr = pV6cidrs[0]
-			pV6SLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pV6cidr, uuid.Nil)
+			pV6SLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+pV6cidr)
 			podSubnets = append(podSubnets, model.Subnet{
 				Lcuuid:        pV6SLcuuid,
 				Name:          k.Name + "_POD_NET",
@@ -754,7 +753,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 	for lcuuid, ip := range podLcuuidToPodIP {
 		var sLcuuid string
-		vinterfaceLcuuid := common.GetUUID(lcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, lcuuid+common.VIF_DEFAULT_MAC)
 		switch {
 		case ip.Is4():
 			sLcuuid = pV4SLcuuid
@@ -766,7 +765,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			continue
 		}
 		modelIP := model.IP{
-			Lcuuid:           common.GetUUID(vinterfaceLcuuid+lcuuid, uuid.Nil),
+			Lcuuid:           common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+lcuuid),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               ip.String(),
 			RegionLcuuid:     k.RegionUUID,

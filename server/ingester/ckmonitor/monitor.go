@@ -144,7 +144,7 @@ func (m *Monitor) isDiskNeedClean(diskInfo *DiskInfo) bool {
 
 	usage := (diskInfo.usedSpace*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
 	if usage > uint64(cleanCfg.UsedPercent) && diskInfo.freeSpace < uint64(cleanCfg.FreeSpace)<<30 {
-		log.Infof("disk usage is over %d%. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
+		log.Infof("disk usage is over %d. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
 			cleanCfg.UsedPercent, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
 		return true
 	} else if cleanCfg.UsedSpace > 0 && diskInfo.usedSpace >= uint64(cleanCfg.UsedSpace)<<30 {
@@ -197,12 +197,15 @@ func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Parti
 			return nil, err
 		}
 		log.Debugf("partition: %s, count: %d, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", partition, count, database, table, minTime, maxTime, rowCount, bytesOnDisk)
-		// 只删除partition数量2个以上的partition中最小的一个
-		if count > 1 && m.isPriorityDrop(database, table) {
-			partition := Partition{partition, database, table, minTime, maxTime, rowCount, bytesOnDisk}
-			partitions = append(partitions, partition)
-			partitionsPriorityDrop = append(partitionsPriorityDrop, partition)
+		minPartition := Partition{partition, database, table, minTime, maxTime, rowCount, bytesOnDisk}
+		// 只删除partition数量2个以上的
+		if count < 2 {
+			continue
 		}
+		if m.isPriorityDrop(database, table) {
+			partitionsPriorityDrop = append(partitionsPriorityDrop, minPartition)
+		}
+		partitions = append(partitions, minPartition)
 	}
 	if len(partitionsPriorityDrop) > 0 {
 		return partitionsPriorityDrop, nil
@@ -274,6 +277,11 @@ func (m *Monitor) start() {
 						log.Warning("drop partition failed.", err)
 					}
 				}
+			}
+
+			// the frequency of TTL check is 1/16 of disk check
+			if counter%(m.checkInterval<<4) == 0 && !m.cfg.CKDiskMonitor.TTLCheckDisabled {
+				checkAndDropExpiredPartition(connect)
 			}
 		}
 	}

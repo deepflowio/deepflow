@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/event/decoder"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -51,14 +52,14 @@ type Eventor struct {
 	PlatformDatas []*grpc.PlatformInfoTable
 }
 
-func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Event, error) {
+func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Event, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EVENT_QUEUE)
 	resourceEventor, err := NewResouceEventor(resourceEventQueue, config, platformDataManager.GetMasterPlatformInfoTable())
 	if err != nil {
 		return nil, err
 	}
 
-	perfEventor, err := NewEventor(common.PERF_EVENT, config, recv, manager, platformDataManager)
+	perfEventor, err := NewEventor(common.PERF_EVENT, config, recv, manager, platformDataManager, exporters)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
-	k8sEventor, err := NewEventor(common.K8S_EVENT, config, recv, manager, platformDataManager)
+	k8sEventor, err := NewEventor(common.K8S_EVENT, config, recv, manager, platformDataManager, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +89,12 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, config *config.Config, 
 		return nil, err
 	}
 	d := decoder.NewDecoder(
+		0,
 		common.RESOURCE_EVENT,
 		queue.QueueReader(eventQueue),
 		eventWriter,
 		platformTable,
+		nil,
 		config,
 	)
 	return &Eventor{
@@ -116,10 +119,12 @@ func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 		return nil, err
 	}
 	d := decoder.NewDecoder(
+		0,
 		common.ALARM_EVENT,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
 		platformTable,
+		nil,
 		config,
 	)
 	return &Eventor{
@@ -128,7 +133,7 @@ func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 	}, nil
 }
 
-func NewEventor(eventType common.EventType, config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager) (*Eventor, error) {
+func NewEventor(eventType common.EventType, config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Eventor, error) {
 	var queueCount, queueSize int
 	var msgType datatype.MessageType
 
@@ -166,10 +171,12 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 			return nil, err
 		}
 		decoders[i] = decoder.NewDecoder(
+			i,
 			eventType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			eventWriter,
 			platformDatas[i],
+			exporters,
 			config,
 		)
 	}

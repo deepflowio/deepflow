@@ -39,10 +39,8 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-
-	var labels string
 	if fieldsUpdate.Label.IsDifferent() {
-		labels = common.StrToJsonstr(fieldsUpdate.Label.GetNew())
+		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		if labels != "" {
 			updateInfo["labels"] = labels
 		}
@@ -70,9 +68,10 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, item *mysql
 	if item.Label == "" {
 		return
 	}
+	labels, _ := common.StrToJsonAndMap(item.Label)
 	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sLabels{{
 		ID:       item.ID,
-		Labels:   common.StrToJsonstr(item.Label),
+		Labels:   labels,
 		TeamID:   md.TeamID,
 		DomainID: md.DomainID,
 	}}

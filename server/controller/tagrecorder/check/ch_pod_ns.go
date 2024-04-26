@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNamespace struct {
@@ -52,6 +53,8 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 				Name:         podNamespace.Name + " (deleted)",
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
 				PodClusterID: podNamespace.PodClusterID,
+				TeamID:       tagrecorder.DomainToTeamID[podNamespace.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podNamespace.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
@@ -59,6 +62,8 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 				Name:         podNamespace.Name,
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
 				PodClusterID: podNamespace.PodClusterID,
+				TeamID:       tagrecorder.DomainToTeamID[podNamespace.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podNamespace.Domain],
 			}
 		}
 	}

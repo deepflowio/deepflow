@@ -48,19 +48,20 @@ func NewVTapCheck(cfg config.MonitorConfig, ctx context.Context) *VTapCheck {
 }
 
 func (v *VTapCheck) Start() {
-	log.Info("controller check start")
+	log.Info("vtap check start")
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
-			// check launch_server resource if exist
-			v.launchServerCheck()
-			// check vtap type
-			v.typeCheck()
-		}
-	}()
-
-	go func() {
-		for range time.Tick(time.Second * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
-			v.deleteLostVTap()
+			mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				// check launch_server resource if exist
+				v.launchServerCheck(db)
+				// check vtap type
+				v.typeCheck(db)
+				// check vtap lost time
+				if v.cfg.VTapAutoDelete.Enabled {
+					v.deleteLostVTap(db)
+				}
+				return nil
+			})
 		}
 	}()
 }
@@ -72,85 +73,85 @@ func (v *VTapCheck) Stop() {
 	log.Info("vtap check stopped")
 }
 
-func (v *VTapCheck) launchServerCheck() {
+func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	var vtaps []mysql.VTap
 	var reg = regexp.MustCompile(` |:`)
 
-	log.Debug("vtap launch_server check start")
+	log.Debugf("ORG(id=%d database=%s) vtap launch_server check start", db.ORGID, db.Name)
 
-	mysql.Db.Find(&vtaps)
+	db.Find(&vtaps)
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
 			var vm mysql.VM
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
-				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid)
-				mysql.Db.Delete(&vtap)
+			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
+				log.Infof("ORG(id=%d database=%s) delete vtap: %s %s, because no related vm", db.ORGID, db.Name, vtap.Name, vtap.Lcuuid)
+				db.Delete(&vtap)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-W%d", vm.Name, vm.ID), "-")
 				// check and update name
 				if vtap.Name != vtapName {
 					log.Infof(
-						"update vtap (%s) name from %s to %s",
-						vtap.Lcuuid, vtap.Name, vtapName,
+						"ORG(id=%d database=%s) update vtap (%s) name from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Name, vtapName,
 					)
-					mysql.Db.Model(&vtap).Update("name", vtapName)
+					db.Model(&vtap).Update("name", vtapName)
 				}
 				// check and update launch_server_id
 				if vtap.LaunchServerID != vm.ID {
 					log.Infof(
-						"update vtap (%s) launch_server_id from %d to %d",
-						vtap.Lcuuid, vtap.LaunchServerID, vm.ID,
+						"ORG(id=%d database=%s) update vtap (%s) launch_server_id from %d to %d",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.LaunchServerID, vm.ID,
 					)
-					mysql.Db.Model(&vtap).Update("launch_server_id", vm.ID)
+					db.Model(&vtap).Update("launch_server_id", vm.ID)
 				}
 				// check and update region
 				if vtap.Region != vm.Region {
 					log.Infof(
-						"update vtap (%s) region from %s to %s",
-						vtap.Lcuuid, vtap.Region, vm.Region,
+						"ORG(id=%d database=%s) update vtap (%s) region from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Region, vm.Region,
 					)
-					mysql.Db.Model(&vtap).Update("region", vm.Region)
+					db.Model(&vtap).Update("region", vm.Region)
 				}
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
 			var host mysql.Host
-			if ret := mysql.Db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
+			if ret := db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
-				mysql.Db.Delete(&vtap)
+				db.Delete(&vtap)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-H%d", host.Name, host.ID), "-")
 				// check and update name
 				if vtap.Name != vtapName {
 					log.Infof(
-						"update vtap (%s) name from %s to %s",
-						vtap.Lcuuid, vtap.Name, vtapName,
+						"ORG(id=%d database=%s) update vtap (%s) name from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Name, vtapName,
 					)
-					mysql.Db.Model(&vtap).Update("name", vtapName)
+					db.Model(&vtap).Update("name", vtapName)
 				}
 				// check and update launch_server_id
 				if vtap.LaunchServerID != host.ID {
 					log.Infof(
-						"update vtap (%s) launch_server_id from %d to %d",
-						vtap.Lcuuid, vtap.LaunchServerID, host.ID,
+						"ORG(id=%d database=%s) update vtap (%s) launch_server_id from %d to %d",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.LaunchServerID, host.ID,
 					)
-					mysql.Db.Model(&vtap).Update("launch_server_id", host.ID)
+					db.Model(&vtap).Update("launch_server_id", host.ID)
 				}
 				// check and update region
 				if vtap.Region != host.Region {
 					log.Infof(
-						"update vtap (%s) region from %s to %s",
-						vtap.Lcuuid, vtap.Region, host.Region,
+						"ORG(id=%d database=%s) update vtap (%s) region from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Region, host.Region,
 					)
-					mysql.Db.Model(&vtap).Update("region", host.Region)
+					db.Model(&vtap).Update("region", host.Region)
 				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
 			var podNode mysql.PodNode
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
-				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
-				mysql.Db.Delete(&vtap)
+			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+				log.Infof("ORG(id=%d database=%s) delete vtap: %s %s", db.ORGID, db.Name, vtap.Name, vtap.Lcuuid)
+				db.Delete(&vtap)
 			} else {
 				var vtapName string
 				if vtap.Type == common.VTAP_TYPE_POD_HOST {
@@ -161,79 +162,79 @@ func (v *VTapCheck) launchServerCheck() {
 				// check and update name
 				if vtap.Name != vtapName {
 					log.Infof(
-						"update vtap (%s) name from %s to %s",
-						vtap.Lcuuid, vtap.Name, vtapName,
+						"ORG(id=%d database=%s) update vtap (%s) name from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Name, vtapName,
 					)
-					mysql.Db.Model(&vtap).Update("name", vtapName)
+					db.Model(&vtap).Update("name", vtapName)
 				}
 				// check and update launch_server_id
 				if vtap.LaunchServerID != podNode.ID {
 					log.Infof(
-						"update vtap (%s) launch_server_id from %d to %d",
-						vtap.Lcuuid, vtap.LaunchServerID, podNode.ID,
+						"ORG(id=%d database=%s) update vtap (%s) launch_server_id from %d to %d",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.LaunchServerID, podNode.ID,
 					)
-					mysql.Db.Model(&vtap).Update("launch_server_id", podNode.ID)
+					db.Model(&vtap).Update("launch_server_id", podNode.ID)
 				}
 				// check and update region
 				if vtap.Region != podNode.Region {
 					log.Infof(
-						"update vtap (%s) region from %s to %s",
-						vtap.Lcuuid, vtap.Region, podNode.Region,
+						"ORG(id=%d database=%s) update vtap (%s) region from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Region, podNode.Region,
 					)
-					mysql.Db.Model(&vtap).Update("region", podNode.Region)
+					db.Model(&vtap).Update("region", podNode.Region)
 				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
 			var pod mysql.Pod
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
-				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
-				mysql.Db.Delete(&vtap)
+			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
+				log.Infof("ORG(id=%d database=%s) delete vtap: %s %s", db.ORGID, db.Name, vtap.Name, vtap.Lcuuid)
+				db.Delete(&vtap)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-P%d", pod.Name, pod.ID), "-")
 				// check and update name
 				if vtap.Name != vtapName {
 					log.Infof(
-						"update vtap (%s) name from %s to %s",
-						vtap.Lcuuid, vtap.Name, vtapName,
+						"ORG(id=%d database=%s) update vtap (%s) name from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Name, vtapName,
 					)
-					mysql.Db.Model(&vtap).Update("name", vtapName)
+					db.Model(&vtap).Update("name", vtapName)
 				}
 				// check and update launch_server_id
 				if vtap.LaunchServerID != pod.ID {
 					log.Infof(
-						"update vtap (%s) launch_server_id from %d to %d",
-						vtap.Lcuuid, vtap.LaunchServerID, pod.ID,
+						"ORG(id=%d database=%s) update vtap (%s) launch_server_id from %d to %d",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.LaunchServerID, pod.ID,
 					)
-					mysql.Db.Model(&vtap).Update("launch_server_id", pod.ID)
+					db.Model(&vtap).Update("launch_server_id", pod.ID)
 				}
 				// check and update region
 				if vtap.Region != pod.Region {
 					log.Infof(
-						"update vtap (%s) region from %s to %s",
-						vtap.Lcuuid, vtap.Region, pod.Region,
+						"ORG(id=%d database=%s) update vtap (%s) region from %s to %s",
+						db.ORGID, db.Name, vtap.Lcuuid, vtap.Region, pod.Region,
 					)
-					mysql.Db.Model(&vtap).Update("region", pod.Region)
+					db.Model(&vtap).Update("region", pod.Region)
 				}
 			}
 		}
 	}
-	log.Debug("vtap launch_server check end")
+	log.Debugf("ORG(id=%d database=%s) vtap launch_server check end", db.ORGID, db.Name)
 }
 
-func (v *VTapCheck) typeCheck() {
+func (v *VTapCheck) typeCheck(db *mysql.DB) {
 	var vtaps []mysql.VTap
 	var podNodes []mysql.PodNode
 	var conns []mysql.VMPodNodeConnection
 
-	log.Debug("vtap type check start")
+	log.Debugf("ORG(id=%d database=%s) vtap type check start", db.ORGID, db.Name)
 
-	mysql.Db.Find(&podNodes)
+	db.Find(&podNodes)
 	idToPodNode := make(map[int]*mysql.PodNode)
 	for i, podNode := range podNodes {
 		idToPodNode[podNode.ID] = &podNodes[i]
 	}
 
-	mysql.Db.Find(&conns)
+	db.Find(&conns)
 	vmIDToPodNodeID := make(map[int]int)
 	podNodeIDToVMID := make(map[int]int)
 	for _, conn := range conns {
@@ -242,7 +243,7 @@ func (v *VTapCheck) typeCheck() {
 	}
 
 	var vms []mysql.VM
-	if err := mysql.Db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
+	if err := db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
 		log.Error(err)
 	}
 	vmIDToVMType := make(map[int]int)
@@ -250,14 +251,14 @@ func (v *VTapCheck) typeCheck() {
 		vmIDToVMType[vm.ID] = vm.HType
 	}
 
-	mysql.Db.Where(
+	db.Where(
 		"type IN (?)",
 		[]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P, common.VTAP_TYPE_POD_HOST},
 	).Find(&vtaps)
 	for _, vtap := range vtaps {
 		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
 			var vm mysql.VM
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
+			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				continue
 			}
 			podNodeID, ok := vmIDToPodNodeID[vm.ID]
@@ -267,21 +268,21 @@ func (v *VTapCheck) typeCheck() {
 			podNode, ok := idToPodNode[podNodeID]
 			if !ok {
 				log.Infof(
-					"pod_node (%s) not found, will not re-discovery vtap (%s), please check db data",
-					podNodeID, vtap.Name,
+					"ORG(id=%d database=%s) pod_node (%s) not found, will not re-discovery vtap (%s), please check db data",
+					db.ORGID, db.Name, podNodeID, vtap.Name,
 				)
 				continue
 			}
 			if vtap.LaunchServer != podNode.IP {
 				log.Infof(
-					"vtap (%s) launch_server (%s) not equal to podNode (%s), will not re-discovery vtap",
-					vtap.Name, vtap.LaunchServer, podNode.IP,
+					"ORG(id=%d database=%s) vtap (%s) launch_server (%s) not equal to podNode (%s), will not re-discovery vtap",
+					db.ORGID, db.Name, vtap.Name, vtap.LaunchServer, podNode.IP,
 				)
 				continue
 			}
 		} else {
 			var podNode mysql.PodNode
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				continue
 			}
 			vmID, ok := podNodeIDToVMID[podNode.ID]
@@ -294,18 +295,18 @@ func (v *VTapCheck) typeCheck() {
 		}
 
 		log.Infof(
-			"delete vtap (%s) type (%d), because has vm_pod_node_connection",
-			vtap.Name, vtap.Type,
+			"ORG(id=%d database=%s) delete vtap (%s) type (%d), because has vm_pod_node_connection",
+			db.ORGID, db.Name, vtap.Name, vtap.Type,
 		)
-		mysql.Db.Delete(&vtap)
+		db.Delete(&vtap)
 	}
 
-	log.Debug("vtap type check end")
+	log.Debugf("ORG(id=%d database=%s) vtap type check end", db.ORGID, db.Name)
 }
 
-func (v *VTapCheck) deleteLostVTap() {
+func (v *VTapCheck) deleteLostVTap(db *mysql.DB) {
 	var vtaps []*mysql.VTap
-	mysql.Db.Where("state = ? and type not in (?)",
+	db.Where("state = ? and type not in (?)",
 		common.VTAP_STATE_NOT_CONNECTED,
 		[]int{common.VTAP_TYPE_DEDICATED, common.VTAP_TYPE_TUNNEL_DECAPSULATION},
 	).Find(&vtaps)
@@ -315,9 +316,18 @@ func (v *VTapCheck) deleteLostVTap() {
 	}
 
 	var ids []int
+	curTimeInt := int(time.Now().Unix())
 	for _, vtap := range vtaps {
-		ids = append(ids, vtap.ID)
-		log.Infof("delete lost vtap(name: %s, ctrl_ip: %s, ctrl_mac: %s)", vtap.Name, vtap.CtrlIP, vtap.CtrlMac)
+		lastSyncTimeInt := int(vtap.SyncedControllerAt.Unix())
+		lostTimeInt := curTimeInt - lastSyncTimeInt
+		if lostTimeInt >= v.cfg.VTapAutoDelete.LostTimeMax {
+			ids = append(ids, vtap.ID)
+			log.Infof(
+				"ORG(id=%d database=%s) delete lost vtap(name: %s, ctrl_ip: %s, ctrl_mac: %s), "+
+					"because lost time(%d) > lost time max",
+				db.ORGID, db.Name, vtap.Name, vtap.CtrlIP, vtap.CtrlMac, lostTimeInt,
+			)
+		}
 	}
-	mysql.Db.Delete(&vtaps, ids)
+	db.Delete(&vtaps, ids)
 }

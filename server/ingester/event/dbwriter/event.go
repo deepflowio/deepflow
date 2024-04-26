@@ -17,14 +17,21 @@
 package dbwriter
 
 import (
+	"fmt"
 	"net"
+	"reflect"
 	"sync/atomic"
+	"unsafe"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
+	exportercommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
+	"github.com/deepflowio/deepflow/server/ingester/exporters/config"
+	utag "github.com/deepflowio/deepflow/server/ingester/exporters/universal_tag"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (
@@ -44,57 +51,59 @@ const (
 )
 
 type EventStore struct {
-	Time uint32 // s
-	_id  uint64
+	pool.ReferenceCount
 
-	StartTime int64
-	EndTime   int64
+	Time uint32 `json:"time" category:"$tag" sub:"flow_info"` // s
+	_id  uint64 `json:"_id" category:"$tag" sub:"flow_info"`
+
+	StartTime int64 `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime   int64 `json:"end_time" category:"$tag" sub:"flow_info"`   // us
 
 	Tagged uint8
 
-	SignalSource     uint8 // Resource / File IO
-	EventType        string
+	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"perf_event_signal_source"` // Resource / File IO
+	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"perf_event_type"`
 	EventDescription string
-	ProcessKName     string
+	ProcessKName     string `json:"process_kname" category:"$tag" sub:"service_info"` // us
 
-	GProcessID uint32
+	GProcessID uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
 
-	RegionID     uint16
-	AZID         uint16
-	L3EpcID      int32
-	HostID       uint16
-	PodID        uint32
-	PodNodeID    uint32
-	PodNSID      uint16
-	PodClusterID uint16
-	PodGroupID   uint32
-	L3DeviceType uint8
-	L3DeviceID   uint32
-	ServiceID    uint32
-	VTAPID       uint16
-	SubnetID     uint16
-	IsIPv4       bool
-	IP4          uint32
-	IP6          net.IP
+	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
+	AZID         uint16 `json:"az_id" category:"$tag" sub:"universal_tag"`
+	L3EpcID      int32  `json:"l3_epc_id" category:"$tag" sub:"universal_tag"`
+	HostID       uint16 `json:"host_id" category:"$tag" sub:"universal_tag"`
+	PodID        uint32 `json:"pod_id" category:"$tag" sub:"universal_tag"`
+	PodNodeID    uint32 `json:"host_node_id" category:"$tag" sub:"universal_tag"`
+	PodNSID      uint16 `json:"pod_ns_id" category:"$tag" sub:"universal_tag"`
+	PodClusterID uint16 `json:"pod_cluster_id" category:"$tag" sub:"universal_tag"`
+	PodGroupID   uint32 `json:"pod_group_id" category:"$tag" sub:"universal_tag"`
+	L3DeviceType uint8  `json:"l3_device_type" category:"$tag" sub:"universal_tag"`
+	L3DeviceID   uint32 `json:"l3_device_id" category:"$tag" sub:"universal_tag"`
+	ServiceID    uint32 `json:"service_id" category:"$tag" sub:"universal_tag"`
+	VTAPID       uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
+	SubnetID     uint16 `json:"subnet_id" category:"$tag" sub:"universal_tag"`
+	IsIPv4       bool   `json:"is_ipv4" category:"$tag" sub:"network_layer"`
+	IP4          uint32 `json:"ip4" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	IP6          net.IP `json:"ip6" category:"$tag" sub:"network_layer"  to_string:"IPv6String"`
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'event', otherwise stored in '<OrgId>_event'.
 	OrgId  uint16
 	TeamID uint16
 
-	AutoInstanceID   uint32
-	AutoInstanceType uint8
-	AutoServiceID    uint32
-	AutoServiceType  uint8
+	AutoInstanceID   uint32 `json:"auto_instance_id" category:"$tag" sub:"universal_tag"`
+	AutoInstanceType uint8  `json:"auto_instance_type" category:"$tag" sub:"universal_tag" enumfile:"auto_instance_type"`
+	AutoServiceID    uint32 `json:"auto_service_id" category:"$tag" sub:"universal_tag"`
+	AutoServiceType  uint8  `json:"auto_service_type" category:"$tag" sub:"universal_tag" enumfile:"auto_service_type"`
 
-	AppInstance string
+	AppInstance string `json:"app_instance" category:"$tag" sub:"service_info"`
 
-	AttributeNames  []string
-	AttributeValues []string
+	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
+	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
 	HasMetrics bool
-	Bytes      uint32
-	Duration   uint64
+	Bytes      uint32 `json:"bytes" category:"$metrics" sub:"throughput"`
+	Duration   uint64 `json:"duration" category:"$metrics" sub:"delay"`
 }
 
 func (e *EventStore) WriteBlock(block *ckdb.Block) {
@@ -164,6 +173,41 @@ func (e *EventStore) Table() string {
 
 func (e *EventStore) Release() {
 	ReleaseEventStore(e)
+}
+
+func (e *EventStore) DataSource() uint32 {
+	if e.HasMetrics {
+		return uint32(config.PERF_EVENT)
+	}
+	return uint32(config.MAX_DATASOURCE_ID)
+}
+
+func (e *EventStore) EncodeTo(protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {
+	switch protocol {
+	case config.PROTOCOL_KAFKA:
+		tags := e.QueryUniversalTags(utags)
+		k8sLabels := utags.QueryCustomK8sLabels(e.PodID)
+		return exportercommon.EncodeToJson(e, int(e.DataSource()), cfg, tags, tags, k8sLabels, k8sLabels), nil
+	default:
+		return nil, fmt.Errorf("event unsupport export to %s", protocol)
+	}
+}
+
+func (e *EventStore) QueryUniversalTags(utags *utag.UniversalTagsManager) *utag.UniversalTags {
+	return utags.QueryUniversalTags(
+		e.RegionID, e.AZID, e.HostID, e.PodNSID, e.PodClusterID, e.SubnetID, e.VTAPID,
+		uint8(e.L3DeviceType), e.AutoServiceType, e.AutoInstanceType,
+		e.L3DeviceID, e.AutoServiceID, e.AutoInstanceID, e.PodNodeID, e.PodGroupID, e.PodID, uint32(e.L3EpcID), 0, e.ServiceID,
+		e.IsIPv4, e.IP4, e.IP6,
+	)
+}
+
+func (e *EventStore) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(e)), offset, kind, dataType)
+}
+
+func (e *EventStore) TimestampUs() int64 {
+	return int64(e.EndTime)
 }
 
 var EventCounter uint32
@@ -316,11 +360,13 @@ var eventPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireEventStore() *EventStore {
-	return eventPool.Get().(*EventStore)
+	e := eventPool.Get().(*EventStore)
+	e.Reset()
+	return e
 }
 
 func ReleaseEventStore(e *EventStore) {
-	if e == nil {
+	if e == nil || e.SubReferenceCount() {
 		return
 	}
 	attributeNames := e.AttributeNames[:0]

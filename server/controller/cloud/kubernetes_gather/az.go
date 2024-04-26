@@ -23,7 +23,7 @@ import (
 
 func (k *KubernetesGather) getAZ() (model.AZ, error) {
 	log.Debug("get az starting")
-	k.azLcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(k.UuidGenerate)
+	k.azLcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(k.orgID, k.UuidGenerate)
 	az := model.AZ{
 		Lcuuid:       k.azLcuuid,
 		Name:         k.Name,

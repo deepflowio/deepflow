@@ -21,11 +21,11 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/libs/codec"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 )
 
-func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, error) {
+func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (Document, error) {
 	if decoder == nil {
 		return nil, errors.New("No input decoder")
 	}
@@ -35,69 +35,67 @@ func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, erro
 		return nil, fmt.Errorf("Decode failed: %s", err)
 	}
 
-	doc := AcquireDocument()
-	doc.Timestamp = pbDoc.Timestamp
-
-	tag := flow_metrics.AcquireTag()
-	tag.Field = flow_metrics.AcquireField()
-	tag.ReadFromPB(pbDoc.Tag)
-	doc.Tagger = tag
-
 	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
 	case flow_metrics.FLOW_ID:
-		flowMeter := flow_metrics.AcquireFlowMeter()
-		flowMeter.ReadFromPB(pbDoc.Meter.Flow)
-		doc.Meter = flowMeter
+		doc := AcquireDocumentFlow()
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.FlowMeter.ReadFromPB(pbDoc.Meter.Flow)
+		return doc, nil
 	case flow_metrics.ACL_ID:
-		usageMeter := flow_metrics.AcquireUsageMeter()
-		usageMeter.ReadFromPB(pbDoc.Meter.Usage)
-		doc.Meter = usageMeter
+		doc := AcquireDocumentUsage()
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.UsageMeter.ReadFromPB(pbDoc.Meter.Usage)
+		return doc, nil
 	case flow_metrics.APP_ID:
-		appMeter := flow_metrics.AcquireAppMeter()
-		appMeter.ReadFromPB(pbDoc.Meter.App)
-		doc.Meter = appMeter
+		doc := AcquireDocumentApp()
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.AppMeter.ReadFromPB(pbDoc.Meter.App)
+		return doc, nil
 	default:
 		return nil, fmt.Errorf("Unknow meter ID %d", meterID)
 
 	}
-
-	doc.Flags = DocumentFlag(pbDoc.Flags)
-	return doc, nil
 }
 
 // queue monitor 打印时使用
-func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*Document, error) {
+func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (Document, error) {
 	pbDoc := &pb.Document{}
 	decoder.ReadPB(pbDoc)
 	if decoder.Failed() {
 		return nil, errors.New("Decode failed")
 	}
 
-	doc := &Document{}
-	doc.Timestamp = pbDoc.Timestamp
-
-	tag := &flow_metrics.Tag{}
-	tag.Field = &flow_metrics.Field{}
-	tag.ReadFromPB(pbDoc.Tag)
-	doc.Tagger = tag
-
 	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
 	case flow_metrics.FLOW_ID:
-		flowMeter := flow_metrics.AcquireFlowMeter()
-		flowMeter.ReadFromPB(pbDoc.Meter.Flow)
-		doc.Meter = flowMeter
+		doc := &DocumentFlow{}
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.FlowMeter.ReadFromPB(pbDoc.Meter.Flow)
+		return doc, nil
 	case flow_metrics.ACL_ID:
-		usageMeter := flow_metrics.AcquireUsageMeter()
-		usageMeter.ReadFromPB(pbDoc.Meter.Usage)
-		doc.Meter = usageMeter
+		doc := &DocumentUsage{}
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.UsageMeter.ReadFromPB(pbDoc.Meter.Usage)
+		return doc, nil
 	case flow_metrics.APP_ID:
-		appMeter := flow_metrics.AcquireAppMeter()
-		appMeter.ReadFromPB(pbDoc.Meter.App)
-		doc.Meter = appMeter
+		doc := &DocumentApp{}
+		doc.Timestamp = pbDoc.Timestamp
+		doc.Flags = DocumentFlag(pbDoc.Flags)
+		doc.Tag.ReadFromPB(pbDoc.Tag)
+		doc.AppMeter.ReadFromPB(pbDoc.Meter.App)
+		return doc, nil
+	default:
+		return nil, fmt.Errorf("Unknow meter ID %d", meterID)
 	}
-
-	doc.Flags = DocumentFlag(pbDoc.Flags)
-	return doc, nil
 }

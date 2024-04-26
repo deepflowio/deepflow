@@ -24,13 +24,12 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork, podNetwork model.Network, err error) {
 	log.Debug("get nodes starting")
 	podNetworkCIDRs := []string{}
-	nodeLcuuidToHostName, err := cloudcommon.GetNodeHostNameByDomain(k.Lcuuid, k.isSubDomain)
+	nodeLcuuidToHostName, err := cloudcommon.GetNodeHostNameByDomain(k.Lcuuid, k.isSubDomain, k.db)
 	if err != nil {
 		log.Warningf("get pod node hostname error : (%s)", err.Error())
 	}
@@ -105,14 +104,15 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		if err != nil {
 			log.Warningf("node (%s) cpu num transition int error", name)
 		}
+		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		podNode := model.PodNode{
-			Lcuuid:           uID,
+			Lcuuid:           uLcuuid,
 			Name:             name,
 			Type:             nodeType,
 			ServerType:       common.POD_NODE_SERVER_TYPE_HOST,
 			State:            state,
 			IP:               nodeIP,
-			Hostname:         nodeLcuuidToHostName[uID],
+			Hostname:         nodeLcuuidToHostName[uLcuuid],
 			VCPUNum:          cpuNum,
 			MemTotal:         memory,
 			VPCLcuuid:        k.VPCUUID,
@@ -121,7 +121,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			PodClusterLcuuid: k.podClusterLcuuid,
 		}
 		podNodes = append(podNodes, podNode)
-		k.nodeIPToLcuuid[nodeIP] = uID
+		k.nodeIPToLcuuid[nodeIP] = uLcuuid
 		podCIDR := nData.Get("spec").Get("podCidr").MustString()
 		if podCIDR == "" {
 			podCIDR = nData.Get("spec").Get("podCIDR").MustString()
@@ -132,7 +132,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 	}
 
 	nodeNetworkName := k.Name + "_NODE_NET"
-	nodeNetworkLcuuid := common.GetUUID(k.UuidGenerate+nodeNetworkName, uuid.Nil)
+	nodeNetworkLcuuid := common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nodeNetworkName)
 	nodeIPs := cloudcommon.StringStringMapKeys(k.nodeIPToLcuuid)
 	nodeCIDRs := []string{}
 	if len(nodeIPs) != 0 {
@@ -170,7 +170,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 	}
 
 	podNetworkName := k.Name + "_POD_NET"
-	podNetworkLcuuid := common.GetUUID(k.UuidGenerate+podNetworkName, uuid.Nil)
+	podNetworkLcuuid := common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+podNetworkName)
 
 	podCIDRs := []string{}
 	if len(podNetworkCIDRs) != 0 {

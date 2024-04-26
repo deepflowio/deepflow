@@ -18,10 +18,19 @@ mod ntp;
 mod session;
 mod synchronizer;
 
-pub(crate) use session::{Session, DEFAULT_TIMEOUT};
+pub use session::{Session, DEFAULT_TIMEOUT};
 pub(crate) use synchronizer::{StaticConfig, Status, Synchronizer};
 
+cfg_if::cfg_if! {
+    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        mod remote_exec;
+        pub use remote_exec::Executor;
+    }
+}
+
 use std::time::{Duration, SystemTime};
+
+const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 
 pub fn get_timestamp(ntp_diff: i64) -> Duration {
     let now = SystemTime::now()

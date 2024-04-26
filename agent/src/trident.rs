@@ -213,6 +213,16 @@ impl fmt::Display for AgentId {
     }
 }
 
+impl From<&AgentId> for trident::AgentId {
+    fn from(id: &AgentId) -> Self {
+        Self {
+            ip: Some(id.ip.to_string()),
+            mac: Some(id.mac.to_string()),
+            team_id: Some(id.team_id.clone()),
+        }
+    }
+}
+
 pub struct Trident {
     state: TridentState,
     handle: Option<JoinHandle<()>>,
@@ -275,7 +285,7 @@ impl Trident {
         let config = &config_handler.static_config;
         let hostname = match config.override_os_hostname.as_ref() {
             Some(name) => name.to_owned(),
-            None => get_hostname().unwrap_or_default(),
+            None => get_hostname().unwrap_or("Unknown".to_string()),
         };
 
         let ntp_diff = Arc::new(AtomicI64::new(0));
@@ -523,6 +533,15 @@ impl Trident {
             stats::Countable::Owned(Box::new(synchronizer.ntp_counter())),
         );
         synchronizer.start();
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let remote_executor = crate::rpc::Executor::new(
+            synchronizer.agent_id.clone(),
+            session.clone(),
+            runtime.clone(),
+        );
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        remote_executor.start();
 
         let mut domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),

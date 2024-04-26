@@ -17,6 +17,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -42,6 +43,32 @@ func HandleOrgIDMiddleware() gin.HandlerFunc {
 			}
 		}
 		ctx.Set(common.HEADER_KEY_X_ORG_ID, orgID)
+
+		var err error
+		var userType, userID int
+		userTypeString := ctx.Request.Header.Get(common.HEADER_KEY_X_USER_TYPE)
+		if userTypeString == "" {
+			log.Warningf("header is invalid: no %s", common.HEADER_KEY_X_USER_TYPE)
+		} else {
+			userType, err = strconv.Atoi(userTypeString)
+			if err != nil {
+				ctx.Abort()
+				return
+			}
+		}
+		userIDString := ctx.Request.Header.Get(common.HEADER_KEY_X_USER_ID)
+		if len(userIDString) == 0 {
+			err = errors.New(fmt.Sprintf("header is invalid: no %s", common.HEADER_KEY_X_USER_ID))
+		} else {
+			userID, err = strconv.Atoi(userIDString)
+			if err != nil {
+				ctx.Abort()
+				return
+			}
+		}
+		ctx.Set(common.HEADER_KEY_X_USER_TYPE, userType)
+		ctx.Set(common.HEADER_KEY_X_USER_ID, userID)
+
 		ctx.Next()
 	}
 }

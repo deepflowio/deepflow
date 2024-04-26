@@ -52,7 +52,10 @@ use tokio::sync::{
 use tokio::task::JoinHandle;
 use tokio::time;
 
-use super::ntp::{NtpMode, NtpPacket, NtpTime};
+use super::{
+    ntp::{NtpMode, NtpPacket, NtpTime},
+    RPC_RETRY_INTERVAL,
+};
 
 use crate::common::endpoint::EPC_INTERNET;
 use crate::common::policy::Acl;
@@ -64,17 +67,16 @@ use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
 use crate::trident::{self, AgentId, ChangedConfig, RunningMode, TridentState, VersionInfo};
 #[cfg(any(target_os = "linux"))]
-use crate::utils::environment::get_current_k8s_image;
+use crate::utils::environment::{get_current_k8s_image, get_k8s_namespace};
 use crate::utils::{
     command::get_hostname,
     environment::{
-        get_executable_path, get_k8s_namespace, is_tt_pod, running_in_container, running_in_k8s,
+        get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
         running_in_only_watch_k8s_mode,
     },
     stats,
 };
 use public::{
-    consts::{CONTAINER_NAME, DAEMONSET_NAME},
     proto::{
         common::TridentType,
         trident::{self as tp, Exception, TapMode},
@@ -83,7 +85,6 @@ use public::{
 };
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
-const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
 const DEFAULT_NTP_MAX_INTERVAL: Duration = Duration::from_secs(60);
@@ -1184,7 +1185,7 @@ impl Synchronizer {
                         "template":{
                             "spec":{
                                 "containers": [{
-                                    "name": CONTAINER_NAME,
+                                    "name": public::consts::CONTAINER_NAME,
                                     "image": new_k8s_image,
                                 }],
                             }
@@ -1193,7 +1194,10 @@ impl Synchronizer {
                 });
                 let params = PatchParams::default();
                 let patch = Patch::Strategic(&patch);
-                if let Err(e) = daemonsets.patch(DAEMONSET_NAME, &params, &patch).await {
+                if let Err(e) = daemonsets
+                    .patch(public::consts::DAEMONSET_NAME, &params, &patch)
+                    .await
+                {
                     return Err(format!(
                         "patch deepflow-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
                         &current_k8s_image, e

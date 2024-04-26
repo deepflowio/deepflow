@@ -29,6 +29,58 @@ use crate::{
 // ProtocolVersion in PulsarApi.proto
 const MAX_PROTOCOL_VERSION: i32 = 21;
 
+struct TopicMap<K, V, const N: usize>
+where
+    K: Eq + std::hash::Hash,
+{
+    kv: HashMap<K, V>,
+    list: Vec<(K, V)>,
+    use_map: bool,
+}
+
+impl<K, V, const N: usize> TopicMap<K, V, N>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn insert(&mut self, id: K, topic: V) {
+        if self.use_map {
+            self.kv.insert(id, topic);
+        } else {
+            for (k, v) in self.list.iter_mut() {
+                if *k == id {
+                    *v = topic;
+                    return;
+                }
+            }
+            if self.list.len() == N {
+                self.use_map = true;
+                self.kv = self.list.drain(..).collect();
+                self.kv.insert(id, topic);
+            } else {
+                self.list.push((id, topic));
+            }
+        }
+    }
+
+    fn get(&self, id: &K) -> Option<&V> {
+        if self.use_map {
+            self.kv.get(id)
+        } else {
+            self.list.iter().find(|(k, _)| k == id).map(|(_, v)| v)
+        }
+    }
+
+    fn new() -> Self {
+        Self {
+            kv: HashMap::new(),
+            list: Vec::new(),
+            use_map: false,
+        }
+    }
+}
+
+type PulsarTopicMap = TopicMap<u64, String, 16>;
+
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct PulsarInfo {
     msg_type: LogMessageType,
@@ -83,8 +135,8 @@ pub struct PulsarLog {
     version: i32,
     domain: Option<String>,
 
-    producer_topic: HashMap<u64, String>,
-    consumer_topic: HashMap<u64, String>,
+    producer_topic: PulsarTopicMap,
+    consumer_topic: PulsarTopicMap,
 }
 
 impl Default for PulsarLog {
@@ -93,8 +145,8 @@ impl Default for PulsarLog {
             perf_stats: None,
             version: MAX_PROTOCOL_VERSION,
             domain: None,
-            producer_topic: HashMap::new(),
-            consumer_topic: HashMap::new(),
+            producer_topic: PulsarTopicMap::new(),
+            consumer_topic: PulsarTopicMap::new(),
         }
     }
 }
@@ -319,8 +371,8 @@ impl PulsarInfo {
 
     fn update_topic(
         &mut self,
-        producer_topic: &mut HashMap<u64, String>,
-        consumer_topic: &mut HashMap<u64, String>,
+        producer_topic: &mut PulsarTopicMap,
+        consumer_topic: &mut PulsarTopicMap,
     ) -> Option<()> {
         let command = self.command.as_ref();
         match command.r#type() {
@@ -954,6 +1006,33 @@ mod tests {
                     output_path
                 );
             }
+        }
+    }
+
+    #[test]
+    fn check_topicmap() {
+        let mut map1: TopicMap<u64, u64, 16> = TopicMap::new();
+        let mut map2: HashMap<u64, u64> = HashMap::new();
+        for i in 0..5 {
+            map1.insert(i, i);
+            map2.insert(i, i);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
+        }
+        for i in 0..11 {
+            map1.insert(i, i + 64);
+            map2.insert(i, i + 64);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
+        }
+        for i in 0..32 {
+            map1.insert(i, i + 128);
+            map2.insert(i, i + 128);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
         }
     }
 }

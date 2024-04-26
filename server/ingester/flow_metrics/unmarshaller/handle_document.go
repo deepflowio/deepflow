@@ -62,9 +62,9 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 				info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 				if info == nil {
 					t.TagSource |= uint8(flow_metrics.EpcIP)
-					info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+					info = common.RegetInfoFromIP(t.IsIPv4 == 0, t.IP6, t.IP, t.L3EpcID, platformData)
 				}
-			} else if t.IsIPv6 != 0 {
+			} else if t.IsIPv4 == 0 {
 				t.TagSource |= uint8(flow_metrics.EpcIP)
 				info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 			} else {
@@ -95,9 +95,9 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 				info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
 				if info1 == nil {
 					t.TagSource1 |= uint8(flow_metrics.EpcIP)
-					info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
+					info1 = common.RegetInfoFromIP(t.IsIPv4 == 0, t.IP61, t.IP1, t.L3EpcID1, platformData)
 				}
-			} else if t.IsIPv6 != 0 {
+			} else if t.IsIPv4 == 0 {
 				t.TagSource1 |= uint8(flow_metrics.EpcIP)
 				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
 			} else {
@@ -110,12 +110,12 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 	return info, info1
 }
 
-func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) error {
-	t := doc.Tagger.(*flow_metrics.Tag)
+func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) error {
+	t := doc.Tags()
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
 
 	// vtap_acl 分钟级数据不用填充
-	if doc.Meter.ID() == flow_metrics.ACL_ID &&
+	if doc.Meter().ID() == flow_metrics.ACL_ID &&
 		t.DatabaseSuffixID() == 1 { // 只有acl后缀
 		return nil
 	}
@@ -149,11 +149,11 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.PodID1 = info1.PodID
 		t.PodClusterID1 = uint16(info1.PodClusterID)
 		if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
-			t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
+			t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.Protocol, t.ServerPort)
 		}
 		if info == nil {
 			var ip0 net.IP
-			if t.IsIPv6 != 0 {
+			if t.IsIPv4 == 0 {
 				ip0 = t.IP6
 			} else {
 				ip0 = utils.IpFromUint32(t.IP)
@@ -192,15 +192,15 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
 			//for a single-side table (vtap_xxx_port), if ServerPort is valid, it needs to match the serviceID
 			if t.ServerPort > 0 && t.Code&EdgeCode == 0 {
-				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
+				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, t.ServerPort)
 				// for the 0-side of the double-side table (vtap_xxx_edge_port) or serverPort is invalid, if it is PodServiceIP, then need to match the serviceID
 			} else if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) { //On the 0 side, if it is just Pod Node, there is no need to match the service
-				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
+				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, 0)
 			}
 		}
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
 			var ip1 net.IP
-			if t.IsIPv6 != 0 {
+			if t.IsIPv4 == 0 {
 				ip1 = t.IP61
 			} else {
 				ip1 = utils.IpFromUint32(t.IP1)

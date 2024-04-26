@@ -35,16 +35,16 @@ func Test_copyStruct(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		assertFunc func(t *testing.T, data *model.VTapGroupConfigurationResponse)
+		assertFunc func(t *testing.T, data *model.AgentGroupConfigResponse)
 	}{
 		{
 			name: "ignore name test",
 			args: args{
 				ignoreName: ignoreName,
-				from:       &mysql.VTapGroupConfiguration{},
-				to:         &model.VTapGroupConfigurationResponse{},
+				from:       &agent_config.AgentGroupConfigModel{},
+				to:         &model.AgentGroupConfigResponse{},
 			},
-			assertFunc: func(t *testing.T, data *model.VTapGroupConfigurationResponse) {
+			assertFunc: func(t *testing.T, data *model.AgentGroupConfigResponse) {
 				if data.WasmPlugins == nil {
 					t.Errorf("WasmPlugins is nil, wanted: []string")
 				}
@@ -63,7 +63,7 @@ func Test_copyStruct(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			copyStruct(tt.args.from, tt.args.to, tt.args.ignoreName)
-			tt.assertFunc(t, tt.args.to.(*model.VTapGroupConfigurationResponse))
+			tt.assertFunc(t, tt.args.to.(*model.AgentGroupConfigResponse))
 		})
 	}
 }

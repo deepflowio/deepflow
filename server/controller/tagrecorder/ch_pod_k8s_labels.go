@@ -41,7 +41,8 @@ func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Label.IsDifferent() {
-		updateInfo["labels"] = fieldsUpdate.Label.GetNew()
+		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		updateInfo["labels"] = labels
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sLabels
@@ -63,7 +64,8 @@ func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, item *mysql.Pod) (
 	if item.Label == "" {
 		return
 	}
-	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: item.Label, TeamID: md.TeamID, DomainID: md.DomainID}}
+	labels, _ := common.StrToJsonAndMap(item.Label)
+	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: labels, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

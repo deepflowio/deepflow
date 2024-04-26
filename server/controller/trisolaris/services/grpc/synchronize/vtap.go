@@ -313,13 +313,13 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is %s-%d org_id %d not found vtapInfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) org_id %d not found vtapInfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
 		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	vtapCache, err := e.getVTapCache(in, orgID)
 	if err != nil {
-		log.Warningf("err:%s ctrlIp is %s, ctrlMac is %s, team_id is %s-%d, org_id is %d, hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
+		log.Warningf("err:%s ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d), org_id is %d, hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
 			err, ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
@@ -328,7 +328,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 			log.Errorf("ctrlIp is %s, ctrlMac is %s, not team_id refuse(%v) register", ctrlIP, ctrlMac, trisolaris.GetIsRefused())
 			return e.GetFailedResponse(in, nil), nil
 		}
-		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: %s-%d, org_id is %d, host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
+		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), org_id is %d, host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
 			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
@@ -355,7 +355,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
-		log.Infof("ctrl_ip is %s, ctrl_mac is %s, team_id is %s-%d, org_id is %d, host_ips is %s, "+
+		log.Infof("ctrl_ip is %s, ctrl_mac is %s, team_id is (str=%s,int=%d), org_id is %d, host_ips is %s, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
@@ -366,7 +366,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
-		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, team_id is %s-%d, org_id is %d, host_ips is %s,"+
+		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, team_id is (str=%s,int=%d), org_id is %d, host_ips is %s,"+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
@@ -445,7 +445,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id is %s-%d, org_id is %d, kubernetes_force_watch: %t)",
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id is (str=%s,int=%d), org_id is %d, kubernetes_force_watch: %t)",
 				in.GetKubernetesClusterId(), ctrlIP, ctrlMac,
 				teamIDStr, teamIDInt, orgID, in.GetKubernetesForceWatch())
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
@@ -674,7 +674,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is %s-%d org_id %d not found  vtapinfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) org_id is %d not found  vtapinfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
 		return &api.SyncResponse{
 			Status:        &STATUS_FAILED,
 			Revision:      proto.String(in.GetRevision()),
@@ -704,7 +704,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	newAcls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
-		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, team_id: %s-%d, org_id is %d, "+
+		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, team_id: (str=%s,int=%d), org_id is %d, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d datalen: %d), "+
 			"(groups version %d -> %d), "+
@@ -715,7 +715,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
-		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, team_id: %s-%d, org_id is %d, "+
+		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, team_id: (str=%s,int=%d), org_id is %d, "+
 			"(platform data version  %d -> %d), "+
 			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
@@ -780,6 +780,19 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 
 func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
 	var err error
+	orgID := trisolaris.GetOrgIDByTeamID(r.GetTeamId())
+	if orgID == 0 {
+		log.Errorf("get orgid failed by team_id(%s)", r.GetTeamId())
+		response := &api.SyncResponse{
+			Status: &STATUS_FAILED,
+		}
+		err = in.Send(response)
+		if err != nil {
+			log.Error(err)
+		}
+
+		return nil
+	}
 	for {
 		response, err := e.pushResponse(r)
 		if err != nil {
@@ -790,8 +803,8 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 			log.Error(err)
 			break
 		}
-		pushmanager.Wait()
+		pushmanager.Wait(orgID)
 	}
-	log.Info("exit push", r.GetCtrlIp(), r.GetCtrlMac())
+	log.Info("exit agent push", r.GetCtrlIp(), r.GetCtrlMac())
 	return err
 }

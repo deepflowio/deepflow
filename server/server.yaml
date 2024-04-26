@@ -156,8 +156,12 @@ controller:
       data-duration: 86400
       # rebalance vtap interval, default: 1h, uint: s
       rebalance-interval: 3600
-    # automatically delete lost vtaps, uint:s
-    vtap_auto_delete_interval: 3600
+    ## automatically delete lost vtaps
+    # vtap_auto_delete:
+    #   enabled: true
+    #   # if current time - vtap lost time >= lost_time_max, vtap will be deleted
+    #   # uint: s
+    #   lost_time_max: 3600
     # warrant
     warrant:
       host: warrant
@@ -557,13 +561,18 @@ ingester:
   #prometheus-label-cache-expiration: 86400
 
   #ck-disk-monitor:
-  #  check-interval: 300 # 检查时间间隔(单位: 秒)
+  #  check-interval: 180 # check time interval (unit: seconds)
+  #  ttl-check-disabled: false # whether to not check TTL expired data
   ## 磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space, 或磁盘占用大于used-space, 开始清理数据
   ## When the disk space is insufficient, the disk occupancy > 'used-percent' and the disk idle < 'free-space' are met at the same time, or the disk occupancy > 'used-space', then the data is cleaned up
   #  disk-cleanups:
+  #  - disk-name-prefix: default  # monitor disks starting with 'disk-name-prefix', check the disks 'select * from system.disks'
+  #    used-percent: 80         #  disk usage threshold, ranges: 0-100
+  #    free-space: 300          #  uint: GB, disk minimum free threshold
+  #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  - disk-name-prefix: path_  # monitor disks starting with 'disk-name-prefix', check the disks 'select * from system.disks'
   #    used-percent: 80         #  disk usage threshold, ranges: 0-100
-  #    free-space: 100          #  uint: GB, disk minimum free threshold
+  #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
   #  - database: flow_log
@@ -643,33 +652,89 @@ ingester:
   #flow-tag-cache-flush-timeout: 1800
 
   #exporters:
-  #  enabled: false
-  #  # export datas ranges: cbpf-net-span, ebpf-sys-span (app spans from Opentelemetry are not supported)
-  #  export-datas: [cbpf-net-span,ebpf-sys-span]
-  #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
-  #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
-  #  export-custom-k8s-labels-regexp:  # type string, default: "", means not export custom k8s labels. for example: ".+", means export all custom k8s labels; "aaa|bbb": means export labels which contains 'aaa' or 'bbb' string. ref: https://github.com/google/re2/wiki/Syntax
-  #  export-only-with-traceid: false # if set 'true', if the span has no trace id, it will not be exported
-  #  otlp-exporters:
-  #  - enabled: false
-  #    addr: 127.0.0.1:4317 # grpc protobuf addr, only support protocol 'grpc'
-  #    queue-count: 4       # parallelism of sender
-  #    queue-size: 100000   # size of each exporter queue
-  #    export-datas: [cbpf-net-span,ebpf-sys-span]
-  #    export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
-  #    export-custom-k8s-labels-regexp:
-  #    export-only-with-traceid: false
-  #    export-batch-count: 32 # ExportRequest contains defalut(32) ResourceSpans(each l7_flow_log corresponds to a ResourceSpans)
-  #    grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
-  #      key1: value1
-  #      key2: value2
-
-  #metrics-prom-writer:
-  #  enabled: false
-  #  endpoint:               #eg. http://1.2.3.4:9091
-  #  headers:                # type: map[string]string, extra http request headers
-  #  batch-size: 2048        # each http request contians how many timeseries
-  #  flush-timeout: 5
-  #  queue-count: 2
-  #  queue-size:  1000000
-  #  metrics-filter: [app] # only support: 'app', means flow_metrics.'vtap_app_edgp_port.1s'/'vtap_app_port.1s'
+  #- protocol: kafka
+  #  enabled: true
+  #  # randomly select an address that can be sent successfully. Kafka address format as: 'broker1.example.com:9092'
+  #  endpoints: [broker1.example.com:9092, broker2.example.com:9092]
+  #  # the data source that needs to be exported format as $db_name.$table_name, is also the topic name of Kafka
+  #  data-sources:
+  #  - flow_log.l7_flow_log
+  #  - flow_log.network.1m
+  #  - flow_log.application_map.1m
+  #  # number of queues exported in parallel
+  #  queue-count: 4
+  #  # size of exporting queue
+  #  queue-size: 100000
+  #  # the number of items exported in each batch
+  #  batch-size: 1024
+  #  flush-timeout: 10
+  #  # the value of tag is "", whether to export
+  #  export-empty-tag: false
+  #  # the value of metrics is 0, whether to export
+  #  export-empty-metrics-disabled: false
+  #  # whether the id value of the enumeration type is not converted into a string for output
+  #  enum-translate-to-name-disabled: false
+  #  # whether the id value of universal-tag is not converted into a resource name for output
+  #  universal-tag-translate-to-name-disabled: false
+  #  tag-filters:
+  #  - field-name: signal_source # database column name
+  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #    field-values: [3]         # vlaues
+  #  export-fields: # field_name or $category
+  #  - $tag
+  #  - $metrics
+  #  sasl:
+  #    enabled: false # default: false
+  #    security-protocol: SASL_SSL  # currently only supports: SASL_SSL
+  #    sasl-mechanism: PLAIN # currently only supports: PLAIN
+  #    username: aaa
+  #    password: bbb
+  #- protocol: prometheus
+  #  enabled: true
+  #  # randomly select an address that can be sent successfully, prometheus address format as: http://127.0.0.1:9091/receive
+  #  endpoints: [http://127.0.0.1:9091/receive, http://1.1.1.1:9091/receive]
+  #  data-sources: # currently only supports 'flow_metrics.*'
+  #  - flow_metrics.application_map.1s
+  #  queue-count: 4
+  #  queue-size: 100000
+  #  batch-size: 1024
+  #  flush-timeout: 10
+  #  tag-filters:
+  #  - field-name: signal_source
+  #    operator: "="
+  #    field-values: [3]
+  #  export-fields:
+  #  - $tag
+  #  - $metrics
+  #  extra-headers:  # type: map[string]string, extra http request headers
+  #    key1: value1
+  #    key2: value2
+  #  export-empty-tag: false
+  #  export-empty-metrics-disabled: false
+  #  enum-translate-to-name-disabled: false
+  #  universal-tag-translate-to-name-disabled: false
+  #- protocol: opentemetry
+  #  enabled: true
+  #  # Randomly select an address that can be sent successfully, otlp address format as: 127.0.0.1:4317, only supports grpc protocol
+  #  endpoints: [127.0.0.1:4317, 1.1.1.1:4317]
+  #  data-sources: # currently only supports 'flow_log.l7_flow_log'
+  #  - flow_log.l7_flow_log
+  #  queue-count: 4
+  #  queue-size: 100000
+  #  batch-size: 32
+  #  flush-timeout: 10
+  #  tag-filters:
+  #  - field-name: signal_source
+  #    operator: "="
+  #    field-values: [3]
+  #  export-fields:
+  #  - $tag
+  #  - $metrics
+  #  - $k8s.label
+  #  export-empty-tag: false
+  #  export-empty-metrics-disabled: false
+  #  enum-translate-to-name-disabled: false
+  #  universal-tag-translate-to-name-disabled: false
+  #  extra-headers:  # type: map[string]string, extra http request headers
+  #    key1: value1
+  #    key2: value2

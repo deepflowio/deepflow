@@ -23,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
@@ -76,6 +75,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				log.Infof("podgroup (%s) namespace id not found", name)
 				continue
 			}
+			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 			serviceType := common.POD_GROUP_STATEFULSET
 			label := "statefulset:" + namespace + ":" + name
 			replicas := cData.Get("spec").Get("replicas").MustInt()
@@ -93,9 +93,9 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			case 4:
 				replicas = 0
 				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
-					uID = metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString()
+					uLcuuid = common.IDGenerateUUID(k.orgID, metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString())
 					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
-					if k.podGroupLcuuids.Contains(uID) {
+					if k.podGroupLcuuids.Contains(uLcuuid) {
 						log.Debugf("inplaceset pod (%s) abstract workload already existed", name)
 						continue
 					}
@@ -125,8 +125,8 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					if targetIndex != -1 {
 						abstractPGName = resourceName[:targetIndex]
 					}
-					uID = common.GetUUID(namespace+abstractPGName, uuid.Nil)
-					if k.podGroupLcuuids.Contains(uID) {
+					uLcuuid = common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					if k.podGroupLcuuids.Contains(uLcuuid) {
 						log.Debugf("sci pod (%s) abstract workload already existed", name)
 						continue
 					}
@@ -139,10 +139,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
 			if ok {
-				k.nsLabelToGroupLcuuids[namespace+label].Add(uID)
+				k.nsLabelToGroupLcuuids[namespace+label].Add(uLcuuid)
 			} else {
 				groupIDsSet := mapset.NewSet()
-				groupIDsSet.Add(uID)
+				groupIDsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[namespace+label] = groupIDsSet
 			}
 			mLabels := cData.GetPath("spec", "template", "metadata", "labels").MustMap()
@@ -154,10 +154,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				nsLabel := namespace + key + "_" + vString
 				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
 				if ok {
-					k.nsLabelToGroupLcuuids[nsLabel].Add(uID)
+					k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
 				} else {
 					nsGroupIDsSet := mapset.NewSet()
-					nsGroupIDsSet.Add(uID)
+					nsGroupIDsSet.Add(uLcuuid)
 					k.nsLabelToGroupLcuuids[nsLabel] = nsGroupIDsSet
 				}
 			}
@@ -170,10 +170,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				nsL := namespace + key + "_" + vString
 				_, ok = k.nsLabelToGroupLcuuids[nsL]
 				if ok {
-					k.nsLabelToGroupLcuuids[nsL].Add(uID)
+					k.nsLabelToGroupLcuuids[nsL].Add(uLcuuid)
 				} else {
 					nsGIDsSet := mapset.NewSet()
-					nsGIDsSet.Add(uID)
+					nsGIDsSet.Add(uLcuuid)
 					k.nsLabelToGroupLcuuids[nsL] = nsGIDsSet
 				}
 			}
@@ -195,7 +195,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				}
 			}
 			podGroup := model.PodGroup{
-				Lcuuid:             uID,
+				Lcuuid:             uLcuuid,
 				Name:               name,
 				Label:              k.GetLabel(labels),
 				Type:               serviceType,
@@ -206,8 +206,8 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
 			podGroups = append(podGroups, podGroup)
-			k.podGroupLcuuids.Add(uID)
-			k.pgLcuuidTopodTargetPorts[uID] = podTargetPorts
+			k.podGroupLcuuids.Add(uLcuuid)
+			k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
 		}
 	}
 	log.Debug("get podgroups complete")
@@ -239,6 +239,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			log.Infof("replicationcontroller (%s) name not found", uID)
 			continue
 		}
+		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
@@ -249,10 +250,10 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		serviceType := common.POD_GROUP_RC
 		_, ok = k.nsLabelToGroupLcuuids[namespace+label]
 		if ok {
-			k.nsLabelToGroupLcuuids[namespace+label].Add(uID)
+			k.nsLabelToGroupLcuuids[namespace+label].Add(uLcuuid)
 		} else {
 			rcLcuuidsSet := mapset.NewSet()
-			rcLcuuidsSet.Add(uID)
+			rcLcuuidsSet.Add(uLcuuid)
 			k.nsLabelToGroupLcuuids[namespace+label] = rcLcuuidsSet
 		}
 		labels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
@@ -264,10 +265,10 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			nsLabel := namespace + key + "_" + vString
 			_, ok = k.nsLabelToGroupLcuuids[nsLabel]
 			if ok {
-				k.nsLabelToGroupLcuuids[nsLabel].Add(uID)
+				k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
 			} else {
 				nsRCLcuuidsSet := mapset.NewSet()
-				nsRCLcuuidsSet.Add(uID)
+				nsRCLcuuidsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[nsLabel] = nsRCLcuuidsSet
 			}
 		}
@@ -290,7 +291,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 
 		podNum := rData.Get("spec").Get("replicas").MustInt()
 		podRC := model.PodGroup{
-			Lcuuid:             uID,
+			Lcuuid:             uLcuuid,
 			Name:               name,
 			Label:              k.GetLabel(labels),
 			Type:               serviceType,
@@ -301,8 +302,8 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			PodClusterLcuuid:   k.podClusterLcuuid,
 		}
 		podRCs = append(podRCs, podRC)
-		k.podGroupLcuuids.Add(uID)
-		k.pgLcuuidTopodTargetPorts[uID] = podTargetPorts
+		k.podGroupLcuuids.Add(uLcuuid)
+		k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
 	}
 	log.Debug("get replicationcontrollers complete")
 	return

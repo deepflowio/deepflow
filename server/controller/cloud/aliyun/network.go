@@ -54,8 +54,8 @@ func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subn
 			azId := network.Get("ZoneId").MustString()
 			cidr := network.Get("CidrBlock").MustString()
 
-			networkLcuuid := common.GenerateUUID(networkId)
-			vpcLcuuid := common.GenerateUUID(vpcId)
+			networkLcuuid := common.GenerateUUIDByOrgID(a.orgID, networkId)
+			vpcLcuuid := common.GenerateUUIDByOrgID(a.orgID, vpcId)
 			retNetwork := model.Network{
 				Lcuuid:         networkLcuuid,
 				Name:           networkName,
@@ -64,7 +64,7 @@ func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subn
 				Shared:         false,
 				External:       false,
 				NetType:        common.NETWORK_TYPE_LAN,
-				AZLcuuid:       common.GenerateUUID(a.uuidGenerate + "_" + azId),
+				AZLcuuid:       common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+azId),
 				RegionLcuuid:   a.getRegionLcuuid(region.Lcuuid),
 			}
 			retNetworks = append(retNetworks, retNetwork)
@@ -72,7 +72,7 @@ func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subn
 			a.regionLcuuidToResourceNum[retNetwork.RegionLcuuid]++
 
 			retSubnet := model.Subnet{
-				Lcuuid:        common.GenerateUUID(networkLcuuid),
+				Lcuuid:        common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),
 				Name:          networkName,
 				CIDR:          cidr,
 				NetworkLcuuid: networkLcuuid,

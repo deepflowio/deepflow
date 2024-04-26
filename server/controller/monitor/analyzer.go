@@ -95,7 +95,7 @@ func (c *AnalyzerCheck) Start() {
 					common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
 				return
 			}
-			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
+			refresh.RefreshCache(dbAndIP.db.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
 }

@@ -52,22 +52,10 @@ type FlowMetricsTTL struct {
 	VtapApp1S  int `yaml:"vtap-app-1s"`
 }
 
-type PromWriterConfig struct {
-	Enabled       bool              `yaml:"enabled"`
-	Endpoint      string            `yaml:"endpoint"`
-	Headers       map[string]string `yaml:"headers"`
-	BatchSize     int               `yaml:"batch-size"`
-	FlushTimeout  int               `yaml:"flush-timeout"`
-	QueueCount    int               `yaml:"queue-count"`
-	QueueSize     int               `yaml:"queue-size"`
-	MetricsFilter []string          `yaml:"metrics-filter"`
-}
-
 type Config struct {
 	Base                 *config.Config
 	CKReadTimeout        int                   `yaml:"ck-read-timeout"`
 	CKWriterConfig       config.CKWriterConfig `yaml:"metrics-ck-writer"`
-	PromWriterConfig     PromWriterConfig      `yaml:"metrics-prom-writer"`
 	DisableSecondWrite   bool                  `yaml:"disable-second-write"`
 	UnmarshallQueueCount int                   `yaml:"unmarshall-queue-count"`
 	UnmarshallQueueSize  int                   `yaml:"unmarshall-queue-size"`
@@ -100,21 +88,6 @@ func (c *Config) Validate() error {
 		c.FlowMetricsTTL.VtapApp1S = DefaultFlowMetrics1STTL
 	}
 
-	if c.PromWriterConfig.QueueCount <= 0 {
-		c.PromWriterConfig.QueueCount = DefaultPromWriterQueueCount
-	}
-	if c.PromWriterConfig.QueueSize <= 0 {
-		c.PromWriterConfig.QueueCount = DefaultPromWriterQueueSize
-	}
-
-	if c.PromWriterConfig.BatchSize <= 0 {
-		c.PromWriterConfig.BatchSize = DefaultPromWriterBatchSize
-	}
-
-	if c.PromWriterConfig.FlushTimeout <= 0 {
-		c.PromWriterConfig.FlushTimeout = DefaultPromWriterFlushTimeout
-	}
-
 	return nil
 }
 
@@ -123,7 +96,6 @@ func Load(base *config.Config, path string) *Config {
 		FlowMetrics: Config{
 			Base:                 base,
 			CKWriterConfig:       config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
-			PromWriterConfig:     PromWriterConfig{},
 			CKReadTimeout:        DefaultCKReadTimeout,
 			UnmarshallQueueCount: DefaultUnmarshallQueueCount,
 			UnmarshallQueueSize:  DefaultUnmarshallQueueSize,

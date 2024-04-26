@@ -34,9 +34,10 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -391,7 +392,7 @@ func (v *VTapInfo) loadPlugins() {
 }
 
 func (v *VTapInfo) loadConfigData() {
-	deafaultConfiguration := &models.RVTapGroupConfiguration{}
+	deafaultConfiguration := &agent_config.RAgentGroupConfigModel{}
 	b, err := json.Marshal(DefaultVTapGroupConfig)
 	if err == nil {
 		err = json.Unmarshal(b, deafaultConfiguration)
@@ -404,7 +405,7 @@ func (v *VTapInfo) loadConfigData() {
 
 	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration)
 	dbDataCache := v.metaData.GetDBDataCache()
-	configs := dbDataCache.GetVTapGroupConfigurationsFromDB(v.db)
+	configs := dbDataCache.GetAgentGroupConfigsFromDB(v.db)
 	v.convertConfig(configs)
 	v.loadPlugins()
 }
@@ -483,7 +484,7 @@ func DefaultFieldNone(filed string) bool {
 	return false
 }
 
-func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
+func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) {
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
@@ -503,7 +504,7 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 		} else {
 			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = ""
 		}
-		tapConfiguration := &models.VTapGroupConfiguration{}
+		tapConfiguration := &agent_config.AgentGroupConfigModel{}
 		typeOfVTapConfiguration := reflect.ValueOf(tapConfiguration).Elem()
 		tt := reflect.TypeOf(config).Elem()
 		tv := reflect.ValueOf(config).Elem()
@@ -522,7 +523,7 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 			}
 		}
 		// 转换结构体类型
-		rtapConfiguration := &models.RVTapGroupConfiguration{}
+		rtapConfiguration := &agent_config.RAgentGroupConfigModel{}
 		b, err := json.Marshal(tapConfiguration)
 		if err == nil {
 			err = json.Unmarshal(b, rtapConfiguration)
@@ -765,6 +766,8 @@ func (v *VTapInfo) generateVTapIP() {
 			EpcId:        proto.Uint32(uint32(cacheVTap.GetVPCID())),
 			Ip:           proto.String(cacheVTap.GetLaunchServer()),
 			PodClusterId: proto.Uint32(uint32(cacheVTap.GetPodClusterID())),
+			TeamId:       proto.Uint32(uint32(cacheVTap.GetTeamID())),
+			OrgId:        proto.Uint32(uint32(v.ORGID)),
 		}
 		vTapIPs = append(vTapIPs, data)
 	}
@@ -875,7 +878,7 @@ func (v *VTapInfo) generatePlatformDataAndSegment() {
 	v.generateAllVTapPlatformData()
 	log.Info(v.Log("platform data changed generate all vtap segment"))
 	v.generateAllVTapSegements()
-	pushmanager.Broadcast()
+	pushmanager.Broadcast(int(v.ORGID))
 }
 
 func (v *VTapInfo) monitorDataChanged() {
@@ -1270,7 +1273,7 @@ func (v *VTapInfo) timedRefreshVTapCache() {
 		case <-v.chVTapCacheRefresh:
 			log.Info(v.Logf("start generate vtap cache data from rpc"))
 			v.GenerateVTapCache()
-			pushmanager.Broadcast()
+			pushmanager.Broadcast(v.GetORGID())
 			log.Info(v.Logf("end generate vtap cache data from rpc"))
 		case <-v.ctx.Done():
 			log.Info(v.Log("exit generate vtap cache data"))

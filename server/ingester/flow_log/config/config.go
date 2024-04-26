@@ -24,7 +24,6 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
-	exporters_cfg "github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/config"
 )
 
 var log = logging.MustGetLogger("flow_log.config")
@@ -46,19 +45,14 @@ type FlowLogTTL struct {
 
 type Config struct {
 	Base              *config.Config
-	CKWriterConfig    config.CKWriterConfig      `yaml:"flowlog-ck-writer"`
-	Throttle          int                        `yaml:"throttle"`
-	ThrottleBucket    int                        `yaml:"throttle-bucket"`
-	L4Throttle        int                        `yaml:"l4-throttle"`
-	L7Throttle        int                        `yaml:"l7-throttle"`
-	FlowLogTTL        FlowLogTTL                 `yaml:"flow-log-ttl-hour"`
-	DecoderQueueCount int                        `yaml:"flow-log-decoder-queue-count"`
-	DecoderQueueSize  int                        `yaml:"flow-log-decoder-queue-size"`
-	ExportersCfg      exporters_cfg.ExportersCfg `yaml:"exporters"`
-
-	// OTLPExporter is moved inside ExportersCfg hence deprecated.
-	// Preserved for backward compatibility ONLY.
-	OtlpDeprecated exporters_cfg.OtlpExporterConfigDeprecated `yaml:"otlp-exporter"`
+	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
+	Throttle          int                   `yaml:"throttle"`
+	ThrottleBucket    int                   `yaml:"throttle-bucket"`
+	L4Throttle        int                   `yaml:"l4-throttle"`
+	L7Throttle        int                   `yaml:"l7-throttle"`
+	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
+	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
 }
 
 type FlowLogConfig struct {
@@ -66,37 +60,6 @@ type FlowLogConfig struct {
 }
 
 func (c *Config) Validate() error {
-	// For backward compatibility reason, we must map some config
-	// to the latest field it belongs to.
-
-	// Mapping "ingester.otlp-exporter" to "ingester.exporters.otlp-exporter" with default name.
-	// This won't work when "enabled: false" is set in otlp-exporter
-	if c.OtlpDeprecated.Enabled {
-		log.Warning("config ingester.otlp-exporter is deprecated. mapping to ingester.exporters.otlp-exporter.")
-		c.ExportersCfg = exporters_cfg.ExportersCfg{
-			Enabled: true,
-			OverridableCfg: exporters_cfg.OverridableCfg{
-				ExportDatas:                 c.OtlpDeprecated.ExportDatas,
-				ExportDataTypes:             c.OtlpDeprecated.ExportDataTypes,
-				ExportCustomK8sLabelsRegexp: c.OtlpDeprecated.ExportCustomK8sLabelsRegexp,
-				ExportOnlyWithTraceID:       &c.OtlpDeprecated.ExportOnlyWithTraceID,
-			},
-			OtlpExporterCfgs: []exporters_cfg.OtlpExporterConfig{
-				{
-					Enabled:          true,
-					Addr:             c.OtlpDeprecated.Addr,
-					QueueCount:       c.OtlpDeprecated.QueueCount,
-					QueueSize:        c.OtlpDeprecated.QueueSize,
-					ExportBatchCount: c.OtlpDeprecated.ExportBatchCount,
-					GrpcHeaders:      c.OtlpDeprecated.GrpcHeaders,
-				},
-			},
-		}
-	}
-	if err := c.ExportersCfg.Validate(); err != nil {
-		return err
-	}
-
 	// Begin validation.
 	if c.DecoderQueueCount == 0 {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
@@ -114,12 +77,6 @@ func (c *Config) Validate() error {
 		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
 	}
 
-	if c.ExportersCfg.Enabled {
-		if err := c.ExportersCfg.Validate(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -133,8 +90,6 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
-			ExportersCfg:      exporters_cfg.NewDefaultExportersCfg(),
-			OtlpDeprecated:    exporters_cfg.NewOtlpDefaultConfigDeprecated(),
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

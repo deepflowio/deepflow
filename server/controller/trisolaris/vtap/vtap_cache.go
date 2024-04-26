@@ -30,9 +30,9 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
-	cmodel "github.com/deepflowio/deepflow/server/controller/model"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -40,7 +40,7 @@ import (
 )
 
 type VTapConfig struct {
-	models.RVTapGroupConfiguration
+	agent_config.RAgentGroupConfigModel
 	ConvertedL4LogTapTypes       []uint32
 	ConvertedL4LogIgnoreTapSides []uint32
 	ConvertedL7LogIgnoreTapSides []uint32
@@ -124,9 +124,9 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *models.RVTapGroupConfiguration) *VTapConfig {
+func NewVTapConfig(config *agent_config.RAgentGroupConfigModel) *VTapConfig {
 	vTapConfig := &VTapConfig{}
-	vTapConfig.RVTapGroupConfiguration = *config
+	vTapConfig.RAgentGroupConfigModel = *config
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -163,6 +163,7 @@ type VTapCache struct {
 	processName        *string
 	licenseType        int
 	tapMode            int
+	teamID             int
 	lcuuid             *string
 	licenseFunctions   *string
 	licenseFunctionSet mapset.Set
@@ -244,6 +245,7 @@ func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.processName = proto.String(vtap.ProcessName)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
+	vTapCache.teamID = vtap.TeamID
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
@@ -371,7 +373,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 	v := c.vTapInfo
 	// modify static config
-	yamlConfig := &cmodel.StaticConfig{}
+	yamlConfig := &agent_config.StaticConfig{}
 	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
 	if err != nil {
 		log.Error(v.Logf("%s", err))
@@ -388,7 +390,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledCallMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -398,10 +400,10 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledFunctionMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{}
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{}
 		}
 		if yamlConfig.Ebpf.OnCpuProfile == nil {
-			yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
+			yamlConfig.Ebpf.OnCpuProfile = &agent_config.OnCpuProfile{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -806,6 +808,14 @@ func (c *VTapCache) updateTapMode(tapMode int) {
 	c.tapMode = tapMode
 }
 
+func (c *VTapCache) GetTeamID() int {
+	return c.teamID
+}
+
+func (c *VTapCache) updateTeamID(teamID int) {
+	c.teamID = teamID
+}
+
 func (c *VTapCache) UpdateRevision(revision string) {
 	c.revision = &revision
 }
@@ -1019,6 +1029,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap) {
 		c.updateLicenseFunctions(vtap.LicenseFunctions)
 	}
 	c.updateTapMode(vtap.TapMode)
+	c.updateTeamID(vtap.TeamID)
 	if c.vTapType != vtap.Type {
 		c.vTapType = vtap.Type
 		v.setVTapChangedForSegment()

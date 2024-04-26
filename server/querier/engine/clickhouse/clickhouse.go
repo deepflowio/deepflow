@@ -1121,7 +1121,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 					log.Error(err)
 					return err
 				}
-				newDB = fmt.Sprintf("%04d_%s", orgIDInt, e.DB)
+				if e.DB != chCommon.DB_NAME_FLOW_TAG {
+					newDB = fmt.Sprintf("%04d_%s", orgIDInt, e.DB)
+				}
 			}
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", newDB, table, e.DataSource))
