@@ -510,6 +510,7 @@ pub struct YamlConfig {
     pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
+    pub ignore_overlay_vlan: bool,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
     pub toa_sender_queue_size: usize,
@@ -898,6 +899,7 @@ impl Default for YamlConfig {
             libpcap_enabled: true,
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
+            ignore_overlay_vlan: false,
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
