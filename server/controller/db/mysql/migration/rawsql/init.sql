@@ -1183,6 +1183,7 @@ TRUNCATE TABLE alarm_label;
 
 CREATE TABLE IF NOT EXISTS alarm_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
     sub_view_id             INTEGER,
     sub_view_type           TINYINT(1) DEFAULT 0,
     sub_view_name           TEXT,
@@ -1270,6 +1271,7 @@ TRUNCATE TABLE label;
 
 CREATE TABLE IF NOT EXISTS alarm_endpoint (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
     name                    CHAR(64) NOT NULL,
     push_type               INTEGER NOT NULL COMMENT '0-email, 1-url, 2-pcap',
     description             TEXT,
