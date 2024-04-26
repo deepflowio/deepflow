@@ -111,7 +111,7 @@ func (c *Config) Validate() error {
 		c.PromWriterConfig.QueueCount = DefaultPromWriterQueueCount
 	}
 	if c.PromWriterConfig.QueueSize <= 0 {
-		c.PromWriterConfig.QueueCount = DefaultPromWriterQueueSize
+		c.PromWriterConfig.QueueSize = DefaultPromWriterQueueSize
 	}
 
 	if c.PromWriterConfig.BatchSize <= 0 {
