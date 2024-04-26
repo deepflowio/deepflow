@@ -48,7 +48,7 @@ func NewVTapCheck(cfg config.MonitorConfig, ctx context.Context) *VTapCheck {
 }
 
 func (v *VTapCheck) Start() {
-	log.Info("controller check start")
+	log.Info("vtap check start")
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
 			mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
@@ -56,15 +56,10 @@ func (v *VTapCheck) Start() {
 				v.launchServerCheck(db)
 				// check vtap type
 				v.typeCheck(db)
-				return nil
-			})
-		}
-	}()
-
-	go func() {
-		for range time.Tick(time.Second * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
-			mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				v.deleteLostVTap(db)
+				// check vtap lost time
+				if v.cfg.VTapAutoDelete.Enabled {
+					v.deleteLostVTap(db)
+				}
 				return nil
 			})
 		}
@@ -321,10 +316,18 @@ func (v *VTapCheck) deleteLostVTap(db *mysql.DB) {
 	}
 
 	var ids []int
+	curTimeInt := int(time.Now().Unix())
 	for _, vtap := range vtaps {
-		ids = append(ids, vtap.ID)
-		log.Infof("ORG(id=%d database=%s) delete lost vtap(name: %s, ctrl_ip: %s, ctrl_mac: %s)",
-			db.ORGID, db.Name, vtap.Name, vtap.CtrlIP, vtap.CtrlMac)
+		lastSyncTimeInt := int(vtap.SyncedControllerAt.Unix())
+		lostTimeInt := curTimeInt - lastSyncTimeInt
+		if lostTimeInt >= v.cfg.VTapAutoDelete.LostTimeMax {
+			ids = append(ids, vtap.ID)
+			log.Infof(
+				"ORG(id=%d database=%s) delete lost vtap(name: %s, ctrl_ip: %s, ctrl_mac: %s), "+
+					"because lost time(%d) > lost time max",
+				db.ORGID, db.Name, vtap.Name, vtap.CtrlIP, vtap.CtrlMac, lostTimeInt,
+			)
+		}
 	}
 	db.Delete(&vtaps, ids)
 }
