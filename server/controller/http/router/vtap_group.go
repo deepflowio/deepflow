@@ -21,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -79,6 +80,9 @@ func (v *VtapGroup) createVtapGroup() gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 			return
 		}
+		if vtapGroupCreate.TeamID == 0 {
+			vtapGroupCreate.TeamID = common.DEFAULT_TEAM_ID
+		}
 
 		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Create(vtapGroupCreate)
@@ -102,6 +106,9 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		// 避免struct会有默认值，这里转为map作为函数入参
 		patchMap := map[string]interface{}{}
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
+		if _, ok := patchMap["TEAM_ID"]; !ok {
+			patchMap["TEAM_ID"] = 1
+		}
 
 		lcuuid := c.Param("lcuuid")
 		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
