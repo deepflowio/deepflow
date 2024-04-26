@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTags struct {
@@ -62,6 +63,8 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 			keyToItem[key] = mysql.ChChostCloudTags{
 				ID:        vm.ID,
 				CloudTags: string(cloudTagsStr),
+				TeamID:    tagrecorder.DomainToTeamID[vm.Domain],
+				DomainID:  tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		}
 	}

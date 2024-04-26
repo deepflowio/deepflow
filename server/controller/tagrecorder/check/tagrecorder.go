@@ -32,6 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 var (
@@ -66,6 +67,7 @@ func (c *TagRecorder) Check() {
 		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
 			t := time.Now()
 			log.Infof("ORG(id=%d database=%s) tagrecorder health check data run", db.ORGID, db.Name)
+			tagrecorder.GetTeamInfo(db)
 			if err := c.check(db); err != nil {
 				log.Infof("ORG(id=%d database=%s) tagrecorder health check failed: %v", db.ORGID, db.Name, err.Error())
 			}

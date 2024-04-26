@@ -108,7 +108,7 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewVtap(s.controllerConfig),
 		router.NewVtapGroup(s.controllerConfig),
 		router.NewDataSource(s.controllerConfig),
-		router.NewVTapGroupConfig(),
+		router.NewVTapGroupConfig(s.controllerConfig),
 		router.NewVTapInterface(),
 		router.NewVtapRepo(),
 		router.NewPlugin(),

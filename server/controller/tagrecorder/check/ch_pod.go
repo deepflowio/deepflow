@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPod struct {
@@ -71,6 +72,8 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 				PodNodeID:    pod.PodNodeID,
 				PodGroupID:   pod.PodGroupID,
 				PodServiceID: podServiceID,
+				TeamID:       tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[pod.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
@@ -82,6 +85,8 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 				PodNodeID:    pod.PodNodeID,
 				PodGroupID:   pod.PodGroupID,
 				PodServiceID: podServiceID,
+				TeamID:       tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[pod.Domain],
 			}
 		}
 	}

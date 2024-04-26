@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sLabel struct {
@@ -71,11 +72,13 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 					Key: splitSingleLabel[0],
 				}
 				keyToItem[key] = mysql.ChPodServiceK8sLabel{
-					ID:      podService.ID,
-					Key:     splitSingleLabel[0],
-					Value:   splitSingleLabel[1],
-					L3EPCID: podService.VPCID,
-					PodNsID: podService.PodNamespaceID,
+					ID:       podService.ID,
+					Key:      splitSingleLabel[0],
+					Value:    splitSingleLabel[1],
+					L3EPCID:  podService.VPCID,
+					PodNsID:  podService.PodNamespaceID,
+					TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
+					DomainID: tagrecorder.DomainToDomainID[podService.Domain],
 				}
 			}
 		}

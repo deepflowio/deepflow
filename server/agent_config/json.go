@@ -89,4 +89,5 @@ type AgentGroupConfigResponse struct {
 	AnalyzerIP                        *string        `json:"ANALYZER_IP"`
 	WasmPlugins                       []string       `json:"WASM_PLUGINS"`
 	SoPlugins                         []string       `json:"SO_PLUGINS"`
+	TeamID                            int            `json:"TEAM_ID"`
 }

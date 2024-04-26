@@ -82,7 +82,7 @@ type EventStore struct {
 	ServiceID    uint32 `json:"service_id" category:"$tag" sub:"universal_tag"`
 	VTAPID       uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	SubnetID     uint16 `json:"subnet_id" category:"$tag" sub:"universal_tag"`
-	IsIPv4       bool   `json:"is_ipv4" category:"$tag" sub:"universal_tag"`
+	IsIPv4       bool   `json:"is_ipv4" category:"$tag" sub:"network_layer"`
 	IP4          uint32 `json:"ip4" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
 	IP6          net.IP `json:"ip6" category:"$tag" sub:"network_layer"  to_string:"IPv6String"`
 

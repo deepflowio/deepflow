@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sAnnotation struct {
@@ -56,11 +57,13 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 					Key: annotationInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodServiceK8sAnnotation{
-					ID:      podService.ID,
-					Key:     annotationInfo[0],
-					Value:   annotationInfo[1],
-					L3EPCID: podService.VPCID,
-					PodNsID: podService.PodNamespaceID,
+					ID:       podService.ID,
+					Key:      annotationInfo[0],
+					Value:    annotationInfo[1],
+					L3EPCID:  podService.VPCID,
+					PodNsID:  podService.PodNamespaceID,
+					TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
+					DomainID: tagrecorder.DomainToDomainID[podService.Domain],
 				}
 			}
 		}

@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChNetwork struct {
@@ -52,9 +53,11 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 			networkName += " (deleted)"
 		}
 		keyToItem[IDKey{ID: network.ID}] = mysql.ChNetwork{
-			ID:     network.ID,
-			Name:   networkName,
-			IconID: n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
+			ID:       network.ID,
+			Name:     networkName,
+			IconID:   n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
+			TeamID:   tagrecorder.DomainToTeamID[network.Domain],
+			DomainID: tagrecorder.DomainToDomainID[network.Domain],
 		}
 	}
 	return keyToItem, true

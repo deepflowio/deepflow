@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodGroup struct {
@@ -54,6 +55,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 				PodClusterID: podGroup.PodClusterID,
 				PodNsID:      podGroup.PodNamespaceID,
+				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
@@ -63,6 +66,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 				PodClusterID: podGroup.PodClusterID,
 				PodNsID:      podGroup.PodNamespaceID,
+				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		}
 	}

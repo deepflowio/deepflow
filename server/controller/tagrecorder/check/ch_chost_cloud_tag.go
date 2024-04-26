@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTag struct {
@@ -50,9 +51,11 @@ func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudT
 				Key: k,
 			}
 			keyToItem[key] = mysql.ChChostCloudTag{
-				ID:    vm.ID,
-				Key:   k,
-				Value: v,
+				ID:       vm.ID,
+				Key:      k,
+				Value:    v,
+				TeamID:   tagrecorder.DomainToTeamID[vm.Domain],
+				DomainID: tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		}
 	}
