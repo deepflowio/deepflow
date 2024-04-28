@@ -59,6 +59,7 @@ type Config struct {
 	PodClusterInternalIPToIngester int
 	GrpcMaxMessageLength           int
 	ExportersEnabled               bool
+	PlatformDataRefreshDelayTime   int `deepflow:"1" yaml:"platform-data-refresh-delay-time"`
 }
 
 func (c *Config) Convert() {
