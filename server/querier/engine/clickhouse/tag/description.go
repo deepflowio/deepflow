@@ -959,6 +959,10 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 }
 
 func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
+	// Resource tag showtagvalues:
+	// Device resources, auto_instance, auto_service and resources without their own map, use device_map.
+	// Resources that have their own map, use their own map.
+
 	sqlSplit := strings.Fields(rawSql)
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")

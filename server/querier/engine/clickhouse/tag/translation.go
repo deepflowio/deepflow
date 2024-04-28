@@ -64,6 +64,12 @@ var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "reso
 var STRING_ENUM_TAG = []string{"observation_point", "event_type", "profile_language_type"}
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
+	// Resource tag translation:
+	// Device resources, auto_instance, auto_service and resources without their own map, use device_map.
+	// Resources that have their own map, use their own map.
+	// pod_service, pod_ingress, lb_listener, natgw, lb are used as related resources, and ip_relation_map is used for filtering.
+	// Use device_map when querying natgw, lb, pod_service.
+
 	tagResourceMap := make(map[string]map[string]*Tag)
 	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网
 	for _, resourceStr := range TAG_RESOURCE_TYPE_DEFAULT {
