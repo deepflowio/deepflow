@@ -59,7 +59,7 @@ type Config struct {
 	PodClusterInternalIPToIngester int
 	GrpcMaxMessageLength           int
 	ExportersEnabled               bool
-	PlatformDataRefreshDelayTime   int `deepflow:"1" yaml:"platform-data-refresh-delay-time"`
+	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
 }
 
