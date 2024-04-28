@@ -60,7 +60,7 @@ impl fmt::Debug for MiniPacket {
             .field("timestamp", &self.timestamp)
             .field("second_in_minute", &self.second_in_minute)
             .field("flow_id", &self.flow_id)
-            .field("acl_gids", &self.flow_id)
+            .field("acl_gids", &self.acl_gids)
             .finish()
     }
 }
