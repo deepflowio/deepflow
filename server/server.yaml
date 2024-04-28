@@ -693,6 +693,7 @@ ingester:
   #    sasl-mechanism: PLAIN # currently only supports: PLAIN
   #    username: aaa
   #    password: bbb
+  #  topic:  # If the value is empty, use the value of `deepflow.$data-source` as the kafka topic (eg, `deepflow.flow_log.l7_flow_log`). If it is not empty, use the value as the kafka topic.
   #- protocol: prometheus
   #  enabled: true
   #  # randomly select an address that can be sent successfully, prometheus address format as: http://127.0.0.1:9091/receive

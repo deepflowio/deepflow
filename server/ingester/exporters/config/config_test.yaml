@@ -67,3 +67,4 @@ ingester:
       sasl-mechanism: PLAIN
       username: aaa
       password: aaa
+    topic: abcd
