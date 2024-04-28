@@ -24,6 +24,9 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
+// This project is not an actual project that is visible to the console, so ignore its exceptions when learning
+var ignoredProjectName = "MOS"
+
 type Token struct {
 	token     string
 	expiresAt string
@@ -92,19 +95,19 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 	return &Token{resp.Get("X-Subject-Token").MustString(), resp.Get("token").Get("expires_at").MustString()}, nil
 }
 
-func (h *HuaWei) refreshTokenMap() (err error) {
+func (h *HuaWei) refreshTokenMap() error {
 	log.Infof("refresh cloud (%s) token map", h.name)
-
+	var err error
 	token, err := h.getToken(h.config.ProjectName, h.config.ProjectID)
 	if err != nil {
-		return
+		return err
 	}
 	h.toolDataSet.configProjectToken = token.token
 
 	projectIDs := []string{}
 	jProjects, err := h.getRawData(newRawDataGetContext(fmt.Sprintf("https://%s/v3/auth/projects", h.config.IAMHost), token.token, "projects", pageQueryMethodNotPage))
 	if err != nil {
-		return
+		return err
 	}
 	for i := range jProjects {
 		jp := jProjects[i]
@@ -124,7 +127,12 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 		id := jp.Get("id").MustString()
 		token, err = h.getToken(name, id)
 		if err != nil {
-			log.Errorf("get token failed, pass this project (%s, %s)", name, id)
+			msg := fmt.Sprintf("get token failed, pass this project (%s, %s)", name, id)
+			if name == ignoredProjectName {
+				log.Info(msg)
+			} else {
+				log.Error(msg)
+			}
 			continue
 		}
 		projectIDs = append(projectIDs, id)
@@ -151,5 +159,5 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 		log.Infof("project info (%+v)", p)
 		log.Debugf("token info (%+v)", t)
 	}
-	return
+	return nil
 }
