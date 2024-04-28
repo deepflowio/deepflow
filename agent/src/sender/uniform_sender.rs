@@ -429,7 +429,7 @@ impl<T: Sendable> UniformSender<T> {
         let tcp_stream = self.tcp_stream.as_mut().unwrap();
 
         let mut write_offset = 0usize;
-        loop {
+        while self.running.load(Ordering::Relaxed) {
             let result = tcp_stream.write(&buffer[write_offset..]);
             match result {
                 Ok(size) => {
