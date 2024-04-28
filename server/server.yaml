@@ -219,6 +219,8 @@ controller:
           resource_type:
           #  - all
           #  - vpc
+        # publish data change message to trisolaris
+        publish_to_trisolaris_enabled: true
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000

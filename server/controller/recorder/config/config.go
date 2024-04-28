@@ -24,6 +24,7 @@ type RecorderConfig struct {
 	DeletedResourceRetentionTime uint16 `default:"168" yaml:"deleted_resource_retention_time"`
 	ResourceMaxID0               int    `default:"64000" yaml:"resource_max_id_0"`
 	ResourceMaxID1               int    `default:"499999" yaml:"resource_max_id_1"`
+	PublishToTrisolarisEnabled   bool   `default:"true" yaml:"publish_to_trisolaris_enabled"`
 
 	LogDebug LogDebugConfig `yaml:"log_debug"`
 }

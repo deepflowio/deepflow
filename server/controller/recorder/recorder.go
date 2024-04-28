@@ -388,6 +388,9 @@ func (r *Recorder) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdat
 }
 
 func (r *Recorder) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
+	if !r.cfg.PublishToTrisolarisEnabled {
+		return
+	}
 	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
 	if platformDataChanged {
 		log.Infof("domain(%v) data changed, refresh platform data", r.domainLcuuid)
