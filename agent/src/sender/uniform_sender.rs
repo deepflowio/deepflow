@@ -500,6 +500,9 @@ impl<T: Sendable> UniformSender<T> {
             ) {
                 Ok(_) => {
                     for send_item in batch.drain(..) {
+                        if !self.running.load(Ordering::Relaxed) {
+                            break;
+                        }
                         let message_type = send_item.message_type();
                         self.counter.rx.fetch_add(1, Ordering::Relaxed);
                         debug!(
