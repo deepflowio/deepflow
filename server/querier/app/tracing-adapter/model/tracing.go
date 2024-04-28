@@ -16,6 +16,9 @@
 
 package model
 
+// deepflow-app use `signal_source` to divide flows, all comes from apm use `4`
+const L7_FLOW_SIGNAL_SOURCE_OTEL = 4
+
 type ExSpan struct {
 	Name            string `json:"name"`
 	ID              uint64 `json:"_id"`           // unique id
@@ -35,6 +38,7 @@ type ExSpan struct {
 	AppService      string `json:"app_service"`   // service name
 	AppInstance     string `json:"app_instance"`  // service instance name
 	ServiceUname    string `json:"service_uname"` // equals app_service
+	SignalSource    int    `json:"signal_source"` // fixed value, use 4
 
 	Attribute map[string]string `json:"attribute"`
 }
