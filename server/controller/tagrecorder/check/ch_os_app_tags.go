@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChOSAppTags struct {
@@ -67,6 +68,8 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 			keyToItem[key] = mysql.ChOSAppTags{
 				PID:       process.ID,
 				OSAPPTags: string(osAppTagsStr),
+				TeamID:    tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:  tagrecorder.DomainToDomainID[process.Domain],
 			}
 		}
 	}

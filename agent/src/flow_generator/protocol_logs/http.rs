@@ -42,7 +42,9 @@ use crate::{
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::error::{Error, Result},
-    flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
+    flow_generator::protocol_logs::{
+        decode_base64_to_string, set_captured_byte, L7ProtoRawDataType,
+    },
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use cloud_platform::tingyun;
@@ -211,6 +213,9 @@ pub struct HttpInfo {
     custom_result: Option<String>,
     custom_exception: Option<String>,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     #[serde(skip)]
     attributes: Vec<KeyVal>,
 }
@@ -353,6 +358,7 @@ impl HttpInfo {
                 if self.req_content_length.is_none() {
                     self.req_content_length = other.req_content_length;
                 }
+                self.captured_request_byte += other.captured_request_byte;
             }
             // merge with response
             LogMessageType::Response => {
@@ -373,6 +379,7 @@ impl HttpInfo {
                 if other.is_resp_end {
                     self.is_resp_end = true;
                 }
+                self.captured_response_byte += other.captured_response_byte;
             }
             _ => {}
         }
@@ -462,6 +469,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             req_len: f.req_content_length,
             resp_len: f.resp_content_length,
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             version: Some(f.version.as_str().to_owned()),
             req: L7Request {
                 req_type,
@@ -887,6 +896,7 @@ impl HttpLog {
             }
         }
 
+        set_captured_byte!(info, param);
         // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
         if direction == PacketDirection::ServerToClient {
             info.resp_content_length = content_length;
@@ -1078,6 +1088,7 @@ impl HttpLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        set_captured_byte!(info, param);
         Ok(())
     }
 
@@ -1611,6 +1622,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
             param.set_log_parse_config(parse_config);
 
             let get_http_info = |i: L7ProtocolInfo| match i {
@@ -1715,6 +1727,7 @@ mod tests {
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
+            captured_byte: 1000,
             oracle_parse_conf: OracleParseConfig::default(),
         };
 

@@ -33,7 +33,8 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
+            LogMessageType,
         },
     },
     utils::bytes::{read_u32_be, read_u64_be},
@@ -99,6 +100,9 @@ pub struct DubboInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     rrt: u64,
 }
 
@@ -113,6 +117,7 @@ impl DubboInfo {
         if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
+        self.captured_response_byte = other.captured_response_byte;
     }
 
     fn set_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
@@ -244,6 +249,8 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             version: Some(f.dubbo_version),
@@ -322,6 +329,7 @@ impl L7ProtocolParserInterface for DubboLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        set_captured_byte!(info, param);
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
         } else {
@@ -858,6 +866,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
             param.set_log_parse_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 

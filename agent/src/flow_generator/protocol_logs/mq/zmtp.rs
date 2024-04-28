@@ -9,7 +9,7 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
-            AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     plugin::wasm::{
@@ -106,6 +106,9 @@ pub struct ZmtpInfo {
     command_name: Option<String>,
     payload: Vec<u8>,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     #[serde(skip)]
     attributes: Vec<KeyVal>,
     #[serde(skip)]
@@ -128,6 +131,7 @@ impl ZmtpInfo {
             self.status = res.status;
             self.err_msg = res.err_msg.take();
         }
+        self.captured_response_byte = res.captured_response_byte;
     }
     fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) {
         let mut vm_ref = param.wasm_vm.borrow_mut();
@@ -165,6 +169,8 @@ impl From<ZmtpInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             req_len: f.req_msg_size.map(|x| x as u32),
             resp_len: f.res_msg_size.map(|x| x as u32),
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             row_effect: 0,
             req: L7Request {
                 req_type: f.frame_type.to_string(),
@@ -595,7 +601,7 @@ impl L7ProtocolParserInterface for ZmtpLog {
                 info.rtt = rtt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
             });
-
+            set_captured_byte!(info, param);
             match param.direction {
                 PacketDirection::ClientToServer => {
                     self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -664,7 +670,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -673,6 +679,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let is_zmtp = ZmtpLog::check_protocol(payload, param);
             match zmtp.parse(payload, param, false) {

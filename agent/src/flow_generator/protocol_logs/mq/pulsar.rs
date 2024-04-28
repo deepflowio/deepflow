@@ -20,7 +20,7 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::read_u32_be,
@@ -124,6 +124,9 @@ pub struct PulsarInfo {
     resp_code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     resp_exception: Option<String>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 }
 
 pub struct PulsarLog {
@@ -736,6 +739,8 @@ impl From<PulsarInfo> for L7ProtocolSendLog {
             version: info.version.map(|x| x.to_string()),
             req_len: info.req_len,
             resp_len: info.resp_len,
+            captured_request_byte: info.captured_request_byte,
+            captured_response_byte: info.captured_response_byte,
             req: L7Request {
                 req_type: info.command.r#type().as_str_name().to_string(),
                 domain: info.domain.unwrap_or_default(),
@@ -782,6 +787,7 @@ impl L7ProtocolInfoInterface for PulsarInfo {
             if req.resp_exception.is_none() {
                 req.resp_exception = rsp.resp_exception.clone();
             }
+            req.captured_response_byte = rsp.captured_response_byte;
         }
         Ok(())
     }
@@ -847,7 +853,7 @@ impl L7ProtocolParserInterface for PulsarLog {
                 }
 
                 info.is_tls = param.is_tls();
-
+                set_captured_byte!(info, param);
                 match param.direction {
                     PacketDirection::ClientToServer => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -934,6 +940,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
                 "".to_owned(),

@@ -138,17 +138,17 @@ func getPrometheusLabels(e app.Document, uTags0, uTags1 *utag.UniversalTags, cfg
 		if structTags.ToStringFuncName != "" {
 			ret := structTags.ToStringFunc.Call([]reflect.Value{reflect.ValueOf(value)})
 			valueStr = ret[0].String()
-		} else if structTags.UniversalTagMapID > 0 && !cfg.UniversalTagToStringDisabled {
+		} else if structTags.UniversalTagMapID > 0 && !cfg.UniversalTagTranslateToNameDisabled {
 			if strings.HasSuffix(structTags.Name, "_1") {
 				valueStr = uTags1.GetTagValue(structTags.UniversalTagMapID)
 			} else {
 				valueStr = uTags0.GetTagValue(structTags.UniversalTagMapID)
 			}
-		} else if structTags.EnumFile != "" && !cfg.EnumToStringDisabled {
+		} else if structTags.EnumFile != "" && !cfg.EnumTranslateToNameDisabled {
 			valueStr = structTags.EnumStringMap[valueStr]
 		}
 
-		if !cfg.TagOmitemptyDisabled && valueStr == "" {
+		if !cfg.ExportEmptyTag && valueStr == "" {
 			continue
 		}
 
@@ -188,7 +188,7 @@ func EncodeToPrometheus(e app.Document, utags *utag.UniversalTagsManager, cfg *c
 			continue
 		}
 
-		if cfg.MetricsOmitempty && valueFloat64 == 0 {
+		if cfg.ExportEmptyMetricsDisabled && valueFloat64 == 0 {
 			continue
 		}
 

@@ -31,7 +31,7 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
-            L7ResponseStatus,
+            set_captured_byte, L7ResponseStatus,
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
@@ -92,6 +92,9 @@ pub struct PostgreInfo {
     )]
     pub error_message: String,
     pub status: L7ResponseStatus,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 }
 
 impl L7ProtocolInfoInterface for PostgreInfo {
@@ -105,6 +108,7 @@ impl L7ProtocolInfoInterface for PostgreInfo {
                 LogMessageType::Request => {
                     self.req_type = pg.req_type;
                     std::mem::swap(&mut self.context, &mut pg.context);
+                    self.captured_request_byte = pg.captured_request_byte;
                 }
                 LogMessageType::Response => {
                     self.resp_type = pg.resp_type;
@@ -112,6 +116,7 @@ impl L7ProtocolInfoInterface for PostgreInfo {
                     std::mem::swap(&mut self.error_message, &mut pg.error_message);
                     self.status = pg.status;
                     self.affected_rows = pg.affected_rows;
+                    self.captured_response_byte = pg.captured_response_byte;
                 }
                 _ => {}
             }
@@ -144,6 +149,8 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         L7ProtocolSendLog {
+            captured_request_byte: p.captured_request_byte,
+            captured_response_byte: p.captured_response_byte,
             req_len: None,
             resp_len: None,
             row_effect: p.affected_rows as u32,
@@ -199,6 +206,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         };
 
         self.parse(payload, param, false, &mut info)?;
+        set_captured_byte!(info, param);
         Ok(if info.ignore || !param.parse_log {
             L7ParseResult::None
         } else {
@@ -495,6 +503,9 @@ mod test {
         assert_eq!(info.context.as_str(), "delete  from test;");
         assert_eq!(info.resp_type, 'C');
         assert_eq!(info.resp_type, 'C');
+        assert_eq!(info.captured_request_byte, 24);
+        assert_eq!(info.captured_response_byte, 20);
+
         assert_eq!(
             perf,
             L7PerfStats {
@@ -521,6 +532,8 @@ mod test {
             "delete from test where id=$1 returning id"
         );
         assert_eq!(info.resp_type, 'C');
+        assert_eq!(info.captured_request_byte, 64);
+        assert_eq!(info.captured_response_byte, 25);
 
         assert_eq!(
             perf,
@@ -546,6 +559,8 @@ mod test {
         assert_eq!(info.resp_type, 'E');
         assert_eq!(info.result.as_str(), "42601");
         assert_eq!(info.error_message.as_str(), "syntax_error",);
+        assert_eq!(info.captured_request_byte, 16);
+        assert_eq!(info.captured_response_byte, 98);
 
         assert_eq!(
             perf,
@@ -582,13 +597,14 @@ mod test {
             true,
         );
         let req_payload = p[0].get_l4_payload().unwrap();
+        req_param.set_captured_byte(req_payload.len());
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
 
         (&mut parser).reset();
 
-        let resp_param = &ParseParam::new(
+        let resp_param = &mut ParseParam::new(
             &p[1],
             log_cache.clone(),
             Default::default(),
@@ -598,6 +614,7 @@ mod test {
             true,
         );
         let resp_payload = p[1].get_l4_payload().unwrap();
+        resp_param.set_captured_byte(resp_payload.len());
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)

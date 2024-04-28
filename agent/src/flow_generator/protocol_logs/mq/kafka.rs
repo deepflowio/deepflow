@@ -33,7 +33,8 @@ use crate::{
             },
             decode_base64_to_string,
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
+            LogMessageType,
         },
     },
     utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
@@ -75,6 +76,9 @@ pub struct KafkaInfo {
     pub status: L7ResponseStatus,
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 
     rrt: u64,
 }
@@ -132,6 +136,7 @@ impl KafkaInfo {
         if other.status_code.is_some() {
             self.status_code = other.status_code;
         }
+        self.captured_response_byte = other.captured_response_byte;
         crate::flow_generator::protocol_logs::swap_if!(self, topic_name, is_empty, other);
     }
 
@@ -225,6 +230,8 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             req: L7Request {
@@ -346,6 +353,7 @@ impl L7ProtocolParserInterface for KafkaLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        set_captured_byte!(info, param);
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
         } else {
@@ -770,7 +778,7 @@ mod tests {
             };
 
             let mut kafka = KafkaLog::default();
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -779,6 +787,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let is_kafka = kafka.check_payload(payload, param);
             let info = kafka.parse_payload(payload, param);

@@ -26,6 +26,7 @@ use super::sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_w
 use super::sql_obfuscate::attempt_obfuscation;
 use super::ObfuscateCache;
 
+use crate::flow_generator::protocol_logs::set_captured_byte;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -87,6 +88,9 @@ pub struct MysqlInfo {
     // 2. COM_STMT_EXECUTE request message
     statement_id: u32,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     trace_id: Option<String>,
     span_id: Option<String>,
 }
@@ -129,6 +133,7 @@ impl MysqlInfo {
             LogMessageType::Request => {
                 self.command = other.command;
                 std::mem::swap(&mut self.context, &mut other.context);
+                self.captured_request_byte = other.captured_request_byte;
             }
             LogMessageType::Response => {
                 self.response_code = other.response_code;
@@ -143,6 +148,7 @@ impl MysqlInfo {
                 } else {
                     self.statement_id = 0;
                 }
+                self.captured_response_byte = other.captured_response_byte;
             }
             _ => {}
         }
@@ -288,6 +294,8 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             version: if f.protocol_version == 0 {
                 None
             } else {
@@ -372,6 +380,7 @@ impl L7ProtocolParserInterface for MysqlLog {
             // ignore greeting
             return Ok(L7ParseResult::None);
         }
+        set_captured_byte!(info, param);
         if info.msg_type != LogMessageType::Session {
             info.cal_rrt(param, None).map(|rrt| {
                 info.rrt = rrt;
@@ -733,18 +742,18 @@ mod tests {
                 ),
             );
 
-            let info = mysql.parse_payload(
-                payload,
-                &ParseParam::new(
-                    &*packet,
-                    log_cache.clone(),
-                    Default::default(),
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
-                    Default::default(),
-                    true,
-                    true,
-                ),
+            let mut param = ParseParam::new(
+                &*packet,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
             );
+            param.set_captured_byte(payload.len());
+
+            let info = mysql.parse_payload(payload, &param);
 
             if let Ok(info) = info {
                 if info.is_none() {

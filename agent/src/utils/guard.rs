@@ -305,6 +305,7 @@ impl Guard {
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
                     warn!("refresh process with cpu failed");
                 }
+                drop(system_guard);
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {

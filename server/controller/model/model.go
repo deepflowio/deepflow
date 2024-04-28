@@ -115,6 +115,7 @@ type VtapCreate struct {
 	AZ              string `json:"AZ" binding:"required"`
 	Region          string `json:"REGION" binding:"required"`
 	VtapGroupLcuuid string `json:"VTAP_GROUP_LCUUID" binding:"required"`
+	TeamID          int    `json:"TEAM_ID" binding:"required"`
 }
 
 type VtapUpdate struct {
@@ -167,6 +168,7 @@ type Vtap struct {
 	UpgradePackage     string  `json:"UPGRADE_PACKAGE"`
 	TapMode            int     `json:"TAP_MODE"`
 	Lcuuid             string  `json:"LCUUID"`
+	TeamID             int     `json:"TEAM_ID"`
 	// TODO: format_state
 	// TODO: format_type
 	// TODO: format_exceptions
@@ -221,6 +223,7 @@ type VtapGroup struct {
 	UpdatedAt          string   `json:"UPDATED_AT"`
 	ShortUUID          string   `json:"SHORT_UUID"`
 	Lcuuid             string   `json:"LCUUID"`
+	TeamID             int      `json:"TEAM_ID"`
 	VtapLcuuids        []string `json:"VTAP_LCUUIDS"`
 	DisableVtapLcuuids []string `json:"DISABLE_VTAP_LCUUIDS"`
 	PendingVtapLcuuids []string `json:"PENDING_VTAP_LCUUIDS"`
@@ -232,6 +235,7 @@ type VtapGroupCreate struct {
 	Enable      int      `json:"ENABLE"`
 	VtapLcuuids []string `json:"VTAP_LCUUIDS"`
 	GroupID     string   `json:"GROUP_ID"`
+	TeamID      int      `json:"TEAM_ID"`
 }
 
 type VtapGroupUpdate struct {

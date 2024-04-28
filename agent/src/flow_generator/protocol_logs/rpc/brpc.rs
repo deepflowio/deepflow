@@ -15,7 +15,7 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::read_u32_be,
@@ -46,6 +46,9 @@ pub struct BrpcInfo {
 
     trace_id: Option<String>,
     span_id: Option<String>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 }
 
 #[derive(Default)]
@@ -141,6 +144,8 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
         let request_id = info.get_request_id();
 
         let log = L7ProtocolSendLog {
+            captured_request_byte: info.captured_request_byte,
+            captured_response_byte: info.captured_response_byte,
             flags,
             req_len: info.req_len,
             resp_len: info.resp_len,
@@ -248,7 +253,7 @@ impl L7ProtocolParserInterface for BrpcLog {
                 }
 
                 info.is_tls = param.is_tls();
-
+                set_captured_byte!(info, param);
                 match param.direction {
                     PacketDirection::ClientToServer => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -341,6 +346,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
                 "".to_owned(),

@@ -26,15 +26,17 @@ use super::{
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::L7Protocol,
-        flow::{L7PerfStats, PacketDirection},
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
         error::{Error, Result},
-        protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+        protocol_logs::{
+            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+            set_captured_byte,
+        },
     },
 };
 
@@ -72,6 +74,9 @@ pub struct RedisInfo {
     pub error: Vec<u8>, // '-'
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 
     rrt: u64,
 }
@@ -117,6 +122,7 @@ impl RedisInfo {
         std::mem::swap(&mut self.status, &mut other.status);
         std::mem::swap(&mut self.error, &mut other.error);
         self.resp_status = other.resp_status;
+        self.captured_response_byte = other.captured_response_byte;
         Ok(())
     }
 }
@@ -154,6 +160,8 @@ impl From<RedisInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req: L7Request {
                 req_type: String::from_utf8_lossy(f.request_type.as_slice()).to_string(),
                 resource: String::from_utf8_lossy(f.request.as_slice()).to_string(),
@@ -207,6 +215,7 @@ impl L7ProtocolParserInterface for RedisLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
+        set_captured_byte!(info, param);
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
         } else {
@@ -953,7 +962,7 @@ mod tests {
                 None => continue,
             };
 
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -962,6 +971,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let is_redis = match packet.lookup_key.direction {
                 PacketDirection::ClientToServer => redis.check_payload(payload, param),

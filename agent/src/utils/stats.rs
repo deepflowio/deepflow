@@ -326,6 +326,9 @@ impl Collector {
     }
 
     pub fn set_hostname(&self, hostname: String) {
+        if hostname.is_empty() {
+            return;
+        }
         let mut last = self.hostname.lock().unwrap();
         if *last != hostname {
             info!("set stats hostname to {:?}", hostname);

@@ -266,7 +266,7 @@ pub fn core_file_check() {
     let core_path = fs::read(CORE_FILE_CONFIG);
     if core_path.is_err() {
         warn!(
-            "read {} error: {}",
+            "Core file read {} error: {}",
             CORE_FILE_CONFIG,
             core_path.unwrap_err()
         );
@@ -275,7 +275,7 @@ pub fn core_file_check() {
     let core_path = String::from_utf8(core_path.unwrap());
     if core_path.is_err() {
         warn!(
-            "parse {} error: {}",
+            "Core file parse {} error: {}",
             CORE_FILE_CONFIG,
             core_path.unwrap_err()
         );
@@ -305,11 +305,15 @@ pub fn core_file_check() {
         }
     };
 
-    info!("check core-files in dir: {}", core_path);
+    info!("Check core-files in dir: {}", core_path);
 
     let context = fs::read_dir(core_path.clone());
     if context.is_err() {
-        warn!("Read dir {} error: {}.", core_path, context.unwrap_err());
+        warn!(
+            "Core file read dir {} error: {}.",
+            core_path,
+            context.unwrap_err()
+        );
         return;
     }
 

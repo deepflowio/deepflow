@@ -328,6 +328,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	if h.L7Base.EndTime > h.L7Base.StartTime {
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.L7Base.StartTime)
 	}
+	h.L7Base.Time = uint32(l.EndTimeUnixNano / uint64(time.Second))
 
 	if eventsJSON, err := json.Marshal(l.Events); err == nil {
 		h.Events = string(eventsJSON)

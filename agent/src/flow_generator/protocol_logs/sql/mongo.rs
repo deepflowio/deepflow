@@ -22,6 +22,7 @@ use serde::Serialize;
 use super::super::{AppProtoHead, LogMessageType};
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
+use crate::flow_generator::protocol_logs::set_captured_byte;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -72,6 +73,9 @@ pub struct MongoDBInfo {
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     rrt: u64,
 }
 
@@ -114,6 +118,7 @@ impl MongoDBInfo {
                 self.op_code = other.op_code;
                 std::mem::swap(&mut self.request, &mut other.request);
                 self.request_id = other.request_id;
+                self.captured_request_byte = other.captured_request_byte;
             }
             LogMessageType::Response => {
                 self.response_code = other.response_code;
@@ -122,6 +127,7 @@ impl MongoDBInfo {
                 self.status = other.status;
                 self.response_id = other.response_id;
                 std::mem::swap(&mut self.response, &mut other.response);
+                self.captured_response_byte = other.captured_response_byte;
             }
             _ => {}
         }
@@ -136,6 +142,8 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req_len: std::option::Option::<u32>::from(f.req_len),
             req: L7Request {
                 req_type: f.op_code_name,
@@ -197,6 +205,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
         info.is_tls = param.is_tls();
+        set_captured_byte!(info, param);
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
         } else {
@@ -644,7 +653,7 @@ mod tests {
             };
 
             let mut mongo = MongoDBLog::default();
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -653,6 +662,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let is_mongo = mongo.check_payload(payload, param);
             let info = mongo.parse_payload(payload, param);
