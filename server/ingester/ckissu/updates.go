@@ -125,6 +125,12 @@ var ColumnAdd65 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt8,
 	},
 	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local", "l7_flow_log"},
+		ColumnNames: []string{"captured_request_byte", "captured_response_byte"},
+		ColumnType:  ckdb.UInt32,
+	},
+	{
 		Dbs:         []string{"event"},
 		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
 		ColumnNames: []string{"_id"},

@@ -5,6 +5,8 @@ session_length       , Session Total Bytes     , Byte , request_length + respons
 request_length       , Request Total Bytes     , Byte ,
 response_length      , Response Total Bytes    , Byte ,
 sql_affected_rows    , SQL Affected Rows       , Row  ,
+captured_request_byte  , Captured Request Bytes  , Byte , For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
+captured_response_byte , Captured Response Bytes , Byte , For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
 direction_score      , Direction Score         ,      , The higher the score, the higher the accuracy of the direction of the client and server. When the score is 255, the direction must be correct.
 log_count            , Log Count               ,      ,
 
