@@ -352,6 +352,8 @@ pub struct MysqlLog {
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
 
+    // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
+    parameter_counter: u32,
     has_request: bool,
 }
 
@@ -421,7 +423,133 @@ fn mysql_string(payload: &[u8]) -> &[u8] {
     }
 }
 
+#[derive(PartialEq)]
+enum SqlState {
+    None,
+    Equal,
+    Less,
+    Greater,
+    In1,
+    In2,
+    In3,
+    Values1,
+    Values2,
+    Values3,
+    Values4,
+    Values5,
+    Values6,
+    Values7,
+    Like1,
+    Like2,
+    Like3,
+    Like4,
+    ValuesPause,
+}
+
 impl MysqlLog {
+    fn reset_parameter_counter(&mut self) {
+        self.parameter_counter = 0;
+    }
+
+    fn set_parameter_counter(&mut self, sql: &[u8]) {
+        let mut counter = 0;
+        let mut state = SqlState::None;
+        for byte in sql.iter() {
+            match *byte {
+                b'=' => state = SqlState::Equal,
+                b'?' if state == SqlState::Equal => {
+                    counter += 1;
+                    state = SqlState::None;
+                }
+                b'>' if state == SqlState::None => state = SqlState::Greater,
+                b'?' if state == SqlState::Greater => {
+                    counter += 1;
+                    state = SqlState::None;
+                }
+                _ if state == SqlState::Greater => state = SqlState::None,
+                b'<' if state == SqlState::None => state = SqlState::Less,
+                b'>' if state == SqlState::Less => state = SqlState::Greater,
+                b'?' if state == SqlState::Less => {
+                    counter += 1;
+                    state = SqlState::None;
+                }
+                _ if state == SqlState::Less => state = SqlState::None,
+                b'I' if state == SqlState::None => state = SqlState::In1,
+                b'N' if state == SqlState::In1 => state = SqlState::In2,
+                b'(' if state == SqlState::In2 => state = SqlState::In3,
+                b',' if state == SqlState::In3 => {}
+                b'?' if state == SqlState::In3 => counter += 1,
+                b')' if state == SqlState::In3 => state = SqlState::None,
+                b'V' if state == SqlState::None => state = SqlState::Values1,
+                b'A' if state == SqlState::Values1 => state = SqlState::Values2,
+                b'L' if state == SqlState::Values2 => state = SqlState::Values3,
+                b'U' if state == SqlState::Values3 => state = SqlState::Values4,
+                b'E' if state == SqlState::Values4 => state = SqlState::Values5,
+                b'S' if state == SqlState::Values5 => state = SqlState::Values6,
+                b' ' | b',' if state == SqlState::Values6 => {}
+                b'(' if state == SqlState::Values6 => state = SqlState::Values7,
+                b'?' if state == SqlState::Values7 => {
+                    counter += 1;
+                    state = SqlState::ValuesPause;
+                }
+                _ if state == SqlState::Values7 => {}
+                b')' if state == SqlState::ValuesPause => state = SqlState::Values6,
+                b'?' if state == SqlState::ValuesPause => {}
+                b',' if state == SqlState::ValuesPause => state = SqlState::Values7,
+                b'L' if state == SqlState::None => state = SqlState::Like1,
+                b'I' if state == SqlState::Like1 => state = SqlState::Like2,
+                b'K' if state == SqlState::Like2 => state = SqlState::Like3,
+                b'E' if state == SqlState::Like3 => state = SqlState::Like4,
+                b'?' if state == SqlState::Like4 => {
+                    counter += 1;
+                    state = SqlState::None;
+                }
+                b' ' => {}
+                _ => state = SqlState::None,
+            }
+        }
+
+        self.parameter_counter = counter;
+    }
+
+    fn get_parameters(&mut self, payload: &[u8], info: &mut MysqlInfo) {
+        if self.parameter_counter == 0 {
+            return;
+        }
+        let mut params = vec![];
+        let mut offset = 0;
+        // TODO: Only support first call or rebound.
+        for byte in payload {
+            offset += 1;
+            if *byte == 0x01 {
+                break;
+            }
+        }
+        for _ in 0..self.parameter_counter as usize {
+            if offset + PARAMETER_TYPE_LEN > payload.len() {
+                return;
+            }
+            params.push((FieldType::from(payload[offset]), payload[offset + 1]));
+            offset += PARAMETER_TYPE_LEN;
+        }
+
+        let mut context = String::new();
+        for (i, (field_type, _)) in params.iter().enumerate() {
+            if offset > payload.len() {
+                break;
+            }
+
+            if let Some(length) = field_type.decode(&payload[offset..], &mut context) {
+                if i != params.len() - 1 {
+                    context.push_str(" , ");
+                }
+                offset += length;
+            }
+        }
+
+        info.context = context;
+    }
+
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < PROTOCOL_VERSION_LEN {
@@ -457,15 +585,34 @@ impl MysqlLog {
         match info.command {
             COM_QUIT | COM_STMT_CLOSE => msg_type = LogMessageType::Session,
             COM_FIELD_LIST | COM_STMT_FETCH => (),
-            COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
+            COM_INIT_DB | COM_QUERY => {
                 info.request_string(
                     config,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
                     &self.obfuscate_cache,
                 )?;
             }
+            COM_STMT_PREPARE => {
+                info.request_string(
+                    config,
+                    &payload[COMMAND_OFFSET + COMMAND_LEN..],
+                    &self.obfuscate_cache,
+                )?;
+                if let Some(config) = config {
+                    if config
+                        .obfuscate_enabled_protocols
+                        .is_enabled(L7Protocol::MySQL)
+                    {
+                        self.set_parameter_counter(info.context.as_bytes());
+                    }
+                }
+            }
             COM_STMT_EXECUTE => {
                 info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
+                if payload.len() > EXECUTE_STATEMENT_PARAMS_OFFSET {
+                    self.get_parameters(&payload[EXECUTE_STATEMENT_PARAMS_OFFSET..], info);
+                }
+                self.reset_parameter_counter();
             }
             COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
@@ -719,6 +866,10 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let mut previous_command = 0u8;
+        let mut log_config = LogParserConfig::default();
+        log_config
+            .obfuscate_enabled_protocols
+            .set_enabled(L7Protocol::MySQL);
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -751,6 +902,7 @@ mod tests {
                 true,
                 true,
             );
+            param.parse_config = Some(&log_config);
             param.set_captured_byte(payload.len());
 
             let info = mysql.parse_payload(payload, &param);
@@ -791,6 +943,7 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("mysql-exec.pcap", "mysql-exec.result"),
             ("mysql-statement-id.pcap", "mysql-statement-id.result"),
             ("mysql-statement.pcap", "mysql-statement.result"),
             ("mysql.pcap", "mysql.result"),
@@ -945,6 +1098,116 @@ mod tests {
             info.extract_trace_and_span_id(&config, input);
             assert_eq!(info.trace_id.as_ref().map(|s| s.as_str()), tid);
             assert_eq!(info.span_id.as_ref().map(|s| s.as_str()), sid);
+        }
+    }
+
+    #[test]
+    fn test_set_parameter_counter() {
+        let cases =
+            vec![
+            ("=?", 1),
+            ("= ?", 1),
+            ("<> ?", 0),
+            ("<>?", 1),
+            ("< ?", 0),
+            (">?", 1),
+            ("<?", 1),
+            ("IN (?) ?", 1),
+            ("IN (?,?,?)", 3),
+            ("VALUES (?,?,?,?,?,??),(?,?,?,?,?,?,?)", 13),
+            ("VALUES (?,?,?,?,?,?,?)", 7),
+            ("VALUES (?,?,?,DEFAULT,?,?,?,?)", 7),
+            ("VALUES (?,?,?),(DEFAULT,?,?,?,?)", 7),
+            (
+                "SELECT * FROM ` ? ` WHERE ` ? `=? ? BY ` ? `.` ? ` LIMIT ?",
+                1,
+            ),
+            (
+                "SELECT ` ? `,` ? `,` ? ` FROM ` ? ` WHERE (namespace =?) AND (` ? ` LIKE ?)",
+                2,
+            ),
+            ("SELECT ` ? ` FROM ` ? ` WHERE domain =? AND content <> ?  BY ` ? `.` ? ` LIMIT ?", 1),
+        ];
+        for case in cases {
+            let mut log = MysqlLog::default();
+            log.set_parameter_counter(case.0.as_bytes());
+            assert_eq!(
+                log.parameter_counter, case.1,
+                "Cases {:?} error, actual is {}",
+                case, log.parameter_counter
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_parameter() {
+        fn parse_parameter(field_type: FieldType, payload: Vec<u8>) -> String {
+            let mut output = String::new();
+            field_type.decode(&payload, &mut output);
+            output
+        }
+
+        let mut cases = vec![
+            (FieldType::Long, vec![1, 0, 0, 0], "Long(1)"),
+            (FieldType::Int24, vec![1, 0, 0, 0], "Int24(1)"),
+            (FieldType::Short, vec![1, 0], "Short(1)"),
+            (FieldType::Year, vec![1, 0], "Years(1)"),
+            (FieldType::Tiny, vec![1], "Tiny(1)"),
+            (
+                FieldType::Double,
+                vec![0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x24, 0x40],
+                "Double(10.2)",
+            ),
+            (
+                FieldType::Float,
+                vec![0x33, 0x33, 0x23, 0x41],
+                "Float(10.2)",
+            ),
+            (
+                FieldType::Date,
+                vec![
+                    0x0b, 0xda, 0x07, 0x0a, 0x11, 0x13, 0x1b, 0x1e, 0x01, 00, 00, 00,
+                ],
+                "datetime 2010-10-17 19:27:30.000001",
+            ),
+            (
+                FieldType::Datetime,
+                vec![0x04, 0xda, 0x07, 0x0a, 0x11],
+                "datetime 2010-10-17",
+            ),
+            (
+                FieldType::Timestamp,
+                vec![
+                    0x0b, 0xda, 0x07, 0x0a, 0x11, 0x13, 0x1b, 0x1e, 0x01, 00, 00, 00,
+                ],
+                "datetime 2010-10-17 19:27:30.000001",
+            ),
+            (
+                FieldType::Time,
+                vec![
+                    0x0c, 0x01, 0x78, 0x00, 0x00, 0x00, 0x13, 0x1b, 0x1e, 0x01, 0x00, 0x00, 0x00,
+                ],
+                "time -120d 19:27:30.000001",
+            ),
+            (
+                FieldType::Time,
+                vec![0x08, 0x01, 0x78, 0x00, 0x00, 0x00, 0x13, 0x1b, 0x1e],
+                "time -120d 19:27:30",
+            ),
+            (FieldType::Time, vec![0x1], "time 0d 00:00:00.000000"),
+        ];
+
+        for (i, (field_type, payload, except)) in cases.drain(..).enumerate() {
+            let actual = parse_parameter(field_type, payload);
+            assert_eq!(
+                actual,
+                except.to_string(),
+                "Cases {:3} field type {:?} error: except: {} but actual: {}.",
+                i + 1,
+                field_type,
+                except,
+                actual
+            );
         }
     }
 }
