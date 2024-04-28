@@ -319,6 +319,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	s.EventType = event.Type
 	s.EventDescription = event.Description
 
+	s.OrgId = event.ORGID
+	s.TeamID = event.TeamID
+
 	s.GProcessID = event.GProcessID
 
 	if len(event.AttributeSubnetIDs) > 0 {
@@ -467,6 +470,8 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.PolicyThresholdCritical = event.GetPolicyThresholdCritical()
 	s.PolicyThresholdError = event.GetPolicyThresholdError()
 	s.PolicyThresholdWarning = event.GetPolicyThresholdWarning()
+	s.OrgId = uint16(event.GetOrgId())
+	s.TeamID = uint16(event.GetTeamId())
 
 	d.eventWriter.WriteAlarmEvent(s)
 }
