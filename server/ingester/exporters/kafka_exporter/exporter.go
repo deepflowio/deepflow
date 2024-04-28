@@ -176,9 +176,13 @@ func (e *KafkaExporter) queueProcess(queueID int) {
 			}
 
 			jsonStr := json.(string)
+			topic := e.config.Topic
+			if topic == "" {
+				topic = exporters_cfg.DataSourceID(exportItem.DataSource()).TopicString()
+			}
 			batch = append(batch,
 				&sarama.ProducerMessage{
-					Topic:     exporters_cfg.DataSourceID(exportItem.DataSource()).String(),
+					Topic:     topic,
 					Key:       nil,
 					Value:     sarama.ByteEncoder(utils.Slice(jsonStr)),
 					Timestamp: time.UnixMicro(exportItem.TimestampUs()),

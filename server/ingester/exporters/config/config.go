@@ -48,6 +48,8 @@ const (
 	CATEGORY_K8S_LABEL = "$k8s.label"
 	CATEGORY_TAG       = "$tag"
 	CATEGORY_METRICS   = "$metrics"
+
+	TOPIC_PREFIX = "deepflow."
 )
 
 var DefaultExportCategory = []string{"$service_info", "$tracing_info", "$network_layer", "$flow_info", "$transport_layer", "$application_layer", "$metrics"}
@@ -87,6 +89,21 @@ var dataSourceStrings = []string{
 	MAX_DATASOURCE_ID:  "invalid_datasource",
 }
 
+var dataSourceTopicStrings = []string{
+	NETWORK_1M:         TOPIC_PREFIX + dataSourceStrings[NETWORK_1M],
+	NETWORK_MAP_1M:     TOPIC_PREFIX + dataSourceStrings[NETWORK_MAP_1M],
+	APPLICATION_1M:     TOPIC_PREFIX + dataSourceStrings[APPLICATION_1M],
+	APPLICATION_MAP_1M: TOPIC_PREFIX + dataSourceStrings[APPLICATION_MAP_1M],
+	NETWORK_1S:         TOPIC_PREFIX + dataSourceStrings[NETWORK_1S],
+	NETWORK_MAP_1S:     TOPIC_PREFIX + dataSourceStrings[NETWORK_MAP_1S],
+	APPLICATION_1S:     TOPIC_PREFIX + dataSourceStrings[APPLICATION_1S],
+	APPLICATION_MAP_1S: TOPIC_PREFIX + dataSourceStrings[APPLICATION_MAP_1S],
+	PERF_EVENT:         TOPIC_PREFIX + dataSourceStrings[PERF_EVENT],
+	L4_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L4_FLOW_LOG],
+	L7_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L7_FLOW_LOG],
+	MAX_DATASOURCE_ID:  TOPIC_PREFIX + dataSourceStrings[MAX_DATASOURCE_ID],
+}
+
 func FlowLogMessageToDataSourceID(messageType datatype.MessageType) uint32 {
 	switch messageType {
 	case datatype.MESSAGE_TYPE_TAGGEDFLOW:
@@ -121,6 +138,10 @@ func StringsToDataSourceBits(strs []string) uint32 {
 
 func (d DataSourceID) String() string {
 	return dataSourceStrings[d]
+}
+
+func (d DataSourceID) TopicString() string {
+	return dataSourceTopicStrings[d]
 }
 
 func (d DataSourceID) IsMap() bool {
@@ -361,7 +382,8 @@ type ExporterCfg struct {
 	ExtraHeaders map[string]string `yaml:"extra-headers"`
 
 	// kafka private configuration
-	Sasl Sasl `yaml:"sasl"`
+	Sasl  Sasl   `yaml:"sasl"`
+	Topic string `yaml:"topic"`
 }
 
 type Sasl struct {
