@@ -197,6 +197,8 @@ func (m *MetaData) timedRefreshMetaData() {
 			log.Info(m.Log("end generate metaData from timed"))
 		case <-m.chPlatformData:
 			log.Info(m.Log("start generate platform data from rpc"))
+			time.Sleep(time.Duration(m.config.PlatformDataRefreshDelayTime) * time.Second)
+			log.Info("processing generate platform data from rpc")
 			m.generateDbDataCache()
 			m.platformDataOP.GeneratePlatformData()
 			log.Info(m.Log("end generate platform data from rpc"))
