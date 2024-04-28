@@ -370,6 +370,7 @@ impl<T: Sendable> UniformSender<T> {
         if self.encoder.buffer_len() > 0 {
             self.encoder.set_header_frame_size();
             Self::send_buffer(
+                &self.running,
                 &self.name,
                 &self.counter,
                 &self.exception_handler,
@@ -381,6 +382,7 @@ impl<T: Sendable> UniformSender<T> {
     }
 
     fn send_buffer(
+        running: &Arc<AtomicBool>,
         name: &str,
         counter: &SenderCounter,
         exception_handler: &ExceptionHandler,
@@ -443,7 +445,7 @@ impl<T: Sendable> UniformSender<T> {
         let tcp_stream = conn.tcp_stream.as_mut().unwrap();
 
         let mut write_offset = 0usize;
-        loop {
+        while running.load(Ordering::Relaxed) {
             let result = tcp_stream.write(&buffer[write_offset..]);
             match result {
                 Ok(size) => {
