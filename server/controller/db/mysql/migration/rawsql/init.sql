@@ -2293,7 +2293,7 @@ INSERT INTO vl2(state, name, net_type, isp, lcuuid, domain) values(0, 'PublicNet
 set @lcuuid = (select uuid());
 set @short_uuid = (select substr(replace(uuid(),'-',''), 1, 10));
 set @short_uuid = concat('g-', @short_uuid);
-INSERT INTO vtap_group(lcuuid, id, name, short_uuid) values(@lcuuid, 1, "default", @short_uuid);
+INSERT INTO vtap_group(lcuuid, id, name, short_uuid, team_id) values(@lcuuid, 1, "default", @short_uuid, 1);
 
 CREATE TABLE IF NOT EXISTS data_source (
     id                          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
