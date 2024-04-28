@@ -99,7 +99,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 					launchServer = hostIP
 				}
 
-				vmLcuuid := common.GenerateUUID(vmId)
+				vmLcuuid := common.GenerateUUIDByOrgID(q.orgID, vmId)
 				vmState := common.VM_STATE_EXCEPTION
 				status := vm.Get("status").MustString()
 				if status == "running" {
@@ -107,9 +107,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				} else if status == "stopped" {
 					vmState = common.VM_STATE_STOPPED
 				}
-				azLcuuid := common.GenerateUUID(
-					q.UuidGenerate + "_" + vm.Get("zone_id").MustString(),
-				)
+				azLcuuid := common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_"+vm.Get("zone_id").MustString())
 				retVMs = append(retVMs, model.VM{
 					Lcuuid:       vmLcuuid,
 					Name:         vmName,
@@ -133,8 +131,8 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				retVMSecurityGroups = append(
 					retVMSecurityGroups,
 					model.VMSecurityGroup{
-						Lcuuid:              common.GenerateUUID(vmId + securityGroupId),
-						SecurityGroupLcuuid: common.GenerateUUID(securityGroupId),
+						Lcuuid:              common.GenerateUUIDByOrgID(q.orgID, vmId+securityGroupId),
+						SecurityGroupLcuuid: common.GenerateUUIDByOrgID(q.orgID, securityGroupId),
 						VMLcuuid:            vmLcuuid,
 						Priority:            1,
 					},
@@ -178,7 +176,7 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 		vxnetName := vxnet.Get("vxnet_name").MustString()
 		vxnetId := vxnet.Get("vxnet_id").MustString()
 		if vxnetName == q.defaultVxnetName {
-			subnetLcuuid := common.GenerateUUID(vxnetId)
+			subnetLcuuid := common.GenerateUUIDByOrgID(q.orgID, vxnetId)
 			privateIP := vxnet.Get("private_ip").MustString()
 			if privateIP != "" {
 				cidrParse, _ := ipaddr.Parse(
@@ -192,7 +190,7 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 						Lcuuid:        subnetLcuuid,
 						Name:          vxnetName,
 						CIDR:          subnetCidr,
-						NetworkLcuuid: common.GenerateUUID(vxnetName + regionLcuuid),
+						NetworkLcuuid: common.GenerateUUIDByOrgID(q.orgID, vxnetName+regionLcuuid),
 						VPCLcuuid:     retVPCLcuuid,
 					},
 				)
@@ -253,25 +251,25 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 					log.Infof("nic (%s) vxnet_id is null", nicId)
 					continue
 				}
-				networkLcuuid := common.GenerateUUID(vxnetId)
+				networkLcuuid := common.GenerateUUIDByOrgID(q.orgID, vxnetId)
 				netType := common.VIF_TYPE_LAN
 				index := sort.SearchStrings(q.defaultVxnetIDs, vxnetId)
 				if index < len(q.defaultVxnetIDs) && q.defaultVxnetIDs[index] == vxnetId {
-					networkLcuuid = common.GenerateUUID(q.defaultVxnetName + regionLcuuid)
+					networkLcuuid = common.GenerateUUIDByOrgID(q.orgID, q.defaultVxnetName+regionLcuuid)
 					netType = common.VIF_TYPE_WAN
 				} else if _, ok := q.VxnetIdToVPCLcuuid[vxnetId]; !ok {
 					networkLcuuid = common.NETWORK_ISP_LCUUID
 					netType = common.VIF_TYPE_WAN
 				}
 
-				vinterfaceLcuuid := common.GenerateUUID(nicId + instanceId)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, nicId+instanceId)
 				retVInterfaces = append(retVInterfaces, model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Name:          nic.Get("nic_name").MustString(),
 					Type:          netType,
 					Mac:           nicId,
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
-					DeviceLcuuid:  common.GenerateUUID(instanceId),
+					DeviceLcuuid:  common.GenerateUUIDByOrgID(q.orgID, instanceId),
 					NetworkLcuuid: networkLcuuid,
 					VPCLcuuid:     vpcLcuuid,
 					RegionLcuuid:  regionLcuuid,
@@ -283,9 +281,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 					subnetLcuuid, ok := q.VxnetIdToSubnetLcuuid[vxnetId]
 					if ok {
 						retIPs = append(retIPs, model.IP{
-							Lcuuid: common.GenerateUUID(
-								nicId + privateIP + strconv.Itoa(common.NETWORK_TYPE_LAN),
-							),
+							Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, nicId+privateIP+strconv.Itoa(common.NETWORK_TYPE_LAN)),
 							VInterfaceLcuuid: vinterfaceLcuuid,
 							IP:               privateIP,
 							SubnetLcuuid:     subnetLcuuid,
@@ -296,19 +292,19 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				// 生成公网IP
 				publicIP := nic.Get("eip").Get("eip_addr").MustString()
 				if publicIP != "" {
-					publicVInterfaceLcuuid := common.GenerateUUID(vinterfaceLcuuid)
+					publicVInterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid)
 					retVInterfaces = append(retVInterfaces, model.VInterface{
 						Lcuuid:        publicVInterfaceLcuuid,
 						Type:          common.VIF_TYPE_WAN,
 						Mac:           "ff" + nicId[2:],
 						DeviceType:    common.VIF_DEVICE_TYPE_VM,
-						DeviceLcuuid:  common.GenerateUUID(instanceId),
+						DeviceLcuuid:  common.GenerateUUIDByOrgID(q.orgID, instanceId),
 						NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 						VPCLcuuid:     vpcLcuuid,
 						RegionLcuuid:  regionLcuuid,
 					})
 					retIPs = append(retIPs, model.IP{
-						Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + publicIP),
+						Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid+publicIP),
 						VInterfaceLcuuid: publicVInterfaceLcuuid,
 						IP:               publicIP,
 						RegionLcuuid:     regionLcuuid,

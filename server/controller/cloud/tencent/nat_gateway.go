@@ -21,7 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
@@ -42,8 +41,8 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 			continue
 		}
 		natID := nData.Get("NatGatewayId").MustString()
-		natLcuuid := common.GetUUID(natID, uuid.Nil)
-		vpcLcuuid := common.GetUUID(nData.Get("VpcId").MustString(), uuid.Nil)
+		natLcuuid := common.GetUUIDByOrgID(t.orgID, natID)
+		vpcLcuuid := common.GetUUIDByOrgID(t.orgID, nData.Get("VpcId").MustString())
 		floatingIPs := []string{}
 		for i := range nData.Get("PublicIpAddressSet").MustArray() {
 			floatingIPs = append(floatingIPs, nData.Get("PublicIpAddressSet").GetIndex(i).Get("PublicIpAddress").MustString())
@@ -59,7 +58,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 		t.natIDs = append(t.natIDs, natID)
 
 		if len(floatingIPs) > 0 {
-			vinterfaceLcuuid := common.GetUUID(natLcuuid, uuid.Nil)
+			vinterfaceLcuuid := common.GetUUIDByOrgID(t.orgID, natLcuuid)
 			natVinterfaces = append(natVinterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_WAN,
@@ -72,7 +71,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 			})
 			for _, ip := range floatingIPs {
 				natIPs = append(natIPs, model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ip, uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(t.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),

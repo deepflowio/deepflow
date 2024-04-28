@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
@@ -67,8 +66,8 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 				floatingIPs = append(floatingIPs, a.getStringPointerValue(nAddresses.PublicIp))
 			}
 		}
-		natGatewayLcuuid := common.GetUUID(natGatewayID, uuid.Nil)
-		vpcLcuuid := common.GetUUID(a.getStringPointerValue(nData.VpcId), uuid.Nil)
+		natGatewayLcuuid := common.GetUUIDByOrgID(a.orgID, natGatewayID)
+		vpcLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(nData.VpcId))
 		natGatewayName := a.getResultTagName(nData.Tags)
 		if natGatewayName == "" {
 			natGatewayName = natGatewayID
@@ -82,7 +81,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
 		})
 
-		vinterfaceLcuuid := common.GetUUID(natGatewayLcuuid, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(a.orgID, natGatewayLcuuid)
 		natVinterfaces = append(natVinterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_WAN,
@@ -99,7 +98,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 				IP:               ip,
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
-				Lcuuid:           common.GetUUID(vinterfaceLcuuid+ip, uuid.Nil),
+				Lcuuid:           common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid+ip),
 			})
 		}
 	}

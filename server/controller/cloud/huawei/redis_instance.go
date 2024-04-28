@@ -89,7 +89,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 
 			for _, ip := range strings.Split(jRedis.Get("ip").MustString(), ",") {
 				vif := model.VInterface{
-					Lcuuid:        common.GenerateUUID(redis.Lcuuid + ip),
+					Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, redis.Lcuuid+ip),
 					Type:          common.VIF_TYPE_LAN,
 					Mac:           common.VIF_DEFAULT_MAC,
 					DeviceLcuuid:  redis.Lcuuid,
@@ -108,7 +108,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 					}
 				}
 				ip := model.IP{
-					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ip),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               strings.Trim(ip, " "),
 					SubnetLcuuid:     subnetLcuuid,
@@ -119,7 +119,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 
 			for _, ip := range strings.Split(jRedis.Get("publicip_address").MustString(), ",") {
 				vif := model.VInterface{
-					Lcuuid:        common.GenerateUUID(redis.Lcuuid + ip),
+					Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, redis.Lcuuid+ip),
 					Type:          common.VIF_TYPE_WAN,
 					Mac:           common.VIF_DEFAULT_MAC,
 					DeviceLcuuid:  redis.Lcuuid,
@@ -131,7 +131,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 				vifs = append(vifs, vif)
 
 				ip := model.IP{
-					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ip),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               strings.Trim(ip, " "),
 					RegionLcuuid:     regionLcuuid,

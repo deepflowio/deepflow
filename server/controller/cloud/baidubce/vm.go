@@ -79,7 +79,7 @@ func (b *BaiduBce) getVMs(
 				continue
 			}
 
-			vmLcuuid := common.GenerateUUID(vm.InstanceId)
+			vmLcuuid := common.GenerateUUIDByOrgID(b.orgID, vm.InstanceId)
 			vmState := common.VM_STATE_EXCEPTION
 			if vm.Status == "Running" {
 				vmState = common.VM_STATE_RUNNING
@@ -117,7 +117,7 @@ func (b *BaiduBce) getVMs(
 				continue
 			}
 
-			vinterfaceLcuuid := common.GenerateUUID(vmLcuuid + vm.NicInfo.MacAddress)
+			vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, vmLcuuid+vm.NicInfo.MacAddress)
 			retVInterface := model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_LAN,
@@ -135,12 +135,12 @@ func (b *BaiduBce) getVMs(
 					continue
 				}
 				// 内网IP
-				ipLcuuid := common.GenerateUUID(vinterfaceLcuuid + ip.PrivateIp)
+				ipLcuuid := common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip.PrivateIp)
 				retIP := model.IP{
 					Lcuuid:           ipLcuuid,
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip.PrivateIp,
-					SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 					RegionLcuuid:     region.Lcuuid,
 				}
 				retIPs = append(retIPs, retIP)
@@ -149,7 +149,7 @@ func (b *BaiduBce) getVMs(
 				if ip.Eip == "" || ip.Eip == "null" {
 					continue
 				}
-				publicVInterfaceLcuuid := common.GenerateUUID(vmLcuuid + ip.Eip)
+				publicVInterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, vmLcuuid+ip.Eip)
 				retVInterface = model.VInterface{
 					Lcuuid:        publicVInterfaceLcuuid,
 					Type:          common.VIF_TYPE_WAN,
@@ -162,7 +162,7 @@ func (b *BaiduBce) getVMs(
 				}
 				retVInterfaces = append(retVInterfaces, retVInterface)
 
-				publicIPLcuuid := common.GenerateUUID(publicVInterfaceLcuuid + ip.Eip)
+				publicIPLcuuid := common.GenerateUUIDByOrgID(b.orgID, publicVInterfaceLcuuid+ip.Eip)
 				retIP = model.IP{
 					Lcuuid:           publicIPLcuuid,
 					VInterfaceLcuuid: publicVInterfaceLcuuid,
@@ -236,7 +236,7 @@ func (b *BaiduBce) getVMEnis(
 					continue
 				}
 
-				vinterfaceLcuuid := common.GenerateUUID(vmLcuuid + eni.EniId)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, vmLcuuid+eni.EniId)
 				retVInterface := model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          common.NETWORK_TYPE_LAN,
@@ -254,10 +254,10 @@ func (b *BaiduBce) getVMEnis(
 						continue
 					}
 					retIP := model.IP{
-						Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + privateIP.PrivateIpAddress),
+						Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+privateIP.PrivateIpAddress),
 						VInterfaceLcuuid: vinterfaceLcuuid,
 						IP:               privateIP.PrivateIpAddress,
-						SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+						SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 						RegionLcuuid:     region.Lcuuid,
 					}
 					retIPs = append(retIPs, retIP)
@@ -267,7 +267,7 @@ func (b *BaiduBce) getVMEnis(
 						continue
 					}
 
-					publicVInterfaceLcuuid := common.GenerateUUID(vmLcuuid + privateIP.PublicIpAddress)
+					publicVInterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, vmLcuuid+privateIP.PublicIpAddress)
 					retVInterface = model.VInterface{
 						Lcuuid:        publicVInterfaceLcuuid,
 						Type:          common.NETWORK_TYPE_WAN,
@@ -281,9 +281,7 @@ func (b *BaiduBce) getVMEnis(
 					retVInterfaces = append(retVInterfaces, retVInterface)
 
 					retIP = model.IP{
-						Lcuuid: common.GenerateUUID(
-							publicVInterfaceLcuuid + privateIP.PublicIpAddress,
-						),
+						Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, publicVInterfaceLcuuid+privateIP.PublicIpAddress),
 						VInterfaceLcuuid: publicVInterfaceLcuuid,
 						IP:               privateIP.PublicIpAddress,
 						RegionLcuuid:     region.Lcuuid,

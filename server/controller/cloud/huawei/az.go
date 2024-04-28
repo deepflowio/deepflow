@@ -42,7 +42,7 @@ func (h *HuaWei) getAZs() ([]model.AZ, error) {
 				log.Infof("exclude az: %s, missing attr", zname)
 				continue
 			}
-			lcuuid := common.GenerateUUID(zname + "_" + h.lcuuidGenerate)
+			lcuuid := common.GenerateUUIDByOrgID(h.orgID, zname+"_"+h.lcuuidGenerate)
 			azs = append(
 				azs,
 				model.AZ{

@@ -17,8 +17,7 @@
 package qingcloud
 
 import (
-	"github.com/deckarep/golang-set"
-
+	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -62,7 +61,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 				}
 				vpcIds.Add(vpcId)
 
-				vpcLcuuid := common.GenerateUUID(vpcId)
+				vpcLcuuid := common.GenerateUUIDByOrgID(q.orgID, vpcId)
 				vpcName := vpc.Get("router_name").MustString()
 				if vpcName == "" {
 					vpcName = vpcId
@@ -82,9 +81,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 			}
 		}
 
-		defaultVPCLcuuid := common.GenerateUUID(
-			q.UuidGenerate + "_default_vpc_" + regionLcuuid,
-		)
+		defaultVPCLcuuid := common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_default_vpc_"+regionLcuuid)
 		regionIdToDefaultVPCLcuuid[regionId] = defaultVPCLcuuid
 
 		// 每个区域定义一个default VPC

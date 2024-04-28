@@ -59,7 +59,7 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 			h.toolDataSet.vpcLcuuids = append(h.toolDataSet.vpcLcuuids, id)
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
 
-			vrouterLcuuid := common.GenerateUUID(vpc.Lcuuid)
+			vrouterLcuuid := common.GenerateUUIDByOrgID(h.orgID, vpc.Lcuuid)
 			vrouters = append(
 				vrouters,
 				model.VRouter{
@@ -105,7 +105,7 @@ func (h *HuaWei) formatRoutingTables(jVPC *simplejson.Json, vpcLcuuid, vrouterLc
 		routingTables = append(
 			routingTables,
 			model.RoutingTable{
-				Lcuuid:        common.GenerateUUID(vpcLcuuid + destination + nexthop),
+				Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, vpcLcuuid+destination+nexthop),
 				VRouterLcuuid: vrouterLcuuid,
 				Destination:   destination,
 				Nexthop:       nexthop,

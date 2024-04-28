@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, error) {
@@ -64,13 +63,13 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 				log.Debug("placement is nil")
 				continue
 			}
-			azLcuuid := common.GetUUID(a.getStringPointerValue(ins.Placement.AvailabilityZone), uuid.Nil)
+			azLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(ins.Placement.AvailabilityZone))
 			instanceID := a.getStringPointerValue(ins.InstanceId)
 			vmName := a.getResultTagName(ins.Tags)
 			if vmName == "" {
 				vmName = instanceID
 			}
-			vmLcuuid := common.GetUUID(instanceID, uuid.Nil)
+			vmLcuuid := common.GetUUIDByOrgID(a.orgID, instanceID)
 			vmState, ok := states[string(ins.State.Name)]
 			if !ok {
 				vmState = common.VM_STATE_EXCEPTION
@@ -79,7 +78,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 				Lcuuid:       vmLcuuid,
 				Name:         vmName,
 				Label:        instanceID,
-				VPCLcuuid:    common.GetUUID(a.getStringPointerValue(ins.VpcId), uuid.Nil),
+				VPCLcuuid:    common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(ins.VpcId)),
 				State:        vmState,
 				HType:        common.VM_HTYPE_VM_C,
 				IP:           a.instanceIDToPrimaryIP[instanceID],
@@ -92,8 +91,8 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 
 			for priority, sg := range ins.SecurityGroups {
 				vmSGs = append(vmSGs, model.VMSecurityGroup{
-					Lcuuid:              common.GetUUID(vmLcuuid+a.getStringPointerValue(sg.GroupId), uuid.Nil),
-					SecurityGroupLcuuid: common.GetUUID(a.getStringPointerValue(sg.GroupId), uuid.Nil),
+					Lcuuid:              common.GetUUIDByOrgID(a.orgID, vmLcuuid+a.getStringPointerValue(sg.GroupId)),
+					SecurityGroupLcuuid: common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(sg.GroupId)),
 					VMLcuuid:            vmLcuuid,
 					Priority:            priority,
 				})

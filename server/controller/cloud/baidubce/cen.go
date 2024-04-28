@@ -83,14 +83,14 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 				continue
 			}
 			if i.InstanceId != "" {
-				vpcLcuuids = append(vpcLcuuids, common.GenerateUUID(i.InstanceId))
+				vpcLcuuids = append(vpcLcuuids, common.GenerateUUIDByOrgID(b.orgID, i.InstanceId))
 			}
 		}
 		if len(vpcLcuuids) == 0 {
 			continue
 		}
 		cens = append(cens, model.CEN{
-			Lcuuid:     common.GenerateUUID(c.CsnId),
+			Lcuuid:     common.GenerateUUIDByOrgID(b.orgID, c.CsnId),
 			Name:       c.Name,
 			VPCLcuuids: vpcLcuuids,
 		})

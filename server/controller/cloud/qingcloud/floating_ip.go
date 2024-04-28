@@ -56,9 +56,9 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 					continue
 				}
 				retFloatingIPs = append(retFloatingIPs, model.FloatingIP{
-					Lcuuid:        common.GenerateUUID(eipId),
+					Lcuuid:        common.GenerateUUIDByOrgID(q.orgID, eipId),
 					IP:            ip,
-					VMLcuuid:      common.GenerateUUID(resourceId),
+					VMLcuuid:      common.GenerateUUIDByOrgID(q.orgID, resourceId),
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
 					RegionLcuuid:  regionLcuuid,
@@ -69,19 +69,19 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 					continue
 				}
 				nicId := eip.Get("resource").Get("nic_id").MustString()
-				vinterfaceLcuuid := common.GenerateUUID(nicId + resourceId)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, nicId+resourceId)
 				retVInterfaces = append(retVInterfaces, model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          common.VIF_TYPE_WAN,
 					Mac:           nicId,
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
-					DeviceLcuuid:  common.GenerateUUID(resourceId),
+					DeviceLcuuid:  common.GenerateUUIDByOrgID(q.orgID, resourceId),
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
 					RegionLcuuid:  regionLcuuid,
 				})
 				retIPs = append(retIPs, model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
 					RegionLcuuid:     regionLcuuid,
