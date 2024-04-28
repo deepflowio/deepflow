@@ -226,8 +226,8 @@ message AppProtoLogsData {
     // +-----------------------------------+-----+
     uint32 flags = 18;
     // Excluding L2-L4 packet header
-    int32 captured_request_byte = 19;
-    int32 captured_response_byte = 20;
+    uint32 captured_request_byte = 19;
+    uint32 captured_response_byte = 20;
 }
 
 message AppProtoLogsBaseInfo {

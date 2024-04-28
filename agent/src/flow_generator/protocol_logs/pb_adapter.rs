@@ -107,21 +107,11 @@ impl L7ProtocolSendLog {
         } else {
             -1
         };
-        let captured_request_byte = if self.captured_request_byte > 0 {
-            self.captured_request_byte as i32
-        } else {
-            -1
-        };
-        let captured_response_byte = if self.captured_response_byte > 0 {
-            self.captured_response_byte as i32
-        } else {
-            -1
-        };
 
         log.req_len = req_len;
         log.resp_len = resp_len;
-        log.captured_request_byte = captured_request_byte;
-        log.captured_response_byte = captured_response_byte;
+        log.captured_request_byte = self.captured_request_byte;
+        log.captured_response_byte = self.captured_response_byte;
         log.row_effect = self.row_effect;
 
         log.req = Some(flow_log::L7Request {
