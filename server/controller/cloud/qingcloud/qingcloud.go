@@ -44,6 +44,7 @@ import (
 var log = logging.MustGetLogger("cloud.qingcloud")
 
 type QingCloud struct {
+	orgID                 int
 	Uuid                  string
 	UuidGenerate          string
 	Name                  string
@@ -81,7 +82,7 @@ type QingCloud struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewQingCloud(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud, error) {
+func NewQingCloud(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -124,7 +125,8 @@ func NewQingCloud(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud,
 	}
 
 	return &QingCloud{
-		Uuid: domain.Lcuuid,
+		orgID: orgID,
+		Uuid:  domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		UuidGenerate:          domain.DisplayName,
 		Name:                  domain.Name,

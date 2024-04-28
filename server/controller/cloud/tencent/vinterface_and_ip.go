@@ -21,7 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
@@ -53,10 +52,10 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 		vpcID := vData.Get("VpcId").MustString()
 		subnetID := vData.Get("SubnetId").MustString()
 		vinterfaceID := vData.Get("NetworkInterfaceId").MustString()
-		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
-		subnetLcuuid := common.GetUUID(subnetID, uuid.Nil)
-		vinterfaceLcuuid := common.GetUUID(vinterfaceID, uuid.Nil)
-		deviceLcuuid := common.GetUUID(deviceID, uuid.Nil)
+		vpcLcuuid := common.GetUUIDByOrgID(t.orgID, vpcID)
+		subnetLcuuid := common.GetUUIDByOrgID(t.orgID, subnetID)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(t.orgID, vinterfaceID)
+		deviceLcuuid := common.GetUUIDByOrgID(t.orgID, deviceID)
 		vinterface := model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_LAN,
@@ -82,10 +81,10 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			if err == nil && netPrivateIP.Is4() {
 				privateFlag = true
 				ips = append(ips, model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+privateIP, uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(t.orgID, vinterfaceLcuuid+privateIP),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               privateIP,
-					SubnetLcuuid:     common.GetUUID(subnetLcuuid, uuid.Nil),
+					SubnetLcuuid:     common.GetUUIDByOrgID(t.orgID, subnetLcuuid),
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 			} else {
@@ -95,7 +94,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			publicIP := privateIPData.Get("PublicIpAddress").MustString()
 			netPublicIP, err := netaddr.ParseIP(publicIP)
 			if err == nil && netPublicIP.Is4() {
-				vLcuuid := common.GetUUID(vinterfaceLcuuid, uuid.Nil)
+				vLcuuid := common.GetUUIDByOrgID(t.orgID, vinterfaceLcuuid)
 				vinterfaces = append(vinterfaces, model.VInterface{
 					Lcuuid:        vLcuuid,
 					Type:          common.VIF_TYPE_WAN,
@@ -108,7 +107,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 				})
 
 				ips = append(ips, model.IP{
-					Lcuuid:           common.GetUUID(deviceLcuuid+publicIP, uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(t.orgID, deviceLcuuid+publicIP),
 					VInterfaceLcuuid: vLcuuid,
 					IP:               publicIP,
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
@@ -118,7 +117,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 
 				if privateFlag {
 					vNatRules = append(vNatRules, model.NATRule{
-						Lcuuid:           common.GetUUID(publicIP+"_"+privateIP, uuid.Nil),
+						Lcuuid:           common.GetUUIDByOrgID(t.orgID, publicIP+"_"+privateIP),
 						Type:             "DNAT",
 						Protocol:         "ALL",
 						FloatingIP:       publicIP,

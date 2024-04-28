@@ -217,7 +217,7 @@ func (m *Manager) run(ctx context.Context) {
 			lcuuid := domain.(string)
 			task := NewTask(orgID, lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 			if task == nil || task.Cloud == nil {
-				log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+				log.Errorf("org (%d) domain (%s) init failed", orgID, lcuuidToDomain[lcuuid].Name)
 				continue
 			}
 			m.mutex.Lock()
@@ -235,12 +235,12 @@ func (m *Manager) run(ctx context.Context) {
 			oldDomainConfig := m.taskMap[lcuuid].DomainConfig
 			newDomainConfig := lcuuidToDomain[lcuuid].Config
 			if oldDomainConfig != newDomainConfig {
-				log.Infof("oldDomainConfig: %s", oldDomainConfig)
-				log.Infof("newDomainConfig: %s", newDomainConfig)
+				log.Infof("org (%d) oldDomainConfig: %s", orgID, oldDomainConfig)
+				log.Infof("org (%d) newDomainConfig: %s", orgID, newDomainConfig)
 				m.taskMap[lcuuid].Stop()
 				task := NewTask(orgID, lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 				if task == nil || task.Cloud == nil {
-					log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+					log.Errorf("org (%d) domain (%s) init failed", orgID, lcuuidToDomain[lcuuid].Name)
 					continue
 				}
 
@@ -257,7 +257,7 @@ func (m *Manager) run(ctx context.Context) {
 						m.taskMap[lcuuid].Stop()
 						task := NewTask(orgID, lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 						if task == nil || task.Cloud == nil {
-							log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+							log.Errorf("org (%d) domain (%s) init failed", orgID, lcuuidToDomain[lcuuid].Name)
 							continue
 						}
 

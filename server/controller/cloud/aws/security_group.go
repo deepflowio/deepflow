@@ -27,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []model.SecurityGroupRule, error) {
@@ -59,7 +58,7 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 
 	for _, sData := range retSecurityGroups {
 		sgGroupID := a.getStringPointerValue(sData.GroupId)
-		sgLcuuid := common.GetUUID(sgGroupID, uuid.Nil)
+		sgLcuuid := common.GetUUIDByOrgID(a.orgID, sgGroupID)
 		sgName := a.getResultTagName(sData.Tags)
 		if sgName == "" {
 			sgName = a.getStringPointerValue(sData.GroupName)
@@ -67,7 +66,7 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 		sgs = append(sgs, model.SecurityGroup{
 			Lcuuid:       sgLcuuid,
 			Name:         sgName,
-			VPCLcuuid:    common.GetUUID(a.getStringPointerValue(sData.VpcId), uuid.Nil),
+			VPCLcuuid:    common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(sData.VpcId)),
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
 		})
 
@@ -107,7 +106,7 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 			portRange := fmt.Sprintf("%v-%v", fromPort, toPort)
 			remotes := []string{}
 			for _, pair := range r.rule.UserIdGroupPairs {
-				remotes = append(remotes, common.GetUUID(a.getStringPointerValue(pair.GroupId), uuid.Nil))
+				remotes = append(remotes, common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pair.GroupId)))
 			}
 			ipSlice := []string{}
 			for _, ip4 := range r.rule.IpRanges {
@@ -128,7 +127,7 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 					local, remote = remote, local
 				}
 				sgRules = append(sgRules, model.SecurityGroupRule{
-					Lcuuid:              common.GetUUID(strconv.Itoa(int(r.direction))+sgGroupID+portRange+protocol+remote+local, uuid.Nil),
+					Lcuuid:              common.GetUUIDByOrgID(a.orgID, strconv.Itoa(int(r.direction))+sgGroupID+portRange+protocol+remote+local),
 					SecurityGroupLcuuid: sgLcuuid,
 					Direction:           r.direction,
 					EtherType:           common.SECURITY_GROUP_RULE_IPV4,
@@ -150,7 +149,7 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 					remote = common.SECURITY_GROUP_RULE_IPV4_CIDR
 				}
 				sgRules = append(sgRules, model.SecurityGroupRule{
-					Lcuuid:              common.GetUUID(sgLcuuid+strconv.Itoa(d)+remote, uuid.Nil),
+					Lcuuid:              common.GetUUIDByOrgID(a.orgID, sgLcuuid+strconv.Itoa(d)+remote),
 					SecurityGroupLcuuid: sgLcuuid,
 					Direction:           d,
 					EtherType:           e,

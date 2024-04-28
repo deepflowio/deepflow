@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
@@ -81,7 +80,7 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 		}
 		configJson, _ := json.Marshal(config)
 		retSubDomains = append(retSubDomains, model.SubDomain{
-			Lcuuid:      common.GetUUID(name, uuid.Nil),
+			Lcuuid:      common.GetUUIDByOrgID(a.orgID, name),
 			Name:        name,
 			DisplayName: name,
 			ClusterID:   name,

@@ -79,7 +79,7 @@ func (h *HuaWei) getNATGateways() (
 		floatingIPs := h.toolDataSet.natGatewayLcuuidToFloatingIPs[ng.Lcuuid]
 		if len(floatingIPs) != 0 {
 			natGateways[i].FloatingIPs = strings.Join(floatingIPs, common.STRINGS_JOIN_COMMA)
-			vifLcuuid := common.GenerateUUID(ng.Lcuuid)
+			vifLcuuid := common.GenerateUUIDByOrgID(h.orgID, ng.Lcuuid)
 			vifs = append(
 				vifs,
 				model.VInterface{
@@ -97,7 +97,7 @@ func (h *HuaWei) getNATGateways() (
 				ips = append(
 					ips,
 					model.IP{
-						Lcuuid:           common.GenerateUUID(vifLcuuid + fip),
+						Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vifLcuuid+fip),
 						VInterfaceLcuuid: vifLcuuid,
 						IP:               fip,
 						RegionLcuuid:     ng.RegionLcuuid,

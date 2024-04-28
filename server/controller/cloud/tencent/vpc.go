@@ -19,7 +19,6 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
@@ -38,7 +37,7 @@ func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
 		}
 		vpcID := vData.Get("VpcId").MustString()
 		vpcs = append(vpcs, model.VPC{
-			Lcuuid:       common.GetUUID(vpcID, uuid.Nil),
+			Lcuuid:       common.GetUUIDByOrgID(t.orgID, vpcID),
 			Name:         vData.Get("VpcName").MustString(),
 			CIDR:         vData.Get("CidrBlock").MustString(),
 			Label:        vpcID,

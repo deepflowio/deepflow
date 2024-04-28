@@ -41,7 +41,7 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 			return nil, nil, nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_router_" + router.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_router_"+router.Name)
 		retVRouters = append(retVRouters, model.VRouter{
 			Lcuuid:         lcuuid,
 			Name:           router.Name,
@@ -65,7 +65,7 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 				return nil, nil, nil, err
 			}
 
-			vinterfaceLcuuid := common.GenerateUUID(f.UuidGenerate + port.Mac)
+			vinterfaceLcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+port.Mac)
 			retVInterfaces = append(retVInterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          netType,
@@ -84,7 +84,7 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 				return nil, nil, nil, err
 			}
 			retIPs = append(retIPs, model.IP{
-				Lcuuid:           common.GenerateUUID(port.IP + port.Mac),
+				Lcuuid:           common.GenerateUUIDByOrgID(f.orgID, port.IP+port.Mac),
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               port.IP,
 				SubnetLcuuid:     subnetLcuuid,

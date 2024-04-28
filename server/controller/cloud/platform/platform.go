@@ -53,21 +53,21 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig, db *mysql.DB) (Pla
 	case common.ALIYUN:
 		platform, err = aliyun.NewAliyun(db.ORGID, domain, cfg)
 	case common.AWS:
-		platform, err = aws.NewAws(domain, cfg)
+		platform, err = aws.NewAws(db.ORGID, domain, cfg)
 	case common.AGENT_SYNC:
 		platform, err = genesis.NewGenesis(db.ORGID, domain, cfg)
 	case common.QINGCLOUD:
-		platform, err = qingcloud.NewQingCloud(domain, cfg)
+		platform, err = qingcloud.NewQingCloud(db.ORGID, domain, cfg)
 	case common.BAIDU_BCE:
-		platform, err = baidubce.NewBaiduBce(domain, cfg)
+		platform, err = baidubce.NewBaiduBce(db.ORGID, domain, cfg)
 	case common.TENCENT:
-		platform, err = tencent.NewTencent(domain, cfg)
+		platform, err = tencent.NewTencent(db.ORGID, domain, cfg)
 	case common.KUBERNETES:
 		platform, err = kubernetes.NewKubernetes(db.ORGID, domain)
 	case common.HUAWEI:
-		platform, err = huawei.NewHuaWei(domain, cfg)
+		platform, err = huawei.NewHuaWei(db.ORGID, domain, cfg)
 	case common.FILEREADER:
-		platform, err = filereader.NewFileReader(domain)
+		platform, err = filereader.NewFileReader(db.ORGID, domain)
 	// TODO: other platform
 	default:
 		return nil, errors.New(fmt.Sprintf("domain type (%d) not supported", domain.Type))

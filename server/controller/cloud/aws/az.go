@@ -22,7 +22,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
@@ -36,7 +35,7 @@ func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
 	}
 	for _, aData := range result.AvailabilityZones {
 		zoneName := a.getStringPointerValue(aData.ZoneName)
-		lcuuid := common.GetUUID(zoneName, uuid.Nil)
+		lcuuid := common.GetUUIDByOrgID(a.orgID, zoneName)
 		if _, ok := a.azLcuuidMap[lcuuid]; !ok {
 			log.Debugf("az (%s) has no resource", zoneName)
 			continue

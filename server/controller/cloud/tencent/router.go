@@ -21,7 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []model.RoutingTable, error) {
@@ -52,12 +51,12 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 			continue
 		}
 		rID := rData.Get("RouteTableId").MustString()
-		rLcuuid := common.GetUUID(rID, uuid.Nil)
+		rLcuuid := common.GetUUIDByOrgID(t.orgID, rID)
 		vpcID := rData.Get("VpcId").MustString()
 		routers = append(routers, model.VRouter{
 			Lcuuid:       rLcuuid,
 			Name:         rData.Get("RouteTableName").MustString(),
-			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
+			VPCLcuuid:    common.GetUUIDByOrgID(t.orgID, vpcID),
 			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 
@@ -89,7 +88,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 
 			key := rLcuuid + strconv.Itoa(routeID)
 			routerTables = append(routerTables, model.RoutingTable{
-				Lcuuid:        common.GetUUID(key, uuid.Nil),
+				Lcuuid:        common.GetUUIDByOrgID(t.orgID, key),
 				VRouterLcuuid: rLcuuid,
 				Destination:   destination4 + destination6,
 				Nexthop:       gwID,

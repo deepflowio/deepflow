@@ -107,7 +107,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 
 			for _, ip := range jRDS.Get("private_ips").MustStringArray() {
 				vif := model.VInterface{
-					Lcuuid:        common.GenerateUUID(rds.Lcuuid + ip),
+					Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, rds.Lcuuid+ip),
 					Type:          common.VIF_TYPE_LAN,
 					Mac:           common.VIF_DEFAULT_MAC,
 					DeviceLcuuid:  rds.Lcuuid,
@@ -126,7 +126,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 					}
 				}
 				ip := model.IP{
-					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ip),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               ip,
 					SubnetLcuuid:     subnetLcuuid,
@@ -137,7 +137,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 
 			for _, ip := range jRDS.Get("public_ips").MustStringArray() {
 				vif := model.VInterface{
-					Lcuuid:        common.GenerateUUID(rds.Lcuuid + ip),
+					Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, rds.Lcuuid+ip),
 					Type:          common.VIF_TYPE_WAN,
 					Mac:           common.VIF_DEFAULT_MAC,
 					DeviceLcuuid:  rds.Lcuuid,
@@ -149,7 +149,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 				vifs = append(vifs, vif)
 
 				ip := model.IP{
-					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ip),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               ip,
 					RegionLcuuid:     regionLcuuid,

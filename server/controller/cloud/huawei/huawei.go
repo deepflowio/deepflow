@@ -34,6 +34,7 @@ import (
 var log = logging.MustGetLogger("cloud.huawei")
 
 type HuaWei struct {
+	orgID           int
 	lcuuid          string
 	lcuuidGenerate  string
 	name            string
@@ -45,13 +46,14 @@ type HuaWei struct {
 	debugger        *cloudcommon.Debugger
 }
 
-func NewHuaWei(domain mysql.Domain, globalCloudCfg config.CloudConfig) (*HuaWei, error) {
+func NewHuaWei(orgID int, domain mysql.Domain, globalCloudCfg config.CloudConfig) (*HuaWei, error) {
 	conf := &Config{}
 	err := conf.LoadFromString(domain.Config)
 	if err != nil {
 		return nil, err
 	}
 	return &HuaWei{
+		orgID:  orgID,
 		lcuuid: domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		lcuuidGenerate:  domain.DisplayName,

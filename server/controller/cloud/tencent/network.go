@@ -19,7 +19,6 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
@@ -41,9 +40,9 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 		vpcID := nData.Get("VpcId").MustString()
 		subnetID := nData.Get("SubnetId").MustString()
 		azID := nData.Get("Zone").MustString()
-		networkLcuuid := common.GetUUID(subnetID, uuid.Nil)
-		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
-		azLcuuid := common.GetUUID(t.uuidGenerate+"_"+azID, uuid.Nil)
+		networkLcuuid := common.GetUUIDByOrgID(t.orgID, subnetID)
+		vpcLcuuid := common.GetUUIDByOrgID(t.orgID, vpcID)
+		azLcuuid := common.GetUUIDByOrgID(t.orgID, t.uuidGenerate+"_"+azID)
 		networkName := nData.Get("SubnetName").MustString()
 		networks = append(networks, model.Network{
 			Lcuuid:         networkLcuuid,
@@ -61,7 +60,7 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 		cidr4 := nData.Get("CidrBlock").MustString()
 		cidr6 := nData.Get("Ipv6CidrBlock").MustString()
 		subnets = append(subnets, model.Subnet{
-			Lcuuid:        common.GetUUID(networkLcuuid, uuid.Nil),
+			Lcuuid:        common.GetUUIDByOrgID(t.orgID, networkLcuuid),
 			Name:          networkName,
 			CIDR:          cidr4 + cidr6,
 			NetworkLcuuid: networkLcuuid,
@@ -71,10 +70,10 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 		routeTableID := nData.Get("RouteTableId").MustString()
 		if routeTableID != "" {
 			netVinterfaces = append(netVinterfaces, model.VInterface{
-				Lcuuid:        common.GetUUID(subnetID+routeTableID, uuid.Nil),
+				Lcuuid:        common.GetUUIDByOrgID(t.orgID, subnetID+routeTableID),
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           common.VIF_DEFAULT_MAC,
-				DeviceLcuuid:  common.GetUUID(routeTableID, uuid.Nil),
+				DeviceLcuuid:  common.GetUUIDByOrgID(t.orgID, routeTableID),
 				DeviceType:    common.VIF_DEVICE_TYPE_VROUTER,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,

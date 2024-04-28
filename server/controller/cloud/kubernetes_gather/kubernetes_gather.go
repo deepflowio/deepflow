@@ -17,7 +17,6 @@
 package kubernetes_gather
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -36,7 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
-var log *logging.Logger
+var log = logging.MustGetLogger("cloud.kubernetes_gather")
 
 type KubernetesGather struct {
 	orgID                        int
@@ -81,8 +80,6 @@ type networkLcuuidCIDRs struct {
 }
 
 func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
-	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.kubernetes_gather", db.ORGID))
-
 	var name string
 	var displayName string
 	var clusterID string
