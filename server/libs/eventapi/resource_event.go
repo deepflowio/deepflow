@@ -57,6 +57,9 @@ type ResourceEvent struct {
 	PodID        uint32
 	SubnetID     uint32
 	IP           string
+
+	ORGID  uint16
+	TeamID uint16
 }
 
 type TagFieldOption func(opts *ResourceEvent)
