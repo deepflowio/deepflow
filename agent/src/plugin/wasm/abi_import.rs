@@ -41,7 +41,7 @@ use wasmtime_wasi::snapshots::preview_1::add_wasi_snapshot_preview1_to_linker;
 
     note that the caller storeData.parse_ctx is Always None
 */
-pub(super) fn wasm_log(mut caller: Caller<'_, StoreDataType>, b: i32, len: i32, level: i32) {
+pub(super) fn wasm_log(mut caller: Caller<'_, StoreDataType>, b: u32, len: u32, level: u32) {
     let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
     let mut buf = vec![0u8; len as usize];
 
@@ -73,7 +73,7 @@ pub(super) fn wasm_log(mut caller: Caller<'_, StoreDataType>, b: i32, len: i32, 
 }
 
 // check_memory must invoke first in almost import function
-fn check_memory(caller: &mut Caller<'_, StoreDataType>, b: i32, len: i32, func_name: &str) -> bool {
+fn check_memory(caller: &mut Caller<'_, StoreDataType>, b: u32, len: u32, func_name: &str) -> bool {
     let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
     let mem_size = mem.data_size(caller.as_context());
     if (b + len) as usize > mem_size {
@@ -97,7 +97,7 @@ fn check_memory(caller: &mut Caller<'_, StoreDataType>, b: i32, len: i32, func_n
     //export vm_read_ctx_base
     func vmReadCtxBase(b *byte, length int) int
 */
-pub(super) fn vm_read_ctx_base(mut caller: Caller<'_, StoreDataType>, b: i32, len: i32) -> i32 {
+pub(super) fn vm_read_ctx_base(mut caller: Caller<'_, StoreDataType>, b: u32, len: u32) -> i32 {
     /*
         wasm vm read the parse ctx, host need sesrialize the parse param to bytes and write to the vm.
         b is the wasm ptr indicate the addr bias from instance memory.
@@ -134,7 +134,7 @@ pub(super) fn vm_read_ctx_base(mut caller: Caller<'_, StoreDataType>, b: i32, le
     //export vm_read_payload
     func vmReadPayload(b *byte, length int) int
 */
-pub(super) fn vm_read_payload(mut caller: Caller<'_, StoreDataType>, b: i32, len: i32) -> i32 {
+pub(super) fn vm_read_payload(mut caller: Caller<'_, StoreDataType>, b: u32, len: u32) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_VM_READ_PAYLOAD) {
         return 0;
     }
@@ -180,8 +180,8 @@ pub(super) fn vm_read_payload(mut caller: Caller<'_, StoreDataType>, b: i32, len
 */
 pub(super) fn vm_read_http_req_info(
     mut caller: Caller<'_, StoreDataType>,
-    b: i32,
-    len: i32,
+    b: u32,
+    len: u32,
 ) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_VM_READ_HTTP_REQ) {
         return 0;
@@ -225,8 +225,8 @@ pub(super) fn vm_read_http_req_info(
 */
 pub(super) fn vm_read_http_resp_info(
     mut caller: Caller<'_, StoreDataType>,
-    b: i32,
-    len: i32,
+    b: u32,
+    len: u32,
 ) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_VM_READ_HTTP_RESP) {
         return 0;
@@ -270,8 +270,8 @@ pub(super) fn vm_read_http_resp_info(
 */
 pub(super) fn vm_read_custom_message_info(
     mut caller: Caller<'_, StoreDataType>,
-    b: i32,
-    len: i32,
+    b: u32,
+    len: u32,
 ) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE) {
         return 0;
@@ -317,8 +317,8 @@ pub(super) fn vm_read_custom_message_info(
 */
 pub(super) fn host_read_l7_protocol_info(
     mut caller: Caller<'_, StoreDataType>,
-    b: i32,
-    len: i32,
+    b: u32,
+    len: u32,
 ) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO) {
         return 0;
@@ -400,7 +400,7 @@ pub(super) fn host_read_l7_protocol_info(
     //export host_read_str_result
     func hostReadStrResult(b *byte, length int) bool
 */
-pub(super) fn host_read_str_result(mut caller: Caller<'_, StoreDataType>, b: i32, len: i32) -> i32 {
+pub(super) fn host_read_str_result(mut caller: Caller<'_, StoreDataType>, b: u32, len: u32) -> i32 {
     if !check_memory(&mut caller, b, len, IMPORT_FUNC_HOST_READ_STR_RESULT) {
         return 0;
     }
