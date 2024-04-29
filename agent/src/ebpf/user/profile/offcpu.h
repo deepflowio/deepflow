@@ -20,6 +20,9 @@
 #define TP_HOOK_NAME "tracepoint/sched/sched_switch"
 #define KP_HOOK_NAME "finish_task_switch"
 
+#define MAP_OFFCPU_BUF_A_NAME "__offcpu_output_a"
+#define MAP_OFFCPU_BUF_B_NAME "__offcpu_output_b"
+
 #undef CP_PROFILE_SET_PROBES
 #define CP_PROFILE_SET_PROBES(T)			\
 do {							\
@@ -31,4 +34,7 @@ do {							\
 	(T)->tps_nr = index;				\
 } while(0)
 
+int extended_reader_create(struct bpf_tracer *tracer);
+
 #endif /*DF_USER_OFFCPU_H */
+

@@ -62,8 +62,8 @@ extern __thread uword thread_index;
 
 struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
-static struct bpf_tracer *profiler_tracer;
-static volatile u64 profiler_stop;
+struct bpf_tracer *profiler_tracer;
+volatile u64 profiler_stop;
 
 // for stack_trace_msg_hash relese
 static __thread stack_trace_msg_hash_kv *trace_msg_kvps;
@@ -1125,6 +1125,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 		free_perf_buffer_reader(reader_a);
 		return ETR_NORESOURCE;
 	}
+
+	extended_reader_create(tracer);
 
 	/* clear old perf files */
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");

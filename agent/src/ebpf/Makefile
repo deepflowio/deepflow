@@ -89,6 +89,8 @@ OBJS := user/elf.o \
 	user/vec.o \
 	user/bihash.o \
 	user/profile/profile_common.o \
+	user/profile/offcpu.o \
+	user/profile/extended.o \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
 	user/profile/java/df_jattach.o \
