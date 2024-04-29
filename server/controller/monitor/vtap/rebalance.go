@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
@@ -50,9 +51,11 @@ func (r *RebalanceCheck) Start() {
 		}
 
 		for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
-			r.controllerRebalance()
-			if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-				r.analyzerRebalance()
+			for _, db := range mysql.GetDBs().All() {
+				r.controllerRebalance(db)
+				if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+					r.analyzerRebalance(db)
+				}
 			}
 		}
 	}()
@@ -79,10 +82,10 @@ func (r *RebalanceCheck) Stop() {
 	log.Info("rebalance check stopped")
 }
 
-func (r *RebalanceCheck) controllerRebalance() {
+func (r *RebalanceCheck) controllerRebalance(db *mysql.DB) {
 	controllers, err := service.GetControllers(common.DEFAULT_ORG_ID, map[string]string{})
 	if err != nil {
-		log.Errorf("get controllers failed, (%v)", err)
+		log.Errorf("ORG(id=%d database=%s) get controllers failed, (%v)", db.ORGID, db.Name, err)
 		return
 	}
 
@@ -90,43 +93,43 @@ func (r *RebalanceCheck) controllerRebalance() {
 		// check if need rebalance
 		if controller.VtapCount == 0 && controller.VTapMax > 0 &&
 			controller.State == common.HOST_STATE_COMPLETE && len(controller.Azs) != 0 {
-			log.Infof("need rebalance vtap for controller (%s)", controller.IP)
+			log.Infof("ORG(id=%d database=%s) need rebalance vtap for controller (%s)", db.ORGID, db.Name, controller.IP)
 			args := map[string]interface{}{
 				"check": false,
 				"type":  "controller",
 			}
-			if result, err := service.VTapRebalance(args, r.cfg.IngesterLoadBalancingConfig); err != nil {
-				log.Error(err)
+			if result, err := service.VTapRebalance(db, args, r.cfg.IngesterLoadBalancingConfig); err != nil {
+				log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
 			} else {
 				data, _ := json.Marshal(result)
-				log.Infof("exec rebalance: %s", string(data))
+				log.Infof("ORG(id=%d database=%s) exec rebalance: %s", db.ORGID, db.Name, string(data))
 			}
 			break
 		}
 	}
 }
 
-func (r *RebalanceCheck) analyzerRebalance() {
+func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
 	// check if need rebalance
-	analyzers, err := service.GetAnalyzers(common.DEFAULT_ORG_ID, map[string]interface{}{})
+	analyzers, err := service.GetAnalyzers(db.ORGID, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("get analyzers failed, (%v)", err)
+		log.Errorf("ORG(id=%d database=%s) get analyzers failed, (%v)", db.ORGID, db.Name, err)
 		return
 	}
 
 	for _, analyzer := range analyzers {
 		if analyzer.VtapCount == 0 && analyzer.VTapMax > 0 &&
 			analyzer.State == common.HOST_STATE_COMPLETE && len(analyzer.Azs) != 0 {
-			log.Info("need rebalance vtap for analyzer (%s)", analyzer.IP)
+			log.Infof("ORG(id=%d database=%s) need rebalance vtap for analyzer (%s)", db.ORGID, db.Name, analyzer.IP)
 			args := map[string]interface{}{
 				"check": false,
 				"type":  "analyzer",
 			}
-			if result, err := service.VTapRebalance(args, r.cfg.IngesterLoadBalancingConfig); err != nil {
-				log.Error(err)
+			if result, err := service.VTapRebalance(db, args, r.cfg.IngesterLoadBalancingConfig); err != nil {
+				log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
 			} else {
 				data, _ := json.Marshal(result)
-				log.Infof("exec rebalance: %s", string(data))
+				log.Infof("ORG(id=%d database=%s)exec rebalance: %s", db.ORGID, db.Name, string(data))
 			}
 			break
 		}
@@ -134,18 +137,20 @@ func (r *RebalanceCheck) analyzerRebalance() {
 }
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
-	log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration)
-	analyzerInfo := rebalance.NewAnalyzerInfo()
-	result, err := analyzerInfo.RebalanceAnalyzerByTraffic(true, dataDuration)
-	if err != nil {
-		log.Errorf("fail to rebalance analyzer by data(if check: true): %v", err)
-		return
-	}
-	if result.TotalSwitchVTapNum != 0 {
-		log.Infof("need rebalance, total switch vtap num(%d)", result.TotalSwitchVTapNum)
-		if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(false, dataDuration); err != nil {
-			log.Errorf("fail to rebalance analyzer by data(if check: false): %v", err)
+	for _, db := range mysql.GetDBs().All() {
+		log.Infof("ORG(id=%d database=%s) check analyzer rebalance, traffic duration(%vs)", db.ORGID, db.Name, dataDuration)
+		analyzerInfo := rebalance.NewAnalyzerInfo()
+		result, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
+		if err != nil {
+			log.Errorf("ORG(id=%d database=%s) fail to rebalance analyzer by data(if check: true): %v", db.ORGID, db.Name, err)
+			return
 		}
-		return
+		if result.TotalSwitchVTapNum != 0 {
+			log.Infof("ORG(id=%d database=%s) need rebalance, total switch vtap num(%d)", db.ORGID, db.Name, result.TotalSwitchVTapNum)
+			if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, false, dataDuration); err != nil {
+				log.Errorf("ORG(id=%d database=%s) fail to rebalance analyzer by data(if check: false): %v", db.ORGID, db.Name, err)
+			}
+			continue
+		}
 	}
 }

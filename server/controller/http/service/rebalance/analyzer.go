@@ -47,29 +47,29 @@ type AnalyzerInfo struct {
 
 func NewAnalyzerInfo() *AnalyzerInfo {
 	return &AnalyzerInfo{
-		db:    &DBInfo{},
-		query: &Query{},
+		dbInfo: &DBInfo{},
+		query:  &Query{},
 	}
 }
 
-func (r *DBInfo) Get() error {
-	if err := mysql.Db.Find(&r.AZs).Error; err != nil {
+func (r *DBInfo) Get(db *mysql.DB) error {
+	if err := db.Find(&r.AZs).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.Analyzers).Error; err != nil {
+	if err := db.Find(&r.Analyzers).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.AZAnalyzerConns).Error; err != nil {
+	if err := db.Find(&r.AZAnalyzerConns).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&r.VTaps).Error; err != nil {
+	if err := db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&r.VTaps).Error; err != nil {
 		return err
 	}
 
-	if err := mysql.Db.Find(&r.Controllers).Error; err != nil {
+	if err := db.Find(&r.Controllers).Error; err != nil {
 		return err
 	}
-	if err := mysql.Db.Find(&r.AZControllerConns).Error; err != nil {
+	if err := db.Find(&r.AZControllerConns).Error; err != nil {
 		return err
 	}
 	return nil
