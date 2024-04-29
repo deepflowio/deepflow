@@ -146,6 +146,7 @@ type ColumnDatasourceAdds struct {
 	OldColumnNames             []string
 	ColumnTypes                []ckdb.ColumnType
 	OnlyMapTable, OnlyAppTable bool
+	DefaultValue               string
 }
 
 type ColumnDatasourceAdd struct {
@@ -153,6 +154,7 @@ type ColumnDatasourceAdd struct {
 	OldColumnName              string
 	ColumnType                 ckdb.ColumnType
 	OnlyMapTable, OnlyAppTable bool
+	DefaultValue               string
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
@@ -318,10 +320,11 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		}
 		aggTable := d.name + "_agg"
 		addColumn := &ColumnAdd{
-			Db:         d.db,
-			Table:      aggTable,
-			ColumnName: add.ColumnName,
-			ColumnType: add.ColumnType,
+			Db:           d.db,
+			Table:        aggTable,
+			ColumnName:   add.ColumnName,
+			ColumnType:   add.ColumnType,
+			DefaultValue: add.DefaultValue,
 		}
 		if err := i.addColumn(connect, addColumn); err != nil {
 			return dones, err
@@ -1014,6 +1017,7 @@ func getColumnDatasourceAdds(columnDatasourceAddss []*ColumnDatasourceAdds) []*C
 				ColumnType:    columnAdds.ColumnTypes[i],
 				OnlyMapTable:  columnAdds.OnlyMapTable,
 				OnlyAppTable:  columnAdds.OnlyAppTable,
+				DefaultValue:  columnAdds.DefaultValue,
 			})
 		}
 	}
