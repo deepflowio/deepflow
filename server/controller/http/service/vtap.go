@@ -82,16 +82,16 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	if err := Db.Find(&allVTaps).Error; err != nil {
 		return nil, err
 	}
-	if err := mysql.Db.Find(&vtapGroups).Error; err != nil {
+	if err := Db.Find(&vtapGroups).Error; err != nil {
 		return nil, err
 	}
-	if err := mysql.Db.Find(&regions).Error; err != nil {
+	if err := Db.Find(&regions).Error; err != nil {
 		return nil, err
 	}
-	if err := mysql.Db.Find(&azs).Error; err != nil {
+	if err := Db.Find(&azs).Error; err != nil {
 		return nil, err
 	}
-	if err := mysql.Db.Select("name", "branch", "rev_count").Find(&vtapRepos).Error; err != nil {
+	if err := Db.Select("name", "branch", "rev_count").Find(&vtapRepos).Error; err != nil {
 		return nil, err
 	}
 
@@ -534,7 +534,7 @@ func (a *Agent) BatchDelete(deleteMap []map[string]string) (resp map[string][]st
 }
 
 func execAZRebalance(
-	azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysql.VTap,
+	db *mysql.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysql.VTap,
 	hostIPToAvailableVTapNum map[string]int, hostIPToUsedVTapNum map[string]int,
 	hostIPToState map[string]int, ifCheck bool,
 ) model.AZVTapRebalanceResult {
@@ -607,7 +607,7 @@ func execAZRebalance(
 					continue
 				}
 				if !ifCheck {
-					mysql.Db.Model(vtap).Update("controller_ip", reallocHostIP)
+					db.Model(vtap).Update("controller_ip", reallocHostIP)
 				}
 			} else {
 				log.Infof(
@@ -618,7 +618,7 @@ func execAZRebalance(
 					continue
 				}
 				if !ifCheck {
-					mysql.Db.Model(vtap).Update("analyzer_ip", reallocHostIP)
+					db.Model(vtap).Update("analyzer_ip", reallocHostIP)
 				}
 			}
 			hostVTapRebalanceResult.AfterVTapNum -= 1
@@ -638,15 +638,15 @@ func execAZRebalance(
 	return response
 }
 
-func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
 	var controllers []mysql.Controller
 	var azControllerConns []mysql.AZControllerConnection
 	var vtaps []mysql.VTap
 	response := &model.VTapRebalanceResult{}
 
-	mysql.Db.Find(&controllers)
-	mysql.Db.Find(&azControllerConns)
-	mysql.Db.Where("controller_ip != ''").Find(&vtaps)
+	db.Find(&controllers)
+	db.Find(&azControllerConns)
+	db.Where("controller_ip != ''").Find(&vtaps)
 
 	azToVTaps := make(map[string][]*mysql.VTap)
 	for i, vtap := range vtaps {
@@ -725,7 +725,7 @@ func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalance
 
 		// 执行均衡操作
 		azVTapRebalanceResult := execAZRebalance(
-			az.Lcuuid, len(azVTaps), "controller", controllerIPToVTaps,
+			db, az.Lcuuid, len(azVTaps), "controller", controllerIPToVTaps,
 			controllerIPToAvailableVTapNum, controllerIPToUsedVTapNum,
 			controllerIPToState, ifCheck,
 		)
@@ -735,15 +735,15 @@ func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalance
 	return response, nil
 }
 
-func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
 	var analyzers []mysql.Analyzer
 	var azAnalyzerConns []mysql.AZAnalyzerConnection
 	var vtaps []mysql.VTap
 	response := &model.VTapRebalanceResult{}
 
-	mysql.Db.Find(&analyzers)
-	mysql.Db.Find(&azAnalyzerConns)
-	mysql.Db.Where("analyzer_ip != ''").Find(&vtaps)
+	db.Find(&analyzers)
+	db.Find(&azAnalyzerConns)
+	db.Where("analyzer_ip != ''").Find(&vtaps)
 
 	azToVTaps := make(map[string][]*mysql.VTap)
 	for i, vtap := range vtaps {
@@ -803,7 +803,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 
 		// 执行均衡操作
 		azVTapRebalanceResult := execAZRebalance(
-			az.Lcuuid, len(azVTaps), "analyzer", analyzerIPToVTaps,
+			db, az.Lcuuid, len(azVTaps), "analyzer", analyzerIPToVTaps,
 			analyzerIPToAvailableVTapNum, analyzerIPToUsedVTapNum,
 			analyzerIPToState, ifCheck,
 		)
@@ -813,7 +813,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 	return response, nil
 }
 
-func VTapRebalance(args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
+func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
 	var azs []mysql.AZ
 
 	hostType := "controller"
@@ -826,14 +826,14 @@ func VTapRebalance(args map[string]interface{}, cfg monitorconf.IngesterLoadBala
 		ifCheck = argsCheck.(bool)
 	}
 
-	mysql.Db.Find(&azs)
+	db.Find(&azs)
 	if hostType == "controller" {
-		return vtapControllerRebalance(azs, ifCheck)
+		return vtapControllerRebalance(db, azs, ifCheck)
 	} else {
 		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-			return rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(ifCheck, cfg.DataDuration)
+			return rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
 		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-			result, err := vtapAnalyzerRebalance(azs, ifCheck)
+			result, err := vtapAnalyzerRebalance(db, azs, ifCheck)
 			if err != nil {
 				return nil, err
 			}

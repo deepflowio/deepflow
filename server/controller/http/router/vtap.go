@@ -32,6 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -251,6 +252,13 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		dbInfo, err := mysql.GetDB(orgID.(int))
+		if err != nil {
+			JsonResponse(c, nil, err)
+			return
+		}
+
 		args := make(map[string]interface{})
 		args["check"] = false
 		if value, ok := c.GetQuery("check"); ok {
@@ -261,7 +269,7 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 			if args["type"] != "controller" && args["type"] != "analyzer" {
 				BadRequestResponse(
 					c, httpcommon.INVALID_PARAMETERS,
-					fmt.Sprintf("type (%s) is not supported", args["type"]),
+					fmt.Sprintf("ORG(id=%d database=%s) type (%s) is not supported", dbInfo.ORGID, dbInfo.Name, args["type"]),
 				)
 				return
 			}
@@ -269,8 +277,13 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "must specify type")
 			return
 		}
-		data, err := service.VTapRebalance(args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
-		JsonResponse(c, data, err)
+
+		data, err := service.VTapRebalance(dbInfo, args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
+		if err != nil {
+			JsonResponse(c, nil, fmt.Errorf("ORG(id=%d database=%s) %s", dbInfo.ORGID, dbInfo.Name, err.Error()))
+			return
+		}
+		JsonResponse(c, data, nil)
 	})
 }
 

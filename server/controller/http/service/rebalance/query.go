@@ -16,7 +16,9 @@
 
 package rebalance
 
+import "github.com/deepflowio/deepflow/server/controller/db/mysql"
+
 // //go:generate mockgen -source=query.go -destination=./mocks/mock_querier.go -package=mocks Querier
 type Querier interface {
-	GetAgentDispatcher(domainPrefix string, dataDuration int) (map[string]int64, error)
+	GetAgentDispatcher(db *mysql.DB, domainPrefix string, dataDuration int) (map[string]int64, error)
 }
