@@ -822,11 +822,14 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			funcName, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
 				tagSlice = append(tagSlice, sqlparser.String(funcName))
-				if strings.Contains(sqlparser.String(funcName), "Derivative") && !e.IsDerivative {
-					e.IsDerivative = true
-					e.Model.IsDerivative = true
-					e.Model.DerivativeGroupBy = e.DerivativeGroupBy
-				}
+			}
+
+			// Determine whether there is a Derivative operator
+			exprStr := sqlparser.String(item)
+			if strings.Contains(exprStr, "Derivative") && !e.IsDerivative {
+				e.IsDerivative = true
+				e.Model.IsDerivative = true
+				e.Model.DerivativeGroupBy = e.DerivativeGroupBy
 			}
 		}
 	}
