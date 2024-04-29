@@ -84,9 +84,9 @@ func (g *Genesis) Start() {
 	genesisSyncDataChan := make(chan GenesisSyncData)
 	kubernetesDataChan := make(chan map[int]map[string]KubernetesInfo)
 	prometheusDataChan := make(chan map[int]map[string]PrometheusInfo)
-	sQueue := queue.NewOverwriteQueue("genesis sync data", g.cfg.QueueLengths)
-	kQueue := queue.NewOverwriteQueue("genesis k8s data", g.cfg.QueueLengths)
-	pQueue := queue.NewOverwriteQueue("genesis prometheus data", g.cfg.QueueLengths)
+	sQueue := queue.NewOverwriteQueue("genesis-sync-data", g.cfg.QueueLengths)
+	kQueue := queue.NewOverwriteQueue("genesis-k8s-data", g.cfg.QueueLengths)
+	pQueue := queue.NewOverwriteQueue("genesis-prometheus-data", g.cfg.QueueLengths)
 
 	// 由于可能需要从数据库恢复数据，这里先启动监听
 	go g.receiveGenesisSyncData(genesisSyncDataChan)
