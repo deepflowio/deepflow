@@ -671,7 +671,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	namesLen, valuesLen := len(attributeNames), len(attributeValues)
 	minNamesLen := namesLen
 	if namesLen != valuesLen {
-		log.Warningf("the lengths of AttributeNames(%v) and attributeValues(%v) is different", attributeNames, attributeValues)
+		log.Warningf("the lengths of AttributeNames (%v) and attributeValues (%v) is different", attributeNames, attributeValues)
 		if namesLen > valuesLen {
 			minNamesLen = valuesLen
 		}

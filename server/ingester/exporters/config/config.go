@@ -215,7 +215,7 @@ func operatorStringToID(op string) OperatorID {
 			return OperatorID(i)
 		}
 	}
-	log.Warningf("invalid operator(%s), support operators %v", op, operatorStrings[:INVALID_OPERATOR_ID])
+	log.Warningf("invalid operator (%s), support operators: %v", op, operatorStrings[:INVALID_OPERATOR_ID])
 	return INVALID_OPERATOR_ID
 }
 

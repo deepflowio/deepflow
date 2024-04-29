@@ -51,7 +51,7 @@ func GetMeterID(name string) uint8 {
 	if id, exist := MeterNamesToID[name]; exist {
 		return id
 	}
-	log.Errorf("can't get meter(%s) id", name)
+	log.Errorf("can't get meter (%s) id", name)
 	return MAX_APP_ID
 }
 
@@ -71,7 +71,7 @@ func GetMeasurementID(name string) uint8 {
 	if mid, exist := MeasurementNamesToID[name]; exist {
 		return mid
 	}
-	log.Errorf("can't get measurement(%s) id", name)
+	log.Errorf("can't get measurement (%s) id", name)
 	return MAX_MEASUREMENT_ID
 }
 

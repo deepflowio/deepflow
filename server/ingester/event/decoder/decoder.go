@@ -111,7 +111,7 @@ func (d *Decoder) GetCounter() interface{} {
 }
 
 func (d *Decoder) Run() {
-	log.Infof("event(%s) decoder run", d.eventType)
+	log.Infof("event (%s) decoder run", d.eventType)
 	if d.resourceInfoTable != nil {
 		d.resourceInfoTable.Start()
 	}
