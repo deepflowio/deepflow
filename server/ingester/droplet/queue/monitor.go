@@ -63,7 +63,7 @@ func (m *Monitor) run(conn *net.UDPConn, remote *net.UDPAddr) {
 		m.sendDebug(conn, remote, items)
 		if time.Since(start) > time.Minute {
 			m.DebugOn = false
-			log.Infof("Monitor[%s] change debug switch to off for timeout(60s)", m.Name)
+			log.Infof("Monitor[%s] change debug switch to off for timeout (60s)", m.Name)
 			debugSendMsg(conn, remote, fmt.Sprintf("Stop Monitor[%s] for timeout(60s), total receive %d msg", m.Name, counter))
 		}
 	}

@@ -314,7 +314,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 				orgID := ck.OrgID()
 				if orgID > MAX_ORGANIZATINON_ID {
 					if w.counters[queueID].OrgInvalidCount == 0 {
-						log.Warningf("get writer queue(%s) data orgID wrong %d", w.name, orgID)
+						log.Warningf("writer queue (%s) item wrong orgID %d", w.name, orgID)
 					}
 					w.counters[queueID].OrgInvalidCount++
 					continue
@@ -366,7 +366,7 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 		err := w.InitTable(cache.orgID)
 		if err != nil {
 			if logEnabled {
-				log.Warningf("create table(%s.%s) failed, drop(%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
+				log.Warningf("create table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 			}
 			w.counters[queueID].WriteFailedCount += int64(itemsLen)
 			cache.Release()
@@ -376,7 +376,7 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 	}
 	if err := w.writeItems(queueID, connID, cache); err != nil {
 		if logEnabled {
-			log.Warningf("write table(%s.%s) failed, will retry write(%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
+			log.Warningf("write table (%s.%s) failed, will retry write (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 		}
 		if err := w.ResetConnection(connID); err != nil {
 			log.Warningf("reconnect clickhouse failed: %s", err)
@@ -393,9 +393,9 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 		if logEnabled {
 			if err != nil {
 				w.counters[queueID].RetryFailedCount++
-				log.Warningf("retry write table(%s.%s) failed, drop(%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
+				log.Warningf("retry write table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 			} else {
-				log.Infof("retry write table(%s.%s) success, write(%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
+				log.Infof("retry write table (%s.%s) success, write (%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
 			}
 		}
 		if err != nil {

@@ -622,14 +622,14 @@ func (d *Ddbs) checkAcl(acl *Acl, check ...bool) bool {
 	// 若策略的资源组中任何一个未在云平台数据和IP资源组中查找到，算作无效策略
 	for _, group := range acl.SrcGroups {
 		if len(d.groupIpMap[uint16(group)]) == 0 {
-			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
+			log.Warningf("invalid acl by group (%d): %s\n", group, acl)
 			return true
 		}
 	}
 
 	for _, group := range acl.DstGroups {
 		if len(d.groupIpMap[uint16(group)]) == 0 {
-			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
+			log.Warningf("invalid acl by group (%d): %s\n", group, acl)
 			return true
 		}
 	}

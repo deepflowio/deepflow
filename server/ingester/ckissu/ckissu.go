@@ -336,7 +336,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	}
 
 	if len(dones) == 0 {
-		log.Infof("datasource db(%s) table(%s) already updated.", d.db, d.name)
+		log.Infof("datasource db (%s) table (%s) already updated.", d.db, d.name)
 		return nil, nil
 	}
 
@@ -1029,7 +1029,7 @@ func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, er
 			return dones, err
 		}
 		if version == common.CK_VERSION {
-			log.Infof("db(%s) table(%s) already updated", add.Db, add.Table)
+			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
 		}
 		if err := i.addColumn(connect, add); err != nil {
@@ -1067,11 +1067,11 @@ func (i *Issu) addIndexs(connect *sql.DB, orgIDPrefix string) ([]*IndexAdd, erro
 			return dones, err
 		}
 		if version == common.CK_VERSION {
-			log.Infof("db(%s) table(%s) already updated", add.Db, add.Table)
+			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
 		}
 		if err := i.addIndex(connect, add); err != nil {
-			log.Warningf("db(%s) table(%s) add index failed.err: %s", add.Db, add.Table, err)
+			log.Warningf("db (%s) table (%s) add index failed.err: %s", add.Db, add.Table, err)
 			continue
 		}
 		dones = append(dones, add)

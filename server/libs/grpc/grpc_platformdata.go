@@ -475,7 +475,7 @@ func (t *PlatformInfoTable) IPV4InfoAddLru(info *Info, key uint64) {
 	}
 	var missCount uint64 = 1
 	t.epcIDIPV4Lru.Add(key, &missCount)
-	log.Debugf("can't find IPV4Info from epcID(%d) ip(%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
+	log.Debugf("can't find IPV4Info from epcID (%d) ip (%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
 	t.counter.IP4MissCount++
 }
 
@@ -514,7 +514,7 @@ func (t *PlatformInfoTable) InfoMissStat(mac uint64) {
 	} else {
 		var missCount uint64 = 1
 		t.macMissCount[mac] = &missCount
-		log.Debugf("can't find info from mac(%x)", mac)
+		log.Debugf("can't find info from mac (%x)", mac)
 		t.counter.MacMissCount++
 	}
 }
@@ -556,7 +556,7 @@ func (t *PlatformInfoTable) baseInfoMissStat(epcID int32) {
 	} else {
 		var missCount uint64 = 1
 		t.epcIDBaseMissCount[epcID] = &missCount
-		log.Debug("can't find baseInfo from epcID(%d)", epcID)
+		log.Debug("can't find baseInfo from epcID (%d)", epcID)
 		t.counter.EpcMissCount++
 	}
 }
@@ -635,7 +635,7 @@ func (t *PlatformInfoTable) IPV6InfoAddLru(info *Info, key []byte) {
 	}
 	var missCount uint64 = 1
 	t.epcIDIPV6Lru.Add(key, &missCount)
-	log.Debugf("can't find IPV6Info from epcID(%d) ip(%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
+	log.Debugf("can't find IPV6Info from epcID (%d) ip (%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
 	t.counter.IP6MissCount++
 }
 
@@ -1036,12 +1036,12 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 	newGroupsVersion := masterTable.versionGroups
 	if newGroupsVersion != t.versionGroups {
 		t.versionGroups, t.ServiceTable = newGroupsVersion, masterTable.ServiceTable
-		log.Infof("Update slave(%s) rpc groups version %d -> %d ", t.moduleName, t.versionGroups, newGroupsVersion)
+		log.Infof("Update slave (%s) rpc groups version %d -> %d ", t.moduleName, t.versionGroups, newGroupsVersion)
 	}
 
 	newVersion := masterTable.versionPlatformData
 	if newVersion != t.versionPlatformData {
-		log.Infof("Update slave(%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
+		log.Infof("Update slave (%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
 		t.peerConnections = masterTable.peerConnections
 		t.gprocessInfos = masterTable.gprocessInfos
 		t.vtapIDProcessInfos = masterTable.vtapIDProcessInfos
@@ -1221,7 +1221,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 	prefix := tridentCidr.GetPrefix()
 	_, cidr, err := net.ParseCIDR(prefix)
 	if err != nil {
-		log.Warningf("parse cidr(%s) failed. err=%s", err)
+		log.Warningf("parse cidr (%s) failed: %s", err)
 		return
 	}
 

@@ -46,7 +46,7 @@ func (r *ReferenceCount) SubReferenceCount() bool {
 		now := time.Now().Unix()
 		last := atomic.LoadInt64(&lastStackDump)
 		if now-last > int64(time.Hour/time.Second) {
-			log.Errorf("reference(%d) maybe double released\n%s", *r, string(debug.Stack()))
+			log.Errorf("reference (%d) maybe double released\n%s", *r, string(debug.Stack()))
 			atomic.StoreInt64(&lastStackDump, now)
 		}
 	}

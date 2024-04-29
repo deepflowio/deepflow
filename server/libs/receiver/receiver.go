@@ -753,12 +753,12 @@ func (r *Receiver) ProcessTCPServer() {
 		}
 		if tcpConn, ok := conn.(*net.TCPConn); ok {
 			if err := tcpConn.SetReadBuffer(r.TCPReadBuffer); err != nil {
-				log.Warningf("TCP client(%s) set read buffer failed, err: %s", conn.RemoteAddr().String(), err)
+				log.Warningf("TCP client (%s) set read buffer failed, err: %s", conn.RemoteAddr().String(), err)
 			} else {
-				log.Infof("TCP client(%s) connect success, set read buffer %d.", conn.RemoteAddr().String(), r.TCPReadBuffer)
+				log.Infof("TCP client (%s) connect success, set read buffer %d.", conn.RemoteAddr().String(), r.TCPReadBuffer)
 			}
 		} else {
-			log.Infof("TCP client(%s) connect success.", conn.RemoteAddr().String())
+			log.Infof("TCP client (%s) connect success.", conn.RemoteAddr().String())
 		}
 		go r.handleTCPConnection(conn)
 	}
@@ -827,20 +827,20 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 	reader := bufio.NewReaderSize(conn, r.TCPReaderBuffer)
 	for !r.exit {
 		if err := ReadN(reader, baseHeaderBuffer); err != nil {
-			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+			log.Warningf("TCP client (%s) connection read error: %s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
 
 		if err := baseHeader.Decode(baseHeaderBuffer); err != nil {
-			log.Warningf("TCP client(%s) decode error.%s", conn.RemoteAddr().String(), err.Error())
+			log.Warningf("TCP client (%s) decode error: %s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
 		// 收到只含包头的空包丢弃
 		if baseHeader.FrameSize == datatype.MESSAGE_HEADER_LEN+datatype.FLOW_HEADER_LEN {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
-				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+				log.Warningf("TCP client (%s) connection read error: %s", conn.RemoteAddr().String(), err.Error())
 			} else if r.counter.Invalid == 0 {
-				log.Infof("TCP client(%s) connection read empty content packet", conn.RemoteAddr().String())
+				log.Infof("TCP client (%s) connection read empty content packet", conn.RemoteAddr().String())
 			}
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			continue
@@ -859,7 +859,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
-				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+				log.Warningf("TCP client (%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 				return
 			}
 			flowHeader.Decode(flowHeaderBuffer)
@@ -884,7 +884,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 
 		dataLen := int(baseHeader.FrameSize) - headerLen
 		if dataLen > RECV_BUFSIZE_MAX {
-			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client(%s) wrong frame size(%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
+			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client (%s) wrong frame size (%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
 			return
 		}
 		recvBuffer, isNew := AcquireRecvBuffer(dataLen, TCP)
@@ -894,7 +894,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		if err := ReadN(reader, recvBuffer.Buffer[:dataLen]); err != nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			ReleaseRecvBuffer(recvBuffer)
-			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+			log.Warningf("TCP client (%s) connection read error: %s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
 
